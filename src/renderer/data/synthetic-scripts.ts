@@ -190,7 +190,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
     scopeLabel: '白露季满赠 · 全店合成商品',
     riskLevel: 'medium',
     effectiveFrom: '2026-08-01',
-    effectiveTo: '2026-08-31',
+    effectiveTo: '2099-12-31',
   }),
   defineScript({
     scriptId: 'syn-camp-002',

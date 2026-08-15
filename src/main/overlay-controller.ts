@@ -17,12 +17,16 @@ import {
   clampRectToWorkArea,
   defaultFoxRect,
   dockFoxNativeRect,
-  foxDockEdgeForRect,
   foxDragBaseRect,
+  inferFoxRectFromQuery,
   overlaySizeForPhase,
   placeQueryAnchoredToFox,
   queryAnchorForFox,
+  reconcileFoxDockEdgeForWorkArea,
+  resolveSessionQueryAnchor,
+  resolveFoxDockAfterDrag,
   sanitizeDragDelta,
+  settleQueryDragGesture,
   type Rect,
 } from '../shared/overlay-geometry';
 import {
@@ -38,6 +42,7 @@ import type {
   HandoffMilestone,
   OverlayCommand,
   OverlayRole,
+  QueryAnchor,
   RendererRole,
   ReportablePhase,
   ResultCount,
@@ -55,6 +60,7 @@ import { lockRendererWindow } from './window-security';
 const BLUR_GRACE_MS = 240;
 const HANDOFF_PREPARE_TIMEOUT_MS = 180;
 const HANDOFF_FALLBACK_BUFFER_MS = 100;
+const DISPLAY_RECONCILE_DELAY_MS = 100;
 
 export type OverlayControllerOptions = {
   preloadPath?: string;
@@ -75,6 +81,7 @@ export class OverlayController {
   private dashboard: BrowserWindow | null = null;
   private foxOrigin = { x: 80, y: 80 };
   private foxDockEdge: FoxDockEdge = 'none';
+  private queryDragAnchor: QueryAnchor | null = null;
   private foxPeekIntent: FoxPeekIntent = 'retract';
   private foxPeekEpoch = 0;
   private ignoreBlurUntil = 0;
@@ -82,6 +89,8 @@ export class OverlayController {
   private blurRecheckTimer: ReturnType<typeof setTimeout> | null = null;
   private chromeHandoffTimer: ReturnType<typeof setTimeout> | null = null;
   private queryFocusRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private displayReconcileTimer: ReturnType<typeof setTimeout> | null = null;
+  private displayLifecycleBound = false;
   private chromeHandoffMode: 'preparing-open' | 'opening' | 'closing' | null = null;
   private chromeHandoffSequence = 0;
   private activeChromeHandoffId = 0;
@@ -127,6 +136,13 @@ export class OverlayController {
       backgroundThrottling: false,
       macPanel: false,
     });
+    if (process.platform === 'darwin') {
+      // Query remains an activating BrowserWindow for reliable IME/keyboard focus,
+      // but follows the fox across Spaces and can appear over a fullscreen app.
+      // Configure this once while hidden: repeating the call can briefly transform
+      // the macOS process type and make the Dock/window handoff flicker.
+      this.query.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
 
     this.bindWindowLifecycle(this.fox);
     this.bindWindowLifecycle(this.query);
@@ -150,6 +166,7 @@ export class OverlayController {
     this.fox.setBounds(placed);
     this.resetFoxPeekLifecycle('none');
     this.fox.showInactive();
+    this.bindDisplayLifecycle();
 
     this.registerShortcut();
     this.broadcastShortcutStatus();
@@ -179,6 +196,7 @@ export class OverlayController {
   }
 
   dismiss(): void {
+    this.finishOrClearQueryDrag();
     this.applyEvent({ type: 'DISMISS' });
   }
 
@@ -203,7 +221,7 @@ export class OverlayController {
       }
       this.sendToQuery({
         type: 'activate-search',
-        anchor: this.currentQueryAnchor(),
+        anchor: this.sessionQueryAnchor(),
         animate: false,
       });
       return;
@@ -287,6 +305,9 @@ export class OverlayController {
   moveBy(dx: unknown, dy: unknown, finished = false): void {
     const delta = sanitizeDragDelta(dx, dy);
     if (!delta) {
+      if (finished) {
+        this.finishOrClearQueryDrag();
+      }
       return;
     }
     const target = this.query?.isVisible() ? this.query : this.fox;
@@ -323,31 +344,39 @@ export class OverlayController {
     );
     target.setBounds(next);
     if (target === this.fox) {
+      this.clearQueryDragGesture();
       this.foxOrigin = { x: next.x, y: next.y };
-    } else {
-      const anchor = this.currentQueryAnchor();
-      const inferredFox = clampRectToWorkArea(
-        {
-          x: anchor === 'right' ? next.x + next.width - FOX_SIZE : next.x,
-          y: next.y,
-          width: FOX_SIZE,
-          height: FOX_SIZE,
-        },
-        workArea,
-      );
+    } else if (this.phase !== 'FOX_IDLE' && this.chromeHandoffMode !== 'closing' && this.chromeHandoffMode !== 'preparing-open') {
+      if (this.queryDragAnchor === null) {
+        this.queryDragAnchor = this.currentQueryAnchor();
+      }
+      const inferredFox = inferFoxRectFromQuery(next, workArea, this.queryDragAnchor);
       this.foxOrigin = { x: inferredFox.x, y: inferredFox.y };
+    } else {
+      this.clearQueryDragGesture();
     }
     if (target === this.fox && !finished) {
       this.foxDockEdge = 'none';
       this.resetFoxPeekLifecycle('none');
     }
-    if (finished && target === this.fox) {
-      const edge = foxDockEdgeForRect(next, workArea);
-      this.foxDockEdge = edge;
-      const docked = dockFoxNativeRect(next, workArea, edge);
-      this.fox.setBounds(docked);
-      this.foxOrigin = { x: next.x, y: next.y };
-      this.resetFoxPeekLifecycle(edge);
+    if (finished) {
+      if (target === this.fox) {
+        const inferredFox = {
+          x: this.foxOrigin.x,
+          y: this.foxOrigin.y,
+          width: FOX_SIZE,
+          height: FOX_SIZE,
+        };
+        const edge = resolveFoxDockAfterDrag(inferredFox, workArea);
+        this.foxDockEdge = edge;
+        const docked = dockFoxNativeRect(next, workArea, edge);
+        this.fox.setBounds(docked);
+        this.foxOrigin = { x: next.x, y: next.y };
+        this.resetFoxPeekLifecycle(edge);
+        this.clearQueryDragGesture();
+      } else {
+        this.settlePinnedQueryDrag(next, workArea);
+      }
     }
   }
 
@@ -413,6 +442,8 @@ export class OverlayController {
 
   unregisterShortcut(): void {
     this.quitting = true;
+    this.clearQueryDragGesture();
+    this.unbindDisplayLifecycle();
     this.clearPendingQueryBlur();
     this.clearQueryFocusRetry();
     this.cancelChromeHandoff();
@@ -441,6 +472,7 @@ export class OverlayController {
     }
 
     if (this.phase === 'FOX_IDLE') {
+      this.finishOrClearQueryDrag();
       this.clearPendingQueryBlur();
       const workArea = this.currentWorkArea();
       const foxRect = clampRectToWorkArea(
@@ -459,7 +491,7 @@ export class OverlayController {
         !this.prefersReducedMotion();
       this.cancelChromeHandoff();
       const handoffId = this.nextChromeHandoffId();
-      this.chromeHandoffAnchor = queryAnchorForFox(foxRect, workArea);
+      this.chromeHandoffAnchor = this.sessionQueryAnchor(queryAnchorForFox(foxRect, workArea));
       this.chromeHandoffMode = shouldAnimate ? 'closing' : null;
       this.sendToQuery({
         type: 'collapse',
@@ -489,7 +521,13 @@ export class OverlayController {
       width: FOX_SIZE,
       height: FOX_SIZE,
     };
-    const placed = placeQueryAnchoredToFox(fullFoxRect, size, workArea, this.foxDockEdge);
+    const placed = placeQueryAnchoredToFox(
+      fullFoxRect,
+      size,
+      workArea,
+      this.foxDockEdge,
+      this.queryDragAnchor ?? undefined,
+    );
     if (options.activate) {
       this.clearPendingQueryBlur();
     }
@@ -498,7 +536,7 @@ export class OverlayController {
     if (options.activate) {
       this.cancelChromeHandoff();
       const handoffId = this.nextChromeHandoffId();
-      const anchor = queryAnchorForFox(fullFoxRect, workArea);
+      const anchor = this.sessionQueryAnchor(queryAnchorForFox(fullFoxRect, workArea));
       const foxVisualCenter = this.currentFoxVisualCenter(workArea);
       this.chromeHandoffMode = 'preparing-open';
       this.chromeHandoffAnchor = anchor;
@@ -592,10 +630,12 @@ export class OverlayController {
     const fox = this.fox;
     const query = this.query;
     if (!fox || !query || fox.isDestroyed() || query.isDestroyed()) {
+      this.clearQueryDragGesture();
       return;
     }
     this.clearChromeHandoffTimer();
     this.chromeHandoffMode = null;
+    this.clearQueryDragGesture();
     const workArea = this.currentWorkArea();
     const foxRect = clampRectToWorkArea(
       { x: this.foxOrigin.x, y: this.foxOrigin.y, width: FOX_SIZE, height: FOX_SIZE },
@@ -644,6 +684,109 @@ export class OverlayController {
       clearTimeout(this.queryFocusRetryTimer);
       this.queryFocusRetryTimer = null;
     }
+  }
+
+  private bindDisplayLifecycle(): void {
+    if (this.displayLifecycleBound) {
+      return;
+    }
+    this.displayLifecycleBound = true;
+    screen.on('display-added', this.scheduleDisplayReconcile);
+    screen.on('display-removed', this.scheduleDisplayReconcile);
+    screen.on('display-metrics-changed', this.scheduleDisplayReconcile);
+  }
+
+  private unbindDisplayLifecycle(): void {
+    if (!this.displayLifecycleBound) {
+      return;
+    }
+    this.displayLifecycleBound = false;
+    screen.removeListener('display-added', this.scheduleDisplayReconcile);
+    screen.removeListener('display-removed', this.scheduleDisplayReconcile);
+    screen.removeListener('display-metrics-changed', this.scheduleDisplayReconcile);
+    if (this.displayReconcileTimer !== null) {
+      clearTimeout(this.displayReconcileTimer);
+      this.displayReconcileTimer = null;
+    }
+  }
+
+  private readonly scheduleDisplayReconcile = (): void => {
+    if (this.quitting) {
+      return;
+    }
+    if (this.displayReconcileTimer !== null) {
+      clearTimeout(this.displayReconcileTimer);
+    }
+    this.displayReconcileTimer = setTimeout(() => {
+      this.displayReconcileTimer = null;
+      this.reconcileDisplayTopology();
+    }, DISPLAY_RECONCILE_DELAY_MS);
+  };
+
+  private reconcileDisplayTopology(): void {
+    const fox = this.fox;
+    const query = this.query;
+    if (!fox || !query || fox.isDestroyed() || query.isDestroyed() || this.quitting) {
+      return;
+    }
+    // Let the shared-element transaction finish before changing either native
+    // frame. Otherwise an unplugged display could interrupt a prepared handoff.
+    if (this.chromeHandoffMode !== null) {
+      this.scheduleDisplayReconcile();
+      return;
+    }
+
+    this.finishOrClearQueryDrag();
+
+    const point = {
+      x: Math.round(this.foxOrigin.x + FOX_SIZE / 2),
+      y: Math.round(this.foxOrigin.y + FOX_SIZE / 2),
+    };
+    const workArea = screen.getDisplayNearestPoint(point).workArea;
+    this.foxDockEdge = reconcileFoxDockEdgeForWorkArea(
+      point.x,
+      workArea,
+      this.foxDockEdge,
+    );
+    const clampedFox = clampRectToWorkArea(
+      {
+        x: this.foxOrigin.x,
+        y: this.foxOrigin.y,
+        width: FOX_SIZE,
+        height: FOX_SIZE,
+      },
+      workArea,
+    );
+    if (this.foxDockEdge === 'left') {
+      clampedFox.x = workArea.x;
+    } else if (this.foxDockEdge === 'right') {
+      clampedFox.x = workArea.x + workArea.width - FOX_SIZE;
+    }
+    this.foxOrigin = { x: clampedFox.x, y: clampedFox.y };
+    this.foxPeekIntent = 'retract';
+    this.sendToFox({
+      type: 'sync-fox-edge',
+      edge: this.foxDockEdge,
+      epoch: this.advanceFoxPeekEpoch(),
+    });
+
+    if (this.phase === 'FOX_IDLE') {
+      fox.setBounds(dockFoxNativeRect(clampedFox, workArea, this.foxDockEdge));
+      return;
+    }
+
+    const size = overlaySizeForPhase(this.phase, this.resultCount);
+    const anchor = this.sessionQueryAnchor(queryAnchorForFox(clampedFox, workArea));
+    query.setBounds(
+      placeQueryAnchoredToFox(
+        clampedFox,
+        size,
+        workArea,
+        this.foxDockEdge,
+        this.queryDragAnchor ?? undefined,
+      ),
+    );
+    this.sendToQuery({ type: 'sync-query-anchor', anchor });
   }
 
   private currentWorkArea(): Rect {
@@ -811,12 +954,42 @@ export class OverlayController {
     }
   }
 
-  private currentQueryAnchor(): 'left' | 'right' {
+  private currentQueryAnchor(): QueryAnchor {
     const workArea = this.currentWorkArea();
     return queryAnchorForFox(
       { x: this.foxOrigin.x, width: FOX_SIZE },
       workArea,
     );
+  }
+
+  private sessionQueryAnchor(computed: QueryAnchor = this.currentQueryAnchor()): QueryAnchor {
+    return resolveSessionQueryAnchor(this.queryDragAnchor, computed);
+  }
+
+  private clearQueryDragGesture(): void {
+    this.queryDragAnchor = null;
+  }
+
+  private finishOrClearQueryDrag(): void {
+    if (this.queryDragAnchor === null) {
+      return;
+    }
+    const query = this.query;
+    if (!query || query.isDestroyed()) {
+      this.clearQueryDragGesture();
+      return;
+    }
+    this.settlePinnedQueryDrag(query.getBounds(), this.currentWorkArea());
+  }
+
+  private settlePinnedQueryDrag(queryRect: Rect, workArea: Rect): void {
+    if (this.queryDragAnchor === null) {
+      return;
+    }
+    const settled = settleQueryDragGesture(queryRect, workArea, this.queryDragAnchor);
+    this.foxOrigin = { x: settled.fox.x, y: settled.fox.y };
+    this.foxDockEdge = settled.dockEdge;
+    this.resetFoxPeekLifecycle(settled.dockEdge);
   }
 
   private bindWindowLifecycle(win: BrowserWindow): void {

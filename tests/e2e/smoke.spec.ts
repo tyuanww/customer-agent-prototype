@@ -95,6 +95,7 @@ async function windowSnapshot(app: ElectronApplication): Promise<
     y: number;
     width: number;
     height: number;
+    visibleOnAllWorkspaces: boolean;
   }>
 > {
   return app.evaluate(({ BrowserWindow }) =>
@@ -116,6 +117,7 @@ async function windowSnapshot(app: ElectronApplication): Promise<
         y: bounds.y,
         width: bounds.width,
         height: bounds.height,
+        visibleOnAllWorkspaces: win.isVisibleOnAllWorkspaces(),
       };
     }),
   );
@@ -203,6 +205,9 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       ),
     ).toBe(true);
     expect(before.some((item) => item.role === 'query' && item.visible)).toBe(false);
+    if (process.platform === 'darwin') {
+      expect(before.find((item) => item.role === 'query')?.visibleOnAllWorkspaces).toBe(true);
+    }
 
     await fox.getByTestId('fox-button').click();
     await expect.poll(async () => {

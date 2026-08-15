@@ -98,6 +98,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 ## 透明效果的平台差异
 
 - **macOS**：透明无边框窗 + CSS `backdrop-filter` 通常能看到克制的浅白玻璃。
+- **macOS Space / 全屏**：查询窗在启动期一次性加入所有 Space，并允许显示在全屏应用上方；仍需在真实 Safari / Chrome 全屏、外接屏拔插和物理输入法场景人工验收。
 - **Windows**：同样使用半透明底 `rgba(250,252,255,.88)`。部分 GPU / 系统组合下 `backdrop-filter` **不会模糊桌面**，只会看到半透明实色；这是平台限制，不是功能缺失。阴影与发丝边仍应可见。
 - 系统开启“减少动态效果”时，循环位移、吸附变形与展开动效会降到近乎瞬时，保留可读静态状态。
 
@@ -118,8 +119,26 @@ pnpm test:e2e
 
 ## Windows 打包现状
 
-已配置 `pnpm package:win`（electron-builder NSIS，x64）。本轮只在开发机验证，**未产出也未验收** Windows 安装包或签名。
+`pnpm package:win` 只生成本机未签名证明包：写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`，并关闭 `CSC_IDENTITY_AUTO_DISCOVERY`。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
+
+## macOS 打包与发布
+
+本机验证包与外部发布包严格分开：
+
+```bash
+# 本机验证：生成 Universal DMG + ZIP，显式关闭签名与公证，禁止外发
+pnpm package:mac:local
+
+# 正式外发：先 fail-closed 检查 Bundle ID、完整 Xcode、Developer ID 与公证凭证
+pnpm package:mac
+```
+
+两个命令都会从 `fox-head.png` 机械生成 `build/icon.icns`，并构建同时包含 `x86_64 + arm64` 的 Universal 应用。本地证明包写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`；正式包只写入 `release/distribution/`，两者不会同名覆盖。两类目录都被 Git 忽略。调用方未显式提供 `NODE_EXTRA_CA_CERTS` 时，打包器仅在进程内临时桥接 macOS 系统根证书给 Node，保持 TLS 校验开启并在结束后删除临时文件。包内不生成自动更新元数据，不记录私有 GitHub 仓库坐标，并携带 Electron / Chromium / React 的第三方许可说明。
+
+`package:mac` 默认要求 Hardened Runtime、代码签名和 Apple 公证，并在构建后再次执行 `codesign`、Gatekeeper 和 stapler 校验；缺少任一前置时直接失败，不会静默产出可误外发的未签名包。证书、`.p8` / `.p12`、Apple ID 密码和 Keychain profile 均不得提交仓库或打印到日志。
+
+当前仓库仍使用 `local.demo.customer-agent`，适合本地 Demo；正式首次外发前必须由公司确定长期 Bundle ID，并在 Apple Developer Team 下安装 `Developer ID Application` 证书、配置公证凭证。未签名本地包经外部渠道下载后通常会触发 Gatekeeper 警告或拦截，不能发送给外包或客户。项目 Owner 还需明确软件使用条款与收件人范围；第三方许可声明不等于本 Demo 自身的分发授权。
 
 ## 下一步（不在本 Demo）
 
-正式 OAuth / RBAC、PostgreSQL、达肤妍正式话术快照、真实飞书源、向量检索、LLM、自动发送、自动学习和生产签名更新都不在本仓范围。
+正式 OAuth / RBAC、PostgreSQL、达肤妍正式话术快照、真实飞书源、向量检索、LLM、自动发送、自动学习和自动更新都不在本仓范围。macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。

@@ -129,6 +129,27 @@ describe('QueryApp', () => {
     expect(input).toHaveValue('已有问题继续');
   });
 
+  it('synchronizes a display-driven anchor change without restarting the query session', async () => {
+    render(<QueryApp />);
+    const shell = screen.getByTestId('query-shell');
+    const input = screen.getByTestId('question-input') as HTMLInputElement;
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', anchor: 'left', animate: false });
+      }
+    });
+    fireEvent.change(input, { target: { value: '保留中的问题' } });
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'sync-query-anchor', anchor: 'right' });
+      }
+    });
+
+    expect(shell).toHaveAttribute('data-anchor', 'right');
+    expect(input).toHaveValue('保留中的问题');
+  });
+
   it('arms the hidden shared-element frame before opening and accepts typing after a close/reopen', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);

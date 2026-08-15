@@ -144,6 +144,8 @@ tests/
 - Node.js 24.x；`packageManager` 锁定 pnpm 11.19.0。
 - 必须提供：`pnpm dev`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm test:e2e`。
 - 保留 `pnpm package:win`，本轮不要求产出 Windows 安装包。
+- 提供 `pnpm package:mac:local` 生成显式未签名、不可外发的 Universal DMG + ZIP，用于本机证明；提供 `pnpm package:mac` 作为正式门禁，缺长期 Bundle ID、完整 Xcode、Developer ID 或公证凭证时必须 fail-closed。
+- Mac 图标从仓内狐狸 PNG 机械生成；正式包启用 Hardened Runtime、最小权限 entitlement、签名与 Apple notarization。证书和公证凭证永不进入 Git。
 
 ## 6. 最低测试矩阵
 
@@ -167,6 +169,7 @@ tests/
 ## 7. 完成定义
 
 - 当前机器使用 Node 24 + pnpm 能安装并运行 Demo。
+- 当前 Mac 能构建并启动同时包含 `x86_64 + arm64` 的本地 Universal 包；正式签名 / 公证只有在公司 Apple Developer 前置齐全时才可宣称通过。
 - lint、typecheck、unit/component test、build 全部实际通过。
 - Electron smoke 尽量实际通过；若环境限制，不能把「测试文件存在」写成 PASS。
 - 无真实数据、凭证、飞书链接、远端 API、数据库或模型调用。
@@ -179,4 +182,5 @@ tests/
 - 向量库、Embedding、LLM、自动发送、自动学习。
 - 陪伴型桌宠、进程监听、聊天窗口标题监听。
 - 读取或伪造达肤妍正式发布快照，或把仓外达肤妍材料写入本 Git Demo。
-- 生产签名、自动更新、真实 Windows 安装验收。
+- 自动更新、真实 Windows 安装验收。
+- 替公司代选长期 Bundle ID、代办 Apple Developer Program 或把签名 / 公证凭证写入仓库；这些是正式外发的审批与凭证前置。

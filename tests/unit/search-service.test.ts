@@ -277,6 +277,25 @@ describe('searchScripts', () => {
     }
   });
 
+  it('keeps the main campaign fixture effective after 2026-09-01 while the expired fixture stays filtered', () => {
+    const afterCampaignCutoff = new Date('2026-09-01T00:00:00');
+    const campaign = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-camp-001');
+    const expired = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-camp-002');
+    expect(campaign?.effectiveTo).toBe('2099-12-31');
+    expect(expired?.effectiveTo).toBe('2026-06-30');
+
+    const hit = searchScripts('白露季满赠怎么参加', SYNTHETIC_SCRIPTS, afterCampaignCutoff);
+    expect(hit.status).toBe('hit');
+    if (hit.status === 'hit') {
+      expect(hit.results.some((item) => item.scriptId === 'syn-camp-001')).toBe(true);
+      expect(hit.results.map((item) => item.scriptId)).not.toContain('syn-camp-002');
+    }
+
+    expect(searchScripts('青禾会员日积分怎么兑', SYNTHETIC_SCRIPTS, afterCampaignCutoff)).toEqual({
+      status: 'no-hit',
+    });
+  });
+
   it('never returns expired or not-yet-effective scripts even on an exact variant match', () => {
     const expired = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-camp-002');
     expect(expired).toBeDefined();

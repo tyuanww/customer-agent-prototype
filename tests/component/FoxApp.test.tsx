@@ -527,8 +527,19 @@ describe('FoxApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'fox-edge', edge: 'none', epoch: 5 });
-        listener({ type: 'fox-edge', edge: 'left', epoch: 6 });
+        listener({ type: 'sync-fox-edge', edge: 'right', epoch: 5 });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', 'right');
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-snapping', 'false');
+    expect(Number(screen.getByTestId('fox-idle').getAttribute('data-snap-token'))).toBe(
+      secondToken,
+    );
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'none', epoch: 6 });
+        listener({ type: 'fox-edge', edge: 'left', epoch: 7 });
       }
     });
     const redockedToken = Number(screen.getByTestId('fox-idle').getAttribute('data-snap-token'));
@@ -536,7 +547,7 @@ describe('FoxApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'fox-edge', edge: 'right', epoch: 7 });
+        listener({ type: 'fox-edge', edge: 'right', epoch: 8 });
       }
     });
     expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', 'right');

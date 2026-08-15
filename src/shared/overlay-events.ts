@@ -46,6 +46,8 @@ export type OverlayCommand =
       handoffId?: number;
     }
   | { type: 'fox-edge'; edge: FoxDockEdge; epoch: number }
+  | { type: 'sync-fox-edge'; edge: FoxDockEdge; epoch: number }
+  | { type: 'sync-query-anchor'; anchor: QueryAnchor }
   | {
       type: 'shortcut-status';
       registered: boolean;
@@ -193,12 +195,16 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
       (command.handoffId === undefined || isHandoffId(command.handoffId))
     );
   }
-  if (record.type === 'fox-edge') {
+  if (record.type === 'fox-edge' || record.type === 'sync-fox-edge') {
     const command = value as { edge?: unknown; epoch?: unknown };
     return (
       (command.edge === 'none' || command.edge === 'left' || command.edge === 'right') &&
       isFoxPeekEpoch(command.epoch)
     );
+  }
+  if (record.type === 'sync-query-anchor') {
+    const command = value as { anchor?: unknown };
+    return command.anchor === 'left' || command.anchor === 'right';
   }
   if (record.type === 'shortcut-status') {
     const status = value as {

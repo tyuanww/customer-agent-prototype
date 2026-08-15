@@ -1,5 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { canOpenDashboard } from '../shared/dashboard-access';
+import { canReportUiPhase } from '../shared/query-ipc-access';
 import { IPC_CHANNELS } from '../shared/contracts';
 import {
   canRequestFoxPeek,
@@ -90,8 +91,17 @@ export function registerOverlayIpc(getController: () => OverlayController | null
   ipcMain.handle(
     IPC_CHANNELS.REPORT_UI_PHASE,
     (event, phase: unknown, resultCount: unknown): void => {
-      const controller = guard(event);
-      if (!controller || !isReportablePhase(phase) || !isResultCount(resultCount)) {
+      const controller = getController();
+      if (!controller) {
+        return;
+      }
+      const trusted = isTrustedSender(event, controller.trustedContents());
+      const role = controller.overlayRoleOf(event.sender);
+      if (
+        !canReportUiPhase({ trusted, role }) ||
+        !isReportablePhase(phase) ||
+        !isResultCount(resultCount)
+      ) {
         return;
       }
       controller.reportUiPhase(phase, resultCount);

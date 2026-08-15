@@ -18,9 +18,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "electron-vite build",
+    "generate:mac-icon": "sh scripts/generate-mac-icon.sh",
     "preview": "electron-vite preview",
     "test:e2e": "pnpm build && playwright test",
-    "package:win": "pnpm build && electron-builder --win"
+    "package:win": "node scripts/package-windows.mjs local",
+    "package:mac:local": "node scripts/package-macos.mjs local",
+    "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -56,6 +59,8 @@
     "directories": {
       "output": "release"
     },
+    "publish": null,
+    "afterPack": "./scripts/after-pack-macos.mjs",
     "files": [
       "out/**/*",
       "package.json"
@@ -64,6 +69,18 @@
       {
         "from": "fox-head.png",
         "to": "fox-head.png"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "node_modules/electron/dist/LICENSE",
+        "to": "licenses/Electron-LICENSE.txt"
+      },
+      {
+        "from": "node_modules/electron/dist/LICENSES.chromium.html",
+        "to": "licenses/Chromium-LICENSES.html"
       }
     ],
     "asar": true,
@@ -77,7 +94,37 @@
         }
       ],
       "signAndEditExecutable": false,
-      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-win-${arch}-UNSIGNED.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.business",
+      "darkModeSupport": true,
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "forceCodeSigning": true,
+      "notarize": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "writeUpdateInfo": false
     },
     "nsis": {
       "oneClick": true,

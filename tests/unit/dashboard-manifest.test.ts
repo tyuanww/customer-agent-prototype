@@ -188,6 +188,14 @@ describe('dashboard manifest', () => {
     expect(DASHBOARD_MANIFEST.announce.simulation.errorMessage).toContain('安全停止');
   });
 
+  it('forbids real-brand names in compile-time runtime synthetic copy', () => {
+    const source = readFileSync(sourcePath, 'utf8');
+    expect(JSON.stringify(DASHBOARD_MANIFEST)).not.toContain('达肤妍');
+    expect(source).not.toContain('达肤妍');
+    expect(DASHBOARD_MANIFEST.wording.disclaimer).toContain('虚构合成');
+    expect(DASHBOARD_MANIFEST.wording.disclaimer).toContain('不是真实品牌或正式话术源');
+  });
+
   it('keeps optimization tasks actionable without enabling automatic mutation', () => {
     for (const task of DASHBOARD_MANIFEST.iteration.tasks) {
       expect(['content_gap', 'ranking', 'policy']).toContain(task.cause);

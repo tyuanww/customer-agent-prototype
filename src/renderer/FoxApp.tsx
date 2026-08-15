@@ -102,7 +102,7 @@ export function FoxApp() {
         setShortcutFailed(true);
         setHint(command.message);
       }
-      if (command.type === 'fox-edge') {
+      if (command.type === 'fox-edge' || command.type === 'sync-fox-edge') {
         openingSearchRef.current = false;
         setHandoffFrozen(false);
         clearRetractTimer();
@@ -118,6 +118,7 @@ export function FoxApp() {
         // fresh physical dock. Replaying the snap there would race with hover
         // peek and produce the long double-bounce seen at the screen edge.
         if (
+          command.type === 'fox-edge' &&
           (command.edge === 'left' || command.edge === 'right') &&
           command.edge !== previousEdge
         ) {

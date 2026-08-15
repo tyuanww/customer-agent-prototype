@@ -23,6 +23,8 @@ describe('overlay command boundary', () => {
     ).toBe(true);
     expect(isOverlayCommand({ type: 'activate-search', anchor: 'right', animate: false })).toBe(true);
     expect(isOverlayCommand({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true })).toBe(true);
+    expect(isOverlayCommand({ type: 'sync-fox-edge', edge: 'right', epoch: 3 })).toBe(true);
+    expect(isOverlayCommand({ type: 'sync-query-anchor', anchor: 'right' })).toBe(true);
 
     expect(isOverlayCommand({ type: 'activate-search', anchor: 'left' })).toBe(false);
     expect(
@@ -49,6 +51,8 @@ describe('overlay command boundary', () => {
     expect(isOverlayCommand({ type: 'collapse', anchor: 'center', dockEdge: 'none', animate: true })).toBe(false);
     expect(isOverlayCommand({ type: 'collapse', anchor: 'right', dockEdge: 'none', animate: 'yes' })).toBe(false);
     expect(isOverlayCommand({ type: 'collapse', anchor: 'right', dockEdge: 'outside', animate: true })).toBe(false);
+    expect(isOverlayCommand({ type: 'sync-fox-edge', edge: 'outside', epoch: 3 })).toBe(false);
+    expect(isOverlayCommand({ type: 'sync-query-anchor', anchor: 'center' })).toBe(false);
   });
 
   it('accepts only bounded, non-mirrored 2D fox visual matrices', () => {

@@ -2,6 +2,7 @@ node_modules/
 dist/
 out/
 release/
+build/icon.icns
 playwright-report/
 test-results/
 coverage/
@@ -10,6 +11,12 @@ coverage/
 .env
 .env.*
 !.env.example
+*.p8
+*.p12
+*.mobileprovision
+*.provisionprofile
+electron-builder.env
+electron-builder.env.*
 
 # gstack 的运行输出留在本机；冻结验收证据放在 evidence/qa/。
 .gstack/

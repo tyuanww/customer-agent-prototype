@@ -14,4 +14,19 @@ describe('isAllowedRendererUrl', () => {
       false,
     );
   });
+
+  it('rejects a loose file index and localhost when no explicit dev URL is set', () => {
+    expect(isAllowedRendererUrl('file:///tmp/index.html')).toBe(false);
+    expect(isAllowedRendererUrl('file:///tmp/renderer/index.html')).toBe(false);
+    expect(isAllowedRendererUrl('http://localhost:5173/', undefined)).toBe(false);
+    expect(isAllowedRendererUrl('http://127.0.0.1:5173/', undefined)).toBe(false);
+  });
+
+  it('accepts a packaged asar renderer file URL', () => {
+    expect(
+      isAllowedRendererUrl(
+        'file:///Applications/Demo.app/Contents/Resources/app.asar/out/renderer/index.html',
+      ),
+    ).toBe(true);
+  });
 });

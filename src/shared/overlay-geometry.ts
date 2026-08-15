@@ -1,4 +1,4 @@
-import type { FoxDockEdge, ResultCount } from './overlay-events';
+import type { FoxDockEdge, QueryAnchor, ResultCount } from './overlay-events';
 
 export const FOX_WINDOW_SIZE = 88;
 export const FOX_SIZE = FOX_WINDOW_SIZE;
@@ -94,6 +94,69 @@ export function defaultFoxRect(workArea: Rect): Rect {
   );
 }
 
+export function inferFoxRectFromQuery(
+  query: Pick<Rect, 'x' | 'y' | 'width'>,
+  workArea: Rect,
+  anchor: QueryAnchor,
+): Rect {
+  return clampRectToWorkArea(
+    {
+      x: anchor === 'right' ? query.x + query.width - FOX_SIZE : query.x,
+      y: query.y,
+      width: FOX_SIZE,
+      height: FOX_SIZE,
+    },
+    workArea,
+  );
+}
+
+export type QueryDragStep = {
+  query: Rect;
+  fox: Rect;
+};
+
+export function applyQueryDragIncrements(
+  startQuery: Rect,
+  workArea: Rect,
+  pinnedAnchor: QueryAnchor,
+  deltas: ReadonlyArray<{ dx: number; dy: number }>,
+): QueryDragStep[] {
+  const steps: QueryDragStep[] = [];
+  let query = startQuery;
+  for (const delta of deltas) {
+    const nextQuery = clampRectToWorkArea(
+      { ...query, x: query.x + delta.dx, y: query.y + delta.dy },
+      workArea,
+    );
+    steps.push({
+      query: nextQuery,
+      fox: inferFoxRectFromQuery(nextQuery, workArea, pinnedAnchor),
+    });
+    query = nextQuery;
+  }
+  return steps;
+}
+
+export function settleQueryDragGesture(
+  query: Pick<Rect, 'x' | 'y' | 'width'>,
+  workArea: Rect,
+  pinnedAnchor: QueryAnchor,
+): { fox: Rect; dockEdge: FoxDockEdge; anchor: QueryAnchor } {
+  const fox = inferFoxRectFromQuery(query, workArea, pinnedAnchor);
+  return {
+    fox,
+    dockEdge: resolveFoxDockAfterDrag(fox, workArea),
+    anchor: pinnedAnchor,
+  };
+}
+
+export function resolveFoxDockAfterDrag(
+  fox: Pick<Rect, 'x' | 'width'>,
+  workArea: Rect,
+): FoxDockEdge {
+  return foxDockEdgeForRect(fox, workArea);
+}
+
 export function foxDockEdgeForRect(
   rect: Pick<Rect, 'x' | 'width'>,
   workArea: Rect,
@@ -108,6 +171,25 @@ export function foxDockEdgeForRect(
     return 'right';
   }
   return 'none';
+}
+
+export function reconcileFoxDockEdgeForWorkArea(
+  foxCenterX: number,
+  workArea: Rect,
+  edge: FoxDockEdge,
+): FoxDockEdge {
+  if (edge === 'none') {
+    return edge;
+  }
+  const leftDistance = Math.abs(foxCenterX - workArea.x);
+  const rightDistance = Math.abs(workArea.x + workArea.width - foxCenterX);
+  if (leftDistance < rightDistance) {
+    return 'left';
+  }
+  if (rightDistance < leftDistance) {
+    return 'right';
+  }
+  return edge;
 }
 
 export function dockFoxRect(
@@ -181,9 +263,27 @@ export function placeQueryNearFox(
 export function queryAnchorForFox(
   fox: Pick<Rect, 'x' | 'width'>,
   workArea: Rect,
-): 'left' | 'right' {
+): QueryAnchor {
   const center = fox.x + fox.width / 2;
   return center > workArea.x + workArea.width / 2 ? 'right' : 'left';
+}
+
+export function resolveSessionQueryAnchor(
+  pinned: QueryAnchor | null,
+  computed: QueryAnchor,
+): QueryAnchor {
+  return pinned ?? computed;
+}
+
+export function resolveQueryAnchorAfterCloseLifecycle(input: {
+  pinned: QueryAnchor | null;
+  computedFromIdleFox: QueryAnchor;
+  closeCompleted: boolean;
+}): QueryAnchor {
+  return resolveSessionQueryAnchor(
+    input.closeCompleted ? null : input.pinned,
+    input.computedFromIdleFox,
+  );
 }
 
 export function placeQueryAnchoredToFox(
@@ -191,8 +291,9 @@ export function placeQueryAnchoredToFox(
   size: Size,
   workArea: Rect,
   dockEdge: FoxDockEdge = 'none',
+  pinnedAnchor?: QueryAnchor,
 ): Rect {
-  const anchor = queryAnchorForFox(fox, workArea);
+  const anchor = pinnedAnchor ?? queryAnchorForFox(fox, workArea);
   const placed = clampRectToWorkArea(
     {
       x: anchor === 'right' ? fox.x + fox.width - size.width : fox.x,

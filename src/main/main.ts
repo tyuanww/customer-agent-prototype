@@ -63,7 +63,10 @@ if (!gotLock) {
     applySessionSecurity(session.defaultSession);
 
     controller = new OverlayController();
-    registerClipboardIpc(() => controller?.trustedContents() ?? []);
+    registerClipboardIpc(
+      () => controller?.trustedContents() ?? [],
+      (contents) => controller?.overlayRoleOf(contents) ?? null,
+    );
     registerOverlayIpc(() => controller);
     await controller.start();
     desktopShell = installDesktopShell({

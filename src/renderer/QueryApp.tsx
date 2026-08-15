@@ -266,6 +266,10 @@ export function QueryApp() {
         }
         return;
       }
+      if (command.type === 'sync-query-anchor') {
+        setAnchor(command.anchor);
+        return;
+      }
       if (command.type === 'collapse') {
         cancelScheduledOpening();
         cancelScheduledInputFocus();
