@@ -2,3 +2,10 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
+minimumReleaseAgeExclude:
+  - ejs@3.1.10
+  - semver@5.7.2
+overrides:
+  '@electron/get@>=3.0.0 <4.0.0': 3.1.0
+  ejs@<3.1.10: ^3.1.10
+  semver@>=2.0.0-alpha <5.7.2: ^5.7.2

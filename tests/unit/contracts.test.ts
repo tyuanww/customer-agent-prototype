@@ -1,12 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { IPC_CHANNEL_WHITELIST, IPC_CHANNELS } from '../../src/shared/contracts';
+import { COPY_SUCCESS_MESSAGE, IPC_CHANNEL_WHITELIST, IPC_CHANNELS } from '../../src/shared/contracts';
 
 describe('IPC whitelist', () => {
-  it('only allows the typed copy and platform channels', () => {
+  it('only allows the typed overlay and clipboard channels', () => {
     expect(IPC_CHANNEL_WHITELIST).toEqual([
       IPC_CHANNELS.COPY_TEXT,
       IPC_CHANNELS.GET_PLATFORM,
+      IPC_CHANNELS.GET_WINDOW_CONTEXT,
+      IPC_CHANNELS.OPEN_SEARCH,
+      IPC_CHANNELS.OPEN_DASHBOARD,
+      IPC_CHANNELS.DISMISS,
+      IPC_CHANNELS.REPORT_UI_PHASE,
+      IPC_CHANNELS.REPORT_HANDOFF_MILESTONE,
+      IPC_CHANNELS.MOVE_FOX_BY,
+      IPC_CHANNELS.SET_FOX_PEEK,
+      IPC_CHANNELS.OVERLAY_COMMAND,
     ]);
-    expect(IPC_CHANNEL_WHITELIST).toHaveLength(2);
+    expect(new Set(IPC_CHANNEL_WHITELIST).size).toBe(IPC_CHANNEL_WHITELIST.length);
+  });
+
+  it('uses 已复制 as the only success copy label', () => {
+    expect(COPY_SUCCESS_MESSAGE).toBe('已复制');
+    expect(COPY_SUCCESS_MESSAGE).not.toContain('已发送');
   });
 });

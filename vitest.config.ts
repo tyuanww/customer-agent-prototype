@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  assetsInclude: ['**/*.png'],
   resolve: {
     alias: {
       '@shared': resolve(__dirname, 'src/shared'),

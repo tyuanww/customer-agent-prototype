@@ -1,13 +1,22 @@
 import { MAX_QUERY_CHARS } from '@shared/contracts';
 import { SYNTHETIC_SCRIPTS } from '../../data/synthetic-scripts';
 import type {
+  MatchKind,
   RankedScript,
   ScriptFixture,
   SearchOutcome,
 } from './types';
+import {
+  matchSearchMetadata,
+  understandQuery,
+  type QueryUnderstanding,
+} from './query-understanding';
+import { isCurrentlyEffective, parseValidityRange } from './validity';
 
 export const MIN_HIT_SCORE = 38;
 export const MAX_RESULTS = 3;
+
+const MIN_TOPIC_ASSISTED_LEXICAL_SCORE = MIN_HIT_SCORE - 4;
 
 const STOP_TOKENS = new Set([
   '怎么',
@@ -28,6 +37,99 @@ const STOP_TOKENS = new Set([
   '么',
 ]);
 
+const SCRIPT_DOMAINS = new Set(['产品', '活动', '售前', '售后']);
+const RISK_LEVELS = new Set(['low', 'medium', 'high']);
+const SEARCH_INTENTS = new Set([
+  'usage',
+  'safety',
+  'compatibility',
+  'promotion',
+  'aftersales',
+  'return_policy',
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidScriptFixture(value: unknown): value is ScriptFixture {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (
+    !isNonEmptyString(value.scriptId) ||
+    !SCRIPT_DOMAINS.has(value.domain as string) ||
+    !isNonEmptyString(value.answerText) ||
+    !isNonEmptyString(value.platform) ||
+    !isNonEmptyString(value.scopeLabel) ||
+    !RISK_LEVELS.has(value.riskLevel as string) ||
+    !isNonEmptyString(value.effectiveFrom) ||
+    !isNonEmptyString(value.effectiveTo) ||
+    !parseValidityRange(value.effectiveFrom, value.effectiveTo)
+  ) {
+    return false;
+  }
+  if (
+    !Array.isArray(value.questionVariants) ||
+    value.questionVariants.length === 0 ||
+    !value.questionVariants.every(isNonEmptyString)
+  ) {
+    return false;
+  }
+  if (!isRecord(value.search)) {
+    return false;
+  }
+  const intents = value.search.intents;
+  const anchors = value.search.anchors;
+  if (
+    !Array.isArray(intents) ||
+    intents.length === 0 ||
+    !intents.every((intent) => typeof intent === 'string' && SEARCH_INTENTS.has(intent)) ||
+    !Array.isArray(anchors) ||
+    anchors.length === 0
+  ) {
+    return false;
+  }
+  let hasEntityAnchor = false;
+  for (const anchor of anchors) {
+    if (
+      !isRecord(anchor) ||
+      (anchor.kind !== 'entity' && anchor.kind !== 'topic') ||
+      !isNonEmptyString(anchor.label) ||
+      !isNonEmptyString(anchor.canonical) ||
+      !Array.isArray(anchor.aliases) ||
+      !anchor.aliases.every(isNonEmptyString)
+    ) {
+      return false;
+    }
+    hasEntityAnchor ||= anchor.kind === 'entity';
+  }
+  return hasEntityAnchor;
+}
+
+function fixtureSignature(script: ScriptFixture): string {
+  return JSON.stringify(script);
+}
+
+function rejectConflictingScriptIds(scripts: readonly ScriptFixture[]): ScriptFixture[] {
+  const firstSignature = new Map<string, string>();
+  const conflicts = new Set<string>();
+  for (const script of scripts) {
+    const signature = fixtureSignature(script);
+    const previous = firstSignature.get(script.scriptId);
+    if (previous === undefined) {
+      firstSignature.set(script.scriptId, signature);
+    } else if (previous !== signature) {
+      conflicts.add(script.scriptId);
+    }
+  }
+  return scripts.filter((script) => !conflicts.has(script.scriptId));
+}
+
 type QueryFeatures = {
   normalized: string;
   coreOrNormalized: string;
@@ -36,6 +138,15 @@ type QueryFeatures = {
   tokens: string[];
   bigrams: string[];
   trigrams: string[];
+  understanding: QueryUnderstanding;
+};
+
+type ScriptScore = {
+  score: number;
+  lexicalScore: number;
+  exact: boolean;
+  matchKind: MatchKind;
+  matchLabel: string;
 };
 
 export function normalizeQuery(text: string): string {
@@ -47,22 +158,18 @@ export function normalizeQuery(text: string): string {
 }
 
 function stripStopTokens(text: string): string {
-  let next = text;
-  for (const token of STOP_TOKENS) {
-    next = next.replaceAll(token, ' ');
-  }
-  return next.replace(/\s+/g, ' ').trim();
+  // Only remove standalone space-delimited fillers. Replacing characters in a
+  // continuous Chinese term can corrupt legitimate product/entity names.
+  return text
+    .split(' ')
+    .filter((token) => token && !STOP_TOKENS.has(token))
+    .join(' ')
+    .trim();
 }
 
 function tokensOf(text: string): string[] {
   const parts = text.split(' ').filter((part) => part.length >= 2);
-  const extras: string[] = [];
-  for (const part of parts) {
-    if (/[\u4e00-\u9fff]/.test(part) && part.length >= 2) {
-      extras.push(part);
-    }
-  }
-  return [...parts, ...extras];
+  return unique(parts);
 }
 
 function ngrams(text: string, size: number): string[] {
@@ -146,6 +253,7 @@ function buildQueryFeatures(normalizedQuery: string): QueryFeatures {
     tokens: tokensOf(queryCore),
     bigrams: unique(ngrams(coreOrNormalized, 2).filter((gram) => !STOP_TOKENS.has(gram))),
     trigrams: unique(ngrams(coreOrNormalized, 3)),
+    understanding: understandQuery(normalizedQuery),
   };
 }
 
@@ -185,7 +293,7 @@ function scoreAgainstVariant(features: QueryFeatures, variant: string): number {
   return Math.min(99, Math.round(score * 10) / 10);
 }
 
-function scoreScriptWithFeatures(features: QueryFeatures, script: ScriptFixture): number {
+function scoreScriptWithFeatures(features: QueryFeatures, script: ScriptFixture): ScriptScore {
   let best = 0;
   for (const variant of script.questionVariants) {
     const next = scoreAgainstVariant(features, variant);
@@ -196,7 +304,72 @@ function scoreScriptWithFeatures(features: QueryFeatures, script: ScriptFixture)
       break;
     }
   }
-  return best;
+  if (best === 100) {
+    return {
+      score: 100,
+      lexicalScore: 100,
+      exact: true,
+      matchKind: 'exact',
+      matchLabel: '精确问法',
+    };
+  }
+
+  const semantic = matchSearchMetadata(features.understanding, script.search);
+  if (!semantic.entityMatched) {
+    if (
+      semantic.topicContextMatched &&
+      best >= MIN_TOPIC_ASSISTED_LEXICAL_SCORE
+    ) {
+      return {
+        score: Math.max(best, MIN_HIT_SCORE),
+        lexicalScore: best,
+        exact: false,
+        matchKind: 'similar',
+        matchLabel: '品类问题 · 相似问法',
+      };
+    }
+    return {
+      score: 0,
+      lexicalScore: best,
+      exact: false,
+      matchKind: 'similar',
+      matchLabel: '相似问法',
+    };
+  }
+
+  // Some aliases deliberately omit the synthetic brand so users can ask by
+  // category. After removing that alias and supported intent wording, no
+  // unknown text may remain; otherwise an unrelated brand prefix could borrow
+  // the generic alias and cross-match this fixture.
+  if (
+    !semantic.entityScopeMatched &&
+    !semantic.entityContextClean
+  ) {
+    return {
+      score: 0,
+      lexicalScore: best,
+      exact: false,
+      matchKind: 'similar',
+      matchLabel: '相似问法',
+    };
+  }
+  const score = Math.min(99, Math.max(best, semantic.score));
+  if (semantic.score >= best && semantic.kind) {
+    return {
+      score,
+      lexicalScore: best,
+      exact: false,
+      matchKind: semantic.kind,
+      matchLabel: semantic.label,
+    };
+  }
+  return {
+    score,
+    lexicalScore: best,
+    exact: false,
+    matchKind: 'similar',
+    matchLabel: '相似问法',
+  };
 }
 
 export function scoreScript(query: string, script: ScriptFixture): number {
@@ -207,12 +380,41 @@ export function scoreScript(query: string, script: ScriptFixture): number {
   if (!normalizedQuery) {
     return 0;
   }
-  return scoreScriptWithFeatures(buildQueryFeatures(normalizedQuery), script);
+  if (!isValidScriptFixture(script)) {
+    return 0;
+  }
+  const features = buildQueryFeatures(normalizedQuery);
+  if (features.understanding.genericOnly) {
+    return 0;
+  }
+  return scoreScriptWithFeatures(features, script).score;
+}
+
+function compareAscii(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+function dedupeCandidates<T extends { script: ScriptFixture }>(candidates: readonly T[]): T[] {
+  const ids = new Set<string>();
+  const answers = new Set<string>();
+  const uniqueCandidates: T[] = [];
+  for (const candidate of candidates) {
+    const answerKey = normalizeQuery(candidate.script.answerText);
+    if (ids.has(candidate.script.scriptId) || answers.has(answerKey)) {
+      continue;
+    }
+    ids.add(candidate.script.scriptId);
+    answers.add(answerKey);
+    uniqueCandidates.push(candidate);
+  }
+  return uniqueCandidates;
 }
 
 export function searchScripts(
   query: string,
   scripts: readonly ScriptFixture[] = SYNTHETIC_SCRIPTS,
+  now: Date = new Date(),
 ): SearchOutcome {
   if (query.length > MAX_QUERY_CHARS) {
     return { status: 'invalid', reason: 'too-long' };
@@ -224,19 +426,33 @@ export function searchScripts(
   }
 
   const features = buildQueryFeatures(normalizedQuery);
-  const ranked = scripts
+  if (features.understanding.genericOnly) {
+    return { status: 'no-hit' };
+  }
+
+  const validScripts = rejectConflictingScriptIds(scripts.filter(isValidScriptFixture));
+  const candidates = validScripts
+    .filter((script) =>
+      isCurrentlyEffective(script.effectiveFrom, script.effectiveTo, now),
+    )
     .map((script) => ({
       script,
-      score: scoreScriptWithFeatures(features, script),
+      ...scoreScriptWithFeatures(features, script),
     }))
     .filter((item) => item.score >= MIN_HIT_SCORE)
     .sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;
       }
-      return a.script.scriptId.localeCompare(b.script.scriptId);
-    })
-    .slice(0, MAX_RESULTS);
+      if (a.exact !== b.exact) {
+        return a.exact ? -1 : 1;
+      }
+      if (b.lexicalScore !== a.lexicalScore) {
+        return b.lexicalScore - a.lexicalScore;
+      }
+      return compareAscii(a.script.scriptId, b.script.scriptId);
+    });
+  const ranked = dedupeCandidates(candidates).slice(0, MAX_RESULTS);
 
   if (ranked.length === 0) {
     return { status: 'no-hit' };
@@ -254,6 +470,8 @@ export function searchScripts(
     effectiveTo: item.script.effectiveTo,
     rank: (index + 1) as 1 | 2 | 3,
     score: item.score,
+    matchKind: item.matchKind,
+    matchLabel: item.matchLabel,
   }));
 
   return { status: 'hit', results };

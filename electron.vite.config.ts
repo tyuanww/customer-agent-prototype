@@ -29,6 +29,11 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    server: {
+      fs: {
+        allow: [resolve(__dirname)],
+      },
+    },
     build: {
       rollupOptions: {
         input: {

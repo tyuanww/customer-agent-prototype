@@ -1,0 +1,736 @@
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryApp } from '../../src/renderer/QueryApp';
+import { SYNTHETIC_SCRIPTS } from '../../src/renderer/data/synthetic-scripts';
+import {
+  COPY_SUCCESS_MESSAGE,
+  EMPTY_QUERY_MESSAGE,
+  MAX_QUERY_CHARS,
+  QUERY_TOO_LONG_MESSAGE,
+} from '../../src/shared/contracts';
+import {
+  IDENTITY_FOX_VISUAL_TRANSFORM,
+  type OverlayCommand,
+} from '../../src/shared/overlay-events';
+
+const copyText = vi.fn();
+const getPlatform = vi.fn();
+const getWindowContext = vi.fn();
+const openSearch = vi.fn();
+const openDashboard = vi.fn();
+const dismiss = vi.fn();
+const reportUiPhase = vi.fn();
+const reportHandoffMilestone = vi.fn();
+const moveFoxBy = vi.fn();
+const setFoxPeek = vi.fn();
+const commandListeners = new Set<(command: OverlayCommand) => void>();
+
+function dispatchAnimationEnd(target: Element, animationName: string): void {
+  const event = new Event('animationend', { bubbles: true });
+  Object.defineProperty(event, 'animationName', { value: animationName });
+  fireEvent(target, event);
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
+async function searchCleanser(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
+  await user.click(screen.getByTestId('search-button'));
+  await screen.findByTestId('copy-button-1');
+}
+
+describe('QueryApp', () => {
+  beforeEach(() => {
+    copyText.mockReset();
+    getPlatform.mockReset();
+    getWindowContext.mockReset();
+    openSearch.mockReset();
+    openDashboard.mockReset();
+    dismiss.mockReset();
+    reportUiPhase.mockReset();
+    reportHandoffMilestone.mockReset();
+    moveFoxBy.mockReset();
+    setFoxPeek.mockReset();
+    reportHandoffMilestone.mockResolvedValue(undefined);
+    commandListeners.clear();
+    copyText.mockResolvedValue({ ok: true });
+    getPlatform.mockResolvedValue({ platform: 'darwin' });
+    getWindowContext.mockResolvedValue({
+      role: 'query',
+      phase: 'SEARCH_INPUT',
+      shortcut: {
+        registered: true,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '',
+      },
+      testHarness: false,
+    });
+    window.customerAgent = {
+      copyText,
+      getPlatform,
+      getWindowContext,
+      openSearch,
+      openDashboard,
+      dismiss,
+      reportUiPhase,
+      reportHandoffMilestone,
+      moveFoxBy,
+      setFoxPeek,
+      onOverlayCommand(handler) {
+        commandListeners.add(handler);
+        return () => {
+          commandListeners.delete(handler);
+        };
+      },
+    };
+  });
+
+  afterEach(() => {
+    commandListeners.clear();
+    delete window.customerAgent;
+    vi.useRealTimers();
+  });
+
+  it('focuses and selects existing query text when the overlay expands', async () => {
+    render(<QueryApp />);
+    const input = screen.getByTestId('question-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '澄芽洁面' } });
+    for (const listener of commandListeners) {
+      listener({ type: 'activate-search', anchor: 'left', animate: true });
+    }
+    await waitFor(() => {
+      expect(input).toHaveFocus();
+    });
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('澄芽洁面'.length);
+  });
+
+  it('restores native-window focus without selecting and overwriting an entered question', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    const input = screen.getByTestId('question-input') as HTMLInputElement;
+    for (const listener of commandListeners) {
+      listener({ type: 'activate-search', anchor: 'left', animate: false });
+    }
+    await waitFor(() => expect(input).toHaveFocus());
+    fireEvent.change(input, { target: { value: '已有问题' } });
+    input.setSelectionRange('已有问题'.length, '已有问题'.length);
+
+    fireEvent(window, new Event('focus'));
+    await user.keyboard('继续');
+
+    expect(input).toHaveValue('已有问题继续');
+  });
+
+  it('arms the hidden shared-element frame before opening and accepts typing after a close/reopen', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    const shell = screen.getByTestId('query-shell');
+    const input = screen.getByTestId('question-input');
+    const clickedTransform = { a: 1.04, b: 0.08, c: -0.08, d: 1.04, e: 3, f: -4 };
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'prepare-search',
+          handoffId: 11,
+          anchor: 'right',
+          handoffCenterX: 600,
+          handoffCenterY: 44,
+          foxVisualTransform: clickedTransform,
+        });
+      }
+    });
+    expect(shell).toHaveAttribute('data-parked', 'true');
+    expect(shell).toHaveAttribute('data-opening', 'false');
+    expect(shell.style.getPropertyValue('--query-handoff-fox-a')).toBe('1.04');
+    expect(shell.style.getPropertyValue('--query-handoff-fox-b')).toBe('0.08');
+    expect(shell.style.getPropertyValue('--query-handoff-fox-e')).toBe('3');
+    expect(shell.style.getPropertyValue('--query-handoff-fox-f')).toBe('-4');
+    await waitFor(() =>
+      expect(reportHandoffMilestone).toHaveBeenCalledWith(11, 'open-armed'),
+    );
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', handoffId: 11, anchor: 'right', animate: true });
+      }
+    });
+    expect(shell).toHaveAttribute('data-parked', 'false');
+    expect(shell).toHaveAttribute('data-opening', 'true');
+    await waitFor(() => expect(input).toHaveFocus());
+    dispatchAnimationEnd(document.querySelector('.glass-shell') as Element, 'query-shell-unfold');
+    expect(reportHandoffMilestone).toHaveBeenCalledWith(11, 'open-finished');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'collapse',
+          handoffId: 12,
+          anchor: 'right',
+          dockEdge: 'right',
+          animate: true,
+        });
+      }
+    });
+    expect(input).not.toHaveFocus();
+    dispatchAnimationEnd(document.querySelector('.glass-shell') as Element, 'query-shell-fold');
+    expect(shell).toHaveAttribute('data-parked', 'true');
+    expect(reportHandoffMilestone).toHaveBeenCalledWith(12, 'close-finished');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'prepare-search',
+          handoffId: 13,
+          anchor: 'right',
+          handoffCenterX: 600,
+          handoffCenterY: 44,
+          foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
+        });
+      }
+    });
+    await waitFor(() =>
+      expect(reportHandoffMilestone).toHaveBeenCalledWith(13, 'open-armed'),
+    );
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', handoffId: 13, anchor: 'right', animate: false });
+      }
+    });
+    await waitFor(() => expect(input).toHaveFocus());
+    await user.keyboard('重开立即输入');
+    expect(input).toHaveValue('重开立即输入');
+  });
+
+  it('collapses when the capsule fox is clicked, but keeps drag as movement only', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    const fox = screen.getByTestId('capsule-fox');
+
+    expect(fox).toHaveAccessibleName('点击收起查询，拖拽移动查询窗');
+    await user.click(fox);
+    expect(dismiss).toHaveBeenCalledTimes(1);
+
+    dismiss.mockClear();
+    fireEvent.pointerDown(fox, {
+      button: 0,
+      buttons: 1,
+      pointerId: 7,
+      screenX: 20,
+      screenY: 20,
+    });
+    fireEvent.pointerMove(fox, {
+      buttons: 1,
+      pointerId: 7,
+      screenX: 42,
+      screenY: 36,
+    });
+    fireEvent.pointerUp(fox, {
+      button: 0,
+      buttons: 0,
+      pointerId: 7,
+      screenX: 42,
+      screenY: 36,
+    });
+    expect(moveFoxBy).toHaveBeenCalled();
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+
+  it('replays entry motion and exposes an explicit mirrored closing state', async () => {
+    render(<QueryApp />);
+    const shell = screen.getByTestId('query-shell');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', anchor: 'right', animate: true });
+      }
+    });
+    await waitFor(() => expect(shell).toHaveAttribute('data-opening', 'true'));
+    expect(shell).toHaveAttribute('data-anchor', 'right');
+    expect(shell).toHaveAttribute('data-open-duration-ms', '260');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: true });
+      }
+    });
+    expect(shell).toHaveAttribute('data-opening', 'false');
+    expect(shell).toHaveAttribute('data-closing', 'true');
+    expect(shell).toHaveAttribute('data-close-duration-ms', '200');
+  });
+
+  it('shows an explicit empty-query hint and does not invent results', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('validation-error')).toHaveTextContent(EMPTY_QUERY_MESSAGE);
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+    expect(reportUiPhase).toHaveBeenCalledWith('SEARCH_INPUT', 0);
+  });
+
+  it('keeps DeepSeek as an OFF disclosure-only reservation', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    const toggle = screen.getByTestId('deep-thinking-toggle');
+    reportUiPhase.mockClear();
+
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveAttribute('aria-describedby', 'deep-thinking-description');
+    expect(screen.queryByTestId('deep-thinking-panel')).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('deep-thinking-panel')).toHaveTextContent('DeepSeek 辅助重排预留');
+    expect(screen.getByTestId('deep-thinking-panel')).toHaveTextContent(
+      '当前 OFF · 未接入 · 不生成 · 不改写 · 不发送',
+    );
+    expect(reportUiPhase).not.toHaveBeenCalled();
+    expect(copyText).not.toHaveBeenCalled();
+    expect(openDashboard).not.toHaveBeenCalled();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('question-input')).toBeInTheDocument();
+  });
+
+  it('keeps the same fixture ranking after opening the DeepSeek reservation note', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
+    await user.click(screen.getByTestId('deep-thinking-toggle'));
+    await user.click(screen.getByTestId('deep-thinking-toggle'));
+    await user.click(screen.getByTestId('search-button'));
+
+    const cards = await screen.findAllByTestId(/script-card-[123]/);
+    expect(cards).toHaveLength(3);
+    const expectedLead = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-prod-001');
+    expect(expectedLead).toBeDefined();
+    expect(within(cards[0]).getByTestId('answer-text-1')).toHaveTextContent(
+      expectedLead?.answerText ?? '',
+    );
+  });
+
+  it('exposes distinct SEARCHING, RESULTS, COPIED and EMPTY fox states', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    const fox = screen.getByTestId('capsule-fox');
+
+    await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
+    await user.click(screen.getByTestId('search-button'));
+    expect(fox).toHaveAttribute('data-fox-state', 'SEARCHING');
+    await screen.findByTestId('copy-button-1');
+    expect(fox).toHaveAttribute('data-fox-state', 'RESULTS');
+    await user.click(screen.getByTestId('copy-button-1'));
+    expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+    expect(fox).toHaveAttribute('data-fox-state', 'COPIED');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+        listener({ type: 'activate-search', anchor: 'left', animate: true });
+      }
+    });
+    await user.type(screen.getByTestId('question-input'), '今天中午虚构星球食堂有没有排骨汤');
+    await user.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('no-hit');
+    expect(fox).toHaveAttribute('data-fox-state', 'EMPTY');
+  });
+
+  it('does not submit while a Chinese IME composition is active', async () => {
+    render(<QueryApp />);
+    const input = screen.getByTestId('question-input');
+    fireEvent.change(input, { target: { value: '澄' } });
+    fireEvent.compositionStart(input);
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true, keyCode: 229 });
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+    fireEvent.compositionEnd(input);
+    fireEvent.change(input, { target: { value: '澄芽氨基酸洁面怎么用' } });
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: false, keyCode: 13 });
+    expect(await screen.findByTestId('script-card-1')).toBeInTheDocument();
+  });
+
+  it('shows a stable Top 3 without numeric match scores', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+
+    const list = screen.getByTestId('result-list');
+    const cards = within(list).getAllByTestId(/script-card-/);
+    expect(cards).toHaveLength(3);
+    expect(screen.getByTestId('script-card-1')).toHaveClass('is-lead');
+    expect(screen.getByTestId('match-reason-1')).toHaveTextContent('精确问法');
+    expect(list.textContent).not.toContain('匹配分');
+    expect(list.textContent).not.toMatch(/匹配分\s*\d+/);
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it('renders the original synthetic aftersales wording for a natural category question', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '面膜过敏怎么办');
+    await user.click(screen.getByTestId('search-button'));
+
+    const lead = await screen.findByTestId('script-card-1');
+    const expected = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-after-002');
+    expect(expected).toBeDefined();
+    expect(within(lead).getByTestId('answer-text-1')).toHaveTextContent(
+      expected?.answerText ?? '',
+    );
+    expect(within(lead).getByTestId('match-reason-1')).toHaveTextContent('品类问题');
+    expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
+    expect(lead.textContent).not.toContain('匹配分');
+  });
+
+  it('keeps result cards mounted long enough to play the closing fade', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true });
+      }
+    });
+
+    expect(screen.getByTestId('question-input')).toHaveValue('');
+    expect(screen.getByTestId('result-list')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('result-list')).not.toBeInTheDocument());
+  });
+
+  it('shows searching feedback before revealing results', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
+    await user.click(screen.getByTestId('search-button'));
+
+    expect(screen.getByTestId('searching-indicator')).toHaveTextContent('检索中');
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('script-card-3')).toBeVisible();
+  });
+
+  it('uses a synchronous single-flight guard for same-tick duplicate search submissions', async () => {
+    render(<QueryApp />);
+    const input = screen.getByTestId('question-input');
+    fireEvent.change(input, { target: { value: '澄芽氨基酸洁面怎么用' } });
+
+    fireEvent.click(screen.getByTestId('search-button'));
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
+
+    expect(screen.getByTestId('searching-indicator')).toBeInTheDocument();
+    expect(await screen.findByTestId('script-card-3')).toBeVisible();
+    expect(
+      reportUiPhase.mock.calls.filter(([nextPhase]) => nextPhase === 'SEARCH_INPUT'),
+    ).toHaveLength(1);
+    expect(reportUiPhase.mock.calls.filter(([nextPhase]) => nextPhase === 'RESULTS')).toHaveLength(1);
+  });
+
+  it('cancels a pending search when the question changes so old results cannot mismatch the input', async () => {
+    vi.useFakeTimers();
+    render(<QueryApp />);
+    const input = screen.getByTestId('question-input');
+    fireEvent.change(input, { target: { value: '澄芽氨基酸洁面怎么用' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(screen.getByTestId('searching-indicator')).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: '今天中午虚构星球食堂有没有排骨汤' } });
+    expect(screen.queryByTestId('searching-indicator')).not.toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(input).toHaveValue('今天中午虚构星球食堂有没有排骨汤');
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+  });
+
+  it('uses number keys to copy the matching result but never hijacks input typing', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    const second = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-prod-001-care');
+    expect(second).toBeDefined();
+
+    fireEvent.keyDown(window, { key: '2', code: 'Digit2' });
+    await waitFor(() => expect(copyText).toHaveBeenCalledWith(second?.answerText));
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+      }
+    });
+    copyText.mockClear();
+    const input = screen.getByTestId('question-input');
+    fireEvent.keyDown(input, { key: '1', code: 'Digit1' });
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it('does not hijack numeric typing when the user returns to the input from RESULTS', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    const input = screen.getByTestId('question-input');
+
+    fireEvent.pointerDown(input);
+    await user.click(input);
+    await user.type(input, '1');
+
+    expect(copyText).not.toHaveBeenCalled();
+    expect(input).toHaveValue('澄芽氨基酸洁面怎么用1');
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+    expect(reportUiPhase).toHaveBeenLastCalledWith('SEARCH_INPUT', 0);
+  });
+
+  it('supports Numpad selection while blocking repeat, modifiers, and IME key events', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    const second = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-prod-001-care');
+    expect(second).toBeDefined();
+
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1', repeat: true });
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1', metaKey: true });
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1', altKey: true });
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1', shiftKey: true });
+    fireEvent.keyDown(window, {
+      key: '1',
+      code: 'Digit1',
+      isComposing: true,
+      keyCode: 229,
+    });
+    expect(copyText).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: '2', code: 'Numpad2' });
+    await waitFor(() => expect(copyText).toHaveBeenCalledWith(second?.answerText));
+  });
+
+  it('ignores a number shortcut when that result rank does not exist', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '月白防晒闷痘吗');
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('script-card-2')).toBeVisible();
+    expect(screen.queryByTestId('script-card-3')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: '3', code: 'Numpad3' });
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it('auto-dismisses only after successful copy feedback', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+    expect(dismiss).not.toHaveBeenCalled();
+    await waitFor(() => expect(dismiss).toHaveBeenCalledTimes(1), { timeout: 1_500 });
+  });
+
+  it('locks every copy entry point during COPIED feedback', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+
+    expect(screen.getByTestId('copy-button-2')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('copy-button-2'));
+    fireEvent.keyDown(window, { key: '2', code: 'Digit2' });
+    expect(copyText).toHaveBeenCalledTimes(1);
+  });
+
+  it('never surfaces expired campaign copy in the result list', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '青禾会员日积分怎么兑');
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('no-hit')).toHaveTextContent('没找到合适话术');
+    expect(screen.queryByText(/QINGHE_EXPIRED_DEMO_BODY/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+  });
+
+  it('copies original answer text and only says 已复制', async () => {
+    const user = userEvent.setup();
+    const cleanser = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-prod-001');
+    expect(cleanser).toBeDefined();
+
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+
+    await waitFor(() => {
+      expect(copyText).toHaveBeenCalledWith(cleanser?.answerText);
+    });
+    expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+    expect(screen.queryByText('已发送')).not.toBeInTheDocument();
+    expect(screen.queryByText('已采纳')).not.toBeInTheDocument();
+    expect(reportUiPhase).toHaveBeenCalledWith('COPIED', 3);
+  });
+
+  it('dismisses with Esc after copy without implying the reply was sent', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    await screen.findByTestId('toast');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(dismiss).toHaveBeenCalled();
+    expect(screen.queryByText('已发送')).not.toBeInTheDocument();
+  });
+
+  it('clears customer text and transient results when the overlay collapses', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    await screen.findByTestId('toast');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+      }
+    });
+
+    expect(screen.getByTestId('question-input')).toHaveValue('');
+    expect(screen.queryByTestId('result-pane')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+  });
+
+  it('shows a recoverable copy error with retry', async () => {
+    const user = userEvent.setup();
+    copyText.mockResolvedValue({ ok: false, message: '复制失败，请重试' });
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    expect(await screen.findByTestId('error-state')).toHaveTextContent('复制失败，请重试');
+    expect(screen.getByTestId('retry-button')).toBeInTheDocument();
+  });
+
+  it('never auto-dismisses after a failed copy', async () => {
+    const user = userEvent.setup();
+    copyText.mockResolvedValue({ ok: false, message: '复制失败，请重试' });
+    render(<QueryApp />);
+    await searchCleanser(user);
+    vi.useFakeTimers();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('copy-button-1'));
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('error-state')).toHaveTextContent('复制失败，请重试');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(screen.getByTestId('error-state')).toBeInTheDocument();
+  });
+
+  it('cancels an old success-dismiss timer when a new session opens', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    vi.useFakeTimers();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('copy-button-1'));
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+        listener({ type: 'activate-search', anchor: 'left', animate: true });
+      }
+    });
+    fireEvent.change(screen.getByTestId('question-input'), {
+      target: { value: '新会话问题' },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(screen.getByTestId('question-input')).toHaveValue('新会话问题');
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+  });
+
+  it('ignores a late copy promise after collapse and reopen', async () => {
+    const user = userEvent.setup();
+    const lateCopy = deferred<{ ok: true } | { ok: false; message: string }>();
+    copyText.mockReturnValueOnce(lateCopy.promise);
+    render(<QueryApp />);
+    await searchCleanser(user);
+    fireEvent.click(screen.getByTestId('copy-button-1'));
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'none', animate: false });
+        listener({ type: 'activate-search', anchor: 'right', animate: true });
+      }
+    });
+    fireEvent.change(screen.getByTestId('question-input'), {
+      target: { value: '重开后的问题' },
+    });
+    await act(async () => {
+      lateCopy.resolve({ ok: true });
+      await lateCopy.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('question-input')).toHaveValue('重开后的问题');
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+
+  it('rejects a 2001-character query without searching the fixture', async () => {
+    render(<QueryApp />);
+    fireEvent.change(screen.getByTestId('question-input'), {
+      target: { value: '啊'.repeat(MAX_QUERY_CHARS + 1) },
+    });
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('validation-error')).toHaveTextContent(QUERY_TOO_LONG_MESSAGE);
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+  });
+
+  it('shows the shortcut fallback when registration failed', async () => {
+    getWindowContext.mockResolvedValue({
+      role: 'query',
+      phase: 'SEARCH_INPUT',
+      shortcut: {
+        registered: false,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '全局快捷键 ⌘⇧空格 注册失败，可能被系统或其他软件占用。请点击狐狸头打开查询窗。',
+      },
+      testHarness: false,
+    });
+    render(<QueryApp />);
+    expect(await screen.findByTestId('shortcut-fallback')).toHaveTextContent('注册失败');
+  });
+
+  it('offers a secondary dashboard entry that does not search', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    const dashboardEntry = screen.getByTestId('open-dashboard');
+    expect(dashboardEntry).toHaveAccessibleName('打开运营工作台');
+    expect(dashboardEntry).toHaveAttribute('title', '打开运营工作台');
+    expect(dashboardEntry).not.toHaveTextContent('工作台');
+    expect(dashboardEntry.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+
+    await user.click(dashboardEntry);
+    expect(openDashboard).toHaveBeenCalledTimes(1);
+    expect(copyText).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+  });
+});

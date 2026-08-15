@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { getValidityInfo } from './validity';
 import type { RankedScript, RiskLevel } from './types';
 
 type ScriptCardProps = {
   script: RankedScript;
   copying: boolean;
+  copied: boolean;
   onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
 };
 
@@ -14,66 +14,56 @@ const RISK_COPY: Record<RiskLevel, { label: string; className: string }> = {
   high: { label: '高风险 · 需复核', className: 'risk-chip is-high' },
 };
 
-export function ScriptCard({ script, copying, onCopy }: ScriptCardProps) {
-  const [expanded, setExpanded] = useState(false);
+export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps) {
   const validity = getValidityInfo(script.effectiveFrom, script.effectiveTo);
   const risk = RISK_COPY[script.riskLevel];
+  const lead = script.rank === 1;
 
   return (
     <article
-      className={script.riskLevel === 'high' ? 'script-card is-high' : 'script-card'}
+      className={['script-card', lead ? 'is-lead' : '', script.riskLevel === 'high' ? 'is-high' : '']
+        .filter(Boolean)
+        .join(' ')}
       data-testid={`script-card-${script.rank}`}
     >
       <div className="card-top">
-        <div className="rank-score">
-          <span className="rank">{script.rank}</span>
-          <span className="score">匹配分 {Math.round(script.score)}</span>
+        <div className="card-kicker">
+          <kbd className="rank" aria-label={`按数字 ${script.rank} 快速复制`}>
+            {script.rank}
+          </kbd>
+          <span className="scene-label">{script.scopeLabel}</span>
         </div>
         <div className="card-top-tags">
           <span className={risk.className} data-testid={`risk-${script.rank}`}>
             {risk.label}
           </span>
-          <span className="synthetic-tag">合成</span>
+          <span className="synthetic-tag">DEMO · 合成数据</span>
         </div>
       </div>
-      <p
-        className={expanded ? 'answer-text' : 'answer-text is-clamped'}
-        data-testid={`answer-text-${script.rank}`}
-      >
-        {script.answerText}
-      </p>
-      {expanded ? (
-        <div className="meta-row">
-          <span className="meta-chip">{script.domain}</span>
-          <span className="meta-chip">{script.platform}</span>
-          <span className="meta-chip">{script.scopeLabel}</span>
-          <span className={`validity-chip is-${validity.kind}`}>{validity.text}</span>
-        </div>
-      ) : (
-        <p className="meta-line">
-          {script.domain} · {risk.label} · {validity.text}
+      <div className="card-answer-row">
+        <p className="answer-text" data-testid={`answer-text-${script.rank}`}>
+          {script.answerText}
         </p>
-      )}
-      <div className="card-actions">
         <button
           type="button"
-          className="expand-btn"
-          data-testid={`expand-button-${script.rank}`}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((current) => !current)}
-        >
-          {expanded ? '收起' : '展开全文'}
-        </button>
-        <button
-          type="button"
-          className="copy-btn"
+          className={copied ? 'copy-btn is-copied' : 'copy-btn'}
           data-testid={`copy-button-${script.rank}`}
           disabled={copying}
+          aria-keyshortcuts={String(script.rank)}
           onClick={(event) => onCopy(script, event.currentTarget)}
         >
-          复制话术
+          {copied ? '已复制' : '复制话术'}
         </button>
-        <span className="copy-hotkey">快捷键 {script.rank}</span>
+      </div>
+      <div className="meta-row">
+        <span className={`match-chip is-${script.matchKind}`} data-testid={`match-reason-${script.rank}`}>
+          {script.matchLabel}
+        </span>
+        <span className="meta-chip">{script.domain}</span>
+        <span className="meta-chip">{script.platform}</span>
+        <span className={`validity-chip is-${validity.kind}`} data-testid={`validity-${script.rank}`}>
+          {validity.text}
+        </span>
       </div>
     </article>
   );
