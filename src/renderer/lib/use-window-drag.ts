@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useRef, type MouseEvent, type PointerEvent } from 'react';
 import { DRAG_THRESHOLD_PX, MAX_DRAG_DELTA_PER_EVENT } from '@shared/overlay-geometry';
+import type { FoxDragSample } from '@shared/fox-presence';
+
+export type WindowDragEndReason = 'up' | 'cancel' | 'lost' | 'blur' | 'buttons0';
+
+export type WindowDragEnd = {
+  reason: WindowDragEndReason;
+  moved: boolean;
+};
+
+export type WindowDragGestureOptions = {
+  onPressStart?: () => void;
+  onGestureSample?: (sample: FoxDragSample) => void;
+  onGestureEnd?: (end: WindowDragEnd) => void;
+};
 
 type DragHandlers = {
   onPointerDown: (event: PointerEvent<HTMLElement>) => void;
@@ -31,18 +45,24 @@ function pointerPoint(event: PointerEvent<HTMLElement>): { x: number; y: number 
 export function useWindowDrag(
   onMove: (dx: number, dy: number, finished: boolean) => void,
   onClick: () => void,
+  gesture: WindowDragGestureOptions = {},
 ): DragHandlers {
   const onMoveRef = useRef(onMove);
   const onClickRef = useRef(onClick);
+  const gestureRef = useRef(gesture);
   const draggingRef = useRef(false);
   const movedRef = useRef(false);
   const handledClickRef = useRef(false);
   const lastRef = useRef<{ x: number; y: number } | null>(null);
+  const originRef = useRef<{ x: number; y: number } | null>(null);
+  const startedAtRef = useRef(0);
+  const distanceRef = useRef(0);
   const activePointerIdRef = useRef<number | null>(null);
   const captureTargetRef = useRef<HTMLElement | null>(null);
 
   onMoveRef.current = onMove;
   onClickRef.current = onClick;
+  gestureRef.current = gesture;
 
   const emitClick = useCallback((): void => {
     if (movedRef.current || handledClickRef.current) {
@@ -59,7 +79,7 @@ export function useWindowDrag(
   }, []);
 
   const finishDrag = useCallback(
-    (allowClick: boolean): void => {
+    (allowClick: boolean, reason: WindowDragEndReason): void => {
       if (!draggingRef.current) {
         return;
       }
@@ -72,6 +92,7 @@ export function useWindowDrag(
       // lostpointercapture, which must not finish the same gesture twice.
       draggingRef.current = false;
       lastRef.current = null;
+      originRef.current = null;
       activePointerIdRef.current = null;
       captureTargetRef.current = null;
 
@@ -102,13 +123,15 @@ export function useWindowDrag(
         // Suppress any click synthesized after blur/cancel/lost capture.
         handledClickRef.current = true;
       }
+
+      gestureRef.current.onGestureEnd?.({ reason, moved });
     },
     [emitClick],
   );
 
   useEffect(() => {
     const stopOnBlur = (): void => {
-      finishDrag(false);
+      finishDrag(false, 'blur');
     };
     window.addEventListener('blur', stopOnBlur);
     return () => {
@@ -129,7 +152,7 @@ export function useWindowDrag(
         return;
       }
       if (draggingRef.current) {
-        finishDrag(false);
+        finishDrag(false, 'cancel');
       }
       if (typeof event.currentTarget.setPointerCapture === 'function') {
         try {
@@ -141,9 +164,14 @@ export function useWindowDrag(
       draggingRef.current = true;
       movedRef.current = false;
       handledClickRef.current = false;
-      lastRef.current = pointerPoint(event);
+      const origin = pointerPoint(event);
+      lastRef.current = origin;
+      originRef.current = origin;
+      startedAtRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      distanceRef.current = 0;
       activePointerIdRef.current = event.pointerId;
       captureTargetRef.current = event.currentTarget;
+      gestureRef.current.onPressStart?.();
     },
     onPointerMove(event) {
       if (
@@ -157,7 +185,7 @@ export function useWindowDrag(
       // A move with no primary button is authoritative evidence that the gesture
       // ended; finalize once and ignore all subsequent movement.
       if (typeof event.buttons === 'number' && (event.buttons & 1) === 0) {
-        finishDrag(false);
+        finishDrag(false, 'buttons0');
         return;
       }
       const point = pointerPoint(event);
@@ -168,22 +196,33 @@ export function useWindowDrag(
       }
       movedRef.current = true;
       lastRef.current = point;
+      distanceRef.current += Math.hypot(dx, dy);
+      const origin = originRef.current ?? point;
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      gestureRef.current.onGestureSample?.({
+        lastDx: dx,
+        lastDy: dy,
+        totalDx: point.x - origin.x,
+        totalDy: point.y - origin.y,
+        distancePx: distanceRef.current,
+        elapsedMs: now - startedAtRef.current,
+      });
       emitMove(dx, dy);
     },
     onPointerUp(event) {
       if (activePointerIdRef.current !== event.pointerId) {
         return;
       }
-      finishDrag(true);
+      finishDrag(true, 'up');
     },
     onPointerCancel(event) {
       if (activePointerIdRef.current === event.pointerId) {
-        finishDrag(false);
+        finishDrag(false, 'cancel');
       }
     },
     onLostPointerCapture(event) {
       if (activePointerIdRef.current === event.pointerId) {
-        finishDrag(false);
+        finishDrag(false, 'lost');
       }
     },
     onClick(event) {

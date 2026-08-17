@@ -144,7 +144,7 @@ export function AnnounceModule() {
           </label>
           <button
             type="button"
-            className="dash-reset announce-simulation-action"
+            className="dash-action-primary announce-simulation-action"
             data-testid="announce-push-action"
             disabled={!selected?.published || simulationStatus === 'loading'}
             onClick={startSimulation}

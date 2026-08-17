@@ -22,7 +22,7 @@ export type DesktopMenuEntry =
 export type ApplicationMenuSection =
   | {
       type: 'role';
-      role: 'appMenu' | 'editMenu' | 'windowMenu';
+      role: 'appMenu' | 'fileMenu' | 'editMenu' | 'windowMenu';
     }
   | {
       type: 'agent';
@@ -114,13 +114,23 @@ export function createTrayMenuModel(): readonly DesktopMenuEntry[] {
 export function createApplicationMenuModel(
   platform: NodeJS.Platform,
 ): readonly ApplicationMenuSection[] {
-  const agentItems: DesktopMenuEntry[] = [action('open-search'), action('open-dashboard')];
-  if (platform !== 'darwin') {
-    agentItems.push(separator(), action('quit'));
+  const agent: ApplicationMenuSection = {
+    type: 'agent',
+    label: '客服 Agent',
+    items: [action('open-search'), action('open-dashboard')],
+  };
+  if (platform === 'darwin') {
+    return [
+      { type: 'role', role: 'appMenu' },
+      { type: 'role', role: 'fileMenu' },
+      agent,
+      { type: 'role', role: 'editMenu' },
+      { type: 'role', role: 'windowMenu' },
+    ];
   }
   return [
-    { type: 'role', role: 'appMenu' },
-    { type: 'agent', label: '客服 Agent', items: agentItems },
+    { type: 'role', role: 'fileMenu' },
+    agent,
     { type: 'role', role: 'editMenu' },
     { type: 'role', role: 'windowMenu' },
   ];

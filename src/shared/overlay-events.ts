@@ -1,4 +1,5 @@
 import { isOverlayPhase, type OverlayPhase } from './overlay-machine';
+import { isQueryLayoutAckCommand, type QueryLayoutAckCommand } from './query-layout';
 
 export type OverlayRole = 'fox' | 'query';
 export type RendererRole = OverlayRole | 'dashboard';
@@ -44,9 +45,13 @@ export type OverlayCommand =
       dockEdge: FoxDockEdge;
       animate: boolean;
       handoffId?: number;
+      handoffCenterX: number;
+      handoffCenterY: number;
     }
+  | QueryLayoutAckCommand
   | { type: 'fox-edge'; edge: FoxDockEdge; epoch: number }
   | { type: 'sync-fox-edge'; edge: FoxDockEdge; epoch: number }
+  | ({ type: 'fox-drag-settled' } & FoxDragSettleAck)
   | { type: 'sync-query-anchor'; anchor: QueryAnchor }
   | {
       type: 'shortcut-status';
@@ -62,6 +67,30 @@ export type ShortcutStatus = {
 };
 
 export type FoxDockEdge = 'none' | 'left' | 'right';
+export type FoxDockSnapshot = {
+  edge: FoxDockEdge;
+  epoch: number;
+};
+export type FoxDragSettleAck = FoxDockSnapshot & {
+  settleId: number;
+  generation: number;
+};
+
+export function selectAuthoritativeFoxDockSnapshot(
+  preferred: FoxDockSnapshot | null | undefined,
+  ...candidates: Array<FoxDockSnapshot | null | undefined>
+): FoxDockSnapshot | null {
+  let latest: FoxDockSnapshot | null = preferred ?? null;
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    if (!latest || candidate.epoch > latest.epoch) {
+      latest = candidate;
+    }
+  }
+  return latest;
+}
 export const FOX_PEEK_INTENTS = ['peek', 'retract'] as const;
 export type FoxPeekIntent = (typeof FOX_PEEK_INTENTS)[number];
 export type QueryAnchor = 'left' | 'right';
@@ -103,6 +132,27 @@ export function isFoxPeekIntent(value: unknown): value is FoxPeekIntent {
 
 export function isFoxPeekEpoch(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+export function isFoxDragGeneration(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+export function isFoxDragSettleId(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+export function isFoxDragSettleAck(value: unknown): value is FoxDragSettleAck {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as Partial<FoxDragSettleAck>;
+  return (
+    (candidate.edge === 'none' || candidate.edge === 'left' || candidate.edge === 'right')
+    && isFoxPeekEpoch(candidate.epoch)
+    && isFoxDragSettleId(candidate.settleId)
+    && isFoxDragGeneration(candidate.generation)
+  );
 }
 
 export function isHandoffId(value: unknown): value is number {
@@ -179,13 +229,20 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
       dockEdge?: unknown;
       animate?: unknown;
       handoffId?: unknown;
+      handoffCenterX?: unknown;
+      handoffCenterY?: unknown;
     };
     return (
       (command.anchor === 'left' || command.anchor === 'right') &&
       (command.dockEdge === 'none' || command.dockEdge === 'left' || command.dockEdge === 'right') &&
       typeof command.animate === 'boolean' &&
-      (command.handoffId === undefined || isHandoffId(command.handoffId))
+      (command.handoffId === undefined || isHandoffId(command.handoffId)) &&
+      isHandoffCoordinate(command.handoffCenterX) &&
+      isHandoffCoordinate(command.handoffCenterY)
     );
+  }
+  if (record.type === 'query-layout-ack') {
+    return isQueryLayoutAckCommand(value);
   }
   if (record.type === 'activate-search') {
     const command = value as { anchor?: unknown; animate?: unknown; handoffId?: unknown };
@@ -201,6 +258,9 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
       (command.edge === 'none' || command.edge === 'left' || command.edge === 'right') &&
       isFoxPeekEpoch(command.epoch)
     );
+  }
+  if (record.type === 'fox-drag-settled') {
+    return isFoxDragSettleAck(value);
   }
   if (record.type === 'sync-query-anchor') {
     const command = value as { anchor?: unknown };

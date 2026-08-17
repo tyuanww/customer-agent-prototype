@@ -4,6 +4,7 @@ import { isAllowedRendererUrl } from '../shared/renderer-url';
 export function isTrustedSender(
   event: IpcMainInvokeEvent,
   contents: readonly WebContents[],
+  devServerUrl?: string,
 ): boolean {
   const sender = event.sender;
   if (sender.isDestroyed()) {
@@ -20,5 +21,21 @@ export function isTrustedSender(
     return false;
   }
 
-  return isAllowedRendererUrl(sender.getURL());
+  return isAllowedRendererUrl(sender.getURL(), devServerUrl);
+}
+
+export function isTrustedMainFrameSender(
+  event: IpcMainInvokeEvent,
+  contents: readonly WebContents[],
+  devServerUrl?: string,
+): boolean {
+  if (!isTrustedSender(event, contents, devServerUrl)) {
+    return false;
+  }
+  const frame = event.senderFrame;
+  if (!frame) {
+    return false;
+  }
+  const mainFrame = event.sender.mainFrame;
+  return frame === mainFrame;
 }

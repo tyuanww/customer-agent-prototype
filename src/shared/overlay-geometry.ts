@@ -20,10 +20,11 @@ export const FOX_EDGE_VISIBLE_PX = FOX_SIZE / 2;
 // Reveal the whole 64px visual with 4px of breathing room at the screen edge.
 export const FOX_EDGE_PEEK_VISIBLE_PX = FOX_SIZE - 8;
 export const FOX_EDGE_PEEK_TRAVEL_PX = FOX_EDGE_PEEK_VISIBLE_PX - FOX_EDGE_VISIBLE_PX;
-// The peek state leaves only transparent chrome outside the work area. Fox
-// dragging may preserve that small overflow so the first pointer delta stays
-// continuous instead of snapping the native window to the ordinary 8px margin.
+// Peek chrome leftover inside the on-screen 88px frame (not a native overflow).
+// Native fox bounds stay fully inside workArea with margin 0.
 export const FOX_DRAG_SAFE_OVERFLOW_PX = FOX_SIZE - FOX_EDGE_PEEK_VISIBLE_PX;
+export const FOX_REST_CROP_OFFSET_PX = FOX_SIZE - FOX_EDGE_VISIBLE_PX;
+export const FOX_PEEK_CROP_OFFSET_PX = FOX_SIZE - FOX_EDGE_PEEK_VISIBLE_PX;
 
 export type Rect = {
   x: number;
@@ -45,7 +46,10 @@ export type OverlayChromePhase =
   | 'ERROR'
   | 'COPIED';
 
-export function overlaySizeForPhase(phase: OverlayChromePhase, resultCount: ResultCount = 0): Size {
+export function preferredQuerySizeForPhase(
+  phase: OverlayChromePhase,
+  resultCount: ResultCount = 0,
+): Size {
   if (phase === 'FOX_IDLE') {
     return { width: FOX_SIZE, height: FOX_SIZE };
   }
@@ -62,6 +66,34 @@ export function overlaySizeForPhase(phase: OverlayChromePhase, resultCount: Resu
         ? QUERY_PANEL_TWO_RESULTS_HEIGHT
         : QUERY_PANEL_THREE_RESULTS_HEIGHT;
   return { width: QUERY_WIDTH, height };
+}
+
+export function availableOverlayHeight(workArea: Pick<Rect, 'height'>): number {
+  return Math.max(1, workArea.height - SCREEN_MARGIN * 2);
+}
+
+export function overlaySizeForPhase(
+  phase: OverlayChromePhase,
+  resultCount: ResultCount = 0,
+  workArea?: Pick<Rect, 'height'>,
+  measuredHeight?: number | null,
+): Size {
+  if (phase === 'FOX_IDLE' || phase === 'SEARCH_INPUT') {
+    return preferredQuerySizeForPhase(phase, resultCount);
+  }
+  const available = workArea ? availableOverlayHeight(workArea) : QUERY_PANEL_MAX_HEIGHT;
+  if (typeof measuredHeight === 'number' && Number.isFinite(measuredHeight)) {
+    const maxHeight = Math.max(QUERY_PANEL_MIN_HEIGHT, Math.min(QUERY_PANEL_MAX_HEIGHT, available));
+    return {
+      width: QUERY_WIDTH,
+      height: Math.round(Math.min(maxHeight, Math.max(QUERY_PANEL_MIN_HEIGHT, measuredHeight))),
+    };
+  }
+  const preferred = preferredQuerySizeForPhase(phase, resultCount);
+  return {
+    width: preferred.width,
+    height: Math.min(preferred.height, available),
+  };
 }
 
 export function clampRectToWorkArea(
@@ -233,6 +265,30 @@ export function dockFoxNativeRect(
   return clamped;
 }
 
+/**
+ * Resolve the shared-element center from the native Fox frame that the window
+ * server actually accepted. A macOS window manager may seat a background
+ * overlay at an active-stage boundary instead of the requested display edge;
+ * deriving this point from workArea would make the handoff jump away from the
+ * visible fox.
+ */
+export function foxVisualCenterForNativeRect(
+  rect: Pick<Rect, 'x' | 'y' | 'width' | 'height'>,
+  edge: FoxDockEdge,
+  peekTravelPx = 0,
+): { x: number; y: number } {
+  const peekTravel = Math.min(rect.width, Math.max(0, peekTravelPx));
+  const x = edge === 'left'
+    ? rect.x + peekTravel
+    : edge === 'right'
+      ? rect.x + rect.width - peekTravel
+      : rect.x + rect.width / 2;
+  return {
+    x,
+    y: rect.y + rect.height / 2,
+  };
+}
+
 export function foxDragBaseRect(
   fullFoxRect: Rect,
   workArea: Rect,
@@ -241,7 +297,145 @@ export function foxDragBaseRect(
   if (edge === 'none') {
     return fullFoxRect;
   }
-  return dockFoxRect(fullFoxRect, workArea, edge, FOX_EDGE_PEEK_VISIBLE_PX);
+  return dockFoxNativeRect(fullFoxRect, workArea, edge);
+}
+
+export function isRectFullyOnWorkArea(
+  rect: Pick<Rect, 'x' | 'y' | 'width' | 'height'>,
+  workArea: Rect,
+  margin = 0,
+): boolean {
+  return (
+    rect.x >= workArea.x + margin
+    && rect.y >= workArea.y + margin
+    && rect.x + rect.width <= workArea.x + workArea.width - margin
+    && rect.y + rect.height <= workArea.y + workArea.height - margin
+  );
+}
+
+export function isInwardFoxDrag(edge: FoxDockEdge, dx: number): boolean {
+  if (edge === 'left') {
+    return dx > 0;
+  }
+  if (edge === 'right') {
+    return dx < 0;
+  }
+  return false;
+}
+
+export function foxDockCropOffsetPx(peeking: boolean): number {
+  return peeking ? FOX_PEEK_CROP_OFFSET_PX : FOX_REST_CROP_OFFSET_PX;
+}
+
+export function foxDragInwardPx(edge: 'left' | 'right', totalDx: number): number {
+  return edge === 'left' ? totalDx : -totalDx;
+}
+
+export function foxDragSessionHeadOffset(
+  edge: 'left' | 'right',
+  cropPx: number,
+  inwardPx: number,
+): number {
+  const remaining = Math.max(0, cropPx - Math.max(0, inwardPx));
+  if (remaining === 0) {
+    return 0;
+  }
+  return edge === 'left' ? -remaining : remaining;
+}
+
+export type FoxDockDragSession = {
+  edge: 'left' | 'right';
+  cropPx: number;
+  originX: number;
+  originY: number;
+  logicalInward: number;
+  logicalDy: number;
+};
+
+export function createFoxDockDragSession(
+  edge: 'left' | 'right',
+  peeking: boolean,
+  origin: Pick<Rect, 'x' | 'y'>,
+): FoxDockDragSession {
+  return {
+    edge,
+    cropPx: foxDockCropOffsetPx(peeking),
+    originX: origin.x,
+    originY: origin.y,
+    logicalInward: 0,
+    logicalDy: 0,
+  };
+}
+
+export function foxDockDragSessionExtraPx(session: FoxDockDragSession): number {
+  return Math.max(0, session.logicalInward - session.cropPx);
+}
+
+export function foxDockDragSessionVisuallyUndocked(
+  session: Pick<FoxDockDragSession, 'logicalInward'>,
+): boolean {
+  return session.logicalInward > 0;
+}
+
+export function foxDockDragSessionNativeRect(
+  session: FoxDockDragSession,
+  workArea: Rect,
+): Rect {
+  const extra = foxDockDragSessionExtraPx(session);
+  const sign = session.edge === 'left' ? 1 : -1;
+  return clampRectToWorkArea(
+    {
+      x: session.originX + sign * extra,
+      y: session.originY + session.logicalDy,
+      width: FOX_SIZE,
+      height: FOX_SIZE,
+    },
+    workArea,
+    0,
+  );
+}
+
+export function advanceFoxDockDragSession(
+  session: FoxDockDragSession,
+  dx: number,
+  dy: number,
+  workArea: Rect,
+): {
+  session: FoxDockDragSession;
+  nativeRect: Rect;
+} {
+  const inwardDelta = foxDragInwardPx(session.edge, dx);
+  const nextSession: FoxDockDragSession = {
+    ...session,
+    logicalInward: session.logicalInward + inwardDelta,
+    logicalDy: session.logicalDy + dy,
+  };
+  return {
+    session: nextSession,
+    nativeRect: foxDockDragSessionNativeRect(nextSession, workArea),
+  };
+}
+
+export function finishFoxDockDragSession(
+  session: FoxDockDragSession,
+  workArea: Rect,
+): { rect: Rect; edge: FoxDockEdge } {
+  if (session.logicalInward <= session.cropPx) {
+    const seated = clampRectToWorkArea(
+      {
+        x: session.originX,
+        y: session.originY + session.logicalDy,
+        width: FOX_SIZE,
+        height: FOX_SIZE,
+      },
+      workArea,
+      0,
+    );
+    return { rect: seated, edge: session.edge };
+  }
+  const visual = foxDockDragSessionNativeRect(session, workArea);
+  const edge = resolveFoxDockAfterDrag(visual, workArea);
+  return { rect: dockFoxNativeRect(visual, workArea, edge), edge };
 }
 
 export function placeQueryNearFox(
@@ -303,14 +497,19 @@ export function placeQueryAnchoredToFox(
     },
     workArea,
   );
-  // A docked fox exposes 32px of its 64px visual exactly on the physical edge.
-  // Keep the query window flush to that edge during the shared-element
-  // handoff; the ordinary 8px safety margin would clip the proxy to 24px.
+  // Keep a docked Query aligned with the native Fox frame that WindowServer
+  // actually accepted. Stage Manager may seat a background overlay inward
+  // from the physical workArea edge; re-requesting x=0 here would make the
+  // shared-element handoff jump and restart the native boundary tug-of-war.
   if (dockEdge === 'left') {
-    return { ...placed, x: workArea.x };
+    return clampRectToWorkArea({ ...placed, x: fox.x }, workArea, 0);
   }
   if (dockEdge === 'right') {
-    return { ...placed, x: workArea.x + workArea.width - placed.width };
+    return clampRectToWorkArea(
+      { ...placed, x: fox.x + fox.width - placed.width },
+      workArea,
+      0,
+    );
   }
   return placed;
 }

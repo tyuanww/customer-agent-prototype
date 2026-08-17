@@ -12,9 +12,10 @@ import { isTrustedSender } from './sender-guard';
 export function registerClipboardIpc(
   getTrusted: () => WebContents[],
   getRole: (contents: WebContents) => OverlayRole | null,
+  getDevServerUrl: () => string | undefined,
 ): void {
   const guard = (event: IpcMainInvokeEvent): boolean => {
-    return isTrustedSender(event, getTrusted());
+    return isTrustedSender(event, getTrusted(), getDevServerUrl());
   };
 
   ipcMain.handle(

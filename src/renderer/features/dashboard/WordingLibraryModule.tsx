@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import {
   DASHBOARD_MANIFEST,
   type DomainId,
@@ -37,6 +37,22 @@ export function WordingLibraryModule() {
     setSelectedId(data.entries.find((item) => item.domain === next)?.scriptId ?? null);
   };
 
+  const handleDomainKeyDown = (event: KeyboardEvent<HTMLButtonElement>, current: DomainId) => {
+    const currentIndex = data.domains.findIndex((item) => item.id === current);
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % data.domains.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + data.domains.length) % data.domains.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = data.domains.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = data.domains[nextIndex];
+    chooseDomain(next.id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`wording-tab-${next.id}`)?.focus();
+    });
+  };
+
   return (
     <div className="dash-module" data-testid="module-wording">
       <header className="dash-module-head">
@@ -60,6 +76,7 @@ export function WordingLibraryModule() {
             className={domain === item.id ? 'is-active' : ''}
             data-testid={`wording-domain-${item.id}`}
             onClick={() => chooseDomain(item.id)}
+            onKeyDown={(event) => handleDomainKeyDown(event, item.id)}
           >
             <strong>{item.label}</strong>
             <span>{item.readiness === 'upstream_authoring' ? '待上游建设' : '结构已确认'}</span>

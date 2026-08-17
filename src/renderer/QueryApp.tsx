@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { flushSync } from 'react-dom';
 import {
-  COPY_SUCCESS_MESSAGE,
   EMPTY_QUERY_MESSAGE,
   MAX_QUERY_CHARS,
   QUERY_TOO_LONG_MESSAGE,
@@ -17,14 +16,26 @@ import {
 } from '@shared/fox-motion';
 import { QUERY_INPUT_HEIGHT, QUERY_WIDTH } from '@shared/overlay-geometry';
 import {
+  acceptQueryLayoutAck,
+  composeQueryDesiredHeight,
+  measureQueryHugHeight,
+  QUERY_CONTENT_BLANK_TOLERANCE_PX,
+  QUERY_LAYOUT_FALLBACK_MS,
+  QUERY_LAYOUT_MAX_HEIGHT,
+  QUERY_LAYOUT_MIN_HEIGHT,
+  type QueryLayoutAck,
+  type QueryLayoutRequest,
+  type QueryResizeEdge,
+} from '@shared/query-layout';
+import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type FoxVisualTransform,
   type QueryAnchor,
   type ResultCount,
 } from '@shared/overlay-events';
 import { reduceOverlay, type OverlayPhase } from '@shared/overlay-machine';
-import { FoxHead } from './components/FoxHead';
-import { ScriptCard } from './features/search/ScriptCard';
+import { QueryCapsule } from './features/search/QueryCapsule';
+import { QueryResultsPane } from './features/search/QueryResultsPane';
 import { searchScripts } from './features/search/search-service';
 import type { RankedScript } from './features/search/types';
 import { isImeComposing, shouldSubmitOnEnter } from './lib/ime';
@@ -59,11 +70,30 @@ export function QueryApp() {
     IDENTITY_FOX_VISUAL_TRANSFORM,
   );
   const [deepThinkingInfoOpen, setDeepThinkingInfoOpen] = useState(false);
+  const [layoutReady, setLayoutReady] = useState(true);
+  const [resizeEdge, setResizeEdge] = useState<QueryResizeEdge>('bottom');
+  const [queryHeight, setQueryHeight] = useState(QUERY_INPUT_HEIGHT);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultPaneRef = useRef<HTMLElement>(null);
+  const resultContentRef = useRef<HTMLDivElement>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const layoutSequenceRef = useRef(0);
+  const lastAppliedLayoutSequenceRef = useRef(0);
+  const layoutFrameRef = useRef<number | null>(null);
+  const hugPassRef = useRef(0);
+  const phaseRef = useRef<OverlayPhase>(phase);
+  const resultCountRef = useRef<ResultCount>(0);
+  const resizeGripRef = useRef<HTMLDivElement | null>(null);
+  const resizePointerRef = useRef<number | null>(null);
+  const resizeOriginYRef = useRef(0);
+  const resizeDeltaRef = useRef(0);
+  const resizeFrameRef = useRef<number | null>(null);
+  const resizeFinishedRef = useRef(true);
   const composingRef = useRef(false);
   const copyInFlightRef = useRef(false);
   const searchInFlightRef = useRef(false);
+  const dashboardOpenFailedRef = useRef(false);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
   const searchTimerRef = useRef<number | null>(null);
@@ -75,6 +105,9 @@ export function QueryApp() {
   const pendingCopyRef = useRef<RankedScript | null>(null);
   const activeHandoffIdRef = useRef(0);
   const queryInteractiveRef = useRef(false);
+  const openingRef = useRef(false);
+  const openingUserInteractionRef = useRef(false);
+  phaseRef.current = phase;
 
   const cancelScheduledResultFocus = useCallback(() => {
     if (resultFocusFrameRef.current !== null) {
@@ -105,6 +138,10 @@ export function QueryApp() {
     setCopiedRank(null);
     setErrorMessage('');
     setInvalidMessage('');
+    setLayoutReady(true);
+    layoutSequenceRef.current = 0;
+    lastAppliedLayoutSequenceRef.current = 0;
+    resultCountRef.current = 0;
   }, []);
 
   const cancelScheduledCollapseContent = useCallback((finish: boolean) => {
@@ -163,12 +200,118 @@ export function QueryApp() {
     [],
   );
 
+  const finishOpening = useCallback(() => {
+    if (!openingRef.current) {
+      return;
+    }
+    openingRef.current = false;
+    setOpening(false);
+    if (!openingUserInteractionRef.current) {
+      // A mapped macOS panel can assign passive focus to a non-input node.
+      // Restore the primary contract unless the user actually interacted with
+      // a Query control during the opening transition.
+      focusQueryInput(false);
+    }
+    reportHandoffMilestone(activeHandoffIdRef.current, 'open-finished');
+  }, [focusQueryInput, reportHandoffMilestone]);
+
   const reportPhase = useCallback((next: OverlayPhase, resultCount: ResultCount = 0) => {
     setPhase(next);
+    resultCountRef.current = resultCount;
+    if (next === 'SEARCH_INPUT') {
+      setLayoutReady(true);
+    } else if (next !== 'COPIED' && next !== 'FOX_IDLE' && window.customerAgent?.reportQueryLayout) {
+      setLayoutReady(false);
+    }
     if (next !== 'FOX_IDLE') {
       void window.customerAgent?.reportUiPhase(next, resultCount);
     }
   }, []);
+
+  const requestQueryLayout = useCallback((phase: OverlayPhase, resultCount: ResultCount) => {
+    if (
+      phase === 'FOX_IDLE'
+      || phase === 'SEARCH_INPUT'
+      || phase === 'COPIED'
+      || opening
+      || closing
+      || !resizeFinishedRef.current
+    ) {
+      return;
+    }
+    const api = window.customerAgent;
+    const report = api?.reportQueryLayout;
+    if (!report) {
+      setLayoutReady(true);
+      return;
+    }
+    const shell = shellRef.current;
+    const pane = resultPaneRef.current;
+    const content = resultContentRef.current;
+    const banner = bannerRef.current;
+    const capsule = shell?.querySelector<HTMLElement>('.query-capsule');
+    const lastCard = pane?.querySelector<HTMLElement>('.script-card:last-of-type');
+    const lastCopy = lastCard?.querySelector<HTMLElement>('.copy-btn');
+    let lastContentBottom = 0;
+    for (const node of [lastCard, lastCopy, banner, content?.lastElementChild ?? null]) {
+      if (node) {
+        lastContentBottom = Math.max(lastContentBottom, node.getBoundingClientRect().bottom);
+      }
+    }
+    const panePad = pane
+      ? Number.parseFloat(getComputedStyle(pane).paddingBottom) || 0
+      : 0;
+    const paneBorder = pane
+      ? Number.parseFloat(getComputedStyle(pane).borderTopWidth) || 0
+      : 0;
+    const intrinsic = composeQueryDesiredHeight({
+      capsuleHeight: capsule?.offsetHeight ?? QUERY_INPUT_HEIGHT,
+      bannerHeight: banner?.offsetHeight ?? 0,
+      contentScrollHeight: Math.max(
+        content?.scrollHeight ?? 0,
+        banner?.offsetHeight ?? 0,
+      ),
+      chromeExtra: paneBorder + QUERY_CONTENT_BLANK_TOLERANCE_PX,
+    });
+    const hugged = shell
+      ? measureQueryHugHeight({
+          shellTop: shell.getBoundingClientRect().top,
+          paneTop: pane?.getBoundingClientRect().top,
+          paneScrollHeight: Math.max(
+            pane?.scrollHeight ?? 0,
+            (content?.scrollHeight ?? 0) + panePad,
+          ),
+          panePaddingBottom: panePad,
+          lastContentBottom: lastContentBottom > 0 ? lastContentBottom : undefined,
+        })
+      : intrinsic;
+    const measuredFromDom = lastContentBottom > 0 ? hugged : intrinsic;
+    const request: QueryLayoutRequest = {
+      sessionId: activeHandoffIdRef.current,
+      sequence: ++layoutSequenceRef.current,
+      phase,
+      resultCount,
+      desiredHeight: measuredFromDom,
+    };
+    void report(request).then((ack) => {
+      if (!acceptQueryLayoutAck({
+        ack,
+        requestSessionId: request.sessionId,
+        requestSequence: request.sequence,
+        minSequence: lastAppliedLayoutSequenceRef.current,
+        activeSessionId: activeHandoffIdRef.current,
+        currentPhase: phaseRef.current,
+        currentResultCount: resultCountRef.current,
+      })) {
+        return;
+      }
+      lastAppliedLayoutSequenceRef.current = ack.sequence;
+      layoutSequenceRef.current = Math.max(layoutSequenceRef.current, ack.sequence);
+      setResizeEdge(ack.resizeEdge);
+      setQueryHeight(ack.height);
+      setLayoutReady(true);
+    }).catch(() => undefined);
+  }, [closing, opening]);
 
   useEffect(() => {
     const api = window.customerAgent;
@@ -206,6 +349,15 @@ export function QueryApp() {
         cancelScheduledCollapseContent(true);
         activeHandoffIdRef.current = command.handoffId;
         queryInteractiveRef.current = false;
+        openingRef.current = false;
+        openingUserInteractionRef.current = false;
+        searchGenerationRef.current += 1;
+        searchInFlightRef.current = false;
+        if (searchTimerRef.current !== null) {
+          window.clearTimeout(searchTimerRef.current);
+          searchTimerRef.current = null;
+        }
+        setSearching(false);
         (document.activeElement as HTMLElement | null)?.blur?.();
         flushSync(() => {
           setAnchor(command.anchor);
@@ -228,6 +380,10 @@ export function QueryApp() {
           setInvalidMessage('');
           setErrorMessage('');
           setDeepThinkingInfoOpen(false);
+          setLayoutReady(true);
+          layoutSequenceRef.current = 0;
+          lastAppliedLayoutSequenceRef.current = 0;
+          resultCountRef.current = 0;
         });
         // With backgroundThrottling disabled for the hidden Query window, this
         // rAF is a real layout/paint barrier rather than an arbitrary delay.
@@ -252,6 +408,8 @@ export function QueryApp() {
           );
         }
         queryInteractiveRef.current = true;
+        openingRef.current = command.animate;
+        openingUserInteractionRef.current = false;
         flushSync(() => {
           setAnchor(command.anchor);
           setClosing(false);
@@ -278,6 +436,8 @@ export function QueryApp() {
           activeHandoffIdRef.current = command.handoffId;
         }
         queryInteractiveRef.current = false;
+        openingRef.current = false;
+        openingUserInteractionRef.current = false;
         (document.activeElement as HTMLElement | null)?.blur?.();
         flushSync(() => {
           setAnchor(command.anchor);
@@ -287,8 +447,13 @@ export function QueryApp() {
               Math.max(QUERY_INPUT_HEIGHT, window.innerHeight),
               command.anchor,
               command.dockEdge,
+              { x: command.handoffCenterX, y: command.handoffCenterY },
             ),
           );
+          setLayoutReady(true);
+          layoutSequenceRef.current = 0;
+          lastAppliedLayoutSequenceRef.current = 0;
+          resultCountRef.current = 0;
           setOpening(false);
           // Animated closes keep the shared fox visible until the shell reaches
           // its handoff frame; no-motion closes park immediately.
@@ -328,6 +493,32 @@ export function QueryApp() {
         }
         return;
       }
+      if (command.type === 'query-layout-ack') {
+        const ack: QueryLayoutAck = {
+          ok: true,
+          sessionId: command.sessionId,
+          sequence: command.sequence,
+          phase: command.phase,
+          resultCount: command.resultCount,
+          height: command.height,
+          resizeEdge: command.resizeEdge,
+        };
+        if (!acceptQueryLayoutAck({
+          ack,
+          minSequence: lastAppliedLayoutSequenceRef.current,
+          activeSessionId: activeHandoffIdRef.current,
+          currentPhase: phaseRef.current,
+          currentResultCount: resultCountRef.current,
+        })) {
+          return;
+        }
+        lastAppliedLayoutSequenceRef.current = ack.sequence;
+        layoutSequenceRef.current = Math.max(layoutSequenceRef.current, ack.sequence);
+        setResizeEdge(ack.resizeEdge);
+        setQueryHeight(ack.height);
+        setLayoutReady(true);
+        return;
+      }
       if (command.type === 'shortcut-status' && !command.registered) {
         setShortcutFailed(true);
         setShortcutHint(command.message);
@@ -342,6 +533,80 @@ export function QueryApp() {
     focusQueryInput,
     reportHandoffMilestone,
   ]);
+
+  useLayoutEffect(() => {
+    if (opening || closing) {
+      return undefined;
+    }
+    if (phase === 'SEARCH_INPUT' || phase === 'FOX_IDLE' || phase === 'COPIED') {
+      hugPassRef.current = 0;
+      return undefined;
+    }
+    if (layoutReady) {
+      return undefined;
+    }
+    hugPassRef.current = 1;
+    layoutFrameRef.current = window.requestAnimationFrame(() => {
+      layoutFrameRef.current = null;
+      requestQueryLayout(phase, results.length as ResultCount);
+    });
+    return () => {
+      if (layoutFrameRef.current !== null) {
+        window.cancelAnimationFrame(layoutFrameRef.current);
+        layoutFrameRef.current = null;
+      }
+    };
+  }, [closing, layoutReady, opening, phase, requestQueryLayout, results.length]);
+
+  useEffect(() => {
+    if (!layoutReady || opening || closing) {
+      return undefined;
+    }
+    if (phase === 'SEARCH_INPUT' || phase === 'FOX_IDLE' || phase === 'COPIED') {
+      hugPassRef.current = 0;
+      return undefined;
+    }
+    if (hugPassRef.current !== 1) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      const pane = resultPaneRef.current;
+      const lastContent = pane?.querySelector<HTMLElement>(
+        '.script-card:last-of-type, .status-banner',
+      );
+      const overflowed = Boolean(
+        pane &&
+          lastContent &&
+          (lastContent.getBoundingClientRect().bottom > pane.getBoundingClientRect().bottom + 0.5
+            || pane.scrollHeight > pane.clientHeight + 0.5),
+      );
+      hugPassRef.current = 2;
+      if (overflowed && resizeFinishedRef.current) {
+        requestQueryLayout(phase, results.length as ResultCount);
+      }
+    }, 32);
+    return () => window.clearTimeout(timer);
+  }, [closing, layoutReady, opening, phase, queryHeight, requestQueryLayout, results.length]);
+
+  useEffect(() => {
+    if (!opening) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      finishOpening();
+    }, QUERY_OPEN_DURATION_MS + 48);
+    return () => window.clearTimeout(timer);
+  }, [finishOpening, opening]);
+
+  useEffect(() => {
+    if (layoutReady || opening || closing) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setLayoutReady(true);
+    }, QUERY_LAYOUT_FALLBACK_MS + 80);
+    return () => window.clearTimeout(timer);
+  }, [closing, layoutReady, opening]);
 
   useEffect(() => {
     const restoreInputFocus = () => {
@@ -425,10 +690,12 @@ export function QueryApp() {
   );
 
   const runSearch = useCallback(() => {
+    dashboardOpenFailedRef.current = false;
     if (searchInFlightRef.current) {
       return;
     }
-    const trimmed = query.trim();
+    const liveQuery = inputRef.current?.value ?? query;
+    const trimmed = liveQuery.trim();
     if (!trimmed) {
       setResults([]);
       setCopiedRank(null);
@@ -437,7 +704,7 @@ export function QueryApp() {
       return;
     }
 
-    if (query.length > MAX_QUERY_CHARS) {
+    if (liveQuery.length > MAX_QUERY_CHARS) {
       setResults([]);
       setCopiedRank(null);
       setInvalidMessage(QUERY_TOO_LONG_MESSAGE);
@@ -553,20 +820,48 @@ export function QueryApp() {
     [phase, reportPhase, results.length],
   );
 
+  const openDashboard = useCallback(() => {
+    dashboardOpenFailedRef.current = false;
+    const request = window.customerAgent?.openDashboard();
+    const failOpen = (): void => {
+      dashboardOpenFailedRef.current = true;
+      setErrorMessage('工作台未打开，请重试。查询窗口仍保持可用。');
+      reportPhase('ERROR', results.length as ResultCount);
+    };
+    if (!request) {
+      failOpen();
+      return;
+    }
+    void Promise.resolve(request).then((result) => {
+      if (!result || result.ok !== true) {
+        failOpen();
+        return;
+      }
+      dashboardOpenFailedRef.current = false;
+      setErrorMessage('');
+      if (phaseRef.current === 'ERROR') {
+        const resultCount = results.length as ResultCount;
+        reportPhase(resultCount > 0 ? 'RESULTS' : 'SEARCH_INPUT', resultCount);
+      }
+    }).catch(() => {
+      failOpen();
+    });
+  }, [reportPhase, results.length]);
+
   const retry = useCallback(() => {
+    if (dashboardOpenFailedRef.current) {
+      openDashboard();
+      return;
+    }
     if (pendingCopyRef.current && errorMessage.includes('复制')) {
       void copyScript(pendingCopyRef.current);
       return;
     }
     runSearch();
-  }, [copyScript, errorMessage, runSearch]);
+  }, [copyScript, errorMessage, openDashboard, runSearch]);
 
   const dismiss = useCallback(() => {
     void window.customerAgent?.dismiss();
-  }, []);
-
-  const openDashboard = useCallback(() => {
-    void window.customerAgent?.openDashboard();
   }, []);
 
   const drag = useWindowDrag(
@@ -627,6 +922,200 @@ export function QueryApp() {
   };
 
   const expanded = phase === 'RESULTS' || phase === 'EMPTY' || phase === 'ERROR' || phase === 'COPIED';
+  const showQueryResizeGrip = phase === 'RESULTS' || phase === 'EMPTY' || phase === 'ERROR';
+
+  const applyQueryResizeAck = useCallback((
+    ack: QueryLayoutAck | null | undefined,
+    request: { sessionId: number; sequence: number },
+  ) => {
+    if (!acceptQueryLayoutAck({
+      ack,
+      requestSessionId: request.sessionId,
+      requestSequence: request.sequence,
+      minSequence: lastAppliedLayoutSequenceRef.current,
+      activeSessionId: activeHandoffIdRef.current,
+      currentPhase: phaseRef.current,
+      currentResultCount: resultCountRef.current,
+    }) || !ack) {
+      return;
+    }
+    lastAppliedLayoutSequenceRef.current = ack.sequence;
+    layoutSequenceRef.current = Math.max(layoutSequenceRef.current, ack.sequence);
+    setResizeEdge(ack.resizeEdge);
+    setQueryHeight(ack.height);
+  }, []);
+
+  const releaseQueryResizeCapture = useCallback((pointerId: number | null) => {
+    const grip = resizeGripRef.current;
+    if (pointerId === null || !grip) {
+      return;
+    }
+    try {
+      if (grip.hasPointerCapture?.(pointerId)) {
+        grip.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Capture may already have been released by the host.
+    }
+  }, []);
+
+  const finishQueryResize = useCallback((
+    kind: 'end' | 'cancel',
+    pointerId?: number,
+    options?: { alreadyLost?: boolean },
+  ) => {
+    if (resizeFinishedRef.current) {
+      return;
+    }
+    if (pointerId !== undefined && resizePointerRef.current !== pointerId) {
+      return;
+    }
+    resizeFinishedRef.current = true;
+    if (resizeFrameRef.current !== null) {
+      window.cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = null;
+    }
+    const captured = resizePointerRef.current;
+    resizePointerRef.current = null;
+    if (!options?.alreadyLost) {
+      releaseQueryResizeCapture(captured);
+    }
+    const api = window.customerAgent?.resizeQueryHeight;
+    if (!api || activeHandoffIdRef.current <= 0) {
+      return;
+    }
+    const request = {
+      type: kind,
+      sessionId: activeHandoffIdRef.current,
+      sequence: ++layoutSequenceRef.current,
+      phase: phaseRef.current,
+    };
+    void api({
+      type: kind,
+      sessionId: request.sessionId,
+      sequence: request.sequence,
+    }).then((ack) => {
+      applyQueryResizeAck(ack, request);
+    }).catch(() => undefined);
+  }, [applyQueryResizeAck, releaseQueryResizeCapture]);
+
+  const startQueryResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (parked || opening || closing || !showQueryResizeGrip) {
+      return;
+    }
+    if (typeof event.button === 'number' && event.button !== 0) {
+      return;
+    }
+    if (resizePointerRef.current !== null && !resizeFinishedRef.current) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    resizeGripRef.current = event.currentTarget;
+    resizeFinishedRef.current = false;
+    resizePointerRef.current = event.pointerId;
+    resizeOriginYRef.current = event.screenY;
+    resizeDeltaRef.current = 0;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const request = {
+      type: 'begin' as const,
+      sessionId: activeHandoffIdRef.current,
+      sequence: ++layoutSequenceRef.current,
+      phase: phaseRef.current,
+    };
+    void window.customerAgent?.resizeQueryHeight?.({
+      type: 'begin',
+      sessionId: request.sessionId,
+      sequence: request.sequence,
+    }).then((ack) => {
+      applyQueryResizeAck(ack, request);
+    }).catch(() => undefined);
+  };
+
+  const moveQueryResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (resizeFinishedRef.current || resizePointerRef.current !== event.pointerId) {
+      return;
+    }
+    if (typeof event.buttons === 'number' && (event.buttons & 1) === 0) {
+      finishQueryResize('cancel', event.pointerId);
+      return;
+    }
+    // The preload/Main contract accepts finite integers only. Pointer
+    // coordinates can be fractional on scaled displays, so normalize once at
+    // the renderer boundary instead of silently rejecting a valid drag frame.
+    resizeDeltaRef.current = Math.round(event.screenY - resizeOriginYRef.current);
+    if (resizeFrameRef.current !== null) {
+      return;
+    }
+    resizeFrameRef.current = window.requestAnimationFrame(() => {
+      resizeFrameRef.current = null;
+      if (resizeFinishedRef.current) {
+        return;
+      }
+      const request = {
+        sessionId: activeHandoffIdRef.current,
+        sequence: ++layoutSequenceRef.current,
+        phase: phaseRef.current,
+      };
+      void window.customerAgent?.resizeQueryHeight?.({
+        type: 'update',
+        sessionId: request.sessionId,
+        sequence: request.sequence,
+        deltaY: resizeDeltaRef.current,
+      }).then((ack) => {
+        applyQueryResizeAck(ack, request);
+      }).catch(() => undefined);
+    });
+  };
+
+  const handleQueryResizeKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.key !== 'ArrowUp' &&
+      event.key !== 'ArrowDown' &&
+      event.key !== 'Home' &&
+      event.key !== 'End'
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const request = {
+      sessionId: activeHandoffIdRef.current,
+      sequence: ++layoutSequenceRef.current,
+      phase: phaseRef.current,
+    };
+    void window.customerAgent?.resizeQueryHeight?.({
+      type: 'keyboard',
+      sessionId: request.sessionId,
+      sequence: request.sequence,
+      key: event.key,
+      shiftKey: event.shiftKey,
+    }).then((ack) => {
+      applyQueryResizeAck(ack, request);
+    }).catch(() => undefined);
+  };
+
+  useEffect(() => {
+    const abort = () => finishQueryResize('cancel');
+    const onWindowPointerUp = (event: PointerEvent) => {
+      finishQueryResize('end', event.pointerId);
+    };
+    const onWindowPointerCancel = (event: PointerEvent) => {
+      finishQueryResize('cancel', event.pointerId);
+    };
+    window.addEventListener('blur', abort);
+    window.addEventListener('pointerup', onWindowPointerUp);
+    window.addEventListener('pointercancel', onWindowPointerCancel);
+    return () => {
+      window.removeEventListener('blur', abort);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerCancel);
+    };
+  }, [finishQueryResize]);
+
+  useEffect(() => () => {
+    finishQueryResize('cancel');
+  }, [finishQueryResize]);
+
   const shortcutLabel = formatAcceleratorLabel('CommandOrControl+Shift+Space', platform);
   const foxVisualState = searching
     ? 'SEARCHING'
@@ -645,6 +1134,7 @@ export function QueryApp() {
         parked ? 'is-parked' : '',
         opening ? 'is-opening' : '',
         closing ? 'is-closing' : '',
+        layoutReady ? '' : 'is-awaiting-layout',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -681,10 +1171,13 @@ export function QueryApp() {
           '--query-handoff-fox-f': handoffFoxTransform.f,
         } as CSSProperties
       }
+      ref={shellRef}
       data-testid="query-shell"
       data-phase={phase}
       data-window-role="query"
       data-anchor={anchor}
+      data-layout-ready={layoutReady ? 'true' : 'false'}
+      data-resize-edge={resizeEdge}
       data-parked={parked ? 'true' : 'false'}
       data-opening={opening ? 'true' : 'false'}
       data-closing={closing ? 'true' : 'false'}
@@ -692,6 +1185,16 @@ export function QueryApp() {
       data-close-duration-ms={QUERY_CLOSE_DURATION_MS}
       data-handoff-id={activeHandoffIdRef.current}
       aria-busy={searching}
+      onPointerDownCapture={() => {
+        if (openingRef.current) {
+          openingUserInteractionRef.current = true;
+        }
+      }}
+      onKeyDownCapture={() => {
+        if (openingRef.current) {
+          openingUserInteractionRef.current = true;
+        }
+      }}
     >
       <div
         className="glass-shell"
@@ -700,8 +1203,7 @@ export function QueryApp() {
             return;
           }
           if (event.animationName === 'query-shell-unfold') {
-            setOpening(false);
-            reportHandoffMilestone(activeHandoffIdRef.current, 'open-finished');
+            finishOpening();
           }
           if (event.animationName === 'query-shell-fold') {
             flushSync(() => {
@@ -713,203 +1215,84 @@ export function QueryApp() {
         }}
       >
         <div className="glass-surface" aria-hidden="true" />
-        <div className="query-capsule">
-          <button
-            type="button"
-            className="capsule-fox"
-            data-testid="capsule-fox"
-            data-fox-state={foxVisualState}
-            aria-label="点击收起查询，拖拽移动查询窗"
-            title="点击收起 · 拖拽移动"
-            {...drag}
-          >
-            <FoxHead size={64} className={`is-query-${foxVisualState.toLowerCase()}`} />
-          </button>
-          <div className="capsule-field">
-            <label className="sr-only" htmlFor="customer-question">
-              客户问题
-            </label>
-            {deepThinkingInfoOpen ? (
-              <div
-                id="deep-thinking-panel"
-                className="deep-thinking-note"
-                data-testid="deep-thinking-panel"
-                role="note"
-              >
-                <strong>DeepSeek 辅助重排预留</strong>
-                <span>当前 OFF · 未接入 · 不生成 · 不改写 · 不发送</span>
-              </div>
-            ) : (
-              <input
-                id="customer-question"
-                ref={inputRef}
-                className="capsule-input"
-                data-testid="question-input"
-                value={query}
-                maxLength={MAX_QUERY_CHARS}
-                autoComplete="off"
-                aria-describedby="query-guidance"
-                aria-invalid={invalidMessage ? true : undefined}
-                spellCheck={false}
-                placeholder="输入或粘贴客户问题，回车查询"
-                onPointerDown={cancelScheduledResultFocus}
-                onFocus={cancelScheduledResultFocus}
-                onBeforeInput={cancelScheduledInputFocus}
-                onChange={(event) => {
-                  changeQuery(event.target.value);
-                }}
-                onCompositionStart={() => {
-                  cancelScheduledInputFocus();
-                  composingRef.current = true;
-                }}
-                onCompositionEnd={() => {
-                  composingRef.current = false;
-                }}
-                onKeyDown={onKeyDown}
-              />
-            )}
-            <span id="deep-thinking-description" className="sr-only">
-              {DEEP_THINKING_DESCRIPTION}
-            </span>
-            <div className="capsule-meta">
-              <p
-                id="query-guidance"
-                className="capsule-hint"
-                aria-live={invalidMessage ? 'polite' : undefined}
-              >
-                {invalidMessage ? (
-                  <span className="validation-error" data-testid="validation-error">
-                    {invalidMessage}
-                  </span>
-                ) : (
-                  <span>
-                    Enter 查询 · Esc 收起 · 只复制不代发
-                    {shortcutFailed ? '' : ` · ${shortcutLabel}`}
-                  </span>
-                )}
-              </p>
-              <div className="capsule-tools">
-                <button
-                  type="button"
-                  className="dashboard-entry"
-                  data-testid="open-dashboard"
-                  aria-label="打开运营工作台"
-                  title="打开运营工作台"
-                  onClick={openDashboard}
-                >
-                  <svg
-                    className="dashboard-entry-icon"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.25" />
-                    <path d="M3 7.25h14M7.25 7.5v9" />
-                    <path d="M10 10.25h4.5M10 13.25h3" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="deep-thinking-entry"
-                  data-testid="deep-thinking-toggle"
-                  aria-label={`${deepThinkingInfoOpen ? '收起' : '查看'}深度思考预留说明，功能默认 OFF`}
-                  aria-pressed={deepThinkingInfoOpen}
-                  aria-expanded={deepThinkingInfoOpen}
-                  aria-controls="deep-thinking-panel"
-                  aria-describedby="deep-thinking-description"
-                  onClick={() => setDeepThinkingInfoOpen((current) => !current)}
-                >
-                  深度思考 <span>预留 · OFF</span>
-                </button>
-                <div className="env-badges" data-testid="env-badges">
-                  <span className="env-badge">DEMO</span>
-                  <span className="env-badge">MOCK AUTH</span>
-                  <span className="env-badge">SYNTHETIC DATA</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="search-btn"
-            data-testid="search-button"
-            onClick={runSearch}
-            disabled={searching}
-            aria-busy={searching}
-          >
-            {searching ? (
-              <span className="searching-label" data-testid="searching-indicator">
-                <span className="searching-dots" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                检索中
-              </span>
-            ) : (
-              '查询'
-            )}
-          </button>
-        </div>
+        <QueryCapsule
+          foxVisualState={foxVisualState}
+          foxDrag={drag}
+          deepThinkingInfoOpen={deepThinkingInfoOpen}
+          deepThinkingDescription={DEEP_THINKING_DESCRIPTION}
+          query={query}
+          inputRef={inputRef}
+          invalidMessage={invalidMessage}
+          shortcutFailed={shortcutFailed}
+          shortcutLabel={shortcutLabel}
+          searching={searching}
+          onCancelScheduledResultFocus={cancelScheduledResultFocus}
+          onCancelScheduledInputFocus={cancelScheduledInputFocus}
+          onChangeQuery={changeQuery}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            composingRef.current = false;
+          }}
+          onKeyDown={onKeyDown}
+          onOpenDashboard={openDashboard}
+          onToggleDeepThinking={() => setDeepThinkingInfoOpen((current) => !current)}
+          onSearch={runSearch}
+        />
 
         {shortcutFailed ? (
-          <p className="shortcut-banner" data-testid="shortcut-fallback">
+          <p ref={bannerRef} className="shortcut-banner" data-testid="shortcut-fallback">
             {shortcutHint || '全局快捷键注册失败，请点击狐狸头打开。'}
           </p>
         ) : null}
 
         {expanded ? (
-          <section
-            ref={resultPaneRef}
-            className="result-pane"
-            data-testid="result-pane"
-            aria-label="候选话术"
-            tabIndex={-1}
-          >
-            {phase === 'EMPTY' ? (
-              <div className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
-                <span className="no-hit-mark" aria-hidden="true">?</span>
-                <strong>没找到合适话术</strong>
-                <span>换个说法再试，或转人工话术师。当前 Demo 未接通真实话术库。</span>
-              </div>
-            ) : null}
-
-            {phase === 'ERROR' ? (
-              <div className="status-banner is-error" data-testid="error-state">
-                <strong>查询未完成</strong>
-                <span>{errorMessage || '出现可恢复错误，请重试。'}</span>
-                <button type="button" className="retry-btn" data-testid="retry-button" onClick={retry}>
-                  重试
-                </button>
-              </div>
-            ) : null}
-
-            {phase === 'RESULTS' || phase === 'COPIED' || (phase === 'ERROR' && results.length > 0) ? (
-              <div className="card-list" data-testid="result-list">
-                <div className="result-heading" role="status" aria-live="polite">
-                  <strong>候选话术</strong>
-                  {phase === 'COPIED' ? (
-                    <span className="copied-feedback" data-testid="toast">
-                      {COPY_SUCCESS_MESSAGE}
-                    </span>
-                  ) : (
-                    <span>{results.length} 条 · 按 1 / 2 / 3 复制</span>
-                  )}
-                </div>
-                {results.map((script) => (
-                  <ScriptCard
-                    key={script.scriptId}
-                    script={script}
-                    copying={copying || phase === 'COPIED'}
-                    copied={copiedRank === script.rank}
-                    onCopy={(item, trigger) => {
-                      void copyScript(item, trigger);
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </section>
+          <QueryResultsPane
+            phase={phase}
+            resultPaneRef={resultPaneRef}
+            bannerRef={bannerRef}
+            resultContentRef={resultContentRef}
+            errorMessage={errorMessage}
+            results={results}
+            copying={copying}
+            copiedRank={copiedRank}
+            onRetry={retry}
+            onCopy={(item, trigger) => {
+              void copyScript(item, trigger);
+            }}
+          />
+        ) : null}
+        {showQueryResizeGrip ? (
+          <div
+            ref={resizeGripRef}
+            className="query-resize-grip"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="调整查询窗高度"
+            aria-valuemin={QUERY_LAYOUT_MIN_HEIGHT}
+            aria-valuemax={QUERY_LAYOUT_MAX_HEIGHT}
+            aria-valuenow={queryHeight}
+            aria-valuetext={`${queryHeight} 像素`}
+            data-edge={resizeEdge}
+            data-testid="query-resize-grip"
+            tabIndex={0}
+            onPointerDown={startQueryResize}
+            onPointerMove={moveQueryResize}
+            onPointerUp={(event) => {
+              if (resizePointerRef.current !== event.pointerId) return;
+              finishQueryResize('end', event.pointerId);
+            }}
+            onPointerCancel={(event) => {
+              if (resizePointerRef.current !== event.pointerId) return;
+              finishQueryResize('cancel', event.pointerId);
+            }}
+            onLostPointerCapture={(event) => {
+              if (resizePointerRef.current !== event.pointerId) return;
+              finishQueryResize('cancel', event.pointerId, { alreadyLost: true });
+            }}
+            onKeyDown={handleQueryResizeKey}
+          />
         ) : null}
       </div>
     </div>

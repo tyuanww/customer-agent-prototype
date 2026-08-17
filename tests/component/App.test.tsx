@@ -18,6 +18,7 @@ describe('App role switch', () => {
       dismiss: vi.fn(),
       reportUiPhase: vi.fn(),
       moveFoxBy: vi.fn(),
+      commitFoxDragSettle: vi.fn(),
       setFoxPeek: vi.fn(),
       onOverlayCommand: () => () => undefined,
     };
@@ -40,6 +41,7 @@ describe('App role switch', () => {
       dismiss: vi.fn(),
       reportUiPhase: vi.fn(),
       moveFoxBy: vi.fn(),
+      commitFoxDragSettle: vi.fn(),
       setFoxPeek: vi.fn(),
       onOverlayCommand: () => () => undefined,
     };

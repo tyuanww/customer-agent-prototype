@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
+  FOX_HALO_DURATION_MS,
+  FOX_HALO_OPACITY_MAX,
+  FOX_HALO_OPACITY_MIN,
+  FOX_HALO_SIZE_MAX_PX,
+  FOX_HALO_SIZE_MIN_PX,
+  FOX_DOCK_READY_MAX_SCALE,
+  FOX_DOCK_READY_RISE_PX,
+  FOX_DOCK_READY_TILT_DEG,
+  FOX_DOCK_READY_TRAVEL_PX,
   FOX_IDLE_DURATION_MS,
   FOX_IDLE_FLOAT_PX,
   FOX_IDLE_MAX_SCALE,
@@ -16,6 +28,10 @@ import {
   isVisibleIdleFloat,
   isVisibleIdleSwing,
 } from '../../src/shared/fox-motion';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const css = readFileSync(path.join(root, 'src/renderer/styles/app.css'), 'utf8');
+const foxApp = readFileSync(path.join(root, 'src/renderer/FoxApp.tsx'), 'utf8');
 
 describe('fox motion parameters', () => {
   it('keeps idle motion visibly stronger than the old 2px / 0.8deg cycle', () => {
@@ -39,6 +55,68 @@ describe('fox motion parameters', () => {
     expect(FOX_PEEK_DURATION_MS).toBeLessThanOrEqual(500);
     expect(FOX_RETRACT_DURATION_MS).toBeGreaterThanOrEqual(240);
     expect(FOX_RETRACT_DURATION_MS).toBeLessThan(FOX_PEEK_DURATION_MS);
+  });
+
+  it('gives a docked fox a mirrored inward ready motion without paint-heavy animation', () => {
+    expect(FOX_DOCK_READY_TRAVEL_PX).toBe(3);
+    expect(FOX_DOCK_READY_RISE_PX).toBe(2);
+    expect(FOX_DOCK_READY_TILT_DEG).toBe(5);
+    expect(FOX_DOCK_READY_MAX_SCALE).toBe(1.035);
+    expect(foxApp).toContain("'--fox-dock-ready-travel': `${FOX_DOCK_READY_TRAVEL_PX}px`");
+    expect(foxApp).toContain("'--fox-dock-ready-rise': `${FOX_DOCK_READY_RISE_PX}px`");
+    expect(foxApp).toContain("'--fox-dock-ready-tilt': `${FOX_DOCK_READY_TILT_DEG}deg`");
+    expect(css).toContain('@keyframes fox-docked-ready-left');
+    expect(css).toContain('@keyframes fox-docked-ready-right');
+    expect(css).toContain('var(--fox-dock-ready-travel)');
+    expect(css).toContain('var(--fox-follow-x, 0px)');
+    expect(css).toContain('rotate(calc(var(--fox-dock-ready-tilt) + var(--fox-follow-rot, 0deg)))');
+    expect(css).toContain('rotate(calc(0deg - var(--fox-dock-ready-tilt) + var(--fox-follow-rot, 0deg)))');
+    expect(css).toContain('.is-snapping,');
+    expect(css).toContain('.is-peeking,');
+    expect(css).toContain('.is-retracting,');
+    expect(css).toContain('.is-handoff-frozen');
+    const readyMotion = css.slice(
+      css.indexOf('@keyframes fox-docked-ready-left'),
+      css.indexOf('@keyframes fox-halo-breathe'),
+    );
+    expect(readyMotion).toContain('transform:');
+    expect(readyMotion).not.toMatch(/\bfilter:|\bopacity:|\bclip-path:|\bbackdrop-filter:/);
+    expect(css).toMatch(
+      /prefers-reduced-motion: reduce[\s\S]*\.fox-idle\.is-docked-left \.fox-head\.is-glowing[\s\S]*animation: none !important/,
+    );
+  });
+
+  it('splits the idle halo onto an opacity-only purple layer', () => {
+    expect(FOX_HALO_DURATION_MS).toBeGreaterThanOrEqual(3000);
+    expect(FOX_HALO_DURATION_MS).toBeLessThanOrEqual(3400);
+    expect(FOX_HALO_SIZE_MIN_PX).toBe(76);
+    expect(FOX_HALO_SIZE_MAX_PX).toBe(84);
+    expect(FOX_HALO_OPACITY_MIN).toBeGreaterThanOrEqual(0.52);
+    expect(FOX_HALO_OPACITY_MIN).toBeLessThanOrEqual(0.6);
+    expect(FOX_HALO_OPACITY_MAX).toBeGreaterThanOrEqual(0.92);
+    expect(FOX_HALO_OPACITY_MAX).toBeLessThanOrEqual(0.95);
+    expect(css).toContain('.fox-button::before');
+    expect(foxApp).toContain("'--fox-halo-size': `${FOX_HALO_SIZE_MIN_PX}px`");
+    expect(foxApp).toContain("'--fox-halo-outer-size': `${FOX_HALO_SIZE_MAX_PX}px`");
+    expect(foxApp).toContain("'--fox-halo-opacity-min': FOX_HALO_OPACITY_MIN");
+    expect(foxApp).toContain("'--fox-halo-opacity-max': FOX_HALO_OPACITY_MAX");
+    expect(css).toContain('@keyframes fox-halo-breathe');
+    expect(css).toContain('rgba(139, 92, 246');
+    expect(css).not.toContain('@keyframes fox-dock-glint');
+    const idleMotion = css.match(/@keyframes fox-idle-motion\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(idleMotion).toContain('transform:');
+    expect(idleMotion).not.toMatch(/\bfilter:/);
+    const haloMotion = css.match(/@keyframes fox-halo-breathe\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(haloMotion).toContain('opacity:');
+    expect(haloMotion).not.toMatch(/\bfilter:|\btransform:/);
+    expect(css).toContain('.fox-idle.is-handoff-frozen .fox-button::before');
+    expect(css).toContain('.fox-idle .fox-button:focus-visible');
+    expect(css).toContain('.fox-focus-ring');
+    expect(css).toContain('.fox-button:has(.fox-head.is-warning)::before');
+    expect(css).toContain('.fox-button::after');
+    expect(css).toContain('--fox-halo-reduced-opacity');
+    expect(css).toMatch(/prefers-reduced-motion: reduce[\s\S]*\.fox-idle \.fox-button::before[\s\S]*animation: none/);
+    expect(css).toMatch(/prefers-reduced-transparency: reduce[\s\S]*\.fox-button::after/);
   });
 
   it('keeps the frequent query handoff brief and closes faster than it opens', () => {

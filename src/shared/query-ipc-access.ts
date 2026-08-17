@@ -20,3 +20,17 @@ export function canCopyText(input: {
 }): boolean {
   return isTrustedQuerySender(input);
 }
+
+export function canReportQueryLayout(input: {
+  trusted: boolean;
+  role: RendererRole | null;
+}): boolean {
+  return isTrustedQuerySender(input);
+}
+
+export function canResizeQueryHeight(input: {
+  trusted: boolean;
+  role: RendererRole | null;
+}): boolean {
+  return isTrustedQuerySender(input);
+}

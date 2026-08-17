@@ -1,11 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC_CHANNELS,
+  isOpenDashboardResult,
+  openDashboardUnavailable,
   type CopyTextResult,
   type CustomerAgentApi,
+  type OpenDashboardResult,
   type PlatformInfo,
 } from '../shared/contracts';
 import {
+  isFoxDragSettleAck,
+  isFoxDragGeneration,
+  isFoxDragSettleId,
   isFoxPeekIntent,
   isFoxPeekEpoch,
   isFoxVisualTransform,
@@ -17,6 +23,11 @@ import {
   type OverlayCommand,
   type WindowContext,
 } from '../shared/overlay-events';
+import {
+  isQueryLayoutRequest,
+  isQueryResizeRequest,
+  rejectedQueryLayoutAck,
+} from '../shared/query-layout';
 
 const overlayListeners = new Set<(command: OverlayCommand) => void>();
 
@@ -48,8 +59,10 @@ const api: CustomerAgentApi = {
     }
     return ipcRenderer.invoke(IPC_CHANNELS.OPEN_SEARCH, visualTransform);
   },
-  openDashboard(): Promise<void> {
-    return ipcRenderer.invoke(IPC_CHANNELS.OPEN_DASHBOARD);
+  openDashboard(): Promise<OpenDashboardResult> {
+    return ipcRenderer
+      .invoke(IPC_CHANNELS.OPEN_DASHBOARD)
+      .then((value: unknown) => (isOpenDashboardResult(value) ? value : openDashboardUnavailable()));
   },
   dismiss(): Promise<void> {
     return ipcRenderer.invoke(IPC_CHANNELS.DISMISS);
@@ -66,15 +79,36 @@ const api: CustomerAgentApi = {
     }
     return ipcRenderer.invoke(IPC_CHANNELS.REPORT_HANDOFF_MILESTONE, handoffId, milestone);
   },
-  moveFoxBy(deltaX: number, deltaY: number, finished = false): Promise<void> {
+  reportQueryLayout(request) {
+    if (!isQueryLayoutRequest(request)) {
+      return Promise.resolve(rejectedQueryLayoutAck(0, 0));
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.REPORT_QUERY_LAYOUT, request);
+  },
+  resizeQueryHeight(request) {
+    if (!isQueryResizeRequest(request)) {
+      return Promise.resolve(rejectedQueryLayoutAck(0, 0));
+    }
+    return ipcRenderer.invoke(IPC_CHANNELS.RESIZE_QUERY_HEIGHT, request);
+  },
+  moveFoxBy(deltaX: number, deltaY: number, finished = false, generation?: number) {
     if (
       typeof deltaX !== 'number' ||
       typeof deltaY !== 'number' ||
-      typeof finished !== 'boolean'
+      typeof finished !== 'boolean' ||
+      (generation !== undefined && !isFoxDragGeneration(generation))
     ) {
+      return Promise.resolve(null);
+    }
+    return ipcRenderer
+      .invoke(IPC_CHANNELS.MOVE_FOX_BY, deltaX, deltaY, finished, generation)
+      .then((value: unknown) => (isFoxDragSettleAck(value) ? value : null));
+  },
+  commitFoxDragSettle(settleId: number): Promise<void> {
+    if (!isFoxDragSettleId(settleId)) {
       return Promise.resolve();
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.MOVE_FOX_BY, deltaX, deltaY, finished);
+    return ipcRenderer.invoke(IPC_CHANNELS.COMMIT_FOX_DRAG_SETTLE, settleId);
   },
   setFoxPeek(intent, epoch): Promise<void> {
     if (!isFoxPeekIntent(intent) || !isFoxPeekEpoch(epoch)) {

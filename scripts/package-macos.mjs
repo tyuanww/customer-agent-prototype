@@ -1,8 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { prepareNodeSystemCaEnvironment } from './node-system-ca.mjs';
 
 const mode = process.argv[2];
 if (mode !== 'local' && mode !== 'distribution') {
@@ -15,38 +14,16 @@ if (process.platform !== 'darwin') {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDirectory =
   mode === 'local' ? 'release/local-unsigned' : 'release/distribution';
-let temporaryCaDirectory;
+const systemCa = prepareNodeSystemCaEnvironment();
 
 try {
-  const buildEnvironment = { ...process.env };
-  if (!buildEnvironment.NODE_EXTRA_CA_CERTS) {
-    temporaryCaDirectory = mkdtempSync(
-      path.join(os.tmpdir(), 'customer-agent-mac-ca-'),
-    );
-    const certificatePath = path.join(temporaryCaDirectory, 'system-roots.pem');
-    execFileSync(
-      '/usr/bin/security',
-      [
-        'export',
-        '-t',
-        'certs',
-        '-k',
-        '/System/Library/Keychains/SystemRootCertificates.keychain',
-        '-f',
-        'pemseq',
-        '-o',
-        certificatePath,
-      ],
-      { stdio: ['ignore', 'ignore', 'inherit'] },
-    );
-    buildEnvironment.NODE_EXTRA_CA_CERTS = certificatePath;
-  }
+  const buildEnvironment = systemCa.environment;
 
   if (mode === 'local') {
     buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
   }
 
-  execFileSync('pnpm', ['generate:mac-icon'], {
+  execFileSync('pnpm', ['generate:app-icons'], {
     cwd: root,
     env: buildEnvironment,
     stdio: 'inherit',
@@ -88,7 +65,5 @@ try {
     stdio: 'inherit',
   });
 } finally {
-  if (temporaryCaDirectory) {
-    rmSync(temporaryCaDirectory, { recursive: true, force: true });
-  }
+  systemCa.cleanup();
 }

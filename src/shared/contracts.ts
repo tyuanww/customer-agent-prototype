@@ -1,18 +1,32 @@
+import type { OpenDashboardResult } from './dashboard-access';
 import type {
+  FoxDragSettleAck,
   FoxPeekIntent,
   FoxVisualTransform,
   HandoffMilestone,
   OverlayCommand,
+  ReportablePhase,
+  ResultCount,
   WindowContext,
 } from './overlay-events';
-import type { ReportablePhase, ResultCount } from './overlay-events';
 import type { CopyTextResult, PlatformInfo } from './contracts-types';
+import type {
+  QueryLayoutAck,
+  QueryLayoutRequest,
+  QueryResizeRequest,
+} from './query-layout';
 
 export type {
   CopyTextResult,
   PlatformInfo,
   PlatformName,
 } from './contracts-types';
+export type { OpenDashboardResult } from './dashboard-access';
+export {
+  OPEN_DASHBOARD_FAILURE_MESSAGE,
+  isOpenDashboardResult,
+  openDashboardUnavailable,
+} from './dashboard-access';
 
 export { IPC_CHANNELS, IPC_CHANNEL_WHITELIST } from './ipc-channels';
 export type { IpcChannel } from './ipc-channels';
@@ -22,11 +36,19 @@ export type CustomerAgentApi = {
   getPlatform: () => Promise<PlatformInfo>;
   getWindowContext: () => Promise<WindowContext>;
   openSearch: (visualTransform?: FoxVisualTransform) => Promise<void>;
-  openDashboard: () => Promise<void>;
+  openDashboard: () => Promise<OpenDashboardResult>;
   dismiss: () => Promise<void>;
   reportUiPhase: (phase: ReportablePhase, resultCount?: ResultCount) => Promise<void>;
   reportHandoffMilestone?: (handoffId: number, milestone: HandoffMilestone) => Promise<void>;
-  moveFoxBy: (deltaX: number, deltaY: number, finished?: boolean) => Promise<void>;
+  reportQueryLayout?: (request: QueryLayoutRequest) => Promise<QueryLayoutAck>;
+  resizeQueryHeight?: (request: QueryResizeRequest) => Promise<QueryLayoutAck>;
+  moveFoxBy: (
+    deltaX: number,
+    deltaY: number,
+    finished?: boolean,
+    generation?: number,
+  ) => Promise<FoxDragSettleAck | null>;
+  commitFoxDragSettle: (settleId: number) => Promise<void>;
   setFoxPeek: (intent: FoxPeekIntent, epoch: number) => Promise<void>;
   onOverlayCommand: (handler: (command: OverlayCommand) => void) => () => void;
 };

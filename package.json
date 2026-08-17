@@ -17,8 +17,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:float": "vitest run tests/unit/overlay-chrome-window.test.ts tests/unit/overlay-geometry.test.ts tests/unit/fox-presence.test.ts tests/unit/fox-motion.test.ts tests/unit/overlay-events.test.ts tests/unit/fox-peek-access.test.ts tests/component/FoxApp.test.tsx",
+    "test:assets": "vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts",
+    "test:e2e:float": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @float",
     "build": "electron-vite build",
     "generate:mac-icon": "sh scripts/generate-mac-icon.sh",
+    "generate:fox-head": "node scripts/generate-fox-head.mjs",
+    "generate:app-icons": "node scripts/generate-app-icons.mjs",
     "preview": "electron-vite preview",
     "test:e2e": "pnpm build && playwright test",
     "package:win": "node scripts/package-windows.mjs local",
@@ -85,6 +90,13 @@
     ],
     "asar": true,
     "win": {
+      "icon": "build/icon.ico",
+      "extraResources": [
+        {
+          "from": "build/icon.ico",
+          "to": "icon.ico"
+        }
+      ],
       "target": [
         {
           "target": "nsis",
@@ -93,7 +105,7 @@
           ]
         }
       ],
-      "signAndEditExecutable": false,
+      "signExecutable": false,
       "artifactName": "${productName}-${version}-win-${arch}-UNSIGNED.${ext}"
     },
     "mac": {
@@ -129,7 +141,8 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false
+      "allowToChangeInstallationDirectory": false,
+      "differentialPackage": false
     }
   }
 }

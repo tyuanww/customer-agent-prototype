@@ -10,6 +10,10 @@ import {
 } from 'electron';
 import type { OverlayController } from './overlay-controller';
 import {
+  notifyDashboardOpenFailure,
+  runDashboardOpenAttempt,
+} from './dashboard-open-failure';
+import {
   createApplicationMenuModel,
   createOverlayContextMenuModel,
   createTrayMenuModel,
@@ -36,7 +40,14 @@ function createActions(options: DesktopShellOptions): DesktopActions {
       options.controller.openSearch();
     },
     'open-dashboard': () => {
-      void options.controller.openDashboard();
+      void runDashboardOpenAttempt(
+        () => options.controller.openDashboard(),
+        async (reason) => {
+          if (!options.controller.isDisposed()) {
+            await notifyDashboardOpenFailure(reason);
+          }
+        },
+      );
     },
     quit: options.quit,
   };

@@ -22,6 +22,8 @@ const openDashboard = vi.fn();
 const dismiss = vi.fn();
 const reportUiPhase = vi.fn();
 const reportHandoffMilestone = vi.fn();
+const reportQueryLayout = vi.fn();
+const resizeQueryHeight = vi.fn();
 const moveFoxBy = vi.fn();
 const setFoxPeek = vi.fn();
 const commandListeners = new Set<(command: OverlayCommand) => void>();
@@ -56,11 +58,37 @@ describe('QueryApp', () => {
     dismiss.mockReset();
     reportUiPhase.mockReset();
     reportHandoffMilestone.mockReset();
+    reportQueryLayout.mockReset();
+    resizeQueryHeight.mockReset();
     moveFoxBy.mockReset();
     setFoxPeek.mockReset();
     reportHandoffMilestone.mockResolvedValue(undefined);
+    reportQueryLayout.mockImplementation(async (request: {
+      sessionId: number;
+      sequence: number;
+      phase: 'SEARCH_INPUT' | 'RESULTS' | 'EMPTY' | 'ERROR' | 'COPIED';
+      resultCount: 0 | 1 | 2 | 3;
+    }) => ({
+      ok: true,
+      sessionId: request.sessionId,
+      sequence: request.sequence,
+      phase: request.phase,
+      resultCount: request.resultCount,
+      height: 312,
+      resizeEdge: 'bottom',
+    }));
+    resizeQueryHeight.mockImplementation(async (request: { sessionId: number; sequence: number }) => ({
+      ok: true,
+      sessionId: request.sessionId,
+      sequence: request.sequence,
+      phase: 'RESULTS',
+      resultCount: 3,
+      height: 360,
+      resizeEdge: 'bottom',
+    }));
     commandListeners.clear();
     copyText.mockResolvedValue({ ok: true });
+    openDashboard.mockResolvedValue({ ok: true });
     getPlatform.mockResolvedValue({ platform: 'darwin' });
     getWindowContext.mockResolvedValue({
       role: 'query',
@@ -81,7 +109,10 @@ describe('QueryApp', () => {
       dismiss,
       reportUiPhase,
       reportHandoffMilestone,
+      reportQueryLayout,
+      resizeQueryHeight,
       moveFoxBy,
+      commitFoxDragSettle: vi.fn(),
       setFoxPeek,
       onOverlayCommand(handler) {
         commandListeners.add(handler);
@@ -110,6 +141,55 @@ describe('QueryApp', () => {
     });
     expect(input.selectionStart).toBe(0);
     expect(input.selectionEnd).toBe('澄芽洁面'.length);
+  });
+
+  it('reconciles passive focus when the normal opening animation finishes', () => {
+    render(<QueryApp />);
+    const input = screen.getByTestId('question-input') as HTMLInputElement;
+    const fox = screen.getByTestId('capsule-fox') as HTMLButtonElement;
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', anchor: 'left', animate: true });
+      }
+    });
+    fox.focus();
+    expect(fox).toHaveFocus();
+    dispatchAnimationEnd(document.querySelector('.glass-shell') as Element, 'query-shell-unfold');
+    expect(input).toHaveFocus();
+  });
+
+  it('does not steal focus after the user interacts during opening', () => {
+    render(<QueryApp />);
+    const fox = screen.getByTestId('capsule-fox') as HTMLButtonElement;
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', anchor: 'left', animate: true });
+      }
+    });
+    fireEvent.pointerDown(fox, { pointerId: 1, button: 0 });
+    fox.focus();
+    dispatchAnimationEnd(document.querySelector('.glass-shell') as Element, 'query-shell-unfold');
+    expect(fox).toHaveFocus();
+  });
+
+  it('reconciles passive focus through the opening watchdog fallback', () => {
+    vi.useFakeTimers();
+    render(<QueryApp />);
+    const input = screen.getByTestId('question-input') as HTMLInputElement;
+    const fox = screen.getByTestId('capsule-fox') as HTMLButtonElement;
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', anchor: 'left', animate: true });
+      }
+    });
+    fox.focus();
+    expect(fox).toHaveFocus();
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(input).toHaveFocus();
   });
 
   it('restores native-window focus without selecting and overwriting an entered question', async () => {
@@ -198,6 +278,8 @@ describe('QueryApp', () => {
           anchor: 'right',
           dockEdge: 'right',
           animate: true,
+          handoffCenterX: 600,
+          handoffCenterY: 44,
         });
       }
     });
@@ -237,6 +319,7 @@ describe('QueryApp', () => {
     const fox = screen.getByTestId('capsule-fox');
 
     expect(fox).toHaveAccessibleName('点击收起查询，拖拽移动查询窗');
+    expect(screen.getByTestId('query-fox-focus-ring')).toBeInTheDocument();
     await user.click(fox);
     expect(dismiss).toHaveBeenCalledTimes(1);
 
@@ -280,7 +363,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: true });
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: true, handoffCenterX: 600, handoffCenterY: 44 });
       }
     });
     expect(shell).toHaveAttribute('data-opening', 'false');
@@ -355,7 +438,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
         listener({ type: 'activate-search', anchor: 'left', animate: true });
       }
     });
@@ -376,6 +459,49 @@ describe('QueryApp', () => {
     fireEvent.change(input, { target: { value: '澄芽氨基酸洁面怎么用' } });
     fireEvent.keyDown(input, { key: 'Enter', isComposing: false, keyCode: 13 });
     expect(await screen.findByTestId('script-card-1')).toBeInTheDocument();
+  });
+
+  it('reports RESULTS with 1, 2, and 3 candidates for the demo queries', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    openQuerySession(4);
+
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '面膜过敏怎么办' } });
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('script-card-1')).toBeVisible();
+    expect(screen.queryByTestId('script-card-2')).not.toBeInTheDocument();
+    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 1);
+
+    fireEvent.change(screen.getByTestId('question-input'), {
+      target: { value: '澄芽洁面和雾屿精华能一起用吗' },
+    });
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('script-card-2')).toBeVisible();
+    expect(screen.queryByTestId('script-card-3')).not.toBeInTheDocument();
+    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 2);
+
+    fireEvent.change(screen.getByTestId('question-input'), {
+      target: { value: '澄芽氨基酸洁面怎么用' },
+    });
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('script-card-3')).toBeVisible();
+    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 3);
+    await waitFor(() => expect(reportQueryLayout).toHaveBeenCalled());
+    const layoutRequest = reportQueryLayout.mock.calls.at(-1)?.[0] as {
+      desiredHeight: number;
+      phase: string;
+      resultCount: number;
+      sequence: number;
+    };
+    expect(layoutRequest.phase).toBe('RESULTS');
+    expect(layoutRequest.resultCount).toBe(3);
+    expect(Number.isFinite(layoutRequest.desiredHeight)).toBe(true);
+    expect(layoutRequest.desiredHeight).toBeGreaterThan(0);
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('role', 'separator');
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('aria-orientation', 'horizontal');
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('aria-valuenow', '312');
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('data-edge', 'bottom');
+    expect(screen.getByTestId('result-content')).toBeInTheDocument();
   });
 
   it('shows a stable Top 3 without numeric match scores', async () => {
@@ -417,7 +543,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true, handoffCenterX: 44, handoffCenterY: 44 });
       }
     });
 
@@ -486,7 +612,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
       }
     });
     copyText.mockClear();
@@ -619,7 +745,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
       }
     });
 
@@ -670,7 +796,7 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
         listener({ type: 'activate-search', anchor: 'left', animate: true });
       }
     });
@@ -696,7 +822,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'right', dockEdge: 'none', animate: false });
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'none', animate: false, handoffCenterX: 556, handoffCenterY: 44 });
         listener({ type: 'activate-search', anchor: 'right', animate: true });
       }
     });
@@ -753,5 +879,378 @@ describe('QueryApp', () => {
     expect(openDashboard).toHaveBeenCalledTimes(1);
     expect(copyText).not.toHaveBeenCalled();
     expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+  });
+
+  it('keeps query usable and offers retry feedback when dashboard opening fails', async () => {
+    const user = userEvent.setup();
+    openDashboard
+      .mockResolvedValueOnce({ ok: false, message: '工作台未打开，请重试。查询窗口仍保持可用。' })
+      .mockResolvedValueOnce({ ok: true });
+    render(<QueryApp />);
+
+    await user.click(screen.getByTestId('open-dashboard'));
+    expect(await screen.findByTestId('error-state')).toHaveTextContent('工作台未打开，请重试');
+    expect(screen.getByTestId('question-input')).toBeVisible();
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('retry-button'));
+    expect(openDashboard).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(screen.queryByTestId('error-state')).not.toBeInTheDocument();
+    });
+  });
+
+  it('does not pretend success when dashboard opening rejects', async () => {
+    const user = userEvent.setup();
+    openDashboard.mockRejectedValueOnce(new Error('dashboard failed'));
+    render(<QueryApp />);
+
+    await user.click(screen.getByTestId('open-dashboard'));
+    expect(await screen.findByTestId('error-state')).toHaveTextContent('工作台未打开，请重试');
+    expect(screen.getByTestId('question-input')).toBeVisible();
+  });
+
+  function openQuerySession(handoffId: number) {
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'prepare-search',
+          handoffId,
+          anchor: 'left',
+          handoffCenterX: 44,
+          handoffCenterY: 44,
+          foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
+        });
+      }
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', handoffId, anchor: 'left', animate: false });
+      }
+    });
+  }
+
+  it('ignores stale layout ACKs from another session and keeps the new session waiting', async () => {
+    const pending = deferred<{
+      ok: boolean;
+      sessionId: number;
+      sequence: number;
+      phase: 'RESULTS';
+      resultCount: 3;
+      height: number;
+      resizeEdge: 'bottom';
+    }>();
+    reportQueryLayout.mockImplementation(() => pending.promise);
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    openQuerySession(4);
+    await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
+    await user.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('script-card-1');
+    await waitFor(() =>
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'false'),
+    );
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'query-layout-ack',
+          sessionId: 1,
+          sequence: 1,
+          phase: 'RESULTS',
+          resultCount: 3,
+          height: 620,
+          resizeEdge: 'bottom',
+        });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'false');
+    expect(screen.getByTestId('query-resize-grip')).not.toHaveAttribute('aria-valuenow', '620');
+
+    openQuerySession(9);
+    await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
+    await user.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('script-card-1');
+    await waitFor(() =>
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'false'),
+    );
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'query-layout-ack',
+          sessionId: 4,
+          sequence: 2,
+          phase: 'RESULTS',
+          resultCount: 3,
+          height: 620,
+          resizeEdge: 'bottom',
+        });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'false');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'query-layout-ack',
+          sessionId: 9,
+          sequence: 3,
+          phase: 'RESULTS',
+          resultCount: 3,
+          height: 430,
+          resizeEdge: 'top',
+        });
+      }
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true'),
+    );
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('aria-valuenow', '430');
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('data-edge', 'top');
+  });
+
+  it('rejects a second resize pointer, rolls back cancel after height changes, then allows another drag', async () => {
+    let liveHeight = 312;
+    resizeQueryHeight.mockImplementation(async (request: {
+      type: string;
+      sessionId: number;
+      sequence: number;
+      deltaY?: number;
+    }) => {
+      if (request.type === 'update') {
+        liveHeight = 400;
+      }
+      if (request.type === 'cancel') {
+        liveHeight = 312;
+      }
+      return {
+        ok: true,
+        sessionId: request.sessionId,
+        sequence: request.sequence,
+        phase: 'RESULTS' as const,
+        resultCount: 3 as const,
+        height: liveHeight,
+        resizeEdge: 'bottom' as const,
+      };
+    });
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    openQuerySession(4);
+    await searchCleanser(user);
+    await waitFor(() =>
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true'),
+    );
+    const grip = screen.getByTestId('query-resize-grip');
+    const captured = new Set<number>();
+    Object.assign(grip, {
+      setPointerCapture(id: number) {
+        captured.add(id);
+      },
+      hasPointerCapture(id: number) {
+        return captured.has(id);
+      },
+      releasePointerCapture(id: number) {
+        captured.delete(id);
+      },
+    });
+    let pendingFrame: FrameRequestCallback | null = null;
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      pendingFrame = callback;
+      return 17;
+    });
+
+    fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 3, screenY: 400 });
+    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(1);
+    fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 4, screenY: 410 });
+    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(1);
+
+    fireEvent.pointerMove(grip, { buttons: 1, pointerId: 3, screenY: 460, clientY: 460 });
+    expect(pendingFrame).not.toBeNull();
+    act(() => pendingFrame?.(performance.now()));
+    await waitFor(() => expect(resizeQueryHeight).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'update' }),
+    ));
+    await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '400'));
+
+    fireEvent.pointerCancel(grip, { pointerId: 3 });
+    await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '312'));
+    expect(captured.has(3)).toBe(false);
+
+    fireEvent.blur(window);
+    fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 5, screenY: 400 });
+    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
+    raf.mockRestore();
+  });
+
+  it('applies a matching fallback ACK then lets the next natural layout succeed', async () => {
+    const pending = deferred<{
+      ok: boolean;
+      sessionId: number;
+      sequence: number;
+      phase: 'RESULTS';
+      resultCount: 3;
+      height: number;
+      resizeEdge: 'bottom';
+    }>();
+    reportQueryLayout.mockImplementation(() => pending.promise);
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    openQuerySession(4);
+    await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
+    await user.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('script-card-3');
+    await waitFor(() =>
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'false'),
+    );
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'query-layout-ack',
+          sessionId: 4,
+          sequence: 2,
+          phase: 'EMPTY',
+          resultCount: 0,
+          height: 240,
+          resizeEdge: 'bottom',
+        });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'false');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'query-layout-ack',
+          sessionId: 4,
+          sequence: 2,
+          phase: 'RESULTS',
+          resultCount: 3,
+          height: 430,
+          resizeEdge: 'bottom',
+        });
+      }
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true'),
+    );
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('aria-valuenow', '430');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'query-layout-ack',
+          sessionId: 4,
+          sequence: 2,
+          phase: 'RESULTS',
+          resultCount: 3,
+          height: 620,
+          resizeEdge: 'bottom',
+        });
+      }
+    });
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('aria-valuenow', '430');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'query-layout-ack',
+          sessionId: 4,
+          sequence: 1,
+          phase: 'RESULTS',
+          resultCount: 3,
+          height: 340,
+          resizeEdge: 'bottom',
+        });
+      }
+    });
+    expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('aria-valuenow', '430');
+
+    reportQueryLayout.mockImplementation(async (request: {
+      sessionId: number;
+      sequence: number;
+      phase: 'RESULTS';
+      resultCount: 3;
+    }) => ({
+      ok: true,
+      sessionId: request.sessionId,
+      sequence: request.sequence,
+      phase: request.phase,
+      resultCount: request.resultCount,
+      height: 480,
+      resizeEdge: 'bottom' as const,
+    }));
+    await user.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(reportQueryLayout).toHaveBeenCalled());
+    const nextRequest = reportQueryLayout.mock.calls.at(-1)?.[0] as { sequence: number };
+    expect(nextRequest.sequence).toBe(3);
+    await waitFor(() =>
+      expect(screen.getByTestId('query-resize-grip')).toHaveAttribute('aria-valuenow', '480'),
+    );
+  });
+
+  it('cancels immediately on lostpointercapture even when buttons is still 1', async () => {
+    let liveHeight = 312;
+    resizeQueryHeight.mockImplementation(async (request: {
+      type: string;
+      sessionId: number;
+      sequence: number;
+    }) => {
+      if (request.type === 'update') {
+        liveHeight = 400;
+      }
+      if (request.type === 'cancel') {
+        liveHeight = 312;
+      }
+      return {
+        ok: true,
+        sessionId: request.sessionId,
+        sequence: request.sequence,
+        phase: 'RESULTS' as const,
+        resultCount: 3 as const,
+        height: liveHeight,
+        resizeEdge: 'bottom' as const,
+      };
+    });
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    openQuerySession(4);
+    await searchCleanser(user);
+    const grip = screen.getByTestId('query-resize-grip');
+    const captured = new Set<number>();
+    Object.assign(grip, {
+      setPointerCapture(id: number) {
+        captured.add(id);
+      },
+      hasPointerCapture(id: number) {
+        return captured.has(id);
+      },
+      releasePointerCapture(id: number) {
+        captured.delete(id);
+      },
+    });
+    let pendingFrame: FrameRequestCallback | null = null;
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      pendingFrame = callback;
+      return 21;
+    });
+
+    fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 8, screenY: 400 });
+    fireEvent.pointerMove(grip, { buttons: 1, pointerId: 8, screenY: 460, clientY: 460 });
+    act(() => pendingFrame?.(performance.now()));
+    await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '400'));
+
+    fireEvent.lostPointerCapture(grip, { pointerId: 8, buttons: 1 });
+    await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '312'));
+    fireEvent.pointerUp(grip, { pointerId: 8, buttons: 0 });
+    fireEvent.blur(window);
+    expect(resizeQueryHeight.mock.calls.filter((call) => (
+      call[0].type === 'cancel' || call[0].type === 'end'
+    ))).toHaveLength(1);
+    expect(captured.has(8)).toBe(false);
+
+    fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 9, screenY: 400 });
+    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
+    raf.mockRestore();
   });
 });

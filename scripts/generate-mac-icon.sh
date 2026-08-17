@@ -2,7 +2,7 @@
 set -eu
 
 PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-SOURCE_ICON="$PROJECT_DIR/fox-head.png"
+MASTER_ICON="${CUSTOMER_AGENT_ICON_MASTER:-$PROJECT_DIR/assets/app-icon.png}"
 OUTPUT_ICON="$PROJECT_DIR/build/icon.icns"
 ICONSET_DIR=$(mktemp -d "${TMPDIR:-/tmp}/customer-agent-icon.XXXXXX")
 
@@ -16,8 +16,12 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 1
 fi
 
-if [ ! -f "$SOURCE_ICON" ]; then
-  echo "缺少狐狸图标源文件：$SOURCE_ICON" >&2
+if [ "${CUSTOMER_AGENT_SKIP_MASTER_GENERATE:-}" != "1" ]; then
+  node "$PROJECT_DIR/scripts/generate-app-icons.mjs" --master
+fi
+
+if [ ! -f "$MASTER_ICON" ]; then
+  echo "缺少应用图标 master：$MASTER_ICON" >&2
   exit 1
 fi
 
@@ -27,7 +31,7 @@ mkdir -p "$ICONSET_PATH" "$(dirname "$OUTPUT_ICON")"
 make_icon() {
   size="$1"
   filename="$2"
-  sips -z "$size" "$size" "$SOURCE_ICON" --out "$ICONSET_PATH/$filename" >/dev/null
+  sips -z "$size" "$size" "$MASTER_ICON" --out "$ICONSET_PATH/$filename" >/dev/null
 }
 
 make_icon 16 icon_16x16.png

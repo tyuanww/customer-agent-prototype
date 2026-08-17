@@ -1,6 +1,6 @@
 export function isAllowedRendererUrl(
   url: string,
-  devServerUrl: string | undefined = process.env.ELECTRON_RENDERER_URL,
+  devServerUrl?: string,
 ): boolean {
   if (!url) {
     return false;
@@ -27,6 +27,27 @@ export function isAllowedRendererUrl(
     return false;
   } catch {
     return false;
+  }
+}
+
+export function resolveRendererDevServerUrl(
+  isPackaged: boolean,
+  candidate: string | undefined,
+): string | undefined {
+  if (isPackaged || !candidate) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    const protocolOk = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    const hostOk = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost';
+    if (!protocolOk || !hostOk || parsed.username || parsed.password) {
+      return undefined;
+    }
+    return parsed.toString();
+  } catch {
+    return undefined;
   }
 }
 

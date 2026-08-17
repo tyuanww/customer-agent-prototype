@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { DASHBOARD_NAV } from '../../src/renderer/data/dashboard-manifest';
+import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 
 type ColorSchemeListener = (event: MediaQueryListEvent) => void;
 
@@ -15,10 +16,12 @@ class TestPointerEvent extends MouseEvent {
   }
 }
 
-function installColorSchemeMedia(initialDark: boolean) {
+function installColorSchemeMedia(initialDark: boolean, reducedMotion = false) {
   let matches = initialDark;
+  let reducedMatches = reducedMotion;
   const listeners = new Set<ColorSchemeListener>();
-  const mediaQuery = {
+  const reducedListeners = new Set<ColorSchemeListener>();
+  const colorSchemeQuery = {
     get matches() {
       return matches;
     },
@@ -30,18 +33,37 @@ function installColorSchemeMedia(initialDark: boolean) {
     removeListener: (listener: ColorSchemeListener) => listeners.delete(listener),
     dispatchEvent: () => true,
   } as unknown as MediaQueryList;
+  const reducedMotionQuery = {
+    get matches() {
+      return reducedMatches;
+    },
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addEventListener: (_type: string, listener: ColorSchemeListener) => reducedListeners.add(listener),
+    removeEventListener: (_type: string, listener: ColorSchemeListener) => reducedListeners.delete(listener),
+    addListener: (listener: ColorSchemeListener) => reducedListeners.add(listener),
+    removeListener: (listener: ColorSchemeListener) => reducedListeners.delete(listener),
+    dispatchEvent: () => true,
+  } as unknown as MediaQueryList;
 
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
-    value: vi.fn(() => mediaQuery),
+    value: vi.fn((query: string) => (
+      query.includes('prefers-reduced-motion') ? reducedMotionQuery : colorSchemeQuery
+    )),
   });
 
   return {
     setDark(next: boolean) {
       matches = next;
-      const event = { matches, media: mediaQuery.media } as MediaQueryListEvent;
+      const event = { matches, media: colorSchemeQuery.media } as MediaQueryListEvent;
       listeners.forEach((listener) => listener(event));
+    },
+    setReducedMotion(next: boolean) {
+      reducedMatches = next;
+      const event = { matches: next, media: reducedMotionQuery.media } as MediaQueryListEvent;
+      reducedListeners.forEach((listener) => listener(event));
     },
   };
 }
@@ -65,6 +87,7 @@ describe('DashboardApp', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     if (originalCustomerAgent) {
       window.customerAgent = originalCustomerAgent;
     } else {
@@ -83,6 +106,7 @@ describe('DashboardApp', () => {
     delete document.documentElement.dataset.dashboardTheme;
     delete document.documentElement.dataset.dashboardThemeMode;
     document.documentElement.style.removeProperty('color-scheme');
+    window.history.replaceState({}, '', '/');
   });
 
   it('keeps demo banners and never exposes a customerAgent API', async () => {
@@ -93,10 +117,10 @@ describe('DashboardApp', () => {
     const envBadges = screen.getByTestId('dashboard-env-badges');
     expect(within(envBadges).getAllByRole('listitem')).toHaveLength(1);
     expect(envBadges).toHaveTextContent('演示数据');
-    expect(screen.getByTestId('dashboard-disclaimer')).toHaveTextContent(
+    expect(screen.getByTestId('dashboard-disclaimer')).toHaveTextContent('无后端 · 不保存');
+    expect(screen.getByTestId('dashboard-boundary-disclaimer')).toHaveTextContent(
       '话术正文与 VOC 明细均为合成镜像',
     );
-    expect(screen.getByTestId('dashboard-disclaimer')).toHaveTextContent('无后端');
     expect(screen.getByTestId('dashboard-refresh')).toHaveTextContent('固定快照');
 
     await user.click(screen.getByText('演示环境'));
@@ -106,6 +130,7 @@ describe('DashboardApp', () => {
     expect(boundary).toHaveTextContent('SYNTHETIC DATA');
     expect(boundary).toHaveTextContent('NO BACKEND');
     expect(boundary).toHaveTextContent('不保存');
+    expect(boundary).toHaveTextContent('话术正文与 VOC 明细均为合成镜像');
 
     await user.click(screen.getByText('查看 Demo 技术指标与数据边界'));
     expect(screen.getByTestId('adopted-disclaimer')).toBeVisible();
@@ -125,16 +150,129 @@ describe('DashboardApp', () => {
     expect(within(brand).getByText('客服运营工作台')).toBeInTheDocument();
     expect(within(brand).getByText('运营管理端')).toBeInTheDocument();
     expect(brand).not.toHaveTextContent('Manager Decision Desk');
-    expect(screen.getByTestId('dashboard-brand-logo').querySelector('.fox-head-image')).toBeInstanceOf(
+    expect(screen.getByTestId('dashboard-brand-logo').querySelector('.dashboard-brand-fox-image')).toBeInstanceOf(
       HTMLImageElement,
     );
     expect(brand).not.toHaveTextContent('狐客服运营工作台');
 
     const overviewNav = screen.getByTestId('nav-overview');
     expect(overviewNav).toHaveTextContent('管理概览');
+    expect(overviewNav).toHaveClass('is-active');
+    expect(overviewNav).not.toHaveStyle({ borderLeft: '3px solid rgb(111, 76, 195)' });
     expect(within(overviewNav).queryByText('风险、责任与处理进度')).not.toBeInTheDocument();
     expect(screen.getAllByText('管理概览')).toHaveLength(2);
+
+    const shell = screen.getByTestId('dashboard-shell');
+    expect(['integrated', 'native']).toContain(shell.getAttribute('data-dashboard-chrome'));
+    expect(['darwin', 'win32', 'linux', 'unknown']).toContain(shell.getAttribute('data-platform'));
+    expect(screen.getByTestId('dashboard-brand')).toHaveClass('dashboard-no-drag');
+    expect(screen.getByTestId('dashboard-titlebar-drag-strip')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByTestId('dashboard-nav-toggle')).toHaveClass('dashboard-no-drag');
+    expect(screen.getByTestId('dashboard-brand-logo').querySelector('button')).toBeNull();
+    expect(document.title).toBe(DASHBOARD_WINDOW_TITLE);
   });
+
+  function settleNavPhase(shell: HTMLElement) {
+    dispatchNavStructureTransition(shell, 'transitionend');
+  }
+
+  function dispatchNavStructureTransition(
+    shell: HTMLElement,
+    type: 'transitionend' | 'transitioncancel',
+  ) {
+    act(() => {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, 'propertyName', {
+        configurable: true,
+        value: 'grid-template-columns',
+      });
+      shell.dispatchEvent(event);
+    });
+  }
+
+  function collapsedSurfaceOf(shell: HTMLElement) {
+    return Number(shell.getAttribute('data-collapsed-surface'));
+  }
+
+  function mockStructureWidth(shell: HTMLElement, width: number) {
+    const original = window.getComputedStyle.bind(window);
+    return vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const style = original(element, pseudo);
+      if (element === shell) {
+        return new Proxy(style, {
+          get(target, prop, receiver) {
+            if (prop === 'gridTemplateColumns') return `${width}px minmax(0px, 1fr)`;
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+      }
+      return style;
+    });
+  }
+
+  function mockRafQueue() {
+    const queue: FrameRequestCallback[] = [];
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      queue.push(callback);
+      return queue.length;
+    });
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+    return {
+      flushNext() {
+        const callback = queue.shift();
+        if (callback) act(() => callback(performance.now()));
+      },
+      flushAll() {
+        while (queue.length > 0) {
+          const callback = queue.shift();
+          if (callback) act(() => callback(performance.now()));
+        }
+      },
+      restore() {
+        requestFrame.mockRestore();
+        cancelFrame.mockRestore();
+      },
+    };
+  }
+
+  function mockShellLeft(shell: HTMLElement) {
+    return vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 1024,
+      bottom: 768,
+      width: 1024,
+      height: 768,
+      toJSON: () => ({}),
+    } as DOMRect);
+  }
+
+  function expectStableNavChrome(
+    shell: HTMLElement,
+    toggle: HTMLElement,
+    phase: 'expanded' | 'collapsed',
+    width: number,
+  ) {
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    expect(shell).toHaveAttribute('data-nav-phase', phase);
+    expect(shell).not.toHaveAttribute('data-nav-hold', 'true');
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${width}px`);
+    expect(toggle).toHaveAttribute('aria-expanded', phase === 'expanded' ? 'true' : 'false');
+    expect(toggle).toHaveAccessibleName(phase === 'expanded' ? '折叠侧边栏' : '展开侧边栏');
+    expect(resizer).toHaveAttribute('aria-valuenow', String(width));
+    expect(resizer).toHaveAttribute('aria-valuemin', String(
+      phase === 'collapsed' ? width : 216,
+    ));
+    expect(Number(resizer.getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(
+      Number(resizer.getAttribute('aria-valuemin')),
+    );
+    expect(Number(resizer.getAttribute('aria-valuenow'))).toBeLessThanOrEqual(
+      Number(resizer.getAttribute('aria-valuemax')),
+    );
+  }
 
   it('collapses navigation accessibly and keeps the deferred trash item inert', async () => {
     const user = userEvent.setup();
@@ -144,16 +282,18 @@ describe('DashboardApp', () => {
     const trash = screen.getByTestId('nav-workorder-trash');
 
     expect(shell).toHaveAttribute('data-nav-collapsed', 'false');
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(toggle).toHaveAccessibleName('折叠工作台导航');
-    expect(toggle).toHaveAttribute('data-variant', 'collapse');
+    expect(toggle).toHaveAccessibleName('折叠侧边栏');
+    expect(toggle).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('dashboard-nav-chrome')).toContainElement(toggle);
+    expect(screen.getByTestId('dashboard-titlebar-control-island')).toContainElement(toggle);
     const toggleGlyph = screen.getByTestId('dashboard-nav-toggle-glyph');
     expect(toggleGlyph).toHaveAttribute('aria-hidden', 'true');
-    expect(toggleGlyph.querySelectorAll('svg')).toHaveLength(2);
-    expect(toggleGlyph.querySelector('.dashboard-nav-toggle-icon__state.is-close')).toBeInTheDocument();
-    expect(toggleGlyph.querySelector('.dashboard-nav-toggle-icon__state.is-open')).toBeInTheDocument();
+    expect(toggle.querySelectorAll('svg')).toHaveLength(2);
     expect(toggle.querySelector('.dashboard-nav-toggle__bar')).not.toBeInTheDocument();
     expect(toggle.querySelector('input[type="checkbox"]')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-brand-logo').querySelector('button')).toBeNull();
     expect(trash).toBeDisabled();
     expect(trash).toHaveAttribute('aria-disabled', 'true');
     expect(trash).toHaveAccessibleName('工单垃圾桶，二期待实施');
@@ -163,23 +303,57 @@ describe('DashboardApp', () => {
 
     await user.click(screen.getByTestId('nav-workorders'));
     await user.click(toggle);
-    expect(shell).toHaveAttribute('data-nav-collapsed', 'true');
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveAccessibleName('展开工作台导航');
-    expect(toggle).toHaveAttribute('data-variant', 'expand-overlay');
-    expect(toggleGlyph.querySelectorAll('svg')).toHaveLength(2);
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    expect(toggle).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('dashboard-nav-toggle')).toBe(toggle);
+    expect(within(screen.getByTestId('dashboard-brand')).getByText('客服运营工作台')).toBeInTheDocument();
     expect(toggle).not.toHaveFocus();
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-collapsed', 'true');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAccessibleName('展开侧边栏');
+    expect(toggle).not.toHaveAttribute('hidden');
     expect(screen.getByTestId('dashboard-brand-logo')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-brand-logo').querySelector('.dashboard-brand-fox-image')).toBeInstanceOf(
+      HTMLImageElement,
+    );
     expect(screen.getByRole('tab', { name: 'VOC / 工单洞察' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'workorders');
 
     toggle.focus();
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus');
     await user.keyboard('{Enter}');
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    expect(toggle).not.toHaveAttribute('hidden');
+    settleNavPhase(shell);
     expect(shell).toHaveAttribute('data-nav-collapsed', 'false');
-    expect(toggle).toHaveAttribute('data-variant', 'collapse');
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(toggle).toHaveFocus();
+    expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
+    focusSpy.mockRestore();
     unmount();
     render(<DashboardApp />);
     expect(screen.getByTestId('dashboard-shell')).toHaveAttribute('data-nav-collapsed', 'false');
+    expect(screen.getByTestId('dashboard-shell')).toHaveAttribute('data-nav-phase', 'expanded');
+  });
+
+  it('keeps the same toggle DOM in chrome and does not snap brand copy', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+    const brand = screen.getByTestId('dashboard-brand');
+    const chrome = screen.getByTestId('dashboard-nav-chrome');
+
+    await user.click(toggle);
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    expect(chrome).toContainElement(toggle);
+    expect(screen.getByTestId('dashboard-titlebar-control-island')).toContainElement(toggle);
+    expect(toggle).not.toHaveAttribute('hidden');
+    expect(within(brand).getByText('客服运营工作台')).toBeInTheDocument();
+    expect(within(brand).getByText('运营管理端')).toBeInTheDocument();
+    expect(brand.querySelector('.dashboard-brand-copy')).not.toHaveStyle({ maxWidth: '0px' });
   });
 
   it('resizes the expanded navigation through an accessible separator and restores its width', async () => {
@@ -216,7 +390,7 @@ describe('DashboardApp', () => {
     });
     const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
 
-    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+    const shellRect = vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
       x: 0,
       y: 0,
       left: 0,
@@ -230,29 +404,415 @@ describe('DashboardApp', () => {
     fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 7, clientX: 248 });
     expect(shell).toHaveAttribute('data-nav-resizing', 'true');
     fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 7, clientX: 280 });
+    expect(shellRect).toHaveBeenCalledTimes(1);
     expect(pendingFrame).not.toBeNull();
     fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 7, clientX: 320 });
     expect(shell).toHaveAttribute('data-nav-resizing', 'false');
     expect(shell).toHaveAttribute('data-nav-width', '320');
     expect(resizer).toHaveAttribute('aria-valuenow', '320');
     act(() => pendingFrame?.(performance.now()));
+    expect(shellRect).toHaveBeenCalledTimes(1);
     expect(shell).toHaveAttribute('data-nav-width', '320');
     expect(cancelFrame).toHaveBeenCalledWith(91);
-    requestFrame.mockRestore();
-    cancelFrame.mockRestore();
 
     await user.click(screen.getByTestId('dashboard-nav-toggle'));
-    expect(resizer).not.toBeVisible();
-    expect(resizer).toHaveAttribute('tabindex', '-1');
+    settleNavPhase(shell);
+    expect(resizer).toBeVisible();
+    expect(resizer).toHaveAttribute('tabindex', '0');
+    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurfaceOf(shell)));
     await user.click(screen.getByTestId('dashboard-nav-toggle'));
+    settleNavPhase(shell);
     expect(shell).toHaveAttribute('data-nav-width', '320');
     expect(resizer).toBeVisible();
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 8, clientX: 320 });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 8, clientX: 193 });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('193px');
+    expect(resizer).toHaveAttribute('aria-valuemin', '216');
+    expect(resizer).toHaveAttribute('aria-valuenow', '216');
+    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 8, clientX: 193 });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(shell).toHaveAttribute('data-nav-width', '216');
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 9, clientX: 216 });
+    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 9, clientX: 320 });
+    expect(shell).toHaveAttribute('data-nav-width', '320');
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 10, clientX: 320 });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 10, clientX: 200 });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('200px');
+    expect(shell).toHaveAttribute('data-last-expanded-width', '320');
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 10, clientX: 192 });
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('192px');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    expect(shell).toHaveAttribute('data-last-expanded-width', '320');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    expect(shell).toHaveAttribute('data-nav-hold', 'true');
+    expect(resizer).toHaveAttribute('aria-valuemin', String(collapsedSurfaceOf(shell)));
+    expect(resizer).toHaveAttribute('aria-valuenow', '192');
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('192px');
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${collapsedSurfaceOf(shell)}px`);
+    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 10, clientX: 192 });
+    fireEvent.lostPointerCapture(resizer, { pointerId: 10 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    await user.click(screen.getByTestId('dashboard-nav-toggle'));
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-width', '320');
+    requestFrame.mockRestore();
+    cancelFrame.mockRestore();
+  });
+
+  it('keeps an active resize session when pointer samples are retargeted away from the separator', () => {
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    let pendingFrame: FrameRequestCallback | null = null;
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      pendingFrame = callback;
+      return 92;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 1024,
+      bottom: 768,
+      width: 1024,
+      height: 768,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    fireEvent.pointerDown(resizer, {
+      button: 0,
+      buttons: 1,
+      pointerId: 77,
+      clientX: 248,
+    });
+    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
+    fireEvent.pointerMove(window, {
+      button: 0,
+      buttons: 1,
+      pointerId: 77,
+      clientX: 280,
+    });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('280px');
+
+    fireEvent.pointerUp(window, {
+      button: 0,
+      buttons: 0,
+      pointerId: 77,
+      clientX: 300,
+    });
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    expect(shell).toHaveAttribute('data-nav-width', '300');
+    expect(resizer).toHaveAttribute('aria-valuenow', '300');
+    requestFrame.mockRestore();
+  });
+
+  it('previews collapsed drag, snaps back below the expand threshold, and expands only after hysteresis', async () => {
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+
+    let pendingFrame: FrameRequestCallback | null = null;
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      pendingFrame = callback;
+      return 77;
+    });
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 1024,
+      bottom: 768,
+      width: 1024,
+      height: 768,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    const collapsedSurface = collapsedSurfaceOf(shell);
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(resizer).toBeVisible();
+    expect(resizer).toHaveAttribute('tabindex', '0');
+    expect(resizer).toHaveAttribute('aria-valuemin', String(collapsedSurface));
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 21, clientX: collapsedSurface });
+    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 21, clientX: 160 });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('160px');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('160px');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 21, clientX: 160 });
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${collapsedSurface}px`);
+    settleNavPhase(shell);
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
+    expect(resizer).toHaveAttribute('aria-valuetext', `${collapsedSurface} 像素`);
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 22, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 22, clientX: 207 });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('207px');
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 22, clientX: 208 });
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('208px');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    expect(shell).toHaveAttribute('data-nav-hold', 'true');
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('208px');
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 22, clientX: 240 });
+    fireEvent.lostPointerCapture(resizer, { pointerId: 22 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 23, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 23, clientX: 180 });
+    act(() => pendingFrame?.(performance.now()));
+    fireEvent.pointerCancel(resizer, { pointerId: 23, buttons: 0, clientX: 180 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    act(() => pendingFrame?.(performance.now()));
+    settleNavPhase(shell);
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 24, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 24, clientX: 150 });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('150px');
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 0, pointerId: 24, clientX: 260 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    act(() => pendingFrame?.(performance.now()));
+    settleNavPhase(shell);
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 25, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 25, clientX: 165 });
+    act(() => pendingFrame?.(performance.now()));
+    fireEvent.lostPointerCapture(resizer, { pointerId: 25, buttons: 1 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    act(() => pendingFrame?.(performance.now()));
+    settleNavPhase(shell);
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 26, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 26, clientX: 140 });
+    act(() => pendingFrame?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('140px');
+    act(() => {
+      window.dispatchEvent(new Event('blur'));
+    });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    act(() => pendingFrame?.(performance.now()));
+    settleNavPhase(shell);
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+
+    fireEvent.keyDown(resizer, { key: 'Home' });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    fireEvent.keyDown(resizer, { key: 'ArrowRight' });
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    fireEvent.keyDown(resizer, { key: 'End' });
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-width', '348');
+
+    requestFrame.mockRestore();
+    cancelFrame.mockRestore();
+  });
+
+  function parseCssPx(value: string): number {
+    return Number.parseFloat(value);
+  }
+
+  function readChromeBoundary(shell: HTMLElement) {
+    return {
+      rendered: parseCssPx(shell.style.getPropertyValue('--dash-rendered-nav-width')),
+      structure: parseCssPx(shell.style.getPropertyValue('--dash-structure-boundary')),
+      preview: parseCssPx(shell.style.getPropertyValue('--dash-nav-preview-width')),
+      expanded: parseCssPx(shell.style.getPropertyValue('--dashboard-nav-width')),
+    };
+  }
+
+  function assertCollapsedPointerDownGeometry(shell: HTMLElement, expected: number) {
+    const nav = document.getElementById('dashboard-sidebar');
+    const main = shell.querySelector('.dashboard-main');
+    const topbar = shell.querySelector('.dashboard-topbar');
+    const divider = shell.querySelector('.dashboard-nav');
+    const separator = screen.getByTestId('dashboard-nav-resizer');
+    const boundary = readChromeBoundary(shell);
+
+    expect(nav).not.toBeNull();
+    expect(main).not.toBeNull();
+    expect(topbar).not.toBeNull();
+    expect(divider).toBe(nav);
+    expect(separator).toBeInTheDocument();
+    expect(boundary.rendered).toBe(expected);
+    expect(boundary.structure).toBe(expected);
+    expect(boundary.preview).toBe(expected);
+    expect(boundary.expanded).toBe(248);
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+    expect(separator).toHaveAttribute('aria-valuenow', String(expected));
+    expect([
+      boundary.rendered,
+      boundary.structure,
+      boundary.preview,
+    ]).toEqual([expected, expected, expected]);
+  }
+
+  it('keeps macOS collapsed pointerdown without move on the 120px surface', () => {
+    window.history.replaceState({}, '', '/?platform=darwin');
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-collapsed-surface', '120');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 41, clientX: 120 });
+    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    assertCollapsedPointerDownGeometry(shell, 120);
+  });
+
+  it('keeps native collapsed pointerdown without move on the 72px surface', () => {
+    window.history.replaceState({}, '', '/?platform=win32');
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-collapsed-surface', '72');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 42, clientX: 72 });
+    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    assertCollapsedPointerDownGeometry(shell, 72);
+  });
+
+  it('does not let a stale preview settle overwrite a toggle during rollback', () => {
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+    const collapsedSurface = collapsedSurfaceOf(shell);
+
+    const scheduledFrames: FrameRequestCallback[] = [];
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      scheduledFrames.push(callback);
+      return scheduledFrames.length;
+    });
+
+    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 1024,
+      bottom: 768,
+      width: 1024,
+      height: 768,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 43, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 43, clientX: 160 });
+    act(() => scheduledFrames.at(-1)?.(performance.now()));
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('160px');
+
+    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 43, clientX: 160 });
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    const rollbackFlush = scheduledFrames.at(-1);
+
+    fireEvent.click(toggle);
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('160px');
+
+    act(() => {
+      rollbackFlush?.(performance.now());
+    });
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('160px');
+    expect(shell.style.getPropertyValue('--dash-structure-boundary')).toBe('160px');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
+
+    act(() => scheduledFrames.at(-1)?.(performance.now()));
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('248px');
+
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+    requestFrame.mockRestore();
   });
 
   it('shows collapsed navigation tooltips on hover and focus, then dismisses with Escape', () => {
     vi.useFakeTimers();
     render(<DashboardApp />);
     fireEvent.click(screen.getByTestId('dashboard-nav-toggle'));
+    fireEvent.transitionEnd(screen.getByTestId('dashboard-shell'), {
+      propertyName: 'grid-template-columns',
+    });
     const overview = screen.getByTestId('nav-overview');
 
     fireEvent.mouseEnter(overview);
@@ -281,32 +841,380 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     const shell = screen.getByTestId('dashboard-shell');
     const html = document.documentElement;
+    const trigger = screen.getByTestId('dashboard-theme-trigger');
+    const brandFox = screen.getByTestId('dashboard-brand-logo').querySelector<HTMLElement>(
+      '.dashboard-brand-fox',
+    );
+    const brandImages = () => brandFox?.querySelectorAll<HTMLImageElement>(
+      '.dashboard-brand-fox-image',
+    ) ?? [];
+    const brandImage = () => brandFox?.querySelector<HTMLImageElement>(
+      '.dashboard-brand-fox-image',
+    );
 
     expect(shell).toHaveAttribute('data-theme-mode', 'system');
     expect(shell).toHaveAttribute('data-theme', 'light');
-    expect(screen.getByTestId('dashboard-theme-system')).toHaveAttribute('aria-pressed', 'true');
+    expect(brandFox).toHaveAttribute('data-active-variant', 'purple-headset');
+    expect(brandFox).toHaveStyle({ width: '40px', height: '40px' });
+    expect(brandImages()).toHaveLength(1);
+    expect(brandImage()).toHaveClass('is-purple-headset');
+    expect(brandImage()).toHaveAttribute('data-active', 'true');
+    expect(brandFox?.querySelector('.is-white-headset')).toBeNull();
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(html.dataset.dashboardThemeMode).toBe('system');
     expect(html.dataset.dashboardTheme).toBe('light');
     expect(html.style.colorScheme).toBe('light');
+    expect(shell).toHaveStyle({ colorScheme: 'light' });
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('dashboard-theme-system')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('dashboard-theme-system')).toHaveAttribute('role', 'menuitemradio');
 
     await user.click(screen.getByTestId('dashboard-theme-dark'));
     expect(shell).toHaveAttribute('data-theme-mode', 'dark');
     expect(shell).toHaveAttribute('data-theme', 'dark');
-    expect(screen.getByTestId('dashboard-theme-dark')).toHaveAttribute('aria-pressed', 'true');
+    expect(html.style.colorScheme).toBe('dark');
+    expect(shell).toHaveStyle({ colorScheme: 'dark' });
+    expect(brandFox).toHaveAttribute('data-active-variant', 'white-headset');
+    expect(brandImages()).toHaveLength(1);
+    expect(brandImage()).toHaveClass('is-white-headset');
+    expect(brandImage()).toHaveAttribute('data-active', 'true');
+    expect(brandFox?.querySelector('.is-purple-headset')).toBeNull();
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByTestId('dashboard-theme-menu')).not.toBeInTheDocument();
     act(() => colorScheme.setDark(false));
     expect(shell).toHaveAttribute('data-theme', 'dark');
 
+    await user.click(trigger);
     await user.click(screen.getByTestId('dashboard-theme-light'));
     act(() => colorScheme.setDark(true));
     expect(shell).toHaveAttribute('data-theme-mode', 'light');
     expect(shell).toHaveAttribute('data-theme', 'light');
+    expect(html.style.colorScheme).toBe('light');
+    expect(shell).toHaveStyle({ colorScheme: 'light' });
+    expect(brandFox).toHaveAttribute('data-active-variant', 'purple-headset');
+    expect(brandImages()).toHaveLength(1);
+    expect(brandImage()).toHaveClass('is-purple-headset');
 
+    await user.click(trigger);
     await user.click(screen.getByTestId('dashboard-theme-system'));
     expect(shell).toHaveAttribute('data-theme-mode', 'system');
     expect(shell).toHaveAttribute('data-theme', 'dark');
+    expect(brandFox).toHaveAttribute('data-active-variant', 'white-headset');
+    expect(brandImages()).toHaveLength(1);
+    expect(brandImage()).toHaveClass('is-white-headset');
     act(() => colorScheme.setDark(false));
     expect(shell).toHaveAttribute('data-theme', 'light');
+    expect(brandFox).toHaveAttribute('data-active-variant', 'purple-headset');
+    expect(brandImages()).toHaveLength(1);
+    expect(brandImage()).toHaveClass('is-purple-headset');
     expect(html.dataset.dashboardTheme).toBe('light');
+  });
+
+  it('moves through the theme menu with keyboard and returns focus to the trigger', async () => {
+    installColorSchemeMedia(false);
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    const trigger = screen.getByTestId('dashboard-theme-trigger');
+
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    const menu = screen.getByTestId('dashboard-theme-menu');
+    expect(menu).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-theme-system')).toHaveFocus();
+    expect(screen.getByTestId('dashboard-theme-system')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByTestId('dashboard-theme-light')).toHaveAttribute('tabindex', '-1');
+
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByTestId('dashboard-theme-light')).toHaveFocus();
+    expect(screen.getByTestId('dashboard-theme-light')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByTestId('dashboard-theme-system')).toHaveAttribute('tabindex', '-1');
+    await user.keyboard('{End}');
+    expect(screen.getByTestId('dashboard-theme-system')).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(screen.getByTestId('dashboard-theme-light')).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByTestId('dashboard-theme-system')).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByTestId('dashboard-theme-menu')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    await user.keyboard('{ArrowDown}');
+    await user.keyboard(' ');
+    expect(screen.getByTestId('dashboard-shell')).toHaveAttribute('data-theme-mode', 'light');
+    expect(trigger).toHaveFocus();
+
+    trigger.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByTestId('dashboard-theme-menu')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-theme-light')).toHaveFocus();
+    await user.keyboard('{Escape}');
+
+    trigger.focus();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByTestId('dashboard-theme-menu')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-theme-light')).toHaveFocus();
+    await user.keyboard('{Tab}');
+    expect(screen.queryByTestId('dashboard-theme-menu')).not.toBeInTheDocument();
+    expect(trigger).not.toHaveFocus();
+
+    await user.click(trigger);
+    expect(screen.getByTestId('dashboard-theme-menu')).toBeInTheDocument();
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(screen.queryByTestId('dashboard-theme-menu')).not.toBeInTheDocument();
+    expect(trigger).not.toHaveFocus();
+
+    await user.click(trigger);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByTestId('dashboard-theme-menu')).not.toBeInTheDocument();
+    expect(trigger).not.toHaveFocus();
+  });
+
+  it('keeps platform-specific collapsed surfaces and icon anchors', () => {
+    window.history.replaceState({}, '', '/?platform=darwin');
+    const { unmount } = render(<DashboardApp />);
+    const macShell = screen.getByTestId('dashboard-shell');
+    expect(macShell).toHaveAttribute('data-dashboard-chrome', 'integrated');
+    expect(collapsedSurfaceOf(macShell)).toBe(120);
+    expect(macShell).toHaveAttribute('data-icon-anchor', '60');
+    fireEvent.click(screen.getByTestId('dashboard-nav-toggle'));
+    settleNavPhase(macShell);
+    expect(screen.getByRole('separator', { name: '调整工作台侧栏宽度' })).toHaveAttribute('aria-valuenow', '120');
+    unmount();
+
+    window.history.replaceState({}, '', '/?platform=win32');
+    render(<DashboardApp />);
+    const nativeShell = screen.getByTestId('dashboard-shell');
+    expect(nativeShell).toHaveAttribute('data-dashboard-chrome', 'native');
+    expect(collapsedSurfaceOf(nativeShell)).toBe(72);
+    expect(nativeShell).toHaveAttribute('data-icon-anchor', '36');
+    fireEvent.click(screen.getByTestId('dashboard-nav-toggle'));
+    settleNavPhase(nativeShell);
+    expect(screen.getByRole('separator', { name: '调整工作台侧栏宽度' })).toHaveAttribute('aria-valuenow', '72');
+  });
+
+  it('jumps to the collapsed rail immediately when reduced motion is requested', async () => {
+    installColorSchemeMedia(false, true);
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+
+    await user.click(screen.getByTestId('dashboard-nav-toggle'));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(screen.getByTestId('dashboard-nav-toggle')).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('dashboard-nav-toggle')).not.toHaveFocus();
+
+    screen.getByTestId('dashboard-nav-toggle').focus();
+    await user.keyboard('{Enter}');
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(screen.getByTestId('dashboard-nav-toggle')).toHaveFocus();
+
+    await user.click(screen.getByTestId('dashboard-nav-toggle'));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 1024,
+      bottom: 768,
+      width: 1024,
+      height: 768,
+      toJSON: () => ({}),
+    } as DOMRect);
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 31, clientX: collapsedSurfaceOf(shell) });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 31, clientX: 220 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
+    expect(shell).toHaveAttribute('data-nav-width', '248');
+  });
+
+  it('does not settle a reversed structure transition on a stale transitioncancel', () => {
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+
+    fireEvent.click(toggle);
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    fireEvent.click(toggle);
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+
+    const widthSpy = mockStructureWidth(shell, 160);
+    dispatchNavStructureTransition(shell, 'transitioncancel');
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+    expect(screen.getByRole('separator', { name: '调整工作台侧栏宽度' })).toBeVisible();
+    widthSpy.mockRestore();
+
+    settleNavPhase(shell);
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+  });
+
+  it('settles transitioncancel only when the structure already matches the current target', () => {
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+
+    fireEvent.click(toggle);
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    const widthSpy = mockStructureWidth(shell, collapsedSurfaceOf(shell));
+    dispatchNavStructureTransition(shell, 'transitioncancel');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    widthSpy.mockRestore();
+  });
+
+  it('settles immediately when reduced motion turns on mid-transition', () => {
+    const media = installColorSchemeMedia(false, false);
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+
+    fireEvent.click(screen.getByTestId('dashboard-nav-toggle'));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    act(() => media.setReducedMotion(true));
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(screen.getByTestId('dashboard-nav-toggle')).not.toHaveAttribute('hidden');
+  });
+
+  it('cancels auto-expand first-frame hold when reduced motion flips on', () => {
+    const media = installColorSchemeMedia(false, false);
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+    const raf = mockRafQueue();
+    mockShellLeft(shell);
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    const collapsedSurface = collapsedSurfaceOf(shell);
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 61, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 61, clientX: 208 });
+    expect(shell).toHaveAttribute('data-nav-hold', 'true');
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+
+    act(() => media.setReducedMotion(true));
+    expectStableNavChrome(shell, toggle, 'expanded', 248);
+    raf.flushAll();
+    expectStableNavChrome(shell, toggle, 'expanded', 248);
+    raf.flushAll();
+    expect(shell).not.toHaveAttribute('data-nav-phase', 'expanding');
+    raf.restore();
+  });
+
+  it('cancels auto-expand second-frame hold when reduced motion flips on', () => {
+    const media = installColorSchemeMedia(false, false);
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+    const raf = mockRafQueue();
+    mockShellLeft(shell);
+
+    fireEvent.click(toggle);
+    settleNavPhase(shell);
+    const collapsedSurface = collapsedSurfaceOf(shell);
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 62, clientX: collapsedSurface });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 62, clientX: 208 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    raf.flushNext();
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-hold', 'true');
+
+    act(() => media.setReducedMotion(true));
+    expectStableNavChrome(shell, toggle, 'expanded', 248);
+    raf.flushAll();
+    expectStableNavChrome(shell, toggle, 'expanded', 248);
+    raf.flushAll();
+    expect(shell).not.toHaveAttribute('data-nav-phase', 'expanding');
+    raf.restore();
+  });
+
+  it('cancels auto-collapse first-frame hold when reduced motion flips on', () => {
+    const media = installColorSchemeMedia(false, false);
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+    const raf = mockRafQueue();
+    mockShellLeft(shell);
+    const collapsedSurface = collapsedSurfaceOf(shell);
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 63, clientX: 248 });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 63, clientX: 192 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    expect(shell).toHaveAttribute('data-nav-hold', 'true');
+
+    act(() => media.setReducedMotion(true));
+    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
+    raf.flushAll();
+    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
+    raf.flushAll();
+    expect(shell).not.toHaveAttribute('data-nav-phase', 'collapsing');
+    raf.restore();
+  });
+
+  it('cancels auto-collapse second-frame hold when reduced motion flips on', () => {
+    const media = installColorSchemeMedia(false, false);
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+    const raf = mockRafQueue();
+    mockShellLeft(shell);
+    const collapsedSurface = collapsedSurfaceOf(shell);
+
+    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 64, clientX: 248 });
+    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 64, clientX: 192 });
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    raf.flushNext();
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    expect(shell).toHaveAttribute('data-nav-hold', 'true');
+
+    act(() => media.setReducedMotion(true));
+    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
+    raf.flushAll();
+    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
+    raf.flushAll();
+    expect(shell).not.toHaveAttribute('data-nav-phase', 'collapsing');
+    raf.restore();
+  });
+
+  it('clears settling preview on target-matched transitioncancel so viewport clamp can publish', () => {
+    render(<DashboardApp />);
+    const shell = screen.getByTestId('dashboard-shell');
+    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
+    const toggle = screen.getByTestId('dashboard-nav-toggle');
+    const originalInnerWidth = window.innerWidth;
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
+    act(() => window.dispatchEvent(new Event('resize')));
+    fireEvent.keyDown(resizer, { key: 'End' });
+    const expanded = Number(shell.getAttribute('data-nav-width'));
+    expect(expanded).toBeGreaterThan(238);
+
+    fireEvent.click(toggle);
+    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
+    fireEvent.click(toggle);
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
+
+    const widthSpy = mockStructureWidth(shell, expanded);
+    dispatchNavStructureTransition(shell, 'transitioncancel');
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${expanded}px`);
+    widthSpy.mockRestore();
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 700 });
+    act(() => window.dispatchEvent(new Event('resize')));
+    expect(shell).toHaveAttribute('data-nav-width', '238');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('238px');
+    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
+    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth });
   });
 
   it('presents overview work as a decision table, a continuous KPI strip, and operational charts', () => {
@@ -440,6 +1348,15 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('module-wording')).toHaveTextContent('产品话术');
     expect(screen.getByTestId('wording-detail')).toHaveTextContent('DEMO · SYNTHETIC');
 
+    const productTab = screen.getByTestId('wording-domain-product');
+    productTab.focus();
+    fireEvent.keyDown(productTab, { key: 'ArrowRight' });
+    expect(screen.getByTestId('wording-domain-campaign')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('wording-domain-campaign')).toHaveAttribute('tabindex', '0');
+    expect(productTab).toHaveAttribute('tabindex', '-1');
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    expect(screen.getByTestId('wording-domain-campaign')).toHaveFocus();
+
     await user.click(screen.getByTestId('wording-domain-presale'));
     expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('NOT_CREATED');
     expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('UPSTREAM_AUTHORING');
@@ -538,12 +1455,18 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('review-outcome-rewrite'));
     expect(screen.getByTestId('review-outcome-detail')).toHaveTextContent('重写');
 
-    await user.click(screen.getByTestId('review-dimension-sent'));
+    const modifiedTab = screen.getByTestId('review-dimension-modified');
+    modifiedTab.focus();
+    fireEvent.keyDown(modifiedTab, { key: 'ArrowRight' });
     expect(screen.getByTestId('review-dimension-panel')).toHaveTextContent('是否实际发送给客户');
+    expect(screen.getByTestId('review-dimension-sent')).toHaveAttribute('tabindex', '0');
+    expect(modifiedTab).toHaveAttribute('tabindex', '-1');
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    expect(screen.getByTestId('review-dimension-sent')).toHaveFocus();
     expect(screen.getByTestId('review-outcome-list')).toHaveTextContent('确认已发送');
     expect(screen.getByTestId('review-outcome-list')).toHaveTextContent('不可核验');
 
-    await user.click(screen.getByTestId('review-dimension-applicable'));
+    fireEvent.keyDown(screen.getByTestId('review-dimension-sent'), { key: 'End' });
     expect(screen.getByTestId('review-dimension-panel')).toHaveTextContent('平台、商品、活动窗口');
     expect(screen.getByTestId('review-strata')).toHaveTextContent('高风险问题');
   });

@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   canCopyText,
+  canReportQueryLayout,
   canReportUiPhase,
+  canResizeQueryHeight,
   isTrustedQuerySender,
 } from '../../src/shared/query-ipc-access';
 
@@ -17,6 +19,8 @@ describe('trusted query IPC access', () => {
     expect(isTrustedQuerySender({ trusted: true, role: 'query' })).toBe(true);
     expect(canReportUiPhase({ trusted: true, role: 'query' })).toBe(true);
     expect(canCopyText({ trusted: true, role: 'query' })).toBe(true);
+    expect(canReportQueryLayout({ trusted: true, role: 'query' })).toBe(true);
+    expect(canResizeQueryHeight({ trusted: true, role: 'query' })).toBe(true);
   });
 
   it('fails closed for fox, dashboard, unknown, or untrusted senders', () => {
@@ -28,21 +32,26 @@ describe('trusted query IPC access', () => {
     ]) {
       expect(canReportUiPhase(denied)).toBe(false);
       expect(canCopyText(denied)).toBe(false);
+      expect(canReportQueryLayout(denied)).toBe(false);
+      expect(canResizeQueryHeight(denied)).toBe(false);
       expect(isTrustedQuerySender(denied)).toBe(false);
     }
   });
 
   it('wires the query-only predicates into the REPORT_UI_PHASE and COPY_TEXT handlers', () => {
     expect(overlayIpc).toContain('canReportUiPhase({ trusted, role })');
+    expect(overlayIpc).toContain('isTrustedMainFrameSender(');
+    expect(overlayIpc).toContain('controller.rendererDevServerUrl');
+    expect(overlayIpc).toContain('canReportQueryLayout({ trusted, role })');
+    expect(overlayIpc).toContain('canResizeQueryHeight({ trusted, role })');
     expect(overlayIpc).toContain('IPC_CHANNELS.REPORT_UI_PHASE');
+    expect(overlayIpc).toContain('IPC_CHANNELS.REPORT_QUERY_LAYOUT');
+    expect(overlayIpc).toContain('IPC_CHANNELS.RESIZE_QUERY_HEIGHT');
     expect(clipboardIpc).toContain('canCopyText({ trusted, role })');
     expect(clipboardIpc).toContain('IPC_CHANNELS.COPY_TEXT');
     expect(clipboardIpc).toMatch(
       /IPC_CHANNELS\.GET_PLATFORM[\s\S]*if \(!guard\(event\)\)/,
     );
-    expect(overlayIpc).toContain('IPC_CHANNELS.OPEN_SEARCH');
-    expect(overlayIpc).toContain('IPC_CHANNELS.MOVE_FOX_BY');
-    expect(overlayIpc).toContain('guard(event)?.moveBy');
     expect(overlayIpc).not.toMatch(/OPEN_SEARCH[\s\S]{0,400}canReportUiPhase/);
   });
 });

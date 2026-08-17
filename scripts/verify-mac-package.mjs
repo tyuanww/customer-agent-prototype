@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyMacPackageBrandGate } from './mac-package-brand-gate.mjs';
 
 const mode = process.argv[2];
 if (mode !== 'local' && mode !== 'distribution') {
@@ -50,7 +51,12 @@ for (const relativePath of [
   }
 }
 
+const expectedBrandIcon = path.join(root, 'build', 'icon.icns');
+verifyMacPackageBrandGate({ infoPlist, resourcesDirectory: resources, expectedBrandIcon });
+
 for (const forbiddenKey of [
+  'LSUIElement',
+  'LSBackgroundOnly',
   'NSAppTransportSecurity',
   'NSAudioCaptureUsageDescription',
   'NSBluetoothAlwaysUsageDescription',

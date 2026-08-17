@@ -8,11 +8,20 @@
 
 **这是合成数据 Demo，不是正式产品仓，也不等于 `DEV-M0` 已经开始。复制只表示「已复制」，不代发。Dashboard 未接通任何后端。**
 
+## 文档
+
+| 你现在要做什么 | 打开 |
+| --- | --- |
+| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
+| 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
+| 查阅三窗安全、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
+| 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
+
 ## 仓库与工作台
 
 - 本目录应作为独立 Git 仓打开，不与正式立项文档仓混在同一个工作台。
 - 不得修改独立的正式立项与设计文档仓。
-- 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件；`fox-head.png` 是基于其中狐狸标识生成的高分辨率透明浮窗资产。
+- 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `assets/app-icon.png`（近白 squircle）、`build/icon.png` 与 `build/icon.ico`；在 macOS 上还会生成 `build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - 真实达肤妍材料即使存在于仓外，也未授权进入本 Git Demo，因此话术与看板全部是虚构合成内容。
 
 ## 环境
@@ -32,7 +41,7 @@ pnpm exec install-electron
 pnpm dev
 ```
 
-上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 用于当前企业证书环境，禁止关闭 TLS 验证。Electron 42 起不再在依赖安装阶段自动下载桌面运行时，因此用 `pnpm exec install-electron` 显式准备运行时；后续启动也会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。
+上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 只用于**当前这台机器**的企业证书环境，不是每台电脑的通用要求；没有企业拦截 TLS 时不要照抄。禁止关闭 TLS 验证。本项目用 `pnpm exec install-electron` 显式准备锁定版本的 Electron 桌面运行时；后续启动会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。逐步操作见 [第一次运行](docs/tutorial-first-run.md)。
 
 ## 交互
 
@@ -64,9 +73,11 @@ FOX_IDLE → SEARCH_INPUT → RESULTS | EMPTY | ERROR → COPIED → FOX_IDLE
 | `怎么用` | 无实体锚点的泛化意图 no-hit，避免为了演示硬凑候选 |
 | `今天中午虚构星球食堂有没有排骨汤` | 业务无关问题 no-hit |
 
-闲置时显示约 88px 的透明狐狸窗（狐狸视觉约 64px），待机动效约 3 秒一轮：4px 浮动、2° 摆动、轮廓呼吸。拖到当前屏左/右边缘 18px 内会自动吸附：原生窗口始终完整留在工作区，由 renderer 平移裁出等效 44px 窗区，对应 64px 狐狸视觉各露一半（32px），并重播一次方向性吸附。悬停或键盘聚焦时，狐狸用 420ms 镜像探头动效过渡到等效 80px 裁切；移开后用 300ms 反向动效缩回。这样不会让 macOS WindowServer 与屏外透明窗反复争抢位置。打开采用两阶段共享元素交接：隐藏查询窗先按点击瞬间狐狸的真实位置、同尺寸 64px 和当前 2D 位移 / 旋转 / 缩放矩阵准备首帧，renderer 回执后才交换窗口并用约 260ms 的 `clip-path` 展开；贴边查询窗从物理屏幕边缘起步，保持 32px 半露轮廓连续。关闭约 200ms，抵达末帧后再反向换窗。玻璃只淡入淡出，不缩放模糊层；正常完成由动画回执驱动，定时器仅兜底。每个状态只一次性提交最终窗口 bounds，不逐帧 resize、不先弹出整颗贴边狐狸，也不让狐狸和查询同时消失。空态/错误态约 `600×240`，1/2/3 条候选分别约 `600×340/430/620`。查询中的狐狸会来回寻找，命中会弹跳，空态会歪头，复制后会点头；业务状态优先于待机动效。
+闲置时显示约 88px 的透明狐狸窗（狐狸视觉约 64px），待机动效约 3 秒一轮：4px 浮动、2° 摆动、轮廓呼吸。指针只在这只 88px 窗内时，整只狐狸会做非常克制的局部跟随，这不是全局眼球追踪。片刻无操作后会打盹、再睡着；窗口隐藏时睡眠钟暂停，重新可见后从头计时。任何局部活动或打开查询都会唤醒。点按有短促的戳感，拖过 4px 后会顺着方向被提起，拖太久会有一次很克制的烦躁反应。拖到当前屏左/右边缘 18px 内会自动吸附：原生窗口始终完整留在工作区，由 renderer 平移裁出等效 44px 窗区，对应 64px 狐狸视觉各露一半（32px），并重播一次方向性吸附。稳定半露时会做左右镜像的 inward-ready 动效：峰值向屏内探 3px、上抬 2px、内倾 5°并轻微放大，呈现“跃跃欲试”，但仍保持半露裁切和共享元素姿态连续。悬停或键盘聚焦时，狐狸用 420ms 镜像探头动效过渡到等效 80px 裁切；移开后用 300ms 反向动效缩回。这套贴边半露就是本项目的 mini mode，不是桌宠自由漫游。这样不会让 macOS WindowServer 与屏外透明窗反复争抢位置。打开采用两阶段共享元素交接：隐藏查询窗先按点击瞬间狐狸的真实位置、同尺寸 64px 和当前 2D 位移 / 旋转 / 缩放矩阵准备首帧，renderer 回执后才交换窗口并用约 260ms 的 `clip-path` 展开；贴边查询窗从物理屏幕边缘起步，保持 32px 半露轮廓连续。关闭约 200ms，抵达末帧后再反向换窗。玻璃只淡入淡出，不缩放模糊层；正常完成由动画回执驱动，定时器仅兜底。每个状态只一次性提交最终窗口 bounds，不逐帧 resize、不先弹出整颗贴边狐狸，也不让狐狸和查询同时消失。正常结果路径的高度是 Query 对 DOM 的实测 hug（capsule + banner + `result-content` + chrome + 容差），经 typed query-only layout / 纵向 resize IPC 上报后，Main 钳制到 `240..min(620, availableHeight)`（`availableHeight` 为当前 workArea 高减去 16px 边距），一次 `setBounds` 并 ACK，然后才展示内容。旧分档 `600×240 / 340 / 430 / 620` **只属于**测量缺失、过期或被拒绝时的异常 fallback，不是正常 Top 3 的固定窗高。查询中的狐狸会来回寻找，命中会弹跳，空态会歪头，复制后会点头；业务状态优先于待机动效。首击立即打开查询，不为识别双击增加延迟。
 
-Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。顶栏只保留一个「演示数据」标识，并持续写明「无后端 · 不保存 · 话术正文与 VOC 明细均为合成镜像」；完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 边界可在侧栏「演示环境」中查看。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作，深色模式使用独立的炭灰层级。界面采用成熟运营工具的紧凑可折叠导航、1px 分隔线、6–8px 圆角和无悬浮阴影数据面板，不把玻璃与桌宠动效铺进管理端。侧栏展开宽度可在 `216–360px` 内鼠标拖动或键盘调整，默认 `248px`；折叠后保留固定 `72px` 图标轨和原分组占位，图标位置不变、只隐藏文字，hover / focus 会在右侧显示模块名称。狐狸 Logo 槽在鼠标悬停或键盘聚焦时显出标准「左侧面板展开」按钮；展开态按钮使用对应的「收起面板」图标，不再使用 X / 汉堡形变。外观可切换「浅色 / 深色 / 跟随系统」，默认跟随系统且只在当前 Dashboard 会话有效。管理概览使用语义化决策表和连续 KPI 条，显示影响、Owner、下一步、状态、处理窗口、固定统计范围与指标定义。九个一期模块使用滚轮 / 触控 / 原生滚动条；鼠标按住拖动不再滚页。导航另有禁用的「工单垃圾桶 · 二期待实施」占位，不算已实现模块。VOC 可切换预编译合成年 / 月 / 日切片并联动 KPI、Pareto、热力图和详情；「公告与同步」可演练本地成功 / 失败推送回执，但不会联网、发送、保存或改变四分面。数字全部是编译期合成样本；adopted 只等于复制成功。
+Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。顶栏只保留一个「演示数据」标识，并持续写明「无后端 · 不保存 · 话术正文与 VOC 明细均为合成镜像」；完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 边界可在侧栏「演示环境」中查看。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作，深色模式使用独立的炭灰层级。界面采用成熟运营工具的紧凑可折叠导航、1px 分隔线、统一 8px 的矩形圆角和无悬浮阴影数据面板，不把玻璃与桌宠动效铺进管理端。侧栏展开宽度可在 `216–360px` 内鼠标拖动或键盘调整，默认 `248px`；折叠后 macOS 保留固定 `120px` 控制岛 / 图标轨，Windows 与 Linux 保留固定 `72px` 图标轨，并维持原分组占位，图标位置不变、只隐藏文字，hover / focus 会在右侧显示模块名称。macOS 的同一个 PanelLeft 按钮始终固定在红绿灯右侧的侧栏控制岛内，展开 / 折叠只切换图标，不覆盖狐狸 Logo，也不与原生拖动区域重叠；Windows / Linux 则保留原生标题栏与稳定侧栏控制槽。外观可切换「浅色 / 深色 / 跟随系统」，默认跟随系统且只在当前 Dashboard 会话有效。管理概览使用语义化决策表和连续 KPI 条，显示影响、Owner、下一步、状态、处理窗口、固定统计范围与指标定义。九个一期模块使用滚轮 / 触控 / 原生滚动条；鼠标按住拖动不再滚页。导航另有禁用的「工单垃圾桶 · 二期待实施」占位，不算已实现模块。VOC 可切换预编译合成年 / 月 / 日切片并联动 KPI、Pareto、热力图和详情；「公告与同步」可演练本地成功 / 失败推送回执，但不会联网、发送、保存或改变四分面。数字全部是编译期合成样本；adopted 只等于复制成功。
+
+Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色切换为白 / 浅灰耳麦以提高对比，狐狸本体保持原紫色。侧栏业务导航图标为 20px，文字比图标再靠近约 4px；折叠时图标中心仍固定在 macOS `nav.left+60` / Windows·Linux `nav.left+36`。
 
 离线三维抽样复核将“是否修改 / 是否发送 / 是否适用”分别显示，维度 tab、合成结论与分层样本可交互；每项都报告有效分母、不可核验与证据等级。该页不读取最终发送正文，也不会从复制动作推断发送、采纳、未修改或回答正确。
 
@@ -87,6 +98,16 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 - 「深度思考」只是默认 OFF 的 DeepSeek 辅助重排预留说明；它不生成答案、不改写话术、不发送消息，当前也不调用任何模型。
 - 客户问题最多 2000 字。
 
+### 附件借鉴矩阵（clean-room）
+
+本地的 `clawd-on-desk-0.15.0.zip` 只作为只读参考附件，不进入 Git 或安装包。它的根源码是 AGPL-3.0，资源许可是 All Rights Reserved。本 Demo **不是** Clawd 的复制、改色或兼容层，也不使用其中任何 SVG / PNG / GIF / 代码。唯一视觉角色来源仍是本仓 `fox-head.png`。
+
+| 类别 | 内容 |
+| --- | --- |
+| 落地 | 窗内整头局部 follow、可中断睡眠 / 唤醒、点按与拖拽反应、现有贴边 mini mode |
+| 仅理念 | 动作优先级、左右镜像、抓住时暂停待机、睡眠可被局部活动打断、free-roam 的可中断性 |
+| 明确不做 | ZIP 资产 / 源码、全局鼠标追踪、真实桌面漫游、双击 / 多击累加、逐帧移动原生窗 |
+
 ## 快捷键冲突降级
 
 默认注册 `CommandOrControl+Shift+Space`。若被系统或其他软件占用，Demo **不会静默失败**：狐狸头出现警示点，查询窗给出「请点击狐狸头打开」的说明。退出时注销快捷键。
@@ -98,7 +119,8 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 ## 透明效果的平台差异
 
 - **macOS**：透明无边框窗 + CSS `backdrop-filter` 通常能看到克制的浅白玻璃。
-- **macOS Space / 全屏**：查询窗在启动期一次性加入所有 Space，并允许显示在全屏应用上方；仍需在真实 Safari / Chrome 全屏、外接屏拔插和物理输入法场景人工验收。
+- **macOS Space / 全屏**：为保住 regular Dock / Cmd+Tab，Query 不再加入所有 Space，也不覆盖全屏应用。当前 Space 内仍可正常唤起；跨 Space / 全屏覆盖需人工确认已降级。
+- **macOS 折叠侧栏按钮**：自动化的 CDP click 不能冒充 OS 命中。折叠态展开按钮必须用真实鼠标点 island 内按钮中心验收；几何 / `elementFromPoint` 测试只能证明 renderer 合同。
 - **Windows**：同样使用半透明底 `rgba(250,252,255,.88)`。部分 GPU / 系统组合下 `backdrop-filter` **不会模糊桌面**，只会看到半透明实色；这是平台限制，不是功能缺失。阴影与发丝边仍应可见。
 - 系统开启“减少动态效果”时，循环位移、吸附变形与展开动效会降到近乎瞬时，保留可读静态状态。
 
@@ -110,16 +132,27 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:float
+pnpm test:assets
+pnpm test:e2e:float
 pnpm test:e2e
 ```
 
-`pnpm test:e2e` 会先 build，再启动 Electron：验证左右半露与探头、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、三条完整同屏、数字键复制、自动收起、程序坞事件打开 Dashboard、Dashboard 单例 / 安全窗 / 原生滚动 / 折叠导航 / VOC 时间切片 / 本地推送 / 图表联动 / 响应式布局，并核对系统剪贴板。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递，以及真实 OS 全局快捷键仍需人工确认。
+| 命令 | 实际覆盖 | 不要误读成 |
+| --- | --- | --- |
+| `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
+| `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |
+| `pnpm test:e2e:float` | 先 `pnpm build`，再跑 `smoke.spec.ts` 里 `@float` | 不是全量 E2E，也不是真实台前调度验收 |
+| `pnpm test` | 全量 unit / component，含 drag-settle 与 Dashboard 授权 | 不是真实窗口 |
+| `pnpm test:e2e` | 先 build，再跑全部 Playwright | 不是正式发包，也不是真实 OS 焦点 |
 
-当前 macOS 开发机可自动验证单屏左右贴边、窗口内动效和 Dashboard 浏览；跨实体多显示器拖拽、Windows 合成器观感及真实 OS 全局快捷键投递仍需对应设备手工验收。
+`pnpm test:e2e` 会先 build，再启动 Electron：验证左右半露与探头、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、内容贴合高度、数字键复制、自动收起、程序坞事件打开 Dashboard、Dashboard 单例 / 安全窗 / 原生滚动 / 折叠导航 / VOC 时间切片 / 本地推送 / 图表联动 / 响应式布局，并核对系统剪贴板。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递，以及真实 OS 全局快捷键仍需人工确认。
+
+当前 macOS 开发机可自动验证单屏左右贴边、窗口内动效和 Dashboard 浏览；跨实体多显示器拖拽、Windows 合成器观感及真实 OS 全局快捷键投递仍需对应设备手工验收。命令对照与打包门禁见 [如何验证桌面 Demo](docs/how-to-verify-desktop.md)。
 
 ## Windows 打包现状
 
-`pnpm package:win` 只生成本机未签名证明包：写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`，并关闭 `CSC_IDENTITY_AUTO_DISCOVERY`。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
+`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
 
 ## macOS 打包与发布
 
@@ -133,7 +166,7 @@ pnpm package:mac:local
 pnpm package:mac
 ```
 
-两个命令都会从 `fox-head.png` 机械生成 `build/icon.icns`，并构建同时包含 `x86_64 + arm64` 的 Universal 应用。本地证明包写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`；正式包只写入 `release/distribution/`，两者不会同名覆盖。两类目录都被 Git 忽略。调用方未显式提供 `NODE_EXTRA_CA_CERTS` 时，打包器仅在进程内临时桥接 macOS 系统根证书给 Node，保持 TLS 校验开启并在结束后删除临时文件。包内不生成自动更新元数据，不记录私有 GitHub 仓库坐标，并携带 Electron / Chromium / React 的第三方许可说明。
+两个命令都会先从透明狐狸确定性合成 `assets/app-icon.png` master，再生成 `build/icon.icns` / `build/icon.ico`，并构建同时包含 `x86_64 + arm64` 的 Universal 应用。本地证明包写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`；正式包只写入 `release/distribution/`，两者不会同名覆盖。两类目录都被 Git 忽略。调用方未显式提供 `NODE_EXTRA_CA_CERTS` 时，打包器仅在进程内临时桥接 macOS 系统根证书给 Node，保持 TLS 校验开启并在结束后删除临时文件。包内不生成自动更新元数据，不记录私有 GitHub 仓库坐标，并携带 Electron / Chromium / React 的第三方许可说明。
 
 `package:mac` 默认要求 Hardened Runtime、代码签名和 Apple 公证，并在构建后再次执行 `codesign`、Gatekeeper 和 stapler 校验；缺少任一前置时直接失败，不会静默产出可误外发的未签名包。证书、`.p8` / `.p12`、Apple ID 密码和 Keychain profile 均不得提交仓库或打印到日志。
 

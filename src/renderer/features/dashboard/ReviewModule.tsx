@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import {
   DASHBOARD_MANIFEST,
   type OfflineReviewDimensionId,
@@ -24,6 +24,27 @@ export function ReviewModule() {
     const next = data.dimensions.find((dimension) => dimension.id === nextId) ?? data.dimensions[0];
     setDimensionId(next.id);
     setOutcomeId(next.outcomes[0].id);
+  };
+
+  const handleDimensionKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    current: OfflineReviewDimensionId,
+  ) => {
+    const currentIndex = data.dimensions.findIndex((dimension) => dimension.id === current);
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % data.dimensions.length;
+    if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + data.dimensions.length) % data.dimensions.length;
+    }
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = data.dimensions.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = data.dimensions[nextIndex];
+    selectDimension(next.id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`review-tab-${next.id}`)?.focus();
+    });
   };
 
   return (
@@ -76,9 +97,11 @@ export function ReviewModule() {
               role="tab"
               aria-selected={selectedDimension}
               aria-controls="review-dimension-panel"
+              tabIndex={selectedDimension ? 0 : -1}
               className={selectedDimension ? 'is-active' : ''}
               data-testid={`review-dimension-${dimension.id}`}
               onClick={() => selectDimension(dimension.id)}
+              onKeyDown={(event) => handleDimensionKeyDown(event, dimension.id)}
             >
               <strong>{dimension.label}</strong>
               <span>{dimension.verifiable} 可核验 / {dimension.unverifiable} 不可核验</span>

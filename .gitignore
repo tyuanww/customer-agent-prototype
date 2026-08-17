@@ -3,6 +3,8 @@ dist/
 out/
 release/
 build/icon.icns
+build/icon.png
+build/icon.ico
 playwright-report/
 test-results/
 coverage/
@@ -17,6 +19,10 @@ coverage/
 *.provisionprofile
 electron-builder.env
 electron-builder.env.*
+
+# Local read-only design reference. Its source/assets have separate licenses and
+# must never enter this repository or a release artifact.
+/clawd-on-desk-0.15.0.zip
 
 # gstack 的运行输出留在本机；冻结验收证据放在 evidence/qa/。
 .gstack/
