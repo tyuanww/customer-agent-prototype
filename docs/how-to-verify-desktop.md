@@ -2,7 +2,7 @@
 
 本页按「要证明什么 → 跑哪条命令 → 它实际证明了什么」组织。命令都可以复制。先看本机静态 / 自动化结果，再单独列出只有真实设备才能证明的门禁。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [桌面合同](reference-desktop-contracts.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
 
 > 本 Demo 是合成数据、无后端、不代发。验证通过不等于可以正式发包，也不等于真实 OS 焦点 / 台前调度已被证明。
 
@@ -200,7 +200,33 @@ node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distri
 
 ---
 
-## 5. 文档任务建议跑的集合
+## 5. 空间占用与清理
+
+Electron 项目的工作区体积通常主要来自可再生成内容，而不是 UI 源码。先审计，再清理：
+
+```bash
+pnpm workspace:size
+pnpm workspace:check
+pnpm clean:preview
+```
+
+`workspace:size` 按磁盘分配量拆分 `release/`、`node_modules/`、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
+
+`workspace:check` 只检查源码、测试、文档和已纳入项目的资产等 workspace remainder，默认上限为 32 MiB；`node_modules`、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单独统计，不会把可重建或本地工具内容误报为代码膨胀。若有一次性大资产确实需要纳入，可临时使用 `--remainder-budget-mib=N`，并在评审记录原因，不要永久抬高默认门槛。
+
+| 命令 | 行为 | 恢复方式 |
+| --- | --- | --- |
+| `pnpm clean:preview` | 默认 dry-run；列出本地未签名包、`out/`、测试报告、gstack QA 报告与 Vite 缓存 | 无改动 |
+| `pnpm workspace:check` | 检查不可再生源码区是否超过 32 MiB 预算 | 删除或迁移新增大文件后重跑 |
+| `pnpm clean:generated` | 只删除上面的精确 allowlist | `pnpm build`、相应 `package:*` / 测试命令重新生成 |
+| `pnpm clean:deep:preview` | 预览 generated + `node_modules` | 无改动 |
+| `pnpm clean:deep` | 在 generated 之外删除依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm exec install-electron` |
+
+清理器会核对仓库包名、realpath 和精确 allowlist；遇到符号链接、仓外路径或未知 scope 会 fail-closed。它永远不接受 `.git`、`.codegraph`、`src`、`assets`、`evidence`、`docs`、`tests` 和 `clawd-on-desk-0.15.0.zip` 作为目标。冻结 QA 证据、用户只读参考，以及 `docs/reference-api-adapter-handoff.md` 这类衔接说明都不是缓存，清理脚本不得删除。
+
+业内通常把依赖视为锁文件可重建内容、把安装包交给 CI artifact / Release 的保留策略，而不是长期堆在源码工作区；测试报告应短期保存；共享 pnpm store 只偶尔运行 `pnpm store prune`，避免切旧分支时反复下载；Playwright 浏览器使用系统级共享缓存及其自身的未引用版本回收。
+
+## 6. 文档任务建议跑的集合
 
 本轮若只核文档与静态卫生，在前置 PATH 后跑：
 
@@ -212,3 +238,5 @@ pnpm build
 ```
 
 不要把未跑的 `pnpm test:e2e` / `package:*` 写成通过。
+
+文档收尾若只核「Demo 能否接正式库」，读 [API adapter 衔接](reference-api-adapter-handoff.md)：结论是不能直插，也不要把本页静态检查写成九端口已接通。

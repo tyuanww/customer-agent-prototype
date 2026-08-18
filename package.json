@@ -26,6 +26,12 @@
     "generate:app-icons": "node scripts/generate-app-icons.mjs",
     "preview": "electron-vite preview",
     "test:e2e": "pnpm build && playwright test",
+    "workspace:size": "node scripts/workspace-hygiene.mjs size",
+    "workspace:check": "node scripts/workspace-hygiene.mjs check",
+    "clean:preview": "node scripts/workspace-hygiene.mjs clean --scope=generated",
+    "clean:generated": "node scripts/workspace-hygiene.mjs clean --scope=generated --apply",
+    "clean:deep:preview": "node scripts/workspace-hygiene.mjs clean --scope=deep",
+    "clean:deep": "node scripts/workspace-hygiene.mjs clean --scope=deep --apply",
     "package:win": "node scripts/package-windows.mjs local",
     "package:mac:local": "node scripts/package-macos.mjs local",
     "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"

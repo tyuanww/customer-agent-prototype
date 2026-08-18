@@ -8,7 +8,7 @@
 > 复制成功只表示剪贴板写入成功，不表示已发送、已采纳或回答正确。
 > Dashboard 是交互式合成 BI / 架构故事，不是生产系统。
 
-相关文档：[如何验证](how-to-verify-desktop.md) · [桌面合同](reference-desktop-contracts.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
+相关文档：[如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
 
 ---
 
@@ -70,6 +70,8 @@ pnpm exec install-electron
 ```bash
 pnpm dev
 ```
+
+如果你在 macOS Finder 中双击启动，可以直接运行仓根目录的 [`启动客服Agent.command`](../启动客服Agent.command)。它只检查 Node 24、pnpm 和本地 Electron 运行时，不会偷偷安装依赖或访问业务网络；终端窗口保持打开，便于看到启动错误。
 
 | 可观察成功标志 | 失败时不要继续 |
 | --- | --- |
@@ -140,7 +142,9 @@ pnpm dev
 ## 5. 停下来时记住的三句话
 
 1. **synthetic-only**：话术与看板全部是仓内虚构合成数据。
-2. **no backend**：没有 PostgreSQL、飞书、对象存储、线上 API 或模型调用。
-3. **no send**：复制不是发送；adopted 只等于复制成功。
+2. **no backend**：没有 PostgreSQL、飞书、对象存储、线上 API 或模型调用。本仓也没有可切换的 API adapter。
+3. **no send**：复制不是发送；adopted 只等于复制成功。正式记账还要先有 `query_id` 与候选四元组，再 `POST /v1/events/adoption`。
+
+合成 fixture **不能**直接插入正式库。字段、鉴权、版本、生效期、租户与复制语义见 [API adapter 衔接](reference-api-adapter-handoff.md)。
 
 下一步若要核对测试与打包门禁，打开 [如何验证桌面 Demo](how-to-verify-desktop.md)。

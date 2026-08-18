@@ -15,7 +15,11 @@
 | 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
 | 查阅三窗安全、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
+| 了解 main / preload / renderer / shared 的职责和清理边界 | [docs/reference-project-architecture.md](docs/reference-project-architecture.md) |
+| 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
+
+项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除 `node_modules`，仅用于归档或需要从 `pnpm install --frozen-lockfile` 重建依赖时。清理脚本不会触碰 `.git`、`.codegraph`、`src`、`assets`、`evidence`、`docs`、`tests` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
 
 ## 仓库与工作台
 
@@ -94,7 +98,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 - 过期与未生效话术永不返回；卡片不展示匹配分。
 - Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 无 preload，也没有 `customerAgent`。
 - 复制成功只显示「已复制」，不表示已发送、已采纳或回答正确。
-- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。
+- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。本仓 **没有** HTTP API adapter；合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
 - 「深度思考」只是默认 OFF 的 DeepSeek 辅助重排预留说明；它不生成答案、不改写话术、不发送消息，当前也不调用任何模型。
 - 客户问题最多 2000 字。
 
@@ -174,4 +178,6 @@ pnpm package:mac
 
 ## 下一步（不在本 Demo）
 
-正式 OAuth / RBAC、PostgreSQL、达肤妍正式话术快照、真实飞书源、向量检索、LLM、自动发送、自动学习和自动更新都不在本仓范围。macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。
+正式 OAuth / RBAC、PostgreSQL、九端口 Application API、达肤妍正式话术快照、真实飞书源、向量检索、LLM、自动发送、自动学习和自动更新都不在本仓范围。把本 Demo「换成 adapter 就能接库」不成立：缺少 `query_id` / 发布四元组 / 飞书会话，平台与有效期形状也不合法。详见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
+
+macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。
