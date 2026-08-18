@@ -44,8 +44,10 @@ import {
   readDashboardStructureWidth,
   rectContainsRect,
   rectsIntersect,
+  dashboardNavTooltipPosition,
   resolveDashboardTheme,
   settleDashboardNavPhase,
+  systemPrefersDark,
   shouldSettleDashboardNavTransition,
   startDashboardNavPhase,
 } from '../../src/renderer/lib/dashboard-appearance';
@@ -300,5 +302,42 @@ describe('dashboard appearance contract', () => {
     expect(focusAdjacentTabbable(current, 'forward', menu)?.id).toBe('after');
     expect(focusAdjacentTabbable(current, 'backward', menu)?.id).toBe('before');
     document.body.innerHTML = '';
+  });
+
+  it('places collapsed nav tooltips 10px to the right of the icon row', () => {
+    expect(dashboardNavTooltipPosition({ right: 112, top: 80, height: 42 })).toEqual({
+      left: 122,
+      top: 101,
+    });
+  });
+
+  it('reads the system color scheme only through matchMedia', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(prefers-color-scheme: dark)',
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
+    expect(systemPrefersDark()).toBe(true);
+    window.matchMedia = original;
+    expect(resolveDashboardTheme('system', true)).toBe('dark');
+    expect(resolveDashboardTheme('system', false)).toBe('light');
+  });
+
+  it('falls back to light when matchMedia is unavailable', () => {
+    const original = window.matchMedia;
+    try {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: undefined,
+      });
+      expect(systemPrefersDark()).toBe(false);
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: original,
+      });
+    }
   });
 });

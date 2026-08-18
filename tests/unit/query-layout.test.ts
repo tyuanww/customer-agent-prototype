@@ -17,8 +17,11 @@ import {
   isQueryLayoutRequest,
   isQueryResizeRequest,
   queryHandoffCenterFromBounds,
+  queryLayoutAckCommand,
   queryResizeDeltaForKey,
+  acceptedQueryLayoutAck,
   rejectedQueryLayoutAck,
+  reportableOverlayPhase,
   resolveQueryResizeEdge,
   shouldIgnoreQueryLayout,
   QUERY_LAYOUT_MAX_HEIGHT,
@@ -289,11 +292,33 @@ describe('main query layout policy', () => {
     expect(controller).toContain('this.queryResizeSession !== null && !this.queryResizeSession.finished');
     expect(controller).toContain('this.manualQueryHeight !== null || this.queryResizeSession');
     expect(controller).toContain('this.lastQueryLayoutSequence += 1');
-    expect(controller).toContain('phase: this.phase === \'FOX_IDLE\' ? \'SEARCH_INPUT\' : this.phase');
-    expect(controller).toContain('resultCount: this.resultCount');
+    expect(controller).toContain('queryLayoutAckCommand(');
+    expect(controller).toContain('this.activeChromeHandoffId');
+    expect(controller).toContain('reportableOverlayPhase(this.phase)');
+    expect(controller).toContain('this.reportablePhase()');
+    expect(controller).toContain('this.resultCount');
+    expect(reportableOverlayPhase('FOX_IDLE')).toBe('SEARCH_INPUT');
+    expect(reportableOverlayPhase('RESULTS')).toBe('RESULTS');
+    expect(acceptedQueryLayoutAck(2, 4, 312, 'bottom', 'RESULTS', 3)).toEqual({
+      ok: true,
+      sessionId: 2,
+      sequence: 4,
+      phase: 'RESULTS',
+      resultCount: 3,
+      height: 312,
+      resizeEdge: 'bottom',
+    });
+    expect(queryLayoutAckCommand(2, 4, 'RESULTS', 3, 312, 'bottom')).toEqual({
+      type: 'query-layout-ack',
+      sessionId: 2,
+      sequence: 4,
+      phase: 'RESULTS',
+      resultCount: 3,
+      height: 312,
+      resizeEdge: 'bottom',
+    });
     expect(controller).toContain('this.settleQueryResizeSession(true)');
     expect(controller).toContain('if (this.queryResizeSession && !this.queryResizeSession.finished)');
-    expect(controller).toContain('sessionId: this.activeChromeHandoffId');
     expect(isQueryLayoutRequest({
       sessionId: 2,
       sequence: 1,

@@ -131,8 +131,8 @@ pnpm test:e2e
 
 预期产物（名称由 `productName` + `version` + `UNSIGNED` 组成）：
 
-- `release/local-unsigned/客服话术浮窗 Demo-0.1.0-mac-universal-UNSIGNED.dmg`
-- `release/local-unsigned/客服话术浮窗 Demo-0.1.0-mac-universal-UNSIGNED.zip`
+- `release/local-unsigned/客服话术浮窗 Demo-0.1.1-mac-universal-UNSIGNED.dmg`
+- `release/local-unsigned/客服话术浮窗 Demo-0.1.1-mac-universal-UNSIGNED.zip`
 - `release/local-unsigned/mac-universal/*.app`
 
 构建后会跑 `scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `scripts/verify-mac-package.mjs local`。
@@ -172,7 +172,7 @@ node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distri
 
 预期产物：
 
-- `release/local-unsigned/windows/客服话术浮窗 Demo-0.1.0-win-x64-UNSIGNED.exe`
+- `release/local-unsigned/windows/客服话术浮窗 Demo-0.1.1-win-x64-UNSIGNED.exe`
 - `release/local-unsigned/windows/win-unpacked/`（含 `resources/icon.ico`）
 
 本仓没有 Windows `distribution` 路径。`mode !== 'local'` 会直接抛错。

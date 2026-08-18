@@ -10,6 +10,7 @@ const queryApp = [
   readFileSync(path.join(root, 'src/renderer/QueryApp.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/search/QueryCapsule.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/search/QueryResultsPane.tsx'), 'utf8'),
+  readFileSync(path.join(root, 'src/renderer/features/search/query-view.ts'), 'utf8'),
 ].join('\n');
 
 type Rgb = readonly [number, number, number];
@@ -53,8 +54,8 @@ describe('query capsule visual contract', () => {
     expect(queryApp).toContain("reportHandoffMilestone(activeHandoffIdRef.current, 'close-finished')");
     expect(queryApp).toContain("event.animationName === 'query-shell-unfold'");
     expect(queryApp).toContain("event.animationName === 'query-shell-fold'");
-    expect(queryApp).toContain('const SEARCH_FEEDBACK_MS = 280');
-    expect(queryApp).toContain('const COPY_FEEDBACK_MS = 900');
+    expect(queryApp).toContain('export const SEARCH_FEEDBACK_MS = 280');
+    expect(queryApp).toContain('export const COPY_FEEDBACK_MS = 900');
   });
 
   it('treats the capsule as a white-first desktop input with purple as the action anchor', () => {

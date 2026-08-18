@@ -35,6 +35,7 @@ import {
 } from '../shared/overlay-geometry';
 import {
   acceptQueryLayoutSequence,
+  acceptedQueryLayoutAck,
   applyQueryVerticalResize,
   clampQueryDesiredHeight,
   pickQueryResizeEdgeForHeight,
@@ -42,9 +43,11 @@ import {
   fallbackQuerySizeForPhase,
   isQueryContentLayoutPhase,
   queryHandoffCenterFromBounds,
+  queryLayoutAckCommand,
   queryResizeDeltaForKey,
   QUERY_LAYOUT_FALLBACK_MS,
   rejectedQueryLayoutAck,
+  reportableOverlayPhase,
   resolveQueryResizeEdge,
   shouldIgnoreQueryLayout,
   type QueryLayoutAck,
@@ -58,19 +61,27 @@ import {
   type OverlayEvent,
   type OverlayPhase,
 } from '../shared/overlay-machine';
-import type {
-  FoxDockEdge,
-  FoxDragSettleAck,
-  FoxPeekIntent,
-  FoxVisualTransform,
-  HandoffMilestone,
-  OverlayCommand,
-  OverlayRole,
-  QueryAnchor,
-  ReportablePhase,
-  ResultCount,
+import {
+  IDENTITY_FOX_VISUAL_TRANSFORM,
+  activateSearchCommand,
+  collapseQueryCommand,
+  foxDragSettledCommand,
+  foxEdgeCommand,
+  prepareSearchCommand,
+  shortcutStatusCommand,
+  syncFoxEdgeCommand,
+  syncQueryAnchorCommand,
+  type FoxDockEdge,
+  type FoxDragSettleAck,
+  type FoxPeekIntent,
+  type FoxVisualTransform,
+  type HandoffMilestone,
+  type OverlayCommand,
+  type OverlayRole,
+  type QueryAnchor,
+  type ReportablePhase,
+  type ResultCount,
 } from '../shared/overlay-events';
-import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../shared/overlay-events';
 import {
   openDashboardUnavailable,
   type OpenDashboardResult,
@@ -92,7 +103,7 @@ import {
 import { lockRendererWindow } from './window-security';
 import { createOverlayChromeWindow, type OverlayChromeWindowSize } from './overlay-chrome-window';
 import { loadRenderer } from './overlay-renderer-loader';
-import { attachTestHarness } from './overlay-test-harness';
+import { attachTestHarness, isTestHarnessEnabled } from './overlay-test-harness';
 
 const BLUR_GRACE_MS = 240;
 const HANDOFF_PREPARE_TIMEOUT_MS = 180;
@@ -330,11 +341,7 @@ export class OverlayController {
       if (this.chromeHandoffMode !== null) {
         return;
       }
-      this.sendToQuery({
-        type: 'activate-search',
-        anchor: this.sessionQueryAnchor(),
-        animate: false,
-      });
+      this.sendToQuery(activateSearchCommand(this.sessionQueryAnchor(), false));
       return;
     }
     this.openSearch();
@@ -783,7 +790,7 @@ export class OverlayController {
           settleId: ++this.foxDragSettleSequence,
         };
         this.awaitingFoxDragSettle = settle;
-        this.sendToFox({ type: 'fox-drag-settled', ...settle });
+        this.sendToFox(foxDragSettledCommand(settle));
         this.clearQueryDragGesture();
         this.schedulePostFoxDragWork();
         return settle;
@@ -931,15 +938,14 @@ export class OverlayController {
       const queryBounds = query.getBounds();
       const foxVisualCenter = this.currentFoxVisualCenter({ includePeek: false });
       const handoffCenter = queryHandoffCenterFromBounds(foxVisualCenter, queryBounds);
-      this.sendToQuery({
-        type: 'collapse',
+      this.sendToQuery(collapseQueryCommand({
         handoffId,
         anchor: this.chromeHandoffAnchor,
         dockEdge: this.foxDockEdge,
         animate: shouldAnimate,
         handoffCenterX: handoffCenter.x,
         handoffCenterY: handoffCenter.y,
-      });
+      }));
       this.resetFoxPeekLifecycle(this.foxDockEdge);
       if (!shouldAnimate) {
         this.finishClosingHandoff(handoffId);
@@ -980,14 +986,13 @@ export class OverlayController {
       const foxVisualCenter = this.currentFoxVisualCenter();
       this.chromeHandoffMode = 'preparing-open';
       this.chromeHandoffAnchor = anchor;
-      this.sendToQuery({
-        type: 'prepare-search',
+      this.sendToQuery(prepareSearchCommand({
         handoffId,
         anchor,
         handoffCenterX: foxVisualCenter.x - acceptedQueryBounds.x,
         handoffCenterY: foxVisualCenter.y - acceptedQueryBounds.y,
         foxVisualTransform: this.pendingFoxVisualTransform,
-      });
+      }));
       this.pendingFoxVisualTransform = IDENTITY_FOX_VISUAL_TRANSFORM;
       this.chromeHandoffTimer = this.scheduler.schedule(() => {
         this.chromeHandoffTimer = null;
@@ -1030,12 +1035,7 @@ export class OverlayController {
     this.scheduleQueryFocusRetry();
     const animate = rendererArmed && !this.prefersReducedMotion();
     this.chromeHandoffMode = 'opening';
-    this.sendToQuery({
-      type: 'activate-search',
-      handoffId,
-      anchor: this.chromeHandoffAnchor,
-      animate,
-    });
+    this.sendToQuery(activateSearchCommand(this.chromeHandoffAnchor, animate, handoffId));
     if (!animate) {
       this.finishOpeningHandoff(handoffId);
       return;
@@ -1221,11 +1221,7 @@ export class OverlayController {
     }
     this.foxOrigin = { x: clampedFox.x, y: clampedFox.y };
     this.foxPeekIntent = 'retract';
-    this.sendToFox({
-      type: 'sync-fox-edge',
-      edge: this.foxDockEdge,
-      epoch: this.advanceFoxPeekEpoch(),
-    });
+    this.sendToFox(syncFoxEdgeCommand(this.foxDockEdge, this.advanceFoxPeekEpoch()));
 
     if (this.phase === 'FOX_IDLE') {
       fox.setBounds(dockFoxNativeRect(clampedFox, workArea, this.foxDockEdge));
@@ -1243,7 +1239,7 @@ export class OverlayController {
         this.queryDragAnchor ?? undefined,
       ),
     );
-    this.sendToQuery({ type: 'sync-query-anchor', anchor });
+    this.sendToQuery(syncQueryAnchorCommand(anchor));
   }
 
   private currentQuerySize(workArea: Rect) {
@@ -1314,15 +1310,14 @@ export class OverlayController {
         return;
       }
       this.lastQueryLayoutSequence += 1;
-      this.sendToQuery({
-        type: 'query-layout-ack',
-        sessionId: this.activeChromeHandoffId,
-        sequence: this.lastQueryLayoutSequence,
-        phase: this.phase === 'FOX_IDLE' ? 'SEARCH_INPUT' : this.phase,
-        resultCount: this.resultCount,
-        height: this.currentQueryHeight(),
-        resizeEdge: this.queryResizeEdge,
-      });
+      this.sendToQuery(queryLayoutAckCommand(
+        this.activeChromeHandoffId,
+        this.lastQueryLayoutSequence,
+        reportableOverlayPhase(this.phase),
+        this.resultCount,
+        this.currentQueryHeight(),
+        this.queryResizeEdge,
+      ));
     }, QUERY_LAYOUT_FALLBACK_MS);
   }
 
@@ -1347,7 +1342,7 @@ export class OverlayController {
   }
 
   private reportablePhase(): ReportablePhase {
-    return this.phase === 'FOX_IDLE' ? 'SEARCH_INPUT' : this.phase;
+    return reportableOverlayPhase(this.phase);
   }
 
   private acceptedLayoutAck(
@@ -1356,15 +1351,14 @@ export class OverlayController {
     height = this.currentQueryHeight(),
     resizeEdge = this.queryResizeEdge,
   ): QueryLayoutAck {
-    return {
-      ok: true,
+    return acceptedQueryLayoutAck(
       sessionId,
       sequence,
-      phase: this.reportablePhase(),
-      resultCount: this.resultCount,
       height,
       resizeEdge,
-    };
+      this.reportablePhase(),
+      this.resultCount,
+    );
   }
 
   private rejectedLayoutAck(sessionId: number, sequence: number): QueryLayoutAck {
@@ -1447,12 +1441,11 @@ export class OverlayController {
   }
 
   private broadcastShortcutStatus(): void {
-    const command: OverlayCommand = {
-      type: 'shortcut-status',
+    const command: OverlayCommand = shortcutStatusCommand({
       registered: this.shortcutRegistered,
       accelerator: this.accelerator,
       message: this.shortcutMessage,
-    };
+    });
     for (const win of this.getWindows()) {
       if (this.live(win) && !win.webContents.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.OVERLAY_COMMAND, command);
@@ -1474,7 +1467,7 @@ export class OverlayController {
   private resetFoxPeekLifecycle(edge: FoxDockEdge): number {
     this.foxPeekIntent = 'retract';
     const epoch = this.advanceFoxPeekEpoch();
-    this.sendToFox({ type: 'fox-edge', edge, epoch });
+    this.sendToFox(foxEdgeCommand(edge, epoch));
     return epoch;
   }
 
@@ -1660,8 +1653,4 @@ export class OverlayController {
   private createChromeWindow(size: OverlayChromeWindowSize): BrowserWindow {
     return createOverlayChromeWindow(this.preloadPath, size);
   }
-}
-
-export function isTestHarnessEnabled(): boolean {
-  return process.env.DEMO_E2E === '1' || process.argv.includes('--demo-e2e');
 }

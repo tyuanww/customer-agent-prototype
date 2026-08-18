@@ -16,6 +16,7 @@
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
 | 查阅三窗安全、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
 | 了解 main / preload / renderer / shared 的职责和清理边界 | [docs/reference-project-architecture.md](docs/reference-project-architecture.md) |
+| 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
 

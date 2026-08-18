@@ -473,6 +473,48 @@ export function queryHandoffCenterFromBounds(
   };
 }
 
+export function reportableOverlayPhase(phase: OverlayChromePhase): ReportablePhase {
+  return phase === 'FOX_IDLE' ? 'SEARCH_INPUT' : phase;
+}
+
+export function acceptedQueryLayoutAck(
+  sessionId: number,
+  sequence: number,
+  height: number,
+  resizeEdge: QueryResizeEdge,
+  phase: ReportablePhase,
+  resultCount: ResultCount,
+): QueryLayoutAck {
+  return {
+    ok: true,
+    sessionId,
+    sequence,
+    phase,
+    resultCount,
+    height,
+    resizeEdge,
+  };
+}
+
+export function queryLayoutAckCommand(
+  sessionId: number,
+  sequence: number,
+  phase: ReportablePhase,
+  resultCount: ResultCount,
+  height: number,
+  resizeEdge: QueryResizeEdge,
+): QueryLayoutAckCommand {
+  return {
+    type: 'query-layout-ack',
+    sessionId,
+    sequence,
+    phase,
+    resultCount,
+    height,
+    resizeEdge,
+  };
+}
+
 export function rejectedQueryLayoutAck(
   sessionId: number,
   sequence: number,

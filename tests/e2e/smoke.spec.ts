@@ -1319,7 +1319,9 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
     await expect.poll(async () => fox.getByTestId('fox-idle').getAttribute('data-fox-follow')).toBe('false');
     // The local-follow path above is synthetic and deterministic. Isolate the
     // passive 8s/14s clock from an operator's physical cursor crossing this
-    // always-on-top 88px window while the suite runs on a real desktop.
+    // always-on-top 88px window while the suite runs on a real desktop. Set
+    // the native hit-test fence before the final cursor park so the OS warp
+    // cannot enqueue a late pointermove that restarts the sleep deadline.
     await app.evaluate(({ BrowserWindow }) => {
       const win = BrowserWindow.getAllWindows().find((item) =>
         item.webContents.getURL().includes('role=fox'),
@@ -1330,6 +1332,7 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
     await fox.getByTestId('fox-idle').evaluate((idle) => {
       idle.style.pointerEvents = 'none';
     });
+    await parkFoxPointerOutside(app, fox);
     const drowsyAfter = Number(await fox.getByTestId('fox-idle').getAttribute('data-drowsy-after-ms'));
     const sleepAfter = Number(await fox.getByTestId('fox-idle').getAttribute('data-sleep-after-ms'));
     const waitForAmbient = async (expected: 'drowsy' | 'sleeping', timeoutMs: number) => {
@@ -1344,6 +1347,20 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
     await expect(fox.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'sleeping');
     expect(await readFoxNativeBounds(app)).toEqual(beforeFollow);
 
+    // Re-enable the fox window before invoking the real click path. Keeping
+    // ignoreMouseEvents enabled while calling HTMLElement.click() can leave
+    // the Query window visible but unfocused on a busy desktop compositor.
+    await fox.getByTestId('fox-idle').evaluate((idle) => {
+      idle.style.removeProperty('pointer-events');
+    });
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((item) =>
+        item.webContents.getURL().includes('role=fox'),
+      );
+      if (!win) throw new Error('fox window missing');
+      win.setIgnoreMouseEvents(false);
+    });
+
     // Sample and activate in the same renderer task. The sleeping pose keeps
     // animating, so two separate CDP evaluations can legitimately observe
     // different compositor frames even when the handoff itself is continuous.
@@ -1355,16 +1372,6 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
       return { a: matrix.a, b: matrix.b, c: matrix.c, d: matrix.d, e: matrix.e, f: matrix.f };
     });
     await waitForInteractiveQuery(app, query);
-    await fox.getByTestId('fox-idle').evaluate((idle) => {
-      idle.style.removeProperty('pointer-events');
-    });
-    await app.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find((item) =>
-        item.webContents.getURL().includes('role=fox'),
-      );
-      if (!win) throw new Error('fox window missing');
-      win.setIgnoreMouseEvents(false);
-    });
     await query.screenshot({
       path: path.join(screenshotDir, 'fox-query-canonical.png'),
       omitBackground: true,

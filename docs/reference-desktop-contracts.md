@@ -2,7 +2,7 @@
 
 本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `src/` 与 `package.json` 为准。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 
 ---
 

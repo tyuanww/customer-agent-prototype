@@ -169,7 +169,7 @@ Windows Electron 壳
 | `script_version` | 不存在 | 整数，治理快照任一字段变化即 +1 |
 | Question 版本 | 不存在（只有 `questionVariants[]`） | `(question_id, question_version)` 不可变 |
 | `release_seq` / `release_id` | Dashboard 合成 `rel-demo-2026-08-a` | 发布事务内单调；rollback **复制为新 seq**，禁止把 current 指针拨回旧行 |
-| 客户端 N / N-1 | `package.json` `0.1.0`，`appId=local.demo.customer-agent` | 首个签名 Pilot 才建立 N；破坏性变更走 `/v2` |
+| 客户端 N / N-1 | `package.json` `0.1.1`，`appId=local.demo.customer-agent` | 首个签名 Pilot 才建立 N；破坏性变更走 `/v2` |
 | Dashboard `version: "q-14"` | 流水装饰 | **不能**写入 `script_version` 或 `question_version` |
 
 ### 5.2 生效期：闭区间本地日 ≠ 半开 UTC

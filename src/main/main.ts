@@ -1,5 +1,6 @@
 import { app, Menu, session } from 'electron';
-import { isTestHarnessEnabled, OverlayController } from './overlay-controller';
+import { OverlayController } from './overlay-controller';
+import { isTestHarnessEnabled } from './overlay-test-harness';
 import { registerClipboardIpc } from './clipboard-ipc';
 import { registerOverlayIpc } from './overlay-ipc';
 import { applySessionSecurity } from './window-security';

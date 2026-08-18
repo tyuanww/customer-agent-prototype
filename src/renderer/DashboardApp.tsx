@@ -15,7 +15,7 @@ import {
   DASHBOARD_DEFERRED_NAV,
   DASHBOARD_MANIFEST,
   DASHBOARD_NAV,
-  isDashboardModuleId,
+  nextDashboardNavId,
   type DashboardModuleId,
 } from './data/dashboard-manifest';
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
@@ -56,9 +56,11 @@ import {
   isDashboardNavStructureTransition,
   prefersReducedMotion,
   readDashboardStructureWidth,
+  dashboardNavTooltipPosition,
   resolveDashboardSeparatorAria,
   resolveDashboardTheme,
   settleDashboardNavPhase,
+  systemPrefersDark,
   shouldSettleDashboardNavTransition,
   startDashboardNavPhase,
   type DashboardNavPhase,
@@ -85,11 +87,6 @@ type NavTooltipState = {
   top: number;
   visible: boolean;
 };
-
-function systemPrefersDark(): boolean {
-  return typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
 
 export function DashboardApp() {
   const [active, setActive] = useState<DashboardModuleId>('overview');
@@ -574,8 +571,7 @@ export function DashboardApp() {
       setNavTooltip({
         key,
         label,
-        left: rect.right + 10,
-        top: rect.top + (rect.height / 2),
+        ...dashboardNavTooltipPosition(rect),
         visible: true,
       });
       tooltipOpenTimerRef.current = null;
@@ -950,11 +946,10 @@ export function DashboardApp() {
   };
 
   const move = (delta: number) => {
-    const index = DASHBOARD_NAV.findIndex((item) => item.id === active);
-    const next = DASHBOARD_NAV[(index + delta + DASHBOARD_NAV.length) % DASHBOARD_NAV.length];
-    setActive(next.id);
+    const nextId = nextDashboardNavId(active, delta);
+    setActive(nextId);
     window.requestAnimationFrame(() => {
-      document.getElementById(`dash-nav-${next.id}`)?.focus();
+      document.getElementById(`dash-nav-${nextId}`)?.focus();
     });
   };
 
@@ -1264,6 +1259,4 @@ export function DashboardApp() {
   );
 }
 
-export function selectDashboardModule(value: string): DashboardModuleId {
-  return isDashboardModuleId(value) ? value : 'overview';
-}
+export { selectDashboardModule } from './data/dashboard-manifest';

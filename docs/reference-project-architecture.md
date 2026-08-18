@@ -124,12 +124,15 @@ pnpm build
 
 当前目录结构达到 Demo 收尾标准：边界清楚、运行时权限收窄、测试按层分组、生成物有独立清理入口、正式 API 仍保持隔离。
 
-仍然保留的后续债务：`overlay-controller.ts`、`DashboardApp.tsx` 和 `QueryApp.tsx` 仍偏大；它们是状态机和交接逻辑的高耦合区，下一轮应以行为合同为先拆出 controller/hook，而不是为了行数做机械切文件。本轮不移动它们，避免把已验证的交互回归扩大成结构性重构。
+三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard 模块选择与 tooltip 几何。不移动 setBounds、焦点、handoff ACK 或导航状态机。
+
+叶子模块的输入、输出、协议边界和对应测试见 [抽取叶子模块合同](reference-extracted-module-contracts.md)。该页是维护参考，不把这些 helper 提升成跨窗口公共 API。
 
 ## 相关文档
 
 - [第一次运行客服话术浮窗 Demo](tutorial-first-run.md)
 - [如何验证桌面 Demo](how-to-verify-desktop.md)
 - [桌面合同](reference-desktop-contracts.md)
+- [抽取叶子模块合同](reference-extracted-module-contracts.md)
 - [失败安全说明](explanation-failure-safe-lifecycle.md)
 - [API adapter 衔接](reference-api-adapter-handoff.md)

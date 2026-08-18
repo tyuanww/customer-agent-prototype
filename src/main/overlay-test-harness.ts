@@ -4,6 +4,10 @@ import type { OverlayPhase } from '../shared/overlay-machine';
 import type { QueryResizeRequest } from '../shared/query-layout';
 import type { ReportablePhase, ResultCount } from '../shared/overlay-events';
 
+export function isTestHarnessEnabled(): boolean {
+  return process.env.DEMO_E2E === '1' || process.argv.includes('--demo-e2e');
+}
+
 export type OverlayTestHarnessHost = {
   phase: OverlayPhase;
   shortcutRegistered: boolean;

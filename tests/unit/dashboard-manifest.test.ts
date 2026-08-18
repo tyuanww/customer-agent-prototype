@@ -7,6 +7,8 @@ import {
   DASHBOARD_DEFERRED_NAV,
   DASHBOARD_MODULE_IDS,
   DASHBOARD_NAV,
+  nextDashboardNavId,
+  selectDashboardModule,
 } from '../../src/renderer/data/dashboard-manifest';
 
 const sourcePath = path.resolve(
@@ -181,6 +183,12 @@ describe('dashboard manifest', () => {
       expect.objectContaining({ id: 'workorder-trash', statusLabel: '二期待实施' }),
     ]);
     expect(DASHBOARD_MODULE_IDS).not.toContain('workorder-trash');
+    expect(selectDashboardModule('ledger')).toBe('ledger');
+    expect(selectDashboardModule('workorder-trash')).toBe('overview');
+    expect(selectDashboardModule('unknown')).toBe('overview');
+    expect(nextDashboardNavId('overview', 1)).toBe('workorders');
+    expect(nextDashboardNavId('architecture', 1)).toBe('overview');
+    expect(nextDashboardNavId('overview', -1)).toBe('architecture');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不联网');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不发送');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不保存');

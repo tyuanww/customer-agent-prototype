@@ -46,6 +46,7 @@ vi.mock('../../src/main/window-security', () => ({
 
 vi.mock('../../src/main/overlay-test-harness', () => ({
   attachTestHarness: mocks.attachTestHarness,
+  isTestHarnessEnabled: () => false,
 }));
 
 import { OverlayController } from '../../src/main/overlay-controller';

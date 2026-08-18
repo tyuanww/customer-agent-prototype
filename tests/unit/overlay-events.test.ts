@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
+  activateSearchCommand,
+  collapseQueryCommand,
+  foxDragSettledCommand,
+  foxEdgeCommand,
   isFoxDragSettleAck,
   isFoxVisualTransform,
   isOverlayCommand,
+  prepareSearchCommand,
   selectAuthoritativeFoxDockSnapshot,
+  shortcutStatusCommand,
+  syncFoxEdgeCommand,
+  syncQueryAnchorCommand,
 } from '../../src/shared/overlay-events';
 
 describe('overlay command boundary', () => {
@@ -146,6 +154,78 @@ describe('overlay command boundary', () => {
       generation: 2,
     })).toBe(false);
     expect(isOverlayCommand({ type: 'sync-query-anchor', anchor: 'center' })).toBe(false);
+  });
+
+  it('builds overlay command payloads that stay inside the existing protocol', () => {
+    const prepare = prepareSearchCommand({
+      handoffId: 1,
+      anchor: 'left',
+      handoffCenterX: -8,
+      handoffCenterY: 44,
+      foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
+    });
+    expect(prepare).toEqual({
+      type: 'prepare-search',
+      handoffId: 1,
+      anchor: 'left',
+      handoffCenterX: -8,
+      handoffCenterY: 44,
+      foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
+    });
+    expect(isOverlayCommand(prepare)).toBe(true);
+    expect(activateSearchCommand('right', false)).toEqual({
+      type: 'activate-search',
+      anchor: 'right',
+      animate: false,
+    });
+    expect(activateSearchCommand('left', true, 7)).toEqual({
+      type: 'activate-search',
+      anchor: 'left',
+      animate: true,
+      handoffId: 7,
+    });
+    expect(isOverlayCommand(activateSearchCommand('left', true, 7))).toBe(true);
+    expect(collapseQueryCommand({
+      handoffId: 3,
+      anchor: 'right',
+      dockEdge: 'left',
+      animate: true,
+      handoffCenterX: 32,
+      handoffCenterY: 44,
+    })).toEqual({
+      type: 'collapse',
+      handoffId: 3,
+      anchor: 'right',
+      dockEdge: 'left',
+      animate: true,
+      handoffCenterX: 32,
+      handoffCenterY: 44,
+    });
+    expect(foxEdgeCommand('right', 4)).toEqual({ type: 'fox-edge', edge: 'right', epoch: 4 });
+    expect(syncFoxEdgeCommand('none', 5)).toEqual({ type: 'sync-fox-edge', edge: 'none', epoch: 5 });
+    expect(syncQueryAnchorCommand('left')).toEqual({ type: 'sync-query-anchor', anchor: 'left' });
+    expect(shortcutStatusCommand({
+      registered: false,
+      accelerator: 'CommandOrControl+Shift+Space',
+      message: '快捷键注册失败',
+    })).toEqual({
+      type: 'shortcut-status',
+      registered: false,
+      accelerator: 'CommandOrControl+Shift+Space',
+      message: '快捷键注册失败',
+    });
+    expect(foxDragSettledCommand({
+      edge: 'left',
+      epoch: 4,
+      settleId: 9,
+      generation: 2,
+    })).toEqual({
+      type: 'fox-drag-settled',
+      edge: 'left',
+      epoch: 4,
+      settleId: 9,
+      generation: 2,
+    });
   });
 
   it('accepts only bounded, non-mirrored 2D fox visual matrices', () => {

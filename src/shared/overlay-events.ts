@@ -280,3 +280,88 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
   }
   return false;
 }
+
+export function prepareSearchCommand(input: {
+  handoffId: number;
+  anchor: QueryAnchor;
+  handoffCenterX: number;
+  handoffCenterY: number;
+  foxVisualTransform: FoxVisualTransform;
+}): Extract<OverlayCommand, { type: 'prepare-search' }> {
+  return {
+    type: 'prepare-search',
+    handoffId: input.handoffId,
+    anchor: input.anchor,
+    handoffCenterX: input.handoffCenterX,
+    handoffCenterY: input.handoffCenterY,
+    foxVisualTransform: input.foxVisualTransform,
+  };
+}
+
+export function activateSearchCommand(
+  anchor: QueryAnchor,
+  animate: boolean,
+  handoffId?: number,
+): Extract<OverlayCommand, { type: 'activate-search' }> {
+  return handoffId === undefined
+    ? { type: 'activate-search', anchor, animate }
+    : { type: 'activate-search', anchor, animate, handoffId };
+}
+
+export function collapseQueryCommand(input: {
+  handoffId: number;
+  anchor: QueryAnchor;
+  dockEdge: FoxDockEdge;
+  animate: boolean;
+  handoffCenterX: number;
+  handoffCenterY: number;
+}): Extract<OverlayCommand, { type: 'collapse' }> {
+  return {
+    type: 'collapse',
+    handoffId: input.handoffId,
+    anchor: input.anchor,
+    dockEdge: input.dockEdge,
+    animate: input.animate,
+    handoffCenterX: input.handoffCenterX,
+    handoffCenterY: input.handoffCenterY,
+  };
+}
+
+export function foxEdgeCommand(
+  edge: FoxDockEdge,
+  epoch: number,
+): Extract<OverlayCommand, { type: 'fox-edge' }> {
+  return { type: 'fox-edge', edge, epoch };
+}
+
+export function syncFoxEdgeCommand(
+  edge: FoxDockEdge,
+  epoch: number,
+): Extract<OverlayCommand, { type: 'sync-fox-edge' }> {
+  return { type: 'sync-fox-edge', edge, epoch };
+}
+
+export function syncQueryAnchorCommand(
+  anchor: QueryAnchor,
+): Extract<OverlayCommand, { type: 'sync-query-anchor' }> {
+  return { type: 'sync-query-anchor', anchor };
+}
+
+export function shortcutStatusCommand(input: {
+  registered: boolean;
+  accelerator: string;
+  message: string;
+}): Extract<OverlayCommand, { type: 'shortcut-status' }> {
+  return {
+    type: 'shortcut-status',
+    registered: input.registered,
+    accelerator: input.accelerator,
+    message: input.message,
+  };
+}
+
+export function foxDragSettledCommand(
+  ack: FoxDragSettleAck,
+): Extract<OverlayCommand, { type: 'fox-drag-settled' }> {
+  return { type: 'fox-drag-settled', ...ack };
+}

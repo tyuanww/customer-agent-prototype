@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
   EMPTY_QUERY_MESSAGE,
@@ -9,8 +9,6 @@ import { formatAcceleratorLabel } from '@shared/shortcut';
 import {
   QUERY_CLOSE_DURATION_MS,
   QUERY_CONTENT_EXIT_DURATION_MS,
-  QUERY_FOX_CENTER_OFFSET_PX,
-  QUERY_HANDOFF_SIZE_PX,
   QUERY_OPEN_DURATION_MS,
   queryHandoffGeometry,
 } from '@shared/fox-motion';
@@ -18,6 +16,7 @@ import { QUERY_INPUT_HEIGHT, QUERY_WIDTH } from '@shared/overlay-geometry';
 import {
   acceptQueryLayoutAck,
   composeQueryDesiredHeight,
+  isQueryContentLayoutPhase,
   measureQueryHugHeight,
   QUERY_CONTENT_BLANK_TOLERANCE_PX,
   QUERY_LAYOUT_FALLBACK_MS,
@@ -38,14 +37,19 @@ import { QueryCapsule } from './features/search/QueryCapsule';
 import { QueryResultsPane } from './features/search/QueryResultsPane';
 import { searchScripts } from './features/search/search-service';
 import type { RankedScript } from './features/search/types';
+import {
+  COPY_FEEDBACK_MS,
+  DEEP_THINKING_DESCRIPTION,
+  SEARCH_FEEDBACK_MS,
+  maxContentBottom,
+  queryFoxVisualState,
+  queryHandoffCssVars,
+  queryShellClassName,
+  resultCopyRankFromKey,
+} from './features/search/query-view';
 import { isImeComposing, shouldSubmitOnEnter } from './lib/ime';
 import { isInteractiveTarget } from './lib/is-interactive-target';
 import { useWindowDrag } from './lib/use-window-drag';
-
-const SEARCH_FEEDBACK_MS = 280;
-const COPY_FEEDBACK_MS = 900;
-const DEEP_THINKING_DESCRIPTION =
-  'DeepSeek 仅作辅助重排预留，当前 OFF、未接入；不生成、不改写、不发送。';
 
 export function QueryApp() {
   const [phase, setPhase] = useState<OverlayPhase>('SEARCH_INPUT');
@@ -230,9 +234,7 @@ export function QueryApp() {
 
   const requestQueryLayout = useCallback((phase: OverlayPhase, resultCount: ResultCount) => {
     if (
-      phase === 'FOX_IDLE'
-      || phase === 'SEARCH_INPUT'
-      || phase === 'COPIED'
+      !isQueryContentLayoutPhase(phase)
       || opening
       || closing
       || !resizeFinishedRef.current
@@ -252,12 +254,12 @@ export function QueryApp() {
     const capsule = shell?.querySelector<HTMLElement>('.query-capsule');
     const lastCard = pane?.querySelector<HTMLElement>('.script-card:last-of-type');
     const lastCopy = lastCard?.querySelector<HTMLElement>('.copy-btn');
-    let lastContentBottom = 0;
-    for (const node of [lastCard, lastCopy, banner, content?.lastElementChild ?? null]) {
-      if (node) {
-        lastContentBottom = Math.max(lastContentBottom, node.getBoundingClientRect().bottom);
-      }
-    }
+    const lastContentBottom = maxContentBottom([
+      lastCard,
+      lastCopy,
+      banner,
+      content?.lastElementChild ?? null,
+    ]);
     const panePad = pane
       ? Number.parseFloat(getComputedStyle(pane).paddingBottom) || 0
       : 0;
@@ -538,7 +540,7 @@ export function QueryApp() {
     if (opening || closing) {
       return undefined;
     }
-    if (phase === 'SEARCH_INPUT' || phase === 'FOX_IDLE' || phase === 'COPIED') {
+    if (!isQueryContentLayoutPhase(phase)) {
       hugPassRef.current = 0;
       return undefined;
     }
@@ -562,7 +564,7 @@ export function QueryApp() {
     if (!layoutReady || opening || closing) {
       return undefined;
     }
-    if (phase === 'SEARCH_INPUT' || phase === 'FOX_IDLE' || phase === 'COPIED') {
+    if (!isQueryContentLayoutPhase(phase)) {
       hugPassRef.current = 0;
       return undefined;
     }
@@ -893,11 +895,11 @@ export function QueryApp() {
       ) {
         return;
       }
-      const rank = event.code.startsWith('Numpad') ? event.code.slice(-1) : event.key;
-      if (rank !== '1' && rank !== '2' && rank !== '3') {
+      const rank = resultCopyRankFromKey(event.code, event.key);
+      if (rank === null) {
         return;
       }
-      const script = results[Number(rank) - 1];
+      const script = results[rank - 1];
       if (!script) {
         return;
       }
@@ -921,8 +923,8 @@ export function QueryApp() {
     runSearch();
   };
 
-  const expanded = phase === 'RESULTS' || phase === 'EMPTY' || phase === 'ERROR' || phase === 'COPIED';
-  const showQueryResizeGrip = phase === 'RESULTS' || phase === 'EMPTY' || phase === 'ERROR';
+  const showQueryResizeGrip = isQueryContentLayoutPhase(phase);
+  const expanded = showQueryResizeGrip || phase === 'COPIED';
 
   const applyQueryResizeAck = useCallback((
     ack: QueryLayoutAck | null | undefined,
@@ -1117,60 +1119,22 @@ export function QueryApp() {
   }, [finishQueryResize]);
 
   const shortcutLabel = formatAcceleratorLabel('CommandOrControl+Shift+Space', platform);
-  const foxVisualState = searching
-    ? 'SEARCHING'
-    : phase === 'RESULTS'
-      ? 'RESULTS'
-      : phase === 'EMPTY'
-        ? 'EMPTY'
-        : phase === 'COPIED'
-          ? 'COPIED'
-          : 'IDLE';
+  const foxVisualState = queryFoxVisualState(searching, phase);
 
   return (
     <div
-      className={[
-        expanded ? 'query-shell is-expanded' : 'query-shell',
-        parked ? 'is-parked' : '',
-        opening ? 'is-opening' : '',
-        closing ? 'is-closing' : '',
-        layoutReady ? '' : 'is-awaiting-layout',
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      style={
-        {
-          '--query-open-duration': `${QUERY_OPEN_DURATION_MS}ms`,
-          '--query-close-duration': `${QUERY_CLOSE_DURATION_MS}ms`,
-          '--query-content-exit-duration': `${QUERY_CONTENT_EXIT_DURATION_MS}ms`,
-          '--query-handoff-scale-x': handoffGeometry.scaleX,
-          '--query-handoff-scale-y': handoffGeometry.scaleY,
-          '--query-handoff-origin-x': `${handoffGeometry.originX}px`,
-          '--query-handoff-origin-y': `${handoffGeometry.originY}px`,
-          '--query-handoff-clip-top': `${handoffGeometry.clipTop}px`,
-          '--query-handoff-clip-right': `${handoffGeometry.clipRight}px`,
-          '--query-handoff-clip-bottom': `${handoffGeometry.clipBottom}px`,
-          '--query-handoff-clip-left': `${handoffGeometry.clipLeft}px`,
-          '--query-handoff-fox-translate-x': `${
-            handoffGeometry.clipLeft +
-            QUERY_HANDOFF_SIZE_PX / 2 -
-            (anchor === 'left'
-              ? QUERY_FOX_CENTER_OFFSET_PX
-              : QUERY_WIDTH - QUERY_FOX_CENTER_OFFSET_PX)
-          }px`,
-          '--query-handoff-fox-translate-y': `${
-            handoffGeometry.clipTop +
-            QUERY_HANDOFF_SIZE_PX / 2 -
-            QUERY_FOX_CENTER_OFFSET_PX
-          }px`,
-          '--query-handoff-fox-a': handoffFoxTransform.a,
-          '--query-handoff-fox-b': handoffFoxTransform.b,
-          '--query-handoff-fox-c': handoffFoxTransform.c,
-          '--query-handoff-fox-d': handoffFoxTransform.d,
-          '--query-handoff-fox-e': handoffFoxTransform.e,
-          '--query-handoff-fox-f': handoffFoxTransform.f,
-        } as CSSProperties
-      }
+      className={queryShellClassName({
+        expanded,
+        parked,
+        opening,
+        closing,
+        layoutReady,
+      })}
+      style={queryHandoffCssVars({
+        geometry: handoffGeometry,
+        foxTransform: handoffFoxTransform,
+        anchor,
+      })}
       ref={shellRef}
       data-testid="query-shell"
       data-phase={phase}

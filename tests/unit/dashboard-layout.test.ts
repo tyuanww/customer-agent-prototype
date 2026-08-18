@@ -445,7 +445,7 @@ describe('dashboard layout contract', () => {
     expect(app).toContain('colorScheme: resolvedTheme');
     expect(app).toContain("closeMenu('dismiss')");
     expect(app).toContain("closeMenu(event.shiftKey ? 'tab-backward' : 'tab-forward')");
-    expect(rendererMain).toContain("resolveDashboardTheme('system', systemPrefersDark)");
+    expect(rendererMain).toContain("resolveDashboardTheme('system', systemPrefersDark())");
     expect(rendererMain).toContain("document.documentElement.dataset.dashboardThemeMode = 'system'");
     expect(app).not.toMatch(/localStorage|sessionStorage|indexedDB|customerAgent/);
     expect(css).toContain('color-scheme: inherit');

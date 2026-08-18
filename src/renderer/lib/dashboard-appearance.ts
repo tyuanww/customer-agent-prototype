@@ -353,3 +353,19 @@ export function resolveDashboardTheme(
   if (mode === 'system') return systemPrefersDark ? 'dark' : 'light';
   return mode;
 }
+
+export function systemPrefersDark(): boolean {
+  return typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+export function dashboardNavTooltipPosition(rect: {
+  right: number;
+  top: number;
+  height: number;
+}): { left: number; top: number } {
+  return {
+    left: rect.right + 10,
+    top: rect.top + (rect.height / 2),
+  };
+}

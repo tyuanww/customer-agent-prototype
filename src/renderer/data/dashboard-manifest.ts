@@ -1320,6 +1320,18 @@ export function isDashboardModuleId(value: string): value is DashboardModuleId {
   return (DASHBOARD_MODULE_IDS as readonly string[]).includes(value);
 }
 
+export function selectDashboardModule(value: string): DashboardModuleId {
+  return isDashboardModuleId(value) ? value : 'overview';
+}
+
+export function nextDashboardNavId(
+  active: DashboardModuleId,
+  delta: number,
+): DashboardModuleId {
+  const index = DASHBOARD_NAV.findIndex((item) => item.id === active);
+  return DASHBOARD_NAV[(index + delta + DASHBOARD_NAV.length) % DASHBOARD_NAV.length].id;
+}
+
 export function findLedgerRow(operationId: string): LedgerRow | undefined {
   return DASHBOARD_MANIFEST.ledger.rows.find((row) => row.operationId === operationId);
 }
