@@ -6,7 +6,6 @@ import {
   type CopyTextResult,
   type CustomerAgentApi,
   type OpenDashboardResult,
-  type PlatformInfo,
 } from '../shared/contracts';
 import {
   isFoxDragSettleAck,
@@ -46,9 +45,6 @@ const api: CustomerAgentApi = {
       return Promise.resolve({ ok: false, message: '复制内容无效' });
     }
     return ipcRenderer.invoke(IPC_CHANNELS.COPY_TEXT, text);
-  },
-  getPlatform(): Promise<PlatformInfo> {
-    return ipcRenderer.invoke(IPC_CHANNELS.GET_PLATFORM);
   },
   getWindowContext(): Promise<WindowContext> {
     return ipcRenderer.invoke(IPC_CHANNELS.GET_WINDOW_CONTEXT);

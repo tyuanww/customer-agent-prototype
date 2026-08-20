@@ -23,6 +23,9 @@ export const GENERATED_CLEAN_TARGETS = Object.freeze([
   'test-results',
   'playwright-report',
   '.gstack/qa-reports',
+  'build/icon.png',
+  'build/icon.ico',
+  'build/icon.icns',
   'node_modules/.vite',
   'node_modules/.vite-temp',
 ]);
@@ -247,8 +250,16 @@ export function formatBytes(bytes) {
   return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
-function parseCliArguments(argv) {
+export function parseCliArguments(argv) {
   const command = argv[0] ?? 'size';
+  const unknownOptions = argv.slice(1).filter((argument) => (
+    argument !== '--apply'
+    && !argument.startsWith('--scope=')
+    && !argument.startsWith('--remainder-budget-mib=')
+  ));
+  if (unknownOptions.length > 0) {
+    throw new Error(`Unknown cleanup option: ${unknownOptions.join(', ')}`);
+  }
   const scopeOption = argv.find((argument) => argument.startsWith('--scope='));
   const budgetOption = argv.find((argument) => argument.startsWith('--remainder-budget-mib='));
   const remainderBudgetBytes = budgetOption

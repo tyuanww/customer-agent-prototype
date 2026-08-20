@@ -49,9 +49,7 @@ describe('trusted query IPC access', () => {
     expect(overlayIpc).toContain('IPC_CHANNELS.RESIZE_QUERY_HEIGHT');
     expect(clipboardIpc).toContain('canCopyText({ trusted, role })');
     expect(clipboardIpc).toContain('IPC_CHANNELS.COPY_TEXT');
-    expect(clipboardIpc).toMatch(
-      /IPC_CHANNELS\.GET_PLATFORM[\s\S]*if \(!guard\(event\)\)/,
-    );
+    expect(clipboardIpc).not.toContain('GET_PLATFORM');
     expect(overlayIpc).not.toMatch(/OPEN_SEARCH[\s\S]{0,400}canReportUiPhase/);
   });
 });

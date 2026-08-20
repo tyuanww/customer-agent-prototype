@@ -1,4 +1,5 @@
 import type { ReportablePhase, ResultCount } from './overlay-events';
+import type { OverlayPhase } from './overlay-machine';
 import {
   QUERY_INPUT_HEIGHT,
   QUERY_PANEL_MAX_HEIGHT,
@@ -7,7 +8,6 @@ import {
   SCREEN_MARGIN,
   availableOverlayHeight,
   preferredQuerySizeForPhase,
-  type OverlayChromePhase,
   type Rect,
   type Size,
 } from './overlay-geometry';
@@ -246,7 +246,7 @@ export function isQueryLayoutAckCommand(value: unknown): value is QueryLayoutAck
 
 export function shouldIgnoreQueryLayout(
   handoffMode: QueryChromeHandoffMode,
-  phase: OverlayChromePhase,
+  phase: OverlayPhase,
 ): boolean {
   return (
     handoffMode === 'preparing-open' ||
@@ -257,7 +257,7 @@ export function shouldIgnoreQueryLayout(
 }
 
 export function isQueryContentLayoutPhase(
-  phase: OverlayChromePhase,
+  phase: OverlayPhase,
 ): phase is 'RESULTS' | 'EMPTY' | 'ERROR' {
   return phase === 'RESULTS' || phase === 'EMPTY' || phase === 'ERROR';
 }
@@ -268,7 +268,7 @@ export function acceptQueryLayoutAck(input: {
   requestSequence?: number;
   minSequence: number;
   activeSessionId: number;
-  currentPhase: OverlayChromePhase;
+  currentPhase: OverlayPhase;
   currentResultCount: ResultCount;
 }): boolean {
   if (!isQueryLayoutAck(input.ack) || !input.ack.ok) {
@@ -350,7 +350,7 @@ export function clampQueryDesiredHeight(
 }
 
 export function fallbackQuerySizeForPhase(
-  phase: OverlayChromePhase,
+  phase: OverlayPhase,
   resultCount: ResultCount = 0,
   workArea?: Pick<Rect, 'height'>,
 ): Size {
@@ -365,7 +365,7 @@ export function fallbackQuerySizeForPhase(
 }
 
 export function effectiveQuerySize(input: {
-  phase: OverlayChromePhase;
+  phase: OverlayPhase;
   resultCount?: ResultCount;
   workArea?: Pick<Rect, 'height'>;
   measuredHeight?: number | null;
@@ -473,7 +473,7 @@ export function queryHandoffCenterFromBounds(
   };
 }
 
-export function reportableOverlayPhase(phase: OverlayChromePhase): ReportablePhase {
+export function reportableOverlayPhase(phase: OverlayPhase): ReportablePhase {
   return phase === 'FOX_IDLE' ? 'SEARCH_INPUT' : phase;
 }
 

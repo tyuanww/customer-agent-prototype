@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   checkWorkspaceBudget,
   cleanWorkspace,
+  parseCliArguments,
   resolveCleanupTarget,
   workspaceInventory,
 } from '../../scripts/workspace-hygiene.mjs';
@@ -32,6 +33,10 @@ function createWorkspaceFixture() {
     'test-results/result.json',
     'playwright-report/index.html',
     '.gstack/qa-reports/screenshot.png',
+    'build/icon.png',
+    'build/icon.ico',
+    'build/icon.icns',
+    'build/entitlements.mac.plist',
     'node_modules/.vite/cache.bin',
     'node_modules/.vite-temp/cache.bin',
     'node_modules/electron/runtime.bin',
@@ -56,6 +61,25 @@ afterEach(() => {
 });
 
 describe('workspace hygiene', () => {
+  it('fails closed for unknown CLI flags instead of overriding an apply command', () => {
+    expect(parseCliArguments(['clean', '--scope=generated'])).toMatchObject({
+      command: 'clean',
+      scope: 'generated',
+      apply: false,
+    });
+    expect(parseCliArguments(['clean', '--scope=generated', '--apply'])).toMatchObject({
+      command: 'clean',
+      scope: 'generated',
+      apply: true,
+    });
+    expect(() => parseCliArguments([
+      'clean',
+      '--scope=generated',
+      '--apply',
+      '--dry-run',
+    ])).toThrow(/Unknown cleanup option: --dry-run/);
+  });
+
   it('reports generated packages and dependencies separately from the small workspace remainder', () => {
     const root = createWorkspaceFixture();
     const inventory = workspaceInventory(root);
@@ -117,6 +141,10 @@ describe('workspace hygiene', () => {
     expect(existsSync(path.join(root, 'release/local-unsigned'))).toBe(false);
     expect(existsSync(path.join(root, 'out'))).toBe(false);
     expect(existsSync(path.join(root, 'node_modules/.vite'))).toBe(false);
+    expect(existsSync(path.join(root, 'build/icon.png'))).toBe(false);
+    expect(existsSync(path.join(root, 'build/icon.ico'))).toBe(false);
+    expect(existsSync(path.join(root, 'build/icon.icns'))).toBe(false);
+    expect(existsSync(path.join(root, 'build/entitlements.mac.plist'))).toBe(true);
     expect(existsSync(path.join(root, 'node_modules/electron/runtime.bin'))).toBe(true);
     expect(readFileSync(path.join(root, '.git/HEAD'), 'utf8')).toContain('.git/HEAD');
     expect(existsSync(path.join(root, '.codegraph/codegraph.db'))).toBe(true);

@@ -11,7 +11,6 @@ import {
   FOX_FOLLOW_MAX_DEG,
   FOX_FOLLOW_MAX_PX,
   FOX_SLEEP_AFTER_MS,
-  FoxSleepClock,
   ambientFromDeadline,
   clampLocalFollow,
   computeDragReaction,
@@ -22,12 +21,15 @@ import {
   resolveFoxStructuralPose,
   shouldEnterAnnoyedDrag,
   shouldShowFoxHeadsetSignal,
-  writeFoxCssVars,
   type FoxAmbientPose,
   type FoxResolvedPose,
   type FoxStructuralPose,
   type FoxTransientPose,
 } from '../../src/shared/fox-presence';
+import {
+  FoxSleepClock,
+  writeFoxCssVars,
+} from '../../src/renderer/lib/fox-presence-runtime';
 import {
   FOX_CLOSED_LID,
   FOX_EYE_ROI,
@@ -47,6 +49,7 @@ const dragHook = readFileSync(path.join(root, 'src/renderer/lib/use-window-drag.
 const queryApp = [
   readFileSync(path.join(root, 'src/renderer/QueryApp.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/search/QueryCapsule.tsx'), 'utf8'),
+  readFileSync(path.join(root, 'src/renderer/features/search/query-view.ts'), 'utf8'),
 ].join('\n');
 
 const STRUCTURAL: FoxStructuralPose[] = ['handoff', 'snap', 'peek', 'retract', 'dragging', 'none'];

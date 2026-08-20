@@ -3,7 +3,6 @@ import { resolveClipboardWrite } from '../shared/clipboard-write';
 import {
   IPC_CHANNELS,
   type CopyTextResult,
-  type PlatformInfo,
 } from '../shared/contracts';
 import type { OverlayRole } from '../shared/overlay-events';
 import { canCopyText } from '../shared/query-ipc-access';
@@ -40,11 +39,4 @@ export function registerClipboardIpc(
       }
     },
   );
-
-  ipcMain.handle(IPC_CHANNELS.GET_PLATFORM, (event): PlatformInfo => {
-    if (!guard(event)) {
-      return { platform: process.platform };
-    }
-    return { platform: process.platform };
-  });
 }

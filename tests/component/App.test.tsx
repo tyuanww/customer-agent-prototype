@@ -6,10 +6,10 @@ describe('App role switch', () => {
   it('renders the fox idle control when role=fox', () => {
     window.customerAgent = {
       copyText: vi.fn(),
-      getPlatform: vi.fn().mockResolvedValue({ platform: 'darwin' }),
       getWindowContext: vi.fn().mockResolvedValue({
         role: 'fox',
         phase: 'FOX_IDLE',
+        platform: 'darwin',
         shortcut: { registered: true, accelerator: 'CommandOrControl+Shift+Space', message: '' },
         testHarness: false,
       }),
@@ -29,10 +29,10 @@ describe('App role switch', () => {
   it('renders the query capsule when role=query', () => {
     window.customerAgent = {
       copyText: vi.fn(),
-      getPlatform: vi.fn().mockResolvedValue({ platform: 'darwin' }),
       getWindowContext: vi.fn().mockResolvedValue({
         role: 'query',
         phase: 'SEARCH_INPUT',
+        platform: 'darwin',
         shortcut: { registered: true, accelerator: 'CommandOrControl+Shift+Space', message: '' },
         testHarness: false,
       }),

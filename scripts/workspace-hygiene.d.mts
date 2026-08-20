@@ -57,3 +57,9 @@ export function cleanWorkspace(options: Readonly<{
   remove?: (path: string, options: { recursive: true; force: true }) => void;
 }>): CleanupResult;
 export function formatBytes(bytes: number): string;
+export function parseCliArguments(argv: readonly string[]): Readonly<{
+  command: string;
+  scope: string;
+  apply: boolean;
+  remainderBudgetBytes: number;
+}>;

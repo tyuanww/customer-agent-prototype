@@ -1316,14 +1316,6 @@ export const DASHBOARD_MANIFEST = deepFreeze({
   },
 });
 
-export function isDashboardModuleId(value: string): value is DashboardModuleId {
-  return (DASHBOARD_MODULE_IDS as readonly string[]).includes(value);
-}
-
-export function selectDashboardModule(value: string): DashboardModuleId {
-  return isDashboardModuleId(value) ? value : 'overview';
-}
-
 export function nextDashboardNavId(
   active: DashboardModuleId,
   delta: number,

@@ -76,7 +76,7 @@ function acceptedAck(
   };
 }
 
-function createControllerFixture() {
+function createControllerFixture(options: { testHarness?: boolean } = {}) {
   const query = createSender(7, 'query');
   const fox = createSender(8, 'fox');
   const dashboard = createSender(9, 'dashboard');
@@ -95,7 +95,12 @@ function createControllerFixture() {
   const moveBy = vi.fn().mockReturnValue(null);
   const commitFoxDragSettle = vi.fn();
   const controller = {
+    accelerator: 'CommandOrControl+Shift+Space',
+    phase: 'RESULTS',
     rendererDevServerUrl: DEV_SERVER_URL,
+    shortcutMessage: '快捷键可用',
+    shortcutRegistered: true,
+    testHarness: options.testHarness ?? false,
     trustedContents: () => [query.sender, fox.sender, dashboard.sender],
     overlayRoleOf: (sender: WebContents) => roleById.get(sender.id) ?? null,
     reportQueryLayout,
@@ -136,6 +141,41 @@ describe('overlay query layout IPC handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     electronMocks.handlers.clear();
+  });
+
+  it('returns the trusted renderer context with the runtime platform', () => {
+    const fixture = createControllerFixture({ testHarness: true });
+    registerOverlayIpc(() => fixture.controller);
+
+    expect(capturedHandler(IPC_CHANNELS.GET_WINDOW_CONTEXT)(fixture.query.event)).toEqual({
+      role: 'query',
+      phase: 'RESULTS',
+      platform: process.platform,
+      shortcut: {
+        registered: true,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '快捷键可用',
+      },
+      testHarness: true,
+    });
+  });
+
+  it('returns a fail-closed context with the runtime platform for an untrusted sender', () => {
+    const fixture = createControllerFixture();
+    const untrusted = createSender(99, 'query');
+    registerOverlayIpc(() => fixture.controller);
+
+    expect(capturedHandler(IPC_CHANNELS.GET_WINDOW_CONTEXT)(untrusted.event)).toEqual({
+      role: 'query',
+      phase: 'FOX_IDLE',
+      platform: process.platform,
+      shortcut: {
+        registered: false,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '窗口上下文不可用',
+      },
+      testHarness: false,
+    });
   });
 
   it('awaits dashboard opening and returns a typed failure to the trusted query', async () => {

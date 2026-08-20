@@ -57,6 +57,7 @@ export function registerOverlayIpc(getController: () => OverlayController | null
       return {
         role: 'query',
         phase: 'FOX_IDLE',
+        platform: process.platform,
         shortcut: {
           registered: false,
           accelerator: 'CommandOrControl+Shift+Space',
@@ -68,6 +69,7 @@ export function registerOverlayIpc(getController: () => OverlayController | null
     return {
       role: controller.overlayRoleOf(event.sender) ?? 'query',
       phase: controller.phase,
+      platform: process.platform,
       shortcut: {
         registered: controller.shortcutRegistered,
         accelerator: controller.accelerator,

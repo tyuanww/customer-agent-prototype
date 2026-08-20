@@ -5,7 +5,6 @@ describe('IPC whitelist', () => {
   it('only allows the typed overlay and clipboard channels', () => {
     expect(IPC_CHANNEL_WHITELIST).toEqual([
       IPC_CHANNELS.COPY_TEXT,
-      IPC_CHANNELS.GET_PLATFORM,
       IPC_CHANNELS.GET_WINDOW_CONTEXT,
       IPC_CHANNELS.OPEN_SEARCH,
       IPC_CHANNELS.OPEN_DASHBOARD,

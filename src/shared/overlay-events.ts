@@ -98,6 +98,7 @@ export type QueryAnchor = 'left' | 'right';
 export type WindowContext = {
   role: OverlayRole;
   phase: OverlayPhase;
+  platform: string;
   shortcut: ShortcutStatus;
   testHarness: boolean;
 };

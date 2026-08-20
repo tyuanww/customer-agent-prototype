@@ -68,8 +68,9 @@ import {
 } from './lib/dashboard-appearance';
 import './styles/dashboard.css';
 
-const MODULES: Record<DashboardModuleId, () => ReactElement> = {
-  overview: () => <OverviewModule />,
+type DashboardLeafModuleId = Exclude<DashboardModuleId, 'overview'>;
+
+const MODULES: Record<DashboardLeafModuleId, () => ReactElement> = {
   ledger: LedgerModule,
   workorders: WorkorderModule,
   review: ReviewModule,
@@ -125,7 +126,7 @@ export function DashboardApp() {
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
-  const ActiveModule = MODULES[active];
+  const ActiveModule = active === 'overview' ? null : MODULES[active];
   const navMaxWidth = getDashboardNavMaxWidth(viewportWidth);
   const resolvedTheme = resolveDashboardTheme(themeMode, systemDark);
   const navCollapsed = isDashboardNavRailPhase(navPhase);
@@ -1252,11 +1253,9 @@ export function DashboardApp() {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : <ActiveModule />}
+          {ActiveModule ? <ActiveModule /> : <OverviewModule onNavigate={setActive} />}
         </main>
       </div>
     </div>
   );
 }
-
-export { selectDashboardModule } from './data/dashboard-manifest';

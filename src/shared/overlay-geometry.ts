@@ -1,4 +1,5 @@
 import type { FoxDockEdge, QueryAnchor, ResultCount } from './overlay-events';
+import type { OverlayPhase } from './overlay-machine';
 
 export const FOX_WINDOW_SIZE = 88;
 export const FOX_SIZE = FOX_WINDOW_SIZE;
@@ -38,16 +39,8 @@ export type Size = {
   height: number;
 };
 
-export type OverlayChromePhase =
-  | 'FOX_IDLE'
-  | 'SEARCH_INPUT'
-  | 'RESULTS'
-  | 'EMPTY'
-  | 'ERROR'
-  | 'COPIED';
-
 export function preferredQuerySizeForPhase(
-  phase: OverlayChromePhase,
+  phase: OverlayPhase,
   resultCount: ResultCount = 0,
 ): Size {
   if (phase === 'FOX_IDLE') {
@@ -73,7 +66,7 @@ export function availableOverlayHeight(workArea: Pick<Rect, 'height'>): number {
 }
 
 export function overlaySizeForPhase(
-  phase: OverlayChromePhase,
+  phase: OverlayPhase,
   resultCount: ResultCount = 0,
   workArea?: Pick<Rect, 'height'>,
   measuredHeight?: number | null,

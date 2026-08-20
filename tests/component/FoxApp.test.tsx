@@ -9,7 +9,6 @@ import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
 
 const copyText = vi.fn();
-const getPlatform = vi.fn();
 const getWindowContext = vi.fn();
 const openSearch = vi.fn();
 const openDashboard = vi.fn();
@@ -56,7 +55,6 @@ describe('FoxApp', () => {
   beforeEach(() => {
     vi.useRealTimers();
     copyText.mockReset();
-    getPlatform.mockReset();
     getWindowContext.mockReset();
     openSearch.mockReset();
     openDashboard.mockReset();
@@ -68,11 +66,11 @@ describe('FoxApp', () => {
     commitFoxDragSettle.mockResolvedValue(undefined);
     setFoxPeek.mockReset();
     setFoxPeek.mockResolvedValue(undefined);
-    getPlatform.mockResolvedValue({ platform: 'darwin' });
     commandListeners.clear();
     getWindowContext.mockResolvedValue({
       role: 'fox',
       phase: 'FOX_IDLE',
+      platform: 'darwin',
       shortcut: {
         registered: true,
         accelerator: 'CommandOrControl+Shift+Space',
@@ -82,7 +80,6 @@ describe('FoxApp', () => {
     });
     window.customerAgent = {
       copyText,
-      getPlatform,
       getWindowContext,
       openSearch,
       openDashboard,
@@ -937,6 +934,7 @@ describe('FoxApp', () => {
     getWindowContext.mockResolvedValue({
       role: 'fox',
       phase: 'FOX_IDLE',
+      platform: 'darwin',
       shortcut: {
         registered: false,
         accelerator: 'CommandOrControl+Shift+Space',
@@ -1201,6 +1199,7 @@ describe('FoxApp', () => {
     getWindowContext.mockResolvedValue({
       role: 'query',
       phase: 'SEARCH_INPUT',
+      platform: 'darwin',
       shortcut: {
         registered: true,
         accelerator: 'CommandOrControl+Shift+Space',

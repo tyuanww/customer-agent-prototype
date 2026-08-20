@@ -43,7 +43,6 @@ import {
   resolveFoxStructuralPose,
   shouldShowFoxHeadsetSignal,
   shouldEnterAnnoyedDrag,
-  writeFoxCssVars,
   type FoxAmbientPose,
   type FoxTransientPose,
 } from '@shared/fox-presence';
@@ -58,6 +57,7 @@ import {
   foxDragSessionHeadOffset,
 } from '@shared/overlay-geometry';
 import { FoxHead } from './components/FoxHead';
+import { writeFoxCssVars } from './lib/fox-presence-runtime';
 import { useFoxAmbient, useFoxLocalFollow, usePrefersReducedMotion } from './lib/use-fox-presence';
 import { useWindowDrag } from './lib/use-window-drag';
 

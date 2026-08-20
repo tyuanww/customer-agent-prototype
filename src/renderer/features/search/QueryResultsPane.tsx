@@ -7,7 +7,7 @@ import type { RankedScript } from './types';
 type QueryResultsPaneProps = {
   phase: OverlayPhase;
   resultPaneRef: Ref<HTMLElement>;
-  bannerRef: Ref<HTMLDivElement>;
+  statusBannerRef: Ref<HTMLDivElement>;
   resultContentRef: Ref<HTMLDivElement>;
   errorMessage: string;
   results: RankedScript[];
@@ -20,7 +20,7 @@ type QueryResultsPaneProps = {
 export function QueryResultsPane({
   phase,
   resultPaneRef,
-  bannerRef,
+  statusBannerRef,
   resultContentRef,
   errorMessage,
   results,
@@ -38,7 +38,7 @@ export function QueryResultsPane({
             tabIndex={-1}
           >
             {phase === 'EMPTY' ? (
-              <div ref={bannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
+              <div ref={statusBannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
                 <span className="no-hit-mark" aria-hidden="true">?</span>
                 <strong>没找到合适话术</strong>
                 <span>换个说法再试，或转人工话术师。当前 Demo 未接通真实话术库。</span>
@@ -46,7 +46,7 @@ export function QueryResultsPane({
             ) : null}
 
             {phase === 'ERROR' ? (
-              <div ref={bannerRef} className="status-banner is-error" data-testid="error-state">
+              <div ref={statusBannerRef} className="status-banner is-error" data-testid="error-state">
                 <strong>查询未完成</strong>
                 <span>{errorMessage || '出现可恢复错误，请重试。'}</span>
                 <button type="button" className="retry-btn" data-testid="retry-button" onClick={onRetry}>

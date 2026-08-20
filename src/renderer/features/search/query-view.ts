@@ -10,7 +10,8 @@ import {
 import { QUERY_WIDTH } from '@shared/overlay-geometry';
 import type { FoxVisualTransform, QueryAnchor } from '@shared/overlay-events';
 import type { OverlayPhase } from '@shared/overlay-machine';
-import type { QueryFoxVisualState } from './QueryCapsule';
+
+export type QueryFoxVisualState = 'SEARCHING' | 'RESULTS' | 'EMPTY' | 'COPIED' | 'IDLE';
 
 export const SEARCH_FEEDBACK_MS = 280;
 export const COPY_FEEDBACK_MS = 900;

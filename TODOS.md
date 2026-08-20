@@ -1,0 +1,53 @@
+# TODOS
+
+## Verification
+
+### Cover the unavailable WindowContext branch
+
+**What:** Add a handler-level test for `GET_WINDOW_CONTEXT` when the overlay controller is unavailable.
+
+**Why:** Preserve the typed fail-closed response at the Main IPC boundary.
+
+**Context:** The trusted and untrusted sender paths are covered in `tests/unit/overlay-ipc-handlers.test.ts`; the controller-unavailable branch in `src/main/overlay-ipc.ts` is the remaining narrow case.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Cover a rejected renderer WindowContext request
+
+**What:** Add a Query component test in which `getWindowContext()` rejects and the manual search interaction remains usable.
+
+**Why:** Prove renderer startup degrades safely when the context request itself fails.
+
+**Context:** Missing API and successful context responses are covered in `tests/component/QueryApp.test.tsx`; this should remain a component-level error-path test rather than an Electron E2E.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Cover simultaneous shortcut and error banners
+
+**What:** Add a Query layout test for the shortcut warning and the `ERROR` result banner being visible together.
+
+**Why:** Lock the shared banner measurement owner against future height-accounting drift.
+
+**Context:** The equivalent `EMPTY` combination is covered in `tests/component/QueryApp.test.tsx`; reuse that fixture with an error result instead of adding a browser test.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Cover the test harness without a Fox window
+
+**What:** Add a unit test for `attachTestHarness()` when no Fox `BrowserWindow` is present.
+
+**Why:** Keep the optional E2E provenance helper fail-closed without expanding production behavior.
+
+**Context:** The current Stage Manager Electron test covers tracing with a live Fox window. Exercise the absent-window branch directly in a fake Main-process fixture.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+## Completed

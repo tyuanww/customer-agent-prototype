@@ -112,6 +112,7 @@ pnpm build
 | --- | --- | --- |
 | Electron/Vite 输出 | `out/` | `pnpm clean:generated` |
 | 本地未签名包 | `release/local-unsigned/` | `pnpm clean:generated` |
+| 派生打包图标 | `build/icon.png`、`build/icon.ico`、`build/icon.icns` | `pnpm clean:generated`；按需重新运行图标生成或打包脚本 |
 | 测试报告 | `test-results/`、`playwright-report/` | `pnpm clean:generated` |
 | Vite 临时缓存 | `node_modules/.vite*` | `pnpm clean:generated` |
 | 依赖 | `node_modules/` | 只有归档时才用 `pnpm clean:deep` |
@@ -124,7 +125,9 @@ pnpm build
 
 当前目录结构达到 Demo 收尾标准：边界清楚、运行时权限收窄、测试按层分组、生成物有独立清理入口、正式 API 仍保持隔离。
 
-三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard 模块选择与 tooltip 几何。不移动 setBounds、焦点、handoff ACK 或导航状态机。
+三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
+
+Fox presence 的纯姿态解析、deadline 计算与数值几何保留在 `src/shared/fox-presence.ts`；依赖 DOM、`setTimeout` 与 `Date.now` 的运行时所有权集中在 `src/renderer/lib/fox-presence-runtime.ts`。Main 与 preload 不得导入后者。
 
 叶子模块的输入、输出、协议边界和对应测试见 [抽取叶子模块合同](reference-extracted-module-contracts.md)。该页是维护参考，不把这些 helper 提升成跨窗口公共 API。
 

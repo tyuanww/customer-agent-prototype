@@ -2,8 +2,7 @@ import type { Ref } from 'react';
 import { MAX_QUERY_CHARS } from '@shared/contracts';
 import { FoxHead } from '../../components/FoxHead';
 import { useWindowDrag } from '../../lib/use-window-drag';
-
-export type QueryFoxVisualState = 'SEARCHING' | 'RESULTS' | 'EMPTY' | 'COPIED' | 'IDLE';
+import type { QueryFoxVisualState } from './query-view';
 
 type QueryCapsuleProps = {
   foxVisualState: QueryFoxVisualState;

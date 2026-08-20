@@ -39,7 +39,7 @@ const shellClass = queryShellClassName({
 const rank = resultCopyRankFromKey(event.code, event.key);
 ```
 
-`QueryFoxVisualState` 当前仍是 Query 视图组件内部类型的类型导入。它没有运行时依赖，也不应被提升为跨窗口协议；若未来需要复用，应先把类型下沉到 search 专用类型模块。
+`QueryFoxVisualState` 由该叶子模块定义，`QueryCapsule` 只消费这个 search 内部类型。它不是跨窗口协议，不得上移到 preload 或 shared 合同。
 
 ## 3. Shared overlay command 工厂
 
@@ -77,7 +77,6 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 位置：`src/renderer/data/dashboard-manifest.ts`
 
-- `selectDashboardModule(value)` 只接受 manifest 中的已知模块 id；非法值和未实现/延后模块回落到 `overview`。
 - `nextDashboardNavId(active, delta)` 在 `DASHBOARD_NAV` 中循环移动，调用方传入整数步长（当前键盘路径使用 `-1` / `+1`）。它只返回已有导航 id，不创建新路由。
 
 ### 5.2 外观与 tooltip 几何
@@ -89,15 +88,27 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 主题仍是 Dashboard 会话内状态，不写入文件、不改变 Fox / Query 的共享主题。tooltip 的可见性、延迟和 `aria-describedby` 继续由 `DashboardApp` 负责。
 
-## 6. Test-only harness
+## 6. Fox presence 运行时
+
+位置：`src/renderer/lib/fox-presence-runtime.ts`
+
+- `FoxSleepClock` 独占睡眠 timer、deadline 与 token 生命周期；它消费 shared 的纯 schedule helper，但只在 renderer 创建或清理计时器。
+- `writeFoxCssVars` 把已经解析的姿态数值写入 Fox 元素的 CSS variables；Main、preload 与 shared 不持有 DOM 引用。
+- `src/shared/fox-presence.ts` 继续只负责姿态优先级、跟随/拖拽数值、睡眠 deadline 等纯计算。
+
+该拆分是依赖方向约束，不是新的跨窗口 API。改变睡眠阈值或姿态优先级时仍需同时验证 shared 纯函数和 `FoxApp` 生命周期。
+
+## 7. Test-only harness
 
 位置：`src/main/overlay-test-harness.ts`
 
 `isTestHarnessEnabled()` 仅在 `DEMO_E2E=1` 或命令行包含 `--demo-e2e` 时返回 true。`attachTestHarness(controller)` 在启用时把非枚举的 `globalThis.__demoTest` 绑定到 Electron 主进程，用于 E2E 的展开、收起、窗口快照、布局回执和阶段报告。
 
+`beginFoxSetBoundsTrace()` 会清空并开始记录应用对 E2E Fox 窗口发起的 `setBounds` 调用；`endFoxSetBoundsTrace()` 停止记录并返回 bounds / animate 快照。这两个方法只包装测试进程中已存在的 Fox `BrowserWindow`，用来区分应用主动移窗与 WindowServer 重新安置；它们不记录 OS 内部调用，也不改变生产 bounds 策略。
+
 这不是生产 API：生产启动不注入 harness，renderer 不应依赖 `__demoTest`，也不得用 harness 证明真实 macOS WindowServer、Dock、Stage Manager 或 Windows 合成器行为。相关自动化边界见 [如何验证桌面 Demo](how-to-verify-desktop.md)。
 
-## 7. 对应测试与验证
+## 8. 对应测试与验证
 
 叶子合同的单元测试与入口如下：
 
@@ -107,6 +118,7 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 | Shared overlay command | `tests/unit/overlay-events.test.ts` |
 | Query layout ACK | `tests/unit/query-layout.test.ts` |
 | Dashboard manifest / 外观 | `tests/unit/dashboard-manifest.test.ts`、`tests/unit/dashboard-appearance.test.ts` |
+| Fox presence 纯逻辑 / renderer runtime | `tests/unit/fox-presence.test.ts`、`tests/component/FoxApp.test.tsx` |
 | Test-only harness | `tests/unit/overlay-test-harness.test.ts` |
 
 推荐先跑窄反馈环：

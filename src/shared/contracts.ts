@@ -9,18 +9,15 @@ import type {
   ResultCount,
   WindowContext,
 } from './overlay-events';
-import type { CopyTextResult, PlatformInfo } from './contracts-types';
 import type {
   QueryLayoutAck,
   QueryLayoutRequest,
   QueryResizeRequest,
 } from './query-layout';
 
-export type {
-  CopyTextResult,
-  PlatformInfo,
-  PlatformName,
-} from './contracts-types';
+export type CopyTextResult =
+  | { ok: true }
+  | { ok: false; message: string };
 export type { OpenDashboardResult } from './dashboard-access';
 export {
   OPEN_DASHBOARD_FAILURE_MESSAGE,
@@ -33,7 +30,6 @@ export type { IpcChannel } from './ipc-channels';
 
 export type CustomerAgentApi = {
   copyText: (text: string) => Promise<CopyTextResult>;
-  getPlatform: () => Promise<PlatformInfo>;
   getWindowContext: () => Promise<WindowContext>;
   openSearch: (visualTransform?: FoxVisualTransform) => Promise<void>;
   openDashboard: () => Promise<OpenDashboardResult>;

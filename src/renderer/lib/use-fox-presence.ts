@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
-  FoxSleepClock,
   clampLocalFollow,
-  writeFoxCssVars,
   type FoxAmbientPose,
   type FoxFollowOffset,
 } from '@shared/fox-presence';
+import { FoxSleepClock, writeFoxCssVars } from './fox-presence-runtime';
 
 export function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === 'function'

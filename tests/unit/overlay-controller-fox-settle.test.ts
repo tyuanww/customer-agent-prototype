@@ -55,15 +55,25 @@ import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-
 
 type FoxWindowFixture = BrowserWindow & {
   sent: OverlayCommand[];
+  acceptNativeBounds(
+    bounds: { x: number; y: number; width: number; height: number },
+    event: 'move' | 'moved',
+  ): void;
 };
 
 function createFoxWindow(): FoxWindowFixture {
   let bounds = { x: 0, y: 100, width: 88, height: 88 };
   const sent: OverlayCommand[] = [];
+  const nativeBoundsListeners = new Map<'move' | 'moved', Set<() => void>>();
   return {
     getBounds: vi.fn(() => ({ ...bounds })),
     isDestroyed: vi.fn(() => false),
     isVisible: vi.fn(() => true),
+    on: vi.fn((event: 'move' | 'moved', listener: () => void) => {
+      const listeners = nativeBoundsListeners.get(event) ?? new Set<() => void>();
+      listeners.add(listener);
+      nativeBoundsListeners.set(event, listeners);
+    }),
     setBounds: vi.fn((next: typeof bounds) => {
       bounds = { ...next };
     }),
@@ -76,6 +86,15 @@ function createFoxWindow(): FoxWindowFixture {
       }),
     },
     sent,
+    acceptNativeBounds: (
+      next: { x: number; y: number; width: number; height: number },
+      event: 'move' | 'moved',
+    ) => {
+      bounds = { ...next };
+      for (const listener of nativeBoundsListeners.get(event) ?? []) {
+        listener();
+      }
+    },
   } as unknown as FoxWindowFixture;
 }
 
@@ -113,6 +132,24 @@ describe('OverlayController fox drag settle transaction', () => {
       controller.dispose();
     }
   });
+
+  it.each(['move', 'moved'] as const)(
+    'adopts the native Fox frame from the BrowserWindow %s event',
+    (event) => {
+      const { controller, fox } = controllerWithDockedFox();
+      controllers.push(controller);
+      const bindNativeReadback = Reflect.get(
+        controller,
+        'bindFoxNativeBoundsReadback',
+      ) as (win: BrowserWindow) => void;
+
+      bindNativeReadback.call(controller, fox);
+      fox.acceptNativeBounds({ x: 96, y: 124, width: 88, height: 88 }, event);
+
+      expect(Reflect.get(controller, 'foxOrigin')).toEqual({ x: 96, y: 124 });
+      expect(fox.setBounds).not.toHaveBeenCalled();
+    },
+  );
 
   it('holds repeated shortcut intents until the exact final settle commit, then opens once', () => {
     const { controller, fox } = controllerWithDockedFox();

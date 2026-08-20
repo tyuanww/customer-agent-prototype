@@ -96,7 +96,7 @@ pnpm test:e2e:float
 
 | 能证明 | 不能证明 |
 | --- | --- |
-| 当前构建产物能被 Playwright 拉起；`@float` 用例（半露 / 探头、harness 下的舞台边界、局部 follow / 睡眠 / press、reduced motion、Dock 程序证据等） | 真实 macOS 台前调度、真实程序坞点击观感、真实全局快捷键投递、完整 Dashboard E2E（那些不带 `@float`） |
+| 当前构建产物能被 Playwright 拉起；`@float` 用例（左右停靠 / drag-settle、harness 下的舞台边界、局部 follow / 睡眠 / press、reduced motion、Dock 程序证据等） | 真实 macOS 台前调度、真实贴边 hover / retract、真实程序坞点击观感、真实全局快捷键投递、完整 Dashboard E2E（那些不带 `@float`） |
 | 脚本**自身包含 build**；不要再假设「上次的 `out/` 一定够用」 | OS 焦点一定落到输入框（自动化 activate ≠ 真实应用激活） |
 
 ### 2.4 全量静态 + 构建 + 全量 E2E
@@ -115,9 +115,9 @@ pnpm test:e2e
 | `pnpm typecheck` | `tsc --noEmit` 通过 | 打包签名 |
 | `pnpm test` | Vitest 全量 unit / component，**含** drag-settle 与 Dashboard 授权 | 真实窗口、真实剪贴板持久化到用户会话 |
 | `pnpm build` | `electron-vite` 写出 `out/main`、`out/preload`、`out/renderer` | 可以发给客户 |
-| `pnpm test:e2e` | 先 build，再跑全部 Playwright（浮窗交接、数字键复制、Dashboard 单例 / 安全窗 / 滚动 / 导航等） | 真实设备门禁，见第 4 节 |
+| `pnpm test:e2e` | 先 build，再跑全部 Playwright（浮窗交接、数字键复制、Dashboard 可信入口 / 单例 / 安全隔离 / Dock 恢复） | 真实设备门禁，见第 4 节 |
 
-`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
+探头 / 缩回、Query 纵向拖拽，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 纵向拖拽和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
 
 ---
 
@@ -131,8 +131,8 @@ pnpm test:e2e
 
 预期产物（名称由 `productName` + `version` + `UNSIGNED` 组成）：
 
-- `release/local-unsigned/客服话术浮窗 Demo-0.1.1-mac-universal-UNSIGNED.dmg`
-- `release/local-unsigned/客服话术浮窗 Demo-0.1.1-mac-universal-UNSIGNED.zip`
+- `release/local-unsigned/客服话术浮窗 Demo-0.2.0-mac-universal-UNSIGNED.dmg`
+- `release/local-unsigned/客服话术浮窗 Demo-0.2.0-mac-universal-UNSIGNED.zip`
 - `release/local-unsigned/mac-universal/*.app`
 
 构建后会跑 `scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `scripts/verify-mac-package.mjs local`。
@@ -172,7 +172,7 @@ node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distri
 
 预期产物：
 
-- `release/local-unsigned/windows/客服话术浮窗 Demo-0.1.1-win-x64-UNSIGNED.exe`
+- `release/local-unsigned/windows/客服话术浮窗 Demo-0.2.0-win-x64-UNSIGNED.exe`
 - `release/local-unsigned/windows/win-unpacked/`（含 `resources/icon.ico`）
 
 本仓没有 Windows `distribution` 路径。`mode !== 'local'` 会直接抛错。
@@ -216,11 +216,13 @@ pnpm clean:preview
 
 | 命令 | 行为 | 恢复方式 |
 | --- | --- | --- |
-| `pnpm clean:preview` | 默认 dry-run；列出本地未签名包、`out/`、测试报告、gstack QA 报告与 Vite 缓存 | 无改动 |
+| `pnpm clean:preview` | 默认 dry-run；列出本地未签名包、`out/`、派生 `build/icon.*`、测试报告、gstack QA 报告与 Vite 缓存 | 无改动 |
 | `pnpm workspace:check` | 检查不可再生源码区是否超过 32 MiB 预算 | 删除或迁移新增大文件后重跑 |
 | `pnpm clean:generated` | 只删除上面的精确 allowlist | `pnpm build`、相应 `package:*` / 测试命令重新生成 |
 | `pnpm clean:deep:preview` | 预览 generated + `node_modules` | 无改动 |
 | `pnpm clean:deep` | 在 generated 之外删除依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm exec install-electron` |
+
+`clean:generated` 本身就是执行入口，不要给它追加 `--dry-run`。预览必须使用独立的 `clean:preview`；CLI 会拒绝未知参数，避免把无效参数误认为已经覆盖了 `--apply`。
 
 清理器会核对仓库包名、realpath 和精确 allowlist；遇到符号链接、仓外路径或未知 scope 会 fail-closed。它永远不接受 `.git`、`.codegraph`、`src`、`assets`、`evidence`、`docs`、`tests` 和 `clawd-on-desk-0.15.0.zip` 作为目标。冻结 QA 证据、用户只读参考，以及 `docs/reference-api-adapter-handoff.md` 这类衔接说明都不是缓存，清理脚本不得删除。
 

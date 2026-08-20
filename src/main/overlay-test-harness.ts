@@ -26,6 +26,26 @@ export type OverlayTestHarnessHost = {
 };
 
 export function attachTestHarness(controller: OverlayTestHarnessHost): void {
+  const foxSetBoundsCalls: Array<{
+    bounds: Parameters<BrowserWindow['setBounds']>[0];
+    animate: boolean;
+  }> = [];
+  let recordFoxSetBounds = false;
+  const fox = controller
+    .getWindows()
+    .find((win) => win.webContents.getURL().includes('role=fox'));
+  if (fox) {
+    // Native move events do not reveal whether JavaScript or WindowServer
+    // initiated a re-seat. Wrapping only the E2E Fox instance gives tests that
+    // provenance without changing the production bounds policy.
+    const originalSetBounds = fox.setBounds.bind(fox);
+    fox.setBounds = ((bounds, animate) => {
+      if (recordFoxSetBounds) {
+        foxSetBoundsCalls.push({ bounds: { ...bounds }, animate: animate ?? false });
+      }
+      originalSetBounds(bounds, animate);
+    }) as BrowserWindow['setBounds'];
+  }
   const harness = {
     expand: () => {
       controller.openSearch();
@@ -44,6 +64,17 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
     },
     getPhase: () => controller.phase,
     shortcutRegistered: () => controller.shortcutRegistered,
+    beginFoxSetBoundsTrace: () => {
+      foxSetBoundsCalls.length = 0;
+      recordFoxSetBounds = true;
+    },
+    endFoxSetBoundsTrace: () => {
+      recordFoxSetBounds = false;
+      return foxSetBoundsCalls.map((call) => ({
+        bounds: { ...call.bounds },
+        animate: call.animate,
+      }));
+    },
     dockFox: (edge: 'left' | 'right') => {
       const fox = controller
         .getWindows()

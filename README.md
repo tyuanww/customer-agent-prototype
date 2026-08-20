@@ -19,6 +19,9 @@
 | 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
+| 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |
+| 查看已明确延后的验证债务 | [TODOS.md](TODOS.md) |
+| 查阅打包携带的第三方软件许可声明 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
 项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除 `node_modules`，仅用于归档或需要从 `pnpm install --frozen-lockfile` 重建依赖时。清理脚本不会触碰 `.git`、`.codegraph`、`src`、`assets`、`evidence`、`docs`、`tests` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
 
@@ -151,7 +154,7 @@ pnpm test:e2e
 | `pnpm test` | 全量 unit / component，含 drag-settle 与 Dashboard 授权 | 不是真实窗口 |
 | `pnpm test:e2e` | 先 build，再跑全部 Playwright | 不是正式发包，也不是真实 OS 焦点 |
 
-`pnpm test:e2e` 会先 build，再启动 Electron：验证左右半露与探头、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、内容贴合高度、数字键复制、自动收起、程序坞事件打开 Dashboard、Dashboard 单例 / 安全窗 / 原生滚动 / 折叠导航 / VOC 时间切片 / 本地推送 / 图表联动 / 响应式布局，并核对系统剪贴板。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递，以及真实 OS 全局快捷键仍需人工确认。
+`pnpm test:e2e` 会先 build，再启动 Electron：验证左右停靠与 drag-settle、台前调度边界采纳、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、内容贴合高度、数字键复制、自动收起，以及 Dashboard 的可信入口、单例、安全隔离与程序坞恢复，并核对系统剪贴板。探头 / 缩回、查询纵向拖拽、Dashboard 导航 / 模块 / 主题 / 筛选的状态机由更稳定的 unit/component 测试覆盖；默认 Playwright 门禁不再执行依赖 CDP 鼠标命中的长交互链。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递、侧栏与 Query 纵向拖拽、贴边 hover / retract，以及真实 OS 全局快捷键仍需人工确认。
 
 当前 macOS 开发机可自动验证单屏左右贴边、窗口内动效和 Dashboard 浏览；跨实体多显示器拖拽、Windows 合成器观感及真实 OS 全局快捷键投递仍需对应设备手工验收。命令对照与打包门禁见 [如何验证桌面 Demo](docs/how-to-verify-desktop.md)。
 

@@ -55,8 +55,7 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | Channel | 方向 | 额外门禁 |
 | --- | --- | --- |
 | `clipboard:copy-text` | invoke | `isTrustedSender` + `role === 'query'` + `resolveClipboardWrite` |
-| `app:get-platform` | invoke | sender 必须过 guard；失败仍只回 `process.platform` |
-| `overlay:get-window-context` | invoke | 未受信回降级上下文 |
+| `overlay:get-window-context` | invoke | 响应包含 `platform`；未受信 sender 返回带运行时平台、不可用快捷键状态的降级上下文 |
 | `overlay:open-search` | invoke | 若带 transform：必须 `role === 'fox'` 且 `isFoxVisualTransform` |
 | `dashboard:open` | invoke | `trusted && role === 'query'` |
 | `overlay:dismiss` | invoke | trusted overlay |

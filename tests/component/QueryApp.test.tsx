@@ -15,7 +15,6 @@ import {
 } from '../../src/shared/overlay-events';
 
 const copyText = vi.fn();
-const getPlatform = vi.fn();
 const getWindowContext = vi.fn();
 const openSearch = vi.fn();
 const openDashboard = vi.fn();
@@ -51,7 +50,6 @@ async function searchCleanser(user: ReturnType<typeof userEvent.setup>) {
 describe('QueryApp', () => {
   beforeEach(() => {
     copyText.mockReset();
-    getPlatform.mockReset();
     getWindowContext.mockReset();
     openSearch.mockReset();
     openDashboard.mockReset();
@@ -89,10 +87,10 @@ describe('QueryApp', () => {
     commandListeners.clear();
     copyText.mockResolvedValue({ ok: true });
     openDashboard.mockResolvedValue({ ok: true });
-    getPlatform.mockResolvedValue({ platform: 'darwin' });
     getWindowContext.mockResolvedValue({
       role: 'query',
       phase: 'SEARCH_INPUT',
+      platform: 'darwin',
       shortcut: {
         registered: true,
         accelerator: 'CommandOrControl+Shift+Space',
@@ -102,7 +100,6 @@ describe('QueryApp', () => {
     });
     window.customerAgent = {
       copyText,
-      getPlatform,
       getWindowContext,
       openSearch,
       openDashboard,
@@ -855,6 +852,7 @@ describe('QueryApp', () => {
     getWindowContext.mockResolvedValue({
       role: 'query',
       phase: 'SEARCH_INPUT',
+      platform: 'darwin',
       shortcut: {
         registered: false,
         accelerator: 'CommandOrControl+Shift+Space',
@@ -864,6 +862,96 @@ describe('QueryApp', () => {
     });
     render(<QueryApp />);
     expect(await screen.findByTestId('shortcut-fallback')).toHaveTextContent('注册失败');
+  });
+
+  it.each([
+    ['darwin', '⌘⇧空格'],
+    ['win32', 'Ctrl+Shift+Space'],
+  ] as const)(
+    'renders the %s shortcut label from the window context platform',
+    async (platform, shortcutLabel) => {
+      getWindowContext.mockResolvedValue({
+        role: 'query',
+        phase: 'SEARCH_INPUT',
+        platform,
+        shortcut: {
+          registered: true,
+          accelerator: 'CommandOrControl+Shift+Space',
+          message: '',
+        },
+        testHarness: false,
+      });
+
+      render(<QueryApp />);
+
+      await waitFor(() => expect(getWindowContext).toHaveBeenCalledTimes(1));
+      await waitFor(() => {
+        expect(document.getElementById('query-guidance')).toHaveTextContent(shortcutLabel);
+      });
+    },
+  );
+
+  it('measures shortcut and status banners as independent layout owners', async () => {
+    getWindowContext.mockResolvedValue({
+      role: 'query',
+      phase: 'SEARCH_INPUT',
+      platform: 'darwin',
+      shortcut: {
+        registered: false,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '全局快捷键注册失败',
+      },
+      testHarness: false,
+    });
+    const offsetHeight = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockImplementation(function measuredHeight(this: HTMLElement) {
+        if (this.classList.contains('query-capsule')) return 88;
+        if (this.classList.contains('shortcut-banner')) return 24;
+        if (this.classList.contains('status-banner')) return 80;
+        return 0;
+      });
+    const domRect = (top: number, bottom: number) => ({
+      x: 0,
+      y: top,
+      top,
+      bottom,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: Math.max(0, bottom - top),
+      toJSON: () => ({}),
+    }) as DOMRect;
+    const boundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function measuredRect(this: HTMLElement) {
+        if (this.classList.contains('query-shell')) return domRect(40, 40);
+        if (this.classList.contains('shortcut-banner')) return domRect(208, 232);
+        if (this.classList.contains('status-banner')) return domRect(204, 284);
+        return domRect(200, 248);
+      });
+
+    try {
+      const user = userEvent.setup();
+      render(<QueryApp />);
+      expect(await screen.findByTestId('shortcut-fallback')).toBeVisible();
+      await user.type(screen.getByTestId('question-input'), '今天中午虚构星球食堂有没有排骨汤');
+      await user.click(screen.getByTestId('search-button'));
+      expect(await screen.findByTestId('no-hit')).toBeVisible();
+      expect(screen.getByTestId('shortcut-fallback')).toBeVisible();
+      await waitFor(() => {
+        const emptyRequest = reportQueryLayout.mock.calls
+          .map(([request]) => request as { phase: string; desiredHeight: number })
+          .reverse()
+          .find((request) => request.phase === 'EMPTY');
+        // Intrinsic is 88 + 24 + 80 + 12 = 204. The DOM branch must instead
+        // use the lower status-banner edge: 284 - shellTop 40 + 12 = 256.
+        expect(emptyRequest?.desiredHeight).toBe(256);
+      });
+    } finally {
+      boundingClientRect.mockRestore();
+      offsetHeight.mockRestore();
+    }
   });
 
   it('offers a secondary dashboard entry that does not search', async () => {

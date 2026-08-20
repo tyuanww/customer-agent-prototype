@@ -80,7 +80,8 @@ export function QueryApp() {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultPaneRef = useRef<HTMLElement>(null);
   const resultContentRef = useRef<HTMLDivElement>(null);
-  const bannerRef = useRef<HTMLDivElement>(null);
+  const shortcutBannerRef = useRef<HTMLParagraphElement>(null);
+  const statusBannerRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const layoutSequenceRef = useRef(0);
   const lastAppliedLayoutSequenceRef = useRef(0);
@@ -250,14 +251,16 @@ export function QueryApp() {
     const shell = shellRef.current;
     const pane = resultPaneRef.current;
     const content = resultContentRef.current;
-    const banner = bannerRef.current;
+    const shortcutBanner = shortcutBannerRef.current;
+    const statusBanner = statusBannerRef.current;
     const capsule = shell?.querySelector<HTMLElement>('.query-capsule');
     const lastCard = pane?.querySelector<HTMLElement>('.script-card:last-of-type');
     const lastCopy = lastCard?.querySelector<HTMLElement>('.copy-btn');
     const lastContentBottom = maxContentBottom([
       lastCard,
       lastCopy,
-      banner,
+      shortcutBanner,
+      statusBanner,
       content?.lastElementChild ?? null,
     ]);
     const panePad = pane
@@ -268,11 +271,8 @@ export function QueryApp() {
       : 0;
     const intrinsic = composeQueryDesiredHeight({
       capsuleHeight: capsule?.offsetHeight ?? QUERY_INPUT_HEIGHT,
-      bannerHeight: banner?.offsetHeight ?? 0,
-      contentScrollHeight: Math.max(
-        content?.scrollHeight ?? 0,
-        banner?.offsetHeight ?? 0,
-      ),
+      bannerHeight: (shortcutBanner?.offsetHeight ?? 0) + (statusBanner?.offsetHeight ?? 0),
+      contentScrollHeight: content?.scrollHeight ?? 0,
       chromeExtra: paneBorder + QUERY_CONTENT_BLANK_TOLERANCE_PX,
     });
     const hugged = shell
@@ -322,19 +322,11 @@ export function QueryApp() {
     }
 
     void api
-      .getPlatform()
-      .then((info) => {
-        if (info.platform) {
-          setPlatform(info.platform);
-        }
-      })
-      .catch(() => {
-        // Keep Windows-first shortcut label.
-      });
-
-    void api
       .getWindowContext()
       .then((context) => {
+        if (context.platform) {
+          setPlatform(context.platform);
+        }
         if (!context.shortcut.registered) {
           setShortcutFailed(true);
           setShortcutHint(context.shortcut.message);
@@ -1206,7 +1198,7 @@ export function QueryApp() {
         />
 
         {shortcutFailed ? (
-          <p ref={bannerRef} className="shortcut-banner" data-testid="shortcut-fallback">
+          <p ref={shortcutBannerRef} className="shortcut-banner" data-testid="shortcut-fallback">
             {shortcutHint || '全局快捷键注册失败，请点击狐狸头打开。'}
           </p>
         ) : null}
@@ -1215,7 +1207,7 @@ export function QueryApp() {
           <QueryResultsPane
             phase={phase}
             resultPaneRef={resultPaneRef}
-            bannerRef={bannerRef}
+            statusBannerRef={statusBannerRef}
             resultContentRef={resultContentRef}
             errorMessage={errorMessage}
             results={results}
