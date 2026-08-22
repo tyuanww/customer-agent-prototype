@@ -1,4 +1,4 @@
-# 客服 Agent Demo 开发约束
+# 客服 Agent 产品实施仓开发约束
 
 请用中文汇报执行结果，代码标识符可使用英文。
 
@@ -6,18 +6,19 @@
 
 本文件是仓库级工作入口，只定义稳定边界、模块职责和执行方法；不要把像素、动画时长、测试矩阵或发布步骤复制到这里。
 
-- 本仓是独立的本地合成 Demo，不是正式产品仓，也不是 `DEV-M0` 的开始。正式立项与设计文档仓只可作为只读需求参考，必须保持独立工作区和独立 Git 历史。
+- 本仓是客服 Agent 的**产品实施仓**，目标覆盖正式开发、测试、打包与上线；`customer-agent-prototype` 只是历史目录名。当前已实现内容仍处于 v3 合成原型模式，不等于 `DEV-M0`、真实数据接入或上线已获授权。
+- 完整阅读 `PROJECT_CHARTER.md`，以其作为仓库身份、仓间关系与生命周期模式的 SSOT。`ai-赋能立项` 只负责项目进度、批准范围和阶段门记录；两仓保持独立工作区与 Git 历史，不做跨仓运行时依赖。
 - 涉及代码、交互或架构变更前，完整阅读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`。
 - `DESIGN.md` 是产品、视觉和交互不变量的 SSOT；`DEVELOPMENT_BRIEF.md` 是工程与验收边界的 SSOT；`docs/reference-project-architecture.md` 记录当前模块归属；`docs/how-to-verify-desktop.md` 记录分层验证方法。
 - 发现用户要求、实现与上述文档冲突时，先说明冲突及影响，不得静默选择一套或复制出新的规则。
 
 ## 2. 不可破坏的产品与安全边界
 
-- 只使用合成 fixture。不得读取或提交真实飞书、客户数据、凭证、URL 或 token。用户显式提供的 VOC Excel 只允许一次性只读提取结构与聚合；不得把原文、订单、图片、批次、员工、快递或竞品评价写入仓库或运行时读取链路。
-- 不接 PostgreSQL、OAuth、外部模型、线上 API、埋点平台或自动学习；不实现自动发送。
+- **当前原型模式**只使用合成 fixture。不得读取或提交真实飞书、客户数据、凭证、URL 或 token。用户显式提供的 VOC Excel 只允许一次性只读提取结构与聚合；不得把原文、订单、图片、批次、员工、快递或竞品评价写入仓库或未获批运行链路。
+- PostgreSQL、OAuth、线上 API、埋点和正式数据属于本仓后续产品化范围，但只能在获批计划、Ddev、合同和安全门齐备后进入独立模块；不得在当前 renderer 中临时直连。外部模型、自动学习和自动发送继续按专项批准管理。
 - 复制成功只表示“已复制”，不得推断或暗示已发送、已采纳、回答正确或问题已解决。
 - Electron renderer 不得获得 Node.js 权限；所有窗口保持 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`。
-- Fox / Query renderer 只能通过类型化、白名单 preload API 请求原生能力，并按能力施加 sender / role / 必要时 main-frame 门禁；Dashboard 保持无 preload。禁止通用 `send/on/invoke`、任意 channel、任意窗口控制和文件系统能力。
+- Fox / Query renderer 只能通过类型化、白名单 preload API 请求原生能力，并按能力施加 sender / role / 必要时 main-frame 门禁；当前 Dashboard 保持无 preload。未来正式只读 adapter 必须单独评审，禁止通用 `send/on/invoke`、任意 channel、任意窗口控制和文件系统能力。
 - commit、push、创建 PR、merge、deploy 分别需要用户对当前变更明确授权；前一阶段的授权不得自动扩大到下一阶段。
 
 ## 3. 模块边界与依赖方向
@@ -25,7 +26,7 @@
 - `src/main/`：唯一拥有 Electron / OS、BrowserWindow、原生 bounds、应用生命周期、Electron sender 身份判定和原生副作用；可复用 `shared` 中的纯授权谓词。
 - `src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。
 - `src/shared/`：只放跨边界类型、validator、状态模型、几何和纯函数；不得依赖 React、DOM、Electron 或产生 I/O。
-- `src/renderer/`：只拥有 React / DOM、局部交互和合成数据视图；不得导入 `main`、`preload` 或 Electron。
+- `src/renderer/`：只拥有 React / DOM、局部交互和 ViewModel；当前基线读取合成数据，未来正式数据也必须经过受控 adapter。不得导入 `main`、`preload` 或 Electron，也不得直连数据库或持有凭证。
 - `assets/` 中的 canonical 资产是 SSOT；`scripts/` 负责确定性派生。不得手改派生产物制造第二真源。
 - 每个状态、协议、常量和不变量必须有一个写入所有者。当前所有权以架构参考文档为准；迁移所有权时必须同步合同、调用方、测试和文档。
 
@@ -89,3 +90,22 @@
 ## 7. 最终汇报
 
 最终回复至少包含：实现内容、影响的模块 / 信任边界、实际运行的命令与结果、未运行项、已知限制和 Git 状态。只有运行入口发生变化时才重复启动方法。
+
+## Skill routing
+
+When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
+
+Key routing rules:
+- Product ideas/brainstorming → invoke /office-hours
+- Strategy/scope → invoke /plan-ceo-review
+- Architecture → invoke /plan-eng-review
+- Design system/plan review → invoke /design-consultation or /plan-design-review
+- Full review pipeline → invoke /autoplan
+- Bugs/errors → invoke /investigate
+- QA/testing site behavior → invoke /qa or /qa-only
+- Code review/diff check → invoke /review
+- Visual polish → invoke /design-review
+- Ship/deploy/PR → invoke /ship or /land-and-deploy
+- Save progress → invoke /context-save
+- Resume context → invoke /context-restore
+- Author a backlog-ready spec/issue → invoke /spec

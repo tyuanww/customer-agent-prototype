@@ -1492,10 +1492,24 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('announce-no-synced')).toBeInTheDocument();
 
     await user.click(screen.getByTestId('nav-architecture'));
-    expect(screen.getByTestId('arch-node-float')).toHaveTextContent('DEMO 已实现');
-    expect(screen.getByTestId('arch-node-dashboard')).toHaveTextContent('视觉模拟');
+    expect(screen.getByTestId('module-architecture')).toHaveTextContent('一期设计已映射');
+    expect(screen.getByTestId('arch-node-float')).toHaveTextContent('本地合成运行');
+    expect(screen.getByTestId('arch-node-dashboard')).toHaveTextContent('静态合成交互');
     expect(screen.getByTestId('arch-node-search')).toHaveTextContent('正式未接入');
+    expect(screen.getByTestId('arch-node-search')).toHaveTextContent('原型未实现');
     expect(screen.getByTestId('arch-node-search')).toHaveTextContent('红线');
     expect(screen.getByTestId('arch-node-llm')).toHaveTextContent('默认关闭');
+    expect(screen.getByTestId('arch-flow-float')).toHaveTextContent('A1');
+    expect(screen.getByTestId('arch-flow-float')).toHaveTextContent('A6');
+    expect(screen.getByTestId('arch-flow-dashboard')).toHaveTextContent('B1');
+    expect(screen.getByTestId('arch-flow-dashboard')).toHaveTextContent('B7');
+    expect(screen.getByTestId('arch-step-A2')).toHaveTextContent('本地合成运行');
+    expect(screen.getByTestId('arch-step-A2')).toHaveTextContent('正式未接入');
+    expect(screen.getByTestId('arch-step-A4')).toHaveTextContent('原型未实现');
+    expect(screen.getByTestId('arch-step-B1')).toHaveTextContent('静态合成交互');
+    expect(screen.getByTestId('arch-step-B4')).toHaveTextContent('未读取批准文件');
+    expect(screen.getByTestId('arch-step-B6')).toHaveTextContent('交互形状模拟');
+    expect(screen.getByTestId('arch-guardrail-no-auto-send')).toHaveTextContent('禁代发');
+    expect(screen.getByTestId('arch-guardrail-no-new-port')).toHaveTextContent('不新增第十端口');
   });
 });

@@ -22,7 +22,13 @@ export const DASHBOARD_MODULE_IDS = [
 
 export type DashboardModuleId = (typeof DASHBOARD_MODULE_IDS)[number];
 
-export type CapabilityStatus = 'demo-ready' | 'visual-mock' | 'not-connected';
+export type ArchitectureDesignStatus = 'mapped' | 'pending';
+export type ArchitecturePrototypeStatus =
+  | 'runtime-interactive'
+  | 'static-interactive'
+  | 'visual-only'
+  | 'absent';
+export type ArchitectureFormalRuntimeStatus = 'not-started' | 'in-progress' | 'verified';
 export type LedgerTerminal = 'copied' | 'no_hit' | 'abandoned' | 'risk_escalated';
 export type IterationStatus = 'open' | 'in_progress' | 'resolved' | 'wont_fix';
 export type IterationKind = 'no_hit' | 'top1_skipped' | 'risk_escalated';
@@ -233,14 +239,73 @@ export type AnnounceRow = {
   offlineLease: boolean;
 };
 
-export type ArchitectureNode = {
+export type ArchitectureEvidence = {
+  designStatus: ArchitectureDesignStatus;
+  designStatusLabel: string;
+  prototypeStatus: ArchitecturePrototypeStatus;
+  prototypeStatusLabel: string;
+  formalRuntimeStatus: ArchitectureFormalRuntimeStatus;
+  formalRuntimeStatusLabel: string;
+};
+
+export type ArchitectureNode = ArchitectureEvidence & {
   id: string;
   title: string;
   detail: string;
-  status: CapabilityStatus;
-  statusLabel: string;
   redline?: boolean;
 };
+
+export type ArchitectureFlowStep = ArchitectureEvidence & {
+  code: string;
+  title: string;
+  detail: string;
+};
+
+export type ArchitectureFlow = {
+  id: 'float' | 'dashboard';
+  title: string;
+  detail: string;
+  steps: readonly ArchitectureFlowStep[];
+};
+
+export type ArchitectureGuardrail = {
+  id: string;
+  title: string;
+  detail: string;
+};
+
+const ARCHITECTURE_EVIDENCE_LABELS = {
+  design: {
+    mapped: '设计已映射',
+    pending: '设计待映射',
+  },
+  prototype: {
+    'runtime-interactive': '本地合成运行',
+    'static-interactive': '静态合成交互',
+    'visual-only': '交互形状模拟',
+    absent: '原型未实现',
+  },
+  formalRuntime: {
+    'not-started': '正式未接入',
+    'in-progress': '正式实现中',
+    verified: '正式已验证',
+  },
+} as const;
+
+function architectureEvidence(
+  prototypeStatus: ArchitecturePrototypeStatus,
+  formalRuntimeStatus: ArchitectureFormalRuntimeStatus = 'not-started',
+  designStatus: ArchitectureDesignStatus = 'mapped',
+): ArchitectureEvidence {
+  return {
+    designStatus,
+    designStatusLabel: ARCHITECTURE_EVIDENCE_LABELS.design[designStatus],
+    prototypeStatus,
+    prototypeStatusLabel: ARCHITECTURE_EVIDENCE_LABELS.prototype[prototypeStatus],
+    formalRuntimeStatus,
+    formalRuntimeStatusLabel: ARCHITECTURE_EVIDENCE_LABELS.formalRuntime[formalRuntimeStatus],
+  };
+}
 
 export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'overview', label: '管理概览', blurb: '风险、责任与处理进度', group: '经营总览' },
@@ -1190,28 +1255,145 @@ export const DASHBOARD_MANIFEST = deepFreeze({
   },
   architecture: {
     title: '架构能力图',
-    kicker: '双表面 + 中心能力 · 当前阶段未接入',
+    kicker: '双表面 + 九端口 · 设计 / 原型 / 正式三轴分账',
+    implementationDesign: {
+      title: '一期实现设计映射',
+      detail: '把一期开发框架图的两条闭环映射到产品表面；设计已映射、原型可见与正式运行必须分开取证。',
+      flows: [
+        {
+          id: 'float',
+          title: 'Float agent · 话术推荐闭环',
+          detail: 'A1–A6 · 问法进入、候选展示、复制与人工确认。',
+          steps: [
+            {
+              code: 'A1',
+              title: '问法输入',
+              detail: '粘贴或热键进入 Query；Demo 只接本地合成输入。',
+              ...architectureEvidence('runtime-interactive'),
+            },
+            {
+              code: 'A2',
+              title: 'Top 3 原文候选',
+              detail: '返回合成 fixture 原文；不映射正式已发布内容源。',
+              ...architectureEvidence('runtime-interactive'),
+            },
+            {
+              code: 'A3',
+              title: '复制剪贴板',
+              detail: '主 CTA 写入系统剪贴板，只反馈“已复制”。',
+              ...architectureEvidence('runtime-interactive'),
+            },
+            {
+              code: 'A4',
+              title: '占位符二次确认',
+              detail: '仅允许内存填值并二次确认；当前 Demo 未实现。',
+              ...architectureEvidence('absent'),
+            },
+            {
+              code: 'A5',
+              title: '澄清 / 拒答 / 升级',
+              detail: '由策略与人工承接；当前只展示风险与升级边界。',
+              ...architectureEvidence('visual-only'),
+            },
+            {
+              code: 'A6',
+              title: '平台人工确认',
+              detail: '平台适用性必须人工确认，系统不替坐席发送。',
+              ...architectureEvidence('absent'),
+            },
+          ],
+        },
+        {
+          id: 'dashboard',
+          title: 'Dashboard · coach / owner 闭环',
+          detail: 'B1–B7 · 经营判断、双账复核、治理和同步演练。',
+          steps: [
+            {
+              code: 'B1',
+              title: '概览与工具指标',
+              detail: '固定合成快照展示风险、Owner、下一步和处理窗口。',
+              ...architectureEvidence('static-interactive'),
+            },
+            {
+              code: 'B2',
+              title: '检索复制双账',
+              detail: '根问题账与检索操作账分开，复制不推断发送。',
+              ...architectureEvidence('static-interactive'),
+            },
+            {
+              code: 'B3',
+              title: '离线三维抽样复核',
+              detail: '修改、发送、适用性分别统计有效分母与不可核验。',
+              ...architectureEvidence('static-interactive'),
+            },
+            {
+              code: 'B4',
+              title: '工单分析',
+              detail: '只读展示去标识合成聚合、下钻与脱敏导出的交互形状；未读取批准文件。',
+              ...architectureEvidence('visual-only'),
+            },
+            {
+              code: 'B5',
+              title: '话术优化待办',
+              detail: '按内容缺口、排序和策略分域跟进，不自动改写 Answer。',
+              ...architectureEvidence('static-interactive'),
+            },
+            {
+              code: 'B6',
+              title: '内容导入 / 发布 / 回滚',
+              detail: '展示四域治理流水线；正式 Publish 保持禁用。',
+              ...architectureEvidence('visual-only'),
+            },
+            {
+              code: 'B7',
+              title: '公告与离线租约',
+              detail: '本地演练四个同步分面，不联网、不发送、不保存。',
+              ...architectureEvidence('visual-only'),
+            },
+          ],
+        },
+      ] satisfies ArchitectureFlow[],
+      guardrails: [
+        {
+          id: 'human-in-loop',
+          title: '人在环',
+          detail: '系统只给候选；坐席自己选择、人工粘贴发送。',
+        },
+        {
+          id: 'no-auto-send',
+          title: '禁代发',
+          detail: '复制或演练回执不能推断已发送、已采纳、回答正确或问题已解决。',
+        },
+        {
+          id: 'no-new-port',
+          title: '不新增第十端口',
+          detail: 'Demo 不直连正式九端口，也不建立平行搜索平台。',
+        },
+        {
+          id: 'synthetic-only',
+          title: '合成数据边界',
+          detail: '编译期静态 manifest；不读聊天正文、不写盘、不接真实 API。',
+        },
+      ] satisfies ArchitectureGuardrail[],
+    },
     surfaces: [
       {
         id: 'float',
         title: 'Float',
         detail: '狐狸头 → 搜索 → Top3 → 人工选择 → 安全复制',
-        status: 'demo-ready',
-        statusLabel: 'DEMO 已实现',
+        ...architectureEvidence('runtime-interactive'),
       },
       {
         id: 'dashboard',
         title: 'Dashboard',
         detail: '静态合成工作台，浏览架构故事，不接 SoR',
-        status: 'visual-mock',
-        statusLabel: '视觉模拟',
+        ...architectureEvidence('static-interactive'),
       },
       {
         id: 'preload',
         title: 'Preload',
         detail: '白名单 IPC：复制 / 窗口 / dashboard:open',
-        status: 'demo-ready',
-        statusLabel: 'DEMO 已实现',
+        ...architectureEvidence('runtime-interactive'),
       },
     ] satisfies ArchitectureNode[],
     ports: [
@@ -1219,68 +1401,59 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         id: 'auth',
         title: 'auth',
         detail: '正式身份与会话',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
       {
         id: 'search',
         title: 'search',
         detail: '正式检索与 Top3 合同',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
         redline: true,
       },
       {
         id: 'events',
         title: 'events',
         detail: '检索/复制自动事实流水',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
         redline: true,
       },
       {
         id: 'metrics',
         title: 'metrics',
         detail: '双账指标与复核',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
       {
         id: 'workorders',
         title: 'workorders',
         detail: '工单导入与分析',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
         redline: true,
       },
       {
         id: 'content',
         title: 'content',
         detail: '四域绑定与发布',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
         redline: true,
       },
       {
         id: 'announce',
         title: 'announce',
         detail: '公告与客户端确认',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
       {
         id: 'policy',
         title: 'policy',
         detail: '风险与升级策略',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
       {
         id: 'redaction',
         title: 'redaction',
         detail: '脱敏与导出裁剪',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
     ] satisfies ArchitectureNode[],
     dataPlane: [
@@ -1288,30 +1461,26 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         id: 'postgres',
         title: 'PostgreSQL SoR',
         detail: '正式系统的记录系统',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
       {
         id: 'object-store',
         title: '共享导入存储',
         detail: '工单与内容包对象',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
       {
         id: 'outbox-worker',
         title: 'outbox + Import Worker',
         detail: 'TypeScript 异步导入',
-        status: 'not-connected',
-        statusLabel: '正式未接入',
+        ...architectureEvidence('absent'),
       },
     ] satisfies ArchitectureNode[],
     llm: {
       id: 'llm',
       title: '可选 LLM',
       detail: '只能可选重排且默认关闭，绝不改写 Answer。',
-      status: 'not-connected',
-      statusLabel: '正式未接入 · 默认关闭',
+      ...architectureEvidence('absent'),
     } satisfies ArchitectureNode,
   },
 });

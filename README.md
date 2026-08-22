@@ -1,12 +1,14 @@
-# 客服话术浮窗 · Demo v3
+# 客服 Agent 产品 · 当前 v3 原型基线
 
-独立本地原型，验证输入法式桌面浮窗，并用一个演示级 Dashboard 展示正式架构故事：
+本仓是客服 Agent 的**产品实施仓**，目标是在这里完成正式开发、测试、打包与上线。当前提交基线仍是本地合成原型，用来验证输入法式桌面浮窗，并用一个演示级 Dashboard 展示正式架构故事：
 
 `狐狸头 / 快捷键 → 玻璃查询胶囊 → 本地合成 fixture → Top 3 原文 → 人工选择 → 安全复制`
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**这是合成数据 Demo，不是正式产品仓，也不等于 `DEV-M0` 已经开始。复制只表示「已复制」，不代发。Dashboard 未接通任何后端。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。当前运行模式仍是 `DEMO · 合成数据 · 无后端`，不等于 `DEV-M0`、正式接入或上线已完成。复制只表示「已复制」，不代发。**
+
+下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
 ## 文档
 
@@ -18,6 +20,7 @@
 | 了解 main / preload / renderer / shared 的职责和清理边界 | [docs/reference-project-architecture.md](docs/reference-project-architecture.md) |
 | 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
+| 核对已接收的正式机器合同、双哈希和未激活边界 | [contracts/upstream/customer-agent/README.md](contracts/upstream/customer-agent/README.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
 | 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |
 | 查看已明确延后的验证债务 | [TODOS.md](TODOS.md) |
@@ -27,8 +30,8 @@
 
 ## 仓库与工作台
 
-- 本目录应作为独立 Git 仓打开，不与正式立项文档仓混在同一个工作台。
-- 不得修改独立的正式立项与设计文档仓。
+- 本目录应作为独立产品 Git 仓打开，不与项目进度记录仓混成同一工作树或 Git 历史。
+- 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `assets/app-icon.png`（近白 squircle）、`build/icon.png` 与 `build/icon.ico`；在 macOS 上还会生成 `build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - 真实达肤妍材料即使存在于仓外，也未授权进入本 Git Demo，因此话术与看板全部是虚构合成内容。
 
@@ -93,7 +96,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 
 检索按钮至少显示 280ms 的本地反馈；无命中有独立空态动效。检索使用完整问法与字符 n-gram 主路，并用当前合成 fixture 自带的实体锚点、别名和规则意图补足口语化问法；强品类文本 + 匹配问题主题 / 意图可受控召回自然问法，但纯泛化意图仍不能单独制造命中。未带合成品牌的宽品类别名在去掉别名与已识别意图后若还剩未知文本，会整体 fail-closed，避免陌生品牌串到合成话术。卡片只显示「精确问法 / 同义表达 / 主题与意图 / 相似问法」等非数字原因。答案正文不参与召回，有效期与去重均在截取稳定 Top 3 之前完成。检索期间若继续改问题，会取消旧检索。复制成功只反馈「已复制」约 900ms，随后自动收起回狐狸头；复制失败则保留候选供重试。
 
-## Demo 边界
+## 当前原型模式边界
 
 - 只使用仓内标记为 `DEMO · 合成数据` 的虚构护肤客服话术与静态 Dashboard manifest。
 - 运行时不读取飞书、Excel、客户数据、凭证、URL 或 token。用户提供的 VOC Excel 仅在设计阶段做过只读聚合校准，原文件与明细不随 Demo 分发。
@@ -180,8 +183,8 @@ pnpm package:mac
 
 当前仓库仍使用 `local.demo.customer-agent`，适合本地 Demo；正式首次外发前必须由公司确定长期 Bundle ID，并在 Apple Developer Team 下安装 `Developer ID Application` 证书、配置公证凭证。未签名本地包经外部渠道下载后通常会触发 Gatekeeper 警告或拦截，不能发送给外包或客户。项目 Owner 还需明确软件使用条款与收件人范围；第三方许可声明不等于本 Demo 自身的分发授权。
 
-## 下一步（不在本 Demo）
+## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、PostgreSQL、九端口 Application API、达肤妍正式话术快照、真实飞书源、向量检索、LLM、自动发送、自动学习和自动更新都不在本仓范围。把本 Demo「换成 adapter 就能接库」不成立：缺少 `query_id` / 发布四元组 / 飞书会话，平台与有效期形状也不合法。详见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、PostgreSQL、九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型基线**，但属于本仓后续产品化计划的候选范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集已经以 `VERIFIED_NOT_ACTIVATED` 状态接收；这只证明交接字节与来源，不代表 codegen、migration、adapter 或运行时已开始。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」不成立：还缺 `query_id`、发布四元组、飞书会话，以及合法的平台和有效期合同。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。

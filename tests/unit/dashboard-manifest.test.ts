@@ -67,11 +67,52 @@ describe('dashboard manifest', () => {
 
   it('marks search/events/content/workorders as redline and keeps LLM off', () => {
     const redline = DASHBOARD_MANIFEST.architecture.ports
-      .filter((port) => port.redline)
+      .filter((port) => 'redline' in port && port.redline)
       .map((port) => port.id);
     expect(redline).toEqual(['search', 'events', 'workorders', 'content']);
-    expect(DASHBOARD_MANIFEST.architecture.llm.statusLabel).toContain('默认关闭');
+    expect(DASHBOARD_MANIFEST.architecture.llm.detail).toContain('默认关闭');
     expect(DASHBOARD_MANIFEST.architecture.llm.detail).toContain('绝不改写');
+  });
+
+  it('maps the phase-one implementation design with separate design, prototype, and formal axes', () => {
+    const implementation = DASHBOARD_MANIFEST.architecture.implementationDesign;
+    expect(implementation.flows.map((flow) => flow.id)).toEqual(['float', 'dashboard']);
+    expect(implementation.flows[0].steps.map((step) => step.code)).toEqual([
+      'A1', 'A2', 'A3', 'A4', 'A5', 'A6',
+    ]);
+    expect(implementation.flows[1].steps.map((step) => step.code)).toEqual([
+      'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7',
+    ]);
+    const steps = implementation.flows.flatMap((flow) => flow.steps);
+    expect(steps.every((step) => step.designStatus === 'mapped')).toBe(true);
+    expect(steps.every((step) => step.formalRuntimeStatus === 'not-started')).toBe(true);
+    expect(steps.find((step) => step.code === 'A2')).toMatchObject({
+      prototypeStatus: 'runtime-interactive',
+      prototypeStatusLabel: '本地合成运行',
+    });
+    expect(steps.find((step) => step.code === 'A4')).toMatchObject({
+      prototypeStatus: 'absent',
+      prototypeStatusLabel: '原型未实现',
+    });
+    expect(steps.find((step) => step.code === 'B1')).toMatchObject({
+      prototypeStatus: 'static-interactive',
+      prototypeStatusLabel: '静态合成交互',
+    });
+    expect(steps.find((step) => step.code === 'B4')).toMatchObject({
+      prototypeStatus: 'visual-only',
+      formalRuntimeStatus: 'not-started',
+    });
+    expect(DASHBOARD_MANIFEST.architecture.ports.every((port) => (
+      port.prototypeStatus === 'absent' && port.formalRuntimeStatus === 'not-started'
+    ))).toBe(true);
+    expect(implementation.guardrails.map((guardrail) => guardrail.id)).toEqual([
+      'human-in-loop',
+      'no-auto-send',
+      'no-new-port',
+      'synthetic-only',
+    ]);
+    expect(implementation.guardrails.find((guardrail) => guardrail.id === 'no-new-port')?.detail)
+      .toContain('不直连正式九端口');
   });
 
   it('blocks a four-domain release when product is missing', () => {

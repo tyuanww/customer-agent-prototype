@@ -1,14 +1,14 @@
-# Demo → 正式九端口：为何不能“直接插入”
+# 原型基线 → 正式九端口：产品化迁移边界
 
-本页是收尾审查的机器可读结论，不是产品愿景，也不是 DEV-M0 开工包。
+本页是当前 v3 原型到正式产品的迁移参考，不是 DEV-M0 开工授权。它用于防止把合成类型直接升格为正式合同，同时给本仓后续产品化实施保留明确入口。
 
 对照来源（**只读**，本仓不得修改）：
 
-- 人读合同：`31-产品契约-v1.md` v1.6、`39-API合同与发布状态机-v1.md` v1.15
+- 人读合同：`31-产品契约-v1.md` v1.6、`39-API合同与发布状态机-v1.md` v1.16
 - 机器合同：`openapi.v1.yaml`、`33-schema-v1-草案.sql`（schema v1.12）
 - 架构北极星：`37-架构SSOT-v1.md`
 
-正式仓路径：`/Users/hutou/Desktop/ai-赋能立项/business-docs/01-客服Agent项目`。该仓当前状态是 **DESIGN ALIGNED · PENDING G0 / Ddev**：静态合同已对齐，**服务端 / 客户端 / 迁移 / 动态证据仍未实现**。因此本 Demo 即使写了 adapter，运行时也没有可连的 PostgreSQL SoR 或 `/v1` 进程。
+项目记录与正式合同来源仓：`ai-赋能立项/business-docs/01-客服Agent项目`。动态 G0 / Ddev 状态只由该仓 `00–06` 维护，本页不复制计数或充当状态真源。2026-08-22，本仓已通过 `pnpm contracts:intake` 接收并复核合同集 `cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c`，来源 commit 为 `1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38`；锁文件保持 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。这只关闭机器合同交接缺口，不表示已经存在服务端、migration、PostgreSQL SoR、`/v1` 进程或产品 adapter。禁止实时跨仓读取、手改快照或把接收动作解释为 Ddev。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [README](../README.md)
 
@@ -18,11 +18,12 @@
 
 | 问题 | 答案 |
 | --- | --- |
+| 正式机器合同是否已进入产品仓？ | **已接收并按双哈希验证，但未激活。** 当前快照见 `contracts/upstream/customer-agent/contract-set.lock.json`；它不是生成类型、migration、runtime 或 Ddev 证据。 |
 | Demo 现在有没有 API adapter？ | **没有。** `src/` 内零 `fetch` / HTTP 客户端。Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。 |
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**类型、鉴权、事件、发布、租约必须重做**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
-| 本仓下一步该不该实现 adapter？ | **不该。** 那是正式 Windows 客户端 + Application API 的 Ddev 工作。本 Demo 继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
+| 本仓下一步该不该实现 adapter？ | **应该纳入产品化计划，但不能在当前原型改动中顺手接入。** Ddev 后由本仓实现正式 Windows 客户端、Main adapter 与 Application API；当前模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
 
 ---
 
@@ -247,9 +248,9 @@ Demo `validity.ts`：
 
 ---
 
-## 8. 若（仅在 Ddev 之后）做 adapter，最小形状
+## 8. Ddev 之后在本仓实现 adapter 的最小形状
 
-这不是本仓任务，只防止以后把 Demo 类型“升格”成合同：
+这是本仓后续产品化任务，不是当前 v3 原型映射任务。以下边界防止把 Demo 类型“升格”成合同：
 
 ```text
 [Query UI]
@@ -279,9 +280,9 @@ Demo `validity.ts`：
 
 ---
 
-## 9. 本仓因此改了什么（收尾范围）
+## 9. 历史原型收尾记录
 
-只补文档与启动提示，不改检索、IPC、fixture、正式仓。
+以下只记录当时原型收尾改动，不再定义本仓未来产品范围：
 
 - 本文：缺口清单
 - `README.md` / `docs/tutorial-first-run.md` / `docs/how-to-verify-desktop.md` / `docs/reference-desktop-contracts.md`：入口链接

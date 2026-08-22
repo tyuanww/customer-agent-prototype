@@ -1713,6 +1713,158 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   gap: 14px;
 }
 
+.arch-implementation {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-panel-radius);
+  background: var(--dash-surface-subtle);
+}
+
+.arch-implementation-head,
+.arch-flow-step-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arch-implementation-head h2,
+.arch-flow h3,
+.arch-guardrails h3 {
+  margin: 0;
+}
+
+.arch-implementation-head p,
+.arch-flow header p,
+.arch-guardrail p {
+  margin: 4px 0 0;
+  color: var(--dash-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.arch-flow-grid,
+.arch-guardrail-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.arch-flow-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.arch-flow {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-panel-radius);
+  background: var(--dash-material-panel);
+}
+
+.arch-flow h3 {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.arch-flow-steps {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arch-flow-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--dash-line);
+}
+
+.arch-flow-code {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 22px;
+  border-radius: var(--dash-radius);
+  background: var(--dash-purple-soft);
+  color: var(--dash-purple-strong);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.arch-flow-step-head strong {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.arch-flow-step p {
+  margin: 4px 0 0;
+  color: var(--dash-ink-soft);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.arch-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+
+.arch-evidence-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.arch-evidence-item small {
+  color: var(--dash-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 16px;
+}
+
+.arch-flow-step .arch-evidence {
+  margin-top: 6px;
+}
+
+.arch-guardrails {
+  display: grid;
+  gap: 8px;
+}
+
+.arch-guardrails h3 {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.arch-guardrail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.arch-guardrail {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  background: var(--dash-material-panel);
+}
+
+.arch-guardrail strong {
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .arch-row {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
@@ -2806,12 +2958,19 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   .source-readiness p { grid-column: 1 / -1; text-align: left; }
   .release-gate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .review-strata-grid { grid-template-columns: 1fr; }
+  .arch-flow-grid { grid-template-columns: 1fr; }
+  .arch-guardrail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .dashboard-topbar {
     position: sticky;
     top: 0;
     z-index: 5;
   }
+}
+
+@media (max-width: 680px) {
+  .arch-implementation-head { display: grid; }
+  .arch-guardrail-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2919,6 +3078,9 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   .dashboard-topbar,
   .dash-filter-toolbar,
   .dash-filterbar,
+  .arch-implementation,
+  .arch-flow,
+  .arch-guardrail,
   .dash-card,
   .arch-card,
   .dash-table-wrap,
@@ -2950,6 +3112,16 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
   .dashboard-nav-item > button.is-active::before {
     background: Highlight;
+  }
+
+  .arch-flow-step {
+    border-color: CanvasText;
+  }
+
+  .arch-flow-code {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
   }
 
   .dashboard-shell button:is(

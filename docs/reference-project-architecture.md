@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明这个本地 Electron Demo 的模块职责、运行时边界和文件归属。它描述当前代码，不代表正式客服 Agent 的生产架构。正式项目仍以只读参考的设计合同为准，见 [API adapter 衔接](reference-api-adapter-handoff.md)。
+本页说明产品仓**当前 v3 原型基线**的模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
 ## 1. 先看整体
 
@@ -47,6 +47,7 @@
 | `src/shared/` | 跨边界协议、类型、校验器、几何和状态纯函数 | 依赖 DOM、Electron、React 的实现 |
 | `assets/`、根目录 PNG | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `scripts/` | 图标生成、打包、验证、空间清理等开发/发布脚本 | 运行时业务逻辑 |
+| `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -74,10 +75,15 @@ SYNTHETIC_SCRIPTS ──local searchScripts──> Query view model
 
 DASHBOARD_MANIFEST ──read-only──> Dashboard modules
 
-正式 PostgreSQL / /v1 API ──当前不存在于 Demo──> 不允许从 renderer 直连
+contracts/upstream/customer-agent/<contract_set_id>
+  ──VERIFIED_NOT_ACTIVATED──> Ddev 后 codegen / migration 的唯一上游输入
+
+正式 PostgreSQL / /v1 API ──当前原型基线尚未实现──> 不允许从 renderer 直连
 ```
 
-`src/renderer/features/search/search-service.ts` 是 Demo 的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在后续 Ddev 阶段由 main-process adapter 完成，不能把 fixture 直接插入正式表，具体字段缺口见 [Demo → 正式九端口：为何不能“直接插入”](reference-api-adapter-handoff.md)。
+`src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在后续 Ddev 阶段由本仓的 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
+
+当前合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。消费锁显式保持 `ddev_authorized=false` 与 `runtime_activated=false`，因此 renderer、main、preload、构建产物和现有合成搜索均不读取该目录。
 
 ## 5. 测试和验证层级
 
@@ -123,7 +129,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构达到 Demo 收尾标准：边界清楚、运行时权限收窄、测试按层分组、生成物有独立清理入口、正式 API 仍保持隔离。
+当前目录结构达到 v3 原型基线收口标准：边界清楚、运行时权限收窄、测试按层分组、生成物有独立清理入口、正式 API 仍保持隔离。产品化阶段应在这些边界上增加深 adapter 和服务模块，不得把 renderer 直连当成捷径。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 

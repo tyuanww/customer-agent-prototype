@@ -329,14 +329,34 @@ describe('fox head brand assets', () => {
     expect(plate[1]).toBeGreaterThan(235);
     expect(plate[2]).toBeGreaterThan(235);
 
-    const regenerated = path.join(os.tmpdir(), `fox-app-icon-${Date.now()}.png`);
-    generateAppIconMaster({
-      root,
-      source: path.join(root, 'fox-head.png'),
-      destination: regenerated,
-    });
-    expect(sha256(readFileSync(regenerated))).toBe(sha256(readFileSync(path.join(root, 'assets/app-icon.png'))));
-    rmSync(regenerated, { force: true });
+    const appIconTemp = mkdtempSync(path.join(os.tmpdir(), 'fox-app-icon-'));
+    try {
+      const regeneratedA = path.join(appIconTemp, 'app-icon-a.png');
+      const regeneratedB = path.join(appIconTemp, 'app-icon-b.png');
+      generateAppIconMaster({
+        root,
+        source: path.join(root, 'fox-head.png'),
+        destination: regeneratedA,
+      });
+      generateAppIconMaster({
+        root,
+        source: path.join(root, 'fox-head.png'),
+        destination: regeneratedB,
+      });
+
+      const regeneratedABytes = readFileSync(regeneratedA);
+      const regeneratedBBytes = readFileSync(regeneratedB);
+      expect(sha256(regeneratedABytes)).toBe(sha256(regeneratedBBytes));
+
+      // zlib may emit a different IDAT byte stream across supported runtimes.
+      // The exact decoded RGBA output is the portable generated-asset contract.
+      const regenerated = decodePng(regeneratedABytes);
+      expect(regenerated.width).toBe(master.width);
+      expect(regenerated.height).toBe(master.height);
+      expect(sha256(regenerated.pixels)).toBe(sha256(master.pixels));
+    } finally {
+      rmSync(appIconTemp, { recursive: true, force: true });
+    }
     expect(APP_ICON_FOX_FILL).toBeGreaterThan(0.7);
     expect(APP_ICON_PLATE_SIZE).toBe(896);
   });
