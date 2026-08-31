@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { prepareNodeSystemCaEnvironment } from './node-system-ca.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = path.resolve(desktopRoot, '../..');
 export const WINDOWS_LOCAL_UNSIGNED_OUTPUT = 'release/local-unsigned/windows';
 
 export function resetWindowsPackageOutput(projectRoot) {
@@ -53,7 +54,7 @@ export function packageWindows(
 
   try {
     runCommand(process.execPath, ['scripts/generate-app-icons.mjs'], {
-      cwd: root,
+      cwd: desktopRoot,
       env: buildEnvironment,
       stdio: 'inherit',
     });
@@ -62,13 +63,18 @@ export function packageWindows(
       process.execPath,
       ['node_modules/electron-vite/bin/electron-vite.js', 'build'],
       {
-        cwd: root,
+        cwd: desktopRoot,
         env: buildEnvironment,
         stdio: 'inherit',
       },
     );
 
-    resetOutput(root);
+    resetOutput(repositoryRoot);
+
+    const builderOutput = path.relative(
+      desktopRoot,
+      path.join(repositoryRoot, WINDOWS_LOCAL_UNSIGNED_OUTPUT),
+    );
 
     runCommand(
       process.execPath,
@@ -77,19 +83,19 @@ export function packageWindows(
         '--win',
         '--publish',
         'never',
-        `-c.directories.output=${WINDOWS_LOCAL_UNSIGNED_OUTPUT}`,
+        `-c.directories.output=${builderOutput}`,
         '-c.win.signExecutable=false',
         '-c.win.artifactName=${productName}-${version}-win-${arch}-UNSIGNED.${ext}',
       ],
       {
-        cwd: root,
+        cwd: desktopRoot,
         env: buildEnvironment,
         stdio: 'inherit',
       },
     );
 
     runCommand(process.execPath, ['scripts/verify-windows-package.mjs'], {
-      cwd: root,
+      cwd: desktopRoot,
       env: buildEnvironment,
       stdio: 'inherit',
     });

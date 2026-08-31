@@ -19,7 +19,7 @@
 | 问题 | 答案 |
 | --- | --- |
 | 正式机器合同是否已进入产品仓？ | **已接收并按双哈希验证，但未激活。** 当前快照见 `contracts/upstream/customer-agent/contract-set.lock.json`；它不是生成类型、migration、runtime 或 Ddev 证据。 |
-| Demo 现在有没有 API adapter？ | **没有。** `src/` 内零 `fetch` / HTTP 客户端。Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。 |
+| Demo 现在有没有 API adapter？ | **没有。** `apps/desktop/src/` 内零 `fetch` / HTTP 客户端。Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。 |
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**类型、鉴权、事件、发布、租约必须重做**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
@@ -170,7 +170,7 @@ Windows Electron 壳
 | `script_version` | 不存在 | 整数，治理快照任一字段变化即 +1 |
 | Question 版本 | 不存在（只有 `questionVariants[]`） | `(question_id, question_version)` 不可变 |
 | `release_seq` / `release_id` | Dashboard 合成 `rel-demo-2026-08-a` | 发布事务内单调；rollback **复制为新 seq**，禁止把 current 指针拨回旧行 |
-| 客户端 N / N-1 | `package.json` `0.2.0`，`appId=local.demo.customer-agent` | 首个签名 Pilot 才建立 N；破坏性变更走 `/v2` |
+| 客户端 N / N-1 | `apps/desktop/package.json` `0.2.0`，`appId=local.demo.customer-agent` | 首个签名 Pilot 才建立 N；破坏性变更走 `/v2` |
 | Dashboard `version: "q-14"` | 流水装饰 | **不能**写入 `script_version` 或 `question_version` |
 
 ### 5.2 生效期：闭区间本地日 ≠ 半开 UTC

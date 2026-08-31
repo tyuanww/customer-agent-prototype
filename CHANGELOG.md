@@ -9,11 +9,19 @@ All notable changes to this private synthetic Electron demo are documented here.
 - Clarified that Menokin is the single current customer-service pilot and the v3 synthetic implementation is its `PILOT-S0` validation stage, not a separate Demo project.
 - Replaced stale Dafuyan wording and separated enterprise four-domain material availability from runtime activation, G0/Ddev, and production evidence.
 - Established the `DEV-M0-W0` pre-move baseline: pinned Node 24 / pnpm 11.19.0 workspace policy, an `apps/desktop` migration target with no second runtime entry, and a frozen 50-case synthetic development contract.
+- Completed the `DEV-M0-W1` mechanical move into the sole runnable package at `apps/desktop`; the repository root now owns only stable workspace commands plus contract-intake and hygiene policy.
+- Pinned release version ownership to `apps/desktop/package.json`; the root workspace facade is unversioned and the tracked gstack manifest pin prevents future ship-time artifact drift.
 
 ### Fixed
 
 - Made workspace policy checks reject runtime-version drift, canceling or duplicate package declarations, and workspace roots, members, manifests, or required targets that escape through symlinks.
+- Kept Node/pnpm ownership at the workspace root, covered migrated icon lookup paths, and allowlisted only the exact legacy W0 generated icons for post-move cleanup.
 - Stabilized the native close-surface E2E boundary by waiting for BrowserWindow/WebContents focus and tolerating only windows proven destroyed during concurrent snapshot readback.
+
+### Verification
+
+- Node.js 24.19.0 / pnpm 11.19.0: lint, typecheck, 51 unit/component files with 506 tests, build, workspace policy, immutable contract verification, and 14/14 Electron E2E passed after the W1 move.
+- Packaging path contracts passed inside the test suite; no DMG, ZIP, Windows installer, signed artifact, notarization, deployment, or release was produced for W1.
 
 ## [0.2.0] - 2026-08-20
 

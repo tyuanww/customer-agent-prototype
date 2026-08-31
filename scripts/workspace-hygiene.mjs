@@ -13,8 +13,13 @@ import { fileURLToPath } from 'node:url';
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
 export const EXPECTED_NODE_RANGE = '>=24 <25';
 export const EXPECTED_PNPM_VERSION = '11.19.0';
+export const RELEASE_MANIFEST_PATH = 'apps/desktop/package.json';
+export const GSTACK_PACKAGE_JSON_PIN_PATH = '.gstack/package-json-path';
 export const REQUIRED_WORKSPACE_PATTERNS = Object.freeze(['apps/*', 'packages/*']);
 export const REQUIRED_WORKSPACE_DIRECTORIES = Object.freeze(['apps/desktop']);
+export const REQUIRED_WORKSPACE_PACKAGES = Object.freeze([
+  Object.freeze({ directory: 'apps/desktop', name: '@customer-agent/desktop' }),
+]);
 const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
   REQUIRED_WORKSPACE_PATTERNS.map((pattern) => pattern.slice(0, -2)),
 );
@@ -26,19 +31,33 @@ export const WORKSPACE_REMAINDER_BUDGET_BYTES = 32 * 1024 * 1024;
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
   'release/local-unsigned',
+  'apps/desktop/out',
+  'apps/desktop/test-results',
+  'apps/desktop/playwright-report',
+  'apps/desktop/build/icon.png',
+  'apps/desktop/build/icon.ico',
+  'apps/desktop/build/icon.icns',
+  'apps/desktop/node_modules/.vite',
+  'apps/desktop/node_modules/.vite-temp',
+  // W0 generated these at the repository root. Keep them allowlisted so a
+  // post-move cleanup can remove stale artifacts without broadening targets.
   'out',
   'test-results',
   'playwright-report',
-  '.gstack/qa-reports',
   'build/icon.png',
   'build/icon.ico',
   'build/icon.icns',
+  '.gstack/qa-reports',
   'node_modules/.vite',
   'node_modules/.vite-temp',
 ]);
 
 export const DEEP_CLEAN_TARGETS = Object.freeze([
-  ...GENERATED_CLEAN_TARGETS.filter((target) => !target.startsWith('node_modules/')),
+  ...GENERATED_CLEAN_TARGETS.filter(
+    (target) => !target.startsWith('node_modules/')
+      && !target.startsWith('apps/desktop/node_modules/'),
+  ),
+  'apps/desktop/node_modules',
   'node_modules',
 ]);
 
@@ -62,13 +81,17 @@ const PROTECTED_TOP_LEVEL = new Set([
 const INVENTORY_CATEGORIES = Object.freeze([
   { key: 'release', label: 'generated package artifacts', path: 'release' },
   { key: 'dependencies', label: 'reinstallable dependencies', path: 'node_modules' },
+  { key: 'desktop-dependencies', label: 'desktop package dependency links', path: 'apps/desktop/node_modules' },
   { key: 'git', label: 'Git history and metadata', path: '.git' },
   { key: 'local-reference', label: 'user-owned ignored reference', path: 'clawd-on-desk-0.15.0.zip' },
   { key: 'codegraph', label: 'local CodeGraph index', path: '.codegraph' },
   { key: 'gstack', label: 'local gstack reports', path: '.gstack' },
-  { key: 'build-output', label: 'rebuildable renderer/main output', path: 'out' },
-  { key: 'test-output', label: 'temporary test output', path: 'test-results' },
-  { key: 'playwright-output', label: 'temporary Playwright report', path: 'playwright-report' },
+  { key: 'build-output', label: 'rebuildable renderer/main output', path: 'apps/desktop/out' },
+  { key: 'test-output', label: 'temporary test output', path: 'apps/desktop/test-results' },
+  { key: 'playwright-output', label: 'temporary Playwright report', path: 'apps/desktop/playwright-report' },
+  { key: 'legacy-build-output', label: 'pre-move rebuildable output', path: 'out' },
+  { key: 'legacy-test-output', label: 'pre-move temporary test output', path: 'test-results' },
+  { key: 'legacy-playwright-output', label: 'pre-move Playwright report', path: 'playwright-report' },
 ]);
 
 function inodeKey(stats, targetPath) {
@@ -208,6 +231,97 @@ function workspaceMemberSafetyViolations(projectRoot) {
   return violations;
 }
 
+function requiredWorkspacePackageViolations(projectRoot) {
+  const violations = [];
+  for (const requiredPackage of REQUIRED_WORKSPACE_PACKAGES) {
+    if (workspaceDirectoryStatus(projectRoot, requiredPackage.directory) !== 'safe') {
+      continue;
+    }
+    const manifestPath = path.join(projectRoot, requiredPackage.directory, 'package.json');
+    const relativeManifest = path.posix.join(requiredPackage.directory, 'package.json');
+    const manifestStats = lstatSync(manifestPath, { throwIfNoEntry: false });
+    if (!manifestStats) {
+      violations.push({ code: 'WORKSPACE_TARGET_MANIFEST_MISSING', path: relativeManifest });
+      continue;
+    }
+    if (manifestStats.isSymbolicLink() || !manifestStats.isFile()) {
+      violations.push({ code: 'WORKSPACE_TARGET_MANIFEST_UNSAFE', path: relativeManifest });
+      continue;
+    }
+    let manifest;
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    } catch {
+      violations.push({ code: 'WORKSPACE_TARGET_MANIFEST_INVALID', path: relativeManifest });
+      continue;
+    }
+    if (manifest.name !== requiredPackage.name) {
+      violations.push({
+        code: 'WORKSPACE_TARGET_PACKAGE_NAME_MISMATCH',
+        path: relativeManifest,
+        expected: requiredPackage.name,
+        actual: String(manifest.name),
+      });
+    }
+    if (manifest.private !== true) {
+      violations.push({ code: 'WORKSPACE_TARGET_PACKAGE_NOT_PRIVATE', path: relativeManifest });
+    }
+    const toolchainOverrides = ['packageManager', 'engines'].filter(
+      (key) => Object.hasOwn(manifest, key),
+    );
+    if (toolchainOverrides.length > 0) {
+      violations.push({
+        code: 'WORKSPACE_TARGET_TOOLCHAIN_OVERRIDE_FORBIDDEN',
+        path: relativeManifest,
+        actual: toolchainOverrides.join(','),
+      });
+    }
+  }
+  return violations;
+}
+
+function releaseManifestOwnershipViolations(projectRoot, rootPackageJson) {
+  const violations = [];
+  if (Object.hasOwn(rootPackageJson, 'version')) {
+    violations.push({
+      code: 'ROOT_PACKAGE_VERSION_FORBIDDEN',
+      path: 'package.json',
+      actual: String(rootPackageJson.version),
+    });
+  }
+
+  const pinPath = path.join(projectRoot, GSTACK_PACKAGE_JSON_PIN_PATH);
+  const pinStats = lstatSync(pinPath, { throwIfNoEntry: false });
+  if (!pinStats) {
+    violations.push({
+      code: 'RELEASE_MANIFEST_PIN_MISSING',
+      path: GSTACK_PACKAGE_JSON_PIN_PATH,
+    });
+    return violations;
+  }
+  if (pinStats.isSymbolicLink() || !pinStats.isFile()) {
+    violations.push({
+      code: 'RELEASE_MANIFEST_PIN_UNSAFE',
+      path: GSTACK_PACKAGE_JSON_PIN_PATH,
+    });
+    return violations;
+  }
+
+  const nonEmptyLines = readFileSync(pinPath, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (nonEmptyLines.length !== 1 || nonEmptyLines[0] !== RELEASE_MANIFEST_PATH) {
+    violations.push({
+      code: 'RELEASE_MANIFEST_PIN_MISMATCH',
+      path: GSTACK_PACKAGE_JSON_PIN_PATH,
+      expected: RELEASE_MANIFEST_PATH,
+      actual: nonEmptyLines.join(','),
+    });
+  }
+  return violations;
+}
+
 export function checkWorkspacePolicy(
   projectRoot,
   { nodeVersion = process.versions.node } = {},
@@ -293,6 +407,8 @@ export function checkWorkspacePolicy(
       violations.push({ code: 'WORKSPACE_TARGET_UNSAFE', path: relativeDirectory });
     }
   }
+  violations.push(...requiredWorkspacePackageViolations(resolvedRoot));
+  violations.push(...releaseManifestOwnershipViolations(resolvedRoot, packageJson));
   violations.push(...workspaceMemberSafetyViolations(resolvedRoot));
 
   return {
@@ -320,11 +436,25 @@ export function resolveCleanupTarget(projectRoot, relativeTarget) {
   if (!resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
     throw new Error(`Refusing cleanup target outside workspace: ${resolvedTarget}`);
   }
-  if (existsSync(resolvedTarget)) {
-    const targetStats = lstatSync(resolvedTarget);
-    if (targetStats.isSymbolicLink()) {
-      throw new Error(`Refusing symlink cleanup target: ${resolvedTarget}`);
+
+  let currentPath = resolvedRoot;
+  const pathSegments = relativeTarget.split('/');
+  for (const [index, segment] of pathSegments.entries()) {
+    currentPath = path.join(currentPath, segment);
+    const stats = lstatSync(currentPath, { throwIfNoEntry: false });
+    if (!stats) {
+      break;
     }
+    if (stats.isSymbolicLink()) {
+      throw new Error(`Refusing symlink cleanup target component: ${currentPath}`);
+    }
+    const isFinalSegment = index === pathSegments.length - 1;
+    if (!isFinalSegment && !stats.isDirectory()) {
+      throw new Error(`Refusing non-directory cleanup target component: ${currentPath}`);
+    }
+  }
+
+  if (existsSync(resolvedTarget)) {
     const realTarget = realpathSync(resolvedTarget);
     if (!realTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
       throw new Error(`Refusing cleanup target outside workspace: ${realTarget}`);
@@ -413,7 +543,8 @@ export function cleanWorkspace({
   if (apply) {
     for (const target of plan) {
       if (target.existed) {
-        remove(target.absolutePath, { recursive: true, force: true });
+        const verifiedPath = resolveCleanupTarget(resolvedRoot, target.relativeTarget);
+        remove(verifiedPath, { recursive: true, force: true });
       }
     }
   }

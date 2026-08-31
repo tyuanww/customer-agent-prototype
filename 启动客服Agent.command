@@ -36,10 +36,10 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ ! -x "$PROJECT_ROOT/node_modules/.bin/electron-vite" ]]; then
+if [[ ! -x "$PROJECT_ROOT/apps/desktop/node_modules/.bin/electron-vite" ]]; then
   print -u2 "项目依赖尚未安装。请先运行："
   print -u2 "  pnpm install --frozen-lockfile"
-  print -u2 "  pnpm exec install-electron"
+  print -u2 "  pnpm electron:install"
   read -r "?按回车关闭..."
   exit 1
 fi

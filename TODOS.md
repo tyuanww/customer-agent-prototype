@@ -10,7 +10,7 @@
 
 **Why:** Preserve the typed fail-closed response at the Main IPC boundary.
 
-**Context:** The trusted and untrusted sender paths are covered in `tests/unit/overlay-ipc-handlers.test.ts`; the controller-unavailable branch in `src/main/overlay-ipc.ts` is the remaining narrow case.
+**Context:** The trusted and untrusted sender paths are covered in `apps/desktop/tests/unit/overlay-ipc-handlers.test.ts`; the controller-unavailable branch in `apps/desktop/src/main/overlay-ipc.ts` is the remaining narrow case.
 
 **Effort:** S
 **Priority:** P3
@@ -22,7 +22,7 @@
 
 **Why:** Prove renderer startup degrades safely when the context request itself fails.
 
-**Context:** Missing API and successful context responses are covered in `tests/component/QueryApp.test.tsx`; this should remain a component-level error-path test rather than an Electron E2E.
+**Context:** Missing API and successful context responses are covered in `apps/desktop/tests/component/QueryApp.test.tsx`; this should remain a component-level error-path test rather than an Electron E2E.
 
 **Effort:** S
 **Priority:** P3
@@ -34,7 +34,7 @@
 
 **Why:** Lock the shared banner measurement owner against future height-accounting drift.
 
-**Context:** The equivalent `EMPTY` combination is covered in `tests/component/QueryApp.test.tsx`; reuse that fixture with an error result instead of adding a browser test.
+**Context:** The equivalent `EMPTY` combination is covered in `apps/desktop/tests/component/QueryApp.test.tsx`; reuse that fixture with an error result instead of adding a browser test.
 
 **Effort:** S
 **Priority:** P3

@@ -7,9 +7,10 @@ if (mode !== 'local' && mode !== 'distribution') {
   throw new Error('Usage: node scripts/finalize-mac-package.mjs <local|distribution>');
 }
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = path.resolve(desktopRoot, '../..');
 const outputDir = path.join(
-  root,
+  repositoryRoot,
   'release',
   mode === 'local' ? 'local-unsigned' : 'distribution',
 );

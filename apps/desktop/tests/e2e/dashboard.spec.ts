@@ -4,8 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication, type Page, _electron as electron } from '@playwright/test';
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const mainEntry = path.join(repoRoot, 'out/main/index.js');
+const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const mainEntry = path.join(desktopRoot, 'out/main/index.js');
 let launchSequence = 0;
 
 type DemoHarness = {
@@ -42,7 +42,7 @@ async function launchApp(): Promise<ElectronApplication> {
   launchSequence += 1;
   try {
     const app = await electron.launch({
-      cwd: repoRoot,
+      cwd: desktopRoot,
       args: [`--user-data-dir=${userDataDir}`, mainEntry, '--demo-e2e'],
       env: {
         ...process.env,

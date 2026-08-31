@@ -6,7 +6,7 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0` 已于 2026-08-31 开工，当前只完成 workspace scaffold。可运行的 v3 应用仍是 `DEMO · 合成数据 · 无后端`，不代表真实接入或上线。复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，并保持原行为与安全边界。可运行的 v3 应用仍是 `DEMO · 合成数据 · 无后端`，不代表真实接入或上线。复制只表示「已复制」，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -27,15 +27,16 @@
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
 | 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |
 | 查看已明确延后的验证债务 | [TODOS.md](TODOS.md) |
-| 查阅打包携带的第三方软件许可声明 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
+| 查阅打包携带的第三方软件许可声明 | [apps/desktop/THIRD_PARTY_NOTICES.md](apps/desktop/THIRD_PARTY_NOTICES.md) |
 
-项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除 `node_modules`，仅用于归档或需要从 `pnpm install --frozen-lockfile` 重建依赖时。清理脚本不会触碰 `.git`、`.codegraph`、`src`、`assets`、`evidence`、`docs`、`tests` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
+项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除根与桌面包依赖，适合归档或从 `pnpm install --frozen-lockfile` 重建。清理脚本不会触碰 `.git`、`.codegraph`、`apps/desktop/src`、`apps/desktop/assets`、`evidence`、`docs`、`apps/desktop/tests` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
 
 ## 仓库与工作台
 
 - 本目录应作为独立产品 Git 仓打开，不与项目进度记录仓混成同一工作树或 Git 历史。
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
-- 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `assets/app-icon.png`（近白 squircle）、`build/icon.png` 与 `build/icon.ico`；在 macOS 上还会生成 `build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
+- `apps/desktop` 是当前唯一可运行 Electron package；根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
+- 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `apps/desktop/assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `apps/desktop/fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `apps/desktop/assets/app-icon.png`（近白 squircle）、`apps/desktop/build/icon.png` 与 `apps/desktop/build/icon.ico`；在 macOS 上还会生成 `apps/desktop/build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Git 合成运行时；仓内话术与看板继续全部使用虚构合成内容。
 
 ## 环境
@@ -51,11 +52,11 @@ pnpm -v    # 项目锁定 11.19.0
 export NODE_OPTIONS=--use-system-ca
 export NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem
 pnpm install --frozen-lockfile
-pnpm exec install-electron
+pnpm electron:install
 pnpm dev
 ```
 
-上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 只用于**当前这台机器**的企业证书环境，不是每台电脑的通用要求；没有企业拦截 TLS 时不要照抄。禁止关闭 TLS 验证。本项目用 `pnpm exec install-electron` 显式准备锁定版本的 Electron 桌面运行时；后续启动会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。逐步操作见 [第一次运行](docs/tutorial-first-run.md)。
+上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 只用于**当前这台机器**的企业证书环境，不是每台电脑的通用要求；没有企业拦截 TLS 时不要照抄。禁止关闭 TLS 验证。本项目用 `pnpm electron:install` 在唯一桌面包内显式准备锁定版本的 Electron 运行时；后续启动会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。逐步操作见 [第一次运行](docs/tutorial-first-run.md)。
 
 ## 交互
 
@@ -114,7 +115,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 
 ### 附件借鉴矩阵（clean-room）
 
-本地的 `clawd-on-desk-0.15.0.zip` 只作为只读参考附件，不进入 Git 或安装包。它的根源码是 AGPL-3.0，资源许可是 All Rights Reserved。本 Demo **不是** Clawd 的复制、改色或兼容层，也不使用其中任何 SVG / PNG / GIF / 代码。唯一视觉角色来源仍是本仓 `fox-head.png`。
+本地的 `clawd-on-desk-0.15.0.zip` 只作为只读参考附件，不进入 Git 或安装包。它的根源码是 AGPL-3.0，资源许可是 All Rights Reserved。本 Demo **不是** Clawd 的复制、改色或兼容层，也不使用其中任何 SVG / PNG / GIF / 代码。唯一视觉角色来源仍是本仓 `apps/desktop/fox-head.png`。
 
 | 类别 | 内容 |
 | --- | --- |
@@ -154,7 +155,7 @@ pnpm test:e2e
 
 | 命令 | 实际覆盖 | 不要误读成 |
 | --- | --- | --- |
-| `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
+| `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
 | `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |
 | `pnpm test:e2e:float` | 先 `pnpm build`，再跑 `smoke.spec.ts` 里 `@float` | 不是全量 E2E，也不是真实台前调度验收 |
 | `pnpm test` | 全量 unit / component，含 drag-settle 与 Dashboard 授权 | 不是真实窗口 |
@@ -166,7 +167,7 @@ pnpm test:e2e
 
 ## Windows 打包现状
 
-`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
+`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
 
 ## macOS 打包与发布
 
@@ -180,7 +181,7 @@ pnpm package:mac:local
 pnpm package:mac
 ```
 
-两个命令都会先从透明狐狸确定性合成 `assets/app-icon.png` master，再生成 `build/icon.icns` / `build/icon.ico`，并构建同时包含 `x86_64 + arm64` 的 Universal 应用。本地证明包写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`；正式包只写入 `release/distribution/`，两者不会同名覆盖。两类目录都被 Git 忽略。调用方未显式提供 `NODE_EXTRA_CA_CERTS` 时，打包器仅在进程内临时桥接 macOS 系统根证书给 Node，保持 TLS 校验开启并在结束后删除临时文件。包内不生成自动更新元数据，不记录私有 GitHub 仓库坐标，并携带 Electron / Chromium / React 的第三方许可说明。
+两个命令都会先从透明狐狸确定性合成 `apps/desktop/assets/app-icon.png` master，再生成 `apps/desktop/build/icon.icns` / `apps/desktop/build/icon.ico`，并构建同时包含 `x86_64 + arm64` 的 Universal 应用。本地证明包写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`；正式包只写入 `release/distribution/`，两者不会同名覆盖。两类目录都被 Git 忽略。调用方未显式提供 `NODE_EXTRA_CA_CERTS` 时，打包器仅在进程内临时桥接 macOS 系统根证书给 Node，保持 TLS 校验开启并在结束后删除临时文件。包内不生成自动更新元数据，不记录私有 GitHub 仓库坐标，并携带 Electron / Chromium / React 的第三方许可说明。
 
 `package:mac` 默认要求 Hardened Runtime、代码签名和 Apple 公证，并在构建后再次执行 `codesign`、Gatekeeper 和 stapler 校验；缺少任一前置时直接失败，不会静默产出可误外发的未签名包。证书、`.p8` / `.p12`、Apple ID 密码和 Keychain profile 均不得提交仓库或打印到日志。
 

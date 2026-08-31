@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repositoryRoot = path.resolve(root, '../..');
 const packageJson = JSON.parse(
   readFileSync(path.join(root, 'package.json'), 'utf8'),
 ) as {
@@ -37,14 +38,14 @@ const verifyWindowsPackage = readFileSync(
   path.join(root, 'scripts/verify-windows-package.mjs'),
   'utf8',
 );
-const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
-const developmentBrief = readFileSync(path.join(root, 'DEVELOPMENT_BRIEF.md'), 'utf8');
+const readme = readFileSync(path.join(repositoryRoot, 'README.md'), 'utf8');
+const developmentBrief = readFileSync(path.join(repositoryRoot, 'DEVELOPMENT_BRIEF.md'), 'utf8');
 
 describe('Windows local-unsigned packaging contract', () => {
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {
     expect(packageJson.scripts['package:win']).toBe('node scripts/package-windows.mjs local');
     expect(packageJson.scripts['package:win:distribution']).toBeUndefined();
-    expect(packageJson.build.directories.output).toBe('release');
+    expect(packageJson.build.directories.output).toBe('../../release');
     expect(packageJson.build.win.icon).toBe('build/icon.ico');
     expect(packageJson.build.win.signExecutable).toBe(false);
     expect(packageJson.build.win.signAndEditExecutable).toBeUndefined();
@@ -78,7 +79,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageWindows).toContain(
       'rmSync(resolvedOutputDirectory, { recursive: true, force: true })',
     );
-    expect(packageWindows.indexOf('resetWindowsPackageOutput(root)')).toBeLessThan(
+    expect(packageWindows.indexOf('resetOutput(repositoryRoot)')).toBeLessThan(
       packageWindows.indexOf('node_modules/electron-builder/out/cli/cli.js'),
     );
     expect(packageWindows).toContain("['scripts/verify-windows-package.mjs']");

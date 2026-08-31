@@ -159,7 +159,7 @@ sequenceDiagram
 2. `appId` 仍是 `local.demo.customer-agent`。`pnpm package:mac` 在检查到 `local.` / `.demo.` 时直接失败，避免静默打出看起来像正式包的东西。
 3. 未签名包经浏览器 / 网盘下载后，Gatekeeper 通常直接拦截。这不是文案问题，是系统策略。
 4. Windows 后验只比文件树、`UNSIGNED` 后缀、`icon.ico` 字节和许可文件；它不看 PE 图标资源，也不看 Authenticode。
-5. `THIRD_PARTY_NOTICES.md` 只覆盖 Electron / Chromium / React，**不**构成本 Demo 的分发授权。
+5. `apps/desktop/THIRD_PARTY_NOTICES.md` 只覆盖 Electron / Chromium / React，**不**构成本 Demo 的分发授权。
 6. 包内关闭自动更新元数据，避免被当成可升级产品。
 
 ```mermaid

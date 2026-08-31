@@ -93,21 +93,23 @@ FOX_IDLE -> SEARCH_INPUT -> RESULTS | EMPTY | ERROR -> COPIED -> FOX_IDLE
 - 卡片可展示「精确问法 / 同义表达 / 主题与意图 / 相似问法」等非数字原因；答案展示和复制必须是 fixture 中的原始 `answerText`。
 - 不迁移旧学习项目代码、词典、权重、真实数据或持久化 / 学习链路；本仓查询增强必须独立实现并只用合成 fixture。
 
-## 3. 建议目录
+## 3. 当前目录
 
 ```text
-src/
-  main/          窗口、快捷键、锚定、生命周期、白名单 IPC、Dashboard 单例、
-                 drag settle、layout ACK、handoff、shutdown fence、app identity
-  preload/       最小类型化 API（仅 overlay）
-  shared/        合同、状态机、几何、狐狸动效参数、Dashboard 访问控制
-  renderer/      FoxApp + QueryApp + DashboardApp + 合成 fixture / manifest
-docs/            Tutorial / How-to / Reference / Explanation（四象限）
-tests/
-  unit/          状态机、锚定、动效参数、manifest、Dashboard 授权、drag settle
-  component/     展开、空查询、IME、Top 3、复制、导航、Fox 吸附 class
-  e2e/           Electron smoke + Dashboard 单例 / 安全窗
-scripts/         图标派生、本机证明包、正式门禁与打包后验
+apps/desktop/                 唯一 Electron workspace package
+  src/
+    main/                     窗口、快捷键、生命周期、白名单 IPC、Dashboard 单例
+    preload/                  最小类型化 API（仅 overlay）
+    shared/                   合同、状态机、几何与纯函数
+    renderer/                 Fox + Query + Dashboard + 合成 fixture / manifest
+  tests/
+    unit/                     状态机、几何、manifest、授权、drag settle
+    component/                展开、IME、Top 3、复制、导航与状态反馈
+    e2e/                      Electron smoke + Dashboard 单例 / 安全窗
+  assets/、build/             canonical 品牌输入与打包输入
+  scripts/                    图标派生、本机证明包、正式门禁与打包后验
+docs/                         Tutorial / How-to / Reference / Explanation
+scripts/                      仓级合同接收与 workspace 卫生门
 ```
 
 ## 4. 数据流与信任边界
@@ -159,7 +161,7 @@ scripts/         图标派生、本机证明包、正式门禁与打包后验
       reveal ok --> dismiss Query --> {ok:true}
       any fail --> destroy new window, keep Query --> {ok:false}
 
-[app ready] applyApplicationIdentity (regular Dock, assets/app-icon.png)
+[app ready] applyApplicationIdentity (regular Dock, apps/desktop/assets/app-icon.png)
 [before-quit / will-quit] shutdown fence.begin --> guarded scheduler dispose
 [package:*] generate icons --> build --> electron-builder --> post-verifier
 ```
@@ -176,10 +178,10 @@ scripts/         图标派生、本机证明包、正式门禁与打包后验
 ## 5. 工具链与脚本
 
 - Node.js 24.x；`packageManager` 锁定 pnpm 11.19.0。
-- 必须提供：`pnpm dev`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm test:e2e`。日常狐狸动效回归使用轻量 `pnpm test:float`（**不含**完整 drag-settle）；`pnpm test:assets` 只验证现有品牌 raster / Dock 合同，不等于生成，不得塞回每次动效 fast loop；`pnpm test:e2e:float` 自身先 build 再跑 `@float`。狐狸品牌 raster canonical 用 `pnpm generate:fox-head` 从 `assets/fox-head-master.png` 派生 `fox-head.png`、Dashboard 深色耳麦；默认同时派生 `assets/app-icon.png` 与 build PNG/ICO，macOS 上再派生 ICNS。
-- 保留 `pnpm package:win`，Windows 未签名本机证明包隔离写入 `release/local-unsigned/windows/`，NSIS 关闭 differential package；builder 完成后必须 fail-closed 跑 `scripts/verify-windows-package.mjs`：校验 `UNSIGNED.exe`、无 blockmap / latest / app-update 元数据、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致且必要许可证非空。不把该后验写成 PE 图标资源、Authenticode 或真实 Windows 安装验收。本轮主流程最终决定是否实际跨平台产包，日常定向测试不要求产出 Windows 安装包。
+- 必须提供：`pnpm dev`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm test:e2e`。日常狐狸动效回归使用轻量 `pnpm test:float`（**不含**完整 drag-settle）；`pnpm test:assets` 只验证现有品牌 raster / Dock 合同，不等于生成，不得塞回每次动效 fast loop；`pnpm test:e2e:float` 自身先 build 再跑 `@float`。狐狸品牌 raster canonical 用 `pnpm generate:fox-head` 从 `apps/desktop/assets/fox-head-master.png` 派生 `apps/desktop/fox-head.png`、Dashboard 深色耳麦；默认同时派生 `apps/desktop/assets/app-icon.png` 与 build PNG/ICO，macOS 上再派生 ICNS。
+- 保留 `pnpm package:win`，Windows 未签名本机证明包隔离写入 `release/local-unsigned/windows/`，NSIS 关闭 differential package；builder 完成后必须 fail-closed 跑 `apps/desktop/scripts/verify-windows-package.mjs`：校验 `UNSIGNED.exe`、无 blockmap / latest / app-update 元数据、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致且必要许可证非空。不把该后验写成 PE 图标资源、Authenticode 或真实 Windows 安装验收。本轮主流程最终决定是否实际跨平台产包，日常定向测试不要求产出 Windows 安装包。
 - 提供 `pnpm package:mac:local` 生成显式未签名、不可外发的 Universal DMG + ZIP，用于本机证明，并跑 `finalize-mac-package` + `verify-mac-package`；提供 `pnpm package:mac` 作为正式门禁，缺长期 Bundle ID、完整 Xcode、Developer ID 或公证凭证时必须 fail-closed。当前 `appId=local.demo.customer-agent` 不满足正式外发前置，不能暗示已经可以正式发包。
-- Mac / Windows 应用图标从仓内透明狐狸确定性合成独立 `assets/app-icon.png` master（近白 squircle 底板），再生成 `build/icon.icns` / `build/icon.ico`；Tray 与浮窗仍用透明 `fox-head.png`。正式包启用 Hardened Runtime、最小权限 entitlement、签名与 Apple notarization。证书和公证凭证永不进入 Git。
+- Mac / Windows 应用图标从仓内透明狐狸确定性合成独立 `apps/desktop/assets/app-icon.png` master（近白 squircle 底板），再生成 `apps/desktop/build/icon.icns` / `apps/desktop/build/icon.ico`；Tray 与浮窗仍用透明 `apps/desktop/fox-head.png`。正式包启用 Hardened Runtime、最小权限 entitlement、签名与 Apple notarization。证书和公证凭证永不进入 Git。
 
 ## 6. 最低测试矩阵
 

@@ -23,11 +23,11 @@
 
 ## 3. 模块边界与依赖方向
 
-- `src/main/`：唯一拥有 Electron / OS、BrowserWindow、原生 bounds、应用生命周期、Electron sender 身份判定和原生副作用；可复用 `shared` 中的纯授权谓词。
-- `src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。
-- `src/shared/`：只放跨边界类型、validator、状态模型、几何和纯函数；不得依赖 React、DOM、Electron 或产生 I/O。
-- `src/renderer/`：只拥有 React / DOM、局部交互和 ViewModel；当前基线读取合成数据，未来正式数据也必须经过受控 adapter。不得导入 `main`、`preload` 或 Electron，也不得直连数据库或持有凭证。
-- `assets/` 中的 canonical 资产是 SSOT；`scripts/` 负责确定性派生。不得手改派生产物制造第二真源。
+- `apps/desktop/src/main/`：唯一拥有 Electron / OS、BrowserWindow、原生 bounds、应用生命周期、Electron sender 身份判定和原生副作用；可复用 `shared` 中的纯授权谓词。
+- `apps/desktop/src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。
+- `apps/desktop/src/shared/`：只放跨边界类型、validator、状态模型、几何和纯函数；不得依赖 React、DOM、Electron 或产生 I/O。
+- `apps/desktop/src/renderer/`：只拥有 React / DOM、局部交互和 ViewModel；当前基线读取合成数据，未来正式数据也必须经过受控 adapter。不得导入 `main`、`preload` 或 Electron，也不得直连数据库或持有凭证。
+- `apps/desktop/assets/` 中的 canonical 资产是 SSOT；`apps/desktop/scripts/` 负责确定性派生。不得手改派生产物制造第二真源。
 - 每个状态、协议、常量和不变量必须有一个写入所有者。当前所有权以架构参考文档为准；迁移所有权时必须同步合同、调用方、测试和文档。
 
 ## 4. 软件设计纪律

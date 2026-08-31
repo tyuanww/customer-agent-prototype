@@ -47,7 +47,7 @@ pnpm -v    # 项目锁定 11.19.0
 pnpm test:float
 ```
 
-实际执行：
+根命令会委派给 `apps/desktop`；包内实际执行：
 
 ```text
 vitest run \
@@ -62,7 +62,7 @@ vitest run \
 
 | 能证明 | 不能证明 |
 | --- | --- |
-| overlay 窗工厂、几何常量、狐狸姿态分层、探头权限、FoxApp 组件合同 | **完整 drag-settle**：不跑 `tests/unit/overlay-controller-fox-settle.test.ts`，不覆盖 Main `generation` / `settleId` / `commitFoxDragSettle` 矩阵 |
+| overlay 窗工厂、几何常量、狐狸姿态分层、探头权限、FoxApp 组件合同 | **完整 drag-settle**：不跑 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，不覆盖 Main `generation` / `settleId` / `commitFoxDragSettle` 矩阵 |
 | 轻量、可反复跑 | 真实拖拽、真实台前调度、真实 OS 焦点 |
 
 完整 drag-settle 在 `pnpm test` 里，不在这条 fast loop。
@@ -73,7 +73,7 @@ vitest run \
 pnpm test:assets
 ```
 
-实际执行：
+根命令会委派给 `apps/desktop`；包内实际执行：
 
 ```text
 vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts
@@ -81,7 +81,7 @@ vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts
 
 | 能证明 | 不能证明 |
 | --- | --- |
-| 现有 `assets/fox-head-master.png`、`fox-head.png`、Dashboard 深色耳麦、`assets/app-icon.png` 以及路径候选仍满足合同 | **不等于生成**。它不调用 `pnpm generate:fox-head` / `pnpm generate:app-icons` 去改仓内图标 |
+| 现有 `apps/desktop/assets/fox-head-master.png`、`apps/desktop/fox-head.png`、Dashboard 深色耳麦、`apps/desktop/assets/app-icon.png` 以及路径候选仍满足合同 | **不等于生成**。它不调用 `pnpm generate:fox-head` / `pnpm generate:app-icons` 去改仓内图标 |
 | 生成器在临时目录的自检（若测试里用到） | 没有把临时产物写成新的 SSOT |
 
 要重新派生图标，必须显式跑生成脚本，见 [桌面合同](reference-desktop-contracts.md#11-公开-scripts-和模块图)。
@@ -92,12 +92,12 @@ vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts
 pnpm test:e2e:float
 ```
 
-脚本定义是 `pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @float`。
+桌面包脚本定义是 `pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @float`。
 
 | 能证明 | 不能证明 |
 | --- | --- |
 | 当前构建产物能被 Playwright 拉起；`@float` 用例（左右停靠 / drag-settle、harness 下的舞台边界、局部 follow / 睡眠 / press、reduced motion、Dock 程序证据等） | 真实 macOS 台前调度、真实贴边 hover / retract、真实程序坞点击观感、真实全局快捷键投递、完整 Dashboard E2E（那些不带 `@float`） |
-| 脚本**自身包含 build**；不要再假设「上次的 `out/` 一定够用」 | OS 焦点一定落到输入框（自动化 activate ≠ 真实应用激活） |
+| 脚本**自身包含 build**；不要再假设「上次的 `apps/desktop/out/` 一定够用」 | OS 焦点一定落到输入框（自动化 activate ≠ 真实应用激活） |
 
 ### 2.4 全量静态 + 构建 + 全量 E2E
 
@@ -114,7 +114,7 @@ pnpm test:e2e
 | `pnpm lint` | ESLint 通过 | 运行时行为 |
 | `pnpm typecheck` | `tsc --noEmit` 通过 | 打包签名 |
 | `pnpm test` | Vitest 全量 unit / component，**含** drag-settle 与 Dashboard 授权 | 真实窗口、真实剪贴板持久化到用户会话 |
-| `pnpm build` | `electron-vite` 写出 `out/main`、`out/preload`、`out/renderer` | 可以发给客户 |
+| `pnpm build` | `electron-vite` 写出 `apps/desktop/out/main`、`apps/desktop/out/preload`、`apps/desktop/out/renderer` | 可以发给客户 |
 | `pnpm test:e2e` | 先 build，再跑全部 Playwright（浮窗交接、数字键复制、Dashboard 可信入口 / 单例 / 安全隔离 / Dock 恢复） | 真实设备门禁，见第 4 节 |
 
 探头 / 缩回、Query 纵向拖拽，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 纵向拖拽和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
@@ -135,7 +135,7 @@ pnpm test:e2e
 - `release/local-unsigned/客服话术浮窗 Demo-0.2.0-mac-universal-UNSIGNED.zip`
 - `release/local-unsigned/mac-universal/*.app`
 
-构建后会跑 `scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `scripts/verify-mac-package.mjs local`。
+构建后会跑 `apps/desktop/scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `apps/desktop/scripts/verify-mac-package.mjs local`。
 
 | 后验能证明 | 后验不能证明 |
 | --- | --- |
@@ -151,7 +151,7 @@ pnpm test:e2e
 脚本是：
 
 ```text
-node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution
+node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/scripts/package-macos.mjs distribution
 ```
 
 若前置通过，输出目录将是 `release/distribution/`，产物**不得**带 `UNSIGNED`，构建后再做 `codesign --verify --deep --strict`、`spctl --assess --type execute`、`xcrun stapler validate`。
@@ -177,7 +177,7 @@ node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distri
 
 本仓没有 Windows `distribution` 路径。`mode !== 'local'` 会直接抛错。
 
-`scripts/verify-windows-package.mjs` 能证明：存在 `UNSIGNED.exe`、无更新元数据、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致、许可文件非空。
+`apps/desktop/scripts/verify-windows-package.mjs` 能证明：存在 `UNSIGNED.exe`、无更新元数据、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致、许可文件非空。
 
 它**不能**证明：PE 可执行文件内部图标资源、Authenticode / EV 签名、真实 Windows 安装、任务栏图标。对应验收必须在 Windows 设备上做。禁止把未签名产物写成已签名。
 
@@ -210,21 +210,21 @@ pnpm workspace:check
 pnpm clean:preview
 ```
 
-`workspace:size` 按磁盘分配量拆分 `release/`、`node_modules/`、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
+`workspace:size` 按磁盘分配量拆分 `release/`、根与桌面包 `node_modules/`、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
 
 `workspace:check` 只检查源码、测试、文档和已纳入项目的资产等 workspace remainder，默认上限为 32 MiB；`node_modules`、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单独统计，不会把可重建或本地工具内容误报为代码膨胀。若有一次性大资产确实需要纳入，可临时使用 `--remainder-budget-mib=N`，并在评审记录原因，不要永久抬高默认门槛。
 
 | 命令 | 行为 | 恢复方式 |
 | --- | --- | --- |
-| `pnpm clean:preview` | 默认 dry-run；列出本地未签名包、`out/`、派生 `build/icon.*`、测试报告、gstack QA 报告与 Vite 缓存 | 无改动 |
+| `pnpm clean:preview` | 默认 dry-run；列出本地未签名包、`apps/desktop/out/`、派生 `apps/desktop/build/icon.*`、测试报告、gstack QA 报告与 Vite 缓存 | 无改动 |
 | `pnpm workspace:check` | 检查不可再生源码区是否超过 32 MiB 预算 | 删除或迁移新增大文件后重跑 |
 | `pnpm clean:generated` | 只删除上面的精确 allowlist | `pnpm build`、相应 `package:*` / 测试命令重新生成 |
 | `pnpm clean:deep:preview` | 预览 generated + `node_modules` | 无改动 |
-| `pnpm clean:deep` | 在 generated 之外删除依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm exec install-electron` |
+| `pnpm clean:deep` | 在 generated 之外删除根与桌面包依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm electron:install` |
 
 `clean:generated` 本身就是执行入口，不要给它追加 `--dry-run`。预览必须使用独立的 `clean:preview`；CLI 会拒绝未知参数，避免把无效参数误认为已经覆盖了 `--apply`。
 
-清理器会核对仓库包名、realpath 和精确 allowlist；遇到符号链接、仓外路径或未知 scope 会 fail-closed。它永远不接受 `.git`、`.codegraph`、`src`、`assets`、`evidence`、`docs`、`tests` 和 `clawd-on-desk-0.15.0.zip` 作为目标。冻结 QA 证据、用户只读参考，以及 `docs/reference-api-adapter-handoff.md` 这类衔接说明都不是缓存，清理脚本不得删除。
+清理器会核对仓库包名、realpath 和精确 allowlist；遇到符号链接、仓外路径或未知 scope 会 fail-closed。它永远不接受 `.git`、`.codegraph`、`apps/desktop/src`、`apps/desktop/assets`、`evidence`、`docs`、`apps/desktop/tests` 和 `clawd-on-desk-0.15.0.zip` 作为目标。冻结 QA 证据、用户只读参考，以及 `docs/reference-api-adapter-handoff.md` 这类衔接说明都不是缓存，清理脚本不得删除。
 
 业内通常把依赖视为锁文件可重建内容、把安装包交给 CI artifact / Release 的保留策略，而不是长期堆在源码工作区；测试报告应短期保存；共享 pnpm store 只偶尔运行 `pnpm store prune`，避免切旧分支时反复下载；Playwright 浏览器使用系统级共享缓存及其自身的未引用版本回收。
 

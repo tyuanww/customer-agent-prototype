@@ -7,13 +7,13 @@
 ## 1. 使用边界
 
 - 叶子函数不得自行发送 IPC、创建窗口、读取文件、访问数据库或引入真实业务数据。
-- `src/shared/` 中的工厂与 ACK helper 只构造通过 validator 的 typed payload；它们不绕过 Main 的 sender、role、main-frame 或 generation 校验。
-- `src/renderer/features/search/query-view.ts` 和 Dashboard helper 属于 renderer 内部模块。不要把它们当作 preload API，也不要从 Main 进程导入。
+- `apps/desktop/src/shared/` 中的工厂与 ACK helper 只构造通过 validator 的 typed payload；它们不绕过 Main 的 sender、role、main-frame 或 generation 校验。
+- `apps/desktop/src/renderer/features/search/query-view.ts` 和 Dashboard helper 属于 renderer 内部模块。不要把它们当作 preload API，也不要从 Main 进程导入。
 - 状态机仍以 `FoxApp`、`QueryApp`、`DashboardApp` 和 `overlay-controller` 为权威；叶子函数不能通过 CSS 或副作用偷偷改变状态优先级。
 
 ## 2. Query 视图叶子
 
-位置：`src/renderer/features/search/query-view.ts`
+位置：`apps/desktop/src/renderer/features/search/query-view.ts`
 
 | 符号 | 输入 | 输出 / 合同 |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 ## 3. Shared overlay command 工厂
 
-位置：`src/shared/overlay-events.ts`
+位置：`apps/desktop/src/shared/overlay-events.ts`
 
 | 工厂 | 产生的协议命令 | 约束 |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 ## 4. Query layout ACK helper
 
-位置：`src/shared/query-layout.ts`
+位置：`apps/desktop/src/shared/query-layout.ts`
 
 | 符号 | 用途 |
 | --- | --- |
@@ -75,13 +75,13 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 ### 5.1 Manifest 与导航
 
-位置：`src/renderer/data/dashboard-manifest.ts`
+位置：`apps/desktop/src/renderer/data/dashboard-manifest.ts`
 
 - `nextDashboardNavId(active, delta)` 在 `DASHBOARD_NAV` 中循环移动，调用方传入整数步长（当前键盘路径使用 `-1` / `+1`）。它只返回已有导航 id，不创建新路由。
 
 ### 5.2 外观与 tooltip 几何
 
-位置：`src/renderer/lib/dashboard-appearance.ts`
+位置：`apps/desktop/src/renderer/lib/dashboard-appearance.ts`
 
 - `systemPrefersDark()` 在 `matchMedia` 可用时读取系统深色偏好，在无 DOM / 无该 API 的测试环境返回 `false`。renderer 入口用它计算初始主题；Dashboard 组件仍负责监听后续系统主题变化。
 - `dashboardNavTooltipPosition({ right, top, height })` 将 tooltip 放到导航项右侧 10px、垂直中心位置。它只返回位置，不负责显示、计时或 ARIA 关联。
@@ -90,17 +90,17 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 ## 6. Fox presence 运行时
 
-位置：`src/renderer/lib/fox-presence-runtime.ts`
+位置：`apps/desktop/src/renderer/lib/fox-presence-runtime.ts`
 
 - `FoxSleepClock` 独占睡眠 timer、deadline 与 token 生命周期；它消费 shared 的纯 schedule helper，但只在 renderer 创建或清理计时器。
 - `writeFoxCssVars` 把已经解析的姿态数值写入 Fox 元素的 CSS variables；Main、preload 与 shared 不持有 DOM 引用。
-- `src/shared/fox-presence.ts` 继续只负责姿态优先级、跟随/拖拽数值、睡眠 deadline 等纯计算。
+- `apps/desktop/src/shared/fox-presence.ts` 继续只负责姿态优先级、跟随/拖拽数值、睡眠 deadline 等纯计算。
 
 该拆分是依赖方向约束，不是新的跨窗口 API。改变睡眠阈值或姿态优先级时仍需同时验证 shared 纯函数和 `FoxApp` 生命周期。
 
 ## 7. Test-only harness
 
-位置：`src/main/overlay-test-harness.ts`
+位置：`apps/desktop/src/main/overlay-test-harness.ts`
 
 `isTestHarnessEnabled()` 仅在 `DEMO_E2E=1` 或命令行包含 `--demo-e2e` 时返回 true。`attachTestHarness(controller)` 在启用时把非枚举的 `globalThis.__demoTest` 绑定到 Electron 主进程，用于 E2E 的展开、收起、窗口快照、布局回执和阶段报告。
 
@@ -114,17 +114,17 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 | 范围 | 测试 |
 | --- | --- |
-| Query 视图 helper | `tests/unit/query-view.test.ts`、`tests/unit/query-visual.test.ts` |
-| Shared overlay command | `tests/unit/overlay-events.test.ts` |
-| Query layout ACK | `tests/unit/query-layout.test.ts` |
-| Dashboard manifest / 外观 | `tests/unit/dashboard-manifest.test.ts`、`tests/unit/dashboard-appearance.test.ts` |
-| Fox presence 纯逻辑 / renderer runtime | `tests/unit/fox-presence.test.ts`、`tests/component/FoxApp.test.tsx` |
-| Test-only harness | `tests/unit/overlay-test-harness.test.ts` |
+| Query 视图 helper | `apps/desktop/tests/unit/query-view.test.ts`、`apps/desktop/tests/unit/query-visual.test.ts` |
+| Shared overlay command | `apps/desktop/tests/unit/overlay-events.test.ts` |
+| Query layout ACK | `apps/desktop/tests/unit/query-layout.test.ts` |
+| Dashboard manifest / 外观 | `apps/desktop/tests/unit/dashboard-manifest.test.ts`、`apps/desktop/tests/unit/dashboard-appearance.test.ts` |
+| Fox presence 纯逻辑 / renderer runtime | `apps/desktop/tests/unit/fox-presence.test.ts`、`apps/desktop/tests/component/FoxApp.test.tsx` |
+| Test-only harness | `apps/desktop/tests/unit/overlay-test-harness.test.ts` |
 
 推荐先跑窄反馈环：
 
 ```bash
-pnpm exec vitest run \
+pnpm --filter @customer-agent/desktop exec vitest run \
   tests/unit/query-view.test.ts \
   tests/unit/overlay-events.test.ts \
   tests/unit/query-layout.test.ts \

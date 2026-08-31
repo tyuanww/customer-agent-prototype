@@ -5,11 +5,12 @@
 > **开始日期：** 2026-08-31
 > **组织门输入：** `DEC-DDEV-01=PASS`，证据索引 `EVD-DDEV-AUTH-20260831`
 > **产品仓开工输入：** 用户已明确授权“开工授权 / DEV-M0 产品仓开工授权”
-> **当前切片：** `DEV-M0-W0 · pre-move baseline + workspace scaffold`
-> **提交输入：** 用户于 2026-08-31 明确给出“产品仓 W0 提交授权”；该授权不包含推送、PR、合并、部署或 W1
+> **当前切片：** `DEV-M0-W1 · desktop mechanical move`
+> **W1 开工输入：** 用户于 2026-08-31 明确给出“产品仓 W1 分支创建与开工授权（基于 6111272）”；该授权不包含 W1 提交、推送、PR、合并、部署或后续正式能力切片
+> **W0 历史输入：** 用户曾明确给出“产品仓 W0 提交授权”；W0 已通过独立 Git 门完成，不自动扩张到 W1
 > **不代表：** 真实数据、飞书运行接入、Pilot、付费调用、自动发送、部署或发布授权；本记录的状态本身不扩张任何 Git 权限
 
-## 1. 本切片的目标与边界
+## 1. W0 目标与边界（历史基线）
 
 目标是在不改变现有 Electron 行为的前提下，固定机械迁移前的可重放基线，并建立唯一 Monorepo 的根策略与 `apps/desktop` 目标位。
 
@@ -17,14 +18,14 @@
 
 写入所有者是根 workspace 策略、`scripts/workspace-hygiene.mjs` 与迁移前 E2E 证据；现有 Electron main / preload / renderer 的所有权和信任边界不变。
 
-## 2. 边界方案
+## 2. W0 边界方案
 
 | 方案 | 结果 | 原因 |
 | --- | --- | --- |
 | A：保留根应用，只声明 workspace globs、固定工具链并创建 `apps/desktop` 目标位 | **采用** | scaffold 与 mechanical move 分离；没有行为变化，也不会出现双入口 |
 | B：同时创建 desktop/API/DB package manifest，并让根脚本转发 | 不采用 | 会提前制造空包和 pass-through 层，并把目录迁移、配置改写与正式能力混入同一变更 |
 
-## 3. 修改前基线
+## 3. W0 修改前基线
 
 运行环境：Node.js `v24.19.0`、pnpm `11.19.0`。
 
@@ -39,7 +40,7 @@
 
 修改前基线未重新生成安装包；修改后补跑了本地未签名 macOS 包，见第 5 节。签名、公证、Windows 真机和生产验证均未运行，且不能由 macOS 本地构建代替。
 
-## 4. 当前实现事实
+## 4. W0 实现事实
 
 - `pnpm-workspace.yaml` 声明 `apps/*` 与 `packages/*`，但当前可运行应用仍在根目录；不存在第二套运行入口。
 - 根 `packageManager` 与 `engines.pnpm` 统一固定为 `pnpm@11.19.0`；Node 继续限定为 24.x。
@@ -48,7 +49,7 @@
 - 已接收合同仍固定为 `cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c`；本切片保持 `ddev_authorized=false`、`runtime_activated=false`，不把组织开工授权误写成运行时激活。
 - 迁移前 E2E 会先确认 Dashboard / Query 的 Electron 原生窗口和 WebContents 均已获得焦点，再验证“关闭当前表面”；空闲 Fox 按产品行为继续由 `showInactive()` 恢复，不伪造焦点。测试快照容忍且仅容忍已确认销毁的并发关窗对象，不修改窗口运行逻辑。
 
-## 5. 修改后验证
+## 5. W0 修改后验证
 
 | 命令 | 结果 |
 | --- | --- |
@@ -65,8 +66,41 @@
 
 修改后的 E2E 回归依次捕获并修正了三处测试前置问题：`Page.bringToFront()` 与原生焦点不同步；窗口可能在 `BrowserWindow.getAllWindows()` 枚举后、属性读取前被原生关闭；以及空闲 Fox 的 `showInactive()` 行为不应被强行断言为已聚焦。最终只对 Dashboard / Query 等可关闭表面等待原生焦点，空闲 Fox 按真实非激活状态验证 no-op；快照读取仅在窗口或 WebContents 已确认销毁时跳过对象，其他异常继续抛出。期间另有一次无 trace 的测试进程 90 秒 teardown 超时，后续定向与全量复跑未复现；最终可重放结果为目标用例 20/20、全量 14/14。提交前的追加复跑在活动桌面上捕获到测试预设外的本机 IME 输入，因此按环境污染留档，不作为回归失败，也不继续运行会抢占真实键盘的原生焦点测试。
 
-## 6. 下一切片
+## 6. W1 目标与边界
 
-下一切片是独立的 mechanical move：把当前根 Electron 应用原样迁入 `apps/desktop`，修正导入、脚本与测试配置，并以与第 3 节相同的质量门证明行为等价。完成该结构变更后，才进入合同开发授权、codegen / runtime validation，以及 API/config/DB 的后续 DEV-M0 切片。
+W1 从已合并的 W0 基线 `6111272faf1adf9b2e457f9d6458c884480d06f6` 开始，只做一次可审查的机械迁移：把现有 Electron 源码、测试、资产、构建配置和打包脚本原样移入 `apps/desktop`，同时保持根命令稳定，并以 W0 同级质量门证明行为等价。
+
+写入所有者分成两层：`apps/desktop` 唯一拥有桌面运行时、测试、资产、构建和打包知识；根 workspace 只拥有稳定命令门面、合同接收与 workspace 卫生策略。W1 不新增 API、worker、DB、OAuth、遥测、真实数据、UI 行为或 IPC 能力，也不激活正式合同运行时。
+
+## 7. W1 实现事实
+
+- `src/`、`tests/`、`assets/`、`build/`、Electron/Vite/Vitest/Playwright/TypeScript 配置、品牌文件、许可声明与平台打包脚本已迁入 `apps/desktop/`；测试和源码保持同包相对依赖。
+- `apps/desktop/package.json` 是唯一桌面产品 manifest 与产品版本写入点，包名为 `@customer-agent/desktop`；根 `package.json` 不再声明版本，只转发稳定开发 / 验证 / 打包命令，并直接拥有仓级 lint、合同与 workspace 工具；`.gstack/package-json-path` 把后续 `/ship` 版本操作固定到桌面产品 manifest。
+- Node / pnpm 工具链只由根 manifest 与仓级卫生门拥有，桌面产品 manifest 不复制工具链约束，避免双写漂移。
+- Electron 构建输出迁为 `apps/desktop/out/`；本地或正式安装包仍按既有外部产物合同写入根 `release/`，不产生第二套发布目录。
+- workspace 卫生门现在验证 `apps/desktop` 的真实目录、manifest、名称、私有属性与无工具链覆盖，以及产品版本清单固定点和根门面无版本约束；同时分别识别当前 app 产物与 W0 根目录遗留可再生成项（含旧 `build/icon.*`）。
+- main / preload / renderer / shared 的代码内容、IPC 白名单、sender / role 门禁、sandbox 配置、合成 fixture 和复制语义均未扩张。
+- 正式合同仍是 `VERIFIED_NOT_ACTIVATED`，`ddev_authorized=false`、`runtime_activated=false`。
+
+## 8. W1 验证
+
+运行环境：Node.js `v24.19.0`、pnpm `11.19.0`。
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm install --offline` | PASS；2 个 workspace project，0 下载，锁文件与本地依赖图一致 |
+| `pnpm lint` | PASS；根级仓库扫描，零 warning |
+| `pnpm typecheck` | PASS |
+| `pnpm test` | PASS，51 files / 506 tests；包含 macOS / Windows 打包路径合同 |
+| `pnpm build` | PASS；输出 `apps/desktop/out/main`、`preload`、`renderer` |
+| `pnpm workspace:check` | PASS；root policy PASS，source budget 7.20 MiB / 32.0 MiB |
+| `pnpm contracts:verify` | PASS；合同集、来源 SHA 与双哈希通过，仍未激活 |
+| `pnpm test:e2e` | PASS，14/14；真实 Electron 窗口、IPC、复制与 Dashboard 路径在迁移后保持等价 |
+
+W1 未生成 DMG、ZIP 或 Windows 安装包；打包路径和资源合同已由全量测试覆盖，但这不等于实际产包、签名、公证、Windows 真机、部署或发布证据。
+
+## 9. 下一切片
+
+W1 工作树需先经过独立提交、推送、PR 与合并门；本次开工授权不代替这些 Git 授权。W1 落库后，下一项产品能力仍应单独授权：先处理合同开发授权、codegen / runtime validation，再进入 API/config/DB 的后续 `DEV-M0` 纵向切片。
 
 本记录只保存产品仓实施事实；项目总进度与授权状态继续由 `ai-赋能立项` 当前真源拥有。

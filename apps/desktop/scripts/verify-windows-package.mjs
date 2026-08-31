@@ -57,12 +57,13 @@ function isForbiddenUpdateMetadata(relativePath) {
 }
 
 export function verifyWindowsPackage(options = {}) {
-  const projectRoot = options.root ?? path.resolve(
+  const desktopRoot = options.root ?? path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     '..',
   );
+  const repositoryRoot = options.repositoryRoot ?? path.resolve(desktopRoot, '../..');
   const outputDirectory = options.outputDirectory ?? path.join(
-    projectRoot,
+    repositoryRoot,
     WINDOWS_LOCAL_UNSIGNED_OUTPUT,
   );
   requireDirectory(outputDirectory, 'Windows local-unsigned output directory');
@@ -102,7 +103,7 @@ export function verifyWindowsPackage(options = {}) {
   requireDirectory(unpackedDirectory, 'win-unpacked application directory');
   requireDirectory(resourcesDirectory, 'win-unpacked resources directory');
 
-  const expectedIcon = path.join(projectRoot, 'build', 'icon.ico');
+  const expectedIcon = path.join(desktopRoot, 'build', 'icon.ico');
   const packagedIcon = path.join(resourcesDirectory, 'icon.ico');
   requireNonEmptyFile(expectedIcon, 'generated Windows brand icon');
   requireNonEmptyFile(packagedIcon, 'packaged Windows brand icon');

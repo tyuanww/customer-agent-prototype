@@ -11,9 +11,12 @@ if (process.platform !== 'darwin') {
   throw new Error('macOS packages must be built on macOS.');
 }
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outputDirectory =
-  mode === 'local' ? 'release/local-unsigned' : 'release/distribution';
+const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = path.resolve(desktopRoot, '../..');
+const outputDirectory = path.relative(
+  desktopRoot,
+  path.join(repositoryRoot, 'release', mode === 'local' ? 'local-unsigned' : 'distribution'),
+);
 const systemCa = prepareNodeSystemCaEnvironment();
 
 try {
@@ -24,12 +27,12 @@ try {
   }
 
   execFileSync('pnpm', ['generate:app-icons'], {
-    cwd: root,
+    cwd: desktopRoot,
     env: buildEnvironment,
     stdio: 'inherit',
   });
   execFileSync('pnpm', ['build'], {
-    cwd: root,
+    cwd: desktopRoot,
     env: buildEnvironment,
     stdio: 'inherit',
   });
@@ -50,17 +53,17 @@ try {
   }
 
   execFileSync('electron-builder', builderArguments, {
-    cwd: root,
+    cwd: desktopRoot,
     env: buildEnvironment,
     stdio: 'inherit',
   });
   execFileSync(process.execPath, ['scripts/finalize-mac-package.mjs', mode], {
-    cwd: root,
+    cwd: desktopRoot,
     env: buildEnvironment,
     stdio: 'inherit',
   });
   execFileSync(process.execPath, ['scripts/verify-mac-package.mjs', mode], {
-    cwd: root,
+    cwd: desktopRoot,
     env: buildEnvironment,
     stdio: 'inherit',
   });

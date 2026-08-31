@@ -2,9 +2,13 @@ node_modules/
 dist/
 out/
 release/
-build/icon.icns
-build/icon.png
-build/icon.ico
+/apps/desktop/build/icon.icns
+/apps/desktop/build/icon.png
+/apps/desktop/build/icon.ico
+# W0 检出可能保留迁移前的忽略产物；继续忽略并由 workspace clean 精确清除。
+/build/icon.icns
+/build/icon.png
+/build/icon.ico
 playwright-report/
 test-results/
 coverage/
@@ -24,5 +28,6 @@ electron-builder.env.*
 # must never enter this repository or a release artifact.
 /clawd-on-desk-0.15.0.zip
 
-# gstack 的运行输出留在本机；冻结验收证据放在 evidence/qa/。
-.gstack/
+# gstack 的运行输出留在本机；仅跟踪产品版本清单定位，冻结验收证据放在 evidence/qa/。
+.gstack/*
+!.gstack/package-json-path

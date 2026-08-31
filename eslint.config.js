@@ -7,13 +7,15 @@ import globals from 'globals';
 export default tseslint.config(
   {
     ignores: [
-      'out/**',
-      'dist/**',
+      '**/out/**',
+      '**/dist/**',
       'release/**',
-      'coverage/**',
-      'playwright-report/**',
-      'test-results/**',
-      'node_modules/**',
+      '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
+      '**/node_modules/**',
+      '.codegraph/**',
+      '.gstack/**',
     ],
   },
   eslint.configs.recommended,

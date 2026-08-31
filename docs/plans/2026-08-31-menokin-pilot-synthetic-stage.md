@@ -16,8 +16,8 @@ Menokin 是当前唯一客服试点。本阶段继续完善现有 Fox → Query 
 
 ## 2. 允许范围
 
-- `src/renderer/` 内的 UI、交互、可访问性、ViewModel 与纯合成视觉状态；
-- `src/shared/` 内不产生 I/O 的类型、validator、状态模型、几何和纯函数；
+- `apps/desktop/src/renderer/` 内的 UI、交互、可访问性、ViewModel 与纯合成视觉状态；
+- `apps/desktop/src/shared/` 内不产生 I/O 的类型、validator、状态模型、几何和纯函数；
 - 现有窄白名单边界内的 Fox / Query preload 适配与 Main 原生桌面行为；不得扩成通用 IPC；
 - 编译期、深冻结、完全虚构的 fixture / manifest；
 - unit、component、Electron E2E、构建、workspace hygiene、开发诊断与文档；

@@ -53,13 +53,13 @@ pnpm -v    # 成功标志：11.19.x
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm exec install-electron
+pnpm electron:install
 ```
 
 | 步骤 | 可观察成功标志 |
 | --- | --- |
 | `pnpm install --frozen-lockfile` | 结束码 0；没有改写 `pnpm-lock.yaml`；`node_modules/` 就位 |
-| `pnpm exec install-electron` | 显式准备本仓锁定版本的 Electron 桌面运行时。成功时后续 `pnpm dev` 能启动窗口，而不是报缺少 Electron 二进制 |
+| `pnpm electron:install` | 在 `apps/desktop` 显式准备本仓锁定版本的 Electron 桌面运行时。成功时后续根命令 `pnpm dev` 能启动窗口，而不是报缺少 Electron 二进制 |
 
 应用不访问外部业务网络。`pnpm install` 只拉注册表依赖；`pnpm dev` 只连本机 Vite / HMR。
 

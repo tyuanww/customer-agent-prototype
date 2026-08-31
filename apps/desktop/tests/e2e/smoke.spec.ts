@@ -15,9 +15,10 @@ import {
 } from '../../src/shared/fox-motion';
 import { SYNTHETIC_SCRIPTS } from '../../src/renderer/data/synthetic-scripts';
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const mainEntry = path.join(repoRoot, 'out/main/index.js');
-const screenshotDir = path.join(repoRoot, '.gstack/qa-reports/screenshots');
+const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repositoryRoot = path.resolve(desktopRoot, '../..');
+const mainEntry = path.join(desktopRoot, 'out/main/index.js');
+const screenshotDir = path.join(repositoryRoot, '.gstack/qa-reports/screenshots');
 const CLEANSER_QUERY = '澄芽氨基酸洁面怎么用';
 const VERBATIM_TAIL = '合成原文保留尾部空格与换行  \n\n';
 let launchSequence = 0;
@@ -34,7 +35,7 @@ async function launchApp(envOverrides: NodeJS.ProcessEnv = {}): Promise<Electron
   launchSequence += 1;
   try {
     const app = await electron.launch({
-      cwd: repoRoot,
+      cwd: desktopRoot,
       args: [`--user-data-dir=${userDataDir}`, mainEntry, '--demo-e2e'],
       env: {
         ...process.env,

@@ -89,10 +89,10 @@ describe('desktop menu model', () => {
     expect(
       trayIconPath({
         isPackaged: false,
-        appPath: '/repo/customer-agent-prototype',
+        appPath: '/repo/customer-agent-prototype/apps/desktop',
         resourcesPath: '/Applications/Demo.app/Contents/Resources',
       }),
-    ).toBe(join('/repo/customer-agent-prototype', 'fox-head.png'));
+    ).toBe(join('/repo/customer-agent-prototype/apps/desktop', 'fox-head.png'));
     expect(
       trayIconPath({
         isPackaged: true,
@@ -103,12 +103,12 @@ describe('desktop menu model', () => {
     expect(
       trayIconCandidates({
         isPackaged: false,
-        appPath: '/repo/customer-agent-prototype/out/main',
+        appPath: '/repo/customer-agent-prototype/apps/desktop/out/main',
         resourcesPath: '/Electron.app/Contents/Resources',
       }),
     ).toEqual([
-      join('/repo/customer-agent-prototype/out/main', 'fox-head.png'),
-      join('/repo/customer-agent-prototype', 'fox-head.png'),
+      join('/repo/customer-agent-prototype/apps/desktop/out/main', 'fox-head.png'),
+      join('/repo/customer-agent-prototype/apps/desktop', 'fox-head.png'),
     ]);
   });
 });

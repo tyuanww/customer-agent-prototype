@@ -42,7 +42,7 @@ type ContractSetModule = Readonly<{
   }>;
 }>;
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const OPENAPI_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/openapi.v1.yaml';
 const DATABASE_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/33-schema-v1-草案.sql';
 const temporaryRoots: string[] = [];
@@ -50,7 +50,7 @@ let contractSet: ContractSetModule;
 
 beforeAll(async () => {
   contractSet = await import(
-    pathToFileURL(path.join(root, 'scripts/customer-agent-contract-set.mjs')).href
+    pathToFileURL(path.join(repositoryRoot, 'scripts/customer-agent-contract-set.mjs')).href
   ) as ContractSetModule;
 });
 
@@ -392,7 +392,7 @@ describe('customer-agent contract-set intake', () => {
   });
 
   it('verifies the repository snapshot without enabling Ddev or runtime use', () => {
-    const verified = contractSet.verifyIngestedContractSet({ projectRoot: root });
+    const verified = contractSet.verifyIngestedContractSet({ projectRoot: repositoryRoot });
     const manifestBytes = readFileSync(path.join(verified.path, 'contract-set.json'));
     const manifest = JSON.parse(manifestBytes.toString('utf8')) as Record<string, unknown>;
 

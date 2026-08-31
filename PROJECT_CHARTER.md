@@ -2,7 +2,7 @@
 
 > **生效：** 2026-08-21
 > **仓库身份：** 客服 Agent 产品实施仓
-> **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 已于 2026-08-31 开工，当前切片为 workspace scaffold；可运行应用仍是 `PILOT-S0 · SYNTHETIC` 合成基线
+> **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 已于 2026-08-31 开工，`DEV-M0-W1` 已把现有 Electron 应用机械迁入唯一桌面包 `apps/desktop`；可运行能力仍是 `PILOT-S0 · SYNTHETIC` 合成基线
 > **目录名说明：** `customer-agent-prototype` 是历史目录名，不再代表仓库只做原型。
 
 ## 1. 两个仓库各自负责什么
@@ -32,8 +32,8 @@
 ### 当前推进：`DEV-M0 · IN_PROGRESS`（2026-08-31 开始）
 
 - 项目记录仓已签发 `DEC-DDEV-01=PASS`，用户已明确给出产品仓开工授权；本仓只能在批准的 `DEV-M0` 开发 / 测试范围内推进。
-- 当前只完成 pre-move 基线和 workspace scaffold；根目录仍是唯一可运行 Electron 应用，`apps/desktop` 只是下一次机械迁移的目标位。
-- 正式合同快照仍保持 `ddev_authorized=false`、`runtime_activated=false`；合同开发激活、codegen、migration 和 API/config 骨架须按独立切片依次验证。
+- W0 pre-move 基线与 workspace scaffold 已留作历史；W1 已把原 Electron 源码、测试、资产、配置和打包脚本原样迁入唯一可运行包 `apps/desktop`，根目录只保留 workspace 命令门面与仓级合同 / 卫生工具；产品版本也只由 `apps/desktop/package.json` 拥有。
+- 正式合同快照仍保持 `ddev_authorized=false`、`runtime_activated=false`；W1 不包含合同开发激活、codegen、migration 或 API/config 骨架，这些仍须按独立切片依次授权和验证。
 - 真实数据、飞书运行接入、Pilot、付费、遥测、自动发送、部署和发布均未放行。
 
 ### 保留开发基线：`PILOT-S0 · SYNTHETIC`

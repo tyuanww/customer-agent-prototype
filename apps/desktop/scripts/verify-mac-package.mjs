@@ -9,9 +9,10 @@ if (mode !== 'local' && mode !== 'distribution') {
   throw new Error('Usage: node scripts/verify-mac-package.mjs <local|distribution>');
 }
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = path.resolve(desktopRoot, '../..');
 const outputDir = path.join(
-  root,
+  repositoryRoot,
   'release',
   mode === 'local' ? 'local-unsigned' : 'distribution',
 );
@@ -51,7 +52,7 @@ for (const relativePath of [
   }
 }
 
-const expectedBrandIcon = path.join(root, 'build', 'icon.icns');
+const expectedBrandIcon = path.join(desktopRoot, 'build', 'icon.icns');
 verifyMacPackageBrandGate({ infoPlist, resourcesDirectory: resources, expectedBrandIcon });
 
 for (const forbiddenKey of [

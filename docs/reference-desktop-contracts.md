@@ -1,6 +1,6 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `src/` 与 `package.json` 为准。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 
@@ -8,7 +8,7 @@
 
 ## 1. 三个窗口的职责与安全配置
 
-三个 `BrowserWindow`，同一份 renderer 入口 `src/renderer/index.html`，用 `?role=` 分流（`src/renderer/lib/window-role.ts`）。
+三个 `BrowserWindow`，同一份 renderer 入口 `apps/desktop/src/renderer/index.html`，用 `?role=` 分流（`apps/desktop/src/renderer/lib/window-role.ts`）。
 
 | | Fox | Query | Dashboard |
 | --- | --- | --- | --- |
@@ -17,14 +17,14 @@
 | 典型尺寸 | 88×88（`FOX_SIZE`） | 宽 600；高见第 4 节 | 1180×760，最小 980×680 |
 | frame / 透明 / 置顶 | frameless、透明、`alwaysOnTop`、`skipTaskbar` | 同左；`resizable: false` | 标准 frame、不透明、非置顶、显示任务栏 |
 | macOS 形态 | 默认可为 `panel` + `hiddenInMissionControl` | `macPanel: false`，保持 regular Dock | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
-| preload | `src/preload/index.ts` → `out/preload/index.cjs` | 同左 | **无 preload** |
+| preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | **无 preload** |
 | `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无** |
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
 | webPreferences | `contextIsolation: true` `sandbox: true` `nodeIntegration: false` `spellcheck: false` | 同左；Query 另设 `backgroundThrottling: false` | `DASHBOARD_WINDOW_SECURITY`：同样三项 + `spellcheck: false`，**不设 preload** |
 
 共同锁定（`lockRendererWindow`）：拒绝 `window.open`、拦截 `will-navigate`、拦截 `will-attach-webview`。会话级（`applySessionSecurity`）：权限请求 / 权限检查一律 false。
 
-CSP（`src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；本仓也没有 main-process HTTP adapter。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
+CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；本仓也没有 main-process HTTP adapter。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
 
 ---
 
@@ -50,7 +50,7 @@ CSP（`src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许�
 
 preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `send` / `on` / `invoke`。
 
-白名单（`src/shared/ipc-channels.ts`）：
+白名单（`apps/desktop/src/shared/ipc-channels.ts`）：
 
 | Channel | 方向 | 额外门禁 |
 | --- | --- | --- |
@@ -163,15 +163,15 @@ macOS 台前调度可能把后台透明窗限制在 Electron `screen.workArea` �
 
 | 角色 | 路径 | 谁用 |
 | --- | --- | --- |
-| Raster canonical | `assets/fox-head-master.png`（1254 RGBA） | `pnpm generate:fox-head` 的输入 |
-| 共享透明狐狸 | `fox-head.png`（与 master 字节一致派生） | Float / Query / Tray / Dashboard 浅色 |
-| Dashboard 深色耳麦 | `src/renderer/assets/dashboard-fox-headset-dark.png` | 只改耳麦，狐狸本体不反色 |
-| App / Dock master | `assets/app-icon.png`（1024，近白 squircle） | 开发态 `app.dock.setIcon`；再派生 build 图标 |
-| 打包图标 | `build/icon.png`、`build/icon.ico`、`build/icon.icns` | electron-builder / 包内 Resources |
+| Raster canonical | `apps/desktop/assets/fox-head-master.png`（1254 RGBA） | `pnpm generate:fox-head` 的输入 |
+| 共享透明狐狸 | `apps/desktop/fox-head.png`（与 master 字节一致派生） | Float / Query / Tray / Dashboard 浅色 |
+| Dashboard 深色耳麦 | `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png` | 只改耳麦，狐狸本体不反色 |
+| App / Dock master | `apps/desktop/assets/app-icon.png`（1024，近白 squircle） | 开发态 `app.dock.setIcon`；再派生 build 图标 |
+| 打包图标 | `apps/desktop/build/icon.png`、`apps/desktop/build/icon.ico`、`apps/desktop/build/icon.icns` | electron-builder / 包内 Resources |
 
 `pnpm generate:fox-head` **默认**在写出共享 PNG 与深色耳麦后调用 `generateAppIcons`，因此也会派生 App / Dock master、PNG 与 ICO；仅在 macOS 上继续生成 ICNS。`--skip-icons` 才跳过。`--qa` 另写 `evidence/qa/2026-08-17-approved-fox/` 五张小图，那些小图不是 canonical。
 
-开发态不要把透明 `fox-head.png` 设为 Dock 图标；Tray 不要用白底 Dock 图。
+开发态不要把透明 `apps/desktop/fox-head.png` 设为 Dock 图标；Tray 不要用白底 Dock 图。
 
 ---
 
@@ -179,17 +179,17 @@ macOS 台前调度可能把后台透明窗限制在 Electron `screen.workArea` �
 
 | 模块 | 合同 |
 | --- | --- |
-| `src/main/shutdown-fence.ts` | `begin()` 后 `isShuttingDown()` 永真 |
+| `apps/desktop/src/main/shutdown-fence.ts` | `begin()` 后 `isShuttingDown()` 永真 |
 | `isInactiveOverlay` | `disposed \|\| fence` |
 | `GuardedScheduler` | dispose 后不再调度；回调前再查 disposed |
-| `applyApplicationIdentity` | macOS `regular` activation；unpackaged 用 `assets/app-icon.png`；shutdown 中途停止 |
+| `applyApplicationIdentity` | macOS `regular` activation；unpackaged 用 `apps/desktop/assets/app-icon.png`；shutdown 中途停止 |
 | `desktop-lifecycle` | 就绪后的 `activate` 打开 Dashboard；启动期不听 activate；second-instance 在就绪前 defer |
 
 ---
 
 ## 11. 公开 scripts 和模块图
 
-### package.json scripts
+### 根命令与桌面 package scripts
 
 | script | 实现 |
 | --- | --- |
@@ -199,47 +199,47 @@ macOS 台前调度可能把后台透明窗限制在 Electron `screen.workArea` �
 | `test:assets` | 只跑资产合同测试 |
 | `test:e2e:float` | `pnpm build && playwright … --grep @float` |
 | `test:e2e` | `pnpm build && playwright test` |
-| `build` | `electron-vite build` → `out/` |
-| `generate:fox-head` | `scripts/generate-fox-head.mjs` |
-| `generate:app-icons` | `scripts/generate-app-icons.mjs` |
-| `generate:mac-icon` | `scripts/generate-mac-icon.sh`（从 `assets/app-icon.png` 做 ICNS） |
+| `build` | `electron-vite build` → `apps/desktop/out/` |
+| `generate:fox-head` | `apps/desktop/scripts/generate-fox-head.mjs` |
+| `generate:app-icons` | `apps/desktop/scripts/generate-app-icons.mjs` |
+| `generate:mac-icon` | `apps/desktop/scripts/generate-mac-icon.sh`（从 `apps/desktop/assets/app-icon.png` 做 ICNS） |
 | `preview` | `electron-vite preview` |
-| `package:mac:local` | `scripts/package-macos.mjs local` |
+| `package:mac:local` | `apps/desktop/scripts/package-macos.mjs local` |
 | `package:mac` | `verify-mac-release-env.mjs` + `package-macos.mjs distribution` |
-| `package:win` | `scripts/package-windows.mjs local` |
+| `package:win` | `apps/desktop/scripts/package-windows.mjs local` |
 
 ### 源码分层
 
 ```text
-src/main/main.ts                 单实例、CSP、identity、IPC、fence、shell
-src/main/overlay-controller.ts   三窗、handoff、layout、drag、Dashboard
-src/main/overlay-ipc.ts          overlay / dashboard invoke 门禁
-src/main/clipboard-ipc.ts        复制门禁
-src/main/sender-guard.ts         trusted + main-frame
-src/main/window-security.ts      导航 / 权限锁
-src/main/dashboard-window.ts     无 preload 的标准窗
-src/main/dashboard-open-failure.ts 原生失败对话框
-src/main/desktop-shell.ts        菜单 / Tray
-src/main/desktop-lifecycle.ts    Dock activate / 二次启动
-src/main/app-identity.ts         Dock / 品牌图
-src/main/shutdown-fence.ts
-src/main/guarded-scheduler.ts
-src/preload/index.ts             customerAgent 白名单
-src/shared/                      合同、几何、状态机、IPC 名
-src/renderer/FoxApp.tsx
-src/renderer/QueryApp.tsx
-src/renderer/DashboardApp.tsx
-src/renderer/data/               合成 fixture / manifest
-scripts/verify-*-package.mjs     打包后验
-scripts/verify-mac-release-env.mjs 正式外发前置（当前会因 local.demo appId 失败）
+apps/desktop/src/main/main.ts                 单实例、CSP、identity、IPC、fence、shell
+apps/desktop/src/main/overlay-controller.ts   三窗、handoff、layout、drag、Dashboard
+apps/desktop/src/main/overlay-ipc.ts          overlay / dashboard invoke 门禁
+apps/desktop/src/main/clipboard-ipc.ts        复制门禁
+apps/desktop/src/main/sender-guard.ts         trusted + main-frame
+apps/desktop/src/main/window-security.ts      导航 / 权限锁
+apps/desktop/src/main/dashboard-window.ts     无 preload 的标准窗
+apps/desktop/src/main/dashboard-open-failure.ts 原生失败对话框
+apps/desktop/src/main/desktop-shell.ts        菜单 / Tray
+apps/desktop/src/main/desktop-lifecycle.ts    Dock activate / 二次启动
+apps/desktop/src/main/app-identity.ts         Dock / 品牌图
+apps/desktop/src/main/shutdown-fence.ts
+apps/desktop/src/main/guarded-scheduler.ts
+apps/desktop/src/preload/index.ts             customerAgent 白名单
+apps/desktop/src/shared/                      合同、几何、状态机、IPC 名
+apps/desktop/src/renderer/FoxApp.tsx
+apps/desktop/src/renderer/QueryApp.tsx
+apps/desktop/src/renderer/DashboardApp.tsx
+apps/desktop/src/renderer/data/               合成 fixture / manifest
+apps/desktop/scripts/verify-*-package.mjs     打包后验
+apps/desktop/scripts/verify-mac-release-env.mjs 正式外发前置（当前会因 local.demo appId 失败）
 ```
 
 ### 构建产物（`pnpm build`）
 
 | 入口 | 输出 |
 | --- | --- |
-| `src/main/main.ts` | `out/main/index.js` |
-| `src/preload/index.ts` | `out/preload/index.cjs` |
-| `src/renderer/index.html` | `out/renderer/` |
+| `apps/desktop/src/main/main.ts` | `apps/desktop/out/main/index.js` |
+| `apps/desktop/src/preload/index.ts` | `apps/desktop/out/preload/index.cjs` |
+| `apps/desktop/src/renderer/index.html` | `apps/desktop/out/renderer/` |
 
-renderer 无 Node 权限。打包 `files` 只含 `out/**/*` 与 `package.json`；狐狸 PNG 与第三方许可走 `extraResources`。
+renderer 无 Node 权限。`apps/desktop/package.json` 的打包 `files` 只含 package-local `out/**/*` 与 `package.json`；狐狸 PNG 与第三方许可走 `extraResources`。产物在仓库中的实际路径是 `apps/desktop/out/`。

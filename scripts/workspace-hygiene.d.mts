@@ -3,8 +3,14 @@ export type CleanupScope = 'generated' | 'deep';
 export const WORKSPACE_REMAINDER_BUDGET_BYTES: number;
 export const EXPECTED_NODE_RANGE: string;
 export const EXPECTED_PNPM_VERSION: string;
+export const RELEASE_MANIFEST_PATH: string;
+export const GSTACK_PACKAGE_JSON_PIN_PATH: string;
 export const REQUIRED_WORKSPACE_PATTERNS: readonly string[];
 export const REQUIRED_WORKSPACE_DIRECTORIES: readonly string[];
+export const REQUIRED_WORKSPACE_PACKAGES: readonly Readonly<{
+  directory: string;
+  name: string;
+}>[];
 
 export type WorkspaceCategory = Readonly<{
   key: string;

@@ -17,7 +17,7 @@ import {
   parseCliArguments,
   resolveCleanupTarget,
   workspaceInventory,
-} from '../../scripts/workspace-hygiene.mjs';
+} from '../../../../scripts/workspace-hygiene.mjs';
 
 const fixtures: string[] = [];
 
@@ -37,23 +37,36 @@ function createWorkspaceFixture() {
     "packages:\n  - 'apps/*'\n  - 'packages/*'\n",
   );
   mkdirSync(path.join(root, 'apps/desktop'), { recursive: true });
+  writeFileSync(
+    path.join(root, 'apps/desktop/package.json'),
+    JSON.stringify({ name: '@customer-agent/desktop', version: '0.2.0', private: true }),
+  );
   for (const relativePath of [
     'release/local-unsigned/package.bin',
+    'apps/desktop/out/main.js',
+    'apps/desktop/test-results/result.json',
+    'apps/desktop/playwright-report/index.html',
+    'apps/desktop/build/icon.png',
+    'apps/desktop/build/icon.ico',
+    'apps/desktop/build/icon.icns',
+    'apps/desktop/build/entitlements.mac.plist',
+    'apps/desktop/node_modules/.vite/cache.bin',
+    'apps/desktop/node_modules/.vite-temp/cache.bin',
+    'apps/desktop/node_modules/electron/runtime.bin',
+    'apps/desktop/src/main.ts',
+    'apps/desktop/assets/fox.png',
+    // Stale W0 outputs remain safe, explicit cleanup targets after the move.
     'out/main.js',
     'test-results/result.json',
     'playwright-report/index.html',
-    '.gstack/qa-reports/screenshot.png',
     'build/icon.png',
     'build/icon.ico',
     'build/icon.icns',
-    'build/entitlements.mac.plist',
+    '.gstack/qa-reports/screenshot.png',
     'node_modules/.vite/cache.bin',
     'node_modules/.vite-temp/cache.bin',
-    'node_modules/electron/runtime.bin',
     '.codegraph/codegraph.db',
     '.git/HEAD',
-    'src/main.ts',
-    'assets/fox.png',
     'evidence/qa/frozen.png',
     'clawd-on-desk-0.15.0.zip',
   ]) {
@@ -61,6 +74,7 @@ function createWorkspaceFixture() {
     mkdirSync(path.dirname(absolutePath), { recursive: true });
     writeFileSync(absolutePath, relativePath.repeat(4));
   }
+  writeFileSync(path.join(root, '.gstack/package-json-path'), 'apps/desktop/package.json\n');
   return root;
 }
 
@@ -137,6 +151,68 @@ describe('workspace hygiene', () => {
       expected: '24.x',
       actual: '25.8.2',
     }));
+  });
+
+  it('requires the unique private desktop package manifest after the mechanical move', () => {
+    const missingRoot = createWorkspaceFixture();
+    rmSync(path.join(missingRoot, 'apps/desktop/package.json'));
+    expect(checkWorkspacePolicy(missingRoot).violations).toContainEqual(expect.objectContaining({
+      code: 'WORKSPACE_TARGET_MANIFEST_MISSING',
+      path: 'apps/desktop/package.json',
+    }));
+
+    const wrongRoot = createWorkspaceFixture();
+    writeFileSync(
+      path.join(wrongRoot, 'apps/desktop/package.json'),
+      JSON.stringify({
+        name: 'duplicate-root-app',
+        private: false,
+        packageManager: 'pnpm@11.19.0',
+        engines: { node: '>=24 <25' },
+      }),
+    );
+    expect(checkWorkspacePolicy(wrongRoot).violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'WORKSPACE_TARGET_PACKAGE_NAME_MISMATCH' }),
+      expect.objectContaining({ code: 'WORKSPACE_TARGET_PACKAGE_NOT_PRIVATE' }),
+      expect.objectContaining({
+        code: 'WORKSPACE_TARGET_TOOLCHAIN_OVERRIDE_FORBIDDEN',
+        actual: 'packageManager,engines',
+      }),
+    ]));
+  });
+
+  it('pins product version ownership to the desktop release manifest', () => {
+    const rootWithVersion = createWorkspaceFixture();
+    const rootPackage = JSON.parse(readFileSync(path.join(rootWithVersion, 'package.json'), 'utf8'));
+    writeFileSync(
+      path.join(rootWithVersion, 'package.json'),
+      JSON.stringify({ ...rootPackage, version: '0.2.0' }),
+    );
+    expect(checkWorkspacePolicy(rootWithVersion).violations).toContainEqual(
+      expect.objectContaining({ code: 'ROOT_PACKAGE_VERSION_FORBIDDEN' }),
+    );
+
+    const missingPinRoot = createWorkspaceFixture();
+    rmSync(path.join(missingPinRoot, '.gstack/package-json-path'));
+    expect(checkWorkspacePolicy(missingPinRoot).violations).toContainEqual(
+      expect.objectContaining({ code: 'RELEASE_MANIFEST_PIN_MISSING' }),
+    );
+
+    const wrongPinRoot = createWorkspaceFixture();
+    writeFileSync(path.join(wrongPinRoot, '.gstack/package-json-path'), 'package.json\n');
+    expect(checkWorkspacePolicy(wrongPinRoot).violations).toContainEqual(
+      expect.objectContaining({ code: 'RELEASE_MANIFEST_PIN_MISMATCH' }),
+    );
+
+    const unsafePinRoot = createWorkspaceFixture();
+    rmSync(path.join(unsafePinRoot, '.gstack/package-json-path'));
+    symlinkSync(
+      path.join(unsafePinRoot, 'apps/desktop/package.json'),
+      path.join(unsafePinRoot, '.gstack/package-json-path'),
+    );
+    expect(checkWorkspacePolicy(unsafePinRoot).violations).toContainEqual(
+      expect.objectContaining({ code: 'RELEASE_MANIFEST_PIN_UNSAFE' }),
+    );
   });
 
   it('rejects workspace patterns that can cancel or broaden the pinned package set', () => {
@@ -292,7 +368,9 @@ describe('workspace hygiene', () => {
     expect(result.apply).toBe(false);
     expect(result.totalBytes).toBeGreaterThan(0);
     expect(existsSync(path.join(root, 'release/local-unsigned/package.bin'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/desktop/out/main.js'))).toBe(true);
     expect(existsSync(path.join(root, 'out/main.js'))).toBe(true);
+    expect(existsSync(path.join(root, 'build/icon.png'))).toBe(true);
   });
 
   it('removes only allowlisted generated outputs and preserves dependencies and protected content', () => {
@@ -300,17 +378,22 @@ describe('workspace hygiene', () => {
     cleanWorkspace({ projectRoot: root, scope: 'generated', apply: true });
 
     expect(existsSync(path.join(root, 'release/local-unsigned'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/desktop/out'))).toBe(false);
     expect(existsSync(path.join(root, 'out'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/desktop/node_modules/.vite'))).toBe(false);
     expect(existsSync(path.join(root, 'node_modules/.vite'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/desktop/build/icon.png'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/desktop/build/icon.ico'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/desktop/build/icon.icns'))).toBe(false);
     expect(existsSync(path.join(root, 'build/icon.png'))).toBe(false);
     expect(existsSync(path.join(root, 'build/icon.ico'))).toBe(false);
     expect(existsSync(path.join(root, 'build/icon.icns'))).toBe(false);
-    expect(existsSync(path.join(root, 'build/entitlements.mac.plist'))).toBe(true);
-    expect(existsSync(path.join(root, 'node_modules/electron/runtime.bin'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/desktop/build/entitlements.mac.plist'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/desktop/node_modules/electron/runtime.bin'))).toBe(true);
     expect(readFileSync(path.join(root, '.git/HEAD'), 'utf8')).toContain('.git/HEAD');
     expect(existsSync(path.join(root, '.codegraph/codegraph.db'))).toBe(true);
-    expect(existsSync(path.join(root, 'src/main.ts'))).toBe(true);
-    expect(existsSync(path.join(root, 'assets/fox.png'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/desktop/src/main.ts'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/desktop/assets/fox.png'))).toBe(true);
     expect(existsSync(path.join(root, 'evidence/qa/frozen.png'))).toBe(true);
     expect(existsSync(path.join(root, 'clawd-on-desk-0.15.0.zip'))).toBe(true);
   });
@@ -320,8 +403,9 @@ describe('workspace hygiene', () => {
     cleanWorkspace({ projectRoot: root, scope: 'deep', apply: true });
 
     expect(existsSync(path.join(root, 'node_modules'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/desktop/node_modules'))).toBe(false);
     expect(existsSync(path.join(root, '.git/HEAD'))).toBe(true);
-    expect(existsSync(path.join(root, 'src/main.ts'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/desktop/src/main.ts'))).toBe(true);
   });
 
   it('fails closed for unknown roots, non-allowlisted paths, and symlink targets', () => {
@@ -340,6 +424,31 @@ describe('workspace hygiene', () => {
     rmSync(path.join(root, 'out'), { recursive: true, force: true });
     symlinkSync(os.tmpdir(), path.join(root, 'out'));
     expect(() => resolveCleanupTarget(root, 'out')).toThrow(/symlink cleanup target/);
+  });
+
+  it('rejects symlinked cleanup ancestors before deleting protected content', () => {
+    for (const relativeAncestor of ['apps', 'apps/desktop']) {
+      const root = createWorkspaceFixture();
+      const protectedOutput = path.join(root, 'evidence/desktop/out');
+      const sentinel = path.join(protectedOutput, 'must-survive.txt');
+      mkdirSync(protectedOutput, { recursive: true });
+      writeFileSync(sentinel, 'protected');
+
+      const symlinkTarget = relativeAncestor === 'apps'
+        ? path.join(root, 'evidence')
+        : path.join(root, 'evidence/desktop');
+      const symlinkPath = path.join(root, relativeAncestor);
+      rmSync(symlinkPath, { recursive: true, force: true });
+      symlinkSync(symlinkTarget, symlinkPath);
+
+      expect(() => cleanWorkspace({
+        projectRoot: root,
+        scope: 'generated',
+        apply: true,
+      })).toThrow(/symlink cleanup target/);
+      expect(existsSync(sentinel)).toBe(true);
+      expect(existsSync(path.join(root, 'release/local-unsigned/package.bin'))).toBe(true);
+    }
   });
 
   it('rejects a workspace whose root package manifest is a symlink', () => {

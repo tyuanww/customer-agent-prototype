@@ -29,6 +29,7 @@ import {
 import { trayIconCandidates } from '../../src/main/desktop-menu-model';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repositoryRoot = path.resolve(root, '../..');
 const packageBuild = (JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
   build: { win: { extraResources: Array<{ from: string; to: string }> } };
 }).build;
@@ -207,7 +208,7 @@ describe('brand icon assets', () => {
     }
     const generator = readFileSync(path.join(root, 'scripts/generate-app-icons.mjs'), 'utf8');
     const macIcon = readFileSync(path.join(root, 'scripts/generate-mac-icon.sh'), 'utf8');
-    const gitignore = readFileSync(path.join(root, '.gitignore'), 'utf8');
+    const gitignore = readFileSync(path.join(repositoryRoot, '.gitignore'), 'utf8');
     expect(generator).toContain('ICO_FRAME_SIZES');
     expect(generator).toContain('assets/app-icon.png');
     expect(generator).not.toMatch(/https?:\/\//);
@@ -222,7 +223,7 @@ describe('brand icon assets', () => {
   it('splits Tray fox-head candidates from App/Dock master candidates', () => {
     const devLocation = {
       isPackaged: false,
-      appPath: '/repo/customer-agent-prototype/out/main',
+      appPath: '/repo/customer-agent-prototype/apps/desktop/out/main',
       resourcesPath: '/Electron.app/Contents/Resources',
     };
     const packagedMac = {
@@ -230,10 +231,16 @@ describe('brand icon assets', () => {
       appPath: '/Applications/Demo.app/Contents/Resources/app.asar',
       resourcesPath: '/Applications/Demo.app/Contents/Resources',
     };
-    expect(unpackagedAppIconCandidates(devLocation).every((item) => item.endsWith(APP_ICON_MASTER_RELATIVE_PATH))).toBe(true);
+    expect(unpackagedAppIconCandidates(devLocation)).toEqual([
+      path.join(devLocation.appPath, APP_ICON_MASTER_RELATIVE_PATH),
+      path.join('/repo/customer-agent-prototype/apps/desktop', APP_ICON_MASTER_RELATIVE_PATH),
+    ]);
     expect(appIconCandidates(devLocation).join('\n')).not.toContain('fox-head.png');
     expect(appIconCandidates(devLocation).join('\n')).not.toContain('build/icon.png');
-    expect(trayIconCandidates(devLocation).every((item) => item.endsWith('fox-head.png'))).toBe(true);
+    expect(trayIconCandidates(devLocation)).toEqual([
+      path.join(devLocation.appPath, 'fox-head.png'),
+      '/repo/customer-agent-prototype/apps/desktop/fox-head.png',
+    ]);
     expect(trayIconCandidates(devLocation).join('\n')).not.toContain('app-icon.png');
     expect(packagedAppIconCandidates(packagedMac).join('\n')).not.toContain('fox-head.png');
     expect(packagedAppIconCandidates(packagedMac)).toEqual([

@@ -1,31 +1,29 @@
 {
   "name": "customer-agent-demo",
-  "version": "0.2.0",
   "private": true,
-  "description": "客服话术浮窗本地 Demo：狐狸头 → 玻璃查询胶囊 → Top 3 → 人工选择 → 复制；另含静态合成 Dashboard",
-  "author": "Customer Agent Demo",
   "type": "module",
-  "main": "./out/main/index.js",
+  "description": "客服 Agent 产品实施仓 workspace；Electron 产品包位于 apps/desktop",
   "packageManager": "pnpm@11.19.0",
   "engines": {
     "node": ">=24 <25",
     "pnpm": "11.19.0"
   },
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "pnpm --filter @customer-agent/desktop dev",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:float": "vitest run tests/unit/overlay-chrome-window.test.ts tests/unit/overlay-geometry.test.ts tests/unit/fox-presence.test.ts tests/unit/fox-motion.test.ts tests/unit/overlay-events.test.ts tests/unit/fox-peek-access.test.ts tests/component/FoxApp.test.tsx",
-    "test:assets": "vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts",
-    "test:e2e:float": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @float",
-    "build": "electron-vite build",
-    "generate:mac-icon": "sh scripts/generate-mac-icon.sh",
-    "generate:fox-head": "node scripts/generate-fox-head.mjs",
-    "generate:app-icons": "node scripts/generate-app-icons.mjs",
-    "preview": "electron-vite preview",
-    "test:e2e": "pnpm build && playwright test",
+    "typecheck": "pnpm --filter @customer-agent/desktop typecheck",
+    "test": "pnpm --filter @customer-agent/desktop test",
+    "test:watch": "pnpm --filter @customer-agent/desktop test:watch",
+    "test:float": "pnpm --filter @customer-agent/desktop test:float",
+    "test:assets": "pnpm --filter @customer-agent/desktop test:assets",
+    "test:e2e:float": "pnpm --filter @customer-agent/desktop test:e2e:float",
+    "build": "pnpm --filter @customer-agent/desktop build",
+    "preview": "pnpm --filter @customer-agent/desktop preview",
+    "test:e2e": "pnpm --filter @customer-agent/desktop test:e2e",
+    "electron:install": "pnpm --filter @customer-agent/desktop exec install-electron",
+    "generate:mac-icon": "pnpm --filter @customer-agent/desktop generate:mac-icon",
+    "generate:fox-head": "pnpm --filter @customer-agent/desktop generate:fox-head",
+    "generate:app-icons": "pnpm --filter @customer-agent/desktop generate:app-icons",
     "contracts:intake": "node scripts/customer-agent-contract-set.mjs ingest",
     "contracts:verify": "node scripts/customer-agent-contract-set.mjs verify",
     "workspace:size": "node scripts/workspace-hygiene.mjs size",
@@ -34,123 +32,16 @@
     "clean:generated": "node scripts/workspace-hygiene.mjs clean --scope=generated --apply",
     "clean:deep:preview": "node scripts/workspace-hygiene.mjs clean --scope=deep",
     "clean:deep": "node scripts/workspace-hygiene.mjs clean --scope=deep --apply",
-    "package:win": "node scripts/package-windows.mjs local",
-    "package:mac:local": "node scripts/package-macos.mjs local",
-    "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "package:win": "pnpm --filter @customer-agent/desktop package:win",
+    "package:mac:local": "pnpm --filter @customer-agent/desktop package:mac:local",
+    "package:mac": "pnpm --filter @customer-agent/desktop package:mac"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@playwright/test": "^1.55.1",
-    "@testing-library/jest-dom": "6.9.1",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^24.3.1",
-    "@types/react": "^18.3.24",
-    "@types/react-dom": "^18.3.7",
-    "@vitejs/plugin-react": "^4.7.0",
-    "electron": "^43.4.0",
-    "electron-builder": "^26.0.12",
-    "electron-vite": "^4.0.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.4.0",
-    "jsdom": "^26.1.0",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.44.0",
-    "vite": "^6.3.5",
-    "vitest": "^3.2.4"
-  },
-  "build": {
-    "appId": "local.demo.customer-agent",
-    "productName": "客服话术浮窗 Demo",
-    "copyright": "Demo only — synthetic data",
-    "directories": {
-      "output": "release"
-    },
-    "publish": null,
-    "afterPack": "./scripts/after-pack-macos.mjs",
-    "files": [
-      "out/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "fox-head.png",
-        "to": "fox-head.png"
-      },
-      {
-        "from": "THIRD_PARTY_NOTICES.md",
-        "to": "THIRD_PARTY_NOTICES.md"
-      },
-      {
-        "from": "node_modules/electron/dist/LICENSE",
-        "to": "licenses/Electron-LICENSE.txt"
-      },
-      {
-        "from": "node_modules/electron/dist/LICENSES.chromium.html",
-        "to": "licenses/Chromium-LICENSES.html"
-      }
-    ],
-    "asar": true,
-    "win": {
-      "icon": "build/icon.ico",
-      "extraResources": [
-        {
-          "from": "build/icon.ico",
-          "to": "icon.ico"
-        }
-      ],
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "signExecutable": false,
-      "artifactName": "${productName}-${version}-win-${arch}-UNSIGNED.${ext}"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "universal"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "universal"
-          ]
-        }
-      ],
-      "icon": "build/icon.icns",
-      "category": "public.app-category.business",
-      "darkModeSupport": true,
-      "minimumSystemVersion": "12.0",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "forceCodeSigning": true,
-      "notarize": true,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
-    },
-    "dmg": {
-      "writeUpdateInfo": false
-    },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
-      "differentialPackage": false
-    }
+    "typescript-eslint": "^8.44.0"
   }
 }

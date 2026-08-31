@@ -5,11 +5,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repositoryRoot = path.resolve(root, '../..');
 const packageJson = JSON.parse(
   readFileSync(path.join(root, 'package.json'), 'utf8'),
 ) as {
   scripts: Record<string, string>;
   build: {
+    directories: { output: string };
     appId: string;
     publish: null;
     afterPack: string;
@@ -114,7 +116,8 @@ describe('macOS distribution contract', () => {
     expect(packageRunner).toContain("buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false'");
     expect(packageRunner).toContain("'-c.mac.identity=null'");
     expect(packageRunner).toContain("'-c.mac.notarize=false'");
-    expect(packageRunner).toContain("'release/local-unsigned'");
+    expect(packageRunner).toContain("mode === 'local' ? 'local-unsigned' : 'distribution'");
+    expect(packageJson.build.directories.output).toBe('../../release');
     expect(packageRunner).toContain('-UNSIGNED.${ext}');
     expect(packageRunner).toContain("'scripts/finalize-mac-package.mjs', mode");
     expect(packageRunner).toContain("'scripts/verify-mac-package.mjs', mode");
@@ -240,7 +243,7 @@ describe('macOS Dock identity contract', () => {
     expect(packageJson.build.mac.icon).toBe('build/icon.icns');
     expect(packageJson.scripts['generate:app-icons']).toContain('scripts/generate-app-icons.mjs');
     expect(packageRunner).toContain("['generate:app-icons']");
-    const gitignore = readFileSync(path.join(root, '.gitignore'), 'utf8');
+    const gitignore = readFileSync(path.join(repositoryRoot, '.gitignore'), 'utf8');
     expect(gitignore).toContain('build/icon.icns');
     expect(gitignore).toContain('build/icon.png');
     expect(gitignore).toContain('build/icon.ico');
