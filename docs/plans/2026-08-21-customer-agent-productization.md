@@ -1,5 +1,7 @@
 # 客服 Agent 产品化实施路线（gstack 评审已批准，合同已交接，等待组织授权门）
 
+> **状态续记（2026-08-31）：** 本计划以下评审结论保持冻结；项目记录仓随后签发 `DEC-DDEV-01=PASS`，用户已明确授权产品仓进入 `DEV-M0`。当前实施事实与验证见 [`2026-08-31-dev-m0-execution.md`](2026-08-31-dev-m0-execution.md)，不要再把本页原始“等待组织授权门”页头当作当前状态。
+
 > **状态：** GSTACK REVIEW APPROVED · 用户于 2026-08-21 选择 A；ENG-T1 正式修正、来源 commit、contract set 与产品仓验证接收已完成；产品实施继续等待 G0 / Scope 与 Ddev
 > **日期：** 2026-08-21 · 2026-08-22 更新合同交接状态
 > **实施仓：** `customer-agent-prototype`

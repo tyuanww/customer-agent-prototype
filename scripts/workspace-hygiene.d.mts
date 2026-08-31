@@ -1,6 +1,10 @@
 export type CleanupScope = 'generated' | 'deep';
 
 export const WORKSPACE_REMAINDER_BUDGET_BYTES: number;
+export const EXPECTED_NODE_RANGE: string;
+export const EXPECTED_PNPM_VERSION: string;
+export const REQUIRED_WORKSPACE_PATTERNS: readonly string[];
+export const REQUIRED_WORKSPACE_DIRECTORIES: readonly string[];
 
 export type WorkspaceCategory = Readonly<{
   key: string;
@@ -28,6 +32,24 @@ export const DEEP_CLEAN_TARGETS: readonly string[];
 
 export function measureAllocatedBytes(targetPath: string, seen?: Set<string>): number;
 export function assertWorkspaceRoot(projectRoot: string): string;
+export function checkWorkspacePolicy(
+  projectRoot: string,
+  options?: Readonly<{ nodeVersion?: string }>,
+): Readonly<{
+  root: string;
+  packageManager: unknown;
+  nodeEngine: unknown;
+  pnpmEngine: unknown;
+  runtimeNodeVersion: string;
+  workspacePatterns: readonly string[];
+  violations: readonly Readonly<{
+    code: string;
+    expected?: string;
+    actual?: string;
+    path?: string;
+  }>[];
+  pass: boolean;
+}>;
 export function resolveCleanupTarget(projectRoot: string, relativeTarget: string): string;
 export function workspaceInventory(projectRoot: string): Readonly<{
   root: string;

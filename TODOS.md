@@ -1,5 +1,7 @@
 # TODOS
 
+> **复核：** 2026-08-30。下列四项已逐条对照当前测试，仍是未覆盖的 P3 窄分支；它们属于 Menokin `PILOT-S0` 合成基线的验证债务，不构成 G0 / Ddev 或正式 DEV-M0 授权。
+
 ## Verification
 
 ### Cover the unavailable WindowContext branch

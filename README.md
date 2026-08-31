@@ -1,4 +1,4 @@
-# 客服 Agent 产品 · 当前 v3 原型基线
+# 客服 Agent 产品 · Menokin 试点当前实现基线
 
 本仓是客服 Agent 的**产品实施仓**，目标是在这里完成正式开发、测试、打包与上线。当前提交基线仍是本地合成原型，用来验证输入法式桌面浮窗，并用一个演示级 Dashboard 展示正式架构故事：
 
@@ -6,7 +6,7 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。当前运行模式仍是 `DEMO · 合成数据 · 无后端`，不等于 `DEV-M0`、正式接入或上线已完成。复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0` 已于 2026-08-31 开工，当前只完成 workspace scaffold。可运行的 v3 应用仍是 `DEMO · 合成数据 · 无后端`，不代表真实接入或上线。复制只表示「已复制」，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -21,6 +21,9 @@
 | 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
 | 核对已接收的正式机器合同、双哈希和未激活边界 | [contracts/upstream/customer-agent/README.md](contracts/upstream/customer-agent/README.md) |
+| 查看当前 DEV-M0 切片、基线证据与下一步 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
+| 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
+| 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
 | 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |
 | 查看已明确延后的验证债务 | [TODOS.md](TODOS.md) |
@@ -33,7 +36,7 @@
 - 本目录应作为独立产品 Git 仓打开，不与项目进度记录仓混成同一工作树或 Git 历史。
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `assets/app-icon.png`（近白 squircle）、`build/icon.png` 与 `build/icon.ico`；在 macOS 上还会生成 `build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
-- 真实达肤妍材料即使存在于仓外，也未授权进入本 Git Demo，因此话术与看板全部是虚构合成内容。
+- Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Git 合成运行时；仓内话术与看板继续全部使用虚构合成内容。
 
 ## 环境
 
@@ -92,7 +95,7 @@ Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色�
 
 离线三维抽样复核将“是否修改 / 是否发送 / 是否适用”分别显示，维度 tab、合成结论与分层样本可交互；每项都报告有效分母、不可核验与证据等级。该页不读取最终发送正文，也不会从复制动作推断发送、采纳、未修改或回答正确。
 
-VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准，仓内仅保留去标识合成镜像：不包含客户原文、订单号、图片、批次、员工、快递或竞品原始评价。话术库将产品 / 活动 / 售前 / 售后分域；产品、活动只展示公开安全的来源规模与合成结构，售前、售后明确标为 `NOT_CREATED / UPSTREAM_AUTHORING`，不伪装四域已齐。
+VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准，仓内仅保留去标识合成镜像：不包含客户原文、订单号、图片、批次、员工、快递或竞品原始评价。话术库将产品 / 活动 / 售前 / 售后分域；当前屏幕中的规模与状态都是冻结的合成演示场景，不是 Menokin 企业工作簿的实时镜像。Menokin 四域材料是否存在以项目记录仓的受控证据为准，Demo 中的 `NOT_CREATED / UPSTREAM_AUTHORING` 等标签不得反向解释为当前上游事实。
 
 检索按钮至少显示 280ms 的本地反馈；无命中有独立空态动效。检索使用完整问法与字符 n-gram 主路，并用当前合成 fixture 自带的实体锚点、别名和规则意图补足口语化问法；强品类文本 + 匹配问题主题 / 意图可受控召回自然问法，但纯泛化意图仍不能单独制造命中。未带合成品牌的宽品类别名在去掉别名与已识别意图后若还剩未知文本，会整体 fail-closed，避免陌生品牌串到合成话术。卡片只显示「精确问法 / 同义表达 / 主题与意图 / 相似问法」等非数字原因。答案正文不参与召回，有效期与去重均在截取稳定 Top 3 之前完成。检索期间若继续改问题，会取消旧检索。复制成功只反馈「已复制」约 900ms，随后自动收起回狐狸头；复制失败则保留候选供重试。
 
@@ -100,7 +103,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 
 - 只使用仓内标记为 `DEMO · 合成数据` 的虚构护肤客服话术与静态 Dashboard manifest。
 - 运行时不读取飞书、Excel、客户数据、凭证、URL 或 token。用户提供的 VOC Excel 仅在设计阶段做过只读聚合校准，原文件与明细不随 Demo 分发。
-- 不使用达肤妍名义或真实产品/客户原文。
+- 不使用 Menokin 名义、真实产品事实或真实客户原文；正式 Menokin 数据只可在 G0 / Ddev 与数据门通过后由受控 adapter 接入。
 - 不复制或迁移旧 `dafuyan-wording` 项目的代码、词典、权重、数据或配置；查询能力是在本仓按合成合同独立实现。
 - 过期与未生效话术永不返回；卡片不展示匹配分。
 - Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 无 preload，也没有 `customerAgent`。

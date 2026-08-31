@@ -166,29 +166,65 @@ async function windowSnapshot(app: ElectronApplication): Promise<
     visibleOnAllWorkspaces: boolean;
   }>
 > {
-  return app.evaluate(({ BrowserWindow }) =>
-    BrowserWindow.getAllWindows().map((win) => {
-      const bounds = win.getBounds();
-      const url = win.webContents.getURL();
-      return {
-        role: url.includes('role=dashboard')
-          ? 'dashboard'
-          : url.includes('role=fox')
-            ? 'fox'
-            : url.includes('role=query')
-              ? 'query'
-              : url,
-        visible: win.isVisible(),
-        focused: win.isFocused(),
-        webContentsFocused: win.webContents.isFocused(),
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        visibleOnAllWorkspaces: win.isVisibleOnAllWorkspaces(),
-      };
-    }),
-  );
+  return app.evaluate(({ BrowserWindow }) => {
+    const snapshots: Array<{
+      role: string;
+      visible: boolean;
+      focused: boolean;
+      webContentsFocused: boolean;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      visibleOnAllWorkspaces: boolean;
+    }> = [];
+
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+
+      try {
+        const bounds = win.getBounds();
+        const url = win.webContents.getURL();
+        snapshots.push({
+          role: url.includes('role=dashboard')
+            ? 'dashboard'
+            : url.includes('role=fox')
+              ? 'fox'
+              : url.includes('role=query')
+                ? 'query'
+                : url,
+          visible: win.isVisible(),
+          focused: win.isFocused(),
+          webContentsFocused: win.webContents.isFocused(),
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+          visibleOnAllWorkspaces: win.isVisibleOnAllWorkspaces(),
+        });
+      } catch (error) {
+        // A native close can destroy the window between enumeration and readback.
+        if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+        throw error;
+      }
+    }
+
+    return snapshots;
+  });
+}
+
+async function waitForNativeFocus(
+  app: ElectronApplication,
+  role: 'query' | 'dashboard',
+): Promise<void> {
+  await expect.poll(async () => {
+    const snap = await windowSnapshot(app);
+    const target = snap.find((item) => item.role === role);
+    return {
+      focused: target?.focused ?? false,
+      webContentsFocused: target?.webContentsFocused ?? false,
+    };
+  }).toEqual({ focused: true, webContentsFocused: true });
 }
 
 async function waitForInteractiveQuery(
@@ -1584,6 +1620,7 @@ test('closeFocusedSurface closes Dashboard, collapses Query, and is a no-op on i
       return snap.some((item) => item.role === 'dashboard' && item.visible);
     }).toBe(true);
     await dashboard.bringToFront();
+    await waitForNativeFocus(app, 'dashboard');
     const queryContentsId = await app.evaluate(({ BrowserWindow }) => {
       const queryWin = BrowserWindow.getAllWindows().find((item) =>
         item.webContents.getURL().includes('role=query'),
@@ -1624,6 +1661,7 @@ test('closeFocusedSurface closes Dashboard, collapses Query, and is a no-op on i
       return snap.some((item) => item.role === 'query' && item.visible);
     }).toBe(true);
     await query.bringToFront();
+    await waitForNativeFocus(app, 'query');
     await app.evaluate(() => {
       const harness = (globalThis as { __demoTest?: { closeFocusedSurface: () => void } }).__demoTest;
       if (!harness) throw new Error('DEMO_E2E harness missing');
@@ -1651,7 +1689,8 @@ test('closeFocusedSurface closes Dashboard, collapses Query, and is a no-op on i
     expect(queryAfter.destroyed).toBe(false);
     expect(queryAfter.id).toBe(queryContentsId);
 
-    await fox.bringToFront();
+    // Idle Fox is deliberately restored with showInactive(), so native focus is
+    // neither required nor stable here. Exercise the idle state as shipped.
     await app.evaluate(() => {
       const harness = (globalThis as { __demoTest?: { closeFocusedSurface: () => void } }).__demoTest;
       if (!harness) throw new Error('DEMO_E2E harness missing');
@@ -1659,8 +1698,12 @@ test('closeFocusedSurface closes Dashboard, collapses Query, and is a no-op on i
     });
     await expect.poll(async () => {
       const snap = await windowSnapshot(app);
-      return snap.some((item) => item.role === 'fox' && item.visible);
-    }).toBe(true);
+      return {
+        dashboard: snap.some((item) => item.role === 'dashboard' && item.visible),
+        query: snap.some((item) => item.role === 'query' && item.visible),
+        fox: snap.some((item) => item.role === 'fox' && item.visible),
+      };
+    }).toEqual({ dashboard: false, query: false, fox: true });
     // Playwright page.keyboard Meta+W/Control+W does not reliably fire Electron
     // native menu role:close. Keep the three-surface harness above; real Cmd+W
     // remains a manual OS check. Do not register a global shortcut just for tests.

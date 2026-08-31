@@ -2,7 +2,7 @@
 
 > **生效：** 2026-08-21
 > **仓库身份：** 客服 Agent 产品实施仓
-> **当前基线：** v3 合成原型模式，产品化规划中
+> **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 已于 2026-08-31 开工，当前切片为 workspace scaffold；可运行应用仍是 `PILOT-S0 · SYNTHETIC` 合成基线
 > **目录名说明：** `customer-agent-prototype` 是历史目录名，不再代表仓库只做原型。
 
 ## 1. 两个仓库各自负责什么
@@ -21,24 +21,36 @@
 3. `DEVELOPMENT_BRIEF.md` 拥有当前已实现 v3 原型基线的工程与验收边界。
 4. `docs/reference-project-architecture.md` 记录当前代码的模块所有权与信任边界。
 5. `docs/plans/` 记录从当前基线走向正式产品的计划，并必须在页头显式标注 `ROUGH / REVIEWED / APPROVED`；只有 `APPROVED` 计划可作为实施输入，任何计划都不得自行改写 G0 / Ddev 或上述 SSOT。
+6. `docs/reference-document-lifecycle.md` 记录本仓产品文档与项目记录仓当前状态、历史快照和生成视图的边界；它不复制动态门禁数字。
+7. `docs/plans/2026-08-31-dev-m0-execution.md` 记录当前 `DEV-M0` 的产品仓实施事实、验证与下一切片；它不替代项目记录仓的授权真源。
+8. `docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md` 是 `DEC-054 / DEC-055` 对应的 `APPROVED` Menokin 试点 S0 实施输入；它只授权其中列明的纯合成能力，不授权真实数据或正式运行链路。
 
 若本仓文档与 `ai-赋能立项` 的当前批准范围、G0 / Ddev 或正式合同冲突，停止对应正式能力的实现，先在项目记录仓完成决策和版本冻结。视觉实现细节仍由本仓 SSOT 持有，不回写到项目进度仓制造第二份 UI 真源。
 
-## 3. 生命周期模式
+## 3. Menokin 单一试点生命周期
 
-### 当前：原型基线模式
+### 当前推进：`DEV-M0 · IN_PROGRESS`（2026-08-31 开始）
+
+- 项目记录仓已签发 `DEC-DDEV-01=PASS`，用户已明确给出产品仓开工授权；本仓只能在批准的 `DEV-M0` 开发 / 测试范围内推进。
+- 当前只完成 pre-move 基线和 workspace scaffold；根目录仍是唯一可运行 Electron 应用，`apps/desktop` 只是下一次机械迁移的目标位。
+- 正式合同快照仍保持 `ddev_authorized=false`、`runtime_activated=false`；合同开发激活、codegen、migration 和 API/config 骨架须按独立切片依次验证。
+- 真实数据、飞书运行接入、Pilot、付费、遥测、自动发送、部署和发布均未放行。
+
+### 保留开发基线：`PILOT-S0 · SYNTHETIC`
 
 - Fox → Query → Top 3 → 复制和九模块 Dashboard 已作为产品交互基线存在。
 - 仅使用编译期合成 fixture / manifest；无正式 OAuth、PostgreSQL、九端口或真实客户数据。
-- 当前代码与测试只能证明本地交互和桌面工程，不等于产品已上线。
+- 允许单人在本仓继续本地 UI、交互、纯状态模型、合成 fixture、测试、构建、开发诊断和 Windows feasibility smoke；新增付费为 0，2026-09-30 复核。
+- 这是 Menokin 试点的合成验证 profile，不是另一个 Demo 项目；它自身不接正式 API / worker / migration、真实数据或飞书运行链路。
+- 既有 UI 代码与测试只证明本地合成交互和桌面工程；`DEV-M0` 新增证据必须单独标识，二者都不等于产品已上线。
 
-### 下一阶段：产品开发模式
+### 后续：`DEV-M0` 后续切片与 `DEV-M1～DEV-M4`
 
-- 在获批产品化计划与 Ddev 后，在**本仓**实现正式 Windows 客户端、Application API、PostgreSQL SoR、鉴权、内容治理、指标、工单分析和发布链路。
+- 按获批产品化计划在**本仓**依次实现正式 Windows 客户端、Application API、PostgreSQL SoR、鉴权、内容治理、指标、工单分析和发布链路。
 - 正式能力必须通过窄 adapter 和明确的信任边界接入；不得把 renderer 直连数据库/API，也不得把合成类型直接升格为正式合同。
 - 原型模式保留为开发、演示和回归环境，但必须与正式配置、数据和证据分账。
 
-### 后续：试点与上线模式
+### 后续：Menokin 受控试用与上线
 
 - 试点、真实数据接入、外部付费、签名、公证、发布和部署分别走独立批准与验收。
 - “目标上线”是仓库方向，不自动构成 Ddev、真实数据、部署、发布或对外承诺授权。
@@ -55,5 +67,6 @@
 1. 先读本文件，确认仓库身份和当前模式。
 2. 再读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`，确认当前交互和工程基线。
 3. 查看当前分支、工作树和 `docs/plans/` 中计划的显式状态，禁止把 `ROUGH` 草案当作获批计划。
-4. 只有涉及正式范围或阶段门时，才去 `ai-赋能立项` 核对对应真源；不要把整个文档仓复制进来。
-5. 分别汇报原型证据、产品开发证据和上线证据，禁止把三者合并成一个“完成”。
+4. 当前 `DEV-M0` 按 `docs/plans/2026-08-31-dev-m0-execution.md` 和已批准产品化计划逐切片执行；合成 profile 改动仍按 S0 计划约束。
+5. 只有涉及正式范围或阶段门时，才去 `ai-赋能立项` 核对对应真源；不要把整个文档仓复制进来。
+6. 同一 Menokin 试点内分别汇报合成验证、正式产品开发和上线证据；分账不等于拆成多个项目。

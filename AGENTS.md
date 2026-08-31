@@ -6,7 +6,7 @@
 
 本文件是仓库级工作入口，只定义稳定边界、模块职责和执行方法；不要把像素、动画时长、测试矩阵或发布步骤复制到这里。
 
-- 本仓是客服 Agent 的**产品实施仓**，目标覆盖正式开发、测试、打包与上线；`customer-agent-prototype` 只是历史目录名。当前已实现内容仍处于 v3 合成原型模式，不等于 `DEV-M0`、真实数据接入或上线已获授权。
+- 本仓是客服 Agent 的**产品实施仓**，目标覆盖正式开发、测试、打包与上线；`customer-agent-prototype` 只是历史目录名。Menokin 是当前唯一试点，当前已实现的 v3 合成内容属于同一试点的 `PILOT-S0 · SYNTHETIC`，不是平行 Demo 项目，也不等于 `DEV-M0`、真实数据接入或上线已获授权。
 - 完整阅读 `PROJECT_CHARTER.md`，以其作为仓库身份、仓间关系与生命周期模式的 SSOT。`ai-赋能立项` 只负责项目进度、批准范围和阶段门记录；两仓保持独立工作区与 Git 历史，不做跨仓运行时依赖。
 - 涉及代码、交互或架构变更前，完整阅读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`。
 - `DESIGN.md` 是产品、视觉和交互不变量的 SSOT；`DEVELOPMENT_BRIEF.md` 是工程与验收边界的 SSOT；`docs/reference-project-architecture.md` 记录当前模块归属；`docs/how-to-verify-desktop.md` 记录分层验证方法。
@@ -14,7 +14,7 @@
 
 ## 2. 不可破坏的产品与安全边界
 
-- **当前原型模式**只使用合成 fixture。不得读取或提交真实飞书、客户数据、凭证、URL 或 token。用户显式提供的 VOC Excel 只允许一次性只读提取结构与聚合；不得把原文、订单、图片、批次、员工、快递或竞品评价写入仓库或未获批运行链路。
+- **当前 S0 合成模式**只使用合成 fixture。不得读取或提交真实飞书、客户数据、凭证、URL 或 token。Menokin 企业工作簿只允许在仓外受控证据流程中只读提取结构与聚合；不得把原文、订单、图片、批次、员工、快递或竞品评价写入仓库或未获批运行链路。
 - PostgreSQL、OAuth、线上 API、埋点和正式数据属于本仓后续产品化范围，但只能在获批计划、Ddev、合同和安全门齐备后进入独立模块；不得在当前 renderer 中临时直连。外部模型、自动学习和自动发送继续按专项批准管理。
 - 复制成功只表示“已复制”，不得推断或暗示已发送、已采纳、回答正确或问题已解决。
 - Electron renderer 不得获得 Node.js 权限；所有窗口保持 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`。

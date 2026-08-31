@@ -12,6 +12,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   checkWorkspaceBudget,
+  checkWorkspacePolicy,
   cleanWorkspace,
   parseCliArguments,
   resolveCleanupTarget,
@@ -25,8 +26,17 @@ function createWorkspaceFixture() {
   fixtures.push(root);
   writeFileSync(
     path.join(root, 'package.json'),
-    JSON.stringify({ name: 'customer-agent-demo' }),
+    JSON.stringify({
+      name: 'customer-agent-demo',
+      packageManager: 'pnpm@11.19.0',
+      engines: { node: '>=24 <25', pnpm: '11.19.0' },
+    }),
   );
+  writeFileSync(
+    path.join(root, 'pnpm-workspace.yaml'),
+    "packages:\n  - 'apps/*'\n  - 'packages/*'\n",
+  );
+  mkdirSync(path.join(root, 'apps/desktop'), { recursive: true });
   for (const relativePath of [
     'release/local-unsigned/package.bin',
     'out/main.js',
@@ -100,6 +110,157 @@ describe('workspace hygiene', () => {
     expect(result.pass).toBe(true);
     expect(result.violations).toHaveLength(0);
     expect(result.remainderBytes).toBeLessThan(result.remainderBudgetBytes);
+  });
+
+  it('pins the root toolchain and declares the staged monorepo targets', () => {
+    const root = createWorkspaceFixture();
+    const result = checkWorkspacePolicy(root);
+
+    expect(result.pass).toBe(true);
+    expect(result.violations).toHaveLength(0);
+    expect(result.workspacePatterns).toEqual(['apps/*', 'packages/*']);
+    expect(result).toMatchObject({
+      packageManager: 'pnpm@11.19.0',
+      nodeEngine: '>=24 <25',
+      pnpmEngine: '11.19.0',
+      runtimeNodeVersion: expect.stringMatching(/^24\./),
+    });
+  });
+
+  it('rejects a runtime outside Node 24 even when package metadata is correct', () => {
+    const root = createWorkspaceFixture();
+    const result = checkWorkspacePolicy(root, { nodeVersion: '25.8.2' });
+
+    expect(result.pass).toBe(false);
+    expect(result.violations).toContainEqual(expect.objectContaining({
+      code: 'NODE_RUNTIME_MISMATCH',
+      expected: '24.x',
+      actual: '25.8.2',
+    }));
+  });
+
+  it('rejects workspace patterns that can cancel or broaden the pinned package set', () => {
+    const root = createWorkspaceFixture();
+    writeFileSync(
+      path.join(root, 'pnpm-workspace.yaml'),
+      "packages:\n  - 'apps/*'\n  - 'packages/*'\n  - '!apps/*'\n",
+    );
+
+    const result = checkWorkspacePolicy(root);
+    expect(result.pass).toBe(false);
+    expect(result.violations).toContainEqual(expect.objectContaining({
+      code: 'WORKSPACE_PATTERN_SET_MISMATCH',
+    }));
+  });
+
+  it('rejects duplicate workspace package declarations', () => {
+    for (const duplicateKey of ['packages :', '"packages":']) {
+      const root = createWorkspaceFixture();
+      writeFileSync(
+        path.join(root, 'pnpm-workspace.yaml'),
+        `packages:\n  - 'apps/*'\n${duplicateKey}\n  - 'packages/*'\n`,
+      );
+
+      const result = checkWorkspacePolicy(root);
+      expect(result.pass).toBe(false);
+      expect(result.violations).toContainEqual(expect.objectContaining({
+        code: 'WORKSPACE_PACKAGES_DECLARATION_INVALID',
+      }));
+    }
+  });
+
+  it('rejects a required workspace target hidden behind a symlinked ancestor', () => {
+    const root = createWorkspaceFixture();
+    const externalApps = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-external-apps-'));
+    fixtures.push(externalApps);
+    mkdirSync(path.join(externalApps, 'desktop'));
+    rmSync(path.join(root, 'apps'), { recursive: true, force: true });
+    symlinkSync(externalApps, path.join(root, 'apps'));
+
+    const result = checkWorkspacePolicy(root);
+    expect(result.pass).toBe(false);
+    expect(result.violations).toContainEqual(expect.objectContaining({
+      code: 'WORKSPACE_TARGET_UNSAFE',
+      path: 'apps/desktop',
+    }));
+  });
+
+  it('rejects an additional workspace member that escapes through a symlink', () => {
+    const root = createWorkspaceFixture();
+    const externalMember = mkdtempSync(
+      path.join(os.tmpdir(), 'customer-agent-external-member-'),
+    );
+    fixtures.push(externalMember);
+    writeFileSync(
+      path.join(externalMember, 'package.json'),
+      JSON.stringify({ name: 'external-member', version: '1.0.0' }),
+    );
+    symlinkSync(externalMember, path.join(root, 'apps/external'));
+
+    const result = checkWorkspacePolicy(root);
+    expect(result.pass).toBe(false);
+    expect(result.violations).toContainEqual(expect.objectContaining({
+      code: 'WORKSPACE_MEMBER_UNSAFE',
+      path: 'apps/external',
+    }));
+  });
+
+  it('rejects a workspace member whose package manifest is a symlink', () => {
+    const root = createWorkspaceFixture();
+    const member = path.join(root, 'apps/member');
+    mkdirSync(member);
+    const externalManifestRoot = mkdtempSync(
+      path.join(os.tmpdir(), 'customer-agent-external-member-manifest-'),
+    );
+    fixtures.push(externalManifestRoot);
+    const externalManifest = path.join(externalManifestRoot, 'package.json');
+    writeFileSync(externalManifest, JSON.stringify({ name: 'external-member' }));
+    symlinkSync(externalManifest, path.join(member, 'package.json'));
+
+    const result = checkWorkspacePolicy(root);
+    expect(result.pass).toBe(false);
+    expect(result.violations).toContainEqual(expect.objectContaining({
+      code: 'WORKSPACE_MEMBER_MANIFEST_UNSAFE',
+      path: 'apps/member/package.json',
+    }));
+  });
+
+  it('rejects dangling workspace roots and member manifests as unsafe symlinks', () => {
+    const root = createWorkspaceFixture();
+    symlinkSync(path.join(root, 'missing-packages'), path.join(root, 'packages'));
+    const member = path.join(root, 'apps/dangling-member');
+    mkdirSync(member);
+    symlinkSync(path.join(root, 'missing-package.json'), path.join(member, 'package.json'));
+
+    const result = checkWorkspacePolicy(root);
+    expect(result.pass).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'WORKSPACE_GLOB_ROOT_UNSAFE', path: 'packages' }),
+      expect.objectContaining({
+        code: 'WORKSPACE_MEMBER_MANIFEST_UNSAFE',
+        path: 'apps/dangling-member/package.json',
+      }),
+    ]));
+  });
+
+  it('fails closed when a root tool version or required workspace target drifts', () => {
+    const root = createWorkspaceFixture();
+    writeFileSync(
+      path.join(root, 'package.json'),
+      JSON.stringify({
+        name: 'customer-agent-demo',
+        packageManager: 'pnpm@11.19.0',
+        engines: { node: '>=24 <25', pnpm: '>=9' },
+      }),
+    );
+    rmSync(path.join(root, 'apps/desktop'), { recursive: true, force: true });
+
+    const result = checkWorkspacePolicy(root);
+    expect(result.pass).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'PNPM_ENGINE_MISMATCH' }),
+      expect.objectContaining({ code: 'WORKSPACE_TARGET_MISSING', path: 'apps/desktop' }),
+    ]));
   });
 
   it('fails when checked-in workspace remainder exceeds the explicit budget', () => {
@@ -179,6 +340,20 @@ describe('workspace hygiene', () => {
     rmSync(path.join(root, 'out'), { recursive: true, force: true });
     symlinkSync(os.tmpdir(), path.join(root, 'out'));
     expect(() => resolveCleanupTarget(root, 'out')).toThrow(/symlink cleanup target/);
+  });
+
+  it('rejects a workspace whose root package manifest is a symlink', () => {
+    const root = createWorkspaceFixture();
+    const externalManifestRoot = mkdtempSync(
+      path.join(os.tmpdir(), 'customer-agent-external-manifest-'),
+    );
+    fixtures.push(externalManifestRoot);
+    const externalManifest = path.join(externalManifestRoot, 'package.json');
+    writeFileSync(externalManifest, JSON.stringify({ name: 'customer-agent-demo' }));
+    rmSync(path.join(root, 'package.json'));
+    symlinkSync(externalManifest, path.join(root, 'package.json'));
+
+    expect(() => checkWorkspacePolicy(root)).toThrow(/unsafe workspace package\.json/);
   });
 
   it('validates the full plan before removing an earlier target', () => {

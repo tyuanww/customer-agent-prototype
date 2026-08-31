@@ -2,6 +2,19 @@
 
 All notable changes to this private synthetic Electron demo are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Clarified that Menokin is the single current customer-service pilot and the v3 synthetic implementation is its `PILOT-S0` validation stage, not a separate Demo project.
+- Replaced stale Dafuyan wording and separated enterprise four-domain material availability from runtime activation, G0/Ddev, and production evidence.
+- Established the `DEV-M0-W0` pre-move baseline: pinned Node 24 / pnpm 11.19.0 workspace policy, an `apps/desktop` migration target with no second runtime entry, and a frozen 50-case synthetic development contract.
+
+### Fixed
+
+- Made workspace policy checks reject runtime-version drift, canceling or duplicate package declarations, and workspace roots, members, manifests, or required targets that escape through symlinks.
+- Stabilized the native close-surface E2E boundary by waiting for BrowserWindow/WebContents focus and tolerating only windows proven destroyed during concurrent snapshot readback.
+
 ## [0.2.0] - 2026-08-20
 
 ### Changed

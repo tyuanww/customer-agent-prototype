@@ -11,6 +11,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
+export const EXPECTED_NODE_RANGE = '>=24 <25';
+export const EXPECTED_PNPM_VERSION = '11.19.0';
+export const REQUIRED_WORKSPACE_PATTERNS = Object.freeze(['apps/*', 'packages/*']);
+export const REQUIRED_WORKSPACE_DIRECTORIES = Object.freeze(['apps/desktop']);
+const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
+  REQUIRED_WORKSPACE_PATTERNS.map((pattern) => pattern.slice(0, -2)),
+);
 
 // This budget covers source, tests, docs and checked-in assets only. Generated
 // packages and reinstallable dependencies are reported separately and are not
@@ -106,6 +113,10 @@ export function assertWorkspaceRoot(projectRoot) {
   if (!existsSync(packagePath)) {
     throw new Error(`Workspace package.json is missing: ${packagePath}`);
   }
+  const packageStats = lstatSync(packagePath);
+  if (packageStats.isSymbolicLink() || !packageStats.isFile()) {
+    throw new Error(`Refusing unsafe workspace package.json: ${packagePath}`);
+  }
   const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
   if (packageJson.name !== EXPECTED_PACKAGE_NAME) {
     throw new Error(
@@ -113,6 +124,187 @@ export function assertWorkspaceRoot(projectRoot) {
     );
   }
   return resolvedRoot;
+}
+
+// The supported `workspace:check` entrypoint is invoked through pnpm, which
+// validates YAML syntax before this script runs. This narrow reader owns only
+// the exact package-pattern policy for an already-valid workspace document.
+function readWorkspaceConfiguration(workspaceSource) {
+  const patterns = [];
+  let readingPackages = false;
+  let packageDeclarations = 0;
+  for (const line of workspaceSource.split(/\r?\n/)) {
+    if (/^(?:packages|['"]packages['"])\s*:\s*$/.test(line)) {
+      packageDeclarations += 1;
+      readingPackages = true;
+      continue;
+    }
+    if (/^\S/.test(line)) {
+      readingPackages = false;
+      continue;
+    }
+    if (!readingPackages) {
+      continue;
+    }
+    const match = line.match(/^\s*-\s+['"]?([^'"]+?)['"]?\s*$/);
+    if (match) {
+      patterns.push(match[1]);
+    }
+  }
+  return { packageDeclarations, patterns };
+}
+
+function workspaceDirectoryStatus(projectRoot, relativeDirectory) {
+  let currentPath = projectRoot;
+  for (const segment of relativeDirectory.split('/')) {
+    currentPath = path.join(currentPath, segment);
+    const stats = lstatSync(currentPath, { throwIfNoEntry: false });
+    if (!stats) {
+      return 'missing';
+    }
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      return 'unsafe';
+    }
+  }
+  return 'safe';
+}
+
+function workspaceMemberSafetyViolations(projectRoot) {
+  const violations = [];
+  for (const relativeRoot of REQUIRED_WORKSPACE_ROOTS) {
+    const workspaceRoot = path.join(projectRoot, relativeRoot);
+    const rootStats = lstatSync(workspaceRoot, { throwIfNoEntry: false });
+    if (!rootStats) {
+      continue;
+    }
+    if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+      violations.push({ code: 'WORKSPACE_GLOB_ROOT_UNSAFE', path: relativeRoot });
+      continue;
+    }
+    for (const entry of readdirSync(workspaceRoot)) {
+      const relativeMember = path.posix.join(relativeRoot, entry);
+      const memberPath = path.join(projectRoot, relativeRoot, entry);
+      const memberStats = lstatSync(memberPath);
+      if (memberStats.isSymbolicLink()) {
+        violations.push({ code: 'WORKSPACE_MEMBER_UNSAFE', path: relativeMember });
+        continue;
+      }
+      if (!memberStats.isDirectory()) {
+        continue;
+      }
+      const manifestPath = path.join(memberPath, 'package.json');
+      const manifestStats = lstatSync(manifestPath, { throwIfNoEntry: false });
+      if (!manifestStats) {
+        continue;
+      }
+      if (manifestStats.isSymbolicLink() || !manifestStats.isFile()) {
+        violations.push({
+          code: 'WORKSPACE_MEMBER_MANIFEST_UNSAFE',
+          path: path.posix.join(relativeMember, 'package.json'),
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+export function checkWorkspacePolicy(
+  projectRoot,
+  { nodeVersion = process.versions.node } = {},
+) {
+  const resolvedRoot = assertWorkspaceRoot(projectRoot);
+  const packageJson = JSON.parse(
+    readFileSync(path.join(resolvedRoot, 'package.json'), 'utf8'),
+  );
+  const violations = [];
+
+  if (packageJson.packageManager !== `pnpm@${EXPECTED_PNPM_VERSION}`) {
+    violations.push({
+      code: 'PACKAGE_MANAGER_MISMATCH',
+      expected: `pnpm@${EXPECTED_PNPM_VERSION}`,
+      actual: String(packageJson.packageManager),
+    });
+  }
+  if (packageJson.engines?.node !== EXPECTED_NODE_RANGE) {
+    violations.push({
+      code: 'NODE_ENGINE_MISMATCH',
+      expected: EXPECTED_NODE_RANGE,
+      actual: String(packageJson.engines?.node),
+    });
+  }
+  if (packageJson.engines?.pnpm !== EXPECTED_PNPM_VERSION) {
+    violations.push({
+      code: 'PNPM_ENGINE_MISMATCH',
+      expected: EXPECTED_PNPM_VERSION,
+      actual: String(packageJson.engines?.pnpm),
+    });
+  }
+  const runtimeNodeMajor = Number.parseInt(String(nodeVersion).split('.')[0] ?? '', 10);
+  if (runtimeNodeMajor !== 24) {
+    violations.push({
+      code: 'NODE_RUNTIME_MISMATCH',
+      expected: '24.x',
+      actual: String(nodeVersion),
+    });
+  }
+
+  const workspacePath = path.join(resolvedRoot, 'pnpm-workspace.yaml');
+  let workspacePatterns = [];
+  if (!existsSync(workspacePath)) {
+    violations.push({ code: 'WORKSPACE_FILE_MISSING', path: workspacePath });
+  } else {
+    const workspaceStats = lstatSync(workspacePath);
+    if (workspaceStats.isSymbolicLink() || !workspaceStats.isFile()) {
+      violations.push({ code: 'WORKSPACE_FILE_UNSAFE', path: workspacePath });
+    } else {
+      const workspaceConfiguration = readWorkspaceConfiguration(
+        readFileSync(workspacePath, 'utf8'),
+      );
+      workspacePatterns = workspaceConfiguration.patterns;
+      if (workspaceConfiguration.packageDeclarations !== 1) {
+        violations.push({
+          code: 'WORKSPACE_PACKAGES_DECLARATION_INVALID',
+          expected: '1',
+          actual: String(workspaceConfiguration.packageDeclarations),
+        });
+      }
+      if (
+        workspacePatterns.length !== REQUIRED_WORKSPACE_PATTERNS.length
+        || workspacePatterns.some(
+          (pattern, index) => pattern !== REQUIRED_WORKSPACE_PATTERNS[index],
+        )
+      ) {
+        violations.push({
+          code: 'WORKSPACE_PATTERN_SET_MISMATCH',
+          expected: JSON.stringify(REQUIRED_WORKSPACE_PATTERNS),
+          actual: JSON.stringify(workspacePatterns),
+        });
+      }
+    }
+  }
+
+  for (const relativeDirectory of REQUIRED_WORKSPACE_DIRECTORIES) {
+    const status = workspaceDirectoryStatus(resolvedRoot, relativeDirectory);
+    if (status === 'missing') {
+      violations.push({ code: 'WORKSPACE_TARGET_MISSING', path: relativeDirectory });
+      continue;
+    }
+    if (status === 'unsafe') {
+      violations.push({ code: 'WORKSPACE_TARGET_UNSAFE', path: relativeDirectory });
+    }
+  }
+  violations.push(...workspaceMemberSafetyViolations(resolvedRoot));
+
+  return {
+    root: resolvedRoot,
+    packageManager: packageJson.packageManager,
+    nodeEngine: packageJson.engines?.node,
+    pnpmEngine: packageJson.engines?.pnpm,
+    runtimeNodeVersion: nodeVersion,
+    workspacePatterns,
+    violations,
+    pass: violations.length === 0,
+  };
 }
 
 export function resolveCleanupTarget(projectRoot, relativeTarget) {
@@ -294,6 +486,7 @@ function runCli() {
   }
   if (command === 'check') {
     const result = checkWorkspaceBudget(projectRoot, { remainderBudgetBytes });
+    const policy = checkWorkspacePolicy(projectRoot);
     console.log(
       `Workspace source budget: ${result.pass ? 'PASS' : 'FAIL'} `
       + `(remainder ${formatBytes(result.remainderBytes)} / `
@@ -307,6 +500,12 @@ function runCli() {
           )}`,
         );
       }
+    }
+    console.log(`Workspace root policy: ${policy.pass ? 'PASS' : 'FAIL'}`);
+    for (const violation of policy.violations) {
+      console.error(`${violation.code}: ${violation.path ?? violation.actual ?? 'invalid'}`);
+    }
+    if (!result.pass || !policy.pass) {
       process.exitCode = 1;
     }
     return;

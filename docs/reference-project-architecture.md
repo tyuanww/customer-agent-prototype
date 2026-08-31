@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓**当前 v3 原型基线**的模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
+本页说明产品仓**当前 v3 原型基线**的模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。`DEV-M0-W0` 已建立 `apps/desktop` 目标位，但可运行代码尚未机械迁移，因此下文路径仍以根目录当前事实为准。
 
 ## 1. 先看整体
 
@@ -47,13 +47,14 @@
 | `src/shared/` | 跨边界协议、类型、校验器、几何和状态纯函数 | 依赖 DOM、Electron、React 的实现 |
 | `assets/`、根目录 PNG | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `scripts/` | 图标生成、打包、验证、空间清理等开发/发布脚本 | 运行时业务逻辑 |
+| `apps/desktop/` | `DEV-M0` 下一切片的桌面包目标位；当前只有边界说明 | 在 mechanical move 前复制运行代码、建立第二入口或提前塞入 API / DB |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
 | `docs/`、`evidence/qa/` | 可读合同、教程、验证方法和冻结证据 | 可执行源码、运行时缓存 |
 
-这里不需要为了“看起来整齐”移动 `src/main`、`src/renderer` 或 `tests`。当前边界和 import 方向已经表达了系统信任边界；机械移动会增加路径变更和测试合同漂移，却不会减少运行时复杂度。
+目录迁移不能只为了“看起来整齐”。当前 `DEV-M0` 已按批准计划把 mechanical move 作为独立切片：只把现有桌面包原样移入 `apps/desktop`，同步路径与配置并证明行为等价；不得在同一变更中加入 IPC 改造、API、DB 或 UI 行为。迁移后的模块边界和依赖方向必须保持本页语义不变。
 
 ## 3. 三个窗口和安全边界
 
@@ -76,12 +77,12 @@ SYNTHETIC_SCRIPTS ──local searchScripts──> Query view model
 DASHBOARD_MANIFEST ──read-only──> Dashboard modules
 
 contracts/upstream/customer-agent/<contract_set_id>
-  ──VERIFIED_NOT_ACTIVATED──> Ddev 后 codegen / migration 的唯一上游输入
+  ──VERIFIED_NOT_ACTIVATED──> DEV-M0 后续 codegen / migration 切片的唯一上游输入
 
 正式 PostgreSQL / /v1 API ──当前原型基线尚未实现──> 不允许从 renderer 直连
 ```
 
-`src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在后续 Ddev 阶段由本仓的 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
+`src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
 当前合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。消费锁显式保持 `ddev_authorized=false` 与 `runtime_activated=false`，因此 renderer、main、preload、构建产物和现有合成搜索均不读取该目录。
 
