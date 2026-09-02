@@ -1,0 +1,33 @@
+{
+  "name": "@customer-agent/api",
+  "private": true,
+  "type": "module",
+  "description": "客服 Agent 正式 Application API 的 fail-closed 启动骨架",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "pnpm --filter @customer-agent/contracts build:runtime && pnpm build && node dist/main.js",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test:package": "pnpm build && node --test tests/package-entry.smoke.mjs",
+    "test": "pnpm --filter @customer-agent/contracts build:runtime && vitest run && pnpm test:package"
+  },
+  "dependencies": {
+    "@customer-agent/contracts": "workspace:*",
+    "fastify": "5.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.2",
+    "vitest": "3.2.7"
+  }
+}

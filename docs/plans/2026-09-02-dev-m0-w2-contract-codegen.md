@@ -1,10 +1,10 @@
 # DEV-M0-W2 合同 codegen 与 runtime validation 执行记录
 
 > **文档状态：** `EXECUTION RECORD`
-> **切片状态：** `PR #10 · REVIEW REMEDIATION PUSHED · LANDING AUTHORIZED`
+> **切片状态：** `MERGED · PR #10 · main 1a77297`
 > **开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”
 > **提交输入：** 用户于 2026-09-02 明确给出“产品仓 DEV-M0-W2 提交授权（当前头 6c759c6）”
-> **Git 输入：** 用户已分别授权并完成 W2 推送与 PR #10 创建；后续 Review 复核、合并与候选分支清理亦已获得明确授权
+> **Git 输入：** 用户已分别授权并完成 W2 推送、PR #10、Review 复核、squash 合并与候选分支清理
 > **Review 输入：** 用户于 2026-09-02 明确给出“产品仓 DEV-M0-W2 Review 复核授权（PR #10，当前头 cd9878e）”及随后 Review 修复、提交与推送授权；修复候选头为 `74e2a97`
 > **基线：** `origin/main` / `6c759c6b317d9382787dcec200f3e828b7a5007d`
 > **Review 修复基线：** `cd9878e437ca0397a54de621f2a5e23c710150f3`
@@ -59,4 +59,4 @@ W2 只关闭 DEV-M0 的合同编译子项：从已验证且不可变的 OpenAPI 
 
 - DEV-M0 的 Fastify 空宿主、config 拒启矩阵、immutable migration、PG15 clean install、ACL、SQLSTATE、N/N-1 与失败回滚仍未开始。
 - component validator 尚未接到任何 HTTP 或桌面 adapter；这正是 `runtime_activated=false` 的含义。
-- W2 Review 修复已提交并推送；Review 复核、PR #10 合并与候选分支清理已获授权，实际落地结果以 PR #10 和 `main` 历史为准。部署仍未授权，也未执行。
+- W2 Review 修复已提交并推送；PR #10 已于 2026-09-02 squash 合并为 `1a77297d51ce3cf3a0a551290675c60c941be4b6`，候选 worktree 与本地/远端分支已清理。部署仍未授权，也未执行。

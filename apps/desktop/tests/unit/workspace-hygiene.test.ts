@@ -36,6 +36,11 @@ function createWorkspaceFixture() {
     path.join(root, 'pnpm-workspace.yaml'),
     "packages:\n  - 'apps/*'\n  - 'packages/*'\n",
   );
+  mkdirSync(path.join(root, 'apps/api'), { recursive: true });
+  writeFileSync(
+    path.join(root, 'apps/api/package.json'),
+    JSON.stringify({ name: '@customer-agent/api', private: true }),
+  );
   mkdirSync(path.join(root, 'apps/desktop'), { recursive: true });
   writeFileSync(
     path.join(root, 'apps/desktop/package.json'),
@@ -48,6 +53,8 @@ function createWorkspaceFixture() {
   );
   for (const relativePath of [
     'release/local-unsigned/package.bin',
+    'apps/api/dist/main.js',
+    'apps/api/node_modules/fastify/runtime.js',
     'apps/desktop/out/main.js',
     'apps/desktop/test-results/result.json',
     'apps/desktop/playwright-report/index.html',
@@ -119,6 +126,7 @@ describe('workspace hygiene', () => {
     expect(inventory.totalBytes).toBeGreaterThan(0);
     expect(categories.get('release')).toBeGreaterThan(0);
     expect(categories.get('dependencies')).toBeGreaterThan(0);
+    expect(categories.get('api-dependencies')).toBeGreaterThan(0);
     expect(categories.get('workspace-remainder')).toBeGreaterThan(0);
   });
 
@@ -159,6 +167,15 @@ describe('workspace hygiene', () => {
   });
 
   it('requires the private workspace package manifests with no toolchain overrides', () => {
+    const missingApiRoot = createWorkspaceFixture();
+    rmSync(path.join(missingApiRoot, 'apps/api/package.json'));
+    expect(checkWorkspacePolicy(missingApiRoot).violations).toContainEqual(
+      expect.objectContaining({
+        code: 'WORKSPACE_TARGET_MANIFEST_MISSING',
+        path: 'apps/api/package.json',
+      }),
+    );
+
     const missingRoot = createWorkspaceFixture();
     rmSync(path.join(missingRoot, 'apps/desktop/package.json'));
     expect(checkWorkspacePolicy(missingRoot).violations).toContainEqual(expect.objectContaining({
@@ -383,6 +400,8 @@ describe('workspace hygiene', () => {
     expect(result.apply).toBe(false);
     expect(result.totalBytes).toBeGreaterThan(0);
     expect(existsSync(path.join(root, 'release/local-unsigned/package.bin'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/api/dist/main.js'))).toBe(true);
+    expect(existsSync(path.join(root, 'apps/api/node_modules/fastify/runtime.js'))).toBe(true);
     expect(existsSync(path.join(root, 'apps/desktop/out/main.js'))).toBe(true);
     expect(existsSync(path.join(root, 'out/main.js'))).toBe(true);
     expect(existsSync(path.join(root, 'build/icon.png'))).toBe(true);
@@ -393,6 +412,8 @@ describe('workspace hygiene', () => {
     cleanWorkspace({ projectRoot: root, scope: 'generated', apply: true });
 
     expect(existsSync(path.join(root, 'release/local-unsigned'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/api/dist'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/api/node_modules/fastify/runtime.js'))).toBe(true);
     expect(existsSync(path.join(root, 'apps/desktop/out'))).toBe(false);
     expect(existsSync(path.join(root, 'out'))).toBe(false);
     expect(existsSync(path.join(root, 'apps/desktop/node_modules/.vite'))).toBe(false);
@@ -418,6 +439,7 @@ describe('workspace hygiene', () => {
     cleanWorkspace({ projectRoot: root, scope: 'deep', apply: true });
 
     expect(existsSync(path.join(root, 'node_modules'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/api/node_modules'))).toBe(false);
     expect(existsSync(path.join(root, 'apps/desktop/node_modules'))).toBe(false);
     expect(existsSync(path.join(root, '.git/HEAD'))).toBe(true);
     expect(existsSync(path.join(root, 'apps/desktop/src/main.ts'))).toBe(true);

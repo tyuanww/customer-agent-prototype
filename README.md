@@ -6,7 +6,7 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，`DEV-M0-W2` 在独立 `packages/contracts` 中生成正式类型并提供未接线的运行时边界校验。可运行的 v3 应用仍是 `DEMO · 合成数据 · 无后端`，不代表正式 runtime、真实接入或上线。复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，`DEV-M0-W2` 在独立 `packages/contracts` 中生成正式类型并提供未接线的运行时边界校验，W3 候选新增只含 `/health` 的 loopback API/config 启动骨架。可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`，不连接该 API，也不代表正式 runtime、真实接入或上线。复制只表示「已复制」，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -22,8 +22,11 @@
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
 | 核对已接收的正式机器合同、双哈希和未激活边界 | [contracts/upstream/customer-agent/README.md](contracts/upstream/customer-agent/README.md) |
 | 生成并验证正式 OpenAPI 类型与 component runtime schema | [packages/contracts/README.md](packages/contracts/README.md) |
+| 启动并验证 W3 的本机 `/health` API 骨架 | [apps/api/README.md](apps/api/README.md) |
+| 核对 API 命名 profile、变量与失败关闭矩阵 | [docs/reference-api-runtime-config.md](docs/reference-api-runtime-config.md) |
 | 查看当前 DEV-M0 切片、基线证据与下一步 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
 | 查看 W2 合同 codegen / runtime validation 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md](docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md) |
+| 查看 W3 API/config bootstrap 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md](docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md) |
 | 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
@@ -31,13 +34,13 @@
 | 查看已明确延后的验证债务 | [TODOS.md](TODOS.md) |
 | 查阅打包携带的第三方软件许可声明 | [apps/desktop/THIRD_PARTY_NOTICES.md](apps/desktop/THIRD_PARTY_NOTICES.md) |
 
-项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除根与桌面包依赖，适合归档或从 `pnpm install --frozen-lockfile` 重建。清理脚本不会触碰 `.git`、`.codegraph`、`apps/desktop/src`、`apps/desktop/assets`、`evidence`、`docs`、`apps/desktop/tests` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
+项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除根、API 与桌面包依赖，适合归档或从 `pnpm install --frozen-lockfile` 重建。清理脚本不会触碰 `.git`、`.codegraph`、`apps/api/src`、`apps/desktop/src`、`apps/desktop/assets`、`evidence`、`docs`、`apps/api/tests`、`apps/desktop/tests` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
 
 ## 仓库与工作台
 
 - 本目录应作为独立产品 Git 仓打开，不与项目进度记录仓混成同一工作树或 Git 历史。
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
-- `apps/desktop` 是当前唯一可运行 Electron package；根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
+- `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是 W3 候选的独立 Node 服务骨架，当前只允许 loopback `/health`，不与桌面接线。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
 - `packages/contracts` 是正式 OpenAPI 的唯一产品仓编译边界；它只从已验证快照生成 bundle、TypeScript 类型与 component runtime validator，不拥有 HTTP、DB、桌面接线或运行时激活状态。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `apps/desktop/assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `apps/desktop/fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `apps/desktop/assets/app-icon.png`（近白 squircle）、`apps/desktop/build/icon.png` 与 `apps/desktop/build/icon.ico`；在 macOS 上还会生成 `apps/desktop/build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Git 合成运行时；仓内话术与看板继续全部使用虚构合成内容。
@@ -58,6 +61,15 @@ pnpm install --frozen-lockfile
 pnpm electron:install
 pnpm dev
 ```
+
+W3 API 骨架与桌面 Demo 分开启动；它只开放本机 liveness，不提供业务数据：
+
+```bash
+CUSTOMER_AGENT_PROFILE=formal-dev AUTH_MODE=mock pnpm dev:api
+curl --fail --silent http://127.0.0.1:3100/health
+```
+
+部署型 profile、Feishu auth、`/ready` 与 `/v1/*` 当前都会在监听前拒启或保持未注册，详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 只用于**当前这台机器**的企业证书环境，不是每台电脑的通用要求；没有企业拦截 TLS 时不要照抄。禁止关闭 TLS 验证。本项目用 `pnpm electron:install` 在唯一桌面包内显式准备锁定版本的 Electron 运行时；后续启动会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。逐步操作见 [第一次运行](docs/tutorial-first-run.md)。
 
@@ -112,7 +124,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 - 过期与未生效话术永不返回；卡片不展示匹配分。
 - Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 无 preload，也没有 `customerAgent`。
 - 复制成功只显示「已复制」，不表示已发送、已采纳或回答正确。
-- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。本仓 **没有** HTTP API adapter；合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
+- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。W3 的 HTTP host **只有** `/health`，没有业务 adapter，桌面也不连接它；合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
 - 「深度思考」只是默认 OFF 的 DeepSeek 辅助重排预留说明；它不生成答案、不改写话术、不发送消息，当前也不调用任何模型。
 - 客户问题最多 2000 字。
 
@@ -165,7 +177,7 @@ pnpm test:e2e
 | `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
 | `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |
 | `pnpm test:e2e:float` | 先 `pnpm build`，再跑 `smoke.spec.ts` 里 `@float` | 不是全量 E2E，也不是真实台前调度验收 |
-| `pnpm test` | 全量 unit / component，含 drag-settle 与 Dashboard 授权 | 不是真实窗口 |
+| `pnpm test` | contracts 合同测试 + API 配置/loopback 测试 + desktop 全量 unit/component（含 drag-settle 与 Dashboard 授权） | 不含 Electron E2E、真实窗口、数据库或生产依赖 |
 | `pnpm test:e2e` | 先 build，再跑全部 Playwright | 不是正式发包，也不是真实 OS 焦点 |
 
 `pnpm test:e2e` 会先 build，再启动 Electron：验证左右停靠与 drag-settle、台前调度边界采纳、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、内容贴合高度、数字键复制、自动收起，以及 Dashboard 的可信入口、单例、安全隔离与程序坞恢复，并核对系统剪贴板。探头 / 缩回、查询纵向拖拽、Dashboard 导航 / 模块 / 主题 / 筛选的状态机由更稳定的 unit/component 测试覆盖；默认 Playwright 门禁不再执行依赖 CDP 鼠标命中的长交互链。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递、侧栏与 Query 纵向拖拽、贴边 hover / retract，以及真实 OS 全局快捷键仍需人工确认。
@@ -196,6 +208,6 @@ pnpm package:mac
 
 ## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、PostgreSQL、九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；W2 已从该精确输入确定性生成 TypeScript 类型，并让 132 个 component schema 具备可调用的运行时校验，但没有创建服务、migration、adapter，也没有把 validator 接入任何产品运行链。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」不成立：还缺 `query_id`、发布四元组、飞书会话，以及合法的平台和有效期合同。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、PostgreSQL、九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；W2 已从该精确输入确定性生成 TypeScript 类型，并让 132 个 component schema 具备可调用的运行时校验；W3 只把 `HealthResponse` 接入独立 loopback `/health` host，仍没有 migration、业务 adapter、真实 auth 或任何 `/v1` 运行链。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」不成立：还缺 `query_id`、发布四元组、飞书会话，以及合法的平台和有效期合同。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。

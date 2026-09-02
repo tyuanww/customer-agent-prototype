@@ -8,9 +8,9 @@
 - 机器合同：`openapi.v1.yaml`、`33-schema-v1-草案.sql`（schema v1.12）
 - 架构北极星：`37-架构SSOT-v1.md`
 
-项目记录与正式合同来源仓：`ai-赋能立项/business-docs/01-客服Agent项目`。动态 G0 / Ddev 状态只由该仓 `00–06` 维护，本页不复制计数或充当状态真源。2026-08-22，本仓已通过 `pnpm contracts:intake` 接收并复核合同集 `cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c`，来源 commit 为 `1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38`；锁文件保持 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。2026-09-02 的 W2 只从该精确快照生成 TypeScript 与 component runtime validator；仍不存在服务端、migration、PostgreSQL SoR、`/v1` 进程或产品 adapter。禁止实时跨仓读取、手改快照或把 codegen 解释为 runtime 激活。
+项目记录与正式合同来源仓：`ai-赋能立项/business-docs/01-客服Agent项目`。动态 G0 / Ddev 状态只由该仓 `00–06` 维护，本页不复制计数或充当状态真源。2026-08-22，本仓已通过 `pnpm contracts:intake` 接收并复核合同集 `cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c`，来源 commit 为 `1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38`；锁文件保持 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。2026-09-02 的 W2 从该精确快照生成 TypeScript 与 component runtime validator；W3 本地候选新增配置先行拒启和只含 `/health` 的 loopback Fastify host。仍不存在 migration、PostgreSQL SoR、真实鉴权、`/ready`、`/v1` 业务进程或产品 adapter。禁止实时跨仓读取、手改快照，或把 codegen / liveness 解释为 runtime 激活。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [README](../README.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [API 启动配置](reference-api-runtime-config.md) · [桌面合同](reference-desktop-contracts.md) · [README](../README.md)
 
 ---
 
@@ -18,12 +18,12 @@
 
 | 问题 | 答案 |
 | --- | --- |
-| 正式机器合同是否已进入产品仓？ | **已接收、按双哈希验证并生成类型/组件校验器，但未激活。** 当前输入见 `contracts/upstream/customer-agent/contract-set.lock.json`，生成边界见 `packages/contracts`；这不是 migration、HTTP runtime 或生产证据。 |
-| Demo 现在有没有 API adapter？ | **没有。** `apps/desktop/src/` 内零 `fetch` / HTTP 客户端。Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。 |
+| 正式机器合同是否已进入产品仓？ | **已接收、按双哈希验证并生成类型/组件校验器，但未激活。** 当前输入见 `contracts/upstream/customer-agent/contract-set.lock.json`，生成边界见 `packages/contracts`；W3 的 `/health` 只证明本机 liveness，不是 migration、业务 HTTP runtime 或生产证据。 |
+| Demo 现在有没有 API adapter？ | **没有。** `apps/desktop/src/` 内零 `fetch` / HTTP 客户端。Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。并行的 `apps/api` 当前只有 `/health`，桌面不连接它。 |
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**类型、鉴权、事件、发布、租约必须重做**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
-| 本仓下一步该不该实现 adapter？ | **应该纳入产品化计划，但不能在当前原型改动中顺手接入。** Ddev 后由本仓实现正式 Windows 客户端、Main adapter 与 Application API；当前模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
+| 本仓下一步该不该实现 adapter？ | **应该按 DEV-M0 独立切片推进，不能从 `/health` 顺手直连。** 当前先完成 API/config 本机骨架；migration/DB、真实 auth、业务端口与 Windows Main adapter 仍需各自实现和验证。桌面模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
 
 ---
 
