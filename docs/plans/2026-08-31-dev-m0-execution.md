@@ -5,9 +5,10 @@
 > **开始日期：** 2026-08-31
 > **组织门输入：** `DEC-DDEV-01=PASS`，证据索引 `EVD-DDEV-AUTH-20260831`
 > **产品仓开工输入：** 用户已明确授权“开工授权 / DEV-M0 产品仓开工授权”
-> **当前切片：** `DEV-M0-W3 · Application API / config bootstrap · LOCAL IMPLEMENTATION`
-> **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR、Review 修复提交与推送均已按独立授权完成，Review 修复候选头为 `74e2a97`；后续 Review 复核、合并与候选分支清理亦已获得明确授权
-> **W3 开工输入：** 用户于 2026-09-02 在 W2 有序落地步骤后明确表示“都授权了”；当前只解释为创建下一切片分支并本地实现/验证，不包含 W3 提交、推送、PR、合并或部署
+> **当前切片：** `DEV-M0-W3 · Application API / config bootstrap · COMPLETE · MERGED`
+> **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR、Review、合并与候选分支清理均已按独立授权完成，PR #10 squash 合并头为 `1a77297d51ce3cf3a0a551290675c60c941be4b6`
+> **W3 开工输入：** 用户于 2026-09-02 在 W2 有序落地后授权创建下一切片并本地实现/验证；后续提交、推送、PR、Review、合并与候选分支清理又按明确授权完成，PR #11 合并头为 `2758dba5bebefc3fce87fdc73cffb6a7122bbea7`
+> **下一切片：** `DEV-M0-W4 · immutable migration / PostgreSQL deep module · NOT STARTED`；仍须单独开工授权
 > **W1 开工输入：** 用户于 2026-08-31 明确给出“产品仓 W1 分支创建与开工授权（基于 6111272）”；该授权不包含 W1 提交、推送、PR、合并、部署或后续正式能力切片
 > **W0 历史输入：** 用户曾明确给出“产品仓 W0 提交授权”；W0 已通过独立 Git 门完成，不自动扩张到 W1
 > **不代表：** 真实数据、飞书运行接入、Pilot、付费调用、自动发送、部署或发布授权；本记录的状态本身不扩张任何 Git 权限
@@ -101,10 +102,12 @@ W1 从已合并的 W0 基线 `6111272faf1adf9b2e457f9d6458c884480d06f6` 开始�
 
 W1 未生成 DMG、ZIP 或 Windows 安装包；打包路径和资源合同已由全量测试覆盖，但这不等于实际产包、签名、公证、Windows 真机、部署或发布证据。
 
-## 9. W2 落地与 W3 当前状态
+## 9. W2 / W3 落地与下一切片
 
 W1 已通过独立 Git 门合并为 `6c759c6b317d9382787dcec200f3e828b7a5007d`。W2 已通过 PR #10 squash 合并为 `1a77297d51ce3cf3a0a551290675c60c941be4b6`，候选 worktree 与本地/远端分支均已清理；合同包保持 `runtime_activated=false`。
 
-W3 已从该合并头建立隔离分支，并完成本地实现与验证：只实现 loopback Fastify `/health`、命名 profile 与监听前配置拒启；不注册 `/ready` 或九业务端口，不创建 migration/PostgreSQL、真实数据、Feishu auth、桌面接线或运行时激活。当前尚未提交、推送或创建 PR；W3 证据见 [`2026-09-02-dev-m0-w3-api-config-bootstrap.md`](2026-09-02-dev-m0-w3-api-config-bootstrap.md)。
+W3 已从该合并头建立隔离分支并完成实现与验证：只实现 loopback Fastify `/health`、命名 profile 与监听前配置拒启；不注册 `/ready` 或九业务端口，不创建 migration/PostgreSQL、真实数据、Feishu auth、桌面接线或运行时激活。W3 已通过 PR #11 合并为 `2758dba5bebefc3fce87fdc73cffb6a7122bbea7`，候选 worktree 与本地/远端分支均已清理；执行快照见 [`2026-09-02-dev-m0-w3-api-config-bootstrap.md`](2026-09-02-dev-m0-w3-api-config-bootstrap.md)。
+
+下一切片 W4 应建立不可变 migration / PostgreSQL 深模块，覆盖 DDL 来源锁、`status → plan → apply → verify`、PG15 clean install、ACL / SQLSTATE、N-only / N-1 兼容与失败回滚。W4 尚未开工，必须取得单独授权；W2 / W3 合并不自动放行 W4、DEV-M1、真实数据、部署或 Pilot。
 
 本记录只保存产品仓实施事实；项目总进度与授权状态继续由 `ai-赋能立项` 当前真源拥有。

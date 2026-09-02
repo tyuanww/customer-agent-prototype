@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。`DEV-M0-W1` 已把既有 Electron 应用机械迁入 `apps/desktop`；`DEV-M0-W2` 新增独立 `packages/contracts` 编译边界；`DEV-M0-W3` 当前新增只允许 loopback `/health` 的 `apps/api` 启动骨架，但没有桌面接线、DB、鉴权或业务端口。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。`DEV-M0-W1` 已把既有 Electron 应用机械迁入 `apps/desktop`；`DEV-M0-W2` 新增独立 `packages/contracts` 编译边界；`DEV-M0-W3` 已合并只允许 loopback `/health` 的 `apps/api` 启动骨架，但没有桌面接线、DB、鉴权或业务端口。
 
 ## 1. 先看整体
 
@@ -151,7 +151,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译深模块和 W3 API/config 深模块：桌面包、合同包与 API host 所有权分离，桌面运行时权限未放宽。W3 只关闭“配置先行拒启、loopback host 与合同 liveness”候选子项，不关闭 migration、DB、鉴权、ACL、N/N-1、业务端口或 DEV-M0 总门。
+当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译深模块和 W3 API/config 深模块：桌面包、合同包与 API host 所有权分离，桌面运行时权限未放宽。W3 只关闭“配置先行拒启、loopback host 与合同 liveness”实现子项，不关闭 migration、DB、鉴权、ACL、N/N-1、业务端口或 DEV-M0 总门。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 

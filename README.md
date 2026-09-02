@@ -6,7 +6,7 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，`DEV-M0-W2` 在独立 `packages/contracts` 中生成正式类型并提供未接线的运行时边界校验，W3 候选新增只含 `/health` 的 loopback API/config 启动骨架。可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`，不连接该 API，也不代表正式 runtime、真实接入或上线。复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，`DEV-M0-W2` 在独立 `packages/contracts` 中生成正式类型并提供未接线的运行时边界校验，`DEV-M0-W3` 已合并只含 `/health` 的 loopback API/config 启动骨架。可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`，不连接该 API，也不代表正式 runtime、真实接入或上线。复制只表示「已复制」，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -40,7 +40,7 @@
 
 - 本目录应作为独立产品 Git 仓打开，不与项目进度记录仓混成同一工作树或 Git 历史。
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
-- `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是 W3 候选的独立 Node 服务骨架，当前只允许 loopback `/health`，不与桌面接线。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
+- `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是 W3 已合并的独立 Node 服务骨架，当前只允许 loopback `/health`，不与桌面接线。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
 - `packages/contracts` 是正式 OpenAPI 的唯一产品仓编译边界；它只从已验证快照生成 bundle、TypeScript 类型与 component runtime validator，不拥有 HTTP、DB、桌面接线或运行时激活状态。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `apps/desktop/assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `apps/desktop/fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `apps/desktop/assets/app-icon.png`（近白 squircle）、`apps/desktop/build/icon.png` 与 `apps/desktop/build/icon.ico`；在 macOS 上还会生成 `apps/desktop/build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Git 合成运行时；仓内话术与看板继续全部使用虚构合成内容。
