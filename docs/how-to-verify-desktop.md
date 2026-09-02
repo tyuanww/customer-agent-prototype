@@ -32,6 +32,7 @@ pnpm -v    # 项目锁定 11.19.0
 | 仓内现有狐狸 / App 图标合同仍成立 | `pnpm test:assets` | 否 | **否**（只读现有资产；临时目录自测不等于改仓） | 否 |
 | 带 `@float` 标签的 Electron 浮窗 smoke | `pnpm test:e2e:float` | 只覆盖 smoke 里标注 `@float` 的用例 | 否 | **是**（脚本自身先 `pnpm build`） |
 | 静态质量 + 全量 unit/component | `pnpm lint` `pnpm typecheck` `pnpm test` `pnpm build` | `pnpm test` 含 `overlay-controller-fox-settle`，仍不是真实 OS 拖拽 | 否 | `pnpm build` 本身是构建 |
+| W4 database 全门禁 | `pnpm test:db` | 不涉及桌面拖拽 | 否 | 会构建 database package，并启动一次性 PG15 cluster |
 | 全量 Electron Playwright | `pnpm test:e2e` | 含浮窗与 Dashboard smoke，仍不是真实设备门禁 | 否 | **是** |
 | 本机未签名 macOS 证明包 | `pnpm package:mac:local` | 否 | 会先 `generate:app-icons` | 会先 `pnpm build` |
 | 正式 macOS 外发门禁 | `pnpm package:mac` | 否 | 同上 | 同上，但当前会因 Demo `appId` fail-closed |
@@ -113,9 +114,17 @@ pnpm test:e2e
 | --- | --- | --- |
 | `pnpm lint` | ESLint 通过 | 运行时行为 |
 | `pnpm typecheck` | `tsc --noEmit` 通过 | 打包签名 |
-| `pnpm test` | Vitest 全量 unit / component，**含** drag-settle 与 Dashboard 授权 | 真实窗口、真实剪贴板持久化到用户会话 |
+| `pnpm test` | Vitest 全量 unit / component，**含** drag-settle 与 Dashboard 授权；database 只跑 unit/package smoke | W4 PG15 集成门禁、真实窗口、真实剪贴板持久化到用户会话 |
 | `pnpm build` | `electron-vite` 写出 `apps/desktop/out/main`、`apps/desktop/out/preload`、`apps/desktop/out/renderer` | 可以发给客户 |
 | `pnpm test:e2e` | 先 build，再跑全部 Playwright（浮窗交接、数字键复制、Dashboard 可信入口 / 单例 / 安全隔离 / Dock 恢复） | 真实设备门禁，见第 4 节 |
+
+数据库实现、migration、runner、verifier 或 PG harness 有变化时，另跑：
+
+```bash
+CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin pnpm test:db
+```
+
+它只创建私有临时 data directory / Unix socket / database，结束后清理；不连接共享或生产数据库。普通桌面/UI 改动无需反复运行这一重门禁。
 
 探头 / 缩回、Query 纵向拖拽，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 纵向拖拽和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
 
@@ -220,7 +229,7 @@ pnpm clean:preview
 | `pnpm workspace:check` | 检查不可再生源码区是否超过 32 MiB 预算 | 删除或迁移新增大文件后重跑 |
 | `pnpm clean:generated` | 只删除上面的精确 allowlist | `pnpm build`、相应 `package:*` / 测试命令重新生成 |
 | `pnpm clean:deep:preview` | 预览 generated + `node_modules` | 无改动 |
-| `pnpm clean:deep` | 在 generated 之外删除根与桌面包依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm electron:install` |
+| `pnpm clean:deep` | 在 generated 之外删除根、API、database 与桌面包依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm electron:install` |
 
 `clean:generated` 本身就是执行入口，不要给它追加 `--dry-run`。预览必须使用独立的 `clean:preview`；CLI 会拒绝未知参数，避免把无效参数误认为已经覆盖了 `--apply`。
 

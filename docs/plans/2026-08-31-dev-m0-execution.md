@@ -5,10 +5,11 @@
 > **开始日期：** 2026-08-31
 > **组织门输入：** `DEC-DDEV-01=PASS`，证据索引 `EVD-DDEV-AUTH-20260831`
 > **产品仓开工输入：** 用户已明确授权“开工授权 / DEV-M0 产品仓开工授权”
-> **当前切片：** `DEV-M0-W3 · Application API / config bootstrap · COMPLETE · MERGED`
+> **当前切片：** `DEV-M0-W4 · immutable migration / PostgreSQL deep module · IMPLEMENTED · VALIDATED`
 > **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR、Review、合并与候选分支清理均已按独立授权完成，PR #10 squash 合并头为 `1a77297d51ce3cf3a0a551290675c60c941be4b6`
 > **W3 开工输入：** 用户于 2026-09-02 在 W2 有序落地后授权创建下一切片并本地实现/验证；后续提交、推送、PR、Review、合并与候选分支清理又按明确授权完成，PR #11 合并头为 `2758dba5bebefc3fce87fdc73cffb6a7122bbea7`
-> **下一切片：** `DEV-M0-W4 · immutable migration / PostgreSQL deep module · NOT STARTED`；仍须单独开工授权
+> **W4 开工输入：** 用户于 2026-09-02 明确要求“开始启动下一个板块，我给你授权，全部一个个开始做”；本记录将该授权限制为 W4 的实现、验证与独立 Git 生命周期，不扩张到 W5、DEV-M1、真实数据、飞书运行接入、Pilot、部署或生产
+> **下一切片：** `DEV-M0-W5 · runtime adapter / service readiness · NOT STARTED`；仍须单独开工授权
 > **W1 开工输入：** 用户于 2026-08-31 明确给出“产品仓 W1 分支创建与开工授权（基于 6111272）”；该授权不包含 W1 提交、推送、PR、合并、部署或后续正式能力切片
 > **W0 历史输入：** 用户曾明确给出“产品仓 W0 提交授权”；W0 已通过独立 Git 门完成，不自动扩张到 W1
 > **不代表：** 真实数据、飞书运行接入、Pilot、付费调用、自动发送、部署或发布授权；本记录的状态本身不扩张任何 Git 权限
@@ -108,6 +109,178 @@ W1 已通过独立 Git 门合并为 `6c759c6b317d9382787dcec200f3e828b7a5007d`�
 
 W3 已从该合并头建立隔离分支并完成实现与验证：只实现 loopback Fastify `/health`、命名 profile 与监听前配置拒启；不注册 `/ready` 或九业务端口，不创建 migration/PostgreSQL、真实数据、Feishu auth、桌面接线或运行时激活。W3 已通过 PR #11 合并为 `2758dba5bebefc3fce87fdc73cffb6a7122bbea7`，候选 worktree 与本地/远端分支均已清理；执行快照见 [`2026-09-02-dev-m0-w3-api-config-bootstrap.md`](2026-09-02-dev-m0-w3-api-config-bootstrap.md)。
 
-下一切片 W4 应建立不可变 migration / PostgreSQL 深模块，覆盖 DDL 来源锁、`status → plan → apply → verify`、PG15 clean install、ACL / SQLSTATE、N-only / N-1 兼容与失败回滚。W4 尚未开工，必须取得单独授权；W2 / W3 合并不自动放行 W4、DEV-M1、真实数据、部署或 Pilot。
+W4 已在该基线上实现并验证不可变 migration / PostgreSQL 深模块，覆盖 DDL 来源锁、`status → plan → apply → verify`、PG15 clean install、ACL / SQLSTATE、N-only、未知提交回执恢复与失败回滚；执行快照见 [`2026-09-02-dev-m0-w4-postgres-migrations.md`](2026-09-02-dev-m0-w4-postgres-migrations.md)。当前没有前一份签名数据库基线，因此真实 N-1 仍为 `N/A`。W4 不放行 W5、DEV-M1、真实数据、部署或 Pilot。
 
 本记录只保存产品仓实施事实；项目总进度与授权状态继续由 `ai-赋能立项` 当前真源拥有。
+
+## 10. W4 工程评审输入与边界
+
+W4 的唯一目标是把已接收且已验证的 `schema-v1.12.sql` 转换为可确定性重放、可核验、失败关闭的 PostgreSQL 15 migration 模块。它不改变合同的业务语义，不把数据库能力接入 API 或桌面端，也不激活正式运行时。
+
+写入所有者如下：
+
+- 根合同接收器继续唯一拥有合同集、来源提交、文件哈希与 `VERIFIED_NOT_ACTIVATED` 校验；database 模块只能在该锁内读取已验证 snapshot，不复制第二套合同验签。
+- `packages/database` 唯一拥有 migration codegen、不可变 catalogue、应用账本、顺序规划、事务执行与数据库后验核验。
+- PostgreSQL 自身拥有 DDL 原子性、角色和 ACL 的实际状态；调用方只能通过 database 模块的窄接口观察，不直接拼 SQL 或解释内部账本。
+- API、desktop 与治理仓均不成为 database 的运行时依赖；治理仓只记录阶段门和最终合并证据。
+
+### What already exists
+
+| 既有能力 | W4 处理 |
+| --- | --- |
+| 根合同接收器已验证精确合同集、来源 Git SHA 与双哈希，并持有 intake lock | 复用；只扩展一个受锁保护的已验证 database source 回调，不重写验证器 |
+| `schema-v1.12.sql` 已冻结 PG15 DDL、角色、函数、触发器、ACL、SQLSTATE 与 Phase-1 policy seed | 作为唯一生成输入；不手工维护第二份语义 DDL |
+| 根 workspace 已有 contracts → api → desktop 的分层质量门 | 在 contracts 后加入 database；W4 不让 API 依赖 database |
+| 本机已有 PostgreSQL 15 工具链 | 只用于隔离临时 cluster 集成测试；不触碰共享本机数据库 |
+
+## 11. W4 Architecture
+
+采用单个深模块隐藏 source split、账本一致性、锁、事务和验证知识：
+
+```text
+verified contract snapshot (under intake lock)
+                    |
+                    v
+ deterministic generator -- exact source SHA + fixed statement coverage
+                    |
+          +---------+----------+
+          |                    |
+          v                    v
+  0001..0009 SQL       generated manifest/catalogue
+  review artifacts      (embedded SQL + hashes + provenance)
+          |                    |
+          +---------+----------+
+                    v
+          status -> plan -> apply -> verify
+                    |
+       one pg.Client + session advisory lock
+                    |
+       transaction(migration + ledger row)
+                    |
+                    v
+ PostgreSQL schema + private customer_agent_meta ledger
+```
+
+### 11.1 不可变生成物
+
+生成器必须先通过根合同接收器取得已验证 snapshot，再校验固定 source DDL SHA。它去除上游文件最外层 `BEGIN/COMMIT`，由 runner 为每个 migration 独立建立事务，并在每段补入事务内 `search_path`。九段顺序固定为：
+
+1. `0001_extensions`
+2. `0002_identity_and_content`
+3. `0003_events_and_metrics`
+4. `0004_import_release_announce`
+5. `0005_idempotency_rate_limit_outbox`
+6. `0006_definer_functions_and_triggers`
+7. `0007_search_bigram`
+8. `0008_runtime_acl`
+9. `0009_phase1_policy_seed`
+
+生成器必须证明源语句被完整且仅一次归属；允许排除的内容只有文件头、外层事务、空白和由 generator 重建的 `SET LOCAL`。每个 migration 的 id、位置、字节数、SHA-256、源范围及合同 provenance 写入 generated manifest；运行时使用内嵌 catalogue，不从工作区路径读取 SQL。migration/manifest 与内嵌 catalogue 必须先完整写入同文件系统 staging，再以目录级交换发布；普通 I/O 失败时两组一起回滚，不能通过逐文件覆盖留下已知的新旧混合状态。
+
+### 11.2 规划、执行与核验
+
+- `status` 读取私有账本并归一化当前状态；发现未知 migration、顺序缺口、重复位置、checksum 或 provenance 漂移时失败关闭。
+- `plan` 只允许合法前缀向前推进；已完整应用时返回空计划，绝不重跑 DDL，公共结果不携带可执行 SQL。
+- `apply` 只接受真实单会话 `pg.Client` / checked-out `PoolClient` 并取得 session advisory lock；裸 `Pool` 与同 client 重入在查询前拒绝。每个 migration 及其账本写入在同一事务中提交，失败时回滚该 migration，最后可靠释放锁。
+- `verify` 同时核对 catalogue/账本一致性与完整 ACL/default ACL、1,399 条对象/owner/列/约束/索引/视图指纹、函数定义与安全属性、trigger event/enabled 和 policy key；它不把“有表”或“数量相同”误当成数据库状态正确。
+- 所有外部错误统一为稳定 database error code，保留可诊断 cause，但公开消息不得回显连接串、凭证或原始敏感参数。
+
+### 11.3 账本边界
+
+账本位于私有 `customer_agent_meta` schema，记录 position、migration id、migration SHA、contract set id、source Git SHA、source schema SHA、应用时间与耗时。对 `PUBLIC` 撤销 schema/table 权限；只有 migration owner 可写。未知或被篡改的账本不是可自动修复状态，必须停止并由人工处置。
+
+### 11.4 方案比较
+
+| 方案 | 结果 | 理由 |
+| --- | --- | --- |
+| A：确定性 codegen + 内嵌 catalogue + 深 runner | **采用** | 一个接口隐藏九段来源、hash、账本、锁和事务；发布包无需猜工作区文件路径 |
+| B：运行时读取一份大 SQL 并整包执行 | 不采用 | 无逐步状态、失败恢复、不可变账本和合法前缀规划，无法满足 W4 验收 |
+| C：手工维护九份 SQL 与一份上游 DDL | 不采用 | 形成双真源且无法机械证明语句完整覆盖，漂移风险高 |
+
+## 12. W4 Code Quality
+
+- 公共面只导出 `status/plan/apply/verify`、不含 SQL 的状态类型与稳定错误，不导出 executable catalogue、任意 SQL 执行器、账本写口或 test seam。
+- generator、planner、runner、verifier 各承担不同职责；不增加只转发同名参数的 wrapper。
+- catalogue 由生成器写入，禁止手工修改；`db:migrations:check` 必须在任何漂移时失败。
+- 事务与 advisory lock 的时序留在 runner 内；“必须是同一真实 session”由静态类型和运行时门禁共同表达，不靠调用方记住隐含规则。
+- 测试注入只在内部模块使用，不进入 package public entrypoint。
+- migration runner 中应放一段简短 ASCII 注释说明 lock/transaction/ledger 时序；普通模型和纯映射函数不重复文档。
+
+## 13. W4 Tests
+
+测试先窄后宽，且把静态审查、临时 PG15 集成与仓级回归分开：
+
+| 验证面 | 必须证明 |
+| --- | --- |
+| generator unit | 固定 source SHA、九段顺序、语句完整且仅一次覆盖、manifest/hash 确定性、篡改失败、整组发布移除旧成员、第二组交换失败时双组回滚 |
+| planner unit | fresh、合法 partial、complete、unknown id、gap、重复位置、checksum/provenance drift |
+| runner unit | 同 client 事务、失败 rollback、ledger 与 migration 原子提交、锁最终释放、错误脱敏 |
+| isolated PG15 clean install | 九段按序完成；二次 apply 为 no-op；账本、schema inventory、角色、视图、函数、触发器和 seed 后验匹配 |
+| concurrency/session | 两个独立 client 只应用一次；裸 Pool 与同 client 重入在查询前拒绝 |
+| security/contract negatives | runtime role 无越权；稳定 SQLSTATE `ZA001`–`ZA006` 可触发且不被 runner 吞掉 |
+| exact-manifest mutations | 任意新增 PUBLIC/default grant、owner/函数体/config 漂移、replica-only trigger、RLS、列默认值、enum/schema 或 policy key 置换均失败关闭 |
+| synthetic retry | 人工注入的 backfill 在中途失败后无半成品；修正后以同 id 重试，count/hash 与预期一致 |
+| ledger failure | DDL 成功但 ledger insert 失败时同事务回滚，故障解除后同 id 可安全重试 |
+| compatibility | 当前首个签名基线只证明 `N-only=PASS`；真实 `N-1=N/A · no prior signed baseline`，不得伪造升级证据 |
+| package smoke | 构建后的 JS 可从 package entrypoint 加载，且不依赖仓库 SQL 路径 |
+| repository gates | `lint`、`typecheck`、`test`、`build`、`workspace:check`、`contracts:verify` 全部通过 |
+
+PG15 集成测试必须创建独立临时 data directory、私有 Unix socket 和临时数据库，测试后停止 cluster 并清除临时资源；二进制发现失败不得先留下临时目录；不得使用或删除共享本机 cluster 中的对象。普通 `pnpm test` 不强制安装 PG15，database 变更的完整门禁为 `pnpm test:db`。
+
+## 14. W4 Failure Modes
+
+| 路径 | 真实失败 | 测试 | 处理 | 用户可见性 |
+| --- | --- | --- | --- | --- |
+| source → generator | 上游 DDL 漂移、切分 anchor 重复/缺失或目录交换失败 | generator negative + publish rollback | 生成前失败不覆盖；发布失败逆序恢复两个旧目录 | 明确错误与文件组，不留下已知混合集合 |
+| catalogue → plan | 账本有未知 id、gap 或 hash 漂移 | planner negative + PG tamper | 禁止 apply，不尝试猜测修复 | 明确 drift 错误，不泄露连接信息 |
+| advisory lock | 两个进程同时迁移 | PG concurrency | 后者等待同一 session lock，完成后重算 plan | 等待或明确超时，不静默并发 |
+| transaction | DDL/backfill 中途报错 | injected failure | 当前 migration 与 ledger row 同时 rollback | 稳定 apply failure，保留安全 cause |
+| ledger write | DDL 成功但 ledger insert 失败 | injected ledger failure | 同事务 rollback DDL | 明确失败，无“已完成”误报 |
+| verify | 数量不变但 ACL/owner/函数定义/列/约束/索引/trigger/seed key 漂移 | PG mutation negative | 精确 manifest 指纹不匹配即失败 | 指向不变量，不输出敏感行数据 |
+| cleanup | 二进制发现或 cluster 启停异常 | harness unit + integration teardown | 发现二进制后才建目录；finally 只清理已解析的 temp path，并保留 stop/cleanup 组合错误 | 测试失败中给出安全诊断 |
+
+没有“无测试、无错误处理且静默”的已知路径。
+
+## 15. W4 Performance
+
+九个 migration 为一次性顺序控制面，不进入 API 请求路径；清晰的事务与恢复边界优先于并行 DDL。集成验证记录每段执行时间及总耗时用于后续基线，但本切片不凭空设置生产 SLA。catalogue 在构建时内嵌，正常执行不重复扫描或哈希工作区文件。
+
+## 16. W4 Implementation Tasks
+
+- [x] **T1（P1）** — 扩展合同接收器的受锁 verified database-source 回调，并实现确定性九段 codegen、manifest 与漂移检查。
+- [x] **T2（P1）** — 建立 `@customer-agent/database` 公共合同、私有账本、planner 与稳定错误模型。
+- [x] **T3（P1）** — 实现单 client advisory-lock runner、逐段事务、status/plan/apply/verify 与 package smoke。
+- [x] **T4（P1）** — 建立隔离 PG15 harness，覆盖 clean install、幂等、并发、回滚、ACL/SQLSTATE、synthetic retry 与首版 N-only 报告。
+- [x] **T5（P1）** — 接入仓级 scripts/质量门，跑完窄测试与全量回归，并记录真实证据。
+
+Sequential implementation, no parallelization opportunity. T1–T5 都触及同一 database catalogue/runner 合同，拆成并行 worktree 会提高生成物和锁语义冲突风险。
+
+### Outside voice 与实现收口
+
+开工设计与实现专项复核累计提出 16 项有效改进，全部进入 W4：逐字节来源覆盖、`0001` 同事务账本与固定锁、同字节 retry、双目录原子发布、真实 Client/Pool 边界、公开 SQL 隐藏、完整安全 manifest、脏库对象覆盖、未知 `BEGIN` 回执回滚、同 client 重入、PG harness 生命周期，以及并发/账本失败/安全变异/测试分层/文档同步回归。没有延后项。
+
+## 17. NOT in scope
+
+- API `/ready`、九业务路由与 service repository：留给 W5，避免把迁移控制面和请求路径混成一个切片。
+- desktop 接线、renderer 数据、UI 或 IPC：W4 不改变现有产品行为和信任边界。
+- 真实客户/飞书数据、凭证、URL、token 与现有业务库迁移：Ddev 当前只放行合成开发；集成验证只用合成数据和临时 cluster。
+- 真实 N-1 升级签发：当前没有前一份签名数据库基线，只能记录 `N/A`，不能用合成 rehearsal 冒充。
+- PostgreSQL 托管、备份恢复、生产容量、部署、Pilot 与发布：均需后续独立授权与环境证据。
+- 自动修复被篡改账本或数据库：不可靠且可能掩盖入侵/人工漂移，W4 必须失败关闭。
+
+## GSTACK REVIEW REPORT
+
+| Section | Findings | Resolved | Outstanding |
+| --- | ---: | ---: | ---: |
+| Architecture | 4 | 4 | 0 |
+| Data & Security | 4 | 4 | 0 |
+| Failure Handling | 2 | 2 | 0 |
+| Tests | 4 | 4 | 0 |
+| Documentation | 2 | 2 | 0 |
+| Performance | 0 | 0 | 0 |
+
+Scope: Full W4 review complete. The accepted design uses a source-locked generated catalogue, staged whole-set output publication with rollback, one deep database module, a private immutable ledger, same-client locking/transactions, and isolated PG15 verification. W5 and every real-data/runtime/production surface remain outside this authorization.
+
+Implementation Tasks: T1–T5 and all 16 deduplicated review findings were implemented in the W4 release candidate; there are no deferred review findings to add to `TODOS.md`.
+
+NO UNRESOLVED DECISIONS

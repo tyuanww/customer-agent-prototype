@@ -12,4 +12,5 @@ minimumReleaseAgeExclude:
 overrides:
   '@electron/get@>=3.0.0 <4.0.0': 3.1.0
   ejs@<3.1.10: ^3.1.10
+  fast-uri@3.1.5: 3.1.6
   semver@>=2.0.0-alpha <5.7.2: ^5.7.2

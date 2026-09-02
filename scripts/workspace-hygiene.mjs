@@ -20,11 +20,13 @@ export const REQUIRED_WORKSPACE_DIRECTORIES = Object.freeze([
   'apps/api',
   'apps/desktop',
   'packages/contracts',
+  'packages/database',
 ]);
 export const REQUIRED_WORKSPACE_PACKAGES = Object.freeze([
   Object.freeze({ directory: 'apps/api', name: '@customer-agent/api' }),
   Object.freeze({ directory: 'apps/desktop', name: '@customer-agent/desktop' }),
   Object.freeze({ directory: 'packages/contracts', name: '@customer-agent/contracts' }),
+  Object.freeze({ directory: 'packages/database', name: '@customer-agent/database' }),
 ]);
 const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
   REQUIRED_WORKSPACE_PATTERNS.map((pattern) => pattern.slice(0, -2)),
@@ -38,6 +40,7 @@ export const WORKSPACE_REMAINDER_BUDGET_BYTES = 32 * 1024 * 1024;
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
   'release/local-unsigned',
   'apps/api/dist',
+  'packages/database/dist',
   'apps/desktop/out',
   'apps/desktop/test-results',
   'apps/desktop/playwright-report',
@@ -63,10 +66,12 @@ export const DEEP_CLEAN_TARGETS = Object.freeze([
   ...GENERATED_CLEAN_TARGETS.filter(
     (target) => !target.startsWith('node_modules/')
       && !target.startsWith('apps/api/node_modules/')
-      && !target.startsWith('apps/desktop/node_modules/'),
+      && !target.startsWith('apps/desktop/node_modules/')
+      && !target.startsWith('packages/database/node_modules/'),
   ),
   'apps/api/node_modules',
   'apps/desktop/node_modules',
+  'packages/database/node_modules',
   'node_modules',
 ]);
 
@@ -91,12 +96,14 @@ const INVENTORY_CATEGORIES = Object.freeze([
   { key: 'release', label: 'generated package artifacts', path: 'release' },
   { key: 'dependencies', label: 'reinstallable dependencies', path: 'node_modules' },
   { key: 'api-dependencies', label: 'API package dependency links', path: 'apps/api/node_modules' },
+  { key: 'database-dependencies', label: 'database package dependency links', path: 'packages/database/node_modules' },
   { key: 'desktop-dependencies', label: 'desktop package dependency links', path: 'apps/desktop/node_modules' },
   { key: 'git', label: 'Git history and metadata', path: '.git' },
   { key: 'local-reference', label: 'user-owned ignored reference', path: 'clawd-on-desk-0.15.0.zip' },
   { key: 'codegraph', label: 'local CodeGraph index', path: '.codegraph' },
   { key: 'gstack', label: 'local gstack reports', path: '.gstack' },
   { key: 'api-build-output', label: 'rebuildable API output', path: 'apps/api/dist' },
+  { key: 'database-build-output', label: 'rebuildable database output', path: 'packages/database/dist' },
   { key: 'build-output', label: 'rebuildable renderer/main output', path: 'apps/desktop/out' },
   { key: 'test-output', label: 'temporary test output', path: 'apps/desktop/test-results' },
   { key: 'playwright-output', label: 'temporary Playwright report', path: 'apps/desktop/playwright-report' },

@@ -1,0 +1,134 @@
+{
+  "schema": "customer-agent-database-migrations/v1",
+  "contract_set_id": "cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c",
+  "source_git_sha": "1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38",
+  "source_schema_sha256": "47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801",
+  "executable_source_sha256": "0f4f271aa1f84a2bf59e5279c650b3b216cb11df03be2aa536293547f33baaa3",
+  "compatibility": {
+    "current": "N",
+    "prior_signed_baseline": null
+  },
+  "migrations": [
+    {
+      "position": 1,
+      "id": "0001_extensions",
+      "file": "0001_extensions.sql",
+      "sha256": "4876b7ef62bb033b4b7b487e06e88a525b9cb8b3e32e82e6516124b7fc8eca62",
+      "bytes": 5202,
+      "source_ranges": [
+        {
+          "start_line": 17,
+          "end_line": 97
+        }
+      ]
+    },
+    {
+      "position": 2,
+      "id": "0002_identity_and_content",
+      "file": "0002_identity_and_content.sql",
+      "sha256": "62322728f1621c75b2cc0f66ac20e65710a916c714caa84761a93108b71e1b64",
+      "bytes": 41126,
+      "source_ranges": [
+        {
+          "start_line": 98,
+          "end_line": 981
+        }
+      ]
+    },
+    {
+      "position": 3,
+      "id": "0003_events_and_metrics",
+      "file": "0003_events_and_metrics.sql",
+      "sha256": "c109b3c7ec79c73cb6e3748808aca9296ed1c96e5d8fc91ab0046c80fd2b50d4",
+      "bytes": 31383,
+      "source_ranges": [
+        {
+          "start_line": 982,
+          "end_line": 1748
+        }
+      ]
+    },
+    {
+      "position": 4,
+      "id": "0004_import_release_announce",
+      "file": "0004_import_release_announce.sql",
+      "sha256": "ff68d5969e28a9d4d7eed963906f2fc3783f4c34b5ec1fa347ea87c3bc0b2f6a",
+      "bytes": 43438,
+      "source_ranges": [
+        {
+          "start_line": 1749,
+          "end_line": 2630
+        }
+      ]
+    },
+    {
+      "position": 5,
+      "id": "0005_idempotency_rate_limit_outbox",
+      "file": "0005_idempotency_rate_limit_outbox.sql",
+      "sha256": "715db39163e2a99d10a88126a4bded14c75f4fb4ba1ec97dcba573265babdf02",
+      "bytes": 7101,
+      "source_ranges": [
+        {
+          "start_line": 2651,
+          "end_line": 2771
+        }
+      ]
+    },
+    {
+      "position": 6,
+      "id": "0006_definer_functions_and_triggers",
+      "file": "0006_definer_functions_and_triggers.sql",
+      "sha256": "f5b369165b5e5f0e21801f8fd8eb2c4589ee26ca0761327811f4ed5c5903d4ca",
+      "bytes": 176719,
+      "source_ranges": [
+        {
+          "start_line": 2772,
+          "end_line": 6782
+        }
+      ]
+    },
+    {
+      "position": 7,
+      "id": "0007_search_bigram",
+      "file": "0007_search_bigram.sql",
+      "sha256": "7cf632ec4123b9031893646b0b67348cf5a89dd3fe89ec544dccecb576513189",
+      "bytes": 23262,
+      "source_ranges": [
+        {
+          "start_line": 6783,
+          "end_line": 7405
+        }
+      ]
+    },
+    {
+      "position": 8,
+      "id": "0008_runtime_acl",
+      "file": "0008_runtime_acl.sql",
+      "sha256": "f883a929a8742e0f71a498e70de410124e8c25fd2fdee6a492047201475990f2",
+      "bytes": 20450,
+      "source_ranges": [
+        {
+          "start_line": 7406,
+          "end_line": 7657
+        }
+      ]
+    },
+    {
+      "position": 9,
+      "id": "0009_phase1_policy_seed",
+      "file": "0009_phase1_policy_seed.sql",
+      "sha256": "a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e",
+      "bytes": 1712,
+      "source_ranges": [
+        {
+          "start_line": 2631,
+          "end_line": 2650
+        },
+        {
+          "start_line": 7658,
+          "end_line": 7660
+        }
+      ]
+    }
+  ]
+}

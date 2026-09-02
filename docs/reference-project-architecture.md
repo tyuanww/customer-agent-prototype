@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。`DEV-M0-W1` 已把既有 Electron 应用机械迁入 `apps/desktop`；`DEV-M0-W2` 新增独立 `packages/contracts` 编译边界；`DEV-M0-W3` 已合并只允许 loopback `/health` 的 `apps/api` 启动骨架，但没有桌面接线、DB、鉴权或业务端口。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。W1 已把既有 Electron 应用机械迁入 `apps/desktop`；W2 新增 `packages/contracts` 编译边界；W3 建立只允许 loopback `/health` 的 `apps/api` 启动骨架；W4 新增独立 `packages/database` migration 控制面，但 API、桌面、鉴权与真实数据仍未接库。
 
 ## 1. 先看整体
 
@@ -34,14 +34,14 @@
 │ 只放跨 main、preload、renderer 必须一致的类型与纯函数              │
 └────────────────────────────────────────────────────────────────┘
 
-contracts/upstream（不可变输入）
-  └─ packages/contracts（bundle / generated TS / runtime validator）
-       ├─ apps/api（只消费 HealthResponse validator 与 provenance）
-       │    └─ GET /health（loopback；formal-dev/test + mock）
-       └─ 当前未被 desktop 或 DB runtime 消费
+contracts/upstream（不可变输入；同一受锁 snapshot）
+  ├─ packages/contracts（bundle / generated TS / runtime validator）
+  │    └─ apps/api → GET /health（loopback；formal-dev/test + mock）
+  └─ packages/database（0001..0009 / catalogue / ledger / verify）
+       └─ 仅由测试提供临时 PG15 client；未被 apps/api 或 desktop 消费
 ```
 
-桌面主链是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用正式九端口。W3 API 是并行、未接线的本机进程，只证明受控配置拒启和合同有效 liveness。
+桌面主链是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用正式九端口。W3 API 与 W4 database 都是并行、未接线的开发模块：前者只证明受控 liveness，后者只证明冻结 DDL 可安全迁移和核验。
 
 ## 2. 目录归属
 
@@ -58,6 +58,7 @@ contracts/upstream（不可变输入）
 | 根 `scripts/` | 合同快照接收与 workspace 卫生门 | Electron 运行时、UI 或打包资产 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
+| `packages/database/` | 在同一已验证快照内确定性生成九个 migration；拥有 catalogue、私有账本、合法前缀规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -68,6 +69,8 @@ contracts/upstream（不可变输入）
 `DEV-M0-W2` 把“合同接收”与“合同编译”分为两个写入所有者：根 intake 脚本验证、保存不可变输入并拥有 rollover/read snapshot 互斥；`packages/contracts/scripts/generate-contracts.mjs` 只从锁内一致快照生成产品资产。生成器拒绝外部 `$ref`、来源版本/双哈希漂移和手改生成物，并保留已登记的 `x-unique-by` 验证扩展；运行时 validator 按 schema 延迟编译，只返回数量有上限的 schema 路径与关键字，不回显请求正文。
 
 `DEV-M0-W3` 由 `apps/api/src/runtime-config.ts` 单独拥有 profile、auth、bind、port、build version 与错误脱敏；配置必须先于 Fastify 构造通过。当前只有 `formal-dev|test + AUTH_MODE=mock + 127.0.0.1` 可启动，且只注册合同校验后的 `GET /health`；自动 HEAD 派生也被关闭。公共 package 入口只提供 `startApi()` 和窄 `close()` 生命周期，不暴露 Fastify 实例或替换路由 owner 的 factory。部署 profile、Feishu auth、`/ready`、`/v1/*`、DB 与桌面 adapter 均未实现或明确拒启。
+
+`DEV-M0-W4` 由 `packages/database` 单独拥有 DDL source split、不可变 SHA catalogue、`customer_agent_meta.schema_migrations` 账本、固定 advisory-lock key、逐 migration 事务与后验验证。生成器机械证明上游可执行区间完整且只归属一次；runner 要求调用方传入同一个已连接 `pg.Client`，并把 migration 与账本行放在同一事务。仓内没有连接工厂或运行时配置，`apps/api` / `apps/desktop` 也没有依赖该包；W5 才能讨论 `/ready` 与 service repository。
 
 ## 3. 三个窗口和安全边界
 
@@ -143,7 +146,7 @@ pnpm build
 | 测试报告 | `apps/desktop/test-results/`、`apps/desktop/playwright-report/` | `pnpm clean:generated` |
 | Vite 临时缓存 | `apps/desktop/node_modules/.vite*` | `pnpm clean:generated` |
 | API TypeScript 输出 | `apps/api/dist/` | `pnpm clean:generated` |
-| 依赖 | 根、`apps/api/node_modules/` 与 `apps/desktop/node_modules/` | 只有归档时才用 `pnpm clean:deep` |
+| 依赖 | 根、`apps/api/node_modules/`、`packages/database/node_modules/` 与 `apps/desktop/node_modules/` | 只有归档时才用 `pnpm clean:deep` |
 | CodeGraph 索引 | `.codegraph/` | 本地工具状态，不进业务提交 |
 | 用户参考 ZIP | `clawd-on-desk-0.15.0.zip` | 只读、忽略、不得复制资源进仓 |
 
@@ -151,7 +154,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译深模块和 W3 API/config 深模块：桌面包、合同包与 API host 所有权分离，桌面运行时权限未放宽。W3 只关闭“配置先行拒启、loopback host 与合同 liveness”实现子项，不关闭 migration、DB、鉴权、ACL、N/N-1、业务端口或 DEV-M0 总门。
+当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译、W3 API/config 与 W4 database migration 三个深模块：桌面包、合同包、API host 和数据库控制面的所有权分离，桌面运行时权限未放宽。W4 关闭的是“DDL 来源锁、migration/账本/事务与 PG15 N-only 后验”实现子项；它不关闭真实 DB 连接、鉴权、N-1 升级、业务端口或 DEV-M0 总门。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 
@@ -170,3 +173,4 @@ Fox presence 的纯姿态解析、deadline 计算与数值几何保留在 `apps/
 - [Application API 启动配置与拒启矩阵](reference-api-runtime-config.md)
 - [`@customer-agent/contracts` 使用与边界](../packages/contracts/README.md)
 - [`@customer-agent/api` 使用与边界](../apps/api/README.md)
+- [`@customer-agent/database` 使用与边界](../packages/database/README.md)

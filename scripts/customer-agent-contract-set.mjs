@@ -430,7 +430,9 @@ export async function withVerifiedContractSetSnapshot(
     const manifestPath = path.join(verified.path, MANIFEST_FILE);
     const manifest = validateManifest(readJson(manifestPath, 'Contract-set manifest'));
     const openapiPath = path.join(verified.path, manifest.openapi.file);
+    const databasePath = path.join(verified.path, manifest.database.file);
     assertRegularFile(openapiPath, 'OpenAPI contract');
+    assertRegularFile(databasePath, 'Database contract');
 
     const snapshot = Object.freeze({
       ...verified,
@@ -441,6 +443,7 @@ export async function withVerifiedContractSetSnapshot(
         database: Object.freeze({ ...manifest.database }),
       }),
       openapi_source: readFileSync(openapiPath, 'utf8'),
+      database_source: readFileSync(databasePath, 'utf8'),
     });
     return await consumer(snapshot);
   } finally {

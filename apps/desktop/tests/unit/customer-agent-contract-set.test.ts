@@ -45,6 +45,7 @@ type ContractSetModule = Readonly<{
       lock: Readonly<Record<string, unknown>>;
       manifest: Readonly<Record<string, unknown>>;
       openapi_source: string;
+      database_source: string;
     }) => Result | Promise<Result>,
   ) => Promise<Result>;
   parseCliArguments: (arguments_: string[]) => Readonly<{
@@ -331,6 +332,7 @@ describe('customer-agent contract-set intake', () => {
       { projectRoot: productRoot, expectedContractSetId: source.contractSetId },
       async (snapshot) => {
         expect(snapshot.openapi_source).toBe(source.openapi);
+        expect(snapshot.database_source).toBe(source.database);
         expect(snapshot.lock).toMatchObject({
           contract_set_id: source.contractSetId,
           runtime_activated: false,
