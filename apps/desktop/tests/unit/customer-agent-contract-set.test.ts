@@ -36,6 +36,17 @@ type ContractSetModule = Readonly<{
     projectRoot: string;
     expectedContractSetId?: string;
   }) => IntakeResult;
+  withVerifiedContractSetSnapshot: <Result>(
+    options: {
+      projectRoot: string;
+      expectedContractSetId?: string;
+    },
+    consumer: (snapshot: IntakeResult & {
+      lock: Readonly<Record<string, unknown>>;
+      manifest: Readonly<Record<string, unknown>>;
+      openapi_source: string;
+    }) => Result | Promise<Result>,
+  ) => Promise<Result>;
   parseCliArguments: (arguments_: string[]) => Readonly<{
     command: 'ingest' | 'verify';
     options: Readonly<Record<string, string>>;
@@ -305,6 +316,36 @@ describe('customer-agent contract-set intake', () => {
       sourceDirectory: source.directory,
       sourceRepositoryRoot: source.repositoryRoot,
     })).toThrow(/already in progress/);
+  });
+
+  it('holds the rollover lock while a verified snapshot consumer is running', async () => {
+    const productRoot = createProductRoot();
+    const source = createContractSet();
+    contractSet.ingestContractSet({
+      projectRoot: productRoot,
+      sourceDirectory: source.directory,
+      sourceRepositoryRoot: source.repositoryRoot,
+    });
+
+    await contractSet.withVerifiedContractSetSnapshot(
+      { projectRoot: productRoot, expectedContractSetId: source.contractSetId },
+      async (snapshot) => {
+        expect(snapshot.openapi_source).toBe(source.openapi);
+        expect(snapshot.lock).toMatchObject({
+          contract_set_id: source.contractSetId,
+          runtime_activated: false,
+        });
+        expect(snapshot.manifest).toMatchObject({ contract_set_id: source.contractSetId });
+        expect(() => contractSet.ingestContractSet({
+          projectRoot: productRoot,
+          sourceDirectory: source.directory,
+          sourceRepositoryRoot: source.repositoryRoot,
+        })).toThrow(/already in progress/);
+        await Promise.resolve();
+      },
+    );
+
+    expect(contractSet.verifyIngestedContractSet({ projectRoot: productRoot }).status).toBe('VERIFIED');
   });
 
   it('rejects a source whose bytes no longer match the manifest', () => {

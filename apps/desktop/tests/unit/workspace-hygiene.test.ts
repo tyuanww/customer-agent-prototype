@@ -41,6 +41,11 @@ function createWorkspaceFixture() {
     path.join(root, 'apps/desktop/package.json'),
     JSON.stringify({ name: '@customer-agent/desktop', version: '0.2.0', private: true }),
   );
+  mkdirSync(path.join(root, 'packages/contracts'), { recursive: true });
+  writeFileSync(
+    path.join(root, 'packages/contracts/package.json'),
+    JSON.stringify({ name: '@customer-agent/contracts', private: true }),
+  );
   for (const relativePath of [
     'release/local-unsigned/package.bin',
     'apps/desktop/out/main.js',
@@ -153,7 +158,7 @@ describe('workspace hygiene', () => {
     }));
   });
 
-  it('requires the unique private desktop package manifest after the mechanical move', () => {
+  it('requires the private workspace package manifests with no toolchain overrides', () => {
     const missingRoot = createWorkspaceFixture();
     rmSync(path.join(missingRoot, 'apps/desktop/package.json'));
     expect(checkWorkspacePolicy(missingRoot).violations).toContainEqual(expect.objectContaining({
@@ -179,6 +184,15 @@ describe('workspace hygiene', () => {
         actual: 'packageManager,engines',
       }),
     ]));
+
+    const missingContractsRoot = createWorkspaceFixture();
+    rmSync(path.join(missingContractsRoot, 'packages/contracts/package.json'));
+    expect(checkWorkspacePolicy(missingContractsRoot).violations).toContainEqual(
+      expect.objectContaining({
+        code: 'WORKSPACE_TARGET_MANIFEST_MISSING',
+        path: 'packages/contracts/package.json',
+      }),
+    );
   });
 
   it('pins product version ownership to the desktop release manifest', () => {
@@ -303,6 +317,7 @@ describe('workspace hygiene', () => {
 
   it('rejects dangling workspace roots and member manifests as unsafe symlinks', () => {
     const root = createWorkspaceFixture();
+    rmSync(path.join(root, 'packages'), { recursive: true, force: true });
     symlinkSync(path.join(root, 'missing-packages'), path.join(root, 'packages'));
     const member = path.join(root, 'apps/dangling-member');
     mkdirSync(member);

@@ -19,6 +19,7 @@ export const REQUIRED_WORKSPACE_PATTERNS = Object.freeze(['apps/*', 'packages/*'
 export const REQUIRED_WORKSPACE_DIRECTORIES = Object.freeze(['apps/desktop']);
 export const REQUIRED_WORKSPACE_PACKAGES = Object.freeze([
   Object.freeze({ directory: 'apps/desktop', name: '@customer-agent/desktop' }),
+  Object.freeze({ directory: 'packages/contracts', name: '@customer-agent/contracts' }),
 ]);
 const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
   REQUIRED_WORKSPACE_PATTERNS.map((pattern) => pattern.slice(0, -2)),

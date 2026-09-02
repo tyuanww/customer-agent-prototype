@@ -291,7 +291,7 @@ function acquireIntakeLock(projectRoot, upstreamRoot) {
     mkdirSync(lockDirectory);
   } catch (error) {
     if (error && typeof error === 'object' && error.code === 'EEXIST') {
-      throw new Error('Another contract intake is already in progress');
+      throw new Error('Another contract-set operation is already in progress');
     }
     throw error;
   }
@@ -398,6 +398,54 @@ export function verifyIngestedContractSet({ projectRoot, expectedContractSetId }
     ddev_authorized: false,
     runtime_activated: false,
   });
+}
+
+/**
+ * Runs a consumer against one coherent, verified contract-set snapshot.
+ *
+ * The shared intake lock stays held until the (possibly async) consumer
+ * finishes, so a lock rollover cannot mix source bytes with another
+ * snapshot's provenance or replace the active input while generated outputs
+ * are being written.
+ */
+export async function withVerifiedContractSetSnapshot(
+  { projectRoot, expectedContractSetId } = {},
+  consumer,
+) {
+  if (typeof consumer !== 'function') {
+    throw new Error('Contract-set snapshot consumer must be a function');
+  }
+
+  const resolvedRoot = assertProjectRoot(projectRoot ?? defaultProjectRoot());
+  const upstreamRoot = path.join(resolvedRoot, UPSTREAM_ROOT);
+  assertDirectory(upstreamRoot, 'Contract-set upstream directory');
+  const releaseIntakeLock = acquireIntakeLock(resolvedRoot, upstreamRoot);
+
+  try {
+    const verified = verifyIngestedContractSet({
+      projectRoot: resolvedRoot,
+      expectedContractSetId,
+    });
+    const lock = validateConsumptionLock(readJson(verified.lock_path, 'Contract-set lock'));
+    const manifestPath = path.join(verified.path, MANIFEST_FILE);
+    const manifest = validateManifest(readJson(manifestPath, 'Contract-set manifest'));
+    const openapiPath = path.join(verified.path, manifest.openapi.file);
+    assertRegularFile(openapiPath, 'OpenAPI contract');
+
+    const snapshot = Object.freeze({
+      ...verified,
+      lock: Object.freeze({ ...lock }),
+      manifest: Object.freeze({
+        ...manifest,
+        openapi: Object.freeze({ ...manifest.openapi }),
+        database: Object.freeze({ ...manifest.database }),
+      }),
+      openapi_source: readFileSync(openapiPath, 'utf8'),
+    });
+    return await consumer(snapshot);
+  } finally {
+    releaseIntakeLock();
+  }
 }
 
 function manifestsMatch(left, right) {

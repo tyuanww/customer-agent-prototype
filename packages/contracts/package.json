@@ -1,0 +1,48 @@
+{
+  "name": "@customer-agent/contracts",
+  "private": true,
+  "type": "module",
+  "description": "客服 Agent 已锁定 OpenAPI 的确定性类型生成与运行时边界校验",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./generated": {
+      "types": "./src/generated/openapi.generated.ts",
+      "import": "./dist/generated/openapi.generated.js"
+    },
+    "./provenance": {
+      "types": "./src/generated/provenance.generated.ts",
+      "import": "./dist/generated/provenance.generated.js"
+    },
+    "./runtime": {
+      "types": "./src/runtime.ts",
+      "import": "./dist/runtime.js"
+    }
+  },
+  "scripts": {
+    "generate": "node scripts/generate-contracts.mjs",
+    "check:generated": "node scripts/generate-contracts.mjs --check",
+    "typecheck": "tsc --noEmit",
+    "build:runtime": "tsc -p tsconfig.build.json",
+    "test:package": "pnpm build:runtime && node --test tests/package-entry.smoke.mjs",
+    "test": "vitest run && pnpm test:package",
+    "build": "pnpm check:generated && pnpm test:package"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.2",
+    "vitest": "3.2.7",
+    "yaml": "2.9.0"
+  }
+}
