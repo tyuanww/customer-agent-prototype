@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。W1 已把既有 Electron 应用机械迁入 `apps/desktop`；W2 新增 `packages/contracts` 编译边界；W3 建立只允许 loopback `/health` 的 `apps/api` 启动骨架；W4 新增独立 `packages/database` migration 控制面；W5 在 API 内新增私有 runtime pool、service repository 与 `/ready`。桌面、鉴权、业务端口和真实数据仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。W1 已把既有 Electron 应用机械迁入 `apps/desktop`；W2 新增 `packages/contracts` 编译边界；W3 建立只允许 loopback `/health` 的 `apps/api` 启动骨架；W4 新增独立 `packages/database` migration 控制面；W5 在 API 内新增私有 runtime pool、service repository 与 `/ready`；W6 增加统一 CI 与非部署型正式服务候选产物边界。桌面、鉴权、业务端口和真实数据仍未接入。
 
 ## 1. 先看整体
 
@@ -59,7 +59,7 @@ apps/api（W5）
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
 | `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、唯一 runtime pool owner、service readiness，以及 `/health` / `/ready` | 桌面 fixture、renderer、migration owner、Feishu auth、业务端口、真实数据或外部 bind |
-| 根 `scripts/` | 合同快照接收与 workspace 卫生门 | Electron 运行时、UI 或打包资产 |
+| 根 `scripts/` | 合同快照接收、workspace 卫生门、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
 | `packages/database/` | 在同一已验证快照内确定性生成九个 migration；拥有 catalogue、私有账本、合法前缀规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
@@ -137,6 +137,8 @@ pnpm --filter @customer-agent/api test:integration # 隔离 PG15 runtime pool/sc
 pnpm contracts:codegen:check # 重新生成到内存并做字节级零漂移检查
 pnpm test:float       # 浮窗相关快速回归
 pnpm test:e2e:float   # build 后只跑浮窗 E2E
+pnpm check            # Linux/本机统一非设备总门；含候选产物生成与扫描
+pnpm artifact:m0:verify # 只复核非部署型 contracts/database/API 候选产物
 pnpm lint
 pnpm typecheck
 pnpm build
@@ -152,6 +154,7 @@ pnpm build
 | --- | --- | --- |
 | Electron/Vite 输出 | `apps/desktop/out/` | `pnpm clean:generated` |
 | 本地未签名包 | `release/local-unsigned/` | `pnpm clean:generated` |
+| W6 非部署型正式服务候选 | `release/m0-formal-runtime-candidate/` | `pnpm artifact:m0:build` 重建；`pnpm clean:generated` 清除 |
 | 派生打包图标 | `apps/desktop/build/icon.png`、`icon.ico`、`icon.icns` | `pnpm clean:generated`；按需重新运行图标生成或打包脚本 |
 | 测试报告 | `apps/desktop/test-results/`、`apps/desktop/playwright-report/` | `pnpm clean:generated` |
 | Vite 临时缓存 | `apps/desktop/node_modules/.vite*` | `pnpm clean:generated` |
@@ -164,7 +167,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译、W3 API/config、W4 database migration 和 W5 runtime repository/readiness：桌面包、合同包、API host、请求路径 pool 与数据库控制面的所有权分离，桌面运行时权限未放宽。W4 关闭“DDL 来源锁、migration/账本/事务与 PG15 N-only 后验”，W5 关闭“本机 runtime pool、schema/ACL 探针与失败关闭 readiness”实现子项；两者都不关闭真实数据、鉴权、N-1 升级、业务端口或 DEV-M0 总门。
+当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译、W3 API/config、W4 database migration、W5 runtime repository/readiness 和 W6 退出证据工具：桌面包、合同包、API host、请求路径 pool 与数据库控制面的所有权分离，桌面运行时权限未放宽。W6 的产物 builder 只在干净工作树自行构建并复制 contracts/database/API 输出，按严格文件类型白名单写逐文件哈希 manifest；verifier 同样要求干净工作树、manifest 构建提交等于当前 HEAD、仓库 intake 合同身份有效且候选合同锁等于仓库受控锁，并排除 desktop、testkit、tests、source map、合成 fixture 模块与常见凭证标记。候选明确不可部署且 `runtime_activated=false`，不关闭真实数据、鉴权、N-1 升级、业务端口、生产部署或真实 Windows 门。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 

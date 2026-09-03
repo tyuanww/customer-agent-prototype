@@ -1,11 +1,11 @@
 # DEV-M0-W5 runtime adapter / service readiness 执行记录
 
 > **文档状态：** `APPROVED · EXECUTION RECORD`
-> **切片状态：** `REVIEW FIX CANDIDATE · IMPLEMENTED · VALIDATED · AWAITING REVIEW FIX COMMIT AUTHORIZATION`
+> **切片状态：** `MERGED · CLOSED`
 > **开工输入：** 用户于 2026-09-03 明确给出“`DEV-M0-W5` 开工”；该授权覆盖 W5 本地分支、实现与验证，不包含提交、推送、PR、合并、真实数据、飞书运行接入、部署或生产
 > **基线：** `origin/main` / `33c40b86504e205e37d92d915405ae55be34c361`
 > **分支：** `codex/dev-m0-w5-runtime-readiness`
-> **PR：** `#14`；Review 修复基线 `981ab403`
+> **PR：** `#14`；Review 修复头 `06eb8223bc6ff4acda9e35e99eb1c686f4a56fe2`；squash 合并头 `49a574a9ff763c64550d87b9e97cf033caf12f90`
 > **边界：** 不注册 `/v1/*`，不接 desktop，不运行 migration，不读取真实客户或飞书数据，不部署、不发布、不激活 runtime
 
 ## 1. 交付结果
@@ -79,8 +79,8 @@ process environment
 
 未运行 Electron E2E、桌面打包、真实数据、飞书 OAuth、共享/托管 PostgreSQL、备份恢复、部署或设备验证。W5 不改变桌面代码或 UI，也没有这些运行面和授权。
 
-W5 不表示 auth/storage/content、九业务端口、真实 adapter 或 Pilot 已可用；`runtime_activated=false` 保持不变。下一步是在 W5 Git 生命周期完成后形成 DEV-M0 退出复核，再单独评审 DEV-M1，不能由本执行记录自动放行。
+W5 不表示 auth/storage/content、九业务端口、真实 adapter 或 Pilot 已可用；`runtime_activated=false` 保持不变。下一步由 W6 形成 DEV-M0 的 clean-checkout CI、Windows 可行性 smoke 与候选产物隔离证据，再单独评审 DEV-M1，不能由本执行记录自动放行。
 
 ## 6. Review 收口
 
-`/plan-eng-review` 已在实现前完成，结论为 CLEAR、0 unresolved。实现后 `/review` 对 PR #14 执行核心、测试、可维护性、安全、性能与 PostgreSQL/API 合同专项复核。Review 修复进一步关闭了 event-loop stall 后的 deadline 假绿、漏列传递函数、runtime login 反向成员、任意非 owner 的 `public CREATE`、`digest` 脱离 extension owner，以及未穿透 package/main 入口的 smoke 缺口；对应确定性单测、compiled smoke 与临时 PG15 负例均已补齐。最终本地复核为 `clean`，无延后 finding；提交、推送、PR 更新与合并仍分别等待授权。
+`/plan-eng-review` 已在实现前完成，结论为 CLEAR、0 unresolved。实现后 `/review` 对 PR #14 执行核心、测试、可维护性、安全、性能与 PostgreSQL/API 合同专项复核。Review 修复进一步关闭了 event-loop stall 后的 deadline 假绿、漏列传递函数、runtime login 反向成员、任意非 owner 的 `public CREATE`、`digest` 脱离 extension owner，以及未穿透 package/main 入口的 smoke 缺口；对应确定性单测、compiled smoke 与临时 PG15 负例均已补齐。最终复核为 `clean`，修复头 `06eb822` 于 2026-09-03 通过 PR #14 squash 合并为 `49a574a`；远端与本地候选分支均已清理。

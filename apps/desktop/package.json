@@ -14,6 +14,7 @@
     "test:float": "vitest run tests/unit/overlay-chrome-window.test.ts tests/unit/overlay-geometry.test.ts tests/unit/fox-presence.test.ts tests/unit/fox-motion.test.ts tests/unit/overlay-events.test.ts tests/unit/fox-peek-access.test.ts tests/component/FoxApp.test.tsx",
     "test:assets": "vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts",
     "test:e2e:float": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @float",
+    "test:e2e:windows-feasibility": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @windows-feasibility",
     "build": "electron-vite build",
     "generate:mac-icon": "sh scripts/generate-mac-icon.sh",
     "generate:fox-head": "node scripts/generate-fox-head.mjs",

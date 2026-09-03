@@ -32,6 +32,7 @@ pnpm -v    # 项目锁定 11.19.0
 | 仓内现有狐狸 / App 图标合同仍成立 | `pnpm test:assets` | 否 | **否**（只读现有资产；临时目录自测不等于改仓） | 否 |
 | 带 `@float` 标签的 Electron 浮窗 smoke | `pnpm test:e2e:float` | 只覆盖 smoke 里标注 `@float` 的用例 | 否 | **是**（脚本自身先 `pnpm build`） |
 | 静态质量 + 全量 unit/component | `pnpm lint` `pnpm typecheck` `pnpm test` `pnpm build` | `pnpm test` 含 `overlay-controller-fox-settle`，仍不是真实 OS 拖拽 | 否 | `pnpm build` 本身是构建 |
+| W6 统一非设备总门 | `pnpm check` | 含全量 unit/component，不含真实 OS 人工门 | 否 | 是；并生成/扫描非部署型正式服务候选 |
 | W4 database 全门禁 | `pnpm test:db` | 不涉及桌面拖拽 | 否 | 会构建 database package，并启动一次性 PG15 cluster |
 | 全量 Electron Playwright | `pnpm test:e2e` | 含浮窗与 Dashboard smoke，仍不是真实设备门禁 | 否 | **是** |
 | 本机未签名 macOS 证明包 | `pnpm package:mac:local` | 否 | 会先 `generate:app-icons` | 会先 `pnpm build` |
@@ -189,6 +190,17 @@ node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/script
 `apps/desktop/scripts/verify-windows-package.mjs` 能证明：存在 `UNSIGNED.exe`、无更新元数据、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致、许可文件非空。
 
 它**不能**证明：PE 可执行文件内部图标资源、Authenticode / EV 签名、真实 Windows 安装、任务栏图标。对应验收必须在 Windows 设备上做。禁止把未签名产物写成已签名。
+
+W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上执行 `pnpm test:e2e:windows-feasibility` 与 `pnpm package:win`。定向 E2E 会实际启动 Electron，确认 Fox / Query 两个 overlay 使用透明背景、快捷键注册成功、查询窗可打开并能干净退出；它比“脚本存在”多证明一次 clean-checkout 的 Windows 运行路径与未签名产物后验，但仍不是企业坐席真机、IME/DPI/读屏、真实 OS 按键投递、GPU 合成观感、签名、更新或 Pilot 验收。
+
+### 3.4 W6 正式服务候选产物
+
+```bash
+pnpm artifact:m0:build
+pnpm artifact:m0:verify
+```
+
+`artifact:m0:build` 和 `artifact:m0:verify` 都只接受干净工作树；builder 会自行执行全包构建，避免把旧 `dist` 误绑定到当前提交。输出位于 `release/m0-formal-runtime-candidate/`，只允许 `.js`、`.d.ts`、`.json`，内容包括 contracts、database（排除 testkit）和 API 编译结果、合同消费锁及逐文件 SHA-256 manifest。manifest 固定 `deployable=false`、`runtime_activated=false`；验证器要求 `build_git_sha` 与当前 HEAD 一致、合同身份通过仓库 intake 验证、候选合同锁与仓库受控锁逐字节一致，并拒绝 source map、tests/testkit、符号链接、桌面合成 fixture 模块、E2E 开关和常见凭证格式。该目录是 M0 构建隔离证据，不是可部署生产包。
 
 ---
 

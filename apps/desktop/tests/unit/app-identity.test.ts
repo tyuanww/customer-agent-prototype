@@ -242,11 +242,12 @@ describe('brand icon assets', () => {
       '/repo/customer-agent-prototype/apps/desktop/fox-head.png',
     ]);
     expect(trayIconCandidates(devLocation).join('\n')).not.toContain('app-icon.png');
-    expect(packagedAppIconCandidates(packagedMac).join('\n')).not.toContain('fox-head.png');
-    expect(packagedAppIconCandidates(packagedMac)).toEqual([
+    const packagedMacCandidates = packagedAppIconCandidates(packagedMac, 'darwin');
+    expect(packagedMacCandidates.join('\n')).not.toContain('fox-head.png');
+    expect(packagedMacCandidates).toEqual([
       '/Applications/Demo.app/Contents/Resources/icon.icns',
     ]);
-    expect(packagedAppIconCandidates(packagedMac).join('\n')).not.toContain('electron.icns');
+    expect(packagedMacCandidates.join('\n')).not.toContain('electron.icns');
 
     const identity = readFileSync(path.join(root, 'src/main/app-identity.ts'), 'utf8');
     expect(identity).toContain('loadAppNativeImage');

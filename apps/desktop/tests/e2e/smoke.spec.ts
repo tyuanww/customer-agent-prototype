@@ -677,6 +677,49 @@ test('documents that globalShortcut is exercised via the same main harness, not 
   }
 });
 
+test('@windows-feasibility launches transparent overlays, registers the shortcut, and exits cleanly', async () => {
+  const app = await launchApp();
+  try {
+    const fox = await waitForRole(app, 'fox');
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    await expect(fox.getByTestId('fox-button')).toBeVisible();
+
+    const startup = await app.evaluate(async ({ BrowserWindow }) => {
+      const harness = (globalThis as {
+        __demoTest?: {
+          shortcutRegistered: () => boolean;
+          expand: () => void;
+        };
+      }).__demoTest;
+      if (!harness) throw new Error('DEMO_E2E harness missing');
+      const foxWindow = BrowserWindow.getAllWindows()
+        .find((win) => win.webContents.getURL().includes('role=fox'));
+      if (!foxWindow) throw new Error('Fox BrowserWindow missing');
+      const foxCornerAlpha = (await foxWindow.webContents.capturePage()).toBitmap()[3];
+      harness.expand();
+      return { shortcutRegistered: harness.shortcutRegistered(), foxCornerAlpha };
+    });
+
+    expect(startup.shortcutRegistered).toBe(true);
+    expect(startup.foxCornerAlpha).toBe(0);
+    await waitForInteractiveQuery(app, query);
+    const queryCornerAlpha = await app.evaluate(async ({ BrowserWindow }) => {
+      const queryWindow = BrowserWindow.getAllWindows()
+        .find((win) => win.webContents.getURL().includes('role=query'));
+      if (!queryWindow) throw new Error('Query BrowserWindow missing');
+      return (await queryWindow.webContents.capturePage()).toBitmap()[3];
+    });
+    expect(queryCornerAlpha).toBe(0);
+    await expect.poll(async () => {
+      const windows = await windowSnapshot(app);
+      return windows.find((item) => item.role === 'fox')?.visible;
+    }).toBe(false);
+  } finally {
+    await app.close();
+  }
+});
+
 test('resizes the query window by result count in one session', async () => {
   const app = await launchApp();
   try {

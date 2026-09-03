@@ -6,7 +6,7 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，W2 在 `packages/contracts` 中建立合同 codegen/runtime validation，W3 建立 loopback API/config 骨架，W4 已在独立 `packages/database` 中实现并验证不可变 PostgreSQL 15 migration 控制面，W5 本地候选再接入私有 runtime pool 与 `/ready`。数据库仍未接入桌面端，业务端口与正式 runtime 也未激活；可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`。复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，W2 在 `packages/contracts` 中建立合同 codegen/runtime validation，W3 建立 loopback API/config 骨架，W4 已实现并验证不可变 PostgreSQL 15 migration 控制面，W5 已通过 PR #14 合并私有 runtime pool 与 `/ready`。当前 W6 只收口 CI、Windows 可行性 smoke 和不含桌面合成运行面的正式服务候选产物；数据库仍未接入桌面端，业务端口与正式 runtime 也未激活。可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`，复制只表示「已复制」，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -30,6 +30,7 @@
 | 查看 W3 API/config bootstrap 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md](docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md) |
 | 查看 W4 PostgreSQL migration 控制面的实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md](docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md) |
 | 查看 W5 runtime pool / service readiness 的实施边界与证据 | [docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md](docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md) |
+| 查看 W6 CI、Windows smoke 与正式服务候选产物的退出收口 | [docs/plans/2026-09-03-dev-m0-w6-exit-closure.md](docs/plans/2026-09-03-dev-m0-w6-exit-closure.md) |
 | 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |

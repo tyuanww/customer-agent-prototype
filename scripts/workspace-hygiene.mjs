@@ -39,6 +39,7 @@ export const WORKSPACE_REMAINDER_BUDGET_BYTES = 32 * 1024 * 1024;
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
   'release/local-unsigned',
+  'release/m0-formal-runtime-candidate',
   'apps/api/dist',
   'packages/database/dist',
   'apps/desktop/out',

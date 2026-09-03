@@ -2,7 +2,7 @@
 
 > **生效：** 2026-08-21
 > **仓库身份：** 客服 Agent 产品实施仓
-> **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 已于 2026-08-31 开工，W1 完成 workspace 机械迁移，W2 建立 `packages/contracts` 合同编译边界，W3 建立本机 API/config 骨架，W4 已实现并验证独立 `packages/database` 不可变 migration / PostgreSQL 15 控制面；W5 已实现并验证 runtime pool、service repository 与 `/ready`。桌面、业务端口和真实数据仍未接库，当前桌面运行链仍是 `PILOT-S0 · SYNTHETIC` 合成基线
+> **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 已于 2026-08-31 开工，W1 完成 workspace 机械迁移，W2 建立 `packages/contracts` 合同编译边界，W3 建立本机 API/config 骨架，W4 已实现并验证独立 `packages/database` 不可变 migration / PostgreSQL 15 控制面；W5 已通过 PR #14 合并 runtime pool、service repository 与 `/ready`。W6 正在收口统一 CI、Windows 可行性 smoke 与正式服务候选产物隔离证据。桌面、业务端口和真实数据仍未接库，当前桌面运行链仍是 `PILOT-S0 · SYNTHETIC` 合成基线
 > **目录名说明：** `customer-agent-prototype` 是历史目录名，不再代表仓库只做原型。
 
 ## 1. 两个仓库各自负责什么
@@ -34,7 +34,7 @@
 - 项目记录仓已签发 `DEC-DDEV-01=PASS`，用户已明确给出产品仓开工授权；本仓只能在批准的 `DEV-M0` 开发 / 测试范围内推进。
 - W0 pre-move 基线与 workspace scaffold 已留作历史；W1 已把原 Electron 源码、测试、资产、配置和打包脚本原样迁入唯一可运行包 `apps/desktop`，根目录只保留 workspace 命令门面与仓级合同 / 卫生工具；产品版本也只由 `apps/desktop/package.json` 拥有。
 - W2 已在独立 `packages/contracts` 中完成确定性 bundle、TypeScript 类型、provenance、codegen manifest 与 132 个 component runtime validator；包构建产出 Node 可执行 `dist`，validator 按 schema 延迟编译，并保留合同的 `x-unique-by` 校验语义。
-- 正式合同快照继续保持 `ddev_authorized=false`、`runtime_activated=false`；W3 新增 loopback Fastify `/health` 与配置拒启矩阵，W4 从受锁 DDL 快照确定性生成九个不可变 migration，并完成私有账本、同会话 advisory lock、逐段事务、失败关闭后验及隔离 PG15 测试。W5 候选变更新增一个 runtime pool owner 与合同 `/ready`：database/schema 做真实只读检查，auth/storage/content 在 M1/M2 前固定 `not_ready`。API 不自动执行 migration、不注册九业务端口，也不把 desktop 或真实数据接入运行链。
+- 正式合同快照继续保持 `ddev_authorized=false`、`runtime_activated=false`；W3 新增 loopback Fastify `/health` 与配置拒启矩阵，W4 从受锁 DDL 快照确定性生成九个不可变 migration，并完成私有账本、同会话 advisory lock、逐段事务、失败关闭后验及隔离 PG15 测试。W5 已新增一个 runtime pool owner 与合同 `/ready`：database/schema 做真实只读检查，auth/storage/content 在 M1/M2 前固定 `not_ready`。W6 只建立 clean-checkout CI、Windows hosted-runner smoke 和非部署型正式服务候选产物后验。API 不自动执行 migration、不注册九业务端口，也不把 desktop 或真实数据接入运行链。
 - 真实数据、飞书运行接入、Pilot、付费、遥测、自动发送、部署和发布均未放行。
 
 ### 保留开发基线：`PILOT-S0 · SYNTHETIC`
