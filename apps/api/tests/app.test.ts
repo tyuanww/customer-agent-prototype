@@ -15,14 +15,21 @@ import { createApiApp } from '../src/app.js';
 import {
   ApiConfigError,
   parseApiDatabaseBootstrapConfig,
+  parseApiPrivateBootstrapConfig,
   parseApiRuntimeConfig,
 } from '../src/runtime-config.js';
+import type { PolicyAdminRepository } from '../src/policy-admin-repository.js';
+import {
+  createPolicyAdminRepository,
+  createPolicyAdminRepositoryForPool,
+} from '../src/policy-admin-repository.js';
 import {
   createRuntimePoolVerify,
   createServiceRepository,
   createServiceRepositoryForPool,
   runtimeConnectionExceededDeadline,
   type ServiceReadinessChecks,
+  type ServicePolicyFlags,
   type ServiceRepository,
 } from '../src/service-repository.js';
 import { startApi, startApiWithFactory } from '../src/server.js';
@@ -45,6 +52,19 @@ const W5_NOT_READY = Object.freeze({
   content: 'not_ready',
 } satisfies ServiceReadinessChecks);
 
+const M1_AUTH_READY = Object.freeze({
+  ...W5_NOT_READY,
+  auth: 'ok',
+} satisfies ServiceReadinessChecks);
+
+const PHASE1_POLICY_OFF = Object.freeze({
+  rewrite: false,
+  auto_send: false,
+  autofill_adapter: false,
+  llm_ranker: false,
+  metrics_experimental_kpi: false,
+} satisfies ServicePolicyFlags);
+
 afterEach(async () => {
   vi.useRealTimers();
   await Promise.all(openApps.splice(0).map(async (app) => app.close()));
@@ -63,11 +83,25 @@ function stubRepository(
   checks: ServiceReadinessChecks = W5_NOT_READY,
 ): ServiceRepository & Readonly<{
   readiness: ReturnType<typeof vi.fn<ServiceRepository['readiness']>>;
+  readPolicyFlags: ReturnType<typeof vi.fn<ServiceRepository['readPolicyFlags']>>;
   close: ReturnType<typeof vi.fn<ServiceRepository['close']>>;
 }> {
   return {
     readiness: vi.fn<ServiceRepository['readiness']>().mockResolvedValue(checks),
+    readPolicyFlags: vi.fn<ServiceRepository['readPolicyFlags']>()
+      .mockResolvedValue(PHASE1_POLICY_OFF),
     close: vi.fn<ServiceRepository['close']>().mockResolvedValue(undefined),
+  };
+}
+
+function stubPolicyAdminRepository(): PolicyAdminRepository & Readonly<{
+  setPolicyFlag: ReturnType<typeof vi.fn<PolicyAdminRepository['setPolicyFlag']>>;
+  close: ReturnType<typeof vi.fn<PolicyAdminRepository['close']>>;
+}> {
+  return {
+    setPolicyFlag: vi.fn<PolicyAdminRepository['setPolicyFlag']>()
+      .mockResolvedValue(Object.freeze({ ok: true })),
+    close: vi.fn<PolicyAdminRepository['close']>().mockResolvedValue(undefined),
   };
 }
 
@@ -77,6 +111,13 @@ function databaseEnvironment(overrides: Record<string, string> = {}) {
     AUTH_MODE: 'mock',
     CUSTOMER_AGENT_API_PORT: '0',
     DATABASE_URL: 'postgresql://w5_runtime:PASSWORD@127.0.0.1:1/w5_test',
+    CONTENT_ADMIN_DATABASE_URL: 'postgresql://w1b_admin:PASSWORD@127.0.0.1:1/w5_test',
+    IDEMPOTENCY_HMAC_KEYS: JSON.stringify({
+      'hmac-idempotency-v1': 'synthetic-idempotency-material-0001',
+    }),
+    IDEMPOTENCY_HMAC_CURRENT_VERSION: 'hmac-idempotency-v1',
+    LOG_HASH_KEY: 'synthetic-log-hash-material-00000001',
+    LOG_HASH_KEY_VERSION: 'hmac-log-v1',
     DB_CONNECTION_TIMEOUT_MS: '100',
     DB_READINESS_TIMEOUT_MS: '100',
     ...overrides,
@@ -122,7 +163,7 @@ describe('Application API bootstrap', () => {
     const app = createApiApp(testConfig(), repository, diagnostics);
     openApps.push(app);
 
-    for (const dependency of Object.keys(ALL_READY) as (keyof ServiceReadinessChecks)[]) {
+    for (const dependency of ['database', 'schema', 'storage', 'content'] as const) {
       repository.readiness.mockResolvedValueOnce({
         ...ALL_READY,
         [dependency]: 'not_ready',
@@ -137,6 +178,11 @@ describe('Application API bootstrap', () => {
       });
     }
 
+    repository.readiness.mockResolvedValueOnce({ ...ALL_READY, auth: 'not_ready' });
+    const repositoryCannotOwnAuth = await app.inject({ method: 'GET', url: '/ready' });
+    expect(repositoryCannotOwnAuth.statusCode).toBe(200);
+    expect(repositoryCannotOwnAuth.json()).toEqual({ status: 'ready', checks: ALL_READY });
+
     repository.readiness.mockRejectedValueOnce(new Error('private DSN and SQL'));
     const failed = await app.inject({ method: 'GET', url: '/ready' });
     expect(failed.statusCode).toBe(503);
@@ -145,7 +191,7 @@ describe('Application API bootstrap', () => {
       checks: {
         database: 'not_ready',
         schema: 'not_ready',
-        auth: 'not_ready',
+        auth: 'ok',
         storage: 'not_ready',
         content: 'not_ready',
       },
@@ -158,7 +204,28 @@ describe('Application API bootstrap', () => {
     });
   });
 
-  it('keeps the exact method and W5 route surface', async () => {
+  it('normalizes unhandled request failures without reflecting private error text', async () => {
+    const diagnostics = vi.fn();
+    const app = createApiApp(testConfig(), stubRepository(), diagnostics);
+    openApps.push(app);
+    app.get('/_synthetic-request-failure', async () => {
+      throw new Error('private DSN and request payload must not escape');
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/_synthetic-request-failure' });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({
+      error: { code: 'INTERNAL', message: '服务内部错误' },
+    });
+    expect(response.body).not.toContain('private DSN');
+    expect(response.body).not.toContain('request payload');
+    expect(diagnostics).toHaveBeenCalledOnce();
+    expect(diagnostics).toHaveBeenCalledWith({ code: 'API_REQUEST_FAILED' });
+    expect(JSON.stringify(diagnostics.mock.calls)).not.toContain('private DSN');
+  });
+
+  it('keeps the exact method surface while unimplemented M1 ports remain absent', async () => {
     const app = createApiApp(testConfig(), stubRepository());
     openApps.push(app);
 
@@ -171,6 +238,349 @@ describe('Application API bootstrap', () => {
     for (const url of ['/v1/auth/mock-login', '/v1/search']) {
       const response = await app.inject({ method: 'GET', url });
       expect(response.statusCode, url).toBe(404);
+    }
+  });
+
+  it('creates an opaque process-local mock session and resolves only its bearer token', async () => {
+    const app = createApiApp(testConfig(), stubRepository());
+    openApps.push(app);
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/mock-login',
+      payload: { user_id: 'usr_synthetic_agent_001', role: 'agent' },
+    });
+    expect(login.statusCode).toBe(200);
+    expect(login.headers['cache-control']).toBe('no-store');
+    const session = login.json<{ token: string; user: { user_id: string; role: string } }>();
+    expect(session.user).toEqual({ user_id: 'usr_synthetic_agent_001', role: 'agent' });
+    expect(session.token).toMatch(/^mock_[a-f0-9]{32}$/);
+    expect(session.token).not.toContain(session.user.user_id);
+
+    const current = await app.inject({
+      method: 'GET',
+      url: '/v1/auth/me',
+      headers: { authorization: `Bearer ${session.token}` },
+    });
+    expect(current.statusCode).toBe(200);
+    expect(current.headers['cache-control']).toBe('no-store');
+    expect(current.json()).toEqual({
+      user_id: 'usr_synthetic_agent_001',
+      role: 'agent',
+      auth_mode: 'mock',
+    });
+
+    const lowercaseScheme = await app.inject({
+      method: 'GET',
+      url: '/v1/auth/me',
+      headers: { authorization: `bearer ${session.token}` },
+    });
+    expect(lowercaseScheme.statusCode).toBe(200);
+
+    const headerIdentity = await app.inject({
+      method: 'GET',
+      url: '/v1/auth/me',
+      headers: {
+        'x-mock-user': 'usr_synthetic_owner_001',
+        'x-mock-role': 'owner',
+      },
+    });
+    expect(headerIdentity.statusCode).toBe(200);
+    expect(headerIdentity.json()).toEqual({
+      user_id: 'usr_synthetic_owner_001',
+      role: 'owner',
+      auth_mode: 'mock',
+    });
+  });
+
+  it('rejects malformed claims, unknown fields and invalid bearer credentials with contract envelopes', async () => {
+    const app = createApiApp(testConfig(), stubRepository());
+    openApps.push(app);
+
+    for (const payload of [
+      { user_id: '', role: 'agent' },
+      { user_id: 'usr_synthetic_agent_001', role: 'admin' },
+      { user_id: 'usr_synthetic_agent_001', role: 'agent', token: 'injected' },
+    ]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/auth/mock-login',
+        payload,
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: { code: 'VALIDATION', message: '请求不符合已冻结合同' },
+      });
+    }
+
+    for (const headers of [
+      {},
+      { authorization: 'Basic value' },
+      { authorization: 'Bearer missing' },
+      { 'x-mock-user': 'usr_synthetic_agent_001' },
+      { 'x-mock-role': 'agent' },
+      { 'x-mock-user': 'usr_synthetic_agent_001', 'x-mock-role': 'admin' },
+      {
+        authorization: 'Bearer missing',
+        'x-mock-user': 'usr_synthetic_agent_001',
+        'x-mock-role': 'agent',
+      },
+    ]) {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/auth/me',
+        headers,
+      });
+      expect(response.statusCode).toBe(401);
+      expect(response.headers['www-authenticate']).toBe('Bearer');
+      expect(response.json()).toEqual({
+        error: { code: 'UNAUTHORIZED', message: '缺少或无法验证会话' },
+      });
+    }
+  });
+
+  it('rejects oversized or malformed JSON with the stable validation envelope', async () => {
+    const app = createApiApp(testConfig(), stubRepository());
+    openApps.push(app);
+
+    for (const { headers, payload } of [
+      {
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({ user_id: 'x'.repeat(32_768), role: 'agent' }),
+      },
+      { headers: { 'content-type': 'application/json' }, payload: '{"user_id":' },
+      { headers: { 'content-type': 'application/json' }, payload: '' },
+      { headers: {}, payload: 'not-json' },
+    ]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/auth/mock-login',
+        headers,
+        payload,
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: { code: 'VALIDATION', message: '请求不符合已冻结合同' },
+      });
+    }
+  });
+
+  it('reads Phase 1 policy only for an authenticated identity and fails closed', async () => {
+    const repository = stubRepository();
+    const app = createApiApp(testConfig(), repository);
+    openApps.push(app);
+
+    const unauthorized = await app.inject({ method: 'GET', url: '/v1/policy' });
+    expect(unauthorized.statusCode).toBe(401);
+    expect(repository.readPolicyFlags).not.toHaveBeenCalled();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/policy',
+      headers: { 'x-mock-user': 'usr_synthetic_agent_001', 'x-mock-role': 'agent' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.json()).toEqual({ ...PHASE1_POLICY_OFF, auth_mode: 'mock' });
+
+    repository.readPolicyFlags.mockResolvedValueOnce({
+      ...PHASE1_POLICY_OFF,
+      private_database_field: 'must-not-cross-wire-boundary',
+    } as never);
+    const allowlisted = await app.inject({
+      method: 'GET',
+      url: '/v1/policy',
+      headers: { 'x-mock-user': 'usr_synthetic_agent_001', 'x-mock-role': 'agent' },
+    });
+    expect(allowlisted.statusCode).toBe(200);
+    expect(allowlisted.json()).toEqual({ ...PHASE1_POLICY_OFF, auth_mode: 'mock' });
+    expect(allowlisted.body).not.toContain('must-not-cross-wire-boundary');
+
+    repository.readPolicyFlags.mockResolvedValueOnce(null);
+    const unavailable = await app.inject({
+      method: 'GET',
+      url: '/v1/policy',
+      headers: { 'x-mock-user': 'usr_synthetic_agent_001', 'x-mock-role': 'agent' },
+    });
+    expect(unavailable.statusCode).toBe(503);
+    expect(unavailable.headers['retry-after']).toBe('1');
+    expect(unavailable.json()).toEqual({
+      error: { code: 'OVERLOADED', message: '服务暂不可用' },
+    });
+  });
+
+  it('authorizes and validates policy writes before selecting the admin capability', async () => {
+    const adminRepository = stubPolicyAdminRepository();
+    const app = createApiApp(
+      testConfig(),
+      stubRepository(),
+      undefined,
+      undefined,
+      adminRepository,
+    );
+    openApps.push(app);
+    const payload = {
+      flag_key: 'llm_ranker',
+      flag_value: true,
+      adr_id: 'ADR-SYNTHETIC-001',
+    };
+
+    const unauthorized = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: { 'idempotency-key': 'synthetic-policy-001' },
+      payload,
+    });
+    expect(unauthorized.statusCode).toBe(401);
+    expect(adminRepository.setPolicyFlag).not.toHaveBeenCalled();
+
+    const forbidden = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: {
+        'x-mock-user': 'usr_synthetic_agent_001',
+        'x-mock-role': 'agent',
+        'idempotency-key': 'synthetic-policy-001',
+      },
+      payload,
+    });
+    expect(forbidden.statusCode).toBe(403);
+    expect(forbidden.json()).toMatchObject({ error: { code: 'FORBIDDEN' } });
+    expect(adminRepository.setPolicyFlag).not.toHaveBeenCalled();
+
+    const hardOff = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: {
+        'x-mock-user': 'usr_synthetic_owner_001',
+        'x-mock-role': 'owner',
+        'idempotency-key': 'synthetic-policy-002',
+      },
+      payload: { flag_key: 'rewrite', flag_value: true, adr_id: 'ADR-SYNTHETIC-002' },
+    });
+    expect(hardOff.statusCode).toBe(403);
+    expect(hardOff.json()).toMatchObject({
+      error: {
+        code: 'POLICY_DENIED',
+        details: {
+          reason: 'PHASE1_HARD_OFF',
+          flag_key: 'rewrite',
+          requested_value: true,
+        },
+      },
+    });
+    expect(adminRepository.setPolicyFlag).not.toHaveBeenCalled();
+
+    const missingKey = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: {
+        'x-mock-user': 'usr_synthetic_owner_001',
+        'x-mock-role': 'owner',
+      },
+      payload,
+    });
+    expect(missingKey.statusCode).toBe(400);
+
+    const success = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: {
+        'x-mock-user': 'usr_synthetic_owner_001',
+        'x-mock-role': 'owner',
+        'idempotency-key': 'synthetic-policy-003',
+      },
+      payload,
+    });
+    expect(success.statusCode).toBe(200);
+    expect(success.headers['cache-control']).toBe('no-store');
+    expect(success.json()).toEqual({
+      ok: true,
+      flag_key: 'llm_ranker',
+      flag_value: true,
+    });
+    expect(adminRepository.setPolicyFlag).toHaveBeenCalledOnce();
+
+    adminRepository.setPolicyFlag.mockResolvedValueOnce({ ok: false, code: 'OVERLOADED' });
+    const unavailable = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: {
+        'x-mock-user': 'usr_synthetic_owner_001',
+        'x-mock-role': 'owner',
+        'idempotency-key': 'synthetic-policy-004',
+      },
+      payload,
+    });
+    expect(unavailable.statusCode).toBe(503);
+  });
+
+  it('maps a bounded set of transient PostgreSQL policy failures to retryable overload', async () => {
+    const failures = [
+      ...['08006', '53300', '55P03', '57014', '57P01', '57P02', '57P03', 'ECONNREFUSED']
+        .map((code) => ({
+        label: code,
+        error: Object.assign(new Error('synthetic database failure'), { code }),
+        })),
+      { label: 'driver-query-timeout', error: new Error('Query read timeout') },
+      {
+        label: 'driver-active-connection-terminated',
+        error: new Error('Connection terminated unexpectedly'),
+      },
+      {
+        label: 'driver-connection-terminated',
+        error: new Error('Connection terminated'),
+      },
+      {
+        label: 'driver-client-no-longer-queryable',
+        error: new Error(
+          'Client has encountered a connection error and is not queryable',
+        ),
+      },
+      {
+        label: 'driver-client-was-closed',
+        error: new Error('Client was closed and is not queryable'),
+      },
+      {
+        label: 'pool-connect-timeout',
+        error: new Error('timeout exceeded when trying to connect'),
+      },
+    ];
+    for (const { label, error } of failures) {
+      const policyAdminRepository = createPolicyAdminRepositoryForPool({
+        query: vi.fn().mockRejectedValue(error),
+        end: vi.fn().mockResolvedValue(undefined),
+        on: vi.fn(),
+      });
+      const app = createApiApp(
+        testConfig(),
+        stubRepository(),
+        undefined,
+        undefined,
+        policyAdminRepository,
+      );
+      openApps.push(app);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/policy/flags',
+        headers: {
+          'x-mock-user': 'usr_synthetic_owner_001',
+          'x-mock-role': 'owner',
+          'idempotency-key': `synthetic-policy-${label}`,
+        },
+        payload: {
+          flag_key: 'llm_ranker',
+          flag_value: true,
+          adr_id: 'ADR-SYNTHETIC-RETRY',
+        },
+      });
+
+      expect(response.statusCode, label).toBe(503);
+      expect(response.headers['retry-after'], label).toBe('1');
+      expect(response.json(), label).toEqual({
+        error: { code: 'OVERLOADED', message: '服务暂不可用' },
+      });
     }
   });
 
@@ -196,7 +606,7 @@ describe('Application API bootstrap', () => {
       DATABASE_URL: environment.DATABASE_URL,
     })).toEqual({
       connectionString: environment.DATABASE_URL,
-      poolMax: 20,
+      poolMax: 18,
       connectionTimeoutMs: 2000,
       readinessTimeoutMs: 2000,
     });
@@ -237,6 +647,61 @@ describe('Application API bootstrap', () => {
         field: 'DATABASE_URL',
         reason: 'missing',
       });
+    }
+  });
+
+  it('validates isolated key domains and a shared two-pool connection budget', () => {
+    const environment = databaseEnvironment({
+      DB_POOL_MAX: '16',
+      CONTENT_ADMIN_DB_POOL_MAX: '2',
+    });
+    const bootstrap = parseApiPrivateBootstrapConfig(environment);
+
+    expect(bootstrap.runtimeDatabase).toMatchObject({
+      connectionString: environment.DATABASE_URL,
+      poolMax: 16,
+    });
+    expect(bootstrap.policyAdminDatabase).toMatchObject({
+      connectionString: environment.CONTENT_ADMIN_DATABASE_URL,
+      poolMax: 2,
+    });
+    expect(bootstrap.idempotencyHmac).toEqual({
+      currentVersion: 'hmac-idempotency-v1',
+      keys: { 'hmac-idempotency-v1': 'synthetic-idempotency-material-0001' },
+    });
+    expect(bootstrap.logHash).toEqual({
+      version: 'hmac-log-v1',
+      key: 'synthetic-log-hash-material-00000001',
+    });
+    expect(Object.isFrozen(bootstrap)).toBe(true);
+    expect(Object.isFrozen(bootstrap.idempotencyHmac.keys)).toBe(true);
+
+    for (const [overrides, field] of [
+      [{ CONTENT_ADMIN_DATABASE_URL: environment.DATABASE_URL }, 'CONTENT_ADMIN_DATABASE_URL'],
+      [{ CONTENT_ADMIN_DATABASE_URL: 'postgresql://w5_runtime@127.0.0.1:1/w5_admin' }, 'CONTENT_ADMIN_DATABASE_URL'],
+      [{ CONTENT_ADMIN_DATABASE_URL: 'postgresql://w1b_admin@127.0.0.1:2/w5_test' }, 'CONTENT_ADMIN_DATABASE_URL'],
+      [{ CONTENT_ADMIN_DATABASE_URL: 'postgresql://w1b_admin@127.0.0.1:1/w5_admin' }, 'CONTENT_ADMIN_DATABASE_URL'],
+      [{ CONTENT_ADMIN_DATABASE_URL: 'postgresql://w1b_admin@localhost:1/w5_test' }, 'CONTENT_ADMIN_DATABASE_URL'],
+      [{ DB_POOL_MAX: '19', CONTENT_ADMIN_DB_POOL_MAX: '2' }, 'CONTENT_ADMIN_DB_POOL_MAX'],
+      [{ IDEMPOTENCY_HMAC_KEYS: '{bad-json' }, 'IDEMPOTENCY_HMAC_KEYS'],
+      [{
+        IDEMPOTENCY_HMAC_KEYS: JSON.stringify({
+          'hmac-idempotency-v1': 'synthetic-idempotency-material-0001',
+          'hmac-idempotency-v2': 'synthetic-idempotency-material-0001',
+        }),
+      }, 'IDEMPOTENCY_HMAC_KEYS'],
+      [{ IDEMPOTENCY_HMAC_CURRENT_VERSION: 'hmac-missing-v2' }, 'IDEMPOTENCY_HMAC_CURRENT_VERSION'],
+      [{ LOG_HASH_KEY: 'synthetic-idempotency-material-0001' }, 'LOG_HASH_KEY'],
+      [{ LOG_HASH_KEY_VERSION: 'unsafe version' }, 'LOG_HASH_KEY_VERSION'],
+    ] as const) {
+      try {
+        parseApiPrivateBootstrapConfig(databaseEnvironment(overrides));
+        throw new Error(`Expected ${field} rejection`);
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiConfigError);
+        expect((error as ApiConfigError).issues).toContainEqual({ field, reason: 'invalid' });
+        expect((error as Error).message).not.toContain('synthetic-idempotency-material-0001');
+      }
     }
   });
 
@@ -295,6 +760,23 @@ describe('Application API bootstrap', () => {
     expect(repository.close).toHaveBeenCalledOnce();
   });
 
+  it('closes the runtime repository when admin repository construction fails', async () => {
+    const constructionError = new Error('admin repository construction failed');
+    const repository = stubRepository();
+    const buildApp = vi.fn();
+
+    await expect(startApiWithFactory(
+      { environment: databaseEnvironment() },
+      buildApp,
+      () => repository,
+      () => {
+        throw constructionError;
+      },
+    )).rejects.toBe(constructionError);
+    expect(repository.close).toHaveBeenCalledOnce();
+    expect(buildApp).not.toHaveBeenCalled();
+  });
+
   it('binds repository cleanup to Fastify close', async () => {
     const repository = stubRepository();
     const app = createApiApp(testConfig(), repository);
@@ -332,7 +814,7 @@ describe('ServiceRepository readiness', () => {
     return {
       database_probe: 1,
       server_version_num: 150_013,
-      schema_comment: 'CS-AI-C11 schema.v1.12; synthetic unit fixture',
+      schema_comment: 'CS-AI-C11 schema.v1.13; synthetic unit fixture',
       repository_boundary_present: true,
       runtime_identity_safe: true,
       runtime_effective_acl_safe: true,
@@ -525,6 +1007,8 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await applyDatabaseMigrations(owner);
       await owner.query('CREATE ROLE w5_runtime LOGIN');
       await owner.query('GRANT app_runtime TO w5_runtime');
+      await owner.query('CREATE ROLE w1b_admin LOGIN');
+      await owner.query('GRANT app_content_admin TO w1b_admin');
     } finally {
       await owner.end();
     }
@@ -536,36 +1020,218 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
     const host = String(database.config.host);
     const port = String(database.config.port);
     const connectionString = `postgresql://w5_runtime@localhost/${database.name}?${new URLSearchParams({ host, port })}`;
-    const databaseBootstrapConfig = parseApiDatabaseBootstrapConfig({
+    const adminConnectionString = `postgresql://w1b_admin@localhost/${database.name}?${new URLSearchParams({ host, port })}`;
+    const bootstrap = parseApiPrivateBootstrapConfig({
       DATABASE_URL: connectionString,
+      CONTENT_ADMIN_DATABASE_URL: adminConnectionString,
+      IDEMPOTENCY_HMAC_KEYS: JSON.stringify({
+        'hmac-idempotency-v1': 'synthetic-idempotency-material-pg15',
+      }),
+      IDEMPOTENCY_HMAC_CURRENT_VERSION: 'hmac-idempotency-v1',
+      LOG_HASH_KEY: 'synthetic-log-hash-material-pg15-01',
+      LOG_HASH_KEY_VERSION: 'hmac-log-v1',
       DB_POOL_MAX: '2',
+      CONTENT_ADMIN_DB_POOL_MAX: '1',
       DB_CONNECTION_TIMEOUT_MS: '2000',
       DB_READINESS_TIMEOUT_MS: '2000',
     });
-    const repository = createServiceRepository(databaseBootstrapConfig);
-    const app = createApiApp(testConfig(), repository);
+    const repository = createServiceRepository(bootstrap.runtimeDatabase);
+    const policyAdminRepository = createPolicyAdminRepository(bootstrap.policyAdminDatabase);
+    const app = createApiApp(
+      testConfig(),
+      repository,
+      undefined,
+      undefined,
+      policyAdminRepository,
+    );
     openApps.push(app);
 
     await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+    await expect(repository.readPolicyFlags()).resolves.toEqual(PHASE1_POLICY_OFF);
     const response = await app.inject({ method: 'GET', url: '/ready' });
     expect(response.statusCode).toBe(503);
-    expect(response.json()).toEqual({ status: 'not_ready', checks: W5_NOT_READY });
+    expect(response.json()).toEqual({ status: 'not_ready', checks: M1_AUTH_READY });
 
     const runtimeClient = await harness.connect({ ...database.config, user: 'w5_runtime' });
     try {
       await expect(runtimeClient.query('SELECT * FROM public.content_current')).rejects.toMatchObject({
         code: '42501',
       });
+      await expect(runtimeClient.query(
+        "SELECT public.set_policy_flag('llm_ranker', TRUE, 'usr_synthetic_owner_001', 'owner', NULL)",
+      )).rejects.toMatchObject({ code: '42501' });
     } finally {
       await runtimeClient.end();
     }
+
+    const policyWrite = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: {
+        'x-mock-user': 'usr_synthetic_owner_001',
+        'x-mock-role': 'owner',
+        'idempotency-key': 'synthetic-policy-pg15-001',
+      },
+      payload: { flag_key: 'llm_ranker', flag_value: true, adr_id: 'ADR-SYNTHETIC-PG15' },
+    });
+    expect(policyWrite.statusCode).toBe(200);
+    expect(policyWrite.json()).toEqual({ ok: true, flag_key: 'llm_ranker', flag_value: true });
+
+    const ownerAfterPolicyWrite = await harness.connect(database.config);
+    try {
+      const persisted = await ownerAfterPolicyWrite.query<{
+        flag_value: boolean;
+        audit_count: string;
+      }>(`
+        SELECT
+          (SELECT flag_value FROM public.policy_flags WHERE flag_key = 'llm_ranker') AS flag_value,
+          (SELECT pg_catalog.count(*)::text FROM public.change_audits
+           WHERE action = 'policy_set'
+             AND actor_user_id = 'usr_synthetic_owner_001'
+             AND metadata->>'flag_key' = 'llm_ranker') AS audit_count
+      `);
+      expect(persisted.rows[0]).toEqual({ flag_value: true, audit_count: '1' });
+
+      await ownerAfterPolicyWrite.query('GRANT SELECT ON public.content_current TO w5_runtime');
+      try {
+        await expect(repository.readiness()).resolves.toMatchObject({
+          database: 'ok',
+          schema: 'not_ready',
+        });
+        await expect(repository.readPolicyFlags()).resolves.toBeNull();
+        const policyUnderDrift = await app.inject({
+          method: 'GET',
+          url: '/v1/policy',
+          headers: {
+            'x-mock-user': 'usr_synthetic_agent_001',
+            'x-mock-role': 'agent',
+          },
+        });
+        expect(policyUnderDrift.statusCode).toBe(503);
+      } finally {
+        await ownerAfterPolicyWrite.query('REVOKE SELECT ON public.content_current FROM w5_runtime');
+      }
+      await expect(repository.readPolicyFlags()).resolves.toEqual({
+        ...PHASE1_POLICY_OFF,
+        llm_ranker: true,
+      });
+
+      await ownerAfterPolicyWrite.query('GRANT app_runtime TO w1b_admin');
+      const mixedRole = await app.inject({
+        method: 'POST',
+        url: '/v1/policy/flags',
+        headers: {
+          'x-mock-user': 'usr_synthetic_owner_001',
+          'x-mock-role': 'owner',
+          'idempotency-key': 'synthetic-policy-pg15-002',
+        },
+        payload: { flag_key: 'llm_ranker', flag_value: false, adr_id: null },
+      });
+      expect(mixedRole.statusCode).toBe(403);
+      await ownerAfterPolicyWrite.query('REVOKE app_runtime FROM w1b_admin');
+
+      await ownerAfterPolicyWrite.query('CREATE ROLE w1b_admin_inheritor LOGIN');
+      try {
+        await ownerAfterPolicyWrite.query('GRANT w1b_admin TO w1b_admin_inheritor');
+        const inheritedLogin = await app.inject({
+          method: 'POST',
+          url: '/v1/policy/flags',
+          headers: {
+            'x-mock-user': 'usr_synthetic_owner_001',
+            'x-mock-role': 'owner',
+            'idempotency-key': 'synthetic-policy-pg15-003',
+          },
+          payload: { flag_key: 'llm_ranker', flag_value: false, adr_id: null },
+        });
+        expect(inheritedLogin.statusCode).toBe(403);
+      } finally {
+        await ownerAfterPolicyWrite.query('REVOKE w1b_admin FROM w1b_admin_inheritor')
+          .catch(() => undefined);
+        await ownerAfterPolicyWrite.query('DROP ROLE IF EXISTS w1b_admin_inheritor');
+      }
+
+      await ownerAfterPolicyWrite.query('CREATE ROLE w1b_admin_peer LOGIN');
+      try {
+        await ownerAfterPolicyWrite.query('GRANT app_content_admin TO w1b_admin_peer');
+        const sharedCapability = await app.inject({
+          method: 'POST',
+          url: '/v1/policy/flags',
+          headers: {
+            'x-mock-user': 'usr_synthetic_owner_001',
+            'x-mock-role': 'owner',
+            'idempotency-key': 'synthetic-policy-pg15-004',
+          },
+          payload: { flag_key: 'llm_ranker', flag_value: false, adr_id: null },
+        });
+        expect(sharedCapability.statusCode).toBe(403);
+      } finally {
+        await ownerAfterPolicyWrite.query('REVOKE app_content_admin FROM w1b_admin_peer')
+          .catch(() => undefined);
+        await ownerAfterPolicyWrite.query('DROP ROLE IF EXISTS w1b_admin_peer');
+      }
+
+      await ownerAfterPolicyWrite.query(`
+        ALTER FUNCTION public.set_policy_flag(TEXT,BOOLEAN,TEXT,TEXT,TEXT)
+        SECURITY INVOKER
+      `);
+      try {
+        const driftedFunction = await app.inject({
+          method: 'POST',
+          url: '/v1/policy/flags',
+          headers: {
+            'x-mock-user': 'usr_synthetic_owner_001',
+            'x-mock-role': 'owner',
+            'idempotency-key': 'synthetic-policy-pg15-005',
+          },
+          payload: { flag_key: 'llm_ranker', flag_value: false, adr_id: null },
+        });
+        expect(driftedFunction.statusCode).toBe(403);
+      } finally {
+        await ownerAfterPolicyWrite.query(`
+          ALTER FUNCTION public.set_policy_flag(TEXT,BOOLEAN,TEXT,TEXT,TEXT)
+          SECURITY DEFINER
+        `);
+      }
+    } finally {
+      await ownerAfterPolicyWrite.query('REVOKE app_runtime FROM w1b_admin').catch(() => undefined);
+      await ownerAfterPolicyWrite.query('REVOKE w1b_admin FROM w1b_admin_inheritor')
+        .catch(() => undefined);
+      await ownerAfterPolicyWrite.query('DROP ROLE IF EXISTS w1b_admin_inheritor')
+        .catch(() => undefined);
+      await ownerAfterPolicyWrite.query('REVOKE app_content_admin FROM w1b_admin_peer')
+        .catch(() => undefined);
+      await ownerAfterPolicyWrite.query('DROP ROLE IF EXISTS w1b_admin_peer')
+        .catch(() => undefined);
+      await ownerAfterPolicyWrite.query(`
+        ALTER FUNCTION public.set_policy_flag(TEXT,BOOLEAN,TEXT,TEXT,TEXT)
+        SECURITY DEFINER
+      `).catch(() => undefined);
+      await ownerAfterPolicyWrite.end();
+    }
+    const policyRestore = await app.inject({
+      method: 'POST',
+      url: '/v1/policy/flags',
+      headers: {
+        'x-mock-user': 'usr_synthetic_owner_001',
+        'x-mock-role': 'owner',
+        'idempotency-key': 'synthetic-policy-pg15-006',
+      },
+      payload: { flag_key: 'llm_ranker', flag_value: false, adr_id: null },
+    });
+    expect(policyRestore.statusCode).toBe(200);
 
     const owner = await harness.connect(database.config);
     let originalSearchFunctionDefinition: string | undefined;
     let originalScopeFunctionDefinition: string | undefined;
     let originalQuestionValidationDefinition: string | undefined;
     let originalQuestionHashDefinition: string | undefined;
+    let originalPublicQuestionsDefinition: string | undefined;
     try {
+      await owner.query("UPDATE public.policy_flags SET flag_value=TRUE WHERE flag_key='rewrite'");
+      await expect(repository.readPolicyFlags()).resolves.toBeNull();
+      await owner.query("UPDATE public.policy_flags SET flag_value=FALSE WHERE flag_key='rewrite'");
+      await expect(repository.readPolicyFlags()).resolves.toEqual(PHASE1_POLICY_OFF);
+
       const expectSchemaNotReady = async () => {
         await expect(repository.readiness()).resolves.toMatchObject({
           database: 'ok',
@@ -607,6 +1273,15 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       originalQuestionHashDefinition = questionHashDefinition.rows[0]?.function_definition;
       if (!originalQuestionHashDefinition) {
         throw new Error('Expected the frozen question hash function definition');
+      }
+      const publicQuestionsDefinition = await owner.query<{ function_definition: string }>(`
+        SELECT pg_catalog.pg_get_functiondef(
+          'public.content_public_questions(jsonb)'::pg_catalog.regprocedure
+        ) AS function_definition
+      `);
+      originalPublicQuestionsDefinition = publicQuestionsDefinition.rows[0]?.function_definition;
+      if (!originalPublicQuestionsDefinition) {
+        throw new Error('Expected the frozen public question projection definition');
       }
 
       await owner.query('GRANT SELECT ON public.content_current TO w5_runtime');
@@ -656,7 +1331,7 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await owner.query('GRANT SET ON PARAMETER session_replication_role TO w5_runtime');
       await owner.query("ALTER ROLE w5_runtime SET session_replication_role = 'replica'");
       await expectSchemaNotReady();
-      const replicaRepository = createServiceRepository(databaseBootstrapConfig);
+      const replicaRepository = createServiceRepository(bootstrap.runtimeDatabase);
       try {
         await expect(replicaRepository.readiness()).resolves.toMatchObject({
           database: 'ok',
@@ -823,6 +1498,9 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
           risk_categories TEXT[],
           has_conflict BOOLEAN,
           placeholder_keys TEXT[],
+          questions JSONB,
+          search_document TSVECTOR,
+          search_fallback_text TEXT,
           release_id TEXT,
           source_binding_hash TEXT
         )
@@ -888,6 +1566,21 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await owner.query(originalQuestionHashDefinition);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
+      await owner.query(`
+        CREATE OR REPLACE FUNCTION public.content_public_questions(
+          p_questions JSONB
+        ) RETURNS JSONB
+        LANGUAGE sql
+        IMMUTABLE
+        STRICT
+        PARALLEL SAFE
+        SET search_path = pg_catalog, public, pg_temp
+        AS 'SELECT ''[]''::jsonb'
+      `);
+      await expectSchemaNotReady();
+      await owner.query(originalPublicQuestionsDefinition);
+      await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+
       await owner.query('CREATE ROLE w5_alternate_definer NOLOGIN');
       await owner.query(`
         ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
@@ -945,6 +1638,9 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       }
       if (originalQuestionHashDefinition) {
         await owner.query(originalQuestionHashDefinition).catch(() => undefined);
+      }
+      if (originalPublicQuestionsDefinition) {
+        await owner.query(originalPublicQuestionsDefinition).catch(() => undefined);
       }
       await owner.query(`ALTER DATABASE "${database.name}" OWNER TO "${harness.owner}"`).catch(() => undefined);
       await owner.query('DROP SCHEMA IF EXISTS w5_extra_scope CASCADE').catch(() => undefined);

@@ -50,13 +50,21 @@ function catalogueError(message: string): never {
 }
 
 export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue): void {
+  const prior = catalogue.compatibility.priorSignedBaseline;
   if (
-    catalogue.schema !== 'customer-agent-database-migrations/v1'
+    catalogue.schema !== 'customer-agent-database-migrations/v2'
     || !CONTRACT_SET_ID_PATTERN.test(catalogue.contractSetId)
     || !GIT_SHA_PATTERN.test(catalogue.sourceGitSha)
     || !HASH_PATTERN.test(catalogue.sourceSchemaSha256)
     || catalogue.compatibility.current !== 'N'
-    || catalogue.compatibility.priorSignedBaseline !== null
+    || (prior !== null && (
+      !CONTRACT_SET_ID_PATTERN.test(prior.contractSetId)
+      || !GIT_SHA_PATTERN.test(prior.sourceGitSha)
+      || !HASH_PATTERN.test(prior.sourceSchemaSha256)
+      || !Number.isSafeInteger(prior.migrationCount)
+      || prior.migrationCount < 1
+      || prior.migrationCount >= catalogue.migrations.length
+    ))
     || catalogue.migrations.length === 0
   ) {
     catalogueError('Migration catalogue identity or compatibility metadata is invalid');
@@ -70,6 +78,9 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       || !migration.id.startsWith(`${String(index + 1).padStart(4, '0')}_`)
       || ids.has(migration.id)
       || !HASH_PATTERN.test(migration.sha256)
+      || !CONTRACT_SET_ID_PATTERN.test(migration.contractSetId)
+      || !GIT_SHA_PATTERN.test(migration.sourceGitSha)
+      || !HASH_PATTERN.test(migration.sourceSchemaSha256)
       || migration.sha256 !== sha256(migration.sql)
       || migration.bytes !== Buffer.byteLength(migration.sql)
       || !migration.sql.startsWith('-- GENERATED FILE.')
@@ -82,6 +93,14 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     ) {
       catalogueError(`Migration catalogue entry ${migration.id || index + 1} is invalid`);
     }
+    const expectedProvenance = prior !== null && index < prior.migrationCount ? prior : catalogue;
+    if (
+      migration.contractSetId !== expectedProvenance.contractSetId
+      || migration.sourceGitSha !== expectedProvenance.sourceGitSha
+      || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256
+    ) {
+      catalogueError(`Migration catalogue provenance changes outside the declared baseline boundary at ${migration.id}`);
+    }
     ids.add(migration.id);
   }
 }
@@ -90,6 +109,7 @@ function freezeStatus(
   state: MigrationStatus['state'],
   applied: readonly AppliedMigration[],
   pending: readonly DatabaseMigration[],
+  catalogue: ExecutableMigrationCatalogue,
 ): MigrationStatus {
   return Object.freeze({
     state,
@@ -97,8 +117,12 @@ function freezeStatus(
     pending: Object.freeze([...pending]),
     compatibility: Object.freeze({
       current: 'N' as const,
-      priorSignedBaseline: null,
-      priorUpgrade: 'N/A · no prior signed baseline' as const,
+      priorSignedBaseline: catalogue.compatibility.priorSignedBaseline === null
+        ? null
+        : Object.freeze({ ...catalogue.compatibility.priorSignedBaseline }),
+      priorUpgrade: catalogue.compatibility.priorSignedBaseline === null
+        ? 'N/A · no prior signed baseline'
+        : `SUPPORTED · immutable ${catalogue.compatibility.priorSignedBaseline.migrationCount}-migration baseline → ${catalogue.migrations.length - catalogue.compatibility.priorSignedBaseline.migrationCount}-migration current suffix`,
     }),
   });
 }
@@ -126,9 +150,9 @@ export function deriveMigrationStatus(
     }
     if (
       row.migration_sha256 !== expected.sha256
-      || row.contract_set_id !== catalogue.contractSetId
-      || row.source_git_sha !== catalogue.sourceGitSha
-      || row.source_schema_sha256 !== catalogue.sourceSchemaSha256
+      || row.contract_set_id !== expected.contractSetId
+      || row.source_git_sha !== expected.sourceGitSha
+      || row.source_schema_sha256 !== expected.sourceSchemaSha256
     ) {
       ledgerDrift(`Migration ledger provenance drift at ${expected.id}`);
     }
@@ -151,7 +175,7 @@ export function deriveMigrationStatus(
     }));
   }
   const pending = catalogue.migrations.slice(applied.length).map(migrationMetadata);
-  return freezeStatus(pending.length === 0 ? 'COMPLETE' : 'PARTIAL', applied, pending);
+  return freezeStatus(pending.length === 0 ? 'COMPLETE' : 'PARTIAL', applied, pending, catalogue);
 }
 
 export async function inspectMigrationCatalogue(
@@ -248,7 +272,7 @@ export async function inspectMigrationCatalogue(
           'Database is not empty but has no trusted customer-agent migration ledger',
         );
       }
-      return freezeStatus('FRESH', [], catalogue.migrations.map(migrationMetadata));
+      return freezeStatus('FRESH', [], catalogue.migrations.map(migrationMetadata), catalogue);
     }
 
     const ledger = await client.query<LedgerRow>(`

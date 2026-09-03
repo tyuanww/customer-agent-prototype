@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-agent/search-gold-case/v1",
+  "title": "DEV-M1 Chinese search gold case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "query_text",
+    "platform",
+    "product_context_type",
+    "product_context_ref",
+    "sku_hint",
+    "as_of",
+    "expected_any_top3",
+    "forbidden_script_ids",
+    "note"
+  ],
+  "properties": {
+    "id": { "type": "string", "pattern": "^ZH-[0-9]{3}$" },
+    "query_text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "platform": { "enum": ["qianniu", "douyin", "unknown", null] },
+    "product_context_type": { "enum": ["category", "sku", null] },
+    "product_context_ref": { "type": ["string", "null"], "minLength": 1 },
+    "sku_hint": { "type": ["string", "null"], "minLength": 1 },
+    "as_of": { "type": "string", "format": "date-time" },
+    "expected_any_top3": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "forbidden_script_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "note": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "product_context_type": { "const": null } },
+        "required": ["product_context_type"]
+      },
+      "then": { "properties": { "product_context_ref": { "const": null } } },
+      "else": { "properties": { "product_context_ref": { "type": "string", "minLength": 1 } } }
+    }
+  ]
+}

@@ -195,7 +195,7 @@ pnpm test:e2e
 | 命令 | 实际覆盖 | 不要误读成 |
 | --- | --- | --- |
 | `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；132 个 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
-| `pnpm db:migrations:check` / `pnpm test:db` | 已验证 DDL 被确定性分成九段且来源完整覆盖；PG15 临时 cluster 中的 clean install、双客户端串行化、账本/DDL 原子回滚、精确 ACL/函数/触发器/seed 漂移拒绝、SQLSTATE 与 N-only 后验通过 | 已连接 API、真实业务库、N-1 升级、备份恢复或生产就绪 |
+| `pnpm db:migrations:check` / `pnpm test:db` | 已验证 DDL 被确定性分成十段且来源完整覆盖；PG15 临时 cluster 中的 v1.13 clean install、精确 v1.12→v1.13 单段升级、双客户端串行化、账本/DDL 原子回滚、精确 ACL/函数/触发器/seed 漂移拒绝与 SQLSTATE 后验通过 | 已连接 API、真实业务库、备份恢复或生产就绪 |
 | `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
 | `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |
 | `pnpm test:e2e:float` | 先 `pnpm build`，再跑 `smoke.spec.ts` 里 `@float` | 不是全量 E2E，也不是真实台前调度验收 |
@@ -230,6 +230,6 @@ pnpm package:mac
 
 ## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；W2 已生成 TypeScript 类型与 132 个 component runtime validator，W3 把 `HealthResponse` 接入 loopback `/health`，W4 把冻结 DDL 生成九个不可变 migration 并在隔离 PG15 中验证，W5 再用私有 runtime pool、service repository 和 `/ready` 证明 database/schema 边界。W5 不读取业务内容，auth/storage/content 明确未就绪，也没有注册任何 `/v1` 业务路由。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」仍不成立：还缺 M1/M2 的身份、九端口、`query_id`、发布四元组、飞书会话，以及合法的平台和有效期合同。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、十段 migration 基础、runtime readiness 与不可部署候选包。DEV-M1 Slice 1 已加入 development/test mock auth、runtime/admin 双池隔离和受控 policy 读写，但 search/events 主链、真实飞书鉴权、storage/content readiness、桌面 adapter 与 runtime activation 仍不存在。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」仍不成立：后续还需完成 M1/M2 的 search/events、`query_id`、发布四元组、飞书会话，以及合法的平台和有效期合同。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。

@@ -53,12 +53,17 @@ async function runAsRole(client: Client, role: string, sql: string): Promise<voi
 }
 
 function syntheticMigration(id: string, sql: string): ExecutableDatabaseMigration {
+  const baseline = generatedMigrationCatalogue.migrations[0];
+  if (!baseline) throw new Error('Generated migration catalogue has no baseline provenance');
   const normalized = `-- GENERATED FILE. DEV-M0-W4 synthetic transaction rehearsal only.\n${sql.trim()}\n`;
   return Object.freeze({
     position: 2,
     id,
     sha256: sha256(normalized),
     bytes: Buffer.byteLength(normalized),
+    contractSetId: baseline.contractSetId,
+    sourceGitSha: baseline.sourceGitSha,
+    sourceSchemaSha256: baseline.sourceSchemaSha256,
     sourceRanges: Object.freeze([]),
     sql: normalized,
   });
@@ -69,7 +74,26 @@ function rehearsalCatalogue(second: ExecutableDatabaseMigration): ExecutableMigr
   if (!first) throw new Error('Generated migration catalogue has no 0001');
   return Object.freeze({
     ...generatedMigrationCatalogue,
+    contractSetId: first.contractSetId,
+    sourceGitSha: first.sourceGitSha,
+    sourceSchemaSha256: first.sourceSchemaSha256,
+    compatibility: Object.freeze({ current: 'N', priorSignedBaseline: null }),
     migrations: Object.freeze([first, second]),
+  });
+}
+
+function v112BaselineCatalogue(): ExecutableMigrationCatalogue {
+  const prior = generatedMigrationCatalogue.compatibility.priorSignedBaseline;
+  if (!prior) throw new Error('Generated migration catalogue has no v1.12 baseline');
+  return Object.freeze({
+    schema: 'customer-agent-database-migrations/v2',
+    contractSetId: prior.contractSetId,
+    sourceGitSha: prior.sourceGitSha,
+    sourceSchemaSha256: prior.sourceSchemaSha256,
+    compatibility: Object.freeze({ current: 'N', priorSignedBaseline: null }),
+    migrations: Object.freeze(
+      generatedMigrationCatalogue.migrations.slice(0, prior.migrationCount),
+    ),
   });
 }
 
@@ -97,7 +121,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(9);
+      expect(fresh.pending).toHaveLength(10);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -109,11 +133,13 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 9,
+        migrationCount: 10,
         inventory: { tables: 40, views: 2, functions: 143 },
         capabilityRoles: { total: 5, safe: 5, memberships: 0 },
         phase1PolicyHardOff: true,
-        compatibility: { priorUpgrade: 'N/A · no prior signed baseline' },
+        compatibility: {
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 1-migration current suffix',
+        },
       });
 
       const rerun = await applyDatabaseMigrations(client);
@@ -182,6 +208,40 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     }
   }, 180_000);
 
+  it('upgrades an exact v1.12 ledger prefix with only the immutable v1.13 suffix', async () => {
+    const database = harness.createDatabase('upgrade_v1_12_to_v1_13');
+    const client = await harness.connect(database.config);
+    try {
+      const baseline = await applyMigrationCatalogue(client, v112BaselineCatalogue());
+      expect(baseline.applied).toHaveLength(9);
+      const beforeProjection = await client.query<TextRow>(`
+        SELECT pg_get_function_result(
+          'public.search_recommendable_scripts(text,text,text)'::regprocedure
+        ) AS value
+      `);
+      expect(beforeProjection.rows[0]?.value).not.toContain('questions jsonb');
+
+      const pending = await inspectDatabaseMigrations(client);
+      expect(pending.state).toBe('PARTIAL');
+      expect(pending.pending.map(({ id }) => id)).toEqual(['0010_search_projection_v1_13']);
+
+      const upgraded = await applyDatabaseMigrations(client);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0010_search_projection_v1_13']);
+      const afterProjection = await client.query<TextRow>(`
+        SELECT pg_get_function_result(
+          'public.search_recommendable_scripts(text,text,text)'::regprocedure
+        ) AS value
+      `);
+      expect(afterProjection.rows[0]?.value).toContain('questions jsonb');
+      await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
+        status: 'PASS',
+        migrationCount: 10,
+      });
+    } finally {
+      await client.end();
+    }
+  }, 120_000);
+
   it('rolls back an interrupted synthetic backfill and safely retries the same migration id', async () => {
     const database = harness.createDatabase('backfill_retry');
     const client = await harness.connect(database.config);
@@ -241,7 +301,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       `);
       const catalogue = rehearsalCatalogue(migration);
       await applyMigrationCatalogue(client, Object.freeze({
-        ...generatedMigrationCatalogue,
+        ...catalogue,
         migrations: Object.freeze([catalogue.migrations[0]!]),
       }));
       await client.query(`
@@ -315,7 +375,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(recovered.state).toBe('PARTIAL');
       expect(recovered.applied.map(({ id }) => id)).toEqual(['0001_extensions']);
       const resumed = await applyDatabaseMigrations(recoveryClient);
-      expect(resumed.applied).toHaveLength(8);
+      expect(resumed.applied).toHaveLength(9);
       expect(resumed.after.state).toBe('COMPLETE');
     } finally {
       await recoveryClient.end();
@@ -332,12 +392,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         applyDatabaseMigrations(firstClient),
         applyDatabaseMigrations(secondClient),
       ]);
-      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 9]);
+      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 10]);
       expect(results.every(({ after }) => after.state === 'COMPLETE')).toBe(true);
       const ledger = await firstClient.query<CountRow>(`
         SELECT count(*)::int AS count FROM customer_agent_meta.schema_migrations
       `);
-      expect(ledger.rows[0]?.count).toBe(9);
+      expect(ledger.rows[0]?.count).toBe(10);
     } finally {
       await firstClient.end();
       secondClient.release();

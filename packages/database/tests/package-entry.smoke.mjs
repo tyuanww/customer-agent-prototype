@@ -9,7 +9,7 @@ import {
 } from '@customer-agent/database';
 import * as databasePackage from '@customer-agent/database';
 
-test('compiled database package exposes the immutable N-only control surface', () => {
+test('compiled database package exposes the immutable migration control surface', () => {
   assert.equal('databaseMigrationCatalogue' in databasePackage, false);
   assert.equal(typeof inspectDatabaseMigrations, 'function');
   assert.equal(typeof planDatabaseMigrations, 'function');

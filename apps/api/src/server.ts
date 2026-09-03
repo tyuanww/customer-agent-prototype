@@ -1,12 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
 import {
-  parseApiDatabaseBootstrapConfig,
+  parseApiPrivateBootstrapConfig,
   parseApiRuntimeConfig,
   type ApiDatabaseBootstrapConfig,
   type ApiRuntimeConfig,
   type ApiRuntimeEnvironment,
 } from './runtime-config.js';
+import {
+  createPolicyAdminRepository,
+  type PolicyAdminRepository,
+} from './policy-admin-repository.js';
 import {
   createServiceRepository,
   type ServiceRepository,
@@ -21,10 +25,14 @@ export type StartedApi = Readonly<{
 type ApiAppFactory = (
   config: ApiRuntimeConfig,
   repository: ServiceRepository,
+  policyAdminRepository: PolicyAdminRepository,
 ) => FastifyInstance;
 type ServiceRepositoryFactory = (
   config: ApiDatabaseBootstrapConfig,
 ) => ServiceRepository;
+type PolicyAdminRepositoryFactory = (
+  config: ApiDatabaseBootstrapConfig,
+) => PolicyAdminRepository;
 export type StartApiOptions = Readonly<{
   environment?: ApiRuntimeEnvironment;
 }>;
@@ -32,7 +40,16 @@ export type StartApiOptions = Readonly<{
 export async function startApi(
   options: StartApiOptions = {},
 ): Promise<StartedApi> {
-  return startApiWithFactory(options, createApiApp);
+  return startApiWithFactory(
+    options,
+    (config, repository, policyAdminRepository) => createApiApp(
+      config,
+      repository,
+      undefined,
+      undefined,
+      policyAdminRepository,
+    ),
+  );
 }
 
 // Internal test seam. It is deliberately absent from the package entrypoint so
@@ -41,16 +58,20 @@ export async function startApiWithFactory(
   options: StartApiOptions,
   buildApp: ApiAppFactory,
   buildRepository: ServiceRepositoryFactory = createServiceRepository,
+  buildPolicyAdminRepository: PolicyAdminRepositoryFactory = createPolicyAdminRepository,
 ): Promise<StartedApi> {
   // Configuration is resolved before constructing Fastify so rejected profiles
   // cannot register routes, bind a socket, or start background work.
   const environment = options.environment ?? process.env;
   const config = parseApiRuntimeConfig(environment);
-  const database = parseApiDatabaseBootstrapConfig(environment);
-  const repository = buildRepository(database);
+  const bootstrap = parseApiPrivateBootstrapConfig(environment);
+  let repository: ServiceRepository | undefined;
+  let policyAdminRepository: PolicyAdminRepository | undefined;
   let app: FastifyInstance | undefined;
   try {
-    const builtApp = buildApp(config, repository);
+    repository = buildRepository(bootstrap.runtimeDatabase);
+    policyAdminRepository = buildPolicyAdminRepository(bootstrap.policyAdminDatabase);
+    const builtApp = buildApp(config, repository, policyAdminRepository);
     app = builtApp;
     const address = await builtApp.listen({ host: config.host, port: config.port });
     return Object.freeze({
@@ -64,7 +85,8 @@ export async function startApiWithFactory(
     await app?.close().catch(() => undefined);
     // A custom test/build seam may not have registered createApiApp's onClose.
     // close() is idempotent, so this also safely covers partial construction.
-    await repository.close().catch(() => undefined);
+    await repository?.close().catch(() => undefined);
+    await policyAdminRepository?.close().catch(() => undefined);
     throw error;
   }
 }

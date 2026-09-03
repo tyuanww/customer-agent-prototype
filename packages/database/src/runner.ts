@@ -193,9 +193,9 @@ export async function applyMigrationCatalogue(
             migration.position,
             migration.id,
             migration.sha256,
-            catalogue.contractSetId,
-            catalogue.sourceGitSha,
-            catalogue.sourceSchemaSha256,
+            migration.contractSetId,
+            migration.sourceGitSha,
+            migration.sourceSchemaSha256,
             executionMs,
           ],
         );

@@ -1,5 +1,21 @@
 import fastify, { type FastifyInstance } from 'fastify';
 import { parseContractSchema } from '@customer-agent/contracts';
+import { registerAuthRoutes } from './auth-routes.js';
+import {
+  createMockAuthService,
+  type AuthService,
+} from './auth-service.js';
+import {
+  isRequestBodyValidationError,
+  sendInternalError,
+  sendValidationError,
+} from './contract-http-errors.js';
+import { HTTP_JSON_BODY_MAX_BYTES } from './request-boundary.js';
+import {
+  createUnavailablePolicyAdminRepository,
+  type PolicyAdminRepository,
+} from './policy-admin-repository.js';
+import { registerPolicyReadRoute, registerPolicyWriteRoute } from './policy-routes.js';
 import {
   createApiRuntimeDiagnostic,
   reportApiRuntimeDiagnostic,
@@ -27,13 +43,34 @@ export function createApiApp(
   config: ApiRuntimeConfig,
   repository: ServiceRepository,
   diagnosticSink: ApiRuntimeDiagnosticSink = reportApiRuntimeDiagnostic,
+  authService: AuthService = createMockAuthService(),
+  policyAdminRepository: PolicyAdminRepository = createUnavailablePolicyAdminRepository(),
 ): FastifyInstance {
   const app = fastify({
+    bodyLimit: HTTP_JSON_BODY_MAX_BYTES,
     exposeHeadRoutes: false,
     logger: false,
   });
 
-  app.addHook('onClose', async () => repository.close());
+  app.setErrorHandler((error, _request, reply) => {
+    if (isRequestBodyValidationError(error)) return sendValidationError(reply);
+    try {
+      diagnosticSink(createApiRuntimeDiagnostic('API_REQUEST_FAILED', error));
+    } catch {
+      // Diagnostics are observational; a broken sink must not replace the
+      // stable, secretless HTTP failure contract.
+    }
+    return sendInternalError(reply);
+  });
+
+  app.addHook('onClose', async () => {
+    authService.close();
+    await Promise.all([repository.close(), policyAdminRepository.close()]);
+  });
+
+  registerAuthRoutes(app, authService);
+  registerPolicyReadRoute(app, config, repository, authService);
+  registerPolicyWriteRoute(app, policyAdminRepository, authService);
 
   app.get('/health', async (_request, reply) => {
     const payload = parseContractSchema('HealthResponse', {
@@ -58,10 +95,17 @@ export function createApiApp(
       }
       return NOT_READY_CHECKS;
     });
-    const ready = allChecksReady(checks);
+    const composedChecks = Object.freeze({
+      database: checks.database,
+      schema: checks.schema,
+      auth: authService.readiness(),
+      storage: checks.storage,
+      content: checks.content,
+    }) satisfies ServiceReadinessChecks;
+    const ready = allChecksReady(composedChecks);
     const payload = parseContractSchema(ready ? 'ReadyResponse' : 'NotReadyResponse', {
       status: ready ? 'ready' : 'not_ready',
-      checks,
+      checks: composedChecks,
     });
     reply.header('cache-control', 'no-store');
     if (!ready) {

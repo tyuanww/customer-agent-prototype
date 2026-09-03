@@ -115,7 +115,7 @@ pnpm test:e2e
 | --- | --- | --- |
 | `pnpm lint` | ESLint 通过 | 运行时行为 |
 | `pnpm typecheck` | `tsc --noEmit` 通过 | 打包签名 |
-| `pnpm test` | Vitest 全量 unit / component，**含** drag-settle 与 Dashboard 授权；database 只跑 unit/package smoke | W4 PG15 集成门禁、真实窗口、真实剪贴板持久化到用户会话 |
+| `pnpm test` | Vitest 全量 unit / component，**含** drag-settle、Dashboard 授权、合同、database 普通 lane 与 API mock/失败关闭 | PostgreSQL 15 隔离集成门禁、真实窗口、真实剪贴板持久化到用户会话 |
 | `pnpm build` | `electron-vite` 写出 `apps/desktop/out/main`、`apps/desktop/out/preload`、`apps/desktop/out/renderer` | 可以发给客户 |
 | `pnpm test:e2e` | 先 build，再跑全部 Playwright（浮窗交接、数字键复制、Dashboard 可信入口 / 单例 / 安全隔离 / Dock 恢复） | 真实设备门禁，见第 4 节 |
 
@@ -123,9 +123,10 @@ pnpm test:e2e
 
 ```bash
 CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin pnpm test:db
+CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/app.test.ts
 ```
 
-它只创建私有临时 data directory / Unix socket / database，结束后清理；不连接共享或生产数据库。普通桌面/UI 改动无需反复运行这一重门禁。
+两条命令都只创建私有临时 data directory / Unix socket / database，结束后清理；不连接共享或生产数据库。前者证明 migration/catalogue/ledger，后者证明 runtime readiness、runtime/admin 角色隔离、策略函数完整性和失败关闭。普通桌面/UI 改动无需反复运行这些重门禁。
 
 探头 / 缩回、Query 纵向拖拽，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 纵向拖拽和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
 

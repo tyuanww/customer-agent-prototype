@@ -17,9 +17,9 @@ function ledgerRow(index: number) {
     position: migration.position,
     migration_id: migration.id,
     migration_sha256: migration.sha256,
-    contract_set_id: generatedMigrationCatalogue.contractSetId,
-    source_git_sha: generatedMigrationCatalogue.sourceGitSha,
-    source_schema_sha256: generatedMigrationCatalogue.sourceSchemaSha256,
+    contract_set_id: migration.contractSetId,
+    source_git_sha: migration.sourceGitSha,
+    source_schema_sha256: migration.sourceSchemaSha256,
     applied_at: new Date('2026-09-02T00:00:00.000Z'),
     execution_ms: index + 1,
   };
@@ -30,7 +30,7 @@ describe('database migration planner', () => {
     const partial = deriveMigrationStatus([ledgerRow(0), ledgerRow(1)], generatedMigrationCatalogue);
     expect(partial.state).toBe('PARTIAL');
     expect(partial.pending[0]?.id).toBe('0003_events_and_metrics');
-    expect(planMigrationCatalogue(partial).migrations).toHaveLength(7);
+    expect(planMigrationCatalogue(partial).migrations).toHaveLength(8);
 
     const complete = deriveMigrationStatus(
       generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)),
@@ -38,7 +38,22 @@ describe('database migration planner', () => {
     );
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
-    expect(complete.compatibility.priorUpgrade).toBe('N/A · no prior signed baseline');
+    expect(complete.compatibility.priorUpgrade).toBe(
+      'SUPPORTED · immutable 9-migration baseline → 1-migration current suffix',
+    );
+  });
+
+  it('accepts the exact v1.12 ledger prefix and plans only the v1.13 upgrade', () => {
+    const prior = generatedMigrationCatalogue.compatibility.priorSignedBaseline;
+    if (!prior) throw new Error('generated catalogue must declare the v1.12 baseline');
+    const baselineRows = generatedMigrationCatalogue.migrations
+      .slice(0, prior.migrationCount)
+      .map((_, index) => ledgerRow(index));
+    const status = deriveMigrationStatus(baselineRows, generatedMigrationCatalogue);
+
+    expect(status.state).toBe('PARTIAL');
+    expect(status.pending.map(({ id }) => id)).toEqual(['0010_search_projection_v1_13']);
+    expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
 
   it.each([
@@ -110,7 +125,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(9);
+    expect(status.pending).toHaveLength(10);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });

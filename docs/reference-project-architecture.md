@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。W1 已把既有 Electron 应用机械迁入 `apps/desktop`；W2 新增 `packages/contracts` 编译边界；W3 建立只允许 loopback `/health` 的 `apps/api` 启动骨架；W4 新增独立 `packages/database` migration 控制面；W5 在 API 内新增私有 runtime pool、service repository 与 `/ready`；W6 增加统一 CI 与非部署型正式服务候选产物边界。桌面、鉴权、业务端口和真实数据仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 Slice 1 已接收 `schema.v1.13`，增加 mock auth、策略读写路由、独立 runtime/admin 数据库能力和十段 migration。桌面 adapter、正式飞书鉴权、搜索业务端口、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -36,16 +36,16 @@
 
 contracts/upstream（不可变输入；同一受锁 snapshot）
   ├─ packages/contracts（bundle / generated TS / runtime validator）
-  │    └─ apps/api → GET /health + GET /ready（loopback；formal-dev/test + mock）
-  └─ packages/database（0001..0009 / catalogue / ledger / verify）
+  │    └─ apps/api → health / ready / mock auth / policy（loopback only）
+  └─ packages/database（0001..0010 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
-apps/api（W5）
-  └─ private DB bootstrap → one pg.Pool → ServiceRepository
-       └─ runtime-safe schema probe → migrated PostgreSQL 15
+apps/api（DEV-M1 Slice 1）
+  ├─ runtime pg.Pool → ServiceRepository → readiness + policy read
+  └─ isolated admin pg.Pool → PolicyAdminRepository → set_policy_flag only
 ```
 
-桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用正式九端口。W5 只把 W3 API 与一个已迁移 PostgreSQL 15 的 runtime-safe readiness 探针接通；桌面仍不连接 API，API 也没有读取或写入业务内容。
+桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用正式九端口。DEV-M1 Slice 1 只接通本机 mock 身份、策略读取和严格受控的策略管理函数；搜索、事件、桌面 adapter 与真实内容仍未接通。
 
 ## 2. 目录归属
 
@@ -58,11 +58,11 @@ apps/api（W5）
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
-| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、唯一 runtime pool owner、service readiness，以及 `/health` / `/ready` | 桌面 fixture、renderer、migration owner、Feishu auth、业务端口、真实数据或外部 bind |
+| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness 与策略读写边界 | 桌面 fixture、renderer、migration owner、正式 Feishu auth、搜索/事件端口、真实数据或外部 bind |
 | 根 `scripts/` | 合同快照接收、workspace 卫生门、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
-| `packages/database/` | 在同一已验证快照内确定性生成九个 migration；拥有 catalogue、私有账本、合法前缀规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成十个 migration；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -77,6 +77,8 @@ apps/api（W5）
 `DEV-M0-W4` 由 `packages/database` 单独拥有 DDL source split、不可变 SHA catalogue、`customer_agent_meta.schema_migrations` 账本、固定 advisory-lock key、逐 migration 事务与后验验证。生成器机械证明上游可执行区间完整且只归属一次；runner 要求调用方传入同一个已连接 `pg.Client`，并把 migration 与账本行放在同一事务。API startup 不调用这一控制面，runtime pool 不获得 migration-owner 能力。
 
 `DEV-M0-W5` 在 `apps/api/src/runtime-config.ts` 增加只在进程内传递、仅允许本机 PostgreSQL 的 DB bootstrap config，并由 `apps/api/src/service-repository.ts` 单独拥有一个 `pg.Pool`、schema 指纹、single-flight deadline、错误归一化与幂等关闭；`runtime-diagnostics.ts` 只输出稳定、脱敏的运行诊断词表。`GET /health` 不触碰依赖；`GET /ready` 通过一次只读查询核对 database、PostgreSQL 15、`schema.v1.12`、8 个函数 + 2 个视图的完整可信 search 依赖摘要、`pgcrypto.digest` extension 所有权、runtime/login/definer 双向角色边界、parameter ACL，以及当前数据库和全部用户 schema 的精确表/列/函数有效 ACL。任意非 owner 的 `public CREATE` 与 deadline 后才完成的成功探针也失败关闭；auth/storage/content 明确保持为 `not_ready`。因此 W5 的服务可以监听并证明基础设施状态，但仍不会获得业务就绪或 runtime activation。
+
+`DEV-M1 Slice 1` 在不改写上述历史切片的前提下前滚到 `schema.v1.13`：第十段 migration 只替换受控 search projection 与 schema comment，精确的 v1.12 ledger 只计划 `0010`。API 新增进程内 opaque mock session、成对 mock header、策略只读路由和 Owner-only 管理写入口。私有 bootstrap 在任何 pool/Fastify 构造前验证两条不同登录 DSN 指向同一数据库目标、总连接预算和互不复用的 HMAC 域；管理 SQL 每次写入前同时证明登录、`app_content_admin`、`cs_ai_definer`、`set_policy_flag` 定义和 ACL，任一角色或函数漂移均失败关闭。未捕获请求异常只返回稳定 500 合同，不回显原始错误；空 JSON、坏 JSON、超大正文和不支持的媒体类型统一返回稳定 400。
 
 ## 3. 三个窗口和安全边界
 
@@ -106,14 +108,16 @@ contracts/upstream/customer-agent/<contract_set_id>
                                           ├─ HealthResponse ──> apps/api GET /health
                                           └─ Ready/NotReady ──> apps/api GET /ready
 
-W4 migrated PG15 ──app_runtime + one pool──> W5 readiness probe（无业务内容读写）
+v1.13 migrated PG15
+  ├─ app_runtime pool ──> readiness + policy read
+  └─ isolated app_content_admin pool ──> set_policy_flag（唯一受控写入口）
 
-/v1 API / desktop adapter ──尚未实现──> renderer 仍不允许直连
+/v1 search/events / desktop adapter ──尚未实现──> renderer 仍不允许直连
 ```
 
 `apps/desktop/src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance、`HealthResponse` 和 Ready/NotReady validators；renderer、main、preload 和现有合成搜索均未导入该包。W5 runtime pool 只执行 readiness 探针，正式 `/v1` 仍不存在。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有合成搜索均未导入该包。当前 `/v1` 只实现 mock auth 与 policy Slice 1，search/events 和桌面 adapter 仍不存在。
 
 ## 5. 测试和验证层级
 
@@ -167,7 +171,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译、W3 API/config、W4 database migration、W5 runtime repository/readiness 和 W6 退出证据工具：桌面包、合同包、API host、请求路径 pool 与数据库控制面的所有权分离，桌面运行时权限未放宽。W6 的产物 builder 只在干净工作树自行构建并复制 contracts/database/API 输出，按严格文件类型白名单写逐文件哈希 manifest；verifier 同样要求干净工作树、manifest 构建提交等于当前 HEAD、仓库 intake 合同身份有效且候选合同锁等于仓库受控锁，并排除 desktop、testkit、tests、source map、合成 fixture 模块与常见凭证标记。候选明确不可部署且 `runtime_activated=false`，不关闭真实数据、鉴权、N-1 升级、业务端口、生产部署或真实 Windows 门。
+当前目录结构已在 DEV-M0 基线上加入 DEV-M1 Slice 1：合同接收、组件校验、migration 控制面、API host、runtime 只读能力和 policy-admin 写能力各有单一 owner，两个 pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.13 已有精确 N-1 migration 规划与 PG15 证明；W6 的候选产物仍明确不可部署且 `runtime_activated=false`。本切片只关闭 auth/policy 基础边界，不关闭真实数据、正式飞书鉴权、搜索/事件端口、幂等终态、生产部署或真实 Windows 门。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 

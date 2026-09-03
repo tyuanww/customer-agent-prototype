@@ -34,6 +34,19 @@ export type ApiDatabaseBootstrapConfig = Readonly<{
   readinessTimeoutMs: number;
 }>;
 
+export type ApiHmacKeyRing = Readonly<{
+  currentVersion: string;
+  keys: Readonly<Record<string, string>>;
+}>;
+
+/** Private, process-local capability configuration. It must never cross the composition root. */
+export type ApiPrivateBootstrapConfig = Readonly<{
+  runtimeDatabase: ApiDatabaseBootstrapConfig;
+  policyAdminDatabase: ApiDatabaseBootstrapConfig;
+  idempotencyHmac: ApiHmacKeyRing;
+  logHash: Readonly<{ version: string; key: string }>;
+}>;
+
 export type ApiConfigIssue = Readonly<{
   field: string;
   reason:
@@ -48,11 +61,14 @@ export type ApiConfigIssue = Readonly<{
 const PROFILE_SET = new Set<string>(CUSTOMER_AGENT_PROFILES);
 const AUTH_MODE_SET = new Set<string>(['mock', 'feishu']);
 const BUILD_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
+const HMAC_KEY_VERSION_PATTERN = /^hmac-[a-z0-9][a-z0-9._-]{0,31}$/;
 const DIAGNOSTIC_ID_PATTERN = /^diag_[0-9a-f]{32}$/;
 const LOOPBACK_HOST = '127.0.0.1' as const;
 const POSTGRES_LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const DEFAULT_API_PORT = 3100;
-const DEFAULT_DB_POOL_MAX = 20;
+const DEFAULT_DB_POOL_MAX = 18;
+const DEFAULT_POLICY_ADMIN_DB_POOL_MAX = 2;
+const MAX_TOTAL_DB_POOL_CONNECTIONS = 20;
 const DEFAULT_DB_CONNECTION_TIMEOUT_MS = 2_000;
 const DEFAULT_DB_READINESS_TIMEOUT_MS = 2_000;
 const STARTUP_ERROR_REASONS = Object.freeze({
@@ -209,6 +225,165 @@ function isPostgresConnectionString(value: string): boolean {
   }
 }
 
+function postgresLoginName(value: string): string | undefined {
+  try {
+    const username = new URL(value).username;
+    return username.length > 0 ? decodeURIComponent(username) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function postgresDatabaseTarget(value: string): string | undefined {
+  try {
+    const parsed = new URL(value);
+    const socketHost = parsed.searchParams.get('host');
+    const socketPort = parsed.searchParams.get('port');
+    return JSON.stringify({
+      host: socketHost ?? parsed.hostname,
+      port: socketPort ?? (parsed.port || '5432'),
+      database: parsed.pathname,
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function parseHmacVersion(
+  environment: ApiRuntimeEnvironment,
+  field: string,
+  issues: ApiConfigIssue[],
+): string | undefined {
+  const version = exactEnvironmentValue(environment, field, issues);
+  if (version === undefined) {
+    if (environment[field] === undefined) issues.push(issue(field, 'missing'));
+    return undefined;
+  }
+  if (!HMAC_KEY_VERSION_PATTERN.test(version)) {
+    issues.push(issue(field, 'invalid'));
+    return undefined;
+  }
+  return version;
+}
+
+function validHmacKeyMaterial(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.trim() === value
+    && Buffer.byteLength(value, 'utf8') >= 32
+    && Buffer.byteLength(value, 'utf8') <= 128;
+}
+
+function parseHmacKeyRing(
+  environment: ApiRuntimeEnvironment,
+  issues: ApiConfigIssue[],
+): ApiHmacKeyRing | undefined {
+  const field = 'IDEMPOTENCY_HMAC_KEYS';
+  const raw = exactEnvironmentValue(environment, field, issues);
+  const currentVersion = parseHmacVersion(
+    environment,
+    'IDEMPOTENCY_HMAC_CURRENT_VERSION',
+    issues,
+  );
+  if (raw === undefined) {
+    if (environment[field] === undefined) issues.push(issue(field, 'missing'));
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    issues.push(issue(field, 'invalid'));
+    return undefined;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    issues.push(issue(field, 'invalid'));
+    return undefined;
+  }
+  const entries = Object.entries(parsed);
+  if (entries.length === 0 || entries.length > 4
+    || entries.some(([version, key]) => !HMAC_KEY_VERSION_PATTERN.test(version)
+      || !validHmacKeyMaterial(key))
+    || new Set(entries.map(([, key]) => key)).size !== entries.length) {
+    issues.push(issue(field, 'invalid'));
+    return undefined;
+  }
+  if (currentVersion === undefined || !Object.hasOwn(parsed, currentVersion)) {
+    if (currentVersion !== undefined) issues.push(issue('IDEMPOTENCY_HMAC_CURRENT_VERSION', 'invalid'));
+    return undefined;
+  }
+  return Object.freeze({
+    currentVersion,
+    keys: Object.freeze(Object.fromEntries(entries) as Record<string, string>),
+  });
+}
+
+function parseLogHashConfig(
+  environment: ApiRuntimeEnvironment,
+  issues: ApiConfigIssue[],
+): Readonly<{ version: string; key: string }> | undefined {
+  const version = parseHmacVersion(environment, 'LOG_HASH_KEY_VERSION', issues);
+  const key = exactEnvironmentValue(environment, 'LOG_HASH_KEY', issues);
+  if (key === undefined) {
+    if (environment.LOG_HASH_KEY === undefined) issues.push(issue('LOG_HASH_KEY', 'missing'));
+    return undefined;
+  }
+  if (!validHmacKeyMaterial(key)) {
+    issues.push(issue('LOG_HASH_KEY', 'invalid'));
+    return undefined;
+  }
+  return version === undefined ? undefined : Object.freeze({ version, key });
+}
+
+type DatabaseConfigFields = Readonly<{
+  connectionString: string;
+  poolMax: string;
+  defaultPoolMax: number;
+}>;
+
+function parseDatabaseConfig(
+  environment: ApiRuntimeEnvironment,
+  fields: DatabaseConfigFields,
+  issues: ApiConfigIssue[],
+): ApiDatabaseBootstrapConfig | undefined {
+  const connectionString = exactEnvironmentValue(environment, fields.connectionString, issues);
+  if (connectionString === undefined && environment[fields.connectionString] === undefined) {
+    issues.push(issue(fields.connectionString, 'missing'));
+  } else if (connectionString !== undefined
+    && (!isPostgresConnectionString(connectionString) || postgresLoginName(connectionString) === undefined)) {
+    issues.push(issue(fields.connectionString, 'invalid'));
+  }
+
+  const poolMax = parseBoundedPositiveInteger(
+    environment,
+    fields.poolMax,
+    fields.defaultPoolMax,
+    MAX_TOTAL_DB_POOL_CONNECTIONS,
+    issues,
+  );
+  const connectionTimeoutMs = parseBoundedPositiveInteger(
+    environment,
+    'DB_CONNECTION_TIMEOUT_MS',
+    DEFAULT_DB_CONNECTION_TIMEOUT_MS,
+    10_000,
+    issues,
+  );
+  const readinessTimeoutMs = parseBoundedPositiveInteger(
+    environment,
+    'DB_READINESS_TIMEOUT_MS',
+    DEFAULT_DB_READINESS_TIMEOUT_MS,
+    10_000,
+    issues,
+  );
+
+  return connectionString === undefined ? undefined : Object.freeze({
+    connectionString,
+    poolMax,
+    connectionTimeoutMs,
+    readinessTimeoutMs,
+  });
+}
+
 export class ApiConfigError extends Error {
   readonly code = 'CONFIG_INVALID';
   readonly issues: readonly ApiConfigIssue[];
@@ -266,45 +441,57 @@ export function parseApiDatabaseBootstrapConfig(
   environment: ApiRuntimeEnvironment,
 ): ApiDatabaseBootstrapConfig {
   const issues: ApiConfigIssue[] = [];
-  const connectionString = exactEnvironmentValue(environment, 'DATABASE_URL', issues);
-  if (connectionString === undefined && environment.DATABASE_URL === undefined) {
-    issues.push(issue('DATABASE_URL', 'missing'));
-  } else if (connectionString !== undefined && !isPostgresConnectionString(connectionString)) {
-    issues.push(issue('DATABASE_URL', 'invalid'));
-  }
-
-  const poolMax = parseBoundedPositiveInteger(
-    environment,
-    'DB_POOL_MAX',
-    DEFAULT_DB_POOL_MAX,
-    20,
-    issues,
-  );
-  const connectionTimeoutMs = parseBoundedPositiveInteger(
-    environment,
-    'DB_CONNECTION_TIMEOUT_MS',
-    DEFAULT_DB_CONNECTION_TIMEOUT_MS,
-    10_000,
-    issues,
-  );
-  const readinessTimeoutMs = parseBoundedPositiveInteger(
-    environment,
-    'DB_READINESS_TIMEOUT_MS',
-    DEFAULT_DB_READINESS_TIMEOUT_MS,
-    10_000,
-    issues,
-  );
-
-  if (issues.length > 0 || connectionString === undefined) {
+  const config = parseDatabaseConfig(environment, {
+    connectionString: 'DATABASE_URL',
+    poolMax: 'DB_POOL_MAX',
+    defaultPoolMax: DEFAULT_DB_POOL_MAX,
+  }, issues);
+  if (issues.length > 0 || config === undefined) {
     throw new ApiConfigError(issues);
   }
+  return config;
+}
 
-  return Object.freeze({
-    connectionString,
-    poolMax,
-    connectionTimeoutMs,
-    readinessTimeoutMs,
-  });
+export function parseApiPrivateBootstrapConfig(
+  environment: ApiRuntimeEnvironment,
+): ApiPrivateBootstrapConfig {
+  const issues: ApiConfigIssue[] = [];
+  const runtimeDatabase = parseDatabaseConfig(environment, {
+    connectionString: 'DATABASE_URL',
+    poolMax: 'DB_POOL_MAX',
+    defaultPoolMax: DEFAULT_DB_POOL_MAX,
+  }, issues);
+  const policyAdminDatabase = parseDatabaseConfig(environment, {
+    connectionString: 'CONTENT_ADMIN_DATABASE_URL',
+    poolMax: 'CONTENT_ADMIN_DB_POOL_MAX',
+    defaultPoolMax: DEFAULT_POLICY_ADMIN_DB_POOL_MAX,
+  }, issues);
+  const idempotencyHmac = parseHmacKeyRing(environment, issues);
+  const logHash = parseLogHashConfig(environment, issues);
+
+  if (runtimeDatabase && policyAdminDatabase) {
+    const runtimeLogin = postgresLoginName(runtimeDatabase.connectionString);
+    const adminLogin = postgresLoginName(policyAdminDatabase.connectionString);
+    if (runtimeDatabase.connectionString === policyAdminDatabase.connectionString
+      || runtimeLogin === adminLogin
+      || postgresDatabaseTarget(runtimeDatabase.connectionString)
+        !== postgresDatabaseTarget(policyAdminDatabase.connectionString)) {
+      issues.push(issue('CONTENT_ADMIN_DATABASE_URL', 'invalid'));
+    }
+    if (runtimeDatabase.poolMax + policyAdminDatabase.poolMax > MAX_TOTAL_DB_POOL_CONNECTIONS) {
+      issues.push(issue('CONTENT_ADMIN_DB_POOL_MAX', 'invalid'));
+    }
+  }
+  if (idempotencyHmac && logHash
+    && Object.values(idempotencyHmac.keys).includes(logHash.key)) {
+    issues.push(issue('LOG_HASH_KEY', 'invalid'));
+  }
+
+  if (issues.length > 0 || !runtimeDatabase || !policyAdminDatabase
+    || !idempotencyHmac || !logHash) {
+    throw new ApiConfigError(issues);
+  }
+  return Object.freeze({ runtimeDatabase, policyAdminDatabase, idempotencyHmac, logHash });
 }
 
 function createDiagnosticId(): string {

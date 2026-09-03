@@ -14,10 +14,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
-const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v1';
+const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
-const EXPECTED_DATABASE_SHA256 = '47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801';
-const EXPECTED_SOURCE_LINES = 7661;
+const EXPECTED_DATABASE_SHA256 = 'de8b7d9bdcac4ecad844025a47228ba339dad47d61861d261c492cb16a1aea02';
+const EXPECTED_SOURCE_LINES = 7669;
+const BASELINE = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c',
+  sourceGitSha: '1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38',
+  sourceSchemaSha256: '47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801',
+  migrationCount: 9,
+  schemaFile: 'schema-v1.12.sql',
+});
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_PROJECT_ROOT = path.resolve(PACKAGE_ROOT, '../..');
 const MANIFEST_PATH = 'packages/database/migrations/manifest.generated.json';
@@ -35,43 +42,35 @@ const OUTPUT_GROUPS = Object.freeze([
   }),
 ]);
 
-const LEDGER_BOOTSTRAP_SQL = `-- Runner control plane is part of 0001, never an untracked hidden migration.
-CREATE SCHEMA customer_agent_meta;
-REVOKE ALL ON SCHEMA customer_agent_meta FROM PUBLIC;
-
-CREATE TABLE customer_agent_meta.schema_migrations (
-  position              INTEGER PRIMARY KEY CHECK (position > 0),
-  migration_id          TEXT NOT NULL UNIQUE CHECK (migration_id ~ '^[0-9]{4}_[a-z0-9_]+$'),
-  migration_sha256      TEXT NOT NULL CHECK (migration_sha256 ~ '^[0-9a-f]{64}$'),
-  contract_set_id       TEXT NOT NULL,
-  source_git_sha        TEXT NOT NULL CHECK (source_git_sha ~ '^[0-9a-f]{40}$'),
-  source_schema_sha256  TEXT NOT NULL CHECK (source_schema_sha256 ~ '^[0-9a-f]{64}$'),
-  applied_at            TIMESTAMPTZ NOT NULL DEFAULT pg_catalog.clock_timestamp(),
-  execution_ms          INTEGER NOT NULL CHECK (execution_ms >= 0)
-);
-REVOKE ALL ON TABLE customer_agent_meta.schema_migrations FROM PUBLIC;
-COMMENT ON SCHEMA customer_agent_meta IS
-  'CS-AI-C11 migration control plane; owner-only immutable catalogue ledger';
-COMMENT ON TABLE customer_agent_meta.schema_migrations IS
-  'Applied immutable migrations; drift is fail-closed and never auto-repaired';`;
-
-const MIGRATION_SPECS = Object.freeze([
-  Object.freeze({ id: '0001_extensions', ranges: Object.freeze([[17, 97]]), anchor: 'DO $install_preflight$', prelude: LEDGER_BOOTSTRAP_SQL }),
-  Object.freeze({ id: '0002_identity_and_content', ranges: Object.freeze([[98, 981]]), anchor: 'Identity (minimal' }),
-  Object.freeze({ id: '0003_events_and_metrics', ranges: Object.freeze([[982, 1748]]), anchor: 'Events' }),
-  Object.freeze({ id: '0004_import_release_announce', ranges: Object.freeze([[1749, 2630]]), anchor: 'Multi-user content' }),
-  Object.freeze({ id: '0005_idempotency_rate_limit_outbox', ranges: Object.freeze([[2651, 2771]]), anchor: 'NFR v1.3' }),
-  Object.freeze({ id: '0006_definer_functions_and_triggers', ranges: Object.freeze([[2772, 6782]]), anchor: 'trg_release_items_immutable' }),
-  Object.freeze({ id: '0007_search_bigram', ranges: Object.freeze([[6783, 7405]]), anchor: 'Runtime gate' }),
-  Object.freeze({ id: '0008_runtime_acl', ranges: Object.freeze([[7406, 7657]]), anchor: 'Executable fail-closed ACL' }),
-  Object.freeze({ id: '0009_phase1_policy_seed', ranges: Object.freeze([[2631, 2650], [7658, 7660]]), anchor: 'INSERT INTO policy_flags' }),
+const BASELINE_MIGRATIONS = Object.freeze([
+  Object.freeze({ position: 1, id: '0001_extensions', file: '0001_extensions.sql', sha256: '4876b7ef62bb033b4b7b487e06e88a525b9cb8b3e32e82e6516124b7fc8eca62', bytes: 5202, source_ranges: Object.freeze([{ start_line: 17, end_line: 97 }]) }),
+  Object.freeze({ position: 2, id: '0002_identity_and_content', file: '0002_identity_and_content.sql', sha256: '62322728f1621c75b2cc0f66ac20e65710a916c714caa84761a93108b71e1b64', bytes: 41126, source_ranges: Object.freeze([{ start_line: 98, end_line: 981 }]) }),
+  Object.freeze({ position: 3, id: '0003_events_and_metrics', file: '0003_events_and_metrics.sql', sha256: 'c109b3c7ec79c73cb6e3748808aca9296ed1c96e5d8fc91ab0046c80fd2b50d4', bytes: 31383, source_ranges: Object.freeze([{ start_line: 982, end_line: 1748 }]) }),
+  Object.freeze({ position: 4, id: '0004_import_release_announce', file: '0004_import_release_announce.sql', sha256: 'ff68d5969e28a9d4d7eed963906f2fc3783f4c34b5ec1fa347ea87c3bc0b2f6a', bytes: 43438, source_ranges: Object.freeze([{ start_line: 1749, end_line: 2630 }]) }),
+  Object.freeze({ position: 5, id: '0005_idempotency_rate_limit_outbox', file: '0005_idempotency_rate_limit_outbox.sql', sha256: '715db39163e2a99d10a88126a4bded14c75f4fb4ba1ec97dcba573265babdf02', bytes: 7101, source_ranges: Object.freeze([{ start_line: 2651, end_line: 2771 }]) }),
+  Object.freeze({ position: 6, id: '0006_definer_functions_and_triggers', file: '0006_definer_functions_and_triggers.sql', sha256: 'f5b369165b5e5f0e21801f8fd8eb2c4589ee26ca0761327811f4ed5c5903d4ca', bytes: 176719, source_ranges: Object.freeze([{ start_line: 2772, end_line: 6782 }]) }),
+  Object.freeze({ position: 7, id: '0007_search_bigram', file: '0007_search_bigram.sql', sha256: '7cf632ec4123b9031893646b0b67348cf5a89dd3fe89ec544dccecb576513189', bytes: 23262, source_ranges: Object.freeze([{ start_line: 6783, end_line: 7405 }]) }),
+  Object.freeze({ position: 8, id: '0008_runtime_acl', file: '0008_runtime_acl.sql', sha256: 'f883a929a8742e0f71a498e70de410124e8c25fd2fdee6a492047201475990f2', bytes: 20450, source_ranges: Object.freeze([{ start_line: 7406, end_line: 7657 }]) }),
+  Object.freeze({ position: 9, id: '0009_phase1_policy_seed', file: '0009_phase1_policy_seed.sql', sha256: 'a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e', bytes: 1712, source_ranges: Object.freeze([{ start_line: 2631, end_line: 2650 }, { start_line: 7658, end_line: 7660 }]) }),
 ]);
+
+const UPGRADE_SPEC = Object.freeze({
+  position: 10,
+  id: '0010_search_projection_v1_13',
+  file: '0010_search_projection_v1_13.sql',
+  source_ranges: Object.freeze([
+    Object.freeze({ start_line: 6871, end_line: 6961 }),
+    Object.freeze({ start_line: 7508, end_line: 7508 }),
+    Object.freeze({ start_line: 7624, end_line: 7624 }),
+    Object.freeze({ start_line: 7666, end_line: 7667 }),
+  ]),
+});
 
 function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
 
-function sourceLines(source) {
+function sourceLines(source, expectedLines = EXPECTED_SOURCE_LINES) {
   if (!source.endsWith('\n')) {
     throw new Error('Database contract must end with one LF');
   }
@@ -79,66 +78,150 @@ function sourceLines(source) {
     throw new Error('Database contract must use LF line endings');
   }
   const lines = source.slice(0, -1).split('\n');
-  if (lines.length !== EXPECTED_SOURCE_LINES) {
+  if (lines.length !== expectedLines) {
     throw new Error(`Database contract line count drift: ${lines.length}`);
   }
-  if (lines[14] !== 'BEGIN;' || lines[15] !== 'SET LOCAL search_path = public, pg_catalog, pg_temp;' || lines[7660] !== 'COMMIT;') {
+  if (lines[14] !== 'BEGIN;' || lines[15] !== 'SET LOCAL search_path = public, pg_catalog, pg_temp;' || lines.at(-1) !== 'COMMIT;') {
     throw new Error('Database contract outer transaction anchors drifted');
   }
   return lines;
 }
 
-function assertCompleteCoverage() {
-  const covered = new Map();
-  for (const spec of MIGRATION_SPECS) {
-    for (const [startLine, endLine] of spec.ranges) {
-      for (let line = startLine; line <= endLine; line += 1) {
-        const previous = covered.get(line);
-        if (previous) {
-          throw new Error(`Database source line ${line} is assigned to both ${previous} and ${spec.id}`);
-        }
-        covered.set(line, spec.id);
-      }
-    }
-  }
-  const missing = [];
-  for (let line = 17; line <= 7660; line += 1) {
-    if (!covered.has(line)) missing.push(line);
-  }
-  if (missing.length > 0 || covered.size !== 7644) {
-    throw new Error(`Database migration source coverage drift: missing ${missing.slice(0, 8).join(',')}`);
-  }
-}
-
 function linesForRanges(lines, ranges) {
-  return ranges.map(([startLine, endLine]) => lines.slice(startLine - 1, endLine).join('\n')).join('\n');
+  return ranges
+    .map(({ start_line: startLine, end_line: endLine }) => lines.slice(startLine - 1, endLine).join('\n'))
+    .join('\n');
 }
 
-function renderMigration({ spec, position, lines, snapshot }) {
-  const sourceBody = linesForRanges(lines, spec.ranges);
-  if (!sourceBody.includes(spec.anchor)) {
-    throw new Error(`${spec.id} source anchor drifted`);
+function replaceExactly(source, before, after, label) {
+  const first = source.indexOf(before);
+  if (first < 0 || source.indexOf(before, first + before.length) >= 0) {
+    throw new Error(`${label} must occur exactly once in the database contract`);
   }
-  const ranges = spec.ranges.map(([startLine, endLine]) => `${startLine}-${endLine}`).join(', ');
+  return `${source.slice(0, first)}${after}${source.slice(first + before.length)}`;
+}
+
+function anchoredBlock(source, startAnchor, endAnchor, label) {
+  const start = source.indexOf(startAnchor);
+  if (start < 0 || source.indexOf(startAnchor, start + startAnchor.length) >= 0) {
+    throw new Error(`${label} start anchor drifted`);
+  }
+  const end = source.indexOf(endAnchor, start);
+  if (end < 0) throw new Error(`${label} end anchor drifted`);
+  return source.slice(start, end + endAnchor.length);
+}
+
+function finalSchemaComment(source) {
+  const anchor = 'COMMENT ON SCHEMA public IS\n';
+  const start = source.lastIndexOf(anchor);
+  if (start < 0) throw new Error('Schema comment anchor drifted');
+  const end = source.indexOf("';", start);
+  if (end < 0) throw new Error('Schema comment terminator drifted');
+  return source.slice(start, end + 2);
+}
+
+function baselineSource(projectRoot) {
+  const sourcePath = path.join(
+    projectRoot,
+    'contracts/upstream/customer-agent',
+    BASELINE.contractSetId,
+    BASELINE.schemaFile,
+  );
+  if (!existsSync(sourcePath) || !lstatSync(sourcePath).isFile()) {
+    throw new Error('Immutable schema.v1.12 baseline source is missing');
+  }
+  const source = readFileSync(sourcePath, 'utf8');
+  if (sha256(source) !== BASELINE.sourceSchemaSha256) {
+    throw new Error('Immutable schema.v1.12 baseline source drifted');
+  }
+  sourceLines(source, 7661);
+  return source;
+}
+
+function assertUpgradeScope(projectRoot, currentSource) {
+  const baseline = baselineSource(projectRoot);
+  const searchStart = '-- The only app_runtime-readable search boundary.';
+  const searchEnd = 'REVOKE ALL ON FUNCTION search_recommendable_scripts(TEXT,TEXT,TEXT) FROM PUBLIC;';
+  let expected = replaceExactly(
+    baseline,
+    baseline.slice(0, baseline.indexOf('\n')),
+    currentSource.slice(0, currentSource.indexOf('\n')),
+    'Schema version header',
+  );
+  expected = replaceExactly(
+    expected,
+    anchoredBlock(baseline, searchStart, searchEnd, 'schema.v1.12 search function'),
+    anchoredBlock(currentSource, searchStart, searchEnd, 'schema.v1.13 search function'),
+    'Search function upgrade',
+  );
+  expected = replaceExactly(
+    expected,
+    finalSchemaComment(baseline),
+    finalSchemaComment(currentSource),
+    'Schema comment upgrade',
+  );
+  if (expected !== currentSource) {
+    throw new Error('schema.v1.13 contains changes outside the reviewed immutable upgrade scope');
+  }
+}
+
+function loadBaselineMigrations(projectRoot) {
+  return Object.freeze(BASELINE_MIGRATIONS.map((descriptor) => {
+    const migrationPath = path.join(projectRoot, 'packages/database/migrations', descriptor.file);
+    if (!existsSync(migrationPath) || !lstatSync(migrationPath).isFile()) {
+      throw new Error(`Immutable baseline migration is missing: ${descriptor.file}`);
+    }
+    const sql = readFileSync(migrationPath, 'utf8');
+    if (Buffer.byteLength(sql) !== descriptor.bytes || sha256(sql) !== descriptor.sha256) {
+      throw new Error(`Immutable baseline migration drifted: ${descriptor.file}`);
+    }
+    for (const anchor of [BASELINE.contractSetId, BASELINE.sourceGitSha, BASELINE.sourceSchemaSha256]) {
+      if (!sql.includes(anchor)) throw new Error(`Baseline provenance is missing from ${descriptor.file}`);
+    }
+    return Object.freeze({
+      ...descriptor,
+      contract_set_id: BASELINE.contractSetId,
+      source_git_sha: BASELINE.sourceGitSha,
+      source_schema_sha256: BASELINE.sourceSchemaSha256,
+      sql,
+    });
+  }));
+}
+
+function renderUpgradeMigration(lines, snapshot) {
+  const sourceBody = linesForRanges(lines, UPGRADE_SPEC.source_ranges);
+  for (const anchor of [
+    'DROP FUNCTION IF EXISTS search_recommendable_scripts(TEXT,TEXT,TEXT);',
+    'questions JSONB',
+    'public.content_public_questions(candidate.questions_json)',
+    'ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT) OWNER TO cs_ai_definer;',
+    'GRANT EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT) TO app_runtime;',
+    'CS-AI-C11 schema.v1.13;',
+  ]) {
+    if (!sourceBody.includes(anchor)) throw new Error(`${UPGRADE_SPEC.id} source anchor drifted: ${anchor}`);
+  }
+  const ranges = UPGRADE_SPEC.source_ranges
+    .map(({ start_line: startLine, end_line: endLine }) => `${startLine}-${endLine}`)
+    .join(', ');
   const parts = [
     `-- ${GENERATED_HEADER}`,
-    `-- ${spec.id}; source schema.v1.12 lines ${ranges}`,
+    `-- ${UPGRADE_SPEC.id}; source schema.v1.13 lines ${ranges}`,
     `-- contract_set_id=${snapshot.contract_set_id}`,
     `-- source_git_sha=${snapshot.source_git_sha}`,
     `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
     'SET LOCAL search_path = public, pg_catalog, pg_temp;',
     '',
+    sourceBody,
+    '',
   ];
-  if (spec.prelude) parts.push(spec.prelude, '');
-  parts.push(sourceBody, '');
   const sql = `${parts.join('\n').replace(/\n+$/, '')}\n`;
   return Object.freeze({
-    position,
-    id: spec.id,
-    file: `${spec.id}.sql`,
+    ...UPGRADE_SPEC,
     sha256: sha256(sql),
     bytes: Buffer.byteLength(sql),
-    source_ranges: Object.freeze(spec.ranges.map(([startLine, endLine]) => Object.freeze({ start_line: startLine, end_line: endLine }))),
+    contract_set_id: snapshot.contract_set_id,
+    source_git_sha: snapshot.source_git_sha,
+    source_schema_sha256: snapshot.manifest.database.sha256,
     sql,
   });
 }
@@ -149,42 +232,42 @@ function renderCatalogue(manifest, migrations) {
     id: ${JSON.stringify(migration.id)},
     sha256: ${JSON.stringify(migration.sha256)},
     bytes: ${migration.bytes},
+    contractSetId: ${JSON.stringify(migration.contract_set_id)},
+    sourceGitSha: ${JSON.stringify(migration.source_git_sha)},
+    sourceSchemaSha256: ${JSON.stringify(migration.source_schema_sha256)},
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: null }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
-export function buildDatabaseMigrationOutputs(snapshot) {
+export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
   if (!snapshot || typeof snapshot.database_source !== 'string') {
     throw new Error('Verified contract snapshot is missing database_source');
   }
   if (snapshot.manifest?.database?.sha256 !== EXPECTED_DATABASE_SHA256 || sha256(snapshot.database_source) !== EXPECTED_DATABASE_SHA256) {
     throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
   }
-  assertCompleteCoverage();
   const lines = sourceLines(snapshot.database_source);
-  const migrations = Object.freeze(MIGRATION_SPECS.map((spec, index) => renderMigration({ spec, position: index + 1, lines, snapshot })));
-  const reconstructedSourceBody = migrations
-    .flatMap((migration) => migration.source_ranges.flatMap(({ start_line: startLine, end_line: endLine }) =>
-      Array.from({ length: endLine - startLine + 1 }, (_, index) => ({
-        line: startLine + index,
-        text: lines[startLine + index - 1],
-      }))))
-    .sort((left, right) => left.line - right.line)
-    .map(({ text }) => text)
-    .join('\n');
-  const expectedSourceBody = lines.slice(16, 7660).join('\n');
-  if (reconstructedSourceBody !== expectedSourceBody) {
-    throw new Error('Database executable source body cannot be reconstructed byte-for-byte from migration ranges');
-  }
+  assertUpgradeScope(projectRoot, snapshot.database_source);
+  const upgrade = renderUpgradeMigration(lines, snapshot);
+  const migrations = Object.freeze([...loadBaselineMigrations(projectRoot), upgrade]);
+  const upgradeSourceBody = linesForRanges(lines, UPGRADE_SPEC.source_ranges);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
     contract_set_id: snapshot.contract_set_id,
     source_git_sha: snapshot.source_git_sha,
     source_schema_sha256: snapshot.manifest.database.sha256,
-    executable_source_sha256: sha256(expectedSourceBody),
-    compatibility: Object.freeze({ current: 'N', prior_signed_baseline: null }),
+    upgrade_source_sha256: sha256(upgradeSourceBody),
+    compatibility: Object.freeze({
+      current: 'N',
+      prior_signed_baseline: Object.freeze({
+        contract_set_id: BASELINE.contractSetId,
+        source_git_sha: BASELINE.sourceGitSha,
+        source_schema_sha256: BASELINE.sourceSchemaSha256,
+        migration_count: BASELINE.migrationCount,
+      }),
+    }),
     migrations: Object.freeze(migrations.map(({ sql: _sql, ...migration }) => migration)),
   });
   const outputs = new Map();
@@ -338,7 +421,7 @@ export function publishDatabaseMigrationOutputs(
 export async function generateDatabaseMigrations({ projectRoot = DEFAULT_PROJECT_ROOT, check = false } = {}) {
   const resolvedRoot = path.resolve(projectRoot);
   return withVerifiedContractSetSnapshot({ projectRoot: resolvedRoot }, (snapshot) => {
-    const built = buildDatabaseMigrationOutputs(snapshot);
+    const built = buildDatabaseMigrationOutputs(snapshot, { projectRoot: resolvedRoot });
     const relativePaths = [...built.outputs.keys()];
     if (check) {
       verifyExactOutputGroups(resolvedRoot, built.outputs);

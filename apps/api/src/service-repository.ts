@@ -10,9 +10,11 @@ import {
 import type { ApiDatabaseBootstrapConfig } from './runtime-config.js';
 
 export type ServiceReadinessChecks = components['schemas']['ReadyChecks'];
+export type ServicePolicyFlags = Readonly<Omit<components['schemas']['PolicyResponse'], 'auth_mode'>>;
 
 export type ServiceRepository = Readonly<{
   readiness: () => Promise<ServiceReadinessChecks>;
+  readPolicyFlags: () => Promise<ServicePolicyFlags | null>;
   close: () => Promise<void>;
 }>;
 
@@ -65,8 +67,10 @@ interface RuntimeSchemaProbeRow extends QueryResultRow {
   runtime_search_boundary_safe: boolean;
 }
 
+interface RuntimePolicyFlagsRow extends QueryResultRow, ServicePolicyFlags {}
+
 const EXPECTED_SCHEMA_PREFIX = `CS-AI-C11 ${CONTRACT_PROVENANCE.database_version};`;
-const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = 'ff7fe110f2d5f097928bcd09e82f4cfa568972aa87e6d56578d99e338c046b58';
+const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = '87e9234b6d5c21728921a8cebf143f163fc726c7ac2c0a35f3b555d0c8ed6c42';
 const RUNTIME_SCHEMA_PROBE = `
   WITH expected_runtime_relation_acl(relation_name, privilege_type) AS (
     VALUES
@@ -134,6 +138,7 @@ const RUNTIME_SCHEMA_PROBE = `
       ('public.content_questions_source_assets_are_active(jsonb)'),
       ('public.content_questions_are_valid(jsonb)'),
       ('public.content_question_hash(jsonb)'),
+      ('public.content_public_questions(jsonb)'),
       ('public.jsonb_jcs(jsonb)'),
       ('public.content_utc_timestamp_text(timestamp with time zone)'),
       ('public.digest(bytea,text)')
@@ -521,7 +526,7 @@ const RUNTIME_SCHEMA_PROBE = `
             'search_path=pg_catalog, public, pg_temp'
           ]::text[]
           AND (
-            SELECT pg_catalog.count(*) = 10
+            SELECT pg_catalog.count(*) = 11
               AND pg_catalog.encode(
                 pg_catalog.sha256(
                   pg_catalog.convert_to(
@@ -583,12 +588,35 @@ const RUNTIME_SCHEMA_PROBE = `
     ) AS runtime_search_boundary_safe
 `;
 
+// Policy is business-visible runtime data. Prove the same identity, schema and
+// ACL boundary in the same statement so a red readiness probe cannot be raced
+// or bypassed by a separately over-privileged runtime query.
+const RUNTIME_POLICY_FLAGS_READ = `
+  WITH runtime_boundary AS MATERIALIZED (
+    ${RUNTIME_SCHEMA_PROBE}
+  )
+  SELECT
+    COALESCE((SELECT flag_value FROM public.policy_flags WHERE flag_key = 'rewrite'), FALSE) AS rewrite,
+    COALESCE((SELECT flag_value FROM public.policy_flags WHERE flag_key = 'auto_send'), FALSE) AS auto_send,
+    COALESCE((SELECT flag_value FROM public.policy_flags WHERE flag_key = 'autofill_adapter'), FALSE) AS autofill_adapter,
+    COALESCE((SELECT flag_value FROM public.policy_flags WHERE flag_key = 'llm_ranker'), FALSE) AS llm_ranker,
+    COALESCE((SELECT flag_value FROM public.policy_flags WHERE flag_key = 'metrics_experimental_kpi'), FALSE) AS metrics_experimental_kpi
+  FROM runtime_boundary
+  WHERE runtime_boundary.database_probe = 1
+    AND runtime_boundary.server_version_num / 10000 = 15
+    AND runtime_boundary.schema_comment LIKE ($1 || '%')
+    AND runtime_boundary.repository_boundary_present
+    AND runtime_boundary.runtime_identity_safe
+    AND runtime_boundary.runtime_effective_acl_safe
+    AND runtime_boundary.runtime_search_boundary_safe
+`;
+
 function freezeChecks(
   database: ServiceReadinessChecks['database'],
   schema: ServiceReadinessChecks['schema'],
 ): ServiceReadinessChecks {
-  // M1 owns auth; M2 owns import storage and the first current release. Keeping
-  // these hard-off is a truthful readiness result, not a placeholder success.
+  // The repository only proves database/schema. App composition replaces auth
+  // with the auth service's own readiness; M2 owns storage and current content.
   return Object.freeze({
     database,
     schema,
@@ -654,6 +682,32 @@ class PostgresServiceRepository implements ServiceRepository {
       if (this.activeProbe?.operation === operation) this.activeProbe = null;
     });
     return response;
+  }
+
+  async readPolicyFlags(): Promise<ServicePolicyFlags | null> {
+    if (this.closed) return null;
+    try {
+      const result = await this.pool.query<RuntimePolicyFlagsRow>(
+        RUNTIME_POLICY_FLAGS_READ,
+        [EXPECTED_SCHEMA_PREFIX],
+      );
+      if (this.closed) return null;
+      const row = result.rows[0];
+      if (!row || row.rewrite !== false || row.auto_send !== false) {
+        this.report('POLICY_READ_FAILED');
+        return null;
+      }
+      return Object.freeze({
+        rewrite: false,
+        auto_send: false,
+        autofill_adapter: row.autofill_adapter,
+        llm_ranker: row.llm_ranker,
+        metrics_experimental_kpi: row.metrics_experimental_kpi,
+      });
+    } catch (error: unknown) {
+      this.report('POLICY_READ_FAILED', error);
+      return null;
+    }
   }
 
   private async executeProbe(): Promise<ServiceReadinessChecks> {

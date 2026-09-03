@@ -35,6 +35,7 @@ interface ShapeRow extends QueryResultRow {
   missing_functions: string;
   missing_function_signatures: string;
   unsafe_view_owners: string;
+  search_projection: string;
 }
 
 interface SeedRow extends QueryResultRow {
@@ -78,7 +79,7 @@ const REQUIRED_FUNCTIONS = Object.freeze(
   REQUIRED_FUNCTION_SIGNATURES.map((signature) => signature.slice(0, signature.indexOf('('))),
 );
 const REQUIRED_SCHEMA_COMMENT_FRAGMENTS = Object.freeze([
-  'schema.v1.12',
+  'schema.v1.13',
   'Phase1 rewrite/auto_send/training hard-off',
 ]);
 const REQUIRED_POLICY_KEYS = Object.freeze([
@@ -93,7 +94,7 @@ const EXPECTED_ACL_MANIFEST_SHA256 = '45d453e0f6b85a3eeab8eecd4f26101d0e00ca1a24
 const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1399;
 const EXPECTED_OBJECT_MANIFEST_SHA256 = '3ff010d385881c7a338c806e66d1960b37222aaa763512af72e7bf8290790876';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 143;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '49037862acb90670db9fb12d858d42f4e0b0d41260f89fd99b52c5b8d082dcd5';
+const EXPECTED_FUNCTION_SECURITY_SHA256 = 'fa0e17ba34f048e5728a2b7252211da80468f3b29b7ca93b1d9f2e488699e3ac';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 26;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'b946286810208ac9ec4f5f1b00efedada8d8e97270008be144f0d2f45f36df22';
 
@@ -638,7 +639,10 @@ export async function verifyMigrationCatalogue(
          FROM unnest($2::text[]) required(name)
          JOIN pg_catalog.pg_class relation ON relation.oid=to_regclass('public.' || required.name)
          JOIN pg_catalog.pg_roles owner_role ON owner_role.oid=relation.relowner
-        WHERE owner_role.rolname <> 'cs_ai_definer') AS unsafe_view_owners
+        WHERE owner_role.rolname <> 'cs_ai_definer') AS unsafe_view_owners,
+      pg_get_function_result(
+        'public.search_recommendable_scripts(text,text,text)'::regprocedure
+      ) AS search_projection
   `, [
     [...REQUIRED_TABLES],
     [...REQUIRED_VIEWS],
@@ -702,6 +706,9 @@ export async function verifyMigrationCatalogue(
     || shape.missing_functions
     || shape.missing_function_signatures
     || shape.unsafe_view_owners
+    || !shape.search_projection.includes('questions jsonb')
+    || !shape.search_projection.includes('search_document tsvector')
+    || !shape.search_projection.includes('search_fallback_text text')
   ) {
     failures.push('required object/signature or view-owner shape');
   }

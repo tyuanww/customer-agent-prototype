@@ -11,7 +11,13 @@ export type SourceRange = Readonly<{
   endLine: number;
 }>;
 
-export type DatabaseMigration = Readonly<{
+export type MigrationProvenance = Readonly<{
+  contractSetId: string;
+  sourceGitSha: string;
+  sourceSchemaSha256: string;
+}>;
+
+export type DatabaseMigration = MigrationProvenance & Readonly<{
   position: number;
   id: string;
   sha256: string;
@@ -24,13 +30,15 @@ export type ExecutableDatabaseMigration = DatabaseMigration & Readonly<{
 }>;
 
 export type ExecutableMigrationCatalogue = Readonly<{
-  schema: 'customer-agent-database-migrations/v1';
+  schema: 'customer-agent-database-migrations/v2';
   contractSetId: string;
   sourceGitSha: string;
   sourceSchemaSha256: string;
   compatibility: Readonly<{
     current: 'N';
-    priorSignedBaseline: null;
+    priorSignedBaseline: Readonly<MigrationProvenance & {
+      migrationCount: number;
+    }> | null;
   }>;
   migrations: readonly ExecutableDatabaseMigration[];
 }>;
@@ -52,8 +60,8 @@ export type MigrationStatus = Readonly<{
   pending: readonly DatabaseMigration[];
   compatibility: Readonly<{
     current: 'N';
-    priorSignedBaseline: null;
-    priorUpgrade: 'N/A · no prior signed baseline';
+    priorSignedBaseline: ExecutableMigrationCatalogue['compatibility']['priorSignedBaseline'];
+    priorUpgrade: string;
   }>;
 }>;
 
