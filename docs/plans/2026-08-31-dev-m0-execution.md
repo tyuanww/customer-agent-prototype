@@ -1,16 +1,16 @@
 # DEV-M0 产品仓执行记录
 
 > **文档状态：** `APPROVED · EXECUTION RECORD`（记录已授权切片事实，不新增范围授权）
-> **状态：** `IN_PROGRESS · DEV-M0`
+> **状态：** `IMPLEMENTATION COMPLETE · DEV-M0`
 > **开始日期：** 2026-08-31
 > **组织门输入：** `DEC-DDEV-01=PASS`，证据索引 `EVD-DDEV-AUTH-20260831`
 > **产品仓开工输入：** 用户已明确授权“开工授权 / DEV-M0 产品仓开工授权”
-> **当前切片：** `DEV-M0-W6 · exit closure · IMPLEMENTED LOCALLY · AWAITING REMOTE CI（基线 main@49a574a）`
+> **当前切片：** `DEV-M0-W6 · exit closure · MERGED（PR #15，main@44b863d90dde8db1479f774206a5bf98f57c4560）`
 > **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR、Review、合并与候选分支清理均已按独立授权完成，PR #10 squash 合并头为 `1a77297d51ce3cf3a0a551290675c60c941be4b6`
 > **W3 开工输入：** 用户于 2026-09-02 在 W2 有序落地后授权创建下一切片并本地实现/验证；后续提交、推送、PR、Review、合并与候选分支清理又按明确授权完成，PR #11 合并头为 `2758dba5bebefc3fce87fdc73cffb6a7122bbea7`
 > **W4 开工输入：** 用户于 2026-09-02 明确要求“开始启动下一个板块，我给你授权，全部一个个开始做”；本记录将该授权限制为 W4 的实现、验证与独立 Git 生命周期，不扩张到 W5、DEV-M1、真实数据、飞书运行接入、Pilot、部署或生产
 > **W5 开工输入：** 用户于 2026-09-03 明确给出“`DEV-M0-W5` 开工”；本记录将该授权限制为 W5 本地分支、实现与验证，不包含提交、推送、PR、合并、真实数据、飞书运行接入、部署或生产
-> **下一阶段：** W6 的 Linux 总门、PG15 integration 与 Windows feasibility smoke 在 clean checkout 全绿并形成退出证据后，再单独评审 `DEV-M1`；当前不得跨入业务九端口、真实 adapter 或 Pilot
+> **下一阶段：** `DEV-M1` 仍需独立评审与明确授权；当前不得跨入业务九端口、真实 adapter 或 Pilot
 > **W1 开工输入：** 用户于 2026-08-31 明确给出“产品仓 W1 分支创建与开工授权（基于 6111272）”；该授权不包含 W1 提交、推送、PR、合并、部署或后续正式能力切片
 > **W0 历史输入：** 用户曾明确给出“产品仓 W0 提交授权”；W0 已通过独立 Git 门完成，不自动扩张到 W1
 > **不代表：** 真实数据、飞书运行接入、Pilot、付费调用、自动发送、部署或发布授权；本记录的状态本身不扩张任何 Git 权限
@@ -435,4 +435,4 @@ W6 不新增业务能力，只把 DEV-M0 已有实现变成可在 clean checkout
 - `artifact:m0:build` 只组装 contracts/database/API 的非部署型候选目录，排除 desktop、database testkit、tests 与 source map；manifest 绑定当前 Git SHA、contract set、来源 SHA 和逐文件哈希，并固定 `deployable=false`、`runtime_activated=false`。
 - `artifact:m0:verify` 逐文件复核 manifest、合同锁、符号链接、桌面合成模块/E2E 开关与常见凭证标记。它只证明服务构建隔离，不证明生产部署。
 
-本地 Node 24.19.0 / pnpm 11.19.0 已完成 `pnpm check`、PG15 migration 10/10 与 API PG15 18/18；远端 Linux/PG15/Windows 三 lane 仍需在 W6 PR 上形成 clean-checkout 证据。DEV-M0 在远端证据回写前保持 `IN_PROGRESS`。
+本地 Node 24.19.0 / pnpm 11.19.0 已完成 `pnpm check`、PG15 migration 10/10 与 API PG15 18/18。PR #15 的 CI run `33729754086` 已在候选头 `15566eb9ce6573493d0cefc49c054fdf4b13164c` 上完成 Linux canonical、PostgreSQL 15 integration 与 Windows feasibility smoke 三条全绿，并于 2026-09-03 squash 合并为 `44b863d90dde8db1479f774206a5bf98f57c4560`。产品仓 DEV-M0 实施由此完成；`DEV-M1` 仍未授权。

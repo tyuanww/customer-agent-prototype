@@ -6,7 +6,7 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，W2 在 `packages/contracts` 中建立合同 codegen/runtime validation，W3 建立 loopback API/config 骨架，W4 已实现并验证不可变 PostgreSQL 15 migration 控制面，W5 已通过 PR #14 合并私有 runtime pool 与 `/ready`。当前 W6 只收口 CI、Windows 可行性 smoke 和不含桌面合成运行面的正式服务候选产物；数据库仍未接入桌面端，业务端口与正式 runtime 也未激活。可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`，复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1～W6` 产品实施已完成：workspace、合同 codegen/runtime validation、loopback API/config、PostgreSQL 15 migration 控制面、runtime pool/`/ready`、统一 CI、Windows 可行性 smoke 与非部署型候选产物边界均已落入 `main@44b863d`。数据库仍未接入桌面端，业务端口与正式 runtime 也未激活。可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`，复制只表示「已复制」，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
