@@ -42,6 +42,7 @@ const request = Object.freeze({
   bigramTsquery: '什么 & 么时 & 时候 & 候发 & 发货',
   escapedFallbackPattern: '%什么时候发货%',
   topK: 3 as const,
+  suppressMatches: false,
 });
 
 describe('search repository', () => {
@@ -53,11 +54,12 @@ describe('search repository', () => {
 
     expect(query).toHaveBeenCalledOnce();
     expect(query).toHaveBeenCalledWith(SEARCH_CANDIDATES_SQL, [
-      'qianniu', null, null, request.bigramTsquery, '%什么时候发货%', '什么时候发货', 3,
+      'qianniu', null, null, request.bigramTsquery, '%什么时候发货%', '什么时候发货', 3, false,
     ]);
     expect(SEARCH_CANDIDATES_SQL).toContain('LIMIT $7::integer');
     expect(SEARCH_CANDIDATES_SQL).toContain("ILIKE $5::text ESCAPE '\\'");
     expect(SEARCH_CANDIDATES_SQL).toContain('NOT EXISTS (SELECT 1 FROM primary_matches)');
+    expect(SEARCH_CANDIDATES_SQL).toContain('AND NOT $8::boolean');
     expect(result).toMatchObject({
       ok: true,
       releaseId: context.release_id,

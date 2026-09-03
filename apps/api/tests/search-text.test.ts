@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   hmacRedactedQuery,
+  isEntityFreeGenericSearchText,
   normalizeSearchText,
   unicodeBigramTokens,
 } from '../src/search-text.js';
@@ -20,6 +21,14 @@ describe('DEV-M1 Chinese search text contract', () => {
     expect(unicodeBigramTokens('a🦊b 客服')).toEqual(['客服']);
     expect(unicodeBigramTokens('abc-12')).toEqual(['ab', 'bc', '12']);
     expect(unicodeBigramTokens('单')).toEqual([]);
+  });
+
+  it('separates entity-free generic intent from scoped business questions', () => {
+    expect(isEntityFreeGenericSearchText('请问怎么用呢')).toBe(true);
+    expect(isEntityFreeGenericSearchText('活动规则是什么')).toBe(true);
+    expect(isEntityFreeGenericSearchText('%')).toBe(false);
+    expect(isEntityFreeGenericSearchText('星澜洁面露怎么用')).toBe(false);
+    expect(isEntityFreeGenericSearchText('云朵会员周活动什么时候结束')).toBe(false);
   });
 
   it('binds the normalized redacted text to a secret and key version', () => {

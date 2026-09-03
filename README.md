@@ -230,6 +230,6 @@ pnpm package:mac
 
 ## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 W3/W4 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search，以及 query/impression/adoption/escalate 的事务与幂等；查询文本仍不落库，桌面也未接线。真实飞书鉴权、storage/content readiness、桌面 adapter 与 runtime activation 仍不存在。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」仍不成立：后续还需完成 W5 runner、M2 桌面 adapter、飞书会话以及正式数据门。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search、query/impression/adoption/escalate 的事务与幂等，以及通过正式 PostgreSQL 搜索主链执行的 50 条纯合成 runner；runner 只报告 `NOT_SIGNED` 原始分母，不证明真实业务准确率。查询文本仍不落库，桌面也未接线。真实飞书鉴权、storage/content readiness、桌面 adapter 与 runtime activation 仍不存在。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」仍不成立：后续还需 M2 桌面 adapter、飞书会话、正式内容/数据门与独立真实 G1a。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。

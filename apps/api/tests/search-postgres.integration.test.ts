@@ -414,6 +414,7 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
         '%什么时候发货%',
         '什么时候发货',
         3,
+        false,
       ],
     );
     const result = explained.rows[0]?.['QUERY PLAN'][0];

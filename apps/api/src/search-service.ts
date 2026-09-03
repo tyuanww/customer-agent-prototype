@@ -4,7 +4,11 @@ import {
   type SearchRepositoryRequest,
   type SearchRepositoryResult,
 } from './search-repository.js';
-import { normalizeSearchText, unicodeBigramTokens } from './search-text.js';
+import {
+  isEntityFreeGenericSearchText,
+  normalizeSearchText,
+  unicodeBigramTokens,
+} from './search-text.js';
 
 type SearchCandidate = components['schemas']['SearchCandidate'];
 
@@ -56,6 +60,7 @@ export function createSearchBackend(repository: SearchRepositoryPort): SearchBac
         bigramTsquery: bigrams.length === 0 ? null : bigrams.join(' & '),
         escapedFallbackPattern: `%${escapeLikePattern(normalizedQuery)}%`,
         topK: request.topK,
+        suppressMatches: isEntityFreeGenericSearchText(normalizedQuery),
       }) satisfies SearchRepositoryRequest;
 
       let result: SearchRepositoryResult;

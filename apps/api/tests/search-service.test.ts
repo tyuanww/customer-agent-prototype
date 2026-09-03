@@ -55,6 +55,7 @@ describe('search backend', () => {
       bigramTsquery: '退款',
       escapedFallbackPattern: '%a\\%\\_\\\\退款%',
       topK: 3,
+      suppressMatches: false,
     });
     expect(result).toMatchObject({
       ok: true,
@@ -66,6 +67,23 @@ describe('search backend', () => {
       }],
     });
     expect(JSON.stringify(result)).not.toContain('reviewerEvidence');
+  });
+
+  it('preserves release context while suppressing entity-free generic intent matches', async () => {
+    const searchCandidates = vi.fn().mockResolvedValue({
+      ok: true,
+      releaseId: 'rel-synthetic-001',
+      sourceBindingHash: 'b'.repeat(64),
+      candidates: [],
+    });
+    const backend = createSearchBackend({ searchCandidates });
+
+    await backend.search({ ...request, normalizedQuery: '请问怎么用呢' });
+
+    expect(searchCandidates).toHaveBeenCalledWith(expect.objectContaining({
+      normalizedQuery: '请问怎么用呢',
+      suppressMatches: true,
+    }));
   });
 
   it('uses escaped fallback only for a one-code-point query', async () => {

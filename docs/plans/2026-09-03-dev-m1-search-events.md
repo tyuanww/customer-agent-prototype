@@ -1,9 +1,9 @@
 # DEV-M1 · Search + Events 执行记录
 
-> **状态：** APPROVED · IN PROGRESS
+> **状态：** IMPLEMENTED · SYNTHETIC RUNNER NOT SIGNED
 > **开工授权：** 用户于 2026-09-03 明确“继续开工，授权”；仅放行本文件定义的 DEV-M1 合成/测试范围
-> **当前切片基线：** `main@362e53c8eaf4995774eeb0c46660c54c316ecd04`
-> **当前分支：** `codex/dev-m1-events`
+> **当前切片基线：** `main@530e5bb9221f5adb62987f18879f6080c18849bd`
+> **当前分支：** `codex/dev-m1-g1a-runner`
 > **上游合同：** `cs-ai-c11-openapi-1.11.0-schema-1.14-1af001b8b0ce`（`1af001b8b0ce95aac0c42f42251a38feb85f3e26`，`VERIFIED_NOT_ACTIVATED`）
 
 ## 1. 本里程碑交付
@@ -49,9 +49,13 @@ DEV-M1 只实现 Application API / domain 的 Search + Events：
 - [x] W2：已接收 `schema.v1.14` 并保持 v1.12/v1.13 migration 历史逐字节不变；单 SQL 搜索 repository、公开候选映射、稳定错误归一化与 `/v1/search` 路由边界已实现。PR #18 已合并为 `main@362e53c8eaf4995774eeb0c46660c54c316ecd04`。
 - [x] W3：Search 与 `query_events`、精确 `candidate_impressions`、幂等完成已进入同一 `PoolClient` 事务；同体重放、异体冲突、24h key-version 轮换、父 terminal/reselection、来源拒绝回滚后独立审计均有 PG15 证据。当前 synthetic 查询固定 suppressed，不持久化原文。
 - [x] W4：Adoption 唯一 terminal、复制语义、并发 first-wins、Escalation auxiliary/action 稳定事实、HTTP→PG15 主链与 `collection_disabled` 零事件降级均已实现并验证。
-- [ ] W5：未开始；等待本切片 Review/合并后建立独立 runner 分支。
+- [x] W5：冻结 JSONL 已扩充为 `20 + 12 + 18 = 50` 条纯合成用例；运行器通过隔离本机 PostgreSQL 15 应用正式迁移和四域合成发布，并沿当前 SearchBackend/SQL Top 3 主链逐例执行。首次结果为 50/50、禁返 0、后端错误 0；业务阈值未签，固定输出 `NOT_SIGNED` / `NOT_EVALUATED`，不计真实 G1a。
 
 W3/W4 候选验证（2026-09-04）：`workspace:check`、lint、四包 typecheck/build 与仓级测试通过；普通 API 为 79 passed（PG15 套件按设计跳过），显式 API PG15 为 42/42，其中事件事务 9/9；未改桌面行为但仍完成现有 desktop 508/508 回归。未运行 Electron E2E、真实窗口/Windows 设备、真实数据库、飞书、部署或 Pilot；这些均不在本切片授权和实现面内。
+
+W5 runner 首次验证（2026-09-04）：`pnpm test:g1a:synthetic` 先逐行校验 closed-schema、连续 ID、成对 scope、六类安全负例各 2 条和纯合成边界，再启动隔离 PG15。原始分母：正例 20/20、安全负例 12/12、鲁棒性 18/18；expected hit 38/38、expected no-hit 12/12、禁返 0、后端错误 0。该结果只证明当前合成合同可重复执行，阈值和真实业务准确率仍未签发。
+
+W5 最终质量门（2026-09-04）：`workspace:check`、lint、四包 typecheck/build 与仓级测试通过；contracts 17/17、database 19/19、API 81/81、desktop 508/508、artifact boundary 8/8，显式 API PG15 为 43/43（含 G1a runner 50/50）。新增 diff 的凭证扫描为 0 findings；未运行 Electron E2E、真实窗口/设备、真实数据库、飞书、部署或 Pilot，这些均不属于当前合成范围。
 
 ## 4. 停止条件
 
@@ -236,11 +240,11 @@ Synthesized from this review's findings. Each task derives from a specific findi
   - Surfaced by: Architecture #4。
   - Files: API event repository/service/routes/tests。
   - Verify: PG15 并发、replay/body mismatch、parent terminal、first-wins、rollback audit。
-- [ ] **T5 (P1, human: ~3h / CC: ~30min)** — G1a — 完成 50 例 runner 与退出证据
+- [x] **T5 (P1, human: ~3h / CC: ~30min)** — G1a — 完成 50 例 runner 与退出证据
   - Surfaced by: Test Review gap #9。
   - Files: `tests/fixtures/search`、runner、执行记录/验证文档。
   - Verify: runner 全量；未签阈值时只输出可运行与原始分母。
-- [ ] **T6 (P2, human: ~2h / CC: ~20min)** — verification — 跑全量质量门并做凭证/真实数据扫描
+- [x] **T6 (P2, human: ~2h / CC: ~20min)** — verification — 跑全量质量门并做凭证/真实数据扫描
   - Surfaced by: 全部评审项的落地门。
   - Files: 仅修复验证发现的本里程碑问题；不扩大范围。
   - Verify: `pnpm workspace:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build`，再执行定向 PG15/runner。

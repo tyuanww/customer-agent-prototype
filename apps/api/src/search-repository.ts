@@ -8,6 +8,7 @@ export type SearchRepositoryRequest = Readonly<{
   bigramTsquery: string | null;
   escapedFallbackPattern: string;
   topK: 1 | 2 | 3;
+  suppressMatches: boolean;
 }>;
 
 export type SearchRepositoryCandidate = Readonly<{
@@ -91,6 +92,7 @@ candidate_pool AS MATERIALIZED (
   SELECT scoped.*
   FROM scoped
   WHERE scoped.is_candidate
+    AND NOT $8::boolean
 ),
 primary_matches AS MATERIALIZED (
   SELECT candidate_pool.*, search_input.ts_query
@@ -242,6 +244,7 @@ export function createSearchRepository(client: SearchQueryClient): Readonly<{
         request.escapedFallbackPattern,
         request.normalizedQuery,
         request.topK,
+        request.suppressMatches,
       ]);
       const context = result.rows[0];
       if (!context) return Object.freeze({ ok: false, code: 'SOURCE_GATE_NOT_READY' });
