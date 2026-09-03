@@ -1,23 +1,33 @@
 # `@customer-agent/api`
 
-本包是 `DEV-M0-W3` 的正式 Application API 启动骨架。它当前只证明一件事：受控配置通过后，Node 24 可以在本机 loopback 上启动 Fastify，并按冻结 OpenAPI 返回合同有效的 `GET /health`。
+本包是 `DEV-M0-W3～W5` 的正式 Application API 运行时骨架。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过一个私有 `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.12` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。
 
 当前不是业务 API：
 
 - 只允许 `CUSTOMER_AGENT_PROFILE=formal-dev|test`、`AUTH_MODE=mock` 和 `127.0.0.1`。
 - `demo` 属于桌面合成运行链，不允许启动本服务。
-- `single-host`、`multi-instance`、`production` 与 `AUTH_MODE=feishu` 尚未具备依赖，监听前失败关闭。
-- `/ready`、`/v1/*`、PostgreSQL、migration、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
-- 启动失败只输出稳定字段与原因，不回显环境变量值、token、DSN 或异常正文。
+- `single-host`、`multi-instance`、`production` 与 `AUTH_MODE=feishu` 尚未具备后续依赖，监听前失败关闭。
+- `/health` 不访问数据库；`/ready` 只把 database/schema 的真实结果写入合同响应。
+- auth/storage/content 尚未由 M1/M2 实现，因此三项固定 `not_ready`，W5 的 `/ready` 正常结果仍是 503，而不是业务已可用。
+- `/v1/*`、migration 自动执行、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
+- 启动与 readiness 失败只输出稳定字段，不回显环境变量值、token、DSN、SQL 或异常正文。
+- 同一时刻只运行一个 readiness 探针；连接等待与 readiness 响应分别由 `DB_CONNECTION_TIMEOUT_MS`、`DB_READINESS_TIMEOUT_MS` 控制，timer 与单调时钟都会拒绝 deadline 后才完成的成功结果。
+- schema 探针锁定 8 个 search/传递函数、2 个视图、`pgcrypto.digest` extension owner、双向角色成员与当前数据库/全部用户 schema 的精确有效 ACL；任意非 owner 的 `public CREATE` 失败关闭。
+- W5 只接受 `127.0.0.1`、`localhost` 或本机 Unix socket PostgreSQL；任意远程或括号 IPv6 DSN 均在建池前拒绝，托管数据库/TLS 属于后续部署设计。
 
 配置合同与拒启矩阵见 [`docs/reference-api-runtime-config.md`](../../docs/reference-api-runtime-config.md)。
 
 ## 本地运行
 
+先准备一个已应用 W4 九段 migration、且登录角色属于 `app_runtime` 的本机隔离 PostgreSQL 15 数据库。连接串只通过本机环境注入，不写入仓库：
+
 ```bash
 CUSTOMER_AGENT_PROFILE=formal-dev \
 AUTH_MODE=mock \
-CUSTOMER_AGENT_BUILD_VERSION=dev-m0-w3 \
+CUSTOMER_AGENT_BUILD_VERSION=dev-m0-w5 \
+DATABASE_URL='postgresql://<runtime-user>@localhost/<database>' \
+DB_CONNECTION_TIMEOUT_MS=2000 \
+DB_READINESS_TIMEOUT_MS=2000 \
 pnpm dev:api
 ```
 
@@ -25,21 +35,25 @@ pnpm dev:api
 
 ```bash
 curl --fail --silent http://127.0.0.1:3100/health
+curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-预期响应只包含：
+`/health` 预期只包含：
 
 ```json
-{"status":"ok","service":"cs-ai-api","version":"dev-m0-w3"}
+{"status":"ok","service":"cs-ai-api","version":"dev-m0-w5"}
 ```
+
+W5 的 `/ready` 会显示 database/schema 的真实状态，但 auth/storage/content 仍为 `not_ready`，所以返回 503。
 
 ## 验证
 
 ```bash
 pnpm test:api
+pnpm --filter @customer-agent/api test:integration
 pnpm typecheck
 pnpm build
 pnpm workspace:check
 ```
 
-测试使用 Fastify `inject()` 与一次真实 ephemeral loopback 监听；不访问网络服务、数据库或真实数据。
+普通 API 测试使用 Fastify `inject()`、fake pool 与一次真实 ephemeral loopback 监听，不要求 PostgreSQL。显式 integration 会通过 `@customer-agent/database/testkit` 创建并清理隔离的临时 PostgreSQL 15 cluster，只使用合成空库；不会连接共享数据库或真实数据。该 testkit 只供仓内测试，不进入 API 生产请求路径。

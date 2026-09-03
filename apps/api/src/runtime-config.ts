@@ -26,6 +26,14 @@ export type ApiRuntimeConfig = Readonly<{
   runtimeActivated: false;
 }>;
 
+/** Private bootstrap input. Never expose this object through StartedApi, logs, or HTTP. */
+export type ApiDatabaseBootstrapConfig = Readonly<{
+  connectionString: string;
+  poolMax: number;
+  connectionTimeoutMs: number;
+  readinessTimeoutMs: number;
+}>;
+
 export type ApiConfigIssue = Readonly<{
   field: string;
   reason:
@@ -42,7 +50,11 @@ const AUTH_MODE_SET = new Set<string>(['mock', 'feishu']);
 const BUILD_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 const DIAGNOSTIC_ID_PATTERN = /^diag_[0-9a-f]{32}$/;
 const LOOPBACK_HOST = '127.0.0.1' as const;
+const POSTGRES_LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const DEFAULT_API_PORT = 3100;
+const DEFAULT_DB_POOL_MAX = 20;
+const DEFAULT_DB_CONNECTION_TIMEOUT_MS = 2_000;
+const DEFAULT_DB_READINESS_TIMEOUT_MS = 2_000;
 const STARTUP_ERROR_REASONS = Object.freeze({
   EACCES: 'listen_permission_denied',
   EADDRINUSE: 'listen_address_in_use',
@@ -146,6 +158,57 @@ function parseBuildVersion(
   return value;
 }
 
+function parseBoundedPositiveInteger(
+  environment: ApiRuntimeEnvironment,
+  field: string,
+  fallback: number,
+  maximum: number,
+  issues: ApiConfigIssue[],
+): number {
+  const value = exactEnvironmentValue(environment, field, issues);
+  if (value === undefined) return fallback;
+  if (!/^[1-9][0-9]*$/.test(value)) {
+    issues.push(issue(field, 'invalid'));
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > maximum) {
+    issues.push(issue(field, 'invalid'));
+    return fallback;
+  }
+  return parsed;
+}
+
+function isPostgresConnectionString(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    if ((parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:')
+      || parsed.pathname.length <= 1
+      || parsed.hash.length > 0
+      || !POSTGRES_LOOPBACK_HOSTS.has(parsed.hostname)) {
+      return false;
+    }
+
+    // node-postgres lets URI query parameters override explicit Pool options.
+    // W5 therefore accepts no driver controls in DATABASE_URL. The sole query
+    // exception is the Unix-socket host/port pair used by the isolated PG15
+    // integration harness; deployment/TLS DSNs remain a later profile concern.
+    const keys = [...parsed.searchParams.keys()];
+    if (keys.some((key) => key !== 'host' && key !== 'port')) return false;
+    const hosts = parsed.searchParams.getAll('host');
+    const ports = parsed.searchParams.getAll('port');
+    if (hosts.length === 0 && ports.length === 0) return true;
+    if (hosts.length !== 1 || ports.length > 1) return false;
+    const socketHost = hosts[0];
+    if (!socketHost?.startsWith('/') || socketHost.includes('\0')) return false;
+    if (ports.length === 0) return true;
+    return /^[1-9][0-9]*$/.test(ports[0] ?? '')
+      && Number(ports[0]) <= 65_535;
+  } catch {
+    return false;
+  }
+}
+
 export class ApiConfigError extends Error {
   readonly code = 'CONFIG_INVALID';
   readonly issues: readonly ApiConfigIssue[];
@@ -199,6 +262,51 @@ export function parseApiRuntimeConfig(
   });
 }
 
+export function parseApiDatabaseBootstrapConfig(
+  environment: ApiRuntimeEnvironment,
+): ApiDatabaseBootstrapConfig {
+  const issues: ApiConfigIssue[] = [];
+  const connectionString = exactEnvironmentValue(environment, 'DATABASE_URL', issues);
+  if (connectionString === undefined && environment.DATABASE_URL === undefined) {
+    issues.push(issue('DATABASE_URL', 'missing'));
+  } else if (connectionString !== undefined && !isPostgresConnectionString(connectionString)) {
+    issues.push(issue('DATABASE_URL', 'invalid'));
+  }
+
+  const poolMax = parseBoundedPositiveInteger(
+    environment,
+    'DB_POOL_MAX',
+    DEFAULT_DB_POOL_MAX,
+    20,
+    issues,
+  );
+  const connectionTimeoutMs = parseBoundedPositiveInteger(
+    environment,
+    'DB_CONNECTION_TIMEOUT_MS',
+    DEFAULT_DB_CONNECTION_TIMEOUT_MS,
+    10_000,
+    issues,
+  );
+  const readinessTimeoutMs = parseBoundedPositiveInteger(
+    environment,
+    'DB_READINESS_TIMEOUT_MS',
+    DEFAULT_DB_READINESS_TIMEOUT_MS,
+    10_000,
+    issues,
+  );
+
+  if (issues.length > 0 || connectionString === undefined) {
+    throw new ApiConfigError(issues);
+  }
+
+  return Object.freeze({
+    connectionString,
+    poolMax,
+    connectionTimeoutMs,
+    readinessTimeoutMs,
+  });
+}
+
 function createDiagnosticId(): string {
   return `diag_${randomUUID().replaceAll('-', '')}`;
 }
@@ -235,7 +343,7 @@ export function formatApiStartupFailure(
       : 'Problem: 服务启动未完成，未形成可用监听。',
     `Cause: ${cause}`,
     isConfigFailure
-      ? 'Fix: 使用 formal-dev/test + AUTH_MODE=mock，并保持 127.0.0.1；部署型 profile 等后续门完成。'
+      ? 'Fix: 使用 formal-dev/test + AUTH_MODE=mock，保持 127.0.0.1，并提供有效 DATABASE_URL；部署型 profile 等后续门完成。'
       : 'Fix: 根据稳定 Cause 检查本机监听条件；Diagnostic 仅关联本次失败，不传播原始异常或环境值。',
     'Docs: docs/reference-api-runtime-config.md',
     `Diagnostic: ${safeDiagnosticId}`,

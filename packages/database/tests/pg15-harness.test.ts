@@ -1,9 +1,9 @@
 import { readdirSync } from 'node:fs';
 import os from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { Pg15Harness } from './pg15-harness.js';
+import { Pg15Harness } from '../src/testkit/index.js';
 
-const TEMP_PREFIX = 'customer-agent-w4-pg15-';
+const TEMP_PREFIX = 'customer-agent-pg15-';
 
 function pg15TemporaryRoots(): string[] {
   return readdirSync(os.tmpdir()).filter((entry) => entry.startsWith(TEMP_PREFIX)).sort();

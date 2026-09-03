@@ -14,6 +14,7 @@ All notable changes to this customer-agent product implementation repository are
 - Added the `DEV-M0-W2` contract compiler: the locked OpenAPI snapshot now deterministically produces five tracked assets, Node-executable package output, and 132 component runtime schemas while preserving `runtime_activated=false`.
 - Added the `DEV-M0-W3` local Application API bootstrap: named-profile configuration rejects unsafe or unavailable runtime modes before Fastify construction, while the only registered route is a contract-validated loopback `/health` probe.
 - Added the `DEV-M0-W4` PostgreSQL 15 migration control plane: nine source-locked immutable migrations, a private provenance ledger, one-session advisory locking, per-migration atomic transactions, and exact post-apply verification remain isolated from API and desktop runtime wiring.
+- Added the `DEV-M0-W5` runtime repository boundary: a private local-only PostgreSQL pool, contract-valid `/ready`, single-flight deadlines, exact runtime role/ACL/search-dependency proofs, and hard-off auth/storage/content checks remain isolated from desktop and migration-owner capabilities.
 
 ### Fixed
 
@@ -25,6 +26,7 @@ All notable changes to this customer-agent product implementation repository are
 - Prevented `demo`, deployable profiles, Feishu auth, external bind addresses, and malformed ports or build versions from silently starting the W3 service; startup diagnostics expose stable fields/reasons without reflecting environment values.
 - Made W4 reject bare pools, same-session re-entry, untracked schemas/types/relations, ledger drift, unknown transaction acknowledgements, and any ACL, function-owner/config, trigger, or Phase-1 policy-key manifest drift; generated outputs now publish and roll back as two complete directories.
 - Split the ordinary workspace test lane from the PostgreSQL 15 integration lane so routine UI work stays lightweight while `pnpm test:db` remains the required full database gate.
+- Closed W5 review gaps by rejecting deadline-late successes, reverse runtime-login membership, arbitrary non-owner `public` schema CREATE, transitive search helper drift, and `digest` ownership outside its `pgcrypto` extension; compiled package and main-entry smoke now exercise `/ready` and graceful SIGINT.
 
 ### Verification
 
@@ -35,6 +37,7 @@ All notable changes to this customer-agent product implementation repository are
 - W3 locally passed frozen install, lint, three-package typecheck, a full 535-test Vitest run plus two compiled-package Node smokes, build, workspace policy, immutable intake verification, and 132-schema byte-for-byte codegen verification on Node.js 24.19.0 / pnpm 11.19.0. The final review added API failure/shutdown boundary coverage and passed the resulting 13-test API suite plus the 23-test workspace-cleanup file without rerunning the unaffected desktop suite.
 - W3 also passed an actual loopback `/health` HTTP 200 check, graceful SIGINT shutdown, and a pre-listen production/external-bind rejection. Electron E2E was not rerun because desktop code and trust boundaries remain unchanged; no DB, auth provider, business route, real data, deployment, or runtime activation exists in this slice.
 - W4 locally passed Node.js 24.19.0 lint/typecheck, 18 database unit tests, compiled-package smoke, and 10 isolated PostgreSQL 15 integration tests including server-version refusal, runtime SQL non-disclosure, two-client serialization, same-client rejection, DDL/ledger rollback atomicity, exact security-manifest mutation rejection, retry, unknown COMMIT recovery, and untracked-object refusal.
+- W5 review fixes passed lint, four-package typecheck, 567 Vitest tests plus 1 explicitly skipped PG15 scenario in the ordinary lane, four compiled-package/main smokes, build, workspace policy, immutable contract verification, and the explicit 18/18 API lane containing one isolated PostgreSQL 15 mutation scenario. Electron E2E was not rerun because W5 changes no desktop code or trust boundary.
 
 ## [0.2.0] - 2026-08-20
 

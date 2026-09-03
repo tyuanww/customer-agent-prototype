@@ -10,7 +10,7 @@ import type {
   ExecutableMigrationCatalogue,
 } from '../src/types.js';
 import { verifyDatabaseMigrations } from '../src/verifier.js';
-import { Pg15Harness } from './pg15-harness.js';
+import { Pg15Harness } from '../src/testkit/index.js';
 
 interface CountRow extends QueryResultRow { count: number }
 interface TextRow extends QueryResultRow { value: string }

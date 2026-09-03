@@ -34,7 +34,7 @@ Menokin 是当前唯一客服试点。本仓已有的 UI Demo 是同一试点的
 | 阶段 | 当前可做 | 仍不可做 |
 | --- | --- | --- |
 | `PILOT-S0 · SYNTHETIC` | 本地 UI、交互、纯状态模型、编译期合成 fixture、测试、构建、开发诊断、非正式 Windows feasibility smoke | 真实数据、飞书运行接入、正式 API / worker / migration、凭证、付费、遥测、自动发送、部署 |
-| 正式 `DEV-M0` | **进行中**：pre-move 基线、workspace / mechanical move、受控合同 codegen、配置与空服务骨架、不可变 migration / ACL 的开发测试 | 真实数据、飞书运行接入、Pilot、付费、遥测、自动发送、部署、发布；当前 workspace 切片也不激活合同运行时 |
+| 正式 `DEV-M0` | **进行中**：pre-move 基线、workspace / mechanical move、受控合同 codegen、配置与 API 骨架、不可变 migration / ACL、私有 runtime pool 与失败关闭 readiness 的开发测试 | 真实数据、飞书运行接入、Pilot、付费、遥测、自动发送、部署、发布；当前 workspace 切片也不激活合同运行时 |
 
 S0 的代码和测试可以动态推进；已经完成并冻结的历史决定只保留，不反复改写。阶段证据分账是为了防止误报，不代表拆成两个客服项目。项目记录仓的当前 HTML 继续由 `00–06` Markdown 真源生成；本仓不复制其动态计数，也不建立跨仓 watcher 或运行时同步。
 

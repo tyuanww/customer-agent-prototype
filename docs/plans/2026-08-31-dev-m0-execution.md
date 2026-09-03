@@ -5,11 +5,12 @@
 > **开始日期：** 2026-08-31
 > **组织门输入：** `DEC-DDEV-01=PASS`，证据索引 `EVD-DDEV-AUTH-20260831`
 > **产品仓开工输入：** 用户已明确授权“开工授权 / DEV-M0 产品仓开工授权”
-> **当前切片：** `DEV-M0-W4 · immutable migration / PostgreSQL deep module · IMPLEMENTED · VALIDATED`
+> **当前切片：** `DEV-M0-W5 · runtime adapter / service readiness · REVIEW FIX CANDIDATE · AWAITING REVIEW FIX COMMIT AUTHORIZATION（PR #14，本地基线 981ab403）`
 > **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR、Review、合并与候选分支清理均已按独立授权完成，PR #10 squash 合并头为 `1a77297d51ce3cf3a0a551290675c60c941be4b6`
 > **W3 开工输入：** 用户于 2026-09-02 在 W2 有序落地后授权创建下一切片并本地实现/验证；后续提交、推送、PR、Review、合并与候选分支清理又按明确授权完成，PR #11 合并头为 `2758dba5bebefc3fce87fdc73cffb6a7122bbea7`
 > **W4 开工输入：** 用户于 2026-09-02 明确要求“开始启动下一个板块，我给你授权，全部一个个开始做”；本记录将该授权限制为 W4 的实现、验证与独立 Git 生命周期，不扩张到 W5、DEV-M1、真实数据、飞书运行接入、Pilot、部署或生产
-> **下一切片：** `DEV-M0-W5 · runtime adapter / service readiness · NOT STARTED`；仍须单独开工授权
+> **W5 开工输入：** 用户于 2026-09-03 明确给出“`DEV-M0-W5` 开工”；本记录将该授权限制为 W5 本地分支、实现与验证，不包含提交、推送、PR、合并、真实数据、飞书运行接入、部署或生产
+> **下一阶段：** W5 完成并形成 `DEV-M0` 退出证据后再单独评审 `DEV-M1`；当前不得跨入业务九端口、真实 adapter 或 Pilot
 > **W1 开工输入：** 用户于 2026-08-31 明确给出“产品仓 W1 分支创建与开工授权（基于 6111272）”；该授权不包含 W1 提交、推送、PR、合并、部署或后续正式能力切片
 > **W0 历史输入：** 用户曾明确给出“产品仓 W0 提交授权”；W0 已通过独立 Git 门完成，不自动扩张到 W1
 > **不代表：** 真实数据、飞书运行接入、Pilot、付费调用、自动发送、部署或发布授权；本记录的状态本身不扩张任何 Git 权限
@@ -268,19 +269,158 @@ Sequential implementation, no parallelization opportunity. T1–T5 都触及同�
 - PostgreSQL 托管、备份恢复、生产容量、部署、Pilot 与发布：均需后续独立授权与环境证据。
 - 自动修复被篡改账本或数据库：不可靠且可能掩盖入侵/人工漂移，W4 必须失败关闭。
 
+## 18. W5 目标与边界
+
+W5 只补齐正式 Application API 的运行时基础设施：私有数据库连接配置、一个受控 `pg.Pool`、service repository 生命周期，以及合同一致的 `GET /ready`。它不实现 auth/search/events/content 等业务端口，不把桌面 renderer 接到 API，也不读取真实客户或飞书数据。
+
+W5 完成后的真实口径是：
+
+- `/health` 继续只证明 event loop 存活，不访问 DB；
+- `/ready` 对 database/schema 做真实查询，对尚未实现的 auth/storage/content 明确返回 `not_ready`；
+- 因 M1/M2 能力尚未交付，W5 期间 `/ready` 必须返回 503，不能制造业务“全绿”；
+- API 仍只允许 `formal-dev|test + AUTH_MODE=mock + 127.0.0.1`，合同锁继续是 `runtime_activated=false`。
+
+## 19. What already exists
+
+| 现有能力 | W5 处理 |
+| --- | --- |
+| W2 `@customer-agent/contracts` 的 `ReadyResponse` / `NotReadyResponse` runtime validator | 直接复用；不手写第二套 DTO |
+| W3 配置先行拒启、Fastify `/health`、精确方法面与关闭生命周期 | 扩展同一 owner；不新建第二宿主 |
+| W4 `@customer-agent/database` migration 控制面与 `pg.Client` 单会话边界 | 保持隔离；请求池不得调用或弱化 migration runner |
+| W4 隔离 PostgreSQL 15 harness | 只在显式 API integration 门复用；普通 `pnpm test` 不强制 PG15 |
+| 冻结 schema v1.12 的 public schema comment、受控 search 函数与 `app_runtime` ACL | 用作 runtime-safe schema 指纹；不读取私有 migration ledger |
+
+## 20. W5 Architecture
+
+### 20.1 单一运行路径
+
+```text
+environment
+  ├─ public runtime config ───────────────┐
+  └─ private DB bootstrap config          │
+           │                              │
+           ▼                              ▼
+      one pg.Pool ──> ServiceRepository ──> Fastify
+           │              │                  ├─ GET /health  (no dependencies)
+           │              └─ readiness() ────└─ GET /ready
+           │                    ├─ one bounded SQL → database/schema
+           │                    └─ hard-off gates → auth/storage/content
+           └─ end() <──────── Fastify onClose + startup-failure cleanup
+```
+
+私有 DB bootstrap 配置可在进程内构造连接池，但不得进入 `StartedApi.config`、日志、HTTP 响应或错误 cause 文本。`ServiceRepository` 是本切片唯一新增深模块：它拥有 pool、schema 指纹、single-flight deadline、错误归一化与幂等 close；route 只消费五项稳定状态。idle client error 由 pool 淘汰后只记录脱敏诊断，下一次请求必须执行真实探针，不额外制造一次假故障。
+
+### 20.2 readiness 语义
+
+| check | W5 实现 | 结果规则 |
+| --- | --- | --- |
+| database | 连接池执行一条最小查询 | 查询成功=`ok`；获取连接、查询或 readiness deadline 超时=`not_ready`；已淘汰的 idle client error 只记诊断 |
+| schema | 同一查询核对 PostgreSQL 15、`schema.v1.12` comment、完整 search 依赖定义摘要，以及 runtime login、`app_runtime`、`cs_ai_definer` 的无特权/双向成员边界、parameter ACL 和跨当前数据库/全部用户 schema 的精确 ACL | 全部满足=`ok`；依赖定义替换、trigger-disable 参数、额外/缺失/可转授权权限、数据库或对象归属、第三 schema、危险 default ACL、额外角色或特权身份均=`not_ready` |
+| auth | M1 前没有可用 auth provider | 固定 `not_ready`，即使配置允许 mock 也不冒充 handler 已实现 |
+| storage | M2 前没有 import storage adapter | 固定 `not_ready`，不以目录或变量存在冒充 key/hash/size 重读通过 |
+| content | M2 前没有受控 current-release readiness 边界 | 固定 `not_ready`，不直读 `content_current`，不调用有副作用的 lease 函数 |
+
+全部五项为 `ok` 才以合同 `ReadyResponse` 返回 200；否则以 `NotReadyResponse` 返回 503、`Retry-After: 1` 与 `Cache-Control: no-store`。响应只含五个枚举，不含 DSN、SQL、路径、异常文本或内部版本细节。
+
+### 20.3 配置与生命周期
+
+- 新增 `DATABASE_URL`（仅允许 loopback/本机 Unix socket 的 PostgreSQL URL、必填且禁止驱动控制 query 参数）、`DB_POOL_MAX`（默认/上限 20）、`DB_CONNECTION_TIMEOUT_MS` 与 `DB_READINESS_TIMEOUT_MS`（均默认 2000ms）的监听前校验。远程/托管 DSN 在 W5 失败关闭；前者只约束连接获取，后者同时约束 readiness 响应/query/statement；只有隔离 PG15 harness 可使用唯一 Unix-socket `host` 与可选 `port` 参数。
+- public config 继续保持冻结且无 secret；私有 bootstrap config 只传给 repository factory。
+- DB 不可达不会让 `/health` 消失；进程可监听并由 `/ready=503` 阻止业务流量。
+- Fastify `onClose` 释放 pool；构造或监听失败路径再执行幂等 fallback close，原始启动错误仍优先。
+
+## 21. W5 Code Quality
+
+- 只新增一个 service module，不建立 `pool → adapter → repository → service` 的浅转发链。
+- route 不知道 SQL、pool 或 secret；repository 不知道 Fastify/reply。
+- 五项状态使用 OpenAPI 生成 validator 作为最后输出边界；所有异常统一降为稳定 `not_ready`。
+- runtime diagnostics 只允许固定 code 与合法 SQLSTATE；raw error、DSN 与 SQL 不进入日志或 HTTP。
+- migration owner 与 runtime pool 严格分离；W5 不导入 migration runner 到生产请求路径。
+- schema readiness 同时证明登录账号的单一 workload 身份与 search 函数的 owner / SECURITY DEFINER / search_path / ACL，不能只凭“有 EXECUTE”形成假绿。
+- 不修改 desktop、preload、renderer、fixture 或 Dashboard。
+
+## 22. W5 Test Review
+
+框架：Node.js 24 + Vitest；真实依赖边界追加显式 PostgreSQL 15 integration，普通单元门继续无 PG 前置。
+
+```text
+CODE PATHS                                             USER / OPERATOR FLOWS
+[+] runtime config                                    [+] API bootstrap
+  ├─ valid local DB URL/default pool/split timeouts      ├─ valid config → listen → /health 200
+  ├─ missing/remote/driver-override URL → CONFIG_INVALID └─ invalid DB config → no Fastify construction
+  └─ secret absent from public config/errors
+[+] ServiceRepository                                [+] readiness polling
+  ├─ SQL success + exact schema/identity → db/schema ok  ├─ all injected checks ok → 200 exact contract
+  ├─ SQL success + schema drift → db ok/schema not_ready ├─ any check down → 503 + Retry-After: 1
+  ├─ query/deadline error → both not_ready                └─ response never leaks error/DSN/path
+  ├─ concurrent polling → one in-flight query only
+  ├─ late connection at/after deadline → verify rejects client
+  ├─ idle-client error → diagnostic + fresh probe
+  └─ close twice → one pool shutdown
+[+] Fastify routes
+  ├─ /health remains dependency-free
+  ├─ /ready exact GET only; HEAD/POST remain 404
+  └─ /v1/* remains 404
+[→INTEGRATION] temporary PG15
+  ├─ apply locked W4 migrations with owner client
+  ├─ runtime login only member of app_runtime
+  ├─ db/schema become ok through real pool
+  ├─ role/parameter/DB/schema/ACL/search-dependency drift → schema not_ready
+  └─ auth/storage/content stay not_ready; direct SoR read remains denied
+```
+
+所有计划分支都必须在同一 changeset 获得正反测试；没有 LLM/prompt 变化，因此无 eval。integration 使用独立临时 cluster、Unix socket 与合成空库，不接共享数据库或真实数据。
+
+## 23. W5 Failure Modes
+
+| 路径 | 真实失败 | 测试 | 处理 | 可见性 |
+| --- | --- | --- | --- | --- |
+| config | DB URL 缺失、远程 host、scheme/数值非法或 DSN 参数试图覆盖 driver timeout/name | config negative | Fastify 构造前 `CONFIG_INVALID` | 只报字段+稳定 reason，不回显值 |
+| pool | DB 不可达、连接耗尽、deadline 或 idle client 异常 | fake pool + timeout/error | deadline 失败关闭；并发/超时后不放大在途查询；idle error 后真实复探 | `/ready` 503；`/health` 仍 200；内部仅稳定诊断 |
+| schema | PG major/comment、search 依赖摘要、runtime/definer 角色属性与双向成员、parameter ACL/replication role、当前 DB/第三 schema/对象归属、表/列/函数或 default ACL 漂移 | fake rows + PG15 权限变异 | schema=`not_ready` | 不返回内部差异 |
+| later capabilities | auth/storage/content 尚未实现 | exact response tests | 三项 fail-closed | 明确 503，不产生假绿 |
+| contract mapper | check 缺失或非法枚举 | contract validator tests | 响应构造失败，不发送宽松对象 | 测试门阻断 |
+| shutdown | listen 失败或重复 close | lifecycle tests | pool 幂等释放，保留首个 root cause | 稳定启动失败，不泄露 secret |
+
+没有“无测试、无错误处理且静默”的计划路径。
+
+## 24. W5 Performance
+
+- 每个 readiness 周期最多一条数据库查询，不做逐表/N+1 扫描，不调用 search、lease 或 migration verify；并发请求共享同一在途 Promise。
+- pool 上限 20、连接等待默认 2s；独立 readiness deadline/query/statement timeout 默认 2s。在途操作真正结束前不会启动第二条探针；若底层连接在 connection deadline 当时或之后迟到成功，pool verify 会在交给查询前拒绝并销毁该 client。
+- W5 不使用 TTL readiness 缓存，避免把依赖恢复/失效延迟成陈旧绿灯；后续真实流量下若探针频率造成负担，再由部署层降低频率或在独立变更中加短 TTL。
+- 本切片不宣称 300 QPS、托管 PostgreSQL、备份恢复或生产容量已认证。
+
+Sequential implementation, no parallelization opportunity. 配置、repository、route 与生命周期共同定义一个启动/关闭链，拆成并行 worktree 会增加 secret 与 resource ownership 漂移。
+
+## 25. W5 Implementation Tasks
+
+- [x] **T1（P1）** — runtime config — 加入私有 DB bootstrap 配置、数值边界、仅本机 DSN 与脱敏拒启。
+- [x] **T2（P1）** — service repository — 建立单一 pool owner、runtime-safe schema/有效 ACL 指纹、稳定 readiness 与幂等关闭。
+- [x] **T3（P1）** — platform routes — 注册合同校验后的 `/ready`，保持 `/health` 和 `/v1` 边界不变。
+- [x] **T4（P1）** — tests — 覆盖配置、五项状态、错误/关闭路径，并用隔离 PG15 证明真实 pool + runtime ACL。
+- [x] **T5（P1）** — repository gates — API 窄测、PG15 integration、lint/typecheck/test/build/workspace/contracts 全门均已实际通过。
+
+## 26. NOT in scope
+
+- auth mock-login、Feishu OAuth、session/RBAC：属于 DEV-M1 与 Pilot 前后置门；W5 只保留 auth=`not_ready`。
+- storage 上传/读取、content import/publish/current：属于 DEV-M2；W5 不创建空 release、假对象或直读 SoR。
+- search/events/policy/redaction 等九业务端口：属于 DEV-M1+，本切片保持 404。
+- desktop API client、main adapter、renderer 数据切换：属于 DEV-M3；当前桌面继续 `PILOT-S0 · SYNTHETIC`。
+- 真实数据、飞书运行接入、RAGFlow、托管 PG、备份恢复、部署、Pilot、付费、自动发送与遥测：均未由 W5 授权。
+- migration apply/verify 自动挂到 API startup：部署 migration job 尚未设计完成，且 runtime pool 不得持有 migration owner 能力。
+
 ## GSTACK REVIEW REPORT
 
-| Section | Findings | Resolved | Outstanding |
-| --- | ---: | ---: | ---: |
-| Architecture | 4 | 4 | 0 |
-| Data & Security | 4 | 4 | 0 |
-| Failure Handling | 2 | 2 | 0 |
-| Tests | 4 | 4 | 0 |
-| Documentation | 2 | 2 | 0 |
-| Performance | 0 | 0 | 0 |
+| Review | Trigger | Why | Runs | Status | Findings |
+| --- | --- | --- | ---: | --- | --- |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | 本切片不改变产品方向 |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | SKIPPED | 当前运行于 Codex 宿主，按防嵌套规则跳过重复调用 |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 0 unresolved；测试图、失败模式与硬关已写入 |
+| Implementation Review | `/review` + 专项 agents | Security / PostgreSQL / performance / tests / docs | 多轮 | CLEAN | 所有可复现 finding 已在同一候选修复；最终安全与文档复核均为 `clean` |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | 后端基础设施切片，无 UI 变化 |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | 不影响当前桌面启动路径 |
 
-Scope: Full W4 review complete. The accepted design uses a source-locked generated catalogue, staged whole-set output publication with rollback, one deep database module, a private immutable ledger, same-client locking/transactions, and isolated PG15 verification. W5 and every real-data/runtime/production surface remain outside this authorization.
-
-Implementation Tasks: T1–T5 and all 16 deduplicated review findings were implemented in the W4 release candidate; there are no deferred review findings to add to `TODOS.md`.
+**VERDICT:** W5 REVIEW FIX CANDIDATE — PR #14 review findings are fixed and fully validated within the frozen scope; awaiting review-fix commit authorization.
 
 NO UNRESOLVED DECISIONS

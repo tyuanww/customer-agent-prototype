@@ -18,15 +18,19 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "test:package": "pnpm build && node --test tests/package-entry.smoke.mjs",
-    "test": "pnpm --filter @customer-agent/contracts build:runtime && vitest run && pnpm test:package"
+    "test:package": "pnpm build && node --test tests/package-entry.smoke.mjs tests/main-entry.smoke.mjs",
+    "test:integration": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/app.test.ts",
+    "test": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && vitest run && pnpm test:package"
   },
   "dependencies": {
     "@customer-agent/contracts": "workspace:*",
-    "fastify": "5.12.1"
+    "fastify": "5.12.1",
+    "pg": "8.23.0"
   },
   "devDependencies": {
+    "@customer-agent/database": "workspace:*",
     "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
     "typescript": "5.9.2",
     "vitest": "3.2.7"
   }

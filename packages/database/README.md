@@ -15,3 +15,5 @@ pnpm test:db:integration     # 仅隔离 PG15 集成门禁
 ```
 
 PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前是首个签名数据库基线：只证明 `N-only`；真实 `N-1 → N` 为 `N/A · no prior signed baseline`。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
+
+仓内其它 package 若需复用同一临时 PG15 证据面，只能以 devDependency 导入显式 `@customer-agent/database/testkit` 子入口；它不属于 migration/runtime 公共入口，也不得进入生产请求链。

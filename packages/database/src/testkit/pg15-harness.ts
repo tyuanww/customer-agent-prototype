@@ -30,7 +30,7 @@ function discoverPg15Bin(environment: NodeJS.ProcessEnv): string {
     : run('pg_config', ['--bindir'], environment);
   const version = run(path.join(candidate, 'postgres'), ['--version'], environment);
   const major = Number(version.match(/PostgreSQL\)\s+(\d+)/)?.[1]);
-  if (major !== 15) throw new Error(`DEV-M0-W4 integration tests require PostgreSQL 15, found: ${version}`);
+  if (major !== 15) throw new Error(`DEV-M0 integration tests require PostgreSQL 15, found: ${version}`);
   for (const binary of ['postgres', 'initdb', 'pg_ctl', 'createdb']) {
     if (!existsSync(path.join(candidate, binary))) throw new Error(`PostgreSQL 15 binary is missing: ${binary}`);
   }
@@ -38,7 +38,7 @@ function discoverPg15Bin(environment: NodeJS.ProcessEnv): string {
 }
 
 function removeTemporaryCluster(root: string): void {
-  const prefix = path.join(os.tmpdir(), 'customer-agent-w4-pg15-');
+  const prefix = path.join(os.tmpdir(), 'customer-agent-pg15-');
   if (!root.startsWith(prefix)) throw new Error(`Refusing unsafe PG15 test cleanup: ${root}`);
   rmSync(root, { recursive: true, force: true });
   if (existsSync(root)) throw new Error('Temporary PG15 cluster cleanup was incomplete');
@@ -49,7 +49,7 @@ export class Pg15Harness {
   readonly port = randomInt(49_152, 65_535);
   readonly environment = cleanPgEnvironment();
   readonly bin = discoverPg15Bin(this.environment);
-  readonly root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-w4-pg15-'));
+  readonly root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-pg15-'));
   readonly data = path.join(this.root, 'data');
   readonly socket = path.join(this.root, 'socket');
   readonly log = path.join(this.root, 'postgres.log');
@@ -102,7 +102,7 @@ export class Pg15Harness {
   createDatabase(label: string): Readonly<{ name: string; config: ClientConfig }> {
     if (!this.started) throw new Error('Temporary PostgreSQL cluster is not started');
     const safeLabel = label.toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 24);
-    const name = `w4_${safeLabel}_${randomBytes(4).toString('hex')}`;
+    const name = `dev_m0_${safeLabel}_${randomBytes(4).toString('hex')}`;
     run(path.join(this.bin, 'createdb'), [
       '--host', this.socket,
       '--port', String(this.port),

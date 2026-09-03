@@ -6,7 +6,7 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，W2 在 `packages/contracts` 中建立合同 codegen/runtime validation，W3 建立只含 `/health` 的 loopback API/config 骨架，W4 已在独立 `packages/database` 中实现并验证不可变 PostgreSQL 15 migration 控制面。W4 尚未把数据库接入 API 或桌面端，也未激活正式 runtime；可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`。复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1` 已把既有应用机械迁入唯一桌面包 `apps/desktop`，W2 在 `packages/contracts` 中建立合同 codegen/runtime validation，W3 建立 loopback API/config 骨架，W4 已在独立 `packages/database` 中实现并验证不可变 PostgreSQL 15 migration 控制面，W5 本地候选再接入私有 runtime pool 与 `/ready`。数据库仍未接入桌面端，业务端口与正式 runtime 也未激活；可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`。复制只表示「已复制」，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -22,13 +22,14 @@
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
 | 核对已接收的正式机器合同、双哈希和未激活边界 | [contracts/upstream/customer-agent/README.md](contracts/upstream/customer-agent/README.md) |
 | 生成并验证正式 OpenAPI 类型与 component runtime schema | [packages/contracts/README.md](packages/contracts/README.md) |
-| 启动并验证 W3 的本机 `/health` API 骨架 | [apps/api/README.md](apps/api/README.md) |
+| 启动并验证 W3～W5 的本机 `/health`、runtime pool 与 `/ready` | [apps/api/README.md](apps/api/README.md) |
 | 生成、核验并在隔离 PostgreSQL 15 中测试 W4 migration | [packages/database/README.md](packages/database/README.md) |
 | 核对 API 命名 profile、变量与失败关闭矩阵 | [docs/reference-api-runtime-config.md](docs/reference-api-runtime-config.md) |
 | 查看当前 DEV-M0 切片、基线证据与下一步 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
 | 查看 W2 合同 codegen / runtime validation 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md](docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md) |
 | 查看 W3 API/config bootstrap 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md](docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md) |
 | 查看 W4 PostgreSQL migration 控制面的实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md](docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md) |
+| 查看 W5 runtime pool / service readiness 的实施边界与证据 | [docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md](docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md) |
 | 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
@@ -42,7 +43,7 @@
 
 - 本目录应作为独立产品 Git 仓打开，不与项目进度记录仓混成同一工作树或 Git 历史。
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
-- `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是 W3 的独立 Node 服务骨架，当前只允许 loopback `/health`，不与桌面接线；`packages/database` 是 W4 的离线 migration 控制面，不创建连接、不读取环境变量，也不被 API 或桌面依赖。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
+- `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是 W3～W5 的独立 Node 服务骨架，当前只允许 loopback `/health`、`/ready` 与一个私有 runtime pool，不与桌面接线；`packages/database` 是 W4 的离线 migration 控制面，不创建连接、不读取环境变量，只有其显式 testkit 作为 API 集成测试的 devDependency，生产 API 不导入 migration 控制面。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
 - `packages/contracts` 是正式 OpenAPI 的唯一产品仓编译边界；它只从已验证快照生成 bundle、TypeScript 类型与 component runtime validator，不拥有 HTTP、DB、桌面接线或运行时激活状态。
 - `packages/database` 是正式 DDL 的唯一产品仓 migration 边界；它从同一受锁快照确定性生成 `0001..0009`、内嵌 catalogue 与私有账本，并封装 `status → plan → apply → verify`。当前只在一次性本机 PG15 cluster 中使用合成数据验证，不等于已有业务数据库或生产连接。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `apps/desktop/assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `apps/desktop/fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `apps/desktop/assets/app-icon.png`（近白 squircle）、`apps/desktop/build/icon.png` 与 `apps/desktop/build/icon.ico`；在 macOS 上还会生成 `apps/desktop/build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
@@ -65,14 +66,18 @@ pnpm electron:install
 pnpm dev
 ```
 
-W3 API 骨架与桌面 Demo 分开启动；它只开放本机 liveness，不提供业务数据：
+W5 API 运行时骨架与桌面 Demo 分开启动；它开放本机 liveness 与真实基础设施 readiness，不提供业务数据：
 
 ```bash
-CUSTOMER_AGENT_PROFILE=formal-dev AUTH_MODE=mock pnpm dev:api
+CUSTOMER_AGENT_PROFILE=formal-dev \
+AUTH_MODE=mock \
+DATABASE_URL='postgresql://<runtime-user>@localhost/<database>' \
+pnpm dev:api
 curl --fail --silent http://127.0.0.1:3100/health
+curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-部署型 profile、Feishu auth、`/ready` 与 `/v1/*` 当前都会在监听前拒启或保持未注册，详见 [API 启动配置](docs/reference-api-runtime-config.md)。
+`/health` 不访问 DB；`/ready` 只核对 database/schema，auth/storage/content 在 M1/M2 前固定 `not_ready`，因此 W5 返回 503 是预期的真实未就绪。部署型 profile、Feishu auth 与 `/v1/*` 仍会在监听前拒启或保持未注册，详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 W4 数据库包只接受调用方提供的已连接 migration-owner `pg.Client`；下面的命令只生成/核验不可变 catalogue，并在隔离临时 PostgreSQL 15 cluster 中测试，不会访问共享本机或生产数据库：
 
@@ -137,7 +142,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 - 过期与未生效话术永不返回；卡片不展示匹配分。
 - Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 无 preload，也没有 `customerAgent`。
 - 复制成功只显示「已复制」，不表示已发送、已采纳或回答正确。
-- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。W3 的 HTTP host **只有** `/health`，没有业务 adapter，桌面也不连接它；合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
+- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。W3～W5 的 HTTP host **只有** `/health` 与失败关闭的 `/ready`，没有业务 adapter，桌面也不连接它；合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
 - 「深度思考」只是默认 OFF 的 DeepSeek 辅助重排预留说明；它不生成答案、不改写话术、不发送消息，当前也不调用任何模型。
 - 客户问题最多 2000 字。
 
@@ -224,6 +229,6 @@ pnpm package:mac
 
 ## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；W2 已生成 TypeScript 类型与 132 个 component runtime validator，W3 只把 `HealthResponse` 接入 loopback `/health`，W4 则把冻结 DDL 生成九个不可变 migration 并在隔离 PG15 中验证。W4 没有创建运行时连接、`/ready`、业务 repository、真实 auth 或任何 `/v1` 数据链。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」不成立：还缺 W5 service readiness/repository、`query_id`、发布四元组、飞书会话，以及合法的平台和有效期合同。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；W2 已生成 TypeScript 类型与 132 个 component runtime validator，W3 把 `HealthResponse` 接入 loopback `/health`，W4 把冻结 DDL 生成九个不可变 migration 并在隔离 PG15 中验证，W5 再用私有 runtime pool、service repository 和 `/ready` 证明 database/schema 边界。W5 不读取业务内容，auth/storage/content 明确未就绪，也没有注册任何 `/v1` 业务路由。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」仍不成立：还缺 M1/M2 的身份、九端口、`query_id`、发布四元组、飞书会话，以及合法的平台和有效期合同。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。
