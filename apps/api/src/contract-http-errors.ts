@@ -38,6 +38,32 @@ export function sendOverloaded(reply: FastifyReply): FastifyReply {
   }));
 }
 
+export function sendSourceGateNotReady(reply: FastifyReply): FastifyReply {
+  reply.header('retry-after', '1');
+  return reply.code(503).send(parseContractSchema('OverloadedErrorEnvelope', {
+    error: {
+      code: 'OVERLOADED',
+      message: '当前内容来源校验未通过',
+      details: {
+        reason: 'SOURCE_GATE_NOT_READY',
+        retry_after_sec: 1,
+      },
+    },
+  }));
+}
+
+export function sendNotFound(reply: FastifyReply): FastifyReply {
+  return reply.code(404).send(parseContractSchema('NotFoundErrorEnvelope', {
+    error: { code: 'NOT_FOUND', message: '指定资源不存在' },
+  }));
+}
+
+export function sendConflict(reply: FastifyReply): FastifyReply {
+  return reply.code(409).send(parseContractSchema('ConflictErrorEnvelope', {
+    error: { code: 'CONFLICT', message: '请求与当前状态冲突' },
+  }));
+}
+
 export function sendForbiddenOrPolicyDenied(
   reply: FastifyReply,
   code: 'FORBIDDEN' | 'POLICY_DENIED',

@@ -51,12 +51,14 @@ function catalogueError(message: string): never {
 
 export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue): void {
   const prior = catalogue.compatibility.priorSignedBaseline;
+  const reviewedUpgrades = catalogue.compatibility.priorReviewedUpgrades;
   if (
     catalogue.schema !== 'customer-agent-database-migrations/v2'
     || !CONTRACT_SET_ID_PATTERN.test(catalogue.contractSetId)
     || !GIT_SHA_PATTERN.test(catalogue.sourceGitSha)
     || !HASH_PATTERN.test(catalogue.sourceSchemaSha256)
     || catalogue.compatibility.current !== 'N'
+    || !Array.isArray(reviewedUpgrades)
     || (prior !== null && (
       !CONTRACT_SET_ID_PATTERN.test(prior.contractSetId)
       || !GIT_SHA_PATTERN.test(prior.sourceGitSha)
@@ -68,6 +70,22 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     || catalogue.migrations.length === 0
   ) {
     catalogueError('Migration catalogue identity or compatibility metadata is invalid');
+  }
+
+  let precedingMigrationCount = prior?.migrationCount ?? 0;
+  for (const upgrade of reviewedUpgrades) {
+    if (
+      prior === null
+      || !CONTRACT_SET_ID_PATTERN.test(upgrade.contractSetId)
+      || !GIT_SHA_PATTERN.test(upgrade.sourceGitSha)
+      || !HASH_PATTERN.test(upgrade.sourceSchemaSha256)
+      || !Number.isSafeInteger(upgrade.migrationCount)
+      || upgrade.migrationCount <= precedingMigrationCount
+      || upgrade.migrationCount >= catalogue.migrations.length
+    ) {
+      catalogueError('Migration catalogue reviewed-upgrade metadata is invalid');
+    }
+    precedingMigrationCount = upgrade.migrationCount;
   }
 
   const ids = new Set<string>();
@@ -93,7 +111,9 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     ) {
       catalogueError(`Migration catalogue entry ${migration.id || index + 1} is invalid`);
     }
-    const expectedProvenance = prior !== null && index < prior.migrationCount ? prior : catalogue;
+    const expectedProvenance = prior !== null && index < prior.migrationCount
+      ? prior
+      : reviewedUpgrades.find(({ migrationCount }) => index < migrationCount) ?? catalogue;
     if (
       migration.contractSetId !== expectedProvenance.contractSetId
       || migration.sourceGitSha !== expectedProvenance.sourceGitSha

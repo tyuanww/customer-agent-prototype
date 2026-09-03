@@ -1,0 +1,22 @@
+{
+  "schema": "customer-agent-contract-set/v1",
+  "contract_set_id": "cs-ai-c11-openapi-1.11.0-schema-1.14-1af001b8b0ce",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "1af001b8b0ce95aac0c42f42251a38feb85f3e26",
+  "architecture_version": "1.16",
+  "implementation_version": "1.22",
+  "openapi": {
+    "version": "1.11.0",
+    "source_path": "business-docs/01-客服Agent项目/20-设计-进行中/openapi.v1.yaml",
+    "file": "openapi.v1.yaml",
+    "sha256": "06698f233702591c8f981c7b08ebac4b7d5bc5cc2d69d36014ef2a9f5a6802e4",
+    "bytes": 174476
+  },
+  "database": {
+    "version": "schema.v1.14",
+    "source_path": "business-docs/01-客服Agent项目/20-设计-进行中/33-schema-v1-草案.sql",
+    "file": "schema-v1.14.sql",
+    "sha256": "edf909bf9450b5745a85ced4a75a2e2de3e5b061847562cd3a68c9c7c226da99",
+    "bytes": 347716
+  }
+}

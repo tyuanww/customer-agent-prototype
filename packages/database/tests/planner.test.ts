@@ -30,7 +30,7 @@ describe('database migration planner', () => {
     const partial = deriveMigrationStatus([ledgerRow(0), ledgerRow(1)], generatedMigrationCatalogue);
     expect(partial.state).toBe('PARTIAL');
     expect(partial.pending[0]?.id).toBe('0003_events_and_metrics');
-    expect(planMigrationCatalogue(partial).migrations).toHaveLength(8);
+    expect(planMigrationCatalogue(partial).migrations).toHaveLength(9);
 
     const complete = deriveMigrationStatus(
       generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)),
@@ -39,11 +39,11 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 1-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 2-migration current suffix',
     );
   });
 
-  it('accepts the exact v1.12 ledger prefix and plans only the v1.13 upgrade', () => {
+  it('accepts the exact v1.12 ledger prefix and plans only the reviewed v1.13/v1.14 suffix', () => {
     const prior = generatedMigrationCatalogue.compatibility.priorSignedBaseline;
     if (!prior) throw new Error('generated catalogue must declare the v1.12 baseline');
     const baselineRows = generatedMigrationCatalogue.migrations
@@ -52,7 +52,10 @@ describe('database migration planner', () => {
     const status = deriveMigrationStatus(baselineRows, generatedMigrationCatalogue);
 
     expect(status.state).toBe('PARTIAL');
-    expect(status.pending.map(({ id }) => id)).toEqual(['0010_search_projection_v1_13']);
+    expect(status.pending.map(({ id }) => id)).toEqual([
+      '0010_search_projection_v1_13',
+      '0011_search_no_hit_context_v1_14',
+    ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
 
@@ -125,7 +128,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(10);
+    expect(status.pending).toHaveLength(11);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });

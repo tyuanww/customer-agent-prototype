@@ -4,6 +4,7 @@ import {
   parseApiPrivateBootstrapConfig,
   parseApiRuntimeConfig,
   type ApiDatabaseBootstrapConfig,
+  type ApiPrivateBootstrapConfig,
   type ApiRuntimeConfig,
   type ApiRuntimeEnvironment,
 } from './runtime-config.js';
@@ -15,6 +16,7 @@ import {
   createServiceRepository,
   type ServiceRepository,
 } from './service-repository.js';
+import { createUnavailableSearchOperation } from './search-routes.js';
 
 export type StartedApi = Readonly<{
   address: string;
@@ -26,6 +28,7 @@ type ApiAppFactory = (
   config: ApiRuntimeConfig,
   repository: ServiceRepository,
   policyAdminRepository: PolicyAdminRepository,
+  bootstrap: ApiPrivateBootstrapConfig,
 ) => FastifyInstance;
 type ServiceRepositoryFactory = (
   config: ApiDatabaseBootstrapConfig,
@@ -42,12 +45,16 @@ export async function startApi(
 ): Promise<StartedApi> {
   return startApiWithFactory(
     options,
-    (config, repository, policyAdminRepository) => createApiApp(
+    (config, repository, policyAdminRepository, bootstrap) => createApiApp(
       config,
       repository,
       undefined,
       undefined,
       policyAdminRepository,
+      {
+        operation: createUnavailableSearchOperation(),
+        logHash: bootstrap.logHash,
+      },
     ),
   );
 }
@@ -71,7 +78,7 @@ export async function startApiWithFactory(
   try {
     repository = buildRepository(bootstrap.runtimeDatabase);
     policyAdminRepository = buildPolicyAdminRepository(bootstrap.policyAdminDatabase);
-    const builtApp = buildApp(config, repository, policyAdminRepository);
+    const builtApp = buildApp(config, repository, policyAdminRepository, bootstrap);
     app = builtApp;
     const address = await builtApp.listen({ host: config.host, port: config.port });
     return Object.freeze({

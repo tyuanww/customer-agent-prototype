@@ -1,6 +1,6 @@
 # @customer-agent/database
 
-PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 确定性生成十个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是 `schema.v1.13` 的受控 search projection 升级；公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
+PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 确定性生成十一个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是已复核 `schema.v1.13` 的受控 search projection 升级，第十一段是 `schema.v1.14` 的 ready-no-hit 搜索上下文升级；公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
 
 生成命令会先在同一文件系统完整暂存 migration 目录与内嵌 catalogue 目录，再进行目录级替换；普通 I/O 失败会把两个目录一起回滚，避免留下已知的新旧混合生成物，额外旧成员也会在成功发布时被移除。
 
@@ -14,6 +14,6 @@ pnpm test:db                 # database 全门禁，含隔离 PG15
 pnpm test:db:integration     # 仅隔离 PG15 集成门禁
 ```
 
-PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前同时证明 `schema.v1.13` clean install，以及精确已签 `schema.v1.12` ledger 只规划并执行 `0010` 的 `N-1 → N`；未知、缺失、改写或额外 ledger 仍失败关闭。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
+PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前同时证明 `schema.v1.14` clean install、精确 `schema.v1.12` ledger 只规划并执行 `0010+0011`，以及精确 `schema.v1.13` ledger 只规划并执行 `0011`；未知、缺失、改写或额外 ledger 仍失败关闭。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
 
 仓内其它 package 若需复用同一临时 PG15 证据面，只能以 devDependency 导入显式 `@customer-agent/database/testkit` 子入口；它不属于 migration/runtime 公共入口，也不得进入生产请求链。

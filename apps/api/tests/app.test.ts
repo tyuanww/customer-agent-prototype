@@ -84,12 +84,15 @@ function stubRepository(
 ): ServiceRepository & Readonly<{
   readiness: ReturnType<typeof vi.fn<ServiceRepository['readiness']>>;
   readPolicyFlags: ReturnType<typeof vi.fn<ServiceRepository['readPolicyFlags']>>;
+  searchCandidates: ReturnType<typeof vi.fn<ServiceRepository['searchCandidates']>>;
   close: ReturnType<typeof vi.fn<ServiceRepository['close']>>;
 }> {
   return {
     readiness: vi.fn<ServiceRepository['readiness']>().mockResolvedValue(checks),
     readPolicyFlags: vi.fn<ServiceRepository['readPolicyFlags']>()
       .mockResolvedValue(PHASE1_POLICY_OFF),
+    searchCandidates: vi.fn<ServiceRepository['searchCandidates']>()
+      .mockResolvedValue(Object.freeze({ ok: false, code: 'SOURCE_GATE_NOT_READY' })),
     close: vi.fn<ServiceRepository['close']>().mockResolvedValue(undefined),
   };
 }
@@ -814,7 +817,7 @@ describe('ServiceRepository readiness', () => {
     return {
       database_probe: 1,
       server_version_num: 150_013,
-      schema_comment: 'CS-AI-C11 schema.v1.13; synthetic unit fixture',
+      schema_comment: 'CS-AI-C11 schema.v1.14; synthetic unit fixture',
       repository_boundary_present: true,
       runtime_identity_safe: true,
       runtime_effective_acl_safe: true,
@@ -1481,6 +1484,7 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
           p_product_context_type TEXT DEFAULT NULL,
           p_product_context_ref TEXT DEFAULT NULL
         ) RETURNS TABLE(
+          is_candidate BOOLEAN,
           script_id TEXT,
           script_version INTEGER,
           content_hash TEXT,

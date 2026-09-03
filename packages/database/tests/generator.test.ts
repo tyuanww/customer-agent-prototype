@@ -38,13 +38,13 @@ type GeneratorModule = Readonly<{
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectRoot = path.resolve(packageRoot, '../..');
-const contractSetId = 'cs-ai-c11-openapi-1.11.0-schema-1.13-dcd50383b458';
+const contractSetId = 'cs-ai-c11-openapi-1.11.0-schema-1.14-1af001b8b0ce';
 const contractRoot = path.join(projectRoot, 'contracts/upstream/customer-agent', contractSetId);
 const manifest = JSON.parse(readFileSync(path.join(contractRoot, 'contract-set.json'), 'utf8')) as {
   source_git_sha: string;
   database: Readonly<{ sha256: string }>;
 };
-const databaseSource = readFileSync(path.join(contractRoot, 'schema-v1.13.sql'), 'utf8');
+const databaseSource = readFileSync(path.join(contractRoot, 'schema-v1.14.sql'), 'utf8');
 let generator: GeneratorModule;
 
 beforeAll(async () => {
@@ -81,11 +81,11 @@ function prepareExistingPublication(root: string): void {
 }
 
 describe('database migration generator', () => {
-  it('preserves the immutable v1.12 baseline and deterministically appends the reviewed v1.13 upgrade', () => {
+  it('preserves the immutable v1.12/v1.13 history and deterministically appends the reviewed v1.14 upgrade', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());
 
-    expect(first.migrations).toHaveLength(10);
+    expect(first.migrations).toHaveLength(11);
     expect(first.migrations.map(({ id }) => id)).toEqual([
       '0001_extensions',
       '0002_identity_and_content',
@@ -97,6 +97,7 @@ describe('database migration generator', () => {
       '0008_runtime_acl',
       '0009_phase1_policy_seed',
       '0010_search_projection_v1_13',
+      '0011_search_no_hit_context_v1_14',
     ]);
     expect([...first.outputs]).toEqual([...second.outputs]);
     expect(first.migrations.slice(0, 9).map(({ sha256 }) => sha256)).toEqual([
@@ -111,10 +112,15 @@ describe('database migration generator', () => {
       'a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e',
     ]);
     expect(first.migrations[0]?.contract_set_id).toContain('schema-1.12-');
-    expect(first.migrations[9]?.contract_set_id).toBe(contractSetId);
+    expect(first.migrations[9]?.contract_set_id).toContain('schema-1.13-');
+    expect(first.migrations[10]?.contract_set_id).toBe(contractSetId);
     expect(first.migrations[0]?.sql).toContain('CREATE TABLE customer_agent_meta.schema_migrations');
-    expect(first.migrations[9]?.sql).toContain('questions JSONB');
-    expect(first.migrations[9]?.sql).toContain('GRANT EXECUTE ON FUNCTION public.search_recommendable_scripts');
+    expect(first.migrations[9]?.sha256).toBe(
+      '026497120b6ad6d7d885de47d54335bb8891d8b45e2da010cc85eae6ea7b6818',
+    );
+    expect(first.migrations[10]?.sql).toContain('is_candidate BOOLEAN');
+    expect(first.migrations[10]?.sql).toContain('candidate.script_id IS NOT NULL');
+    expect(first.migrations[10]?.sql).toContain('GRANT EXECUTE ON FUNCTION public.search_recommendable_scripts');
     expect(first.migrations.every(({ sql }) => !/^COMMIT;$/m.test(sql))).toBe(true);
   });
 

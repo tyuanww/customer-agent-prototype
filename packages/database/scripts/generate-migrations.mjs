@@ -16,8 +16,8 @@ import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
-const EXPECTED_DATABASE_SHA256 = 'de8b7d9bdcac4ecad844025a47228ba339dad47d61861d261c492cb16a1aea02';
-const EXPECTED_SOURCE_LINES = 7669;
+const EXPECTED_DATABASE_SHA256 = 'edf909bf9450b5745a85ced4a75a2e2de3e5b061847562cd3a68c9c7c226da99';
+const EXPECTED_SOURCE_LINES = 7684;
 const BASELINE = Object.freeze({
   contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c',
   sourceGitSha: '1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38',
@@ -54,15 +54,34 @@ const BASELINE_MIGRATIONS = Object.freeze([
   Object.freeze({ position: 9, id: '0009_phase1_policy_seed', file: '0009_phase1_policy_seed.sql', sha256: 'a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e', bytes: 1712, source_ranges: Object.freeze([{ start_line: 2631, end_line: 2650 }, { start_line: 7658, end_line: 7660 }]) }),
 ]);
 
-const UPGRADE_SPEC = Object.freeze({
+const PRIOR_REVIEWED_UPGRADE = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.13-dcd50383b458',
+  sourceGitSha: 'dcd50383b458775219e1681ad9e767de7cf18517',
+  sourceSchemaSha256: 'de8b7d9bdcac4ecad844025a47228ba339dad47d61861d261c492cb16a1aea02',
+  migrationCount: 10,
+  schemaFile: 'schema-v1.13.sql',
   position: 10,
   id: '0010_search_projection_v1_13',
   file: '0010_search_projection_v1_13.sql',
+  sha256: '026497120b6ad6d7d885de47d54335bb8891d8b45e2da010cc85eae6ea7b6818',
+  bytes: 4313,
   source_ranges: Object.freeze([
     Object.freeze({ start_line: 6871, end_line: 6961 }),
     Object.freeze({ start_line: 7508, end_line: 7508 }),
     Object.freeze({ start_line: 7624, end_line: 7624 }),
     Object.freeze({ start_line: 7666, end_line: 7667 }),
+  ]),
+});
+
+const UPGRADE_SPEC = Object.freeze({
+  position: 11,
+  id: '0011_search_no_hit_context_v1_14',
+  file: '0011_search_no_hit_context_v1_14.sql',
+  source_ranges: Object.freeze([
+    Object.freeze({ start_line: 6871, end_line: 6976 }),
+    Object.freeze({ start_line: 7523, end_line: 7523 }),
+    Object.freeze({ start_line: 7639, end_line: 7639 }),
+    Object.freeze({ start_line: 7681, end_line: 7682 }),
   ]),
 });
 
@@ -120,26 +139,26 @@ function finalSchemaComment(source) {
   return source.slice(start, end + 2);
 }
 
-function baselineSource(projectRoot) {
+function reviewedContractSource(projectRoot, provenance, expectedLines) {
   const sourcePath = path.join(
     projectRoot,
     'contracts/upstream/customer-agent',
-    BASELINE.contractSetId,
-    BASELINE.schemaFile,
+    provenance.contractSetId,
+    provenance.schemaFile,
   );
   if (!existsSync(sourcePath) || !lstatSync(sourcePath).isFile()) {
-    throw new Error('Immutable schema.v1.12 baseline source is missing');
+    throw new Error(`Immutable reviewed source is missing: ${provenance.schemaFile}`);
   }
   const source = readFileSync(sourcePath, 'utf8');
-  if (sha256(source) !== BASELINE.sourceSchemaSha256) {
-    throw new Error('Immutable schema.v1.12 baseline source drifted');
+  if (sha256(source) !== provenance.sourceSchemaSha256) {
+    throw new Error(`Immutable reviewed source drifted: ${provenance.schemaFile}`);
   }
-  sourceLines(source, 7661);
+  sourceLines(source, expectedLines);
   return source;
 }
 
 function assertUpgradeScope(projectRoot, currentSource) {
-  const baseline = baselineSource(projectRoot);
+  const baseline = reviewedContractSource(projectRoot, PRIOR_REVIEWED_UPGRADE, 7669);
   const searchStart = '-- The only app_runtime-readable search boundary.';
   const searchEnd = 'REVOKE ALL ON FUNCTION search_recommendable_scripts(TEXT,TEXT,TEXT) FROM PUBLIC;';
   let expected = replaceExactly(
@@ -150,8 +169,8 @@ function assertUpgradeScope(projectRoot, currentSource) {
   );
   expected = replaceExactly(
     expected,
-    anchoredBlock(baseline, searchStart, searchEnd, 'schema.v1.12 search function'),
-    anchoredBlock(currentSource, searchStart, searchEnd, 'schema.v1.13 search function'),
+    anchoredBlock(baseline, searchStart, searchEnd, 'schema.v1.13 search function'),
+    anchoredBlock(currentSource, searchStart, searchEnd, 'schema.v1.14 search function'),
     'Search function upgrade',
   );
   expected = replaceExactly(
@@ -161,7 +180,7 @@ function assertUpgradeScope(projectRoot, currentSource) {
     'Schema comment upgrade',
   );
   if (expected !== currentSource) {
-    throw new Error('schema.v1.13 contains changes outside the reviewed immutable upgrade scope');
+    throw new Error('schema.v1.14 contains changes outside the reviewed immutable upgrade scope');
   }
 }
 
@@ -188,15 +207,58 @@ function loadBaselineMigrations(projectRoot) {
   }));
 }
 
+function loadPriorReviewedUpgrade(projectRoot) {
+  const migrationPath = path.join(
+    projectRoot,
+    'packages/database/migrations',
+    PRIOR_REVIEWED_UPGRADE.file,
+  );
+  if (!existsSync(migrationPath) || !lstatSync(migrationPath).isFile()) {
+    throw new Error(`Immutable reviewed migration is missing: ${PRIOR_REVIEWED_UPGRADE.file}`);
+  }
+  const sql = readFileSync(migrationPath, 'utf8');
+  if (
+    Buffer.byteLength(sql) !== PRIOR_REVIEWED_UPGRADE.bytes
+    || sha256(sql) !== PRIOR_REVIEWED_UPGRADE.sha256
+  ) {
+    throw new Error(`Immutable reviewed migration drifted: ${PRIOR_REVIEWED_UPGRADE.file}`);
+  }
+  for (const anchor of [
+    PRIOR_REVIEWED_UPGRADE.contractSetId,
+    PRIOR_REVIEWED_UPGRADE.sourceGitSha,
+    PRIOR_REVIEWED_UPGRADE.sourceSchemaSha256,
+  ]) {
+    if (!sql.includes(anchor)) {
+      throw new Error(`Reviewed provenance is missing from ${PRIOR_REVIEWED_UPGRADE.file}`);
+    }
+  }
+  const {
+    migrationCount: _migrationCount,
+    schemaFile: _schemaFile,
+    contractSetId,
+    sourceGitSha,
+    sourceSchemaSha256,
+    ...descriptor
+  } = PRIOR_REVIEWED_UPGRADE;
+  return Object.freeze({
+    ...descriptor,
+    contract_set_id: contractSetId,
+    source_git_sha: sourceGitSha,
+    source_schema_sha256: sourceSchemaSha256,
+    sql,
+  });
+}
+
 function renderUpgradeMigration(lines, snapshot) {
   const sourceBody = linesForRanges(lines, UPGRADE_SPEC.source_ranges);
   for (const anchor of [
     'DROP FUNCTION IF EXISTS search_recommendable_scripts(TEXT,TEXT,TEXT);',
-    'questions JSONB',
+    'is_candidate BOOLEAN',
+    'candidate.script_id IS NOT NULL',
     'public.content_public_questions(candidate.questions_json)',
     'ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT) OWNER TO cs_ai_definer;',
     'GRANT EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT) TO app_runtime;',
-    'CS-AI-C11 schema.v1.13;',
+    'CS-AI-C11 schema.v1.14;',
   ]) {
     if (!sourceBody.includes(anchor)) throw new Error(`${UPGRADE_SPEC.id} source anchor drifted: ${anchor}`);
   }
@@ -205,7 +267,7 @@ function renderUpgradeMigration(lines, snapshot) {
     .join(', ');
   const parts = [
     `-- ${GENERATED_HEADER}`,
-    `-- ${UPGRADE_SPEC.id}; source schema.v1.13 lines ${ranges}`,
+    `-- ${UPGRADE_SPEC.id}; source schema.v1.14 lines ${ranges}`,
     `-- contract_set_id=${snapshot.contract_set_id}`,
     `-- source_git_sha=${snapshot.source_git_sha}`,
     `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
@@ -238,7 +300,7 @@ function renderCatalogue(manifest, migrations) {
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze([{ contractSetId: ${JSON.stringify(PRIOR_REVIEWED_UPGRADE.contractSetId)}, sourceGitSha: ${JSON.stringify(PRIOR_REVIEWED_UPGRADE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(PRIOR_REVIEWED_UPGRADE.sourceSchemaSha256)}, migrationCount: ${PRIOR_REVIEWED_UPGRADE.migrationCount} }]) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
 export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
@@ -251,7 +313,11 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const lines = sourceLines(snapshot.database_source);
   assertUpgradeScope(projectRoot, snapshot.database_source);
   const upgrade = renderUpgradeMigration(lines, snapshot);
-  const migrations = Object.freeze([...loadBaselineMigrations(projectRoot), upgrade]);
+  const migrations = Object.freeze([
+    ...loadBaselineMigrations(projectRoot),
+    loadPriorReviewedUpgrade(projectRoot),
+    upgrade,
+  ]);
   const upgradeSourceBody = linesForRanges(lines, UPGRADE_SPEC.source_ranges);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
@@ -267,6 +333,14 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
         source_schema_sha256: BASELINE.sourceSchemaSha256,
         migration_count: BASELINE.migrationCount,
       }),
+      prior_reviewed_upgrades: Object.freeze([
+        Object.freeze({
+          contract_set_id: PRIOR_REVIEWED_UPGRADE.contractSetId,
+          source_git_sha: PRIOR_REVIEWED_UPGRADE.sourceGitSha,
+          source_schema_sha256: PRIOR_REVIEWED_UPGRADE.sourceSchemaSha256,
+          migration_count: PRIOR_REVIEWED_UPGRADE.migrationCount,
+        }),
+      ]),
     }),
     migrations: Object.freeze(migrations.map(({ sql: _sql, ...migration }) => migration)),
   });

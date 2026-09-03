@@ -1,0 +1,442 @@
+import { createHash } from 'node:crypto';
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  it,
+} from 'vitest';
+import type { Client, ClientConfig } from 'pg';
+import { applyDatabaseMigrations } from '@customer-agent/database';
+import { Pg15Harness } from '@customer-agent/database/testkit';
+import {
+  createSearchRepository,
+  SEARCH_CANDIDATES_SQL,
+} from '../src/search-repository.js';
+import { createSearchBackend, type SearchBackend } from '../src/search-service.js';
+
+const describePg15 = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1'
+  ? describe.sequential
+  : describe.skip;
+
+const RELEASE_ID = 'rel_synthetic_search_v1';
+const INTENT_TAXONOMY_VERSION = 'itax_synthetic_search_v1';
+const INTENT_ID = 'intent_synthetic_shipping';
+const SOURCE_BINDINGS = Object.freeze([
+  ['aftersale', 'srcv_synth_aftersale_v1', 'SRC-SYNTH-AFTERSALE'],
+  ['campaign', 'srcv_synth_campaign_v1', 'SRC-SYNTH-CAMPAIGN'],
+  ['presale', 'srcv_synth_presale_v1', 'SRC-SYNTH-PRESALE'],
+  ['product', 'srcv_synth_product_v1', 'SRC-SYNTH-PRODUCT'],
+] as const);
+
+type CandidateFixture = Readonly<{
+  id: string;
+  title: string;
+  question: string;
+  searchable: string;
+  fallback: string;
+  platformScope?: readonly ('qianniu' | 'douyin')[];
+  productScopeType?: 'storewide' | 'category' | 'sku';
+  productScopeRefs?: readonly string[];
+  temporal?: 'active' | 'future' | 'expired';
+}>;
+
+type ExplainPlanNode = Readonly<{
+  'Node Type'?: string;
+  Plans?: readonly ExplainPlanNode[];
+}>;
+
+type ExplainResult = Readonly<{
+  Plan?: ExplainPlanNode;
+  'Execution Time'?: number;
+}>;
+
+function containsPlanNode(plan: ExplainPlanNode | undefined, nodeType: string): boolean {
+  if (plan === undefined) return false;
+  if (plan['Node Type'] === nodeType) return true;
+  return plan.Plans?.some((child) => containsPlanNode(child, nodeType)) ?? false;
+}
+
+const CANDIDATES = Object.freeze([
+  {
+    id: 'script_01_exact_question',
+    title: '合成配送说明一',
+    question: '什么时候发货',
+    searchable: '什么 么时 时候 候发 发货',
+    fallback: '什么时候发货 合成配送说明一',
+  },
+  {
+    id: 'script_02_exact_title',
+    title: '什么时候发货',
+    question: '合成配送时效问题',
+    searchable: '什么 么时 时候 候发 发货',
+    fallback: '什么时候发货 合成配送时效问题',
+  },
+  {
+    id: 'script_03_phrase_question',
+    title: '合成配送说明三',
+    question: '请问什么时候发货呢',
+    searchable: '什么 么时 时候 候发 发货',
+    fallback: '请问什么时候发货呢 合成配送说明三',
+  },
+  {
+    id: 'script_04_phrase_title',
+    title: '关于什么时候发货的说明',
+    question: '合成配送一般问题',
+    searchable: '什么 么时 时候 候发 发货',
+    fallback: '关于什么时候发货的说明 合成配送一般问题',
+  },
+  {
+    id: 'script_05_category',
+    title: '合成分类专用',
+    question: '合成分类专用',
+    searchable: '合成 成分 分类 类专 专用',
+    fallback: '合成分类专用',
+    productScopeType: 'category',
+    productScopeRefs: ['skin-care'],
+  },
+  {
+    id: 'script_06_sku',
+    title: '合成单品专用',
+    question: '合成单品专用',
+    searchable: '合成 成单 单品 品专 专用',
+    fallback: '合成单品专用',
+    productScopeType: 'sku',
+    productScopeRefs: ['sku-synthetic-001'],
+  },
+  {
+    id: 'script_07_douyin',
+    title: '合成抖音专用',
+    question: '合成抖音专用',
+    searchable: '合成 成抖 抖音 音专 专用',
+    fallback: '合成抖音专用',
+    platformScope: ['douyin'],
+  },
+  {
+    id: 'script_08_literal_wildcard',
+    title: '合成字面通配符',
+    question: '合成字面通配符',
+    searchable: '合成 成字 字面 面通 通配 配符',
+    fallback: '合成%_\\标记',
+  },
+  {
+    id: 'script_09_future',
+    title: '合成未来话术',
+    question: '合成未来话术',
+    searchable: '合成 成未 未来 来话 话术',
+    fallback: '合成未来话术',
+    temporal: 'future',
+  },
+  {
+    id: 'script_10_expired',
+    title: '合成过期话术',
+    question: '合成过期话术',
+    searchable: '合成 成过 过期 期话 话术',
+    fallback: '合成过期话术',
+    temporal: 'expired',
+  },
+] satisfies readonly CandidateFixture[]);
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function sourceBindingHash(): string {
+  return sha256(SOURCE_BINDINGS
+    .map(([domain, sourceVersionId]) => `${domain}:${sourceVersionId}`)
+    .join('|'));
+}
+
+async function seedCandidate(owner: Client, fixture: CandidateFixture, index: number): Promise<void> {
+  const suffix = String(index + 1).padStart(2, '0');
+  const sourceAssetId = `sa_synthetic_search_${suffix}`;
+  const originFingerprint = sha256(`synthetic-origin-${suffix}`);
+  const questionBase = {
+    question_id: `q_synthetic_search_${suffix}`,
+    question_version: 1,
+    question_text: fixture.question,
+    semantic_family_id: `sf_synthetic_search_${suffix}`,
+    origin_fingerprint: originFingerprint,
+    origin_fingerprint_key_version: 'hmac-synthetic-v1',
+    source_asset_id: sourceAssetId,
+    source: 'manual',
+    intent_taxonomy_version: INTENT_TAXONOMY_VERSION,
+    intent_id: INTENT_ID,
+  };
+  const questionHash = await owner.query<{ question_hash: string }>(
+    'SELECT public.content_question_hash($1::jsonb) AS question_hash',
+    [JSON.stringify(questionBase)],
+  );
+  const questions = [{
+    ...questionBase,
+    question_hash: questionHash.rows[0]?.question_hash,
+  }];
+
+  await owner.query(`
+    INSERT INTO public.semantic_source_assets(
+      source_asset_id, source, origin_fingerprint, origin_fingerprint_key_version
+    ) VALUES ($1, 'manual', $2, 'hmac-synthetic-v1')
+  `, [sourceAssetId, originFingerprint]);
+
+  const temporal = fixture.temporal ?? 'active';
+  const effectiveFrom = temporal === 'future'
+    ? "pg_catalog.clock_timestamp() + INTERVAL '1 day'"
+    : temporal === 'expired'
+      ? "pg_catalog.clock_timestamp() - INTERVAL '2 days'"
+      : "pg_catalog.clock_timestamp() - INTERVAL '1 day'";
+  const effectiveTo = temporal === 'expired'
+    ? "pg_catalog.clock_timestamp() - INTERVAL '1 day'"
+    : 'NULL::timestamptz';
+  const platformScope = fixture.platformScope ?? ['qianniu'];
+  const productScopeType = fixture.productScopeType ?? 'storewide';
+  const productScopeRefs = fixture.productScopeRefs ?? [];
+
+  await owner.query(`
+    INSERT INTO public.release_items(
+      release_id, script_id, script_version, content_hash, answer_text, title, category,
+      source_ref, source_version_id, owner_role, review_due_at, effective_from, effective_to,
+      platform_scope, product_scope_type, product_scope_refs, intent_taxonomy_version, intent_id,
+      risk_level, risk_categories, has_conflict, review_mode, primary_reviewer_id,
+      primary_reviewer_role, primary_review_evd, secondary_reviewer_id,
+      secondary_reviewer_role, secondary_review_evd, placeholder_keys, questions_json,
+      search_document, search_fallback_text
+    ) VALUES (
+      $1, $2, 1, $3, $4, $5, 'presale',
+      'SRC-SYNTH-PRESALE', 'srcv_synth_presale_v1', 'ROLE-CONTENT-LEAD',
+      pg_catalog.clock_timestamp() + INTERVAL '365 days', ${effectiveFrom}, ${effectiveTo},
+      $6::text[], $7, $8::text[], $9, $10,
+      'low', ARRAY[]::text[], FALSE, 'single', $11,
+      'ROLE-CONTENT-LEAD', 'EVD-SYNTHETIC-SEARCH', NULL, NULL, NULL,
+      ARRAY[]::text[], $12::jsonb, pg_catalog.to_tsvector('simple', $13), $14
+    )
+  `, [
+    RELEASE_ID,
+    fixture.id,
+    sha256(`synthetic-content-${suffix}`),
+    `合成回答 ${suffix}`,
+    fixture.title,
+    [...platformScope],
+    productScopeType,
+    [...productScopeRefs],
+    INTENT_TAXONOMY_VERSION,
+    INTENT_ID,
+    sha256('synthetic-primary-reviewer'),
+    JSON.stringify(questions),
+    fixture.searchable,
+    fixture.fallback,
+  ]);
+}
+
+async function seedSearchRelease(owner: Client): Promise<void> {
+  await owner.query('BEGIN');
+  try {
+    await owner.query("SELECT pg_catalog.set_config('app.publishing', 'on', true)");
+    await owner.query("SELECT pg_catalog.set_config('app.semantic_asset_write', 'publish', true)");
+    for (const [domain, sourceVersionId, sourceRef] of SOURCE_BINDINGS) {
+      await owner.query(`
+        INSERT INTO public.authoritative_source_versions(
+          source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
+          use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at
+        ) VALUES (
+          $1, $2, $3, 'synthetic-v1', $4,
+          'canonical', 'ROLE-CONTENT-LEAD', 'EVD-SYNTHETIC-SOURCE',
+          'synthetic-owner', pg_catalog.clock_timestamp() - INTERVAL '1 day',
+          pg_catalog.clock_timestamp() + INTERVAL '365 days'
+        )
+      `, [sourceVersionId, sourceRef, domain, sha256(`synthetic-source-${domain}`)]);
+    }
+    await owner.query(`
+      INSERT INTO public.intent_taxonomy_versions(
+        intent_taxonomy_version, approval_evd, approved_by, approved_at
+      ) VALUES ($1, 'EVD-SYNTHETIC-TAXONOMY', 'synthetic-owner', pg_catalog.clock_timestamp())
+    `, [INTENT_TAXONOMY_VERSION]);
+    await owner.query(`
+      INSERT INTO public.intent_taxonomy_entries(
+        intent_taxonomy_version, intent_id, label, lifecycle
+      ) VALUES ($1, $2, '合成发货意图', 'active')
+    `, [INTENT_TAXONOMY_VERSION, INTENT_ID]);
+    await owner.query(`
+      INSERT INTO public.content_releases(
+        release_id, release_seq, title, status, source_binding_hash,
+        published_by, published_by_role
+      ) VALUES ($1, 1, '合成搜索发布', 'published', $2, 'synthetic-owner', 'owner')
+    `, [RELEASE_ID, sourceBindingHash()]);
+    for (const [domain, sourceVersionId] of SOURCE_BINDINGS) {
+      await owner.query(`
+        INSERT INTO public.release_source_bindings(release_id, domain, source_version_id)
+        VALUES ($1, $2, $3)
+      `, [RELEASE_ID, domain, sourceVersionId]);
+    }
+    for (const [index, candidate] of CANDIDATES.entries()) {
+      await seedCandidate(owner, candidate, index);
+    }
+    await owner.query(`
+      INSERT INTO public.content_current(id, current_release_id) VALUES (1, $1)
+    `, [RELEASE_ID]);
+    await owner.query('COMMIT');
+  } catch (error) {
+    await owner.query('ROLLBACK');
+    throw error;
+  }
+}
+
+describePg15('Search backend PostgreSQL 15 boundary', () => {
+  let harness: Pg15Harness;
+  let database: Readonly<{ name: string; config: ClientConfig }>;
+  let owner: Client;
+  let runtime: Client;
+  let backend: SearchBackend;
+
+  beforeAll(async () => {
+    harness = new Pg15Harness();
+    harness.start();
+    database = harness.createDatabase('search_backend');
+    owner = await harness.connect(database.config);
+    await applyDatabaseMigrations(owner);
+    await owner.query('CREATE ROLE w2_search_runtime LOGIN');
+    await owner.query('GRANT app_runtime TO w2_search_runtime');
+    await seedSearchRelease(owner);
+    runtime = await harness.connect({ ...database.config, user: 'w2_search_runtime' });
+    const repository = createSearchRepository(runtime as never);
+    backend = createSearchBackend({ searchCandidates: repository.search });
+  }, 120_000);
+
+  afterAll(async () => {
+    await runtime?.end();
+    await owner?.end();
+    harness?.stop();
+  }, 60_000);
+
+  it('keeps backing content unreadable while exposing only the controlled search function', async () => {
+    await expect(runtime.query('SELECT * FROM public.release_items')).rejects.toMatchObject({
+      code: '42501',
+    });
+    await expect(runtime.query('SELECT * FROM public.v_scripts_recommendable')).rejects.toMatchObject({
+      code: '42501',
+    });
+    await expect(runtime.query(
+      "SELECT pg_catalog.count(*) FROM public.search_recommendable_scripts('qianniu', NULL, NULL)",
+    )).resolves.toMatchObject({ rows: [{ count: '5' }] });
+  });
+
+  it('ranks exact question, exact title and phrase question deterministically inside database Top 3', async () => {
+    const result = await backend.search({
+      normalizedQuery: '什么时候发货',
+      platform: 'qianniu',
+      productContextType: null,
+      productContextRef: null,
+      topK: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      releaseId: RELEASE_ID,
+      sourceBindingHash: sourceBindingHash(),
+      candidates: [
+        { rank: 1, script_id: 'script_01_exact_question' },
+        { rank: 2, script_id: 'script_02_exact_title' },
+        { rank: 3, script_id: 'script_03_phrase_question' },
+      ],
+    });
+  });
+
+  it('applies platform, product and half-open effective scope before ranking', async () => {
+    const search = (normalizedQuery: string, overrides: Partial<Parameters<SearchBackend['search']>[0]> = {}) => (
+      backend.search({
+        normalizedQuery,
+        platform: 'qianniu',
+        productContextType: null,
+        productContextRef: null,
+        topK: 3,
+        ...overrides,
+      })
+    );
+
+    await expect(search('合成分类专用')).resolves.toMatchObject({ ok: true, candidates: [] });
+    await expect(search('合成分类专用', {
+      productContextType: 'category',
+      productContextRef: 'skin-care',
+    })).resolves.toMatchObject({
+      ok: true,
+      candidates: [{ script_id: 'script_05_category' }],
+    });
+    await expect(search('合成单品专用', {
+      productContextType: 'sku',
+      productContextRef: 'sku-synthetic-001',
+    })).resolves.toMatchObject({
+      ok: true,
+      candidates: [{ script_id: 'script_06_sku' }],
+    });
+    await expect(search('合成抖音专用')).resolves.toMatchObject({ ok: true, candidates: [] });
+    await expect(search('合成抖音专用', { platform: 'douyin' })).resolves.toMatchObject({
+      ok: true,
+      candidates: [{ script_id: 'script_07_douyin' }],
+    });
+    await expect(search('合成未来话术')).resolves.toMatchObject({ ok: true, candidates: [] });
+    await expect(search('合成过期话术')).resolves.toMatchObject({ ok: true, candidates: [] });
+  });
+
+  it('escapes ILIKE wildcard characters and distinguishes a ready no-hit', async () => {
+    for (const literal of ['%', '_', '\\']) {
+      await expect(backend.search({
+        normalizedQuery: literal,
+        platform: 'qianniu',
+        productContextType: null,
+        productContextRef: null,
+        topK: 3,
+      })).resolves.toMatchObject({
+        ok: true,
+        candidates: [{ script_id: 'script_08_literal_wildcard' }],
+      });
+    }
+    await expect(backend.search({
+      normalizedQuery: '完全不存在的合成查询',
+      platform: 'qianniu',
+      productContextType: null,
+      productContextRef: null,
+      topK: 3,
+    })).resolves.toEqual({
+      ok: true,
+      releaseId: RELEASE_ID,
+      sourceBindingHash: sourceBindingHash(),
+      candidates: [],
+    });
+  });
+
+  it('keeps database-side Top 3 limiting inside the controlled PG15 execution budget', async () => {
+    const explained = await runtime.query<{ 'QUERY PLAN': ExplainResult[] }>(
+      `EXPLAIN (ANALYZE, FORMAT JSON) ${SEARCH_CANDIDATES_SQL}`,
+      [
+        'qianniu',
+        null,
+        null,
+        '什么 & 么时 & 时候 & 候发 & 发货',
+        '%什么时候发货%',
+        '什么时候发货',
+        3,
+      ],
+    );
+    const result = explained.rows[0]?.['QUERY PLAN'][0];
+
+    expect(containsPlanNode(result?.Plan, 'Limit')).toBe(true);
+    expect(result?.['Execution Time']).toBeTypeOf('number');
+    expect(result?.['Execution Time']).toBeLessThan(250);
+  });
+
+  it('fails closed without inventing no-hit semantics when the four-source gate becomes unavailable', async () => {
+    await owner.query(`
+      SELECT public.suspend_authoritative_source(
+        'srcv_synth_presale_v1', 'SOURCE_REVOKED',
+        'EVD-SYNTHETIC-SUSPENSION', 'synthetic-owner', 'owner'
+      )
+    `);
+
+    await expect(backend.search({
+      normalizedQuery: '什么时候发货',
+      platform: 'qianniu',
+      productContextType: null,
+      productContextRef: null,
+      topK: 3,
+    })).resolves.toEqual({ ok: false, code: 'SOURCE_GATE_NOT_READY' });
+  });
+});

@@ -8,6 +8,11 @@ import {
   type ApiRuntimeDiagnosticSink,
 } from './runtime-diagnostics.js';
 import type { ApiDatabaseBootstrapConfig } from './runtime-config.js';
+import {
+  createSearchRepository,
+  type SearchRepositoryRequest,
+  type SearchRepositoryResult,
+} from './search-repository.js';
 
 export type ServiceReadinessChecks = components['schemas']['ReadyChecks'];
 export type ServicePolicyFlags = Readonly<Omit<components['schemas']['PolicyResponse'], 'auth_mode'>>;
@@ -15,6 +20,7 @@ export type ServicePolicyFlags = Readonly<Omit<components['schemas']['PolicyResp
 export type ServiceRepository = Readonly<{
   readiness: () => Promise<ServiceReadinessChecks>;
   readPolicyFlags: () => Promise<ServicePolicyFlags | null>;
+  searchCandidates: (request: SearchRepositoryRequest) => Promise<SearchRepositoryResult>;
   close: () => Promise<void>;
 }>;
 
@@ -70,7 +76,7 @@ interface RuntimeSchemaProbeRow extends QueryResultRow {
 interface RuntimePolicyFlagsRow extends QueryResultRow, ServicePolicyFlags {}
 
 const EXPECTED_SCHEMA_PREFIX = `CS-AI-C11 ${CONTRACT_PROVENANCE.database_version};`;
-const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = '87e9234b6d5c21728921a8cebf143f163fc726c7ac2c0a35f3b555d0c8ed6c42';
+const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = '09cfe4377c648bff69fdc706ee369ee53c689d06915bc90ce2541b4000af45d0';
 const RUNTIME_SCHEMA_PROBE = `
   WITH expected_runtime_relation_acl(relation_name, privilege_type) AS (
     VALUES
@@ -629,6 +635,7 @@ function freezeChecks(
 class PostgresServiceRepository implements ServiceRepository {
   private closed = false;
   private closePromise: Promise<void> | null = null;
+  private readonly searchRepository: ReturnType<typeof createSearchRepository>;
   private activeProbe: Readonly<{
     operation: Promise<ServiceReadinessChecks>;
     response: Promise<ServiceReadinessChecks>;
@@ -640,6 +647,7 @@ class PostgresServiceRepository implements ServiceRepository {
     private readonly diagnosticSink: ApiRuntimeDiagnosticSink,
     private readonly now: RuntimeClock,
   ) {
+    this.searchRepository = createSearchRepository(this.pool);
     // node-postgres emits idle-client failures on Pool itself. Consume the event
     // so it cannot crash the process. pg-pool already evicts that idle client;
     // the next readiness request must run a fresh probe instead of inventing a
@@ -647,6 +655,13 @@ class PostgresServiceRepository implements ServiceRepository {
     this.pool.on('error', (error) => {
       this.report('DATABASE_IDLE_CLIENT_FAILED', error);
     });
+  }
+
+  async searchCandidates(request: SearchRepositoryRequest): Promise<SearchRepositoryResult> {
+    if (this.closed) {
+      throw Object.assign(new Error('Runtime repository is closed'), { code: '08003' });
+    }
+    return this.searchRepository.search(request);
   }
 
   readiness(): Promise<ServiceReadinessChecks> {

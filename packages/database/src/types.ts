@@ -39,6 +39,9 @@ export type ExecutableMigrationCatalogue = Readonly<{
     priorSignedBaseline: Readonly<MigrationProvenance & {
       migrationCount: number;
     }> | null;
+    priorReviewedUpgrades: readonly Readonly<MigrationProvenance & {
+      migrationCount: number;
+    }>[];
   }>;
   migrations: readonly ExecutableDatabaseMigration[];
 }>;

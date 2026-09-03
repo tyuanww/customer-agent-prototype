@@ -5,10 +5,10 @@
 对照来源（**只读**，本仓不得修改）：
 
 - 人读合同：`31-产品契约-v1.md` v1.6、`39-API合同与发布状态机-v1.md` v1.16
-- 机器合同：`openapi.v1.yaml`、`33-schema-v1-草案.sql`（schema v1.13）
+- 机器合同：`openapi.v1.yaml`、`33-schema-v1-草案.sql`（schema v1.14）
 - 架构北极星：`37-架构SSOT-v1.md`
 
-项目记录与正式合同来源仓：`ai-赋能立项/business-docs/01-客服Agent项目`。动态 G0 / Ddev 状态只由该仓 `00–06` 维护，本页不复制计数或充当状态真源。产品仓先以 `schema.v1.12@1d62e2c` 生成九个不可变 PostgreSQL 15 migration；2026-09-03 又接收并复核 `schema.v1.13@dcd50383b458775219e1681ad9e767de7cf18517`，新增唯一升级 migration `0010_search_projection_v1_13.sql`，旧九段保持逐字节不变。当前合同集为 `cs-ai-c11-openapi-1.11.0-schema-1.13-dcd50383b458`，锁文件仍是 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。DEV-M1 W1 已实现 development/test mock auth、两类私有 HMAC key ring、runtime/admin 双池隔离以及受控 policy 读写；桌面仍没有 API adapter，真实飞书鉴权、搜索/事件主链和生产接入仍不存在。禁止实时跨仓读取、手改快照，或把 codegen、migration、mock auth、policy 写入测试解释为 runtime 激活。
+项目记录与正式合同来源仓：`ai-赋能立项/business-docs/01-客服Agent项目`。动态 G0 / Ddev 状态只由该仓 `00–06` 维护，本页不复制计数或充当状态真源。产品仓以 `schema.v1.12@1d62e2c` 生成前九个不可变 PostgreSQL 15 migration，`schema.v1.13@dcd50383b458` 追加 `0010_search_projection_v1_13.sql`；当前又从治理仓合并头 `1af001b8b0ce95aac0c42f42251a38feb85f3e26` 接收 `schema.v1.14`，只追加 `0011_search_no_hit_context_v1_14.sql`，旧十段保持逐字节不变。当前合同集为 `cs-ai-c11-openapi-1.11.0-schema-1.14-1af001b8b0ce`，锁文件仍是 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。DEV-M1 W2 已实现合成/测试范围的 search repository/domain 与 PG15 受控搜索证明；`/v1/search` 在 W3 原子 query/impression 操作接入前仍固定失败关闭。桌面仍没有 API adapter，真实飞书鉴权、事件主链和生产接入仍不存在。禁止实时跨仓读取、手改快照，或把 codegen、migration、mock auth、policy/search 测试解释为 runtime 激活。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [API 启动配置](reference-api-runtime-config.md) · [桌面合同](reference-desktop-contracts.md) · [README](../README.md)
 
@@ -18,12 +18,12 @@
 
 | 问题 | 答案 |
 | --- | --- |
-| 正式机器合同是否已进入产品仓？ | **已接收 schema v1.13、按双哈希验证，并生成类型/组件校验器与十段 migration，但未激活。** 当前输入见 `contracts/upstream/customer-agent/contract-set.lock.json`；旧 v1.12 九段 migration 不变，v1.13 只追加 `0010`。本机 PG15 测试不是业务 runtime 或生产证据。 |
+| 正式机器合同是否已进入产品仓？ | **已接收 schema v1.14、按双哈希验证，并生成类型/组件校验器与十一段 migration，但未激活。** 当前输入见 `contracts/upstream/customer-agent/contract-set.lock.json`；旧 v1.12/v1.13 十段 migration 不变，v1.14 只追加 `0011`。本机 PG15 测试不是业务 runtime 或生产证据。 |
 | Demo 现在有没有 API adapter？ | **没有。** `apps/desktop/src/` 内零 `fetch` / HTTP 客户端。Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。并行的 `apps/api` 已有 `/health`、`/ready` 与 runtime pool，但桌面不连接它，API 也不读业务内容。 |
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**类型、鉴权、事件、发布、租约必须重做**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
-| 本仓下一步该不该实现 adapter？ | **DEV-M1 Slice 1 已完成，下一步是 W2 Search。** 事件业务端口、真实飞书 auth 与 Windows Main adapter 仍需分层实现和验证，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
+| 本仓下一步该不该实现 adapter？ | **DEV-M1 W2 Search backend 已完成，下一步是 W3 query/impression 原子事务。** 事件业务端口、真实飞书 auth 与 Windows Main adapter 仍需分层实现和验证，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
 
 ---
 

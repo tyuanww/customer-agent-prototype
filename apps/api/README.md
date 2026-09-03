@@ -1,6 +1,6 @@
 # `@customer-agent/api`
 
-本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.13` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 Slice 1 另提供仅限 development/test 的 mock auth、策略只读路由，以及通过独立 admin pool 执行的 Owner-only 策略写入口。
+本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.14` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W2 已加入仅消费脱敏查询的搜索 backend、数据库内稳定 Top 3 和公开候选白名单；mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。
 
 当前不是业务 API：
 
@@ -9,7 +9,7 @@
 - `single-host`、`multi-instance`、`production` 与 `AUTH_MODE=feishu` 尚未具备后续依赖，监听前失败关闭。
 - `/health` 不访问数据库；`/ready` 只把 database/schema/auth 的真实结果写入合同响应。
 - auth 已由当前 mock service 返回 `ok`；storage/content 尚未实现，因此 `/ready` 正常结果仍是 503，而不是业务已可用。
-- 当前仅注册 `/v1/auth/mock-login`、`/v1/auth/me`、`/v1/policy` 与 `/v1/policy/flags`；search/events、migration 自动执行、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
+- 当前另注册 `/v1/search`，但默认 operation 在 W3 原子写入 query/impression 前固定返回 503；events、migration 自动执行、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
 - 启动与 readiness 失败只输出稳定字段，不回显环境变量值、token、DSN、SQL 或异常正文。
 - 同一时刻只运行一个 readiness 探针；连接等待与 readiness 响应分别由 `DB_CONNECTION_TIMEOUT_MS`、`DB_READINESS_TIMEOUT_MS` 控制，timer 与单调时钟都会拒绝 deadline 后才完成的成功结果。
 - schema 探针锁定 9 个 search/传递函数、2 个视图、`pgcrypto.digest` extension owner、双向角色成员与当前数据库/全部用户 schema 的精确有效 ACL；任意非 owner 的 `public CREATE` 失败关闭。
@@ -19,7 +19,7 @@
 
 ## 本地运行
 
-先准备一个已应用十段 migration 的本机隔离 PostgreSQL 15 数据库，并分别提供属于 `app_runtime` 与 `app_content_admin` 的两个登录角色。连接串和 HMAC key 只通过本机环境注入，不写入仓库：
+先准备一个已应用十一段 migration 的本机隔离 PostgreSQL 15 数据库，并分别提供属于 `app_runtime` 与 `app_content_admin` 的两个登录角色。连接串和 HMAC key 只通过本机环境注入，不写入仓库：
 
 ```bash
 CUSTOMER_AGENT_PROFILE=formal-dev \

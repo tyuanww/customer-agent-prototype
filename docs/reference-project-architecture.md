@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 Slice 1 已接收 `schema.v1.13`，增加 mock auth、策略读写路由、独立 runtime/admin 数据库能力和十段 migration。桌面 adapter、正式飞书鉴权、搜索业务端口、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W2 已前滚到 `schema.v1.14` 和十一段 migration，并增加 mock auth、策略读写、独立 runtime/admin 数据库能力及受控 search backend。桌面 adapter、正式飞书鉴权、事件业务端口、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -80,6 +80,8 @@ apps/api（DEV-M1 Slice 1）
 
 `DEV-M1 Slice 1` 在不改写上述历史切片的前提下前滚到 `schema.v1.13`：第十段 migration 只替换受控 search projection 与 schema comment，精确的 v1.12 ledger 只计划 `0010`。API 新增进程内 opaque mock session、成对 mock header、策略只读路由和 Owner-only 管理写入口。私有 bootstrap 在任何 pool/Fastify 构造前验证两条不同登录 DSN 指向同一数据库目标、总连接预算和互不复用的 HMAC 域；管理 SQL 每次写入前同时证明登录、`app_content_admin`、`cs_ai_definer`、`set_policy_flag` 定义和 ACL，任一角色或函数漂移均失败关闭。未捕获请求异常只返回稳定 500 合同，不回显原始错误；空 JSON、坏 JSON、超大正文和不支持的媒体类型统一返回稳定 400。
 
+`DEV-M1 W2` 继续以追加方式接收 `schema.v1.14`：第十一段 migration 只增加 ready-no-hit 上下文，精确 v1.12/v1.13 ledger 分别只规划缺失后缀。API 的 `SearchRepository` 在一条参数化 SQL 内完成 scope-only 快照读取、bigram primary、字面转义 fallback、确定性排序与数据库侧 Top 3；`SearchService` 只映射公开候选字段。`/v1/search` 已有鉴权、输入门禁、脱敏/HMAC 与稳定错误壳，但默认 operation 在 W3 原子写入 query/impression 前固定返回 503，避免产生无事件状态的正式搜索。
+
 ## 3. 三个窗口和安全边界
 
 | WindowRole | Renderer | preload | 主要能力 |
@@ -108,16 +110,17 @@ contracts/upstream/customer-agent/<contract_set_id>
                                           ├─ HealthResponse ──> apps/api GET /health
                                           └─ Ready/NotReady ──> apps/api GET /ready
 
-v1.13 migrated PG15
-  ├─ app_runtime pool ──> readiness + policy read
+v1.14 migrated PG15
+  ├─ app_runtime pool ──> readiness + policy read + controlled SearchRepository
   └─ isolated app_content_admin pool ──> set_policy_flag（唯一受控写入口）
 
-/v1 search/events / desktop adapter ──尚未实现──> renderer 仍不允许直连
+/v1 search route ──W3 operation 未接通、固定 503──> renderer 仍不允许直连
+/v1 events / desktop adapter ──尚未实现──> renderer 仍不允许直连
 ```
 
 `apps/desktop/src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有合成搜索均未导入该包。当前 `/v1` 只实现 mock auth 与 policy Slice 1，search/events 和桌面 adapter 仍不存在。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有合成搜索均未导入该包。当前 `/v1` 已实现 mock auth、policy 与 W2 search 边界，但 search operation 尚未接通，events 和桌面 adapter 仍不存在。
 
 ## 5. 测试和验证层级
 
@@ -171,7 +174,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 DEV-M0 基线上加入 DEV-M1 Slice 1：合同接收、组件校验、migration 控制面、API host、runtime 只读能力和 policy-admin 写能力各有单一 owner，两个 pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.13 已有精确 N-1 migration 规划与 PG15 证明；W6 的候选产物仍明确不可部署且 `runtime_activated=false`。本切片只关闭 auth/policy 基础边界，不关闭真实数据、正式飞书鉴权、搜索/事件端口、幂等终态、生产部署或真实 Windows 门。
+当前目录结构已在 DEV-M0 基线上推进到 DEV-M1 W2：合同接收、组件校验、migration 控制面、API host、runtime 只读能力、policy-admin 写能力与 search repository/service 各有单一 owner，两个 pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；W6 的候选产物仍明确不可部署且 `runtime_activated=false`。本切片只关闭 search backend，未关闭 W3 事件原子性、真实数据、正式飞书鉴权、桌面接线、生产部署或真实 Windows 门。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 
