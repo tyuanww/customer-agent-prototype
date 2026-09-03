@@ -16,7 +16,6 @@ import {
   createServiceRepository,
   type ServiceRepository,
 } from './service-repository.js';
-import { createUnavailableSearchOperation } from './search-routes.js';
 
 export type StartedApi = Readonly<{
   address: string;
@@ -52,8 +51,13 @@ export async function startApi(
       undefined,
       policyAdminRepository,
       {
-        operation: createUnavailableSearchOperation(),
+        operation: { execute: (request) => repository.executeSearch(request) },
         logHash: bootstrap.logHash,
+        idempotencyHmac: bootstrap.idempotencyHmac,
+      },
+      {
+        repository,
+        idempotencyHmac: bootstrap.idempotencyHmac,
       },
     ),
   );

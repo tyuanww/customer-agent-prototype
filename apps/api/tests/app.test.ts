@@ -85,6 +85,9 @@ function stubRepository(
   readiness: ReturnType<typeof vi.fn<ServiceRepository['readiness']>>;
   readPolicyFlags: ReturnType<typeof vi.fn<ServiceRepository['readPolicyFlags']>>;
   searchCandidates: ReturnType<typeof vi.fn<ServiceRepository['searchCandidates']>>;
+  executeSearch: ReturnType<typeof vi.fn<ServiceRepository['executeSearch']>>;
+  recordAdoption: ReturnType<typeof vi.fn<ServiceRepository['recordAdoption']>>;
+  recordEscalation: ReturnType<typeof vi.fn<ServiceRepository['recordEscalation']>>;
   close: ReturnType<typeof vi.fn<ServiceRepository['close']>>;
 }> {
   return {
@@ -93,6 +96,12 @@ function stubRepository(
       .mockResolvedValue(PHASE1_POLICY_OFF),
     searchCandidates: vi.fn<ServiceRepository['searchCandidates']>()
       .mockResolvedValue(Object.freeze({ ok: false, code: 'SOURCE_GATE_NOT_READY' })),
+    executeSearch: vi.fn<ServiceRepository['executeSearch']>()
+      .mockResolvedValue(Object.freeze({ ok: false, code: 'OVERLOADED' })),
+    recordAdoption: vi.fn<ServiceRepository['recordAdoption']>()
+      .mockResolvedValue(Object.freeze({ ok: false, code: 'OVERLOADED' })),
+    recordEscalation: vi.fn<ServiceRepository['recordEscalation']>()
+      .mockResolvedValue(Object.freeze({ ok: false, code: 'OVERLOADED' })),
     close: vi.fn<ServiceRepository['close']>().mockResolvedValue(undefined),
   };
 }

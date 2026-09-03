@@ -9,6 +9,13 @@ import {
 } from './runtime-diagnostics.js';
 import type { ApiDatabaseBootstrapConfig } from './runtime-config.js';
 import {
+  createEventRepository,
+  type EventRepository,
+  type PreparedAdoptionOperation,
+  type PreparedEscalationOperation,
+} from './event-repository.js';
+import type { PreparedSearchOperation } from './search-routes.js';
+import {
   createSearchRepository,
   type SearchRepositoryRequest,
   type SearchRepositoryResult,
@@ -21,10 +28,13 @@ export type ServiceRepository = Readonly<{
   readiness: () => Promise<ServiceReadinessChecks>;
   readPolicyFlags: () => Promise<ServicePolicyFlags | null>;
   searchCandidates: (request: SearchRepositoryRequest) => Promise<SearchRepositoryResult>;
+  executeSearch: EventRepository['executeSearch'];
+  recordAdoption: (request: PreparedAdoptionOperation) => ReturnType<EventRepository['recordAdoption']>;
+  recordEscalation: (request: PreparedEscalationOperation) => ReturnType<EventRepository['recordEscalation']>;
   close: () => Promise<void>;
 }>;
 
-type RuntimePool = Pick<Pool, 'query' | 'end' | 'on'>;
+type RuntimePool = Pick<Pool, 'query' | 'connect' | 'end' | 'on'>;
 type RuntimeClock = () => number;
 
 class RuntimePoolClient extends Client {
@@ -636,6 +646,7 @@ class PostgresServiceRepository implements ServiceRepository {
   private closed = false;
   private closePromise: Promise<void> | null = null;
   private readonly searchRepository: ReturnType<typeof createSearchRepository>;
+  private readonly eventRepository: EventRepository;
   private activeProbe: Readonly<{
     operation: Promise<ServiceReadinessChecks>;
     response: Promise<ServiceReadinessChecks>;
@@ -648,6 +659,7 @@ class PostgresServiceRepository implements ServiceRepository {
     private readonly now: RuntimeClock,
   ) {
     this.searchRepository = createSearchRepository(this.pool);
+    this.eventRepository = createEventRepository(this.pool, undefined, this.diagnosticSink);
     // node-postgres emits idle-client failures on Pool itself. Consume the event
     // so it cannot crash the process. pg-pool already evicts that idle client;
     // the next readiness request must run a fresh probe instead of inventing a
@@ -662,6 +674,21 @@ class PostgresServiceRepository implements ServiceRepository {
       throw Object.assign(new Error('Runtime repository is closed'), { code: '08003' });
     }
     return this.searchRepository.search(request);
+  }
+
+  async executeSearch(request: PreparedSearchOperation) {
+    if (this.closed) return Object.freeze({ ok: false as const, code: 'OVERLOADED' as const });
+    return this.eventRepository.executeSearch(request);
+  }
+
+  async recordAdoption(request: PreparedAdoptionOperation) {
+    if (this.closed) return Object.freeze({ ok: false as const, code: 'OVERLOADED' as const });
+    return this.eventRepository.recordAdoption(request);
+  }
+
+  async recordEscalation(request: PreparedEscalationOperation) {
+    if (this.closed) return Object.freeze({ ok: false as const, code: 'OVERLOADED' as const });
+    return this.eventRepository.recordEscalation(request);
   }
 
   readiness(): Promise<ServiceReadinessChecks> {

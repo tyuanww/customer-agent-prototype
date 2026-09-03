@@ -27,6 +27,7 @@ import type {
   ServiceRepository,
 } from './service-repository.js';
 import { registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
+import { registerEventRoutes, type EventRouteDependencies } from './event-routes.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -47,6 +48,7 @@ export function createApiApp(
   authService: AuthService = createMockAuthService(),
   policyAdminRepository: PolicyAdminRepository = createUnavailablePolicyAdminRepository(),
   searchDependencies?: SearchRouteDependencies,
+  eventDependencies?: EventRouteDependencies,
 ): FastifyInstance {
   const app = fastify({
     bodyLimit: HTTP_JSON_BODY_MAX_BYTES,
@@ -74,6 +76,7 @@ export function createApiApp(
   registerPolicyReadRoute(app, config, repository, authService);
   registerPolicyWriteRoute(app, policyAdminRepository, authService);
   registerSearchRoute(app, authService, searchDependencies);
+  registerEventRoutes(app, authService, eventDependencies);
 
   app.get('/health', async (_request, reply) => {
     const payload = parseContractSchema('HealthResponse', {

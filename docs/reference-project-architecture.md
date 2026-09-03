@@ -80,7 +80,9 @@ apps/api（DEV-M1 Slice 1）
 
 `DEV-M1 Slice 1` 在不改写上述历史切片的前提下前滚到 `schema.v1.13`：第十段 migration 只替换受控 search projection 与 schema comment，精确的 v1.12 ledger 只计划 `0010`。API 新增进程内 opaque mock session、成对 mock header、策略只读路由和 Owner-only 管理写入口。私有 bootstrap 在任何 pool/Fastify 构造前验证两条不同登录 DSN 指向同一数据库目标、总连接预算和互不复用的 HMAC 域；管理 SQL 每次写入前同时证明登录、`app_content_admin`、`cs_ai_definer`、`set_policy_flag` 定义和 ACL，任一角色或函数漂移均失败关闭。未捕获请求异常只返回稳定 500 合同，不回显原始错误；空 JSON、坏 JSON、超大正文和不支持的媒体类型统一返回稳定 400。
 
-`DEV-M1 W2` 继续以追加方式接收 `schema.v1.14`：第十一段 migration 只增加 ready-no-hit 上下文，精确 v1.12/v1.13 ledger 分别只规划缺失后缀。API 的 `SearchRepository` 在一条参数化 SQL 内完成 scope-only 快照读取、bigram primary、字面转义 fallback、确定性排序与数据库侧 Top 3；`SearchService` 只映射公开候选字段。`/v1/search` 已有鉴权、输入门禁、脱敏/HMAC 与稳定错误壳，但默认 operation 在 W3 原子写入 query/impression 前固定返回 503，避免产生无事件状态的正式搜索。
+`DEV-M1 W2` 继续以追加方式接收 `schema.v1.14`：第十一段 migration 只增加 ready-no-hit 上下文，精确 v1.12/v1.13 ledger 分别只规划缺失后缀。API 的 `SearchRepository` 在一条参数化 SQL 内完成 scope-only 快照读取、bigram primary、字面转义 fallback、确定性排序与数据库侧 Top 3；`SearchService` 只映射公开候选字段。W2 结束时 `/v1/search` 已有鉴权、输入门禁、脱敏/HMAC 与稳定错误壳，但 operation 暂时固定 503；该临时边界已由下述 W3/W4 事务接线取代。
+
+`DEV-M1 W3/W4` 由 `EventRepository` 拥有 runtime `PoolClient` 事务、版本化 HMAC 幂等、fencing 和事件状态机。搜索在同一事务内完成受控检索、`query_events`、精确候选四元组和 `idempotency_complete`；当前只放行 synthetic，查询文本固定 suppressed。来源拒绝先回滚业务事务，再用新连接写不含原文/定位符的审计。Adoption 由数据库唯一键保证 first-wins，`adopted` 只代表成功复制；Escalation 保持非终态并按 query/action 返回稳定事实。只有搜索成功而 telemetry INSERT 单独不可用时返回零事件的 `collection_disabled`。
 
 ## 3. 三个窗口和安全边界
 
@@ -114,8 +116,8 @@ v1.14 migrated PG15
   ├─ app_runtime pool ──> readiness + policy read + controlled SearchRepository
   └─ isolated app_content_admin pool ──> set_policy_flag（唯一受控写入口）
 
-/v1 search route ──W3 operation 未接通、固定 503──> renderer 仍不允许直连
-/v1 events / desktop adapter ──尚未实现──> renderer 仍不允许直连
+/v1 search + events ──synthetic transaction 可用──> renderer 仍不允许直连
+/v1 desktop adapter ──尚未实现──> renderer 仍不允许直连
 ```
 
 `apps/desktop/src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
@@ -174,7 +176,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 DEV-M0 基线上推进到 DEV-M1 W2：合同接收、组件校验、migration 控制面、API host、runtime 只读能力、policy-admin 写能力与 search repository/service 各有单一 owner，两个 pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；W6 的候选产物仍明确不可部署且 `runtime_activated=false`。本切片只关闭 search backend，未关闭 W3 事件原子性、真实数据、正式飞书鉴权、桌面接线、生产部署或真实 Windows 门。
+当前目录结构已在 DEV-M0 基线上推进到 DEV-M1 W3/W4：合同接收、组件校验、migration 控制面、API host、runtime 读写能力、policy-admin 写能力、search service 与 event transaction 各有单一 owner，两个 pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；候选产物仍明确不可部署且 `runtime_activated=false`。本切片关闭了合成 query/adoption/escalate 原子性，未放行真实数据、正式飞书鉴权、桌面接线、生产部署或真实 Windows 门。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 

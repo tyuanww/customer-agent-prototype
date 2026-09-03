@@ -2,8 +2,8 @@
 
 > **状态：** APPROVED · IN PROGRESS
 > **开工授权：** 用户于 2026-09-03 明确“继续开工，授权”；仅放行本文件定义的 DEV-M1 合成/测试范围
-> **基线：** `main@180bf22c0ea2959d7ad9dbef0d2eea66e62e7dbe`
-> **分支：** `codex/dev-m1-search-backend`
+> **当前切片基线：** `main@362e53c8eaf4995774eeb0c46660c54c316ecd04`
+> **当前分支：** `codex/dev-m1-events`
 > **上游合同：** `cs-ai-c11-openapi-1.11.0-schema-1.14-1af001b8b0ce`（`1af001b8b0ce95aac0c42f42251a38feb85f3e26`，`VERIFIED_NOT_ACTIVATED`）
 
 ## 1. 本里程碑交付
@@ -46,8 +46,12 @@ DEV-M1 只实现 Application API / domain 的 Search + Events：
 - [x] W0：金标路径、JSON Schema、Owner 与 4 条合成种子用例已建立；合同包测试逐行校验 closed shape、上下文成对、唯一 ID 与非真实品牌边界。
 - [x] W1a：mock auth 已实现 `POST /v1/auth/mock-login` 与 `GET /v1/auth/me`；支持进程内 opaque Bearer 或成对 `X-Mock-User/X-Mock-Role`，两者冲突/单边 header 均拒绝；token 关闭即清空，身份字段经运行时合同校验。
 - [x] W1b：search 输入的 32 KiB 解码前门禁、1～500 Unicode code point 计数、NFKC 后手机号/身份证脱敏及带版本 HMAC 已实现；两类 HMAC key ring 与 runtime/admin 双池在监听前校验；policy 的 owner/hard-off 纯规则、受鉴权只读端点和独立 `app_content_admin` 写 adapter 已通过 unit/package/PG15。Search 编排归入 W2。
-- [x] W2：已接收 `schema.v1.14` 并保持 v1.12/v1.13 migration 历史逐字节不变；单 SQL 搜索 repository、公开候选映射、稳定错误归一化与 `/v1/search` 路由边界已实现。PG15 已证明 Top 3、UTC 半开有效期、平台/商品 scope、字面 wildcard、ready no-hit、四源暂停失败关闭及 runtime 无 backing-table/view 读取权。正式 route 仍由 unavailable operation 返回 503，等待 W3 将 query/impression 与搜索放入同一受控事务后再接通。
-- [ ] W3～W5：未开始。
+- [x] W2：已接收 `schema.v1.14` 并保持 v1.12/v1.13 migration 历史逐字节不变；单 SQL 搜索 repository、公开候选映射、稳定错误归一化与 `/v1/search` 路由边界已实现。PR #18 已合并为 `main@362e53c8eaf4995774eeb0c46660c54c316ecd04`。
+- [x] W3：Search 与 `query_events`、精确 `candidate_impressions`、幂等完成已进入同一 `PoolClient` 事务；同体重放、异体冲突、24h key-version 轮换、父 terminal/reselection、来源拒绝回滚后独立审计均有 PG15 证据。当前 synthetic 查询固定 suppressed，不持久化原文。
+- [x] W4：Adoption 唯一 terminal、复制语义、并发 first-wins、Escalation auxiliary/action 稳定事实、HTTP→PG15 主链与 `collection_disabled` 零事件降级均已实现并验证。
+- [ ] W5：未开始；等待本切片 Review/合并后建立独立 runner 分支。
+
+W3/W4 候选验证（2026-09-04）：`workspace:check`、lint、四包 typecheck/build 与仓级测试通过；普通 API 为 79 passed（PG15 套件按设计跳过），显式 API PG15 为 42/42，其中事件事务 9/9；未改桌面行为但仍完成现有 desktop 508/508 回归。未运行 Electron E2E、真实窗口/Windows 设备、真实数据库、飞书、部署或 Pilot；这些均不在本切片授权和实现面内。
 
 ## 4. 停止条件
 
@@ -228,7 +232,7 @@ Synthesized from this review's findings. Each task derives from a specific findi
   - Surfaced by: Code Quality #5/#6 与 Performance #7。
   - Files: API search repository/service/routes/error mapper/tests。
   - Verify: search unit/API/PG15 matrix，Top 3、no-hit、ACL、无内部字段泄漏。
-- [ ] **T4 (P1, human: ~6h / CC: ~60min)** — events — 实现 query/adoption/escalate 的事务、幂等与 fencing
+- [x] **T4 (P1, human: ~6h / CC: ~60min)** — events — 实现 query/adoption/escalate 的事务、幂等与 fencing
   - Surfaced by: Architecture #4。
   - Files: API event repository/service/routes/tests。
   - Verify: PG15 并发、replay/body mismatch、parent terminal、first-wins、rollback audit。

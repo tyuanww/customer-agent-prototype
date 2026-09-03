@@ -18,6 +18,9 @@ function repository(): ServiceRepository {
     }),
     readPolicyFlags: async () => null,
     searchCandidates: async () => ({ ok: false, code: 'SOURCE_GATE_NOT_READY' }),
+    executeSearch: async () => ({ ok: false, code: 'OVERLOADED' }),
+    recordAdoption: async () => ({ ok: false, code: 'OVERLOADED' }),
+    recordEscalation: async () => ({ ok: false, code: 'OVERLOADED' }),
     close: async () => undefined,
   };
 }
@@ -90,6 +93,10 @@ function appWith(operation?: SearchOperation): FastifyInstance {
     operation === undefined ? undefined : {
       operation,
       logHash: { version: 'hmac-log-v1', key: 'synthetic-search-route-key-000001' },
+      idempotencyHmac: {
+        currentVersion: 'hmac-idempotency-v1',
+        keys: { 'hmac-idempotency-v1': 'synthetic-idempotency-route-key-0001' },
+      },
     },
   );
   openApps.push(app);
@@ -130,6 +137,10 @@ describe('search HTTP route', () => {
       [{}, validRequest(), 401],
       [authHeaders, validRequest({ platform: 'unknown' }), 400],
       [authHeaders, validRequest({ platform_source: 'native_integration' }), 403],
+      [authHeaders, validRequest({ platform_source: 'unknown' }), 400],
+      [authHeaders, validRequest({ detected_platform: 'douyin' }), 400],
+      [authHeaders, validRequest({ collection_mode: 'approved_redacted' }), 403],
+      [authHeaders, validRequest({ collection_mode: 'pilot_recorded' }), 403],
       [authHeaders, validRequest({ query_text: '🦊'.repeat(501) }), 400],
     ] as const;
     for (const [headers, payload, statusCode] of cases) {

@@ -7,8 +7,12 @@ export type DatabaseContractFailure =
   | 'INTERNAL';
 
 const OVERLOAD_CODES = new Set([
+  '40001',
+  '40P01',
   '53300',
   '53400',
+  '55P03',
+  '57014',
   '57P01',
   '57P02',
   '57P03',
@@ -28,8 +32,14 @@ export function mapDatabaseContractError(error: unknown): DatabaseContractFailur
   if (code === 'ZA005' || detail === 'FORBIDDEN' || detail === 'POLICY_DENIED') {
     return 'FORBIDDEN';
   }
-  if (code === 'ZA002' || detail === 'NOT_FOUND') return 'NOT_FOUND';
-  if (code === 'ZA003' || code === 'ZA006' || detail === 'CONFLICT') return 'CONFLICT';
+  if (code === '42501') return 'FORBIDDEN';
+  if (code === 'ZA002' || code === '23503' || detail === 'NOT_FOUND') return 'NOT_FOUND';
+  if (code === 'ZA003' || code === 'ZA006' || code === '23505'
+    || detail === 'CONFLICT' || detail === 'IDEMPOTENCY_BODY_MISMATCH'
+    || detail === 'IDEMPOTENCY_IN_FLIGHT' || detail === 'IDEMPOTENCY_LEASE_LOST') {
+    return 'CONFLICT';
+  }
+  if (code === '23514') return 'VALIDATION';
   if ((typeof code === 'string' && (code.startsWith('08') || OVERLOAD_CODES.has(code)))) {
     return 'OVERLOADED';
   }

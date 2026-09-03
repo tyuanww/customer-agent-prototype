@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test:package": "pnpm build && node --test tests/package-entry.smoke.mjs tests/main-entry.smoke.mjs",
-    "test:integration": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/app.test.ts tests/search-postgres.integration.test.ts",
+    "test:integration": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/app.test.ts tests/search-postgres.integration.test.ts tests/event-postgres.integration.test.ts",
     "test": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && vitest run && pnpm test:package"
   },
   "dependencies": {

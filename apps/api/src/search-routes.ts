@@ -3,25 +3,29 @@ import {
   validateContractSchema,
   type components,
 } from '@customer-agent/contracts';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import {
   authenticateRequestHeaders,
   type AuthenticatedUser,
   type AuthService,
 } from './auth-service.js';
 import {
-  sendConflict,
   sendForbiddenOrPolicyDenied,
-  sendInternalError,
-  sendNotFound,
   sendOverloaded,
-  sendSourceGateNotReady,
   sendUnauthorized,
   sendValidationError,
 } from './contract-http-errors.js';
+import {
+  hmacSafeValue,
+  prepareIdempotencyHashes,
+  type CanonicalJsonValue,
+  type PreparedIdempotencyHashes,
+} from './idempotency.js';
+import { sendOperationFailure, type OperationResult } from './operation-result.js';
 import { redactQueryText } from './request-boundary.js';
 import { validateSearchTextBoundary } from './request-boundary.js';
 import { hmacRedactedQuery, normalizeSearchText } from './search-text.js';
+import type { ApiHmacKeyRing } from './runtime-config.js';
 import type { SearchBackendRequest } from './search-service.js';
 
 type SearchRequest = components['schemas']['SearchRequest'];
@@ -39,22 +43,17 @@ export type PreparedSearchOperation = Readonly<{
   redactionPolicyVersion: string;
   queryHash: string;
   queryHashKeyVersion: string;
+  productContextRefHash: string | null;
+  requestHashes: PreparedIdempotencyHashes;
+  sourceDenial: Readonly<{
+    denialKey: string;
+    actorSubjectHash: string;
+    hashKeyVersion: string;
+    diagnosticId: string;
+  }>;
 }>;
 
-export type SearchOperationResult =
-  | Readonly<{ ok: true; response: SearchResponse }>
-  | Readonly<{
-      ok: false;
-      code:
-        | 'VALIDATION'
-        | 'FORBIDDEN'
-        | 'POLICY_DENIED'
-        | 'NOT_FOUND'
-        | 'CONFLICT'
-        | 'SOURCE_GATE_NOT_READY'
-        | 'OVERLOADED'
-        | 'INTERNAL';
-    }>;
+export type SearchOperationResult = OperationResult<SearchResponse>;
 
 export type SearchOperation = Readonly<{
   execute: (request: PreparedSearchOperation) => Promise<SearchOperationResult>;
@@ -63,6 +62,7 @@ export type SearchOperation = Readonly<{
 export type SearchRouteDependencies = Readonly<{
   operation: SearchOperation;
   logHash: Readonly<{ version: string; key: string }>;
+  idempotencyHmac: ApiHmacKeyRing;
 }>;
 
 export function createUnavailableSearchOperation(): SearchOperation {
@@ -75,16 +75,19 @@ function isSupportedTopK(value: number): value is 1 | 2 | 3 {
   return value === 1 || value === 2 || value === 3;
 }
 
-function sendOperationFailure(reply: FastifyReply, result: Exclude<SearchOperationResult, { ok: true }>) {
-  if (result.code === 'VALIDATION') return sendValidationError(reply);
-  if (result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') {
-    return sendForbiddenOrPolicyDenied(reply, result.code);
-  }
-  if (result.code === 'NOT_FOUND') return sendNotFound(reply);
-  if (result.code === 'CONFLICT') return sendConflict(reply);
-  if (result.code === 'SOURCE_GATE_NOT_READY') return sendSourceGateNotReady(reply);
-  if (result.code === 'OVERLOADED') return sendOverloaded(reply);
-  return sendInternalError(reply);
+function idempotencyBody(request: SearchRequest): CanonicalJsonValue {
+  return {
+    parent_query_id: request.parent_query_id,
+    interaction_reason: request.interaction_reason,
+    query_text: request.query_text,
+    collection_mode: request.collection_mode,
+    detected_platform: request.detected_platform,
+    platform: request.platform,
+    platform_source: request.platform_source,
+    product_context_type: request.product_context_type,
+    product_context_ref: request.product_context_ref,
+    top_k: request.top_k,
+  };
 }
 
 export function registerSearchRoute(
@@ -111,9 +114,32 @@ export function registerSearchRoute(
     if (contract.value.platform_source === 'native_integration') {
       return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
     }
+    if (contract.value.platform_source === 'foreground_process'
+      && contract.value.detected_platform !== contract.value.platform) {
+      return sendValidationError(reply);
+    }
+    if (contract.value.platform_source === 'unknown') return sendValidationError(reply);
+    if (contract.value.collection_mode !== 'synthetic') {
+      return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
+    }
     if (dependencies === undefined) return sendOverloaded(reply);
 
     const redacted = redactQueryText(contract.value.query_text);
+    const actorSubjectHash = hmacSafeValue(
+      `actor:${actor.user_id}`,
+      dependencies.logHash.version,
+      dependencies.logHash.key,
+    );
+    const denialDigest = hmacSafeValue(
+      `source-denial:${actor.user_id}:${contract.value.query_id}`,
+      dependencies.logHash.version,
+      dependencies.logHash.key,
+    );
+    const diagnosticDigest = hmacSafeValue(
+      `diagnostic:${actor.user_id}:${contract.value.query_id}`,
+      dependencies.logHash.version,
+      dependencies.logHash.key,
+    );
     const prepared = Object.freeze({
       actor,
       queryId: contract.value.query_id,
@@ -136,6 +162,23 @@ export function registerSearchRoute(
         dependencies.logHash.key,
       ),
       queryHashKeyVersion: dependencies.logHash.version,
+      productContextRefHash: contract.value.product_context_ref === null
+        ? null
+        : hmacSafeValue(
+          `product-context:${contract.value.product_context_ref}`,
+          dependencies.logHash.version,
+          dependencies.logHash.key,
+        ),
+      requestHashes: prepareIdempotencyHashes(
+        idempotencyBody(contract.value),
+        dependencies.idempotencyHmac,
+      ),
+      sourceDenial: Object.freeze({
+        denialKey: `sda_${denialDigest}`,
+        actorSubjectHash,
+        hashKeyVersion: dependencies.logHash.version,
+        diagnosticId: `diag_${diagnosticDigest.slice(0, 32)}`,
+      }),
     }) satisfies PreparedSearchOperation;
     const result = await dependencies.operation.execute(prepared);
     if (!result.ok) return sendOperationFailure(reply, result);
