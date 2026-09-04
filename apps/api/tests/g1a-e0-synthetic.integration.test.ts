@@ -63,8 +63,8 @@ async function loadedRowCount(owner: Client): Promise<number> {
 }
 
 describeSyntheticRunner('G1A-E0 full synthetic substitute', () => {
-  it('verifies an off-repo package and cleans the isolated PG15 runtime', async () => {
-    const packageFixture = await createSyntheticG1aE0Package();
+  it.each([false, true])('verifies an off-repo package and cleans the isolated PG15 runtime (shared workbook: %s)', async (sharedWorkbook) => {
+    const packageFixture = await createSyntheticG1aE0Package(new Date(), sharedWorkbook);
     try {
       const completed = await runG1aEvaluationPackage({
         inputRoot: packageFixture.inputRoot,
@@ -143,6 +143,24 @@ describeSyntheticRunner('G1A-E0 full synthetic substitute', () => {
       const database = harness.createDatabase('g1a_load_rollback');
       owner = await harness.connect(database.config);
       await applyDatabaseMigrations(owner);
+
+      const duplicateDomain = Object.freeze({
+        ...packageFixture.input,
+        manifest: Object.freeze({
+          ...packageFixture.input.manifest,
+          source_bindings: Object.freeze([
+            ...packageFixture.input.manifest.source_bindings,
+            Object.freeze({
+              ...packageFixture.input.manifest.source_bindings[0]!,
+              source_version_id: 'srcv_synthetic_duplicate_domain',
+            }),
+          ]),
+        }),
+      });
+      await expect(loadG1aEvaluationRelease(owner, duplicateDomain)).rejects.toMatchObject({
+        code: 'G1A_LOAD_CONTRACT_INVALID',
+      });
+      expect(await loadedRowCount(owner)).toBe(0);
 
       const governanceMismatch = withFirstContentItem(packageFixture.input, (item) => Object.freeze({
         ...item,

@@ -128,7 +128,11 @@ async function insertSourceBindings(owner: Client, input: G1aEvaluationPackage):
       binding.source_version_id,
       binding.source_ref,
       binding.domain,
-      input.manifest.content_snapshot_id,
+      // E0 has a package snapshot, not a provider revision per domain. Encode
+      // the domain-scoped snapshot without changing the shared source alias.
+      // JSON tuple encoding avoids delimiter collisions; duplicate domain
+      // versions still violate the unchanged database unique constraint.
+      JSON.stringify(['g1a-e0-domain-snapshot-v1', input.manifest.content_snapshot_id, binding.domain]),
       binding.snapshot_sha256,
       input.manifest.business_owner_role,
       binding.approval_evd,

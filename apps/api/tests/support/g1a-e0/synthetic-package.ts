@@ -100,7 +100,7 @@ function governanceHash(
   return sha256(jcs(snapshot));
 }
 
-function buildContent(): readonly Readonly<Record<string, JsonValue>>[] {
+function buildContent(sharedSourceRef?: string): readonly Readonly<Record<string, JsonValue>>[] {
   return SYNTHETIC_G1A_CANDIDATES.map((candidate, candidateIndex) => {
     const source = sourceFor(candidate.domain);
     const questions = candidate.searchTerms.map((questionText, questionIndex) => {
@@ -153,7 +153,7 @@ function buildContent(): readonly Readonly<Record<string, JsonValue>>[] {
       effective_from: effectiveFrom,
       effective_to: effectiveTo,
     };
-    return Object.freeze({ ...item, content_hash: governanceHash(item, source.sourceRef) });
+    return Object.freeze({ ...item, content_hash: governanceHash(item, sharedSourceRef ?? source.sourceRef) });
   });
 }
 
@@ -190,7 +190,7 @@ function buildCasesAndExpectations(
   });
 }
 
-export async function createSyntheticG1aE0Package(now = new Date()): Promise<Readonly<{
+export async function createSyntheticG1aE0Package(now = new Date(), sharedWorkbook = false): Promise<Readonly<{
   inputRoot: string;
   expectedManifestSha256: string;
   cleanup: () => Promise<void>;
@@ -202,7 +202,8 @@ export async function createSyntheticG1aE0Package(now = new Date()): Promise<Rea
   // package created under the operating system's canonical temporary directory.
   const inputRoot = await realpath(createdRoot);
   try {
-    const content = buildContent();
+    const sharedSourceRef = sharedWorkbook ? 'SRC-SYNTHETIC-SHARED-WORKBOOK' : undefined;
+    const content = buildContent(sharedSourceRef);
     const { cases, expectations } = await buildCasesAndExpectations(now);
     const payload = {
       'content.jsonl': jsonLines(content),
@@ -211,7 +212,7 @@ export async function createSyntheticG1aE0Package(now = new Date()): Promise<Rea
     } as const;
     const sourceBindings = SYNTHETIC_G1A_SOURCE_BINDINGS.map(([domain, sourceVersionId, sourceRef]) => ({
       domain,
-      source_ref: sourceRef,
+      source_ref: sharedSourceRef ?? sourceRef,
       source_version_id: sourceVersionId,
       snapshot_sha256: sha256(`synthetic-g1a-e0-source-${domain}`),
       approval_evd: `EVD-SYNTHETIC-G1A-E0-${domain.toUpperCase()}`,

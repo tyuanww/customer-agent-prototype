@@ -74,6 +74,25 @@
 
 本地正则只作为明显 URL、token、邮箱、手机号和长标识符的 **leak canary**，不得写成 DLP 已完成；真实脱敏结论只由 manifest 绑定的冻结 EVD 证明。内容项不接收独立 `search_terms`，检索文档按与正式导入相同的 question / title / answer 字段权重确定性派生；`content_hash` 在临时 PostgreSQL 中调用正式 `content_governance_hash(...)` 复核，禁止退化成 answer-only hash。
 
+#### E0 共享工作簿的域级来源映射（2026-09-05 本地修正）
+
+`source_ref` 标识来源，允许四域共用同一工作簿；`source_version_id` 仍须四域各自唯一。
+E0 manifest 的 `content_snapshot_id` 是整包快照，不是每域的供应方版本号。
+装载器独占映射职责，将临时数据库 `upstream_version` 确定性编码为
+`JSON.stringify(['g1a-e0-domain-snapshot-v1', content_snapshot_id, domain])`。
+这是隔离评测内部的域级快照键，不宣称是飞书原生 revision，也不改变正式来源版本合同。
+
+该映射对独立来源和共享来源统一使用，不根据重复次数打补丁；JSON 元组防止分隔符歧义。
+来源别名、版本 ID、绑定 hash、内容治理 hash、审批与有效期保持输入原值。
+数据库唯一约束和整体事务回滚保持不变，同来源同域重复版本仍拒绝；不使用忽略冲突的插入。
+无需修改 manifest v2 格式或真实包字节。本轮授权仅本地实现与合成验证，未执行真实 T5、未签发 T6。
+
+本地验证：新增共享工作簿用例在修正前复现 `G1A_LOAD_CONTRACT_INVALID`，修正后通过；
+`pnpm test:g1a:e0` 45/45，宿主网络沙箱内 5/5（含共享来源、重复域拒绝、失败回滚与清理），临时根目录残留 0。
+`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm workspace:check` 通过。
+`pnpm test` 中显式 PG / 真实包用例按开关跳过，E0 PG 合成集已单独验证；未运行真实包、Electron E2E、部署或 T6 签发。
+以上是本地未提交的修正证据，不替代本文原合并快照或治理仓的当前阶段状态。
+
 ### 4.2 独立性
 
 - `dev_synthetic / train / G1a / G1b` 的样本 ID、来源和语义簇交集必须由已绑定内容 hash 的冻结清单实际计算为 0；manifest 中自报一个 `overlap=0` 或与清单内容不一致的任意 hash 均不构成证据；
