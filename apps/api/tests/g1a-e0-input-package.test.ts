@@ -92,6 +92,7 @@ async function rewriteRawPayload(
 function refreshComparisonManifestHash(comparison: MutableRecord): void {
   comparison.manifest_sha256 = g1aComparisonManifestSha256(
     comparison.set as 'dev_synthetic' | 'train' | 'g1b',
+    comparison.status as 'PRESENT' | 'NOT_PRESENT',
     comparison.sample_ids as string[],
     comparison.source_ids as string[],
     comparison.semantic_cluster_ids as string[],
@@ -122,11 +123,37 @@ describe('G1A-E0 input package boundary', () => {
 
     expect(verified).toMatchObject({
       manifest_sha256: packageFixture.expectedManifestSha256,
-      manifest: { classification: 'synthetic', purpose: 'g1a_search_eval_only' },
+      manifest: {
+        schema: 'customer-agent/g1a-evaluation-manifest/v2',
+        classification: 'synthetic',
+        purpose: 'g1a_search_eval_only',
+        comparison_sets: [
+          { set: 'dev_synthetic', status: 'PRESENT' },
+          { set: 'train', status: 'NOT_PRESENT', sample_ids: [], source_ids: [], semantic_cluster_ids: [] },
+          { set: 'g1b', status: 'NOT_PRESENT', sample_ids: [], source_ids: [], semantic_cluster_ids: [] },
+        ],
+      },
     });
     expect(verified.cases).toHaveLength(50);
     expect(verified.expectations).toHaveLength(50);
     expect(verified.content.some((item) => item.questions.length > 1)).toBe(true);
+  });
+
+  it('binds comparison status into the v2 canonical empty-set hash', () => {
+    expect(g1aComparisonManifestSha256('train', 'NOT_PRESENT', [], [], []))
+      .not.toBe(g1aComparisonManifestSha256('train', 'PRESENT', [], [], []));
+  });
+
+  it('rejects the legacy outer manifest schema instead of reinterpreting v1', async () => {
+    const packageFixture = await fixture();
+    const expectedManifestSha256 = await rewriteManifest(packageFixture.inputRoot, (manifest) => {
+      manifest.schema = 'customer-agent/g1a-evaluation-manifest/v1';
+    });
+
+    await expectInputError(() => readG1aEvaluationPackage(packageFixture.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT,
+      expectedManifestSha256,
+    }), 'G1A_INPUT_MANIFEST_INVALID');
   });
 
   it('rejects a wrong external manifest hash before touching an insecure payload', async () => {
@@ -209,6 +236,11 @@ describe('G1A-E0 input package boundary', () => {
     const packageFixture = await fixture();
     const expectedManifestSha256 = await rewriteManifest(packageFixture.inputRoot, (manifest) => {
       const comparisons = manifest.comparison_sets as MutableRecord[];
+      comparisons[1]!.status = 'PRESENT';
+      comparisons[1]!.sample_ids = ['comparison_train_sample'];
+      comparisons[1]!.source_ids = ['comparison_train_source'];
+      comparisons[1]!.semantic_cluster_ids = ['comparison_train_cluster'];
+      refreshComparisonManifestHash(comparisons[1]!);
       comparisons[1]!.sample_ids = ['comparison_train_replaced'];
     });
 
@@ -223,6 +255,9 @@ describe('G1A-E0 input package boundary', () => {
     const firstCase = JSON.parse((await readFile(path.join(packageFixture.inputRoot, 'cases.jsonl'), 'utf8')).split('\n')[0]!) as MutableRecord;
     const expectedManifestSha256 = await rewriteManifest(packageFixture.inputRoot, (manifest) => {
       const comparisons = manifest.comparison_sets as MutableRecord[];
+      comparisons[2]!.status = 'PRESENT';
+      comparisons[2]!.sample_ids = ['comparison_g1b_sample'];
+      comparisons[2]!.source_ids = ['comparison_g1b_source'];
       comparisons[2]!.semantic_cluster_ids = [firstCase.semantic_cluster_id];
       refreshComparisonManifestHash(comparisons[2]!);
     });
@@ -230,6 +265,95 @@ describe('G1A-E0 input package boundary', () => {
     await expectInputError(() => readG1aEvaluationPackage(packageFixture.inputRoot, {
       repositoryRoot: REPOSITORY_ROOT,
       expectedManifestSha256,
+    }), 'G1A_INPUT_INDEPENDENCE_INVALID');
+  });
+
+  it('accepts PRESENT train only when all three identifier axes are populated and hash-bound', async () => {
+    const packageFixture = await fixture();
+    const expectedManifestSha256 = await rewriteManifest(packageFixture.inputRoot, (manifest) => {
+      const train = (manifest.comparison_sets as MutableRecord[])[1]!;
+      train.status = 'PRESENT';
+      train.sample_ids = ['comparison_train_sample'];
+      train.source_ids = ['comparison_train_source'];
+      train.semantic_cluster_ids = ['comparison_train_cluster'];
+      refreshComparisonManifestHash(train);
+    });
+
+    const verified = await readG1aEvaluationPackage(packageFixture.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT,
+      expectedManifestSha256,
+    });
+    expect(verified.manifest.comparison_sets[1]).toMatchObject({
+      set: 'train',
+      status: 'PRESENT',
+      sample_ids: ['comparison_train_sample'],
+      source_ids: ['comparison_train_source'],
+      semantic_cluster_ids: ['comparison_train_cluster'],
+    });
+  });
+
+  it('rejects NOT_PRESENT comparisons carrying identifiers even with a refreshed hash', async () => {
+    const packageFixture = await fixture();
+    const expectedManifestSha256 = await rewriteManifest(packageFixture.inputRoot, (manifest) => {
+      const train = (manifest.comparison_sets as MutableRecord[])[1]!;
+      train.sample_ids = ['comparison_train_fabricated'];
+      refreshComparisonManifestHash(train);
+    });
+
+    await expectInputError(() => readG1aEvaluationPackage(packageFixture.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT,
+      expectedManifestSha256,
+    }), 'G1A_INPUT_INDEPENDENCE_INVALID');
+  });
+
+  it('rejects PRESENT comparisons with an empty axis even with a refreshed hash', async () => {
+    const packageFixture = await fixture();
+    const expectedManifestSha256 = await rewriteManifest(packageFixture.inputRoot, (manifest) => {
+      const train = (manifest.comparison_sets as MutableRecord[])[1]!;
+      train.status = 'PRESENT';
+      train.sample_ids = ['comparison_train_sample'];
+      train.source_ids = ['comparison_train_source'];
+      train.semantic_cluster_ids = [];
+      refreshComparisonManifestHash(train);
+    });
+
+    await expectInputError(() => readG1aEvaluationPackage(packageFixture.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT,
+      expectedManifestSha256,
+    }), 'G1A_INPUT_INDEPENDENCE_INVALID');
+  });
+
+  it('rejects NOT_PRESENT dev_synthetic and missing or unknown comparison statuses', async () => {
+    const absentDevFixture = await fixture();
+    const absentDevAnchor = await rewriteManifest(absentDevFixture.inputRoot, (manifest) => {
+      const devSynthetic = (manifest.comparison_sets as MutableRecord[])[0]!;
+      devSynthetic.status = 'NOT_PRESENT';
+      devSynthetic.sample_ids = [];
+      devSynthetic.source_ids = [];
+      devSynthetic.semantic_cluster_ids = [];
+      refreshComparisonManifestHash(devSynthetic);
+    });
+    await expectInputError(() => readG1aEvaluationPackage(absentDevFixture.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT,
+      expectedManifestSha256: absentDevAnchor,
+    }), 'G1A_INPUT_INDEPENDENCE_INVALID');
+
+    const missingStatusFixture = await fixture();
+    const missingStatusAnchor = await rewriteManifest(missingStatusFixture.inputRoot, (manifest) => {
+      delete (manifest.comparison_sets as MutableRecord[])[1]!.status;
+    });
+    await expectInputError(() => readG1aEvaluationPackage(missingStatusFixture.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT,
+      expectedManifestSha256: missingStatusAnchor,
+    }), 'G1A_INPUT_INDEPENDENCE_INVALID');
+
+    const unknownStatusFixture = await fixture();
+    const unknownStatusAnchor = await rewriteManifest(unknownStatusFixture.inputRoot, (manifest) => {
+      (manifest.comparison_sets as MutableRecord[])[2]!.status = 'UNKNOWN';
+    });
+    await expectInputError(() => readG1aEvaluationPackage(unknownStatusFixture.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT,
+      expectedManifestSha256: unknownStatusAnchor,
     }), 'G1A_INPUT_INDEPENDENCE_INVALID');
   });
 

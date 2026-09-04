@@ -7,6 +7,9 @@ const FILE_NAMES = Object.freeze(['cases.jsonl', 'content.jsonl', 'expectations.
 const PAYLOAD_NAMES = Object.freeze(['content.jsonl', 'cases.jsonl', 'expectations.jsonl'] as const);
 const DOMAINS = Object.freeze(['aftersale', 'campaign', 'presale', 'product'] as const);
 const COMPARISON_SETS = Object.freeze(['dev_synthetic', 'train', 'g1b'] as const);
+const COMPARISON_STATUSES = Object.freeze(['PRESENT', 'NOT_PRESENT'] as const);
+const EVALUATION_MANIFEST_SCHEMA = 'customer-agent/g1a-evaluation-manifest/v2' as const;
+const COMPARISON_MANIFEST_SCHEMA = 'customer-agent/g1a-comparison-manifest/v2' as const;
 const SHA256 = /^[0-9a-f]{64}$/;
 const OPAQUE_ID = /^[a-z][a-z0-9_-]{7,127}$/;
 const EVD_ID = /^EVD-[A-Z0-9-]{6,127}$/;
@@ -35,6 +38,7 @@ const RISK_CATEGORIES = new Set([
 
 export type G1aDomain = (typeof DOMAINS)[number];
 export type G1aComparisonSetName = (typeof COMPARISON_SETS)[number];
+export type G1aComparisonStatus = (typeof COMPARISON_STATUSES)[number];
 export type G1aStratum = 'positive' | 'safety_negative' | 'robustness';
 export type G1aExpectedSearchAction = 'top3' | 'no_hit';
 export type G1aDownstreamAction = 'none' | 'clarify' | 'escalate';
@@ -72,11 +76,11 @@ export type G1aExpectation = Readonly<{
 type PayloadName = (typeof PAYLOAD_NAMES)[number];
 type FileDescriptor = Readonly<{ sha256: string; bytes: number; records: number }>;
 type ComparisonSet = Readonly<{
-  set: G1aComparisonSetName; manifest_sha256: string; sample_ids: readonly string[];
+  set: G1aComparisonSetName; status: G1aComparisonStatus; manifest_sha256: string; sample_ids: readonly string[];
   source_ids: readonly string[]; semantic_cluster_ids: readonly string[];
 }>;
 export type G1aManifest = Readonly<{
-  schema: 'customer-agent/g1a-evaluation-manifest/v1'; eval_set_id: string;
+  schema: typeof EVALUATION_MANIFEST_SCHEMA; eval_set_id: string;
   classification: 'synthetic' | 'approved_redacted'; purpose: 'g1a_search_eval_only';
   release_id: string; release_title: string; release_seq: number; content_snapshot_id: string;
   content_snapshot_sha256: string; source_binding_hash: string; created_at: string; expires_at: string;
@@ -184,13 +188,15 @@ function opaqueIdentifierArray(
 function sha256(value: string | Buffer): string { return createHash('sha256').update(value).digest('hex'); }
 export function g1aComparisonManifestSha256(
   set: G1aComparisonSetName,
+  status: G1aComparisonStatus,
   sampleIds: readonly string[],
   sourceIds: readonly string[],
   semanticClusterIds: readonly string[],
 ): string {
   return sha256(jcs({
-    schema: 'customer-agent/g1a-comparison-manifest/v1',
+    schema: COMPARISON_MANIFEST_SCHEMA,
     set,
+    status,
     sample_ids: [...sampleIds].sort(),
     source_ids: [...sourceIds].sort(),
     semantic_cluster_ids: [...semanticClusterIds].sort(),
@@ -264,18 +270,24 @@ function parseSourceBinding(value: unknown): G1aSourceBinding {
   });
 }
 function parseComparison(value: unknown): ComparisonSet {
-  const record = exactKeys(value, ['set', 'manifest_sha256', 'sample_ids', 'source_ids', 'semantic_cluster_ids'], 'G1A_INPUT_INDEPENDENCE_INVALID');
+  const record = exactKeys(value, ['set', 'status', 'manifest_sha256', 'sample_ids', 'source_ids', 'semantic_cluster_ids'], 'G1A_INPUT_INDEPENDENCE_INVALID');
   if (!COMPARISON_SETS.includes(record.set as ComparisonSet['set'])) fail('G1A_INPUT_INDEPENDENCE_INVALID');
+  if (!COMPARISON_STATUSES.includes(record.status as ComparisonSet['status'])) fail('G1A_INPUT_INDEPENDENCE_INVALID');
   const set = record.set as G1aComparisonSetName;
-  const sampleIds = opaqueIdentifierArray(record.sample_ids, 'G1A_INPUT_INDEPENDENCE_INVALID', { min: 1, max: 100_000 });
-  const sourceIds = opaqueIdentifierArray(record.source_ids, 'G1A_INPUT_INDEPENDENCE_INVALID', { min: 1, max: 100_000 });
-  const semanticClusterIds = opaqueIdentifierArray(record.semantic_cluster_ids, 'G1A_INPUT_INDEPENDENCE_INVALID', { min: 1, max: 100_000 });
+  const status = record.status as G1aComparisonStatus;
+  const minimumIdentifiers = status === 'PRESENT' ? 1 : 0;
+  const sampleIds = opaqueIdentifierArray(record.sample_ids, 'G1A_INPUT_INDEPENDENCE_INVALID', { min: minimumIdentifiers, max: 100_000 });
+  const sourceIds = opaqueIdentifierArray(record.source_ids, 'G1A_INPUT_INDEPENDENCE_INVALID', { min: minimumIdentifiers, max: 100_000 });
+  const semanticClusterIds = opaqueIdentifierArray(record.semantic_cluster_ids, 'G1A_INPUT_INDEPENDENCE_INVALID', { min: minimumIdentifiers, max: 100_000 });
+  if ((status === 'NOT_PRESENT' && (sampleIds.length !== 0 || sourceIds.length !== 0 || semanticClusterIds.length !== 0))
+    || (set === 'dev_synthetic' && status !== 'PRESENT')) fail('G1A_INPUT_INDEPENDENCE_INVALID');
   const manifestSha256 = requiredString(record.manifest_sha256, 'G1A_INPUT_INDEPENDENCE_INVALID', { pattern: SHA256 });
-  if (manifestSha256 !== g1aComparisonManifestSha256(set, sampleIds, sourceIds, semanticClusterIds)) {
+  if (manifestSha256 !== g1aComparisonManifestSha256(set, status, sampleIds, sourceIds, semanticClusterIds)) {
     fail('G1A_INPUT_INDEPENDENCE_INVALID');
   }
   return Object.freeze({
     set,
+    status,
     manifest_sha256: manifestSha256,
     sample_ids: sampleIds,
     source_ids: sourceIds,
@@ -294,7 +306,7 @@ function parseManifest(value: unknown, now: Date): G1aManifest {
     'blind_reviewer_role', 'independence_evidence_id', 'independence_evidence_sha256',
     'source_bindings', 'comparison_sets', 'files',
   ], 'G1A_INPUT_MANIFEST_INVALID');
-  if (record.schema !== 'customer-agent/g1a-evaluation-manifest/v1' || record.purpose !== 'g1a_search_eval_only'
+  if (record.schema !== EVALUATION_MANIFEST_SCHEMA || record.purpose !== 'g1a_search_eval_only'
     || (record.classification !== 'synthetic' && record.classification !== 'approved_redacted')) fail('G1A_INPUT_MANIFEST_INVALID');
   const createdAt = isoInstant(record.created_at, 'G1A_INPUT_MANIFEST_INVALID');
   const expiresAt = isoInstant(record.expires_at, 'G1A_INPUT_MANIFEST_INVALID');
@@ -323,7 +335,7 @@ function parseManifest(value: unknown, now: Date): G1aManifest {
   const bindingHash = requiredString(record.source_binding_hash, 'G1A_INPUT_MANIFEST_INVALID', { pattern: SHA256 });
   if (sourceBindingHash(bindings) !== bindingHash) fail('G1A_INPUT_HASH_MISMATCH');
   return Object.freeze({
-    schema: 'customer-agent/g1a-evaluation-manifest/v1',
+    schema: EVALUATION_MANIFEST_SCHEMA,
     eval_set_id: opaqueIdentifier(record.eval_set_id, 'G1A_INPUT_MANIFEST_INVALID'),
     classification: record.classification, purpose: 'g1a_search_eval_only',
     release_id: opaqueIdentifier(record.release_id, 'G1A_INPUT_MANIFEST_INVALID'),

@@ -218,14 +218,14 @@ export async function createSyntheticG1aE0Package(now = new Date()): Promise<Rea
       review_due_at: REVIEW_DUE_AT,
     }));
     const manifest: JsonValue = {
-      schema: 'customer-agent/g1a-evaluation-manifest/v1',
-      eval_set_id: 'eval_set_synthetic_g1a_e0_v1',
+      schema: 'customer-agent/g1a-evaluation-manifest/v2',
+      eval_set_id: 'eval_set_synthetic_g1a_e0_v2',
       classification: 'synthetic',
       purpose: 'g1a_search_eval_only',
-      release_id: 'rel_synthetic_g1a_e0_v1',
+      release_id: 'rel_synthetic_g1a_e0_v2',
       release_title: '纯合成 G1A-E0 评测发布',
       release_seq: 1,
-      content_snapshot_id: 'snapshot_synthetic_g1a_e0_v1',
+      content_snapshot_id: 'snapshot_synthetic_g1a_e0_v2',
       content_snapshot_sha256: sha256(payload['content.jsonl']),
       source_binding_hash: sha256(sourceBindings
         .map(({ domain, source_version_id: sourceVersionId }) => `${domain}:${sourceVersionId}`)
@@ -244,13 +244,16 @@ export async function createSyntheticG1aE0Package(now = new Date()): Promise<Rea
       independence_evidence_sha256: sha256('synthetic-g1a-e0-independence-evidence'),
       source_bindings: sourceBindings,
       comparison_sets: (['dev_synthetic', 'train', 'g1b'] as const).map((set) => {
-        const sampleIds = [`comparison_${set}_sample`];
-        const sourceIds = [`comparison_${set}_source`];
-        const semanticClusterIds = [`comparison_${set}_cluster`];
+        const status = set === 'dev_synthetic' ? 'PRESENT' : 'NOT_PRESENT';
+        const sampleIds = status === 'PRESENT' ? [`comparison_${set}_sample`] : [];
+        const sourceIds = status === 'PRESENT' ? [`comparison_${set}_source`] : [];
+        const semanticClusterIds = status === 'PRESENT' ? [`comparison_${set}_cluster`] : [];
         return {
           set,
+          status,
           manifest_sha256: g1aComparisonManifestSha256(
             set,
+            status,
             sampleIds,
             sourceIds,
             semanticClusterIds,

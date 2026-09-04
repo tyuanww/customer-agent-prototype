@@ -63,12 +63,12 @@
 
 真实 G1a 包必须位于仓外受控目录，并至少包含：
 
-- `manifest.json`：schema 版本、`eval_set_id`、内容快照 ID/hash、创建/到期时间、用途锁 `g1a_search_eval_only`、DLP 与独立性证据 ID/hash、实施者 / 业务 Owner / 盲审人的伪名主体 hash、删除截止时间；manifest 自身 SHA-256 必须由仓外 EVD 作为必填参数传入，不能从输入目录自证；
+- `manifest.json`：使用 `customer-agent/g1a-evaluation-manifest/v2`，记录 `eval_set_id`、内容快照 ID/hash、创建/到期时间、用途锁 `g1a_search_eval_only`、DLP 与独立性证据 ID/hash、实施者 / 业务 Owner / 盲审人的伪名主体 hash、删除截止时间；manifest 自身 SHA-256 必须由仓外 EVD 作为必填参数传入，不能从输入目录自证；
 - `content.jsonl`：四域不可变来源绑定与可检索发布项；不得携带原始飞书 URL、协作者、审批原文或未脱敏客户信息；
 - `cases.jsonl`：固定 50 条，顺序为 20 正例、12 安全负例、18 鲁棒性；每条有稳定随机 ID、分层标签、平台和成对商品上下文；
 - `expectations.jsonl`：在看系统结果前冻结的可接受话术 ID 集、`expected_search_action`（`top3|no_hit`）、`downstream_action`（`none|clarify|escalate`）与禁止返回 ID；治理决定中的通用 `expected_action` 在 wire 合同中拆为这两个闭合字段，并与问法正文分文件，便于盲审锁定；
 - 每个 payload 的 SHA-256、字节数和 LF/closed-shape 约束；manifest 的 own-hash 由 runner 计算并与仓外锚点比较，不做循环式自描述。
-- `comparison_sets` 中每组样本 ID、来源 ID 与语义簇 ID 都按 `customer-agent/g1a-comparison-manifest/v1` canonical JSON 重新计算 SHA-256，并由外层 manifest 的仓外锚点锁定；T4 EVD 还必须独立记录三组清单 hash，不能让 runner 从当前目录自行选取比较集。
+- `comparison_sets` 使用 `customer-agent/g1a-comparison-manifest/v2`：`PRESENT` 必须让样本 ID、来源 ID 与语义簇 ID 三轴均非空，`NOT_PRESENT` 必须让三轴均为空；状态和排序后的三轴列表一起进入 canonical SHA-256，并由外层 manifest 的仓外锚点锁定。`dev_synthetic` 必须为 `PRESENT`，train/G1b 可以用显式 `NOT_PRESENT` 表达当前尚无对照资产，禁止以测试占位 ID 伪造存在；T4 EVD 仍须独立记录三组清单 hash，不能让 runner 从当前目录自行选取比较集。
 
 任何真实正文都不得进入 Git、测试快照、日志、异常 message 或 gstack 产物。仓内只允许保存 schema、纯合成替身和不含原文的汇总证据。
 
