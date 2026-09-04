@@ -1,6 +1,6 @@
 # `@customer-agent/api`
 
-本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.14` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。
+本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.14` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。G1A-E0 的仓外输入验证和离线评测只位于 `tests/support/g1a-e0/`，不会进入本包正式构建。
 
 当前不是业务 API：
 
@@ -59,9 +59,12 @@ curl --silent --include http://127.0.0.1:3100/ready
 pnpm test:api
 pnpm --filter @customer-agent/api test:integration
 pnpm test:g1a:synthetic
+pnpm test:g1a:e0
 pnpm typecheck
 pnpm build
 pnpm workspace:check
 ```
 
-普通 API 测试使用 Fastify `inject()`、fake pool 与一次真实 ephemeral loopback 监听，不要求 PostgreSQL。显式 integration 会通过 `@customer-agent/database/testkit` 创建并清理隔离的临时 PostgreSQL 15 cluster，只使用合成空库；不会连接共享数据库或真实数据。`test:g1a:synthetic` 先逐行校验冻结 JSONL，再在同类隔离 PG15 中执行 `20 + 12 + 18 = 50` 条合成用例并输出原始分母、Top 3 命中、no-hit、禁返和错误计数。其固定状态为 `NOT_SIGNED` / `NOT_EVALUATED`，不能解释为真实 G1a、业务准确率或 Pilot 通过。该 testkit 只供仓内测试，不进入 API 生产请求路径。
+普通 API 测试使用 Fastify `inject()`、fake pool 与一次真实 ephemeral loopback 监听，不要求 PostgreSQL。显式 integration 会通过 `@customer-agent/database/testkit` 创建并清理隔离的临时 PostgreSQL 15 cluster，只使用合成空库；不会连接共享数据库或真实数据。`test:g1a:synthetic` 先逐行校验旧版冻结 JSONL，再在同类隔离 PG15 中执行 `20 + 12 + 18 = 50` 条合成用例。
+
+`test:g1a:e0` 使用真实包同形、但内容完全合成的仓外临时包，验证外部 manifest hash 锚点、comparison 清单内容哈希、文件/权限/软硬链/大小/canonical JSON、DLP leak canary、独立盲审主体、数据集零交叉、正式 question/governance hash、四域 source gate、事务内后验与整批回滚、只读 repeatable-read、同一 SearchBackend、零事件、Node TCP/fetch 守卫、聚合报告与成功/失败清理。报告中的 `process_guard_attempts` 只覆盖声明的 `NODE_TCP_FETCH_GUARD_ONLY` 观察面，不等于宿主级零出站或 OS 沙箱证明；真实运行前仍须完成 T5 宿主级网络与残留检查。结果固定为 `NOT_SIGNED / NOT_EVALUATED`。只有仓外真实包及其 manifest SHA-256 已另行获批时，才可显式提供 `CUSTOMER_AGENT_G1A_INPUT_ROOT` 与 `CUSTOMER_AGENT_G1A_MANIFEST_SHA256` 运行 `pnpm test:g1a:e0:package`。所有 testkit 均不进入 API 生产请求路径。

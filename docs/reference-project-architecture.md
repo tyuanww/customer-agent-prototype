@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W2 已前滚到 `schema.v1.14` 和十一段 migration，并增加 mock auth、策略读写、独立 runtime/admin 数据库能力及受控 search backend。桌面 adapter、正式飞书鉴权、事件业务端口、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前候选分支还完成了 G1A-E0 T1～T3 的测试专用离线评测链；桌面 adapter、正式飞书鉴权、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -37,15 +37,20 @@
 contracts/upstream（不可变输入；同一受锁 snapshot）
   ├─ packages/contracts（bundle / generated TS / runtime validator）
   │    └─ apps/api → health / ready / mock auth / policy（loopback only）
-  └─ packages/database（0001..0010 / catalogue / ledger / verify）
+  └─ packages/database（0001..0011 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
-apps/api（DEV-M1 Slice 1）
-  ├─ runtime pg.Pool → ServiceRepository → readiness + policy read
-  └─ isolated admin pg.Pool → PolicyAdminRepository → set_policy_flag only
+apps/api（DEV-M1 COMPLETE）
+  ├─ runtime pg.Pool → readiness + policy read + SearchBackend + Events
+  ├─ isolated admin pg.Pool → PolicyAdminRepository → set_policy_flag only
+  └─ legacy synthetic G1a runner → isolated PG15 → same SearchBackend（NOT_EVALUATED）
+
+apps/api/tests/support/g1a-e0（test-only；不进入 dist）
+  └─ off-repo closed package → verifier → isolated PG15 → same SearchBackend
+                                      └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用正式九端口。DEV-M1 Slice 1 只接通本机 mock 身份、策略读取和严格受控的策略管理函数；搜索、事件、桌面 adapter 与真实内容仍未接通。
+桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机 mock 身份、策略、受控 SearchBackend 与 Search + Events 事务，但当前只放行 synthetic；桌面 adapter、真实内容和正式飞书身份仍未接通。
 
 ## 2. 目录归属
 
@@ -58,7 +63,8 @@ apps/api（DEV-M1 Slice 1）
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
-| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness 与策略读写边界 | 桌面 fixture、renderer、migration owner、正式 Feishu auth、搜索/事件端口、真实数据或外部 bind |
+| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness、策略读写、受控搜索与事件事务边界 | 桌面 fixture、renderer、migration owner、正式 Feishu auth、真实数据、桌面 adapter 或外部 bind |
+| `apps/api/tests/support/g1a-e0/` | 测试专用仓外输入校验、一次性 PG15 装载、同一 SearchBackend 评测、聚合报告与清理 | HTTP route、事件写入、桌面依赖、长期数据库、真实内容或正式构建产物 |
 | 根 `scripts/` | 合同快照接收、workspace 卫生门、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
@@ -78,11 +84,13 @@ apps/api（DEV-M1 Slice 1）
 
 `DEV-M0-W5` 在 `apps/api/src/runtime-config.ts` 增加只在进程内传递、仅允许本机 PostgreSQL 的 DB bootstrap config，并由 `apps/api/src/service-repository.ts` 单独拥有一个 `pg.Pool`、schema 指纹、single-flight deadline、错误归一化与幂等关闭；`runtime-diagnostics.ts` 只输出稳定、脱敏的运行诊断词表。`GET /health` 不触碰依赖；`GET /ready` 通过一次只读查询核对 database、PostgreSQL 15、`schema.v1.12`、8 个函数 + 2 个视图的完整可信 search 依赖摘要、`pgcrypto.digest` extension 所有权、runtime/login/definer 双向角色边界、parameter ACL，以及当前数据库和全部用户 schema 的精确表/列/函数有效 ACL。任意非 owner 的 `public CREATE` 与 deadline 后才完成的成功探针也失败关闭；auth/storage/content 明确保持为 `not_ready`。因此 W5 的服务可以监听并证明基础设施状态，但仍不会获得业务就绪或 runtime activation。
 
-`DEV-M1 Slice 1` 在不改写上述历史切片的前提下前滚到 `schema.v1.13`：第十段 migration 只替换受控 search projection 与 schema comment，精确的 v1.12 ledger 只计划 `0010`。API 新增进程内 opaque mock session、成对 mock header、策略只读路由和 Owner-only 管理写入口。私有 bootstrap 在任何 pool/Fastify 构造前验证两条不同登录 DSN 指向同一数据库目标、总连接预算和互不复用的 HMAC 域；管理 SQL 每次写入前同时证明登录、`app_content_admin`、`cs_ai_definer`、`set_policy_flag` 定义和 ACL，任一角色或函数漂移均失败关闭。未捕获请求异常只返回稳定 500 合同，不回显原始错误；空 JSON、坏 JSON、超大正文和不支持的媒体类型统一返回稳定 400。
+`DEV-M1 W0/W1` 在不改写上述历史切片的前提下前滚到 `schema.v1.13`：第十段 migration 只替换受控 search projection 与 schema comment，精确的 v1.12 ledger 只计划 `0010`。API 新增进程内 opaque mock session、成对 mock header、策略只读路由和 Owner-only 管理写入口。私有 bootstrap 在任何 pool/Fastify 构造前验证两条不同登录 DSN 指向同一数据库目标、总连接预算和互不复用的 HMAC 域；管理 SQL 每次写入前同时证明登录、`app_content_admin`、`cs_ai_definer`、`set_policy_flag` 定义和 ACL，任一角色或函数漂移均失败关闭。未捕获请求异常只返回稳定 500 合同，不回显原始错误；空 JSON、坏 JSON、超大正文和不支持的媒体类型统一返回稳定 400。
 
 `DEV-M1 W2` 继续以追加方式接收 `schema.v1.14`：第十一段 migration 只增加 ready-no-hit 上下文，精确 v1.12/v1.13 ledger 分别只规划缺失后缀。API 的 `SearchRepository` 在一条参数化 SQL 内完成 scope-only 快照读取、bigram primary、字面转义 fallback、确定性排序与数据库侧 Top 3；`SearchService` 只映射公开候选字段。W2 结束时 `/v1/search` 已有鉴权、输入门禁、脱敏/HMAC 与稳定错误壳，但 operation 暂时固定 503；该临时边界已由下述 W3/W4 事务接线取代。
 
 `DEV-M1 W3/W4` 由 `EventRepository` 拥有 runtime `PoolClient` 事务、版本化 HMAC 幂等、fencing 和事件状态机。搜索在同一事务内完成受控检索、`query_events`、精确候选四元组和 `idempotency_complete`；当前只放行 synthetic，查询文本固定 suppressed。来源拒绝先回滚业务事务，再用新连接写不含原文/定位符的审计。Adoption 由数据库唯一键保证 first-wins，`adopted` 只代表成功复制；Escalation 保持非终态并按 query/action 返回稳定事实。只有搜索成功而 telemetry INSERT 单独不可用时返回零事件的 `collection_disabled`。
+
+`G1A-E0 T1～T3` 只存在于 API 测试支持目录：读取器要求仓外绝对规范路径、0700 根目录、0600 当前用户普通文件、固定四成员、无软/硬链、大小/LF/canonical JSON、仓外 manifest SHA-256 锚点、与实际 ID 清单绑定的 comparison manifest hash、DLP/独立性 EVD 和 20+12+18 冻结分母；装载器在一次性 PostgreSQL 15 中用正式 question/governance hash 与四域 source gate 做事务内后验，任一失败整批回滚。runner 以 `REPEATABLE READ READ ONLY` 事务调用同一 `SearchBackend/SearchRepository`，保持 HTTP、事件和桌面不参与。Node 网络守卫的观察面显式为 `NODE_TCP_FETCH_GUARD_ONLY`，`process_guard_attempts=0` 不能冒充宿主级零出站或 OS 沙箱；成功或失败都必须关闭 client、停止集群并删除临时目录，报告只保留白名单聚合字段，鲁棒性错题不得输出 `PASS_CANDIDATE`。该实现不进入 `apps/api/dist`，纯合成结果固定为 `NOT_SIGNED / NOT_EVALUATED`。
 
 ## 3. 三个窗口和安全边界
 
@@ -118,11 +126,14 @@ v1.14 migrated PG15
 
 /v1 search + events ──synthetic transaction 可用──> renderer 仍不允许直连
 /v1 desktop adapter ──尚未实现──> renderer 仍不允许直连
+
+仓外 G1A-E0 package ──test-only verifier──> ephemeral PG15
+  └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
 ```
 
 `apps/desktop/src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有合成搜索均未导入该包。当前 `/v1` 已实现 mock auth、policy 与 W2 search 边界，但 search operation 尚未接通，events 和桌面 adapter 仍不存在。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有桌面合成搜索均未导入该包。当前 `/v1` 已实现 mock auth、policy、synthetic-only Search + Events 主链；桌面 adapter 仍不存在，真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
 
 ## 5. 测试和验证层级
 
@@ -143,6 +154,8 @@ pnpm test             # contracts + API + desktop unit/component；不含 Electr
 pnpm test:contract    # 生成物、132 个 component schema 与正反边界
 pnpm test:api         # 配置拒启、未注册路由、合同 health 与真实 loopback
 pnpm --filter @customer-agent/api test:integration # 隔离 PG15 runtime pool/schema/ACL
+pnpm test:g1a:e0    # 真实包同形的纯合成 E0：输入边界、PG15、同一 SearchBackend、清理
+pnpm test:g1a:e0:package # 仅在仓外真实包及 manifest SHA 已获授权时运行
 pnpm contracts:codegen:check # 重新生成到内存并做字节级零漂移检查
 pnpm test:float       # 浮窗相关快速回归
 pnpm test:e2e:float   # build 后只跑浮窗 E2E
@@ -176,7 +189,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 DEV-M0 基线上推进到 DEV-M1 W3/W4：合同接收、组件校验、migration 控制面、API host、runtime 读写能力、policy-admin 写能力、search service 与 event transaction 各有单一 owner，两个 pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；候选产物仍明确不可部署且 `runtime_activated=false`。本切片关闭了合成 query/adoption/escalate 原子性，未放行真实数据、正式飞书鉴权、桌面接线、生产部署或真实 Windows 门。
+当前目录结构已在 DEV-M0 基线上完成 DEV-M1 W0～W5，并在当前候选分支完成 G1A-E0 T1～T3：合同接收、组件校验、migration 控制面、API host、runtime 读写能力、policy-admin 写能力、SearchBackend、event transaction、legacy synthetic runner 与 test-only E0 runner 各有单一 owner，两个 API pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；DEV-M1 最终 `main@5cf650c`、CI run `33785347931` 三路全绿，候选产物仍明确不可部署且 `runtime_activated=false`。E0 的成功/失败清理和 50 条同形合成闭环已本地通过，但仍为 `NOT_SIGNED / NOT_EVALUATED`；真实数据、正式飞书鉴权、桌面接线、生产部署和真实 Windows 门均未放行。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 

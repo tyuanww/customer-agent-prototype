@@ -1,0 +1,206 @@
+# 真实 G1a 搜索准入与离线影子执行计划
+
+> **状态：** `APPROVED · G1A-E0 ONLY`
+> **实施状态：** `T1～T3 COMPLETE · LOCAL SYNTHETIC EVIDENCE`（当前候选分支，尚未提交/合并）
+> **真实准入状态：** `T4～T6 NOT_STARTED · G1a NOT_EVALUATED`
+> **决定来源：** 治理仓 `DEC-SEARCH-01`（2026-09-04，`PASS-WITH-CONDITIONS`）
+> **产品基线：** `main@5cf650ca87e0948f6dff6ad0bed6be078017e3f6`
+> **治理基线：** `main@c64ed231efd7b432cdee9b866677909b3d8a86d7`
+> **当前分支：** `codex/g1a-search-admission`
+> **授权边界：** 只放行本计划 T1～T3 的离线工具与合成替身实现；真实数据导出、复制、装载与运行须在对应 EVD 完成后另行执行。本文不授权 DEV-M2、桌面 adapter、飞书运行接入、外部模型、自动发送、部署或 Pilot。
+
+## 1. 结论
+
+现有 `DEV-M1` 已具备可复用的 PostgreSQL 15 `SearchBackend`、四域 current-release 门、DB 侧 Top 3、来源/版本/范围过滤与纯合成 50 条 runner，但现有 HTTP 路由仍主动拒绝非 `synthetic`，桌面也仍使用本地合成检索。真实 G1a 不应通过放宽 `/v1/search` 或接入飞书来完成。
+
+本计划选择**离线、用途锁定、无网络出站的影子评测**：受控真实资料在仓外完成脱敏和冻结；产品仓只实现闭合 manifest 校验、隔离 PG15 装载、同一 `SearchBackend` 执行和不含原文的汇总报告。这样能验证真实检索质量，同时保持在线 API、事件采集、桌面和生产权限全部关闭。
+
+## 2. 已有能力与缺口
+
+| 项 | 当前事实 | G1a 处理 |
+| --- | --- | --- |
+| 搜索实现 | `SearchRepository` 在单 SQL 内完成 current release、四域来源、scope、有效期、排序和 Top 3 | 原样复用，不复制第二套 ranker |
+| HTTP 路由 | `/v1/search` 只接受 `collection_mode=synthetic` | G1a 不经过 HTTP，不放宽路由 |
+| 合同 | `CollectionMode` 已含 `approved_redacted`，但当前运行路由未启用 | 仅作为受控资料分类语义；本轮不改 OpenAPI |
+| 事件 | Search + query/impression/adoption/escalate 事务已实现 | G1a 不写运行事件，不产生采用率或发送事实 |
+| 桌面 | Query 仍读 `SYNTHETIC_SCRIPTS`，无 API adapter | 保持不变；DEV-M2 另行授权 |
+| runner | 50 条纯合成、50/50、`NOT_SIGNED / NOT_EVALUATED` | 复用执行结构，不复用数据、分数或结论 |
+| 真实资料 | 不在 Git，尚无冻结 G1a 包和盲审结果 | 由治理仓 EVD 门单独准备和签收 |
+
+## 3. 采用与拒绝的方案
+
+### 方案 A：直接开放 `/v1/search` 的 `approved_redacted`
+
+拒绝。它会同时引入真实身份、运行时内容、事件留存、notice、桌面 adapter 和生产 ACL，无法把“评测”与“上线链路”隔离，失败面超过当前决定。
+
+### 方案 B：独立离线 G1a runner（采用）
+
+```text
+仓外受控工作区
+  ├─ 权威四域快照（已脱敏、不可变、带 SHA-256）
+  ├─ 20 正例 + 12 安全负例 + 18 鲁棒性问法
+  └─ 盲审前冻结的期望话术 ID / no-hit / 澄清或升级条件
+            │  closed manifest + hash verification
+            ▼
+本机隔离 PostgreSQL 15（无 TCP 监听、临时目录、运行后销毁）
+  └─ 评测专用 owner 装载不可变 release snapshot
+            │
+            ▼
+现有 SearchBackend → SearchRepository → search_recommendable_scripts
+            │
+            ▼
+逐例结果（仅评测进程内）→ 聚合计分 → 脱敏报告
+  └─ 不含 query_text / answer_text / source locator / PII / token
+```
+
+离线 runner 是评测工具，不是第十个业务端口。它不得导入 `apps/desktop`，不得注册 HTTP route，不得读取飞书、不写运行事件、不把真实文本写入仓库，也不得创建可长期复用的真实数据库。
+
+实现固定放在 `apps/api/tests/support/g1a-e0/` 与显式 runner test 中；API 的 `tsconfig.build.json` 只编译 `src/**`，因此该能力不进入 `apps/api/dist` 或正式候选包。此处的 Node 网络守卫只防止评测进程意外 TCP / fetch 出站，并允许当前临时 PostgreSQL Unix socket；报告只把该观察面记为 `NODE_TCP_FETCH_GUARD_ONLY / process_guard_attempts`，不得改写成宿主级“零外网”。它不是对 UDP、预缓存原生引用、恶意原生代码或 OS 沙箱成立的证明，T5 真实运行前仍须补宿主级网络与残留检查。
+
+## 4. 冻结评测合同
+
+### 4.1 输入包
+
+真实 G1a 包必须位于仓外受控目录，并至少包含：
+
+- `manifest.json`：schema 版本、`eval_set_id`、内容快照 ID/hash、创建/到期时间、用途锁 `g1a_search_eval_only`、DLP 与独立性证据 ID/hash、实施者 / 业务 Owner / 盲审人的伪名主体 hash、删除截止时间；manifest 自身 SHA-256 必须由仓外 EVD 作为必填参数传入，不能从输入目录自证；
+- `content.jsonl`：四域不可变来源绑定与可检索发布项；不得携带原始飞书 URL、协作者、审批原文或未脱敏客户信息；
+- `cases.jsonl`：固定 50 条，顺序为 20 正例、12 安全负例、18 鲁棒性；每条有稳定随机 ID、分层标签、平台和成对商品上下文；
+- `expectations.jsonl`：在看系统结果前冻结的可接受话术 ID 集、`expected_action` 与禁止返回 ID；与问法正文分文件，便于盲审锁定；
+- 每个 payload 的 SHA-256、字节数和 LF/closed-shape 约束；manifest 的 own-hash 由 runner 计算并与仓外锚点比较，不做循环式自描述。
+- `comparison_sets` 中每组样本 ID、来源 ID 与语义簇 ID 都按 `customer-agent/g1a-comparison-manifest/v1` canonical JSON 重新计算 SHA-256，并由外层 manifest 的仓外锚点锁定；T4 EVD 还必须独立记录三组清单 hash，不能让 runner 从当前目录自行选取比较集。
+
+任何真实正文都不得进入 Git、测试快照、日志、异常 message 或 gstack 产物。仓内只允许保存 schema、纯合成替身和不含原文的汇总证据。
+
+本地正则只作为明显 URL、token、邮箱、手机号和长标识符的 **leak canary**，不得写成 DLP 已完成；真实脱敏结论只由 manifest 绑定的冻结 EVD 证明。内容项不接收独立 `search_terms`，检索文档按与正式导入相同的 question / title / answer 字段权重确定性派生；`content_hash` 在临时 PostgreSQL 中调用正式 `content_governance_hash(...)` 复核，禁止退化成 answer-only hash。
+
+### 4.2 独立性
+
+- `dev_synthetic / train / G1a / G1b` 的样本 ID、来源和语义簇交集必须由已绑定内容 hash 的冻结清单实际计算为 0；manifest 中自报一个 `overlap=0` 或与清单内容不一致的任意 hash 均不构成证据；
+- G1a 使用同一冻结内容快照同时跑关键词基线与当前候选方案；不得在看到结果后删除难题、补答案或修改内容；
+- 真实 Pilot 产生的 `REAL-FWD` 只进入 G1b，不得回填 G1a；
+- 唯一实现者不得担任独立盲审人，按伪名 subject hash 判定而不是只比较角色名。`L1 · SINGLE_OWNER` 可继续承担资料治理和决定签发，但不能替代这一项业务防泄漏检查。
+
+### 4.3 通过阈值
+
+- 正例 Top3：`>= 14/20`（70%）；
+- 每个冻结的“平台 × 核心意图”分层：Top3 `>= 50%` 且至少命中 1 条；
+- 来源、版本、平台/商品范围和有效期正确率：总体及每个分层均为 `100%`；
+- 12 条安全负例：错误直答、禁止话术返回、越权泄露和自动代发均为 `0`；标为 `expected_action=no_hit` 的用例必须 `12/12` no-hit；
+- 18 条鲁棒性：逐条按预冻结的 hit/no-hit/澄清/升级条件判定并独立报告；存在非安全类错题时 runner 只能给 `REVIEW_REQUIRED`，不能给 `PASS_CANDIDATE`；其中安全行为错误任一 `>0` 即失败；
+- backend error、未绑定来源、跨 release 候选和运行事件写入均为 `0`；E0 的 `process_guard_attempts` 必须为 `0`，T5 再由宿主级控制证明真实运行无外部网络调用；
+- 单机隔离评测记录每次查询耗时，p95 目标 `<300ms`；该结果只是本地搜索预算证据，不等于 300 QPS 或端到端性能认证。
+
+阈值不得由 runner 根据结果动态调整。任何降门槛都必须回到治理仓新建 DEC，不能修改本计划后直接重跑。
+
+## 5. 失败关闭与清理
+
+| 失败 | 必须结果 |
+| --- | --- |
+| manifest 未知字段、缺项、hash/字节数不符 | 读取任何正文前失败 |
+| DLP、用途锁、到期日或批准 EVD 缺失 | 不创建数据库、不运行搜索 |
+| 四域 binding 不完整、来源暂停、内容 hash/审核/scope 不合格 | 整批失败，不转成普通 no-hit |
+| 数据集交叉或盲审锁未冻结 | 不计分，状态 `NOT_EVALUATED` |
+| backend error、禁止候选或安全错误 | G1a 直接失败，保留安全摘要后销毁临时库 |
+| 报告包含正文、定位符或 PII | 报告生成失败，不落盘 |
+| 临时 PG 停止或清理失败 | 退出非零并列出受控路径；不得宣称完成 |
+
+运行结束必须销毁临时 PG cluster 和进程内明细。受控输入包按 manifest 到期删除并留下不含正文的删除证明；失败不能通过跳过清理或保留数据库“方便复查”。
+
+## 6. 实施切片
+
+| 任务 | 状态 | 范围 | 退出证据 | 可并行 |
+| --- | --- | --- | --- | --- |
+| T1 | **COMPLETE · LOCAL** | 定义仓内 G1a manifest/case/expectation schema 与纯合成替身 | closed-shape、50 条分母、hash、用途锁、过期和交叉负例 | 与 T4 业务准备并行 |
+| T2 | **COMPLETE · LOCAL** | 实现仓外路径读取器和前置 verifier | 读取正文前验 manifest；路径/符号链接/权限/大小失败关闭；错误不回显正文 | T1 后 |
+| T3 | **COMPLETE · LOCAL** | 实现隔离 PG15 evaluation release loader、SearchBackend runner、聚合报告和清理 | 无 HTTP/事件；同一 SearchBackend；事务内 source-gate 后验与整批回滚；报告白名单；Node TCP/fetch 守卫与清理正反例 | T2 后 |
+| T4 | **NOT STARTED** | 在仓外准备真实四域内容快照、50 条评测集、DLP 与删除计划 | `EVD-G1A-DATA-01`、`EVD-G1A-EVALSET-01` | 不属于代码提交 |
+| T5 | **NOT STARTED** | 冻结关键词基线和独立盲审答案，运行一次真实 G1a | `EVD-G1A-BLIND-01`、原始分母和失败清单 | T3、T4 后 |
+| T6 | **NOT STARTED** | 业务 Owner + QA 复核阈值、失败关闭、清理证明并签发 | `EVD-G1A-RUN-01`、`EVD-G1A-SIGN-01` | T5 后 |
+
+T1～T3 可使用纯合成替身开发和测试。T4 的真实资料准备、T5 的真实运行和 T6 的签发分别是独立动作；任何一个未完成都不能把状态写成 G1a Pass。
+
+### 6.1 T1～T3 本地退出证据（2026-09-04）
+
+- `pnpm test:g1a:e0`：37/37，通过真实包同形输入边界、comparison 内容 hash、20+12+18/唯一性/格式/大小负例、用例来源零交叉、候选 release/provenance 与全部硬门、PII 报告拒绝、事务回滚、50 条纯合成闭环及加载/冻结时间失败时的集群清理；报告为 `EXECUTABLE / NOT_SIGNED / NOT_EVALUATED`；
+- `pnpm --filter @customer-agent/api test:integration`：43/43，通过 PostgreSQL 15 runtime、search/events 与旧版 synthetic runner 回归；
+- `pnpm test`：contracts 17/17、database 19/19、API 114/114（显式 PG 用例另跑）、desktop 508/508、artifact boundary 8/8；
+- `pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm workspace:check` 均通过；
+- `pnpm test:g1a:synthetic` 旧版基线继续 50/50、禁返 0、backend error 0，且仍为 `NOT_SIGNED / NOT_EVALUATED`。
+
+未运行 `pnpm test:g1a:e0:package`：当前没有获批的仓外真实输入包与外部 manifest SHA-256 锚点。未运行 Electron E2E 或真实设备测试：本切片没有修改桌面运行入口，且它们不能替代真实 G1a。
+
+## 7. 验证计划
+
+```text
+INPUT BOUNDARY
+  [PASS -> UNIT] closed schemas / exact file set / LF / size / SHA-256
+  [PASS -> UNIT] purpose lock / expiry / EVD / 20+12+18 / unique IDs
+  [PASS -> UNIT] dev-train-G1a-G1b sample/source/semantic-cluster disjointness
+  [PASS -> UNIT] no raw path, URL, query, answer or PII-shaped ID in errors/reports
+
+EPHEMERAL DATA PATH
+  [PASS -> PG15] four-domain immutable release and current binding
+  [PASS -> PG15] source-gate / governance hash / question contract fail closed and roll back
+  [PASS -> PG15] runtime role is read-only and cannot write evaluation seed objects
+  [PASS -> PG15] cleanup on success and caught failure paths
+  [T5 PRECONDITION] host-level reconciliation for signal/abrupt process termination before any real run
+
+SCORING
+  [PASS -> UNIT] positive Top3 and per-stratum denominators
+  [PASS -> UNIT] 12/12 no-hit and forbidden=0 hard gate
+  [PASS -> UNIT] source/version/scope/effective 100% hard gate
+  [PASS -> UNIT] synthetic input remains NOT_EVALUATED; real candidate remains NOT_SIGNED
+  [PASS -> UNIT] report whitelist rejects text, locator and PII fields
+  [PASS -> UNIT] robustness mismatches cannot claim PASS_CANDIDATE; non-hard misses require review
+
+NETWORK OBSERVATION
+  [PASS -> UNIT] TCP/fetch attempts are blocked and counted; proxy state restores idempotently
+  [PASS -> UNIT] out-of-bound and symlink-escaped Unix sockets are rejected
+  [T5 PRECONDITION] host-level egress control proves channels outside the Node guard
+
+REGRESSION
+  [REQUIRED] pnpm lint / typecheck / test / build / workspace:check
+  [REQUIRED] explicit PostgreSQL 15 integration and synthetic runner
+  [NOT IN SCOPE] Electron E2E, Feishu, real desktop, production, Pilot
+```
+
+## 8. 不在本计划范围
+
+- 开放 `/v1/search` 的 `approved_redacted` 或 `pilot_recorded`；
+- 真实飞书 OAuth、机器人读取、文档订阅或在线同步；
+- Electron main/preload/renderer API adapter；
+- import/publish/announce 正式端口、DEV-M2、真实事件留存或 Dashboard 指标；
+- RAGFlow、embedding、外部 LLM、教师、训练、自动学习或付费调用；
+- 自动填、自动发送、生产部署、真实坐席灰度或上线承诺。
+
+## 9. GSTACK REVIEW REPORT
+
+### Architecture Review
+
+1. **[P1] 准入、评测和运行接入原先被同一句“真实 G1a”混在一起。** 已拆为 `DEC-SEARCH-01`、G1a 离线运行与 DEV-M2 三个独立关口。
+2. **[P1] 直接放宽 HTTP `collection_mode` 会扩大信任边界。** 采用无 HTTP、无事件、无桌面的离线 runner；公开合同和路由保持不变。
+3. **[P1] 真实内容不能进入 Git 或长期数据库。** 输入包固定在仓外受控目录，采用不可变 manifest、隔离 PG15 和运行后销毁。
+4. **[P1] 合成 50/50 不能成为真实分数。** 真实集、合成集、train、G1b 按来源和语义簇强制零交叉。
+
+### Code Quality Review
+
+5. **[P2] 不复制第二套检索器。** runner 依赖现有 `SearchBackend` port；装载、验证、计分和报告各有单一所有者。
+6. **[P2] 不把评测模式散落成 route flag。** G1a 工具以独立入口封装用途锁、生命周期和清理，业务调用方无需理解临时库细节。
+7. **[P2] 报告边界必须白名单。** 只输出 ID、计数、hash、耗时和稳定失败码，不透传输入行或数据库 row。
+
+### Test Review
+
+8. **[P1] 当前 runner 只验证纯合成固定数据。** T1～T3 增加真实包形状的合成替身、独立性、锁定、脱敏和清理负例。
+9. **[P1] 安全负例不能混入总体均值。** 12 条单独 100% no-hit/安全硬门，任一错误直接失败。
+10. **[P2] 本地性能不能冒充容量认证。** 只记录单机 p95 `<300ms`；300 QPS、端到端和 Windows 仍未认证。
+
+### Parallelization
+
+代码 T1～T3 串行收口；业务资料 T4 可并行准备。T5 只在两条链都完成后执行，T6 只签真实结果。该顺序把真实资料暴露窗口压到一次受控运行，并避免实现者提前看到盲审答案。
+
+### Final Decision
+
+采用方案 B。`DEC-SEARCH-01` 只冻结评测口径并允许 G1A-E0 工具准备；当前真实 G1a 状态仍为 `NOT_STARTED`，DEV-M2 与运行接入继续 `NO-GO`。
+
+NO UNRESOLVED DECISIONS

@@ -22,7 +22,7 @@ export type SyntheticG1aCase = Readonly<{
 
 type CandidateDomain = 'aftersale' | 'campaign' | 'presale' | 'product';
 
-type SyntheticCandidate = Readonly<{
+export type SyntheticG1aCandidate = Readonly<{
   id: string;
   domain: CandidateDomain;
   title: string;
@@ -37,14 +37,14 @@ const FIXTURE_URL = new URL('../../../../tests/fixtures/search/zh-gold.jsonl', i
 const RELEASE_ID = 'rel_synthetic_g1a_v1';
 const INTENT_TAXONOMY_VERSION = 'itax_synthetic_g1a_v1';
 const INTENT_ID = 'intent_synthetic_g1a';
-const SOURCE_BINDINGS = Object.freeze([
+export const SYNTHETIC_G1A_SOURCE_BINDINGS = Object.freeze([
   ['aftersale', 'srcv_synth_g1a_aftersale_v1', 'SRC-SYNTH-G1A-AFTERSALE'],
   ['campaign', 'srcv_synth_g1a_campaign_v1', 'SRC-SYNTH-G1A-CAMPAIGN'],
   ['presale', 'srcv_synth_g1a_presale_v1', 'SRC-SYNTH-G1A-PRESALE'],
   ['product', 'srcv_synth_g1a_product_v1', 'SRC-SYNTH-G1A-PRODUCT'],
 ] as const);
 
-const CANDIDATES = Object.freeze([
+export const SYNTHETIC_G1A_CANDIDATES = Object.freeze([
   {
     id: 'syn-presale-cleanser-001',
     domain: 'presale',
@@ -166,7 +166,7 @@ const CANDIDATES = Object.freeze([
     platformScope: ['douyin'],
     validity: 'future',
   },
-] satisfies readonly SyntheticCandidate[]);
+] satisfies readonly SyntheticG1aCandidate[]);
 
 const GOLD_KEYS = Object.freeze([
   'as_of',
@@ -186,7 +186,7 @@ function sha256(value: string): string {
 }
 
 function sourceBindingHash(): string {
-  return sha256(SOURCE_BINDINGS
+  return sha256(SYNTHETIC_G1A_SOURCE_BINDINGS
     .map(([domain, sourceVersionId]) => `${domain}:${sourceVersionId}`)
     .join('|'));
 }
@@ -282,12 +282,12 @@ function searchDocument(terms: readonly string[]): string {
 }
 
 function sourceFor(domain: CandidateDomain): Readonly<{ versionId: string; ref: string }> {
-  const binding = SOURCE_BINDINGS.find(([bindingDomain]) => bindingDomain === domain);
+  const binding = SYNTHETIC_G1A_SOURCE_BINDINGS.find(([bindingDomain]) => bindingDomain === domain);
   if (!binding) throw new Error(`Missing synthetic source binding for ${domain}`);
   return Object.freeze({ versionId: binding[1], ref: binding[2] });
 }
 
-async function seedCandidate(owner: Client, candidate: SyntheticCandidate, index: number): Promise<void> {
+async function seedCandidate(owner: Client, candidate: SyntheticG1aCandidate, index: number): Promise<void> {
   const suffix = String(index + 1).padStart(2, '0');
   const sourceAssetId = `sa_synthetic_g1a_${suffix}`;
   const originFingerprint = sha256(`synthetic-g1a-origin-${suffix}`);
@@ -367,7 +367,7 @@ export async function seedSyntheticG1aRelease(owner: Client): Promise<void> {
   try {
     await owner.query("SELECT pg_catalog.set_config('app.publishing', 'on', true)");
     await owner.query("SELECT pg_catalog.set_config('app.semantic_asset_write', 'publish', true)");
-    for (const [domain, sourceVersionId, sourceRef] of SOURCE_BINDINGS) {
+    for (const [domain, sourceVersionId, sourceRef] of SYNTHETIC_G1A_SOURCE_BINDINGS) {
       await owner.query(`
         INSERT INTO public.authoritative_source_versions(
           source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
@@ -395,13 +395,13 @@ export async function seedSyntheticG1aRelease(owner: Client): Promise<void> {
         published_by, published_by_role
       ) VALUES ($1, 1, '纯合成 G1a runner 发布', 'published', $2, 'synthetic-owner', 'owner')
     `, [RELEASE_ID, sourceBindingHash()]);
-    for (const [domain, sourceVersionId] of SOURCE_BINDINGS) {
+    for (const [domain, sourceVersionId] of SYNTHETIC_G1A_SOURCE_BINDINGS) {
       await owner.query(`
         INSERT INTO public.release_source_bindings(release_id, domain, source_version_id)
         VALUES ($1, $2, $3)
       `, [RELEASE_ID, domain, sourceVersionId]);
     }
-    for (const [index, candidate] of CANDIDATES.entries()) {
+    for (const [index, candidate] of SYNTHETIC_G1A_CANDIDATES.entries()) {
       await seedCandidate(owner, candidate, index);
     }
     await owner.query('INSERT INTO public.content_current(id, current_release_id) VALUES (1, $1)', [RELEASE_ID]);
