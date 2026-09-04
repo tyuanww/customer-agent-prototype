@@ -1,9 +1,11 @@
+import { randomBytes, randomInt } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomBytes, randomInt } from 'node:crypto';
 import { Client, type ClientConfig } from 'pg';
+
+const TEMPORARY_PREFIX = 'customer-agent-pg15-';
 
 function cleanPgEnvironment(): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = { ...process.env, PGCONNECT_TIMEOUT: '5' };
@@ -24,32 +26,35 @@ function run(file: string, arguments_: readonly string[], environment: NodeJS.Pr
 }
 
 function discoverPg15Bin(environment: NodeJS.ProcessEnv): string {
-  const configured = process.env.CUSTOMER_AGENT_PG15_BIN;
-  const candidate = configured
-    ? path.resolve(configured)
-    : run('pg_config', ['--bindir'], environment);
+  const configured = environment.CUSTOMER_AGENT_PG15_BIN;
+  const candidate = configured ? path.resolve(configured) : run('pg_config', ['--bindir'], environment);
   const version = run(path.join(candidate, 'postgres'), ['--version'], environment);
   const major = Number(version.match(/PostgreSQL\)\s+(\d+)/)?.[1]);
-  if (major !== 15) throw new Error(`DEV-M0 integration tests require PostgreSQL 15, found: ${version}`);
-  for (const binary of ['postgres', 'initdb', 'pg_ctl', 'createdb']) {
+  if (major !== 15) throw new Error(`Ephemeral database requires PostgreSQL 15, found: ${version}`);
+  for (const binary of ['postgres', 'initdb', 'pg_ctl', 'createdb', 'psql']) {
     if (!existsSync(path.join(candidate, binary))) throw new Error(`PostgreSQL 15 binary is missing: ${binary}`);
   }
   return candidate;
 }
 
 function removeTemporaryCluster(root: string): void {
-  const prefix = path.join(os.tmpdir(), 'customer-agent-pg15-');
-  if (!root.startsWith(prefix)) throw new Error(`Refusing unsafe PG15 test cleanup: ${root}`);
+  if (path.dirname(root) !== os.tmpdir() || !path.basename(root).startsWith(TEMPORARY_PREFIX)) {
+    throw new Error('Refusing unsafe PostgreSQL cleanup target');
+  }
   rmSync(root, { recursive: true, force: true });
-  if (existsSync(root)) throw new Error('Temporary PG15 cluster cleanup was incomplete');
+  if (existsSync(root)) throw new Error('Temporary PostgreSQL cluster cleanup was incomplete');
 }
 
+/**
+ * Owns one throwaway PostgreSQL 15 cluster. The server has no TCP listener,
+ * accepts local Unix-socket clients only, and always removes its private root.
+ */
 export class Pg15Harness {
   readonly owner = 'gate_owner';
   readonly port = randomInt(49_152, 65_535);
   readonly environment = cleanPgEnvironment();
   readonly bin = discoverPg15Bin(this.environment);
-  readonly root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-pg15-'));
+  readonly root = mkdtempSync(path.join(os.tmpdir(), TEMPORARY_PREFIX));
   readonly data = path.join(this.root, 'data');
   readonly socket = path.join(this.root, 'socket');
   readonly log = path.join(this.root, 'postgres.log');
@@ -58,7 +63,7 @@ export class Pg15Harness {
 
   start(): void {
     try {
-      if (process.platform === 'win32') throw new Error('Use WSL/Linux for the Unix-socket PG15 integration gate');
+      if (process.platform === 'win32') throw new Error('Unix-socket PostgreSQL is required');
       mkdirSync(this.socket, { recursive: true, mode: 0o700 });
       run(path.join(this.bin, 'initdb'), [
         '-D', this.data,

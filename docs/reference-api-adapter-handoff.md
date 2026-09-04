@@ -23,7 +23,7 @@
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**类型、鉴权、事件、发布、租约必须重做**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
-| 本仓下一步该不该实现 adapter？ | **DEV-M1 W5 纯合成 runner 已可执行且未签业务阈值；完成本里程碑退出回填后，下一开发里程碑才是 M2。** 真实飞书 auth 与 Windows Main adapter 仍需分层实现和验证，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
+| 本仓下一步该不该实现 adapter？ | **还不该。** DEV-M1 已完成，G1A-E0 T1～T3 也已形成本地候选证据；现在应先完成真实 G1a 的仓外受控快照、盲审、一次离线影子运行和签收。DEV-M2、真实飞书 auth 与 Windows Main adapter 仍需后续独立授权，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
 
 ---
 
@@ -71,7 +71,7 @@ Windows Electron 壳
 | 空态 | escalate | events | 文案“转人工话术师”，**无按钮、无事件** | `open_feishu` / `copy_contact` 是辅助动作，不是 terminal |
 | 收起 / 切后台 | `dismissed` / `timeout` | events | 无上报 | 明确放弃才 `dismissed`；idle 达 `CLIENT_ACTION_TIMEOUT_MS` 才 `timeout` |
 | Dashboard 九模块 | metrics / workorders / content / announce | 对应端口 | 静态合成 | 只读 GET；coach/owner RBAC；agent 无管理权；Publish 仍仅 owner |
-| 架构图九端口 | 故事 | 九端口 | 全部 `正式未接入` | 状态标签不是可用性声明 |
+| 架构图九端口 | 目标拓扑 | 九端口 | API 已实现 development/test 的 auth/policy/search/events 子集；桌面和真实运行均未接入 | 状态标签不是生产可用性声明 |
 
 正式检索 **唯一 SQL 边界** 是 `search_recommendable_scripts(...)`。Adapter 若在客户端自拼 WHERE、直扫 `scripts`、或把 Demo fixture 当 SoR，即违反 INV-EFF / INV-ACL。
 
@@ -276,7 +276,7 @@ Demo `validity.ts`：
 - 把 `DASHBOARD_MANIFEST.ledger.rows` insert 进 `query_events`
 - 在 renderer 存 token / 问法原文 / 占位符值
 - 用 Demo 的 `copied` / `abandoned` / `risk_escalated` 当 OpenAPI enum
-- 宣称本仓已通过 G0、已把 API/桌面接通 PostgreSQL，或已具备生产数据库
+- 宣称产品仓代码可以替治理仓签发 G0/G1a、桌面已接通 PostgreSQL，或已具备生产数据库
 
 ---
 

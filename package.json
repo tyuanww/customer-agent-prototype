@@ -42,6 +42,8 @@
     "test:contract": "pnpm --filter @customer-agent/contracts test",
     "test:api": "pnpm --filter @customer-agent/api test",
     "test:g1a:synthetic": "pnpm --filter @customer-agent/contracts exec vitest run tests/search-gold.test.ts && pnpm --filter @customer-agent/api test:g1a:synthetic",
+    "test:g1a:e0": "pnpm --filter @customer-agent/api test:g1a:e0:synthetic",
+    "test:g1a:e0:package": "pnpm --filter @customer-agent/api test:g1a:e0:package",
     "workspace:size": "node scripts/workspace-hygiene.mjs size",
     "workspace:check": "node scripts/workspace-hygiene.mjs check",
     "clean:preview": "node scripts/workspace-hygiene.mjs clean --scope=generated",
