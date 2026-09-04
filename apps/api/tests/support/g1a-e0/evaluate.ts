@@ -40,7 +40,8 @@ export type G1aEvaluationReport = Readonly<{
   schema: 'customer-agent/g1a-evaluation-report/v1';
   status: 'NOT_SIGNED';
   runner_result: 'EXECUTABLE' | 'FAILED';
-  decision: 'NOT_EVALUATED' | 'PASS_CANDIDATE' | 'REVIEW_REQUIRED' | 'FAIL';
+  decision: 'NOT_EVALUATED' | 'REVIEW_REQUIRED' | 'FAIL';
+  search_action_result: 'NOT_EVALUATED' | 'PASS_CANDIDATE' | 'REVIEW_REQUIRED' | 'FAIL';
   business_accuracy_claim: 'NOT_EVALUATED' | 'CANDIDATE_ONLY';
   downstream_action_evaluation: 'NOT_EVALUATED';
   network_observation_scope: 'NODE_TCP_FETCH_GUARD_ONLY';
@@ -63,7 +64,10 @@ export type G1aEvaluationReport = Readonly<{
     process_guard_attempt_maximum: 0;
     local_p95_budget_ms: 300;
   }>;
-  strata: Readonly<Record<G1aStratum, Readonly<{ total: number; correct: number }>>>;
+  strata: Readonly<Record<G1aStratum, Readonly<{
+    total: number;
+    search_action_correct: number;
+  }>>>;
   positive_strata: readonly Readonly<{
     stratum_id: string;
     total: number;
@@ -73,7 +77,7 @@ export type G1aEvaluationReport = Readonly<{
   raw: Readonly<{
     positive_top3_hits: number;
     safety_no_hits: number;
-    robustness_correct: number;
+    robustness_search_action_correct: number;
     forbidden_violations: number;
     source_correct: number;
     source_checked: number;
@@ -303,15 +307,23 @@ export async function evaluateG1aPackage(
   const hardFailed = failures.some((entry) => hardFailureCodes.has(entry.code));
   const robustnessNeedsReview = totals.robustness.correct !== totals.robustness.total;
   const synthetic = input.manifest.classification === 'synthetic';
-  let decision: G1aEvaluationReport['decision'] = 'PASS_CANDIDATE';
-  if (synthetic) decision = 'NOT_EVALUATED';
-  else if (hardFailed) decision = 'FAIL';
-  else if (robustnessNeedsReview) decision = 'REVIEW_REQUIRED';
+  let decision: G1aEvaluationReport['decision'] = 'REVIEW_REQUIRED';
+  let searchActionResult: G1aEvaluationReport['search_action_result'] = 'PASS_CANDIDATE';
+  if (synthetic) {
+    decision = 'NOT_EVALUATED';
+    searchActionResult = 'NOT_EVALUATED';
+  } else if (hardFailed) {
+    decision = 'FAIL';
+    searchActionResult = 'FAIL';
+  } else if (robustnessNeedsReview) {
+    searchActionResult = 'REVIEW_REQUIRED';
+  }
   return Object.freeze({
     schema: 'customer-agent/g1a-evaluation-report/v1',
     status: 'NOT_SIGNED',
     runner_result: hardFailed ? 'FAILED' : 'EXECUTABLE',
     decision,
+    search_action_result: searchActionResult,
     business_accuracy_claim: synthetic ? 'NOT_EVALUATED' : 'CANDIDATE_ONLY',
     downstream_action_evaluation: 'NOT_EVALUATED',
     network_observation_scope: 'NODE_TCP_FETCH_GUARD_ONLY',
@@ -335,15 +347,24 @@ export async function evaluateG1aPackage(
       local_p95_budget_ms: 300,
     }),
     strata: Object.freeze({
-      positive: Object.freeze(totals.positive),
-      safety_negative: Object.freeze(totals.safety_negative),
-      robustness: Object.freeze(totals.robustness),
+      positive: Object.freeze({
+        total: totals.positive.total,
+        search_action_correct: totals.positive.correct,
+      }),
+      safety_negative: Object.freeze({
+        total: totals.safety_negative.total,
+        search_action_correct: totals.safety_negative.correct,
+      }),
+      robustness: Object.freeze({
+        total: totals.robustness.total,
+        search_action_correct: totals.robustness.correct,
+      }),
     }),
     positive_strata: positiveStrataReport,
     raw: Object.freeze({
       positive_top3_hits: positiveTop3Hits,
       safety_no_hits: safetyNoHits,
-      robustness_correct: totals.robustness.correct,
+      robustness_search_action_correct: totals.robustness.correct,
       forbidden_violations: forbiddenViolations,
       source_correct: sourceCorrect,
       source_checked: sourceChecked,
@@ -354,6 +375,24 @@ export async function evaluateG1aPackage(
     }),
     failures: Object.freeze(failures),
   });
+}
+
+/**
+ * Fails the controlled-package CLI test when evaluation did not complete safely.
+ * T3 only evaluates search actions, so an executable report remains review-required
+ * until the separately governed downstream-action blind review is complete.
+ */
+export function assertExecutableG1aControlledReport(report: G1aEvaluationReport): void {
+  if (
+    report.classification !== 'approved_redacted'
+    || report.status !== 'NOT_SIGNED'
+    || report.runner_result !== 'EXECUTABLE'
+    || report.decision !== 'REVIEW_REQUIRED'
+    || report.downstream_action_evaluation !== 'NOT_EVALUATED'
+    || !['PASS_CANDIDATE', 'REVIEW_REQUIRED'].includes(report.search_action_result)
+  ) {
+    throw new Error('G1A_EVALUATION_NOT_EXECUTABLE');
+  }
 }
 
 export function assertScrubbedG1aReport(value: G1aEvaluationReport): void {

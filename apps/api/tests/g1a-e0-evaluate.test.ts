@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SearchBackend } from '../src/search-service.js';
 import {
+  assertExecutableG1aControlledReport,
   assertScrubbedG1aReport,
   evaluateG1aPackage,
 } from './support/g1a-e0/evaluate.js';
@@ -160,13 +161,14 @@ describe('G1A-E0 aggregate evaluator', () => {
       status: 'NOT_SIGNED',
       runner_result: 'EXECUTABLE',
       decision: 'NOT_EVALUATED',
+      search_action_result: 'NOT_EVALUATED',
       business_accuracy_claim: 'NOT_EVALUATED',
       downstream_action_evaluation: 'NOT_EVALUATED',
       denominator: 50,
       raw: {
         positive_top3_hits: 20,
         safety_no_hits: 12,
-        robustness_correct: 18,
+        robustness_search_action_correct: 18,
         backend_errors: 0,
         event_writes: 0,
         process_guard_attempts: 0,
@@ -178,7 +180,7 @@ describe('G1A-E0 aggregate evaluator', () => {
     expect(JSON.stringify(report)).not.toContain('合成答案');
   });
 
-  it('only emits a candidate decision for an approved-redacted package', async () => {
+  it('keeps the overall decision under review when only approved-redacted search actions pass', async () => {
     const report = await evaluateG1aPackage(
       backend(),
       evaluationPackage('approved_redacted'),
@@ -188,9 +190,12 @@ describe('G1A-E0 aggregate evaluator', () => {
     expect(report).toMatchObject({
       status: 'NOT_SIGNED',
       runner_result: 'EXECUTABLE',
-      decision: 'PASS_CANDIDATE',
+      decision: 'REVIEW_REQUIRED',
+      search_action_result: 'PASS_CANDIDATE',
       business_accuracy_claim: 'CANDIDATE_ONLY',
+      downstream_action_evaluation: 'NOT_EVALUATED',
     });
+    expect(() => assertExecutableG1aControlledReport(report)).not.toThrow();
   });
 
   it('fails closed on a release-source binding mismatch', async () => {
@@ -202,6 +207,9 @@ describe('G1A-E0 aggregate evaluator', () => {
 
     expect(report.runner_result).toBe('FAILED');
     expect(report.decision).toBe('FAIL');
+    expect(report.search_action_result).toBe('FAIL');
+    expect(() => assertExecutableG1aControlledReport(report))
+      .toThrow('G1A_EVALUATION_NOT_EXECUTABLE');
     expect(report.failures.some((failure) => failure.code === 'SOURCE_BINDING_MISMATCH')).toBe(true);
   });
 
@@ -305,10 +313,23 @@ describe('G1A-E0 aggregate evaluator', () => {
       { eventWrites: 0, processGuardAttempts: 0 },
     );
 
-    expect(report.raw.robustness_correct).toBe(0);
+    expect(report.raw.robustness_search_action_correct).toBe(0);
     expect(report.runner_result).toBe('EXECUTABLE');
     expect(report.decision).toBe('REVIEW_REQUIRED');
+    expect(report.search_action_result).toBe('REVIEW_REQUIRED');
     expect(report.failures.filter((failure) => failure.code === 'EXPECTED_TOP3_MISS')).toHaveLength(18);
+    expect(() => assertExecutableG1aControlledReport(report)).not.toThrow();
+  });
+
+  it('rejects a synthetic report at the controlled-package execution gate', async () => {
+    const report = await evaluateG1aPackage(
+      backend(),
+      evaluationPackage('synthetic'),
+      { eventWrites: 0, processGuardAttempts: 0 },
+    );
+
+    expect(() => assertExecutableG1aControlledReport(report))
+      .toThrow('G1A_EVALUATION_NOT_EXECUTABLE');
   });
 
   it('fails when event writes or process-guarded network attempts are observed', async () => {

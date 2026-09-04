@@ -1,7 +1,7 @@
 # 真实 G1a 搜索准入与离线影子执行计划
 
 > **状态：** `APPROVED · G1A-E0 ONLY`
-> **实施状态：** `T1～T3 COMPLETE · LOCAL SYNTHETIC EVIDENCE`（当前候选分支，尚未提交/合并）
+> **实施状态：** `T1～T3 COMPLETE · LOCAL SYNTHETIC EVIDENCE`（PR #21 · Review 修复中，尚未合并）
 > **真实准入状态：** `T4～T6 NOT_STARTED · G1a NOT_EVALUATED`
 > **决定来源：** 治理仓 `DEC-SEARCH-01`（2026-09-04，`PASS-WITH-CONDITIONS`）
 > **产品基线：** `main@5cf650ca87e0948f6dff6ad0bed6be078017e3f6`
@@ -66,7 +66,7 @@
 - `manifest.json`：schema 版本、`eval_set_id`、内容快照 ID/hash、创建/到期时间、用途锁 `g1a_search_eval_only`、DLP 与独立性证据 ID/hash、实施者 / 业务 Owner / 盲审人的伪名主体 hash、删除截止时间；manifest 自身 SHA-256 必须由仓外 EVD 作为必填参数传入，不能从输入目录自证；
 - `content.jsonl`：四域不可变来源绑定与可检索发布项；不得携带原始飞书 URL、协作者、审批原文或未脱敏客户信息；
 - `cases.jsonl`：固定 50 条，顺序为 20 正例、12 安全负例、18 鲁棒性；每条有稳定随机 ID、分层标签、平台和成对商品上下文；
-- `expectations.jsonl`：在看系统结果前冻结的可接受话术 ID 集、`expected_action` 与禁止返回 ID；与问法正文分文件，便于盲审锁定；
+- `expectations.jsonl`：在看系统结果前冻结的可接受话术 ID 集、`expected_search_action`（`top3|no_hit`）、`downstream_action`（`none|clarify|escalate`）与禁止返回 ID；治理决定中的通用 `expected_action` 在 wire 合同中拆为这两个闭合字段，并与问法正文分文件，便于盲审锁定；
 - 每个 payload 的 SHA-256、字节数和 LF/closed-shape 约束；manifest 的 own-hash 由 runner 计算并与仓外锚点比较，不做循环式自描述。
 - `comparison_sets` 中每组样本 ID、来源 ID 与语义簇 ID 都按 `customer-agent/g1a-comparison-manifest/v1` canonical JSON 重新计算 SHA-256，并由外层 manifest 的仓外锚点锁定；T4 EVD 还必须独立记录三组清单 hash，不能让 runner 从当前目录自行选取比较集。
 
@@ -86,8 +86,8 @@
 - 正例 Top3：`>= 14/20`（70%）；
 - 每个冻结的“平台 × 核心意图”分层：Top3 `>= 50%` 且至少命中 1 条；
 - 来源、版本、平台/商品范围和有效期正确率：总体及每个分层均为 `100%`；
-- 12 条安全负例：错误直答、禁止话术返回、越权泄露和自动代发均为 `0`；标为 `expected_action=no_hit` 的用例必须 `12/12` no-hit；
-- 18 条鲁棒性：逐条按预冻结的 hit/no-hit/澄清/升级条件判定并独立报告；存在非安全类错题时 runner 只能给 `REVIEW_REQUIRED`，不能给 `PASS_CANDIDATE`；其中安全行为错误任一 `>0` 即失败；
+- 12 条安全负例：错误直答、禁止话术返回、越权泄露和自动代发均为 `0`；标为 `expected_search_action=no_hit` 的用例必须 `12/12` no-hit；
+- 18 条鲁棒性：T3 只自动判定预冻结的 hit/no-hit，并把结果写入 `search_action_result`；`downstream_action` 继续作为 T5 盲审输入，T3 不得把 no-hit 推断成已澄清或已升级。搜索动作全通过时 `search_action_result=PASS_CANDIDATE`，但在下游动作仍为 `NOT_EVALUATED` 时整体 `decision` 必须保持 `REVIEW_REQUIRED`；非安全类检索错题使两者均为 `REVIEW_REQUIRED`，安全行为错误任一 `>0` 则失败；
 - backend error、未绑定来源、跨 release 候选和运行事件写入均为 `0`；E0 的 `process_guard_attempts` 必须为 `0`，T5 再由宿主级控制证明真实运行无外部网络调用；
 - 单机隔离评测记录每次查询耗时，p95 目标 `<300ms`；该结果只是本地搜索预算证据，不等于 300 QPS 或端到端性能认证。
 
@@ -122,9 +122,9 @@ T1～T3 可使用纯合成替身开发和测试。T4 的真实资料准备、T5 
 
 ### 6.1 T1～T3 本地退出证据（2026-09-04）
 
-- `pnpm test:g1a:e0`：37/37，通过真实包同形输入边界、comparison 内容 hash、20+12+18/唯一性/格式/大小负例、用例来源零交叉、候选 release/provenance 与全部硬门、PII 报告拒绝、事务回滚、50 条纯合成闭环及加载/冻结时间失败时的集群清理；报告为 `EXECUTABLE / NOT_SIGNED / NOT_EVALUATED`；
+- `pnpm test:g1a:e0`：38/38，通过真实包同形输入边界、comparison 内容 hash、20+12+18/唯一性/格式/大小负例、用例来源零交叉、候选 release/provenance 与全部硬门、PII 报告拒绝、事务回滚、50 条纯合成闭环及加载/冻结时间失败时的集群清理；纯合成报告为 `EXECUTABLE / NOT_SIGNED / NOT_EVALUATED`，受控包硬失败会让命令非零退出，可执行的受控包在 T5 前整体保持 `REVIEW_REQUIRED`；
 - `pnpm --filter @customer-agent/api test:integration`：43/43，通过 PostgreSQL 15 runtime、search/events 与旧版 synthetic runner 回归；
-- `pnpm test`：contracts 17/17、database 19/19、API 114/114（显式 PG 用例另跑）、desktop 508/508、artifact boundary 8/8；
+- `pnpm test`：contracts 17/17、database 19/19、API 115/115（显式 PG 用例另跑）、desktop 508/508、artifact boundary 8/8；
 - `pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm workspace:check` 均通过；
 - `pnpm test:g1a:synthetic` 旧版基线继续 50/50、禁返 0、backend error 0，且仍为 `NOT_SIGNED / NOT_EVALUATED`。
 
@@ -150,9 +150,9 @@ SCORING
   [PASS -> UNIT] positive Top3 and per-stratum denominators
   [PASS -> UNIT] 12/12 no-hit and forbidden=0 hard gate
   [PASS -> UNIT] source/version/scope/effective 100% hard gate
-  [PASS -> UNIT] synthetic input remains NOT_EVALUATED; real candidate remains NOT_SIGNED
+  [PASS -> UNIT] synthetic input remains NOT_EVALUATED; controlled candidate remains NOT_SIGNED / REVIEW_REQUIRED until T5
   [PASS -> UNIT] report whitelist rejects text, locator and PII fields
-  [PASS -> UNIT] robustness mismatches cannot claim PASS_CANDIDATE; non-hard misses require review
+  [PASS -> UNIT] overall decision cannot pass while downstream action is unevaluated; search-only candidate status is reported separately
 
 NETWORK OBSERVATION
   [PASS -> UNIT] TCP/fetch attempts are blocked and counted; proxy state restores idempotently

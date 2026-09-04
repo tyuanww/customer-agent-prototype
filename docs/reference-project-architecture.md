@@ -90,7 +90,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 `DEV-M1 W3/W4` 由 `EventRepository` 拥有 runtime `PoolClient` 事务、版本化 HMAC 幂等、fencing 和事件状态机。搜索在同一事务内完成受控检索、`query_events`、精确候选四元组和 `idempotency_complete`；当前只放行 synthetic，查询文本固定 suppressed。来源拒绝先回滚业务事务，再用新连接写不含原文/定位符的审计。Adoption 由数据库唯一键保证 first-wins，`adopted` 只代表成功复制；Escalation 保持非终态并按 query/action 返回稳定事实。只有搜索成功而 telemetry INSERT 单独不可用时返回零事件的 `collection_disabled`。
 
-`G1A-E0 T1～T3` 只存在于 API 测试支持目录：读取器要求仓外绝对规范路径、0700 根目录、0600 当前用户普通文件、固定四成员、无软/硬链、大小/LF/canonical JSON、仓外 manifest SHA-256 锚点、与实际 ID 清单绑定的 comparison manifest hash、DLP/独立性 EVD 和 20+12+18 冻结分母；装载器在一次性 PostgreSQL 15 中用正式 question/governance hash 与四域 source gate 做事务内后验，任一失败整批回滚。runner 以 `REPEATABLE READ READ ONLY` 事务调用同一 `SearchBackend/SearchRepository`，保持 HTTP、事件和桌面不参与。Node 网络守卫的观察面显式为 `NODE_TCP_FETCH_GUARD_ONLY`，`process_guard_attempts=0` 不能冒充宿主级零出站或 OS 沙箱；成功或失败都必须关闭 client、停止集群并删除临时目录，报告只保留白名单聚合字段，鲁棒性错题不得输出 `PASS_CANDIDATE`。该实现不进入 `apps/api/dist`，纯合成结果固定为 `NOT_SIGNED / NOT_EVALUATED`。
+`G1A-E0 T1～T3` 只存在于 API 测试支持目录：读取器要求仓外绝对规范路径、0700 根目录、0600 当前用户普通文件、固定四成员、无软/硬链、大小/LF/canonical JSON、仓外 manifest SHA-256 锚点、与实际 ID 清单绑定的 comparison manifest hash、DLP/独立性 EVD 和 20+12+18 冻结分母；装载器在一次性 PostgreSQL 15 中用正式 question/governance hash 与四域 source gate 做事务内后验，任一失败整批回滚。runner 以 `REPEATABLE READ READ ONLY` 事务调用同一 `SearchBackend/SearchRepository`，保持 HTTP、事件和桌面不参与。Node 网络守卫的观察面显式为 `NODE_TCP_FETCH_GUARD_ONLY`，`process_guard_attempts=0` 不能冒充宿主级零出站或 OS 沙箱；成功或失败都必须关闭 client、停止集群并删除临时目录，报告只保留白名单聚合字段。T3 仅自动评估 `expected_search_action`，其候选结论写入 `search_action_result`；`downstream_action` 在 T5 前保持 `NOT_EVALUATED`，因此整体 `decision` 不得提前通过，硬失败还会使受控包命令非零退出。该实现不进入 `apps/api/dist`，纯合成结果固定为 `NOT_SIGNED / NOT_EVALUATED`。
 
 ## 3. 三个窗口和安全边界
 

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { assertExecutableG1aControlledReport } from './support/g1a-e0/evaluate.js';
 import { runG1aEvaluationPackage } from './support/g1a-e0/runner.js';
 
 const describeControlledPackage = process.env.CUSTOMER_AGENT_API_G1A_E0_PACKAGE === '1'
@@ -21,7 +22,14 @@ describeControlledPackage('G1A-E0 controlled package runner', () => {
     });
 
     process.stdout.write(`G1A_E0_REPORT ${JSON.stringify(completed)}\n`);
-    expect(completed.report.status).toBe('NOT_SIGNED');
+    assertExecutableG1aControlledReport(completed.report);
+    expect(completed.report).toMatchObject({
+      classification: 'approved_redacted',
+      status: 'NOT_SIGNED',
+      runner_result: 'EXECUTABLE',
+      decision: 'REVIEW_REQUIRED',
+      downstream_action_evaluation: 'NOT_EVALUATED',
+    });
     expect(completed.runtime).toMatchObject({
       postgres_major: 15,
       transaction_isolation: 'repeatable read',
