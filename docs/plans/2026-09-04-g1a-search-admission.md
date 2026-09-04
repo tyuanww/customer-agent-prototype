@@ -1,12 +1,12 @@
 # 真实 G1a 搜索准入与离线影子执行计划
 
 > **状态：** `APPROVED · G1A-E0 ONLY`
-> **实施状态：** `T1～T3 COMPLETE · LOCAL SYNTHETIC EVIDENCE`（PR #21 · Review 修复中，尚未合并）
+> **实施状态：** `T1～T3 COMPLETE · MERGED SYNTHETIC EVIDENCE`（PR #21 · `main@be33c0e` · post-merge CI run `33849888116` 三条 lane 全绿）
 > **真实准入状态：** `T4～T6 NOT_STARTED · G1a NOT_EVALUATED`
 > **决定来源：** 治理仓 `DEC-SEARCH-01`（2026-09-04，`PASS-WITH-CONDITIONS`）
-> **产品基线：** `main@5cf650ca87e0948f6dff6ad0bed6be078017e3f6`
-> **治理基线：** `main@c64ed231efd7b432cdee9b866677909b3d8a86d7`
-> **当前分支：** `codex/g1a-search-admission`
+> **产品基线：** `main@be33c0e6e6b95264449525fd6a067ee164204093`
+> **治理基线：** `main@6427b8f352d574a7031fba293ee656875f86fa22`
+> **实现归档：** PR #21（候选头 `ec97528`，合并头 `be33c0e`）
 > **授权边界：** 只放行本计划 T1～T3 的离线工具与合成替身实现；真实数据导出、复制、装载与运行须在对应 EVD 完成后另行执行。本文不授权 DEV-M2、桌面 adapter、飞书运行接入、外部模型、自动发送、部署或 Pilot。
 
 ## 1. 结论
@@ -111,16 +111,18 @@
 
 | 任务 | 状态 | 范围 | 退出证据 | 可并行 |
 | --- | --- | --- | --- | --- |
-| T1 | **COMPLETE · LOCAL** | 定义仓内 G1a manifest/case/expectation schema 与纯合成替身 | closed-shape、50 条分母、hash、用途锁、过期和交叉负例 | 与 T4 业务准备并行 |
-| T2 | **COMPLETE · LOCAL** | 实现仓外路径读取器和前置 verifier | 读取正文前验 manifest；路径/符号链接/权限/大小失败关闭；错误不回显正文 | T1 后 |
-| T3 | **COMPLETE · LOCAL** | 实现隔离 PG15 evaluation release loader、SearchBackend runner、聚合报告和清理 | 无 HTTP/事件；同一 SearchBackend；事务内 source-gate 后验与整批回滚；报告白名单；Node TCP/fetch 守卫与清理正反例 | T2 后 |
+| T1 | **COMPLETE · MERGED** | 定义仓内 G1a manifest/case/expectation schema 与纯合成替身 | closed-shape、50 条分母、hash、用途锁、过期和交叉负例 | 与 T4 业务准备并行 |
+| T2 | **COMPLETE · MERGED** | 实现仓外路径读取器和前置 verifier | 读取正文前验 manifest；路径/符号链接/权限/大小失败关闭；错误不回显正文 | T1 后 |
+| T3 | **COMPLETE · MERGED** | 实现隔离 PG15 evaluation release loader、SearchBackend runner、聚合报告和清理 | 无 HTTP/事件；同一 SearchBackend；事务内 source-gate 后验与整批回滚；报告白名单；Node TCP/fetch 守卫与清理正反例 | T2 后 |
 | T4 | **NOT STARTED** | 在仓外准备真实四域内容快照、50 条评测集、DLP 与删除计划 | `EVD-G1A-DATA-01`、`EVD-G1A-EVALSET-01` | 不属于代码提交 |
 | T5 | **NOT STARTED** | 冻结关键词基线和独立盲审答案，运行一次真实 G1a | `EVD-G1A-BLIND-01`、原始分母和失败清单 | T3、T4 后 |
 | T6 | **NOT STARTED** | 业务 Owner + QA 复核阈值、失败关闭、清理证明并签发 | `EVD-G1A-RUN-01`、`EVD-G1A-SIGN-01` | T5 后 |
 
 T1～T3 可使用纯合成替身开发和测试。T4 的真实资料准备、T5 的真实运行和 T6 的签发分别是独立动作；任何一个未完成都不能把状态写成 G1a Pass。
 
-### 6.1 T1～T3 本地退出证据（2026-09-04）
+### 6.1 T1～T3 合并退出证据（2026-09-04）
+
+- PR #21 已以候选头 `ec97528` 合并为 `main@be33c0e6e6b95264449525fd6a067ee164204093`；合并后 CI run `33849888116` 的 Linux canonical、PostgreSQL 15 integration 与 Windows feasibility smoke 三条 lane 全绿；
 
 - `pnpm test:g1a:e0`：38/38，通过真实包同形输入边界、comparison 内容 hash、20+12+18/唯一性/格式/大小负例、用例来源零交叉、候选 release/provenance 与全部硬门、PII 报告拒绝、事务回滚、50 条纯合成闭环及加载/冻结时间失败时的集群清理；纯合成报告为 `EXECUTABLE / NOT_SIGNED / NOT_EVALUATED`，受控包硬失败会让命令非零退出，可执行的受控包在 T5 前整体保持 `REVIEW_REQUIRED`；
 - `pnpm --filter @customer-agent/api test:integration`：43/43，通过 PostgreSQL 15 runtime、search/events 与旧版 synthetic runner 回归；
@@ -129,6 +131,18 @@ T1～T3 可使用纯合成替身开发和测试。T4 的真实资料准备、T5 
 - `pnpm test:g1a:synthetic` 旧版基线继续 50/50、禁返 0、backend error 0，且仍为 `NOT_SIGNED / NOT_EVALUATED`。
 
 未运行 `pnpm test:g1a:e0:package`：当前没有获批的仓外真实输入包与外部 manifest SHA-256 锚点。未运行 Electron E2E 或真实设备测试：本切片没有修改桌面运行入口，且它们不能替代真实 G1a。
+
+### 6.2 T4 受控准备清单（未启动）
+
+T4 只在双仓之外的受控工作区执行，且开始前必须满足以下条件：
+
+- 明确仓外根目录、唯一访问人、用途锁、保留期限和删除时间；该目录不得位于本仓或治理仓工作树内；
+- 为四域内容快照分别记录来源版本、导出时间、文件级 SHA-256、DLP 结论和批准证据 ID，不在 Git 中记录正文、URL 或定位符；
+- 独立冻结 20 条正例、12 条安全负例、18 条鲁棒性用例，并生成与 dev/train/G1b 的样本、来源和语义簇零交叉证明；
+- 盲审答案由唯一实现者之外的人员在看到系统输出前锁定；实现者只接收外层 manifest 锚点和运行授权；
+- 预先写明成功、失败、超时和宿主异常后的清理步骤，以及不含正文的删除证明字段。
+
+当前仅完成清单归档，`EVD-G1A-DATA-01`、`EVD-G1A-EVALSET-01` 与 `EVD-G1A-BLIND-01` 仍为 `NOT READY`；未创建、复制或读取任何真实内容。
 
 ## 7. 验证计划
 

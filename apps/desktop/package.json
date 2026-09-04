@@ -1,6 +1,6 @@
 {
   "name": "@customer-agent/desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "客服话术浮窗本地 Demo：狐狸头 → 玻璃查询胶囊 → Top 3 → 人工选择 → 复制；另含静态合成 Dashboard",
   "author": "Customer Agent Demo",

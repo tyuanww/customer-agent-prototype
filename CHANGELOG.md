@@ -4,6 +4,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-04
+
 ### Changed
 
 - Clarified that Menokin is the single current customer-service pilot and the v3 synthetic implementation is its `PILOT-S0` validation stage, not a separate Demo project.
@@ -15,6 +17,9 @@ All notable changes to this customer-agent product implementation repository are
 - Added the `DEV-M0-W3` local Application API bootstrap: named-profile configuration rejects unsafe or unavailable runtime modes before Fastify construction, while the only registered route is a contract-validated loopback `/health` probe.
 - Added the `DEV-M0-W4` PostgreSQL 15 migration control plane: nine source-locked immutable migrations, a private provenance ledger, one-session advisory locking, per-migration atomic transactions, and exact post-apply verification remain isolated from API and desktop runtime wiring.
 - Added the `DEV-M0-W5` runtime repository boundary: a private local-only PostgreSQL pool, contract-valid `/ready`, single-flight deadlines, exact runtime role/ACL/search-dependency proofs, and hard-off auth/storage/content checks remain isolated from desktop and migration-owner capabilities.
+- Completed `DEV-M1` through PR #17～#20 with mock auth / policy, the controlled `SearchBackend`, transactional Search + Events, and a 50-case synthetic runner that remains `NOT_SIGNED / NOT_EVALUATED`.
+- Merged the `G1A-E0` T1～T3 offline admission harness through PR #21, including fail-closed external-package validation, isolated PostgreSQL 15 execution, aggregate-only reporting, and positive/negative cleanup evidence.
+- Archived the next T4 boundary as an external controlled-workspace checklist; no real data read, copy, evaluation run, runtime integration, deployment, or release activation is included.
 
 ### Fixed
 
@@ -27,6 +32,7 @@ All notable changes to this customer-agent product implementation repository are
 - Made W4 reject bare pools, same-session re-entry, untracked schemas/types/relations, ledger drift, unknown transaction acknowledgements, and any ACL, function-owner/config, trigger, or Phase-1 policy-key manifest drift; generated outputs now publish and roll back as two complete directories.
 - Split the ordinary workspace test lane from the PostgreSQL 15 integration lane so routine UI work stays lightweight while `pnpm test:db` remains the required full database gate.
 - Closed W5 review gaps by rejecting deadline-late successes, reverse runtime-login membership, arbitrary non-owner `public` schema CREATE, transitive search helper drift, and `digest` ownership outside its `pgcrypto` extension; compiled package and main-entry smoke now exercise `/ready` and graceful SIGINT.
+- Reconciled the repository charter and G1a admission plan with the merged PR #21 / `main@be33c0e` product baseline and `main@6427b8f` governance baseline, removing stale local-candidate wording.
 
 ### Verification
 
@@ -38,6 +44,8 @@ All notable changes to this customer-agent product implementation repository are
 - W3 also passed an actual loopback `/health` HTTP 200 check, graceful SIGINT shutdown, and a pre-listen production/external-bind rejection. Electron E2E was not rerun because desktop code and trust boundaries remain unchanged; no DB, auth provider, business route, real data, deployment, or runtime activation exists in this slice.
 - W4 locally passed Node.js 24.19.0 lint/typecheck, 18 database unit tests, compiled-package smoke, and 10 isolated PostgreSQL 15 integration tests including server-version refusal, runtime SQL non-disclosure, two-client serialization, same-client rejection, DDL/ledger rollback atomicity, exact security-manifest mutation rejection, retry, unknown COMMIT recovery, and untracked-object refusal.
 - W5 review fixes passed lint, four-package typecheck, 567 Vitest tests plus 1 explicitly skipped PG15 scenario in the ordinary lane, four compiled-package/main smokes, build, workspace policy, immutable contract verification, and the explicit 18/18 API lane containing one isolated PostgreSQL 15 mutation scenario. Electron E2E was not rerun because W5 changes no desktop code or trust boundary.
+- PR #21 post-merge CI run `33849888116` passed the Linux canonical, PostgreSQL 15 integration, and Windows feasibility smoke lanes; T1～T3 evidence remains synthetic and does not establish a real G1a decision.
+- The 0.2.1 closeout passed lint, typecheck, 51 test files with 508 tests, 8 formal-artifact boundary tests, build, workspace policy, and deterministic contract/migration checks on Node.js 24.19.0 / pnpm 11.19.0. Real-package, Electron E2E, device, deployment, and production checks were intentionally not run because this closeout changes documentation and release metadata only.
 
 ## [0.2.0] - 2026-08-20
 
