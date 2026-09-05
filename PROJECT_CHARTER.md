@@ -5,6 +5,8 @@
 > **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 与 `DEV-M1` 已完成，DEV-M1 W0～W5 通过 PR #17～#20 合并 mock auth / policy、受控 SearchBackend、Search + Events 事务和 50 条纯合成 runner（`main@5cf650c`，CI run `33785347931` 三条 lane 全绿）。`G1A-E0` T1～T3 已通过 PR #21 合并到 `main@be33c0e`，合并后 CI run `33849888116` 三条 lane 全绿；其证据仍是纯合成并固定为 `NOT_SIGNED / NOT_EVALUATED`。桌面仍未接 API，真实内容、飞书运行接入、部署与 Pilot 均未放行
 > **目录名说明：** `customer-agent-prototype` 是历史目录名，不再代表仓库只做原型。
 
+> **G1a 状态核对（2026-09-05）：** 上述 PR #21 是 T1～T3 的历史实现基线；共享来源装载修复已由 PR #24 合并至 `4dbee4b`。真实准入为 `T4 READY（历史静态验收，运行前重验）· T5 ATTEMPTED / BLOCKED · NOT_EVALUATED · T6 NOT SIGNED`，不构成上线或运行接入放行。后续动态进展查阅 [G1a 实施计划](docs/plans/2026-09-04-g1a-search-admission.md)，批准与真实证据以治理仓 `DEC-SEARCH-01` 为准。
+
 ## 1. 两个仓库各自负责什么
 
 | 仓库 | 主责 | 不负责 |
@@ -39,7 +41,7 @@
 - 正式合同快照继续保持 `ddev_authorized=false`、`runtime_activated=false`；W3 新增 loopback Fastify `/health` 与配置拒启矩阵，W4 从受锁 DDL 快照确定性生成九个不可变 migration，并完成私有账本、同会话 advisory lock、逐段事务、失败关闭后验及隔离 PG15 测试。W5 已新增一个 runtime pool owner 与合同 `/ready`：database/schema 做真实只读检查，auth/storage/content 在 M1/M2 前固定 `not_ready`。W6 已建立 clean-checkout CI、Windows hosted-runner smoke 和非部署型正式服务候选产物后验。API 不自动执行 migration、不注册九业务端口，也不把 desktop 或真实数据接入运行链。
 - 真实数据、飞书运行接入、Pilot、付费、遥测、自动发送、部署和发布均未放行。
 - DEV-M1 已完成 mock auth / policy、受控 SearchBackend、Search + Events 事务及 50 条纯合成 runner；最终 `main@5cf650c`、CI run `33785347931` 三条 lane 全绿。该 runner 只证明执行链可重复，固定为 `NOT_SIGNED / NOT_EVALUATED`，不能替代真实 G1a。
-- `DEC-SEARCH-01` 已冻结真实 G1a 的 20+12+18 分母、阈值和隔离边界；`G1A-E0` T1～T3 已通过 PR #21 合并到 `main@be33c0e`：仓外输入验证、隔离 PG15、同一 SearchBackend、零事件、聚合脱敏报告及成功/失败清理证据均已具备。该证据仍是纯合成、`NOT_SIGNED / NOT_EVALUATED`；真实输入包、真实运行和签字均未开始。
+- `DEC-SEARCH-01` 已冻结真实 G1a 的 20+12+18 分母、阈值和隔离边界；`G1A-E0` T1～T3 已通过 PR #21 合并到 `main@be33c0e`：仓外输入验证、隔离 PG15、同一 SearchBackend、零事件、聚合脱敏报告及成功/失败清理证据均已具备。该工具证据仍是纯合成、`NOT_SIGNED / NOT_EVALUATED`，不替代真实评测；真实准入当前记录与后续入口见页头核对说明，不再沿用 T1～T3 收尾时的“均未开始”状态。
 
 ### 保留开发基线：`PILOT-S0 · SYNTHETIC`
 
@@ -51,7 +53,7 @@
 
 ### 后续：真实 G1a `T4～T6` 与 `DEV-M2～DEV-M4`
 
-- G1A-E0 T1～T3 的工具实现已通过 PR #21 合并到 `main@be33c0e` 并形成纯合成证据；下一步只在仓外准备真实数据、独立盲审和删除计划，随后分别授权真实运行与签字。真实 G1a Pass 后，再按独立授权在**本仓**推进正式 Windows adapter、内容治理、指标、工单分析和发布链路。
+- G1A-E0 的工具修复合并不等于真实 G1a 通过。真实运行前必须重验包有效期、权限、外部 manifest 锚点和清理条件，展示 dry-run 后取得对应运行授权；过期不运行、不自动延期。真实结果复核与 T6 签发仍是独立动作。真实 G1a Pass 后，再按独立授权在**本仓**推进正式 Windows adapter、内容治理、指标、工单分析和发布链路。
 - 正式能力必须通过窄 adapter 和明确的信任边界接入；不得把 renderer 直连数据库/API，也不得把合成类型直接升格为正式合同。
 - 原型模式保留为开发、演示和回归环境，但必须与正式配置、数据和证据分账。
 
@@ -70,8 +72,8 @@
 ## 5. 每次开始工作的检查顺序
 
 1. 先读本文件，确认仓库身份和当前模式。
-2. 再读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`，确认当前交互和工程基线。
+2. 按 `AGENTS.md` 的任务路由读取相关规则；涉及桌面代码、交互或接入时，再读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`，确认当前交互和工程基线。
 3. 查看当前分支、工作树和 `docs/plans/` 中计划的显式状态，禁止把 `ROUGH` 草案当作获批计划。
-4. `DEV-M0` 与 `DEV-M1` 已完成；`docs/plans/2026-09-04-g1a-search-admission.md` 的 G1A-E0 T1～T3 已通过 PR #21 合并，下一步是仓外 T4 真实证据包准备。合成 profile 改动仍按 S0 计划约束。
+4. `DEV-M0` 与 `DEV-M1` 已完成；通过 `docs/plans/2026-09-04-g1a-search-admission.md` 核对 G1A-E0 的当前实现、真实评测状态和下一授权动作，不从历史 T1～T3 快照推断 T4～T6 尚未开始或已经放行。合成 profile 改动仍按 S0 计划约束。
 5. 只有涉及正式范围或阶段门时，才去 `ai-赋能立项` 核对对应真源；不要把整个文档仓复制进来。
 6. 同一 Menokin 试点内分别汇报合成验证、正式产品开发和上线证据；分账不等于拆成多个项目。

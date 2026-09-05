@@ -4,24 +4,36 @@
 
 ## 1. 指令定位与权威顺序
 
+- 遵守宿主的指令优先级；全局、父目录与本仓规则在各自范围内共同适用，更深目录的规则只作用于对应子树。本文件不覆盖系统或开发者指令。用户明确的任务范围与限制优先于 Skill 默认流程。
+- 本文件拥有仓库级执行方法；下述 SSOT 按领域拥有事实与合同，不是把某份文档的全部操作步骤套用到每项任务。阶段状态按章程和对应批准记录核对，不在这里复制动态完成状态。
+
 本文件是仓库级工作入口，只定义稳定边界、模块职责和执行方法；不要把像素、动画时长、测试矩阵或发布步骤复制到这里。
 
-- 本仓是客服 Agent 的**产品实施仓**，目标覆盖正式开发、测试、打包与上线；`customer-agent-prototype` 只是历史目录名。Menokin 是当前唯一试点，当前已实现的 v3 合成内容属于同一试点的 `PILOT-S0 · SYNTHETIC`，不是平行 Demo 项目，也不等于 `DEV-M0`、真实数据接入或上线已获授权。
-- 完整阅读 `PROJECT_CHARTER.md`，以其作为仓库身份、仓间关系与生命周期模式的 SSOT。`ai-赋能立项` 只负责项目进度、批准范围和阶段门记录；两仓保持独立工作区与 Git 历史，不做跨仓运行时依赖。
-- 涉及代码、交互或架构变更前，完整阅读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`。
-- `DESIGN.md` 是产品、视觉和交互不变量的 SSOT；`DEVELOPMENT_BRIEF.md` 是工程与验收边界的 SSOT；`docs/reference-project-architecture.md` 记录当前模块归属；`docs/how-to-verify-desktop.md` 记录分层验证方法。
-- 发现用户要求、实现与上述文档冲突时，先说明冲突及影响，不得静默选择一套或复制出新的规则。
+- 本仓是客服 Agent 的**产品实施仓**，目标覆盖正式开发、测试、打包与上线；`customer-agent-prototype` 只是历史目录名。Menokin 是当前唯一试点，桌面 v3 合成内容属于同一试点的 `PILOT-S0 · SYNTHETIC`，不是平行 Demo 项目。桌面合成验证不代表正式能力、真实数据接入或上线获准；也不能据此推断独立 API / 合同 / 数据库模块尚未开发。
+- 首次处理本仓任务、上下文缺失或生命周期发生变化时，完整阅读 `PROJECT_CHARTER.md`；同一上下文已读且未变化时无需重复。以其作为仓库身份、仓间关系与生命周期模式的 SSOT。`ai-赋能立项` 只负责项目进度、批准范围和阶段门记录；两仓保持独立工作区与 Git 历史，不做跨仓运行时依赖。
+- 首次修改桌面代码、交互或架构前，完整阅读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`；已读且未变化时复核受影响章节即可。纯解释、诊断、文档维护只读相关规则；API / 合同 / 数据库工作读取对应 `APPROVED` 计划与架构边界，涉及桌面交互或接入时再读桌面文档。不全面扫描无关文件。
+- `DESIGN.md` 是产品、视觉和交互不变量的 SSOT；`DEVELOPMENT_BRIEF.md` 是桌面 v3 合成基线工程与验收边界的 SSOT；`docs/reference-project-architecture.md` 记录当前模块归属；`docs/how-to-verify-desktop.md` 记录分层验证方法。
+- 发现用户要求、实现与上述文档冲突时，说明具体来源与影响。若当前授权足以明确解决，按授权推进并在范围内更新对应规则；若涉及未获批正式能力、安全门或实质歧义，只暂停依赖该决定的部分，继续独立且已授权的工作。不得用实现结果替代阶段批准。
+
+### 1.1 任务范围、自主执行与完成标准
+
+- “解释 / 检查 / 诊断 / 审查 / 只做计划”默认只读，以结论、证据、影响和建议完成，不自动修复。用户同时明确要求“修复 / 优化 / 实施 / 修改”时，完成指定范围内的修改和适度验证，不停在计划或能力说明。
+- 已授权且范围明确的日常工作自主推进；常规实现选择、只读核验、范围内可逆修改不重复请求确认。只有缺少会实质影响结果的信息，或下一动作超出授权时才询问；询问时说明缺失信息或授权边界。
+- 授权在同一任务中持续有效，可由一次明确指令同时覆盖多个动作；不要按工具调用次数重复索取授权。“继续”仅推进已授权范围。遇到真正阻塞时，报告证据、已完成部分及需要的下一步，不把未完成项写成完成。
+- Skill、测试失败或顺手发现的问题不自动扩大任务范围。只读任务不因发现可修问题而转为实施；实施任务完成相关修复与验证后停止，不自动开展全仓重构、发布或下一阶段。
 
 ## 2. 不可破坏的产品与安全边界
 
-- **当前 S0 合成模式**只使用合成 fixture。不得读取或提交真实飞书、客户数据、凭证、URL 或 token。Menokin 企业工作簿只允许在仓外受控证据流程中只读提取结构与聚合；不得把原文、订单、图片、批次、员工、快递或竞品评价写入仓库或未获批运行链路。
-- PostgreSQL、OAuth、线上 API、埋点和正式数据属于本仓后续产品化范围，但只能在获批计划、Ddev、合同和安全门齐备后进入独立模块；不得在当前 renderer 中临时直连。外部模型、自动学习和自动发送继续按专项批准管理。
+- **桌面 S0 合成模式及未获批真实数据的开发 / 测试链路**只使用合成 fixture。不得读取或提交真实飞书 / 客户数据及其内部 URL、凭证或 token；公开技术文档链接与合成本地测试地址不在此禁令内。Menokin 企业工作簿只允许在仓外受控证据流程中只读提取结构与聚合；不得把原文、订单、图片、批次、员工、快递或竞品评价写入仓库或未获批运行链路。
+- PostgreSQL、OAuth、线上 API、埋点和正式数据按各自获批计划、Ddev、合同和安全门进入独立模块；已有开发 / 测试实现不代表真实运行接入已放行，也不应被误判为全仓禁止后端。不得在当前 renderer 中临时直连。外部模型、自动学习和自动发送继续按专项批准管理。
 - 复制成功只表示“已复制”，不得推断或暗示已发送、已采纳、回答正确或问题已解决。
 - Electron renderer 不得获得 Node.js 权限；所有窗口保持 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`。
 - Fox / Query renderer 只能通过类型化、白名单 preload API 请求原生能力，并按能力施加 sender / role / 必要时 main-frame 门禁；当前 Dashboard 保持无 preload。未来正式只读 adapter 必须单独评审，禁止通用 `send/on/invoke`、任意 channel、任意窗口控制和文件系统能力。
-- commit、push、创建 PR、merge、deploy 分别需要用户对当前变更明确授权；前一阶段的授权不得自动扩大到下一阶段。
+- commit、push、创建 PR、merge、deploy 分别需要用户对当前变更明确授权；前一阶段的授权不得自动扩大到下一阶段；已明确覆盖的动作无需再次确认。发布 / 外发、向他人发送消息、凭据处理和重要数据删除同样需要相应明确授权，不由 Skill 默认步骤或“测试通过”代替。
 
 ## 3. 模块边界与依赖方向
+
+以下细则描述桌面模块；`apps/api/`、`packages/contracts/`、`packages/database/`、根脚本与合同快照的所有权以 `docs/reference-project-architecture.md` 和对应获批合同为准，不把桌面无后端 / 无 preload 等局部约束外推到整个 workspace。
 
 - `apps/desktop/src/main/`：唯一拥有 Electron / OS、BrowserWindow、原生 bounds、应用生命周期、Electron sender 身份判定和原生副作用；可复用 `shared` 中的纯授权谓词。
 - `apps/desktop/src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。
@@ -71,41 +83,50 @@
 
 ## 5. 变更工作流
 
-1. `.codegraph/` 存在时，理解或定位代码先用 CodeGraph，再用 `rg` 补充；不要从文件名猜调用关系。
-2. 修改前检查工作树并保护用户已有改动。先写清本次变更的所有者、不变量、最小接口、失败路径和验证面。
-3. 中等以上结构变更至少比较两个边界方案，选择接口更简单、信息泄漏更少、调用方认知负担更低的方案。
-4. 实现完整可运行的纵向切片；不得留下伪按钮、未接线状态、临时重复常量或静默补丁。
+1. 需要理解或定位代码且 `.codegraph/` 存在时，先用可用的 CodeGraph；不可用、失败或结果不足 / 过时时，直接用定向 `rg` 和源码阅读继续，不询问是否降级。不为此自行安装或重建索引；纯文档 / 规则检查无需 CodeGraph。不要从文件名猜调用关系。
+2. 修改前检查工作树并保护用户已有改动。代码 / 交互 / 架构变更前简述所有者、不变量、最小接口、失败路径和验证面；小修改可用简短说明，不强制另写计划文件。文档修改说明目标与核验方式即可。
+3. 涉及模块所有权迁移、跨进程合同或状态机重组的中等以上结构变更，至少比较两个边界方案，选择接口更简单、信息泄漏更少、调用方认知负担更低的方案。
+4. 功能实施应完成本次授权的可运行纵向切片；不得留下伪按钮、未接线状态、临时重复常量或静默补丁。
 5. Bug 若暴露重复知识、错误抽象或缺失不变量，应在授权范围内修根因；超出范围时明确记录债务、影响和后续入口，不用特殊分支伪装完成。
-6. 实现后按浅模块、pass-through、信息泄漏、重复、特殊情况、隐含顺序和晦涩命名做一次设计复审。
+6. 结构性实现后按浅模块、pass-through、信息泄漏、重复、特殊情况、隐含顺序和晦涩命名做一次设计复审；普通局部修改只复核受影响设计，不默认启动额外 Skill、多模型或子 agent 流程。
 
 ## 6. 验证与证据
 
-- 仅在依赖缺失或锁文件变化时安装依赖；统一使用 Node.js 24.x 与 pnpm，提交 `pnpm-lock.yaml` 的有效变化。
-- 先跑受影响模块的窄测试，再按影响面扩展。代码变更至少实际运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`。
-- Float / handoff / 原生窗口行为追加 `pnpm test:float` 与相关 Electron E2E；品牌资产追加 `pnpm test:assets`；Dashboard 追加对应 component / E2E。具体路由以 `docs/how-to-verify-desktop.md` 为准。
+- 仅在依赖缺失或锁文件变化时安装依赖；统一使用 Node.js 24.x 与项目锁定的 pnpm，保留 `pnpm-lock.yaml` 的必要有效变化；是否提交仍受第 2 节授权约束。
+- 验证按任务与风险选择：纯解释 / 诊断以必要的只读证据或安全复现完成；纯文档、注释与规则修改检查差异、引用和一致性（如 `git diff --check`），不默认安装依赖、启动应用或跑全量构建。
+- 局部代码修改先运行受影响的测试及相关 lint / typecheck，涉及构建输入时追加 build。跨模块、公共合同、权限 / 安全边界、依赖或构建配置变更，以及完整基线验收 / 准备交付时，运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；影响面不确定时扩大验证并说明理由。获批计划或 CI 的专项门禁仍须执行。
+- `DEVELOPMENT_BRIEF.md` 的完整基线完成定义用于对应基线验收；`docs/how-to-verify-desktop.md` 提供命令与证据边界。日常任务如何选取检查以本节为准，不将文档中的“本轮”建议视作永久全量要求。通过后仅因新修改、失败或未解决风险重复运行；不能为得到干净工作树而自动提交或丢弃改动。
+- Float 行为变更运行 `pnpm test:float`；handoff / 原生窗口集成变更追加相关 Electron E2E，完整 drag-settle 需覆盖其专项矩阵，不能只用 float 快测代替。品牌资产变更追加 `pnpm test:assets`；Dashboard 局部行为运行对应 component，涉及窗口生命周期 / 信任边界时追加相关 E2E。具体路由以 `docs/how-to-verify-desktop.md` 为准。
 - 生成物、打包或目录调整追加 `pnpm workspace:check`；正式打包只使用对应 package 脚本及其 fail-closed 后验。
 - 自动化不得冒充真实 Stage Manager、Dock、系统焦点、签名 / 公证或 Windows 合成器证据。未实机验证的项目必须明确标为未确认。
 - 若环境阻塞，保留实现并报告命令、关键输出、阻塞层级和未验证范围；不得把“测试文件存在”写成 PASS。
 
 ## 7. 最终汇报
 
-最终回复至少包含：实现内容、影响的模块 / 信任边界、实际运行的命令与结果、未运行项、已知限制和 Git 状态。只有运行入口发生变化时才重复启动方法。
+按任务汇报：解释 / 诊断 / 审查给出结论、证据位置、影响及未确认项；实施任务说明修改内容、影响的模块 / 信任边界、实际验证结果、相关未运行项与理由、已知限制及 Git 状态。纯文档任务可简短汇报，不套用无关的设备 / 发布清单。只有运行入口发生变化时才重复启动方法。
 
-## Skill routing
+## 8. Skill routing
 
-When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
+- 用户明确点名 Skill 时读取并使用该 Skill；未点名时按实际任务目标和流程收益选择，不因单个关键词或“拿不准”强制调用。简单解释、规则维护和局部修改不默认进入完整评审管线。
+- 使用宿主实际提供的 Skill 加载方式；无专用 Skill 工具时读取对应 `SKILL.md`，不要等待不存在的工具。仅为审计 Skill 规则而阅读时，将其作为审计对象，不执行其启动脚本或工作流。
+- 先按第 1.1 节确定只读或实施范围，再执行 Skill 中适用的步骤。诊断阶段不自动进入修复，审查不自动 auto-fix，讨论 PR / 部署不自动执行 ship。Skill 不能扩大 Git、发布、消息、真实数据或付费授权。
+- 不把 Skill 的升级、遥测引导、安装、配置写回、自动 checkpoint commit 或跨任务同步当作当前任务的必要步骤；只有用户明确要求或当前授权确实覆盖时执行。无关引导不阻塞主任务。
+- 已明确的偏好和模型 / 外部模型路由保持有效，不擅自换模型。仅在用户要求或实际采用的 Skill 明确需要且任务范围允许时使用多模型 / 子 agent；不把某个 Skill 的内部编排变成所有任务的默认流程。产品运行链中的外部模型仍按第 2 节专项批准。
+- 工具不可用时，区分必要信息与可选流程：缺少必要信息才停下询问；可选步骤可用等价方法完成或说明未执行，不伪报 Skill / 外部模型审查完成。
 
-Key routing rules:
-- Product ideas/brainstorming → invoke /office-hours
-- Strategy/scope → invoke /plan-ceo-review
-- Architecture → invoke /plan-eng-review
-- Design system/plan review → invoke /design-consultation or /plan-design-review
-- Full review pipeline → invoke /autoplan
-- Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
-- Code review/diff check → invoke /review
-- Visual polish → invoke /design-review
-- Ship/deploy/PR → invoke /ship or /land-and-deploy
-- Save progress → invoke /context-save
-- Resume context → invoke /context-restore
-- Author a backlog-ready spec/issue → invoke /spec
+下列是任务匹配入口，不是每次都要执行的清单：
+
+| 任务 | Skill 入口与范围 |
+| --- | --- |
+| 产品构思 / 头脑风暴 | `/office-hours` |
+| 战略 / 范围评审 | `/plan-ceo-review` |
+| 架构方案评审 | `/plan-eng-review` |
+| 设计系统 / 设计计划评审 | `/design-consultation` 或 `/plan-design-review` |
+| 用户要求完整评审管线 | `/autoplan` |
+| Bug 根因诊断或修复 | `/investigate`；只读诊断止于证据与建议，明确授权修复后才实施 |
+| 验证应用行为 | 只读报告用 `/qa-only`；明确要求测试并修复用 `/qa` |
+| 代码评审 / diff 检查 | `/review`；默认只读，自动修复步骤须有修改授权 |
+| 视觉质量审查 / 优化 | `/design-review`；按用户要求区分报告与修改 |
+| 执行交付 / 部署 | `/ship` 或 `/land-and-deploy`；每个动作仍受已有明确授权约束 |
+| 保存 / 恢复进度 | `/context-save` / `/context-restore` |
+| 编写可进入 backlog 的 spec / issue | `/spec`；远端建 issue 须在用户请求范围内 |
