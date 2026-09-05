@@ -403,6 +403,8 @@ function parseContent(value: unknown): G1aContentItem {
   if (questions.some((question) => question.intent_taxonomy_version !== taxonomyVersion || question.intent_id !== intentId)) fail('G1A_INPUT_CONTENT_INVALID');
   const riskCategories = stringArray(record.risk_categories, 'G1A_INPUT_CONTENT_INVALID', { max: 7 });
   if (riskCategories.some((category) => !RISK_CATEGORIES.has(category))) fail('G1A_INPUT_CONTENT_INVALID');
+  // Match the frozen database risk contract before any PG runtime is created.
+  if ((record.risk_level === 'high') !== (riskCategories.length > 0)) fail('G1A_INPUT_CONTENT_INVALID');
   const primaryHash = requiredString(record.primary_reviewer_id_hash, 'G1A_INPUT_CONTENT_INVALID', { pattern: SHA256 });
   const dualRequired = record.risk_level === 'high' || record.has_conflict === true;
   if (dualRequired !== (record.review_mode === 'dual') || record.primary_reviewer_role !== 'ROLE-CONTENT-LEAD') fail('G1A_INPUT_CONTENT_INVALID');
@@ -419,6 +421,7 @@ function parseContent(value: unknown): G1aContentItem {
     || answer.replaceAll('{订单号}', '').replaceAll('{日期}', '').match(/[{}]/u)) fail('G1A_INPUT_CONTENT_INVALID');
   const effectiveFrom = isoInstant(record.effective_from, 'G1A_INPUT_CONTENT_INVALID');
   const effectiveTo = record.effective_to === null ? null : isoInstant(record.effective_to, 'G1A_INPUT_CONTENT_INVALID');
+  if (record.domain === 'campaign' && effectiveTo === null) fail('G1A_INPUT_CONTENT_INVALID');
   if (effectiveTo !== null && Date.parse(effectiveFrom) >= Date.parse(effectiveTo)) fail('G1A_INPUT_CONTENT_INVALID');
   return Object.freeze({
     script_id: opaqueIdentifier(record.script_id, 'G1A_INPUT_CONTENT_INVALID'),

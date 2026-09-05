@@ -114,6 +114,58 @@ async function expectInputError(
 }
 
 describe('G1A-E0 input package boundary', () => {
+  it.each([
+    { label: 'low with risk category', risk_level: 'low', risk_categories: ['campaign_rules'] },
+    { label: 'medium with risk category', risk_level: 'medium', risk_categories: ['campaign_rules'] },
+    { label: 'high without risk category', risk_level: 'high', risk_categories: [] },
+    { label: 'high with single review', risk_level: 'high', risk_categories: ['campaign_rules'], review_mode: 'single' },
+    { label: 'same-subject dual review', secondary_reviewer_id_hash: 'a'.repeat(64) },
+  ])('rejects $label before database loading', async ({ label: _label, ...changes }) => {
+    const created = await fixture();
+    const anchor = await rewritePayload(created.inputRoot, 'content.jsonl', (rows) => {
+      Object.assign(rows[0]!, {
+        risk_level: 'high', risk_categories: ['campaign_rules'], has_conflict: false,
+        review_mode: 'dual', primary_reviewer_id_hash: 'a'.repeat(64),
+        secondary_reviewer_id_hash: 'b'.repeat(64), secondary_reviewer_role: 'ROLE-CS-MANAGER',
+        secondary_review_evd: 'EVD-SYNTHETIC-SECOND-REVIEW',
+      }, changes);
+      if (changes.risk_level === 'low' || changes.risk_level === 'medium') {
+        Object.assign(rows[0]!, { review_mode: 'single', secondary_reviewer_id_hash: null,
+          secondary_reviewer_role: null, secondary_review_evd: null });
+      }
+    });
+    await expectInputError(() => readG1aEvaluationPackage(created.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT, expectedManifestSha256: anchor,
+    }), 'G1A_INPUT_CONTENT_INVALID');
+  });
+
+  it.each(['low', 'medium', 'high'] as const)('accepts schema-valid %s risk/review shape', async (level) => {
+    const created = await fixture();
+    const anchor = await rewritePayload(created.inputRoot, 'content.jsonl', (rows) => {
+      Object.assign(rows[0]!, { risk_level: level, risk_categories: level === 'high' ? ['campaign_rules'] : [] });
+      if (level === 'high') Object.assign(rows[0]!, { review_mode: 'dual',
+        primary_reviewer_id_hash: 'a'.repeat(64), secondary_reviewer_id_hash: 'b'.repeat(64),
+        secondary_reviewer_role: 'ROLE-CS-MANAGER', secondary_review_evd: 'EVD-SYNTHETIC-SECOND-REVIEW' });
+    });
+    // Input shape only: this does not certify governance hashes or reviewer identity.
+    const parsed = await readG1aEvaluationPackage(created.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT, expectedManifestSha256: anchor,
+    });
+    expect(parsed.content[0]?.risk_level).toBe(level);
+  });
+
+  it('rejects a campaign without an end date before database loading', async () => {
+    const created = await fixture();
+    const anchor = await rewritePayload(created.inputRoot, 'content.jsonl', (rows) => {
+      const campaign = rows.find((row) => row.domain === 'campaign');
+      expect(campaign).toBeDefined();
+      campaign!.effective_to = null;
+    });
+    await expectInputError(() => readG1aEvaluationPackage(created.inputRoot, {
+      repositoryRoot: REPOSITORY_ROOT, expectedManifestSha256: anchor,
+    }), 'G1A_INPUT_CONTENT_INVALID');
+  });
+
   it('accepts the exact off-repo synthetic substitute with an external manifest anchor', async () => {
     const packageFixture = await fixture();
     const verified = await readG1aEvaluationPackage(packageFixture.inputRoot, {

@@ -2,14 +2,25 @@
 
 > **状态：** `APPROVED · G1A-E0 ONLY`
 > **实施状态：** `T1～T3 COMPLETE · MERGED SYNTHETIC EVIDENCE`（PR #21 · `main@be33c0e` · post-merge CI run `33849888116` 三条 lane 全绿）
-> **真实准入状态：** `T4 READY（历史静态验收，运行前重验）· T5 ATTEMPTED / BLOCKED · T6 NOT SIGNED · G1a NOT_EVALUATED`（2026-09-05 回填；治理仓拥有批准与真实证据）
+> **真实准入状态：** `T4 HISTORICAL READY / RISK REVALIDATION REQUIRED · T5 ATTEMPTED / BLOCKED · T6 NOT SIGNED · G1a NOT_EVALUATED`（2026-09-05；历史验收保留，当前包不能据此重跑；治理仓拥有批准与真实证据）
 > **决定来源：** 治理仓 `DEC-SEARCH-01`（2026-09-04，`PASS-WITH-CONDITIONS`）
-> **当前产品基线：** `main@4dbee4b4da3b52fcf261309562320859bba03c0f`（PR #24；合并后 CI run `33930030132` 三路全绿；原 T1～T3 基线见实现归档）
-> **治理基线：** `main@6427b8f352d574a7031fba293ee656875f86fa22`
+> **当前产品基线：** `main@90197ffa399517a4fce56227ad1ef8735398a54d`（PR #25 状态回填；风险输入校验修正在独立候选分支，尚未合并）
+> **治理基线：** `main@e70b88fa25c2c527a3d562685a9245b345de43f7`（本轮读取的本地基线）
 > **实现归档：** PR #21（候选头 `ec97528`，合并头 `be33c0e`）
 > **授权边界：** 只放行本计划 T1～T3 的离线工具与合成替身实现；真实数据导出、复制、装载与运行须在对应 EVD 完成后另行执行。本文不授权 DEV-M2、桌面 adapter、飞书运行接入、外部模型、自动发送、部署或 Pilot。
 
 ## 1. 结论
+
+### 2026-09-05 风险输入校验修正（本地候选）
+
+- T5 ATTEMPT-06/07 已尝试但未生成评测报告。ATTEMPT-07 的受控诊断为 SQLSTATE `23514`、表 `release_items`；清理证据为 PASS，临时根目录与 PG 进程残留均为 0，真实输入未删除。
+- 仓外只读投影发现 33/33 条均为 medium 且风险类别非空，与冻结数据库风险合同冲突。旧装包器按域填类别并硬编码 medium/single，没有消费逐条审定输入；这一事实足以阻断装载，不代表其他风险已经排除。
+- 产品输入边界提前拒绝 low/medium 携带类别、high 无类别及活动缺少截止时间；保持既有高风险/冲突双审与数据库约束，不做自动改判或降级。
+- 仓外装包逻辑改为消费显式、来源绑定的审定合同；覆盖缺失审定、来源漂移、同主体双审及未决冲突。结构校验不是审核人身份和审批真实性的证明；旧包与历史锚点不修改。
+- 33 条逐条候选及空白待审模板仅在仓外生成，正式批准 0/33。完成真实审定后才可准备版本化新包、外部锚点和新基线 dry-run；不得复用历史 READY 直接重跑 T5。
+- 验证：输入边界 31/31；E0 纯合成（含隔离 PG15）54/54；仓外审定合同 8/8；lint、typecheck、test、build、workspace:check 均通过。未运行新的真实 T5，未签发 T6；不涉及桌面变更，未重复本地 Electron E2E。
+
+以下各节中的既往验证/修复记录保留其当时语境；当前重跑条件以上述状态为准。
 
 现有 `DEV-M1` 已具备可复用的 PostgreSQL 15 `SearchBackend`、四域 current-release 门、DB 侧 Top 3、来源/版本/范围过滤与纯合成 50 条 runner，但现有 HTTP 路由仍主动拒绝非 `synthetic`，桌面也仍使用本地合成检索。真实 G1a 不应通过放宽 `/v1/search` 或接入飞书来完成。
 
