@@ -18,7 +18,7 @@
 - `PROJECT_CHARTER.md`、`DESIGN.md`、`DEVELOPMENT_BRIEF.md` 和 `docs/reference-*.md` 是产品当前边界、交互和工程知识的稳定文档。
 - 源码、测试和构建证据记录“产品实现事实”；它们不能替代批准记录、G0 / Ddev 或生产验收证据。
 - `CHANGELOG.md`、`TODOS.md` 和带日期的审查/验证材料保留历史变化；历史材料可以追加勘误，但不覆盖已发生的记录。
-- 当前 v3 运行模式仍是 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。合成 fixture、Dashboard manifest 和本地运行结果不得写成真实接入、上线或客户验证。
+- 当前桌面 v3 运行模式仍是 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`；NO BACKEND 仅指桌面未连接后端，不代表独立 Application API、合同、数据库与 Search + Events 未实现。合成 fixture、Dashboard manifest 和本地运行结果不得写成真实接入、上线或客户验证。
 
 ## 3. 修改与交接规则
 
@@ -26,6 +26,7 @@
 2. 产品实现变化留在本仓，并用测试/构建命令形成可追溯证据；需要回填时向项目记录仓提交摘要和证据引用，不复制另一份动态状态。
 3. 产品仓文档不保存真实客户原文、飞书凭证、token、内部批准原话或未脱敏链接；正式 adapter、OAuth、数据库和线上 API 必须受当前获批里程碑及剩余数据 / 安全门约束，Ddev 开工不得被扩大解释为真实接入。
 4. 本地 Demo 不使用文件 watcher、跨仓运行时读取或飞书实时双向同步。需要查看项目动态时，人工打开项目记录仓生成的当前视图并刷新。
+5. 业务原表与项目主源副本分开留存；项目使用已确认的四域汇总工作簿，来源比较及表头补齐结论由项目记录仓的带日期证据保存。显示内容一致不等于可装包版本已冻结，更不替代权限、有效期、manifest 锚点和正式运行批准。不得为消除已确认的表头补齐而覆盖主源，也不把话术正文或内部链接写入本仓。
 
 ## 4. Menokin 单一试点的分阶段含义
 

@@ -2,10 +2,10 @@
 
 > **生效：** 2026-08-21
 > **仓库身份：** 客服 Agent 产品实施仓
-> **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 与 `DEV-M1` 已完成，DEV-M1 W0～W5 通过 PR #17～#20 合并 mock auth / policy、受控 SearchBackend、Search + Events 事务和 50 条纯合成 runner（`main@5cf650c`，CI run `33785347931` 三条 lane 全绿）。`G1A-E0` T1～T3 已通过 PR #21 合并到 `main@be33c0e`，合并后 CI run `33849888116` 三条 lane 全绿；其证据仍是纯合成并固定为 `NOT_SIGNED / NOT_EVALUATED`。桌面仍未接 API，真实内容、飞书运行接入、部署与 Pilot 均未放行
+> **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 与 `DEV-M1` 已完成，DEV-M1 W0～W5 通过 PR #17～#20 合并 mock auth / policy、受控 SearchBackend、Search + Events 事务和 50 条纯合成 runner（`main@5cf650c`，CI run `33785779859` 三条 lane 全绿）。`G1A-E0` T1～T3 已通过 PR #21 合并到 `main@be33c0e`，合并后 CI run `33849888116` 三条 lane 全绿；其证据仍是纯合成并固定为 `NOT_SIGNED / NOT_EVALUATED`。桌面仍未接 API，真实内容、飞书运行接入、部署与 Pilot 均未放行
 > **目录名说明：** `customer-agent-prototype` 是历史目录名，不再代表仓库只做原型。
 
-> **G1a 状态核对（2026-09-05）：** 上述 PR #21 是 T1～T3 的历史实现基线；共享来源装载修复已由 PR #24 合并至 `4dbee4b`。真实准入为 `T4 READY（历史静态验收，运行前重验）· T5 ATTEMPTED / BLOCKED · NOT_EVALUATED · T6 NOT SIGNED`，不构成上线或运行接入放行。后续动态进展查阅 [G1a 实施计划](docs/plans/2026-09-04-g1a-search-admission.md)，批准与真实证据以治理仓 `DEC-SEARCH-01` 为准。
+> **G1a 状态核对（2026-09-05）：** 上述 PR #21 是 T1～T3 的历史实现基线；共享来源装载修复已由 PR #24 合并至 `4dbee4b`。当前为 `T4 BLOCKED · T5 ATTEMPTED / BLOCKED · NOT_EVALUATED · T6 NOT SIGNED`，历史静态 READY 不代表当前可运行。四域业务版本已批准，负责人承接已确认；现行双审机器合同尚未转换，下一步是负责人承接合同落地与版本化新包准备，不重复要求业务重新审批，也不伪造第二审核人。后续动态进展查阅 [G1a 实施计划](docs/plans/2026-09-04-g1a-search-admission.md)，批准与真实证据以治理仓当前台账及追加决定为准。话术搜索上线是主线，AI 探索暂停；真实运行接入和上线尚未放行。
 
 ## 1. 两个仓库各自负责什么
 
@@ -40,7 +40,7 @@
 - W2 已在独立 `packages/contracts` 中完成确定性 bundle、TypeScript 类型、provenance、codegen manifest 与 132 个 component runtime validator；包构建产出 Node 可执行 `dist`，validator 按 schema 延迟编译，并保留合同的 `x-unique-by` 校验语义。
 - 正式合同快照继续保持 `ddev_authorized=false`、`runtime_activated=false`；W3 新增 loopback Fastify `/health` 与配置拒启矩阵，W4 从受锁 DDL 快照确定性生成九个不可变 migration，并完成私有账本、同会话 advisory lock、逐段事务、失败关闭后验及隔离 PG15 测试。W5 已新增一个 runtime pool owner 与合同 `/ready`：database/schema 做真实只读检查，auth/storage/content 在 M1/M2 前固定 `not_ready`。W6 已建立 clean-checkout CI、Windows hosted-runner smoke 和非部署型正式服务候选产物后验。API 不自动执行 migration、不注册九业务端口，也不把 desktop 或真实数据接入运行链。
 - 真实数据、飞书运行接入、Pilot、付费、遥测、自动发送、部署和发布均未放行。
-- DEV-M1 已完成 mock auth / policy、受控 SearchBackend、Search + Events 事务及 50 条纯合成 runner；最终 `main@5cf650c`、CI run `33785347931` 三条 lane 全绿。该 runner 只证明执行链可重复，固定为 `NOT_SIGNED / NOT_EVALUATED`，不能替代真实 G1a。
+- DEV-M1 已完成 mock auth / policy、受控 SearchBackend、Search + Events 事务及 50 条纯合成 runner；最终 `main@5cf650c`、CI run `33785779859` 三条 lane 全绿。该 runner 只证明执行链可重复，固定为 `NOT_SIGNED / NOT_EVALUATED`，不能替代真实 G1a。
 - `DEC-SEARCH-01` 已冻结真实 G1a 的 20+12+18 分母、阈值和隔离边界；`G1A-E0` T1～T3 已通过 PR #21 合并到 `main@be33c0e`：仓外输入验证、隔离 PG15、同一 SearchBackend、零事件、聚合脱敏报告及成功/失败清理证据均已具备。该工具证据仍是纯合成、`NOT_SIGNED / NOT_EVALUATED`，不替代真实评测；真实准入当前记录与后续入口见页头核对说明，不再沿用 T1～T3 收尾时的“均未开始”状态。
 
 ### 保留开发基线：`PILOT-S0 · SYNTHETIC`

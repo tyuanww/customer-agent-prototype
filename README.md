@@ -25,6 +25,8 @@
 | 启动并验证 W3～W5 的本机 `/health`、runtime pool 与 `/ready` | [apps/api/README.md](apps/api/README.md) |
 | 生成、核验并在隔离 PostgreSQL 15 中测试 W4 migration | [packages/database/README.md](packages/database/README.md) |
 | 核对 API 命名 profile、变量与失败关闭矩阵 | [docs/reference-api-runtime-config.md](docs/reference-api-runtime-config.md) |
+| 当前上线主线：真实话术搜索准入；通过后按授权推进桌面接线与上线验收 | [docs/plans/2026-09-04-g1a-search-admission.md](docs/plans/2026-09-04-g1a-search-admission.md) |
+| 已暂停的探索备忘：教师辅助选句与合成材料（不是上线前置条件） | [docs/plans/2026-09-05-script-selection-preparation.md](docs/plans/2026-09-05-script-selection-preparation.md) |
 | 查看当前 DEV-M0 切片、基线证据与下一步 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
 | 查看 W2 合同 codegen / runtime validation 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md](docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md) |
 | 查看 W3 API/config bootstrap 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md](docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md) |

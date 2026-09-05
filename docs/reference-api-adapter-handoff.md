@@ -19,11 +19,11 @@
 | 问题 | 答案 |
 | --- | --- |
 | 正式机器合同是否已进入产品仓？ | **已接收 schema v1.14、按双哈希验证，并生成类型/组件校验器与十一段 migration，但未激活。** 当前输入见 `contracts/upstream/customer-agent/contract-set.lock.json`；旧 v1.12/v1.13 十段 migration 不变，v1.14 只追加 `0011`。本机 PG15 测试不是业务 runtime 或生产证据。 |
-| Demo 现在有没有 API adapter？ | **没有。** `apps/desktop/src/` 内零 `fetch` / HTTP 客户端。Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。并行的 `apps/api` 已有 `/health`、`/ready` 与 runtime pool，但桌面不连接它，API 也不读业务内容。 |
+| Demo 现在有没有 API adapter？ | **没有。** Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。并行 `apps/api` 已实现 `/health`、`/ready`、mock auth / policy 与 synthetic-only Search + Events，能够在批准的测试链路读取合成内容；桌面不连接它，正式真实内容运行接入未放行。 |
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**类型、鉴权、事件、发布、租约必须重做**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
-| 本仓下一步该不该实现 adapter？ | **还不该。** DEV-M1 已完成，G1A-E0 T1～T3 也已形成本地候选证据；现在应先完成真实 G1a 的仓外受控快照、盲审、一次离线影子运行和签收。DEV-M2、真实飞书 auth 与 Windows Main adapter 仍需后续独立授权，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面模式继续保持 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。 |
+| 本仓下一步该不该实现 adapter？ | **尚未进入该阶段。** DEV-M1 与 G1A-E0 T1～T3 已合并；T4 历史准备已留证，但 Attempt06/07 未产生有效报告。四域业务版本已批准、负责人承接已确认，先完成现行机器合同转换与版本化新包，再按运行授权重验、评测和签收；具体进度见 [G1a 计划](plans/2026-09-04-g1a-search-admission.md)。DEV-M2、真实飞书 auth 与 Windows Main adapter 仍需后续独立授权，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面继续使用合成 profile。 |
 
 ---
 
