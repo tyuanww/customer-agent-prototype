@@ -135,6 +135,15 @@ const CANDIDATES = Object.freeze([
     fallback: '合成过期话术',
     temporal: 'expired',
   },
+  { id: 'script_11_ambiguous_cup_a', title: '合成甲杯售后流程', question: '合成甲杯售后流程', searchable: '合成 成甲 甲杯 杯售 售后 后流 流程', fallback: '合成甲杯售后流程' },
+  { id: 'script_12_ambiguous_cup_b', title: '合成乙杯售后流程', question: '合成乙杯售后流程', searchable: '合成 成乙 乙杯 杯售 售后 后流 流程', fallback: '合成乙杯售后流程' },
+  { id: 'script_13_negative_phrase', title: '可以不退货', question: '可以不退货', searchable: '可以 以不 不退 退货', fallback: '可以不退货' },
+  { id: 'script_14_numeric_phrase', title: '买1件送1件', question: '买1件送1件', searchable: '买1 1件 件送 送1 1件', fallback: '买1件送1件' },
+  { id: 'script_15_payment_phrase', title: '付款发货', question: '付款发货', searchable: '付款 款发 发货', fallback: '付款发货' },
+  { id: 'script_16_refund_phrase', title: '可以退款', question: '可以退款', searchable: '可以 以退 退款', fallback: '可以退款' },
+  { id: 'script_17_free_shipping_phrase', title: '退货免运费', question: '退货免运费', searchable: '退货 货免 免运 运费', fallback: '退货免运费' },
+  { id: 'script_18_chinese_number_phrase', title: '买一件送十一件', question: '买一件送十一件', searchable: '买一 一件 件送 送十 十一 一件', fallback: '买一件送十一件' },
+  { id: 'script_19_cup_phrase', title: '杯退货流程', question: '杯退货流程', searchable: '杯退 退货 货流 流程', fallback: '杯退货流程' },
 ] satisfies readonly CandidateFixture[]);
 
 function sha256(value: string): string {
@@ -316,7 +325,7 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     });
     await expect(runtime.query(
       "SELECT pg_catalog.count(*) FROM public.search_recommendable_scripts('qianniu', NULL, NULL)",
-    )).resolves.toMatchObject({ rows: [{ count: '5' }] });
+    )).resolves.toMatchObject({ rows: [{ count: '14' }] });
   });
 
   it('ranks exact question, exact title and phrase question deterministically inside database Top 3', async () => {
@@ -424,6 +433,35 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     expect(result?.['Execution Time']).toBeLessThan(250);
   });
 
+  it.each([
+    '不要告诉我什么时候发货，我要取消订单',
+    '不是问什么时候发货，我要查询退款进度',
+    '无条件保证今天必须发货',
+    '请问合成单品专用如何查询',
+    '您好请问怎么用呢',
+    '什么时候法货',
+    '合成杯售后流程',
+    '可以退货',
+    '买1件送11件',
+    '付款前发货',
+    '可以退全款',
+    '退货运费',
+    '买一件送一件',
+    '你好杯退货流程',
+    '我想了解合成分类专用,请说明流程',
+    '请问合成抖音专用呢',
+    '请问合成未来话术呢',
+    '请问合成过期话术呢',
+  ])('does not recall a different business condition from a near-match query: %s', async (normalizedQuery) => {
+    await expect(backend.search({ normalizedQuery, platform: 'qianniu', productContextType: null, productContextRef: null, topK: 3 }))
+      .resolves.toMatchObject({ ok: true, candidates: [] });
+  });
+
+  it('does not prevent a literal negative question from matching the approved phrase', async () => {
+    await expect(backend.search({ normalizedQuery: '可以不退货', platform: 'qianniu', productContextType: null, productContextRef: null, topK: 3 }))
+      .resolves.toMatchObject({ ok: true, candidates: [{ script_id: 'script_13_negative_phrase' }] });
+  });
+
   it('fails closed without inventing no-hit semantics when the four-source gate becomes unavailable', async () => {
     await owner.query(`
       SELECT public.suspend_authoritative_source(
@@ -432,12 +470,14 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
       )
     `);
 
-    await expect(backend.search({
-      normalizedQuery: '什么时候发货',
-      platform: 'qianniu',
-      productContextType: null,
-      productContextRef: null,
-      topK: 3,
-    })).resolves.toEqual({ ok: false, code: 'SOURCE_GATE_NOT_READY' });
+    for (const normalizedQuery of ['什么时候发货', '请问什么时候发货呢', '什么时发货']) {
+      await expect(backend.search({
+        normalizedQuery,
+        platform: 'qianniu',
+        productContextType: null,
+        productContextRef: null,
+        topK: 3,
+      })).resolves.toEqual({ ok: false, code: 'SOURCE_GATE_NOT_READY' });
+    }
   });
 });
