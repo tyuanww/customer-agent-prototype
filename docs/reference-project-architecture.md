@@ -213,3 +213,5 @@ Fox presence 的纯姿态解析、deadline 计算与数值几何保留在 `apps/
 - [`@customer-agent/contracts` 使用与边界](../packages/contracts/README.md)
 - [`@customer-agent/api` 使用与边界](../apps/api/README.md)
 - [`@customer-agent/database` 使用与边界](../packages/database/README.md)
+
+B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化输入到唯一新 v3 包的派生、完整读取校验与失败清理；复用 content-identity 和输入读取器，不拥有批准签发、真实资料抽取或评测运行。操作入口只在显式环境开关下执行，留在 test-support 边界内，不进入 API 产物。详见 [B4 实施记录](plans/2026-09-06-owner-package-assembler.md)。

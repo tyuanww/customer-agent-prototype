@@ -229,7 +229,9 @@ function decodeUtf8(bytes: Buffer, code: G1aInputErrorCode): string {
     fail(code);
   }
 }
-async function readSecureMember(root: string, name: string, maximum: number): Promise<Buffer> {
+/** Reads one fixed-name private file; callers own the allowed member set and root validation. */
+export async function readSecureMember(root: string, name: string, maximum: number): Promise<Buffer> {
+  if (path.basename(name) !== name || name === '.' || name === '..') fail('G1A_INPUT_MEMBER_INSECURE');
   try {
     const member = path.join(root, name);
     const before = await lstat(member, { bigint: true });
