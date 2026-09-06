@@ -4,6 +4,11 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+### Added
+
+- Consumed the immutable OpenAPI 1.12.0 / schema.v1.15 owner-acceptance contract from source commit `2c75d8e7670134e6aa95a4780ff09fe0422a65e8`, generating 133 component validators without runtime activation.
+- Appended atomic migration `0012_owner_acceptance_v1_15` while preserving all eleven prior migrations, with exact PostgreSQL object/ACL/role verification and expanded API search-dependency fingerprints.
+
 ## [0.2.1] - 2026-09-04
 
 ### Changed

@@ -55,6 +55,7 @@ const REQUIRED_TABLES = Object.freeze([
   'release_items', 'content_current', 'announcements', 'snapshot_offline_leases',
   'source_denial_audits', 'client_sync_state', 'policy_flags', 'idempotency_keys',
   'rate_limit_buckets', 'outbox_jobs', 'rewrite_logs',
+  'owner_acceptance_records', 'owner_acceptance_revocations',
 ]);
 const REQUIRED_VIEWS = Object.freeze(['v_release_source_gate', 'v_scripts_recommendable']);
 const REQUIRED_FUNCTION_SIGNATURES = Object.freeze([
@@ -79,7 +80,7 @@ const REQUIRED_FUNCTIONS = Object.freeze(
   REQUIRED_FUNCTION_SIGNATURES.map((signature) => signature.slice(0, signature.indexOf('('))),
 );
 const REQUIRED_SCHEMA_COMMENT_FRAGMENTS = Object.freeze([
-  'schema.v1.14',
+  'schema.v1.15',
   'Phase1 rewrite/auto_send/training hard-off',
 ]);
 const REQUIRED_POLICY_KEYS = Object.freeze([
@@ -89,14 +90,14 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
   'metrics_experimental_kpi',
   'rewrite',
 ]);
-const EXPECTED_ACL_MANIFEST_ENTRIES = 163;
-const EXPECTED_ACL_MANIFEST_SHA256 = '45d453e0f6b85a3eeab8eecd4f26101d0e00ca1a245081d5e3f9629c96a8a257';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1399;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '3ff010d385881c7a338c806e66d1960b37222aaa763512af72e7bf8290790876';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 143;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '701b3b9e6836870f5fb444fec686788bc79c2232ea65fbe3e9e60c3809615600';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 26;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'b946286810208ac9ec4f5f1b00efedada8d8e97270008be144f0d2f45f36df22';
+const EXPECTED_ACL_MANIFEST_ENTRIES = 170;
+const EXPECTED_ACL_MANIFEST_SHA256 = '240420b33a1cbc170aaa1931440cc3f526db3444f2f79e00f06005610b327ceb';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1446;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '6f7a7228db055670afd252b0ebe515609f1f11b489f1bcc704df05ca61cc75ae';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 159;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '82bdd31352628619c81cd8f2464d99813f5e67ec82b2da142bed8f142e969992';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 31;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'ff9f0bd07849fa9847655d02bc0fff32e5d2b5d988beb942120eadc504a33991';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -154,11 +155,11 @@ export async function verifyMigrationCatalogue(
           FROM pg_catalog.pg_auth_members membership
           JOIN pg_catalog.pg_roles member_role ON member_role.oid=membership.member
           JOIN pg_catalog.pg_roles granted_role ON granted_role.oid=membership.roleid
-          WHERE member_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker')
-             OR granted_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker')
+          WHERE member_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar')
+             OR granted_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar')
         ) AS memberships
       FROM pg_catalog.pg_roles role
-      WHERE role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker')
+      WHERE role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar')
     `);
   const aclResult = await verifyQuery<ManifestRow>(client, `
     WITH acl_entries(entry) AS (
@@ -666,10 +667,10 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 40 || inventory.views !== 2 || inventory.functions !== 143 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 42 || inventory.views !== 2 || inventory.functions !== 159 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
-  if (!roles || roles.total !== 5 || roles.safe !== 5 || roles.memberships !== 0) {
+  if (!roles || roles.total !== 6 || roles.safe !== 6 || roles.memberships !== 0) {
     failures.push('capability role safety');
   }
   if (!acl || acl.entries !== EXPECTED_ACL_MANIFEST_ENTRIES || sha256(acl.manifest) !== EXPECTED_ACL_MANIFEST_SHA256) {

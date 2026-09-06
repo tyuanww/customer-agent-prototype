@@ -669,6 +669,41 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** G1a bounded owner acceptance metadata (not runtime authorization) */
+        OwnerAcceptanceRecord: {
+            /** @constant */
+            schema: "customer-agent/owner-acceptance/v1";
+            /** @constant */
+            review_mode: "owner_acceptance";
+            /** @constant */
+            purpose: "g1a_offline_only";
+            owner_subject_hash: string;
+            approval_evidence_id: string;
+            accepted_at: string;
+            expires_at: string;
+            scope: {
+                source_bindings: {
+                    /** @enum {unknown} */
+                    domain: "aftersale" | "campaign" | "presale" | "product";
+                    source_version_id: string;
+                    snapshot_sha256: string;
+                    review_due_at: string;
+                }[];
+                items: {
+                    script_id: string;
+                    script_version: number;
+                    /** @enum {unknown} */
+                    domain: "aftersale" | "campaign" | "presale" | "product";
+                    source_version_id: string;
+                    review_input_sha256: string;
+                    /** @enum {unknown} */
+                    risk_level: "low" | "medium" | "high";
+                    risk_categories: ("refund_compensation" | "price_discount" | "campaign_rules" | "efficacy_safety_claim" | "account_privacy" | "complaint_escalation" | "legal_commitment")[];
+                    /** @constant */
+                    has_conflict: false;
+                }[];
+            };
+        };
         /**
          * @description 只允许来自服务端验签后的会话 claims。
          * @enum {string}
@@ -1006,7 +1041,7 @@ export interface components {
         /** @description high 必须至少一类；low/medium 必须为空数组。 */
         RiskCategories: components["schemas"]["RiskCategory"][];
         /** @enum {string} */
-        ReviewMode: "single" | "dual";
+        ReviewMode: "single" | "dual" | "owner_acceptance";
         /** @enum {string} */
         PlaceholderKey: "order_id" | "date";
         /** @enum {string} */

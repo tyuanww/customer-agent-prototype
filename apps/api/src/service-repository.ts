@@ -86,7 +86,7 @@ interface RuntimeSchemaProbeRow extends QueryResultRow {
 interface RuntimePolicyFlagsRow extends QueryResultRow, ServicePolicyFlags {}
 
 const EXPECTED_SCHEMA_PREFIX = `CS-AI-C11 ${CONTRACT_PROVENANCE.database_version};`;
-const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = '09cfe4377c648bff69fdc706ee369ee53c689d06915bc90ce2541b4000af45d0';
+const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = 'cf33ad08f0e6ef34dfa6f212e69aaac151a69603d69ee52db32c9e7bd02333ec';
 const RUNTIME_SCHEMA_PROBE = `
   WITH expected_runtime_relation_acl(relation_name, privilege_type) AS (
     VALUES
@@ -157,7 +157,11 @@ const RUNTIME_SCHEMA_PROBE = `
       ('public.content_public_questions(jsonb)'),
       ('public.jsonb_jcs(jsonb)'),
       ('public.content_utc_timestamp_text(timestamp with time zone)'),
-      ('public.digest(bytea,text)')
+      ('public.digest(bytea,text)'),
+      ('public.owner_acceptance_release_ready(text)'),
+      ('public.owner_acceptance_active_record(text,text,text)'),
+      ('public.owner_acceptance_sources_ready(text,jsonb)'),
+      ('public.owner_acceptance_instant(jsonb)')
   ),
   guarded_user_schemas AS (
     SELECT oid, nspname, nspowner, nspacl
@@ -542,7 +546,7 @@ const RUNTIME_SCHEMA_PROBE = `
             'search_path=pg_catalog, public, pg_temp'
           ]::text[]
           AND (
-            SELECT pg_catalog.count(*) = 11
+            SELECT pg_catalog.count(*) = 15
               AND pg_catalog.encode(
                 pg_catalog.sha256(
                   pg_catalog.convert_to(

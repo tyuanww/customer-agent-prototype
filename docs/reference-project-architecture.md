@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。已合并 G1A-E0 T1～T3 的测试专用离线评测链；桌面 adapter、正式飞书鉴权、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。已合并 G1A-E0 T1～T3 的测试专用离线评测链；桌面 adapter、正式飞书鉴权、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -37,7 +37,7 @@
 contracts/upstream（不可变输入；同一受锁 snapshot）
   ├─ packages/contracts（bundle / generated TS / runtime validator）
   │    └─ apps/api → health / ready / mock auth / policy（loopback only）
-  └─ packages/database（0001..0011 / catalogue / ledger / verify）
+  └─ packages/database（0001..0012 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
 apps/api（DEV-M1 COMPLETE）
@@ -68,7 +68,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | 根 `scripts/` | 合同快照接收、workspace 卫生门、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
-| `packages/database/` | 在同一已验证快照内确定性生成十一段 migration；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成十二段 migration；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -91,6 +91,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 `DEV-M1 W3/W4` 由 `EventRepository` 拥有 runtime `PoolClient` 事务、版本化 HMAC 幂等、fencing 和事件状态机。搜索在同一事务内完成受控检索、`query_events`、精确候选四元组和 `idempotency_complete`；当前只放行 synthetic，查询文本固定 suppressed。来源拒绝先回滚业务事务，再用新连接写不含原文/定位符的审计。Adoption 由数据库唯一键保证 first-wins，`adopted` 只代表成功复制；Escalation 保持非终态并按 query/action 返回稳定事实。只有搜索成功而 telemetry INSERT 单独不可用时返回零事件的 `collection_disabled`。
 
 `G1A-E0 T1～T3` 只存在于 API 测试支持目录：读取器要求仓外绝对规范路径、0700 根目录、0600 当前用户普通文件、固定四成员、无软/硬链、大小/LF/canonical JSON、仓外 manifest SHA-256 锚点、与实际 ID 清单绑定的 comparison manifest hash、DLP/独立性 EVD 和 20+12+18 冻结分母；装载器在一次性 PostgreSQL 15 中用正式 question/governance hash 与四域 source gate 做事务内后验，任一失败整批回滚。runner 以 `REPEATABLE READ READ ONLY` 事务调用同一 `SearchBackend/SearchRepository`，保持 HTTP、事件和桌面不参与。Node 网络守卫的观察面显式为 `NODE_TCP_FETCH_GUARD_ONLY`，`process_guard_attempts=0` 不能冒充宿主级零出站或 OS 沙箱；成功或失败都必须关闭 client、停止集群并删除临时目录，报告只保留白名单聚合字段。T3 仅自动评估 `expected_search_action`，其候选结论写入 `search_action_result`；`downstream_action` 在 T5 前保持 `NOT_EVALUATED`，因此整体 `decision` 不得提前通过，硬失败还会使受控包命令非零退出。该实现不进入 `apps/api/dist`，纯合成结果固定为 `NOT_SIGNED / NOT_EVALUATED`。
+
+`负责人承接 B1/B2` 接收固定 source Git 的 OpenAPI 1.12.0 / schema.v1.15，根接收器校验版本和双路径的封闭配对。生成器保持 0001–0011 不变，把六段 owner 增量提取为一个原子 0012；数据库后验涵盖新增两表、NOLOGIN 登记角色及函数/触发器/ACL，API readiness 把四个新增搜索依赖加入受信摘要。登记能力不授予 runtime；G1a 输入、loader 与真实准入仍由后续独立切片负责。实施证据见 [B1/B2 记录](plans/2026-09-06-owner-contract-consumption.md)。
 
 ## 3. 三个窗口和安全边界
 
