@@ -132,13 +132,16 @@ function requireSafeDirectoryOrMissing(directory, label) {
   }
 }
 
-export function buildM0FormalCandidate({ projectRoot = repositoryRoot } = {}) {
+export function buildM0FormalCandidate({ projectRoot = repositoryRoot, check = false } = {}) {
   const resolvedProjectRoot = realpathSync(path.resolve(projectRoot));
   requireCleanWorktree(resolvedProjectRoot);
   execFileSync('pnpm', ['build'], {
     cwd: resolvedProjectRoot,
     stdio: 'inherit',
   });
+  if (check) {
+    execFileSync('pnpm', ['test:built'], { cwd: resolvedProjectRoot, stdio: 'inherit' });
+  }
   requireCleanWorktree(resolvedProjectRoot);
   const { releaseRoot, candidateRoot } = safeCandidatePath(resolvedProjectRoot);
   requireSafeDirectoryOrMissing(releaseRoot, 'RELEASE_ROOT');
@@ -201,7 +204,11 @@ export function buildM0FormalCandidate({ projectRoot = repositoryRoot } = {}) {
 const invokedDirectly = process.argv[1]
   && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (invokedDirectly) {
-  const result = buildM0FormalCandidate();
+  const args = process.argv.slice(2);
+  if (args.length > 1 || args.some((arg) => arg !== '--check')) {
+    throw new Error('M0_FORMAL_CANDIDATE_ARGUMENT_INVALID');
+  }
+  const result = buildM0FormalCandidate({ check: args.includes('--check') });
   console.log(
     `M0 formal runtime candidate built: ${result.manifest.artifacts.length} files at ${result.candidateRoot}`,
   );

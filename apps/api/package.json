@@ -24,7 +24,9 @@
     "test:g1a:e0:synthetic": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_G1A_E0_SYNTHETIC=1 vitest run tests/g1a-e0-input-package.test.ts tests/g1a-e0-boundary.test.ts tests/g1a-e0-evaluate.test.ts tests/g1a-e0-synthetic.integration.test.ts",
     "test:g1a:e0:package": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_G1A_E0_PACKAGE=1 vitest run tests/g1a-e0.runner.test.ts",
     "test": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && vitest run && pnpm test:package",
-    "assemble:g1a:owner": "pnpm --filter @customer-agent/contracts build:runtime && CUSTOMER_AGENT_G1A_ASSEMBLE=1 vitest run tests/g1a-owner-assembly.runner.test.ts"
+    "assemble:g1a:owner": "pnpm --filter @customer-agent/contracts build:runtime && CUSTOMER_AGENT_G1A_ASSEMBLE=1 vitest run tests/g1a-owner-assembly.runner.test.ts",
+    "test:package:built": "node --test tests/package-entry.smoke.mjs tests/main-entry.smoke.mjs",
+    "test:built": "vitest run && pnpm test:package:built"
   },
   "dependencies": {
     "@customer-agent/contracts": "workspace:*",

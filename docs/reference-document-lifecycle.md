@@ -20,6 +20,8 @@
 - `CHANGELOG.md`、`TODOS.md` 和带日期的审查/验证材料保留历史变化；历史材料可以追加勘误，但不覆盖已发生的记录。
 - 当前桌面 v3 运行模式仍是 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`；NO BACKEND 仅指桌面未连接后端，不代表独立 Application API、合同、数据库与 Search + Events 未实现。合成 fixture、Dashboard manifest 和本地运行结果不得写成真实接入、上线或客户验证。
 
+当前一期任务统一从[执行清单](plans/2026-09-06-execution-goal.md)恢复。章程和 README 只链接入口；带日期的计划保存当时的批准、设计和证据，页头明确历史属性。功能说明随功能交付；merge SHA / CI 由 GitHub 和既有交付证据记录，不为同步每个 SHA 循环新增文档 PR。
+
 ## 3. 修改与交接规则
 
 1. 项目范围、阶段门或授权发生变化时，先更新项目记录仓的当前真源；本仓只在获得明确的实施输入后调整产品计划或代码。

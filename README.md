@@ -1,12 +1,12 @@
 # 客服 Agent 产品 · Menokin 试点当前实现基线
 
-本仓是客服 Agent 的**产品实施仓**，目标是在这里完成正式开发、测试、打包与上线。当前提交基线仍是本地合成原型，用来验证输入法式桌面浮窗，并用一个演示级 Dashboard 展示正式架构故事：
+本仓是客服 Agent 的**产品实施仓**，目标是在这里完成正式开发、测试、打包与上线。桌面可运行基线使用本地合成数据，用来验证输入法式桌面浮窗，并用一个演示级 Dashboard 展示正式架构故事：
 
 `狐狸头 / 快捷键 → 玻璃查询胶囊 → 本地合成 fixture → Top 3 原文 → 人工选择 → 安全复制`
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。Menokin 是当前唯一客服试点；`DEV-M0-W1～W6` 产品实施已完成：workspace、合同 codegen/runtime validation、loopback API/config、PostgreSQL 15 migration 控制面、runtime pool/`/ready`、统一 CI、Windows 可行性 smoke 与非部署型候选产物边界均已落入 `main@44b863d`。数据库仍未接入桌面端，业务端口与正式 runtime 也未激活。可运行的 v3 桌面应用仍是 `DEMO · 合成数据 · 无后端`，复制只表示「已复制」，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。当前任务、证据及下一动作只维护在[执行清单](docs/plans/2026-09-06-execution-goal.md)；模块实现查[架构参考](docs/reference-project-architecture.md)。桌面仍使用合成模式，复制只表示“已复制”，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -14,6 +14,7 @@
 
 | 你现在要做什么 | 打开 |
 | --- | --- |
+| 按统一流程开发、审查、提交 PR、合并、验收和发布，处理授权与证据复用 | [工程工作流程](docs/reference-engineering-workflow.md) |
 | 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
 | 查阅三窗安全、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
@@ -25,9 +26,9 @@
 | 启动并验证 W3～W5 的本机 `/health`、runtime pool 与 `/ready` | [apps/api/README.md](apps/api/README.md) |
 | 生成、核验并在隔离 PostgreSQL 15 中测试 W4 migration | [packages/database/README.md](packages/database/README.md) |
 | 核对 API 命名 profile、变量与失败关闭矩阵 | [docs/reference-api-runtime-config.md](docs/reference-api-runtime-config.md) |
-| 当前上线主线：真实话术搜索准入；通过后按授权推进桌面接线与上线验收 | [docs/plans/2026-09-04-g1a-search-admission.md](docs/plans/2026-09-04-g1a-search-admission.md) |
+| 恢复当前一期任务、核对证据与下一动作 | [当前执行清单](docs/plans/2026-09-06-execution-goal.md) |
 | 已暂停的探索备忘：教师辅助选句与合成材料（不是上线前置条件） | [docs/plans/2026-09-05-script-selection-preparation.md](docs/plans/2026-09-05-script-selection-preparation.md) |
-| 查看当前 DEV-M0 切片、基线证据与下一步 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
+| 追溯 DEV-M0 历史切片与基线证据 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
 | 查看 W2 合同 codegen / runtime validation 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md](docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md) |
 | 查看 W3 API/config bootstrap 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md](docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md) |
 | 查看 W4 PostgreSQL migration 控制面的实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md](docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md) |

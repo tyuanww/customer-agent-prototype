@@ -32,7 +32,9 @@
     "build:runtime": "tsc -p tsconfig.build.json",
     "test:package": "pnpm build:runtime && node --test tests/package-entry.smoke.mjs",
     "test": "vitest run && pnpm test:package",
-    "build": "pnpm check:generated && pnpm test:package"
+    "build": "pnpm check:generated && pnpm build:runtime",
+    "test:package:built": "node --test tests/package-entry.smoke.mjs",
+    "test:built": "vitest run && pnpm test:package:built"
   },
   "dependencies": {
     "ajv": "8.20.0",

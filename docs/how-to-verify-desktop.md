@@ -20,7 +20,7 @@ pnpm -v    # 项目锁定 11.19.0
 
 企业 CA 只适用于当前这台需要系统根证书的开发机，不是通用验证前置。不要关闭 TLS 验证。
 
-本页**不**要求你现在执行 Electron E2E 或打包。下列命令按需使用；「本轮文档任务」的最低核验见文末「文档任务建议跑的集合」。
+本页**不**要求你现在执行 Electron E2E 或打包。下列命令按需使用；文档任务的范围选择见文末「选择检查范围」。
 
 ---
 
@@ -107,7 +107,6 @@ pnpm test:e2e:float
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm build
 pnpm test:e2e
 ```
 
@@ -142,8 +141,8 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 预期产物（名称由 `productName` + `version` + `UNSIGNED` 组成）：
 
-- `release/local-unsigned/客服话术浮窗 Demo-0.2.0-mac-universal-UNSIGNED.dmg`
-- `release/local-unsigned/客服话术浮窗 Demo-0.2.0-mac-universal-UNSIGNED.zip`
+- `release/local-unsigned/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.dmg`
+- `release/local-unsigned/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.zip`
 - `release/local-unsigned/mac-universal/*.app`
 
 构建后会跑 `apps/desktop/scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `apps/desktop/scripts/verify-mac-package.mjs local`。
@@ -183,7 +182,7 @@ node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/script
 
 预期产物：
 
-- `release/local-unsigned/windows/客服话术浮窗 Demo-0.2.0-win-x64-UNSIGNED.exe`
+- `release/local-unsigned/windows/客服话术浮窗 Demo-<version>-win-x64-UNSIGNED.exe`
 - `release/local-unsigned/windows/win-unpacked/`（含 `resources/icon.ico`）
 
 本仓没有 Windows `distribution` 路径。`mode !== 'local'` 会直接抛错。
@@ -250,17 +249,14 @@ pnpm clean:preview
 
 业内通常把依赖视为锁文件可重建内容、把安装包交给 CI artifact / Release 的保留策略，而不是长期堆在源码工作区；测试报告应短期保存；共享 pnpm store 只偶尔运行 `pnpm store prune`，避免切旧分支时反复下载；Playwright 浏览器使用系统级共享缓存及其自身的未引用版本回收。
 
-## 6. 文档任务建议跑的集合
+## 6. 选择检查范围
 
-本轮若只核文档与静态卫生，在前置 PATH 后跑：
+验证范围以 [AGENTS.md 第6节](../AGENTS.md#6-验证与证据) 为准；本页只解释命令和证据边界。普通文档任务执行 `git diff --check`、`pnpm docs:check` 及引用/语义核对；不默认运行 lint/typecheck/test/build。命令、CI 或构建输入实际变化时，按其代码影响面验证。
 
-```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-```
+`pnpm verify:plan --base <commit>` 显示本地差异的 CI 路由（包含未提交与新增文件）。机器分类由 `scripts/verification-policy.mjs` 唯一拥有：已知文档走轻量检查，规则文档额外核对执行入口，未知路径回退完整检查。CI 保留原有检查名称并以 `CI gate` 汇总，失败、取消或缺失输出不能放行。
 
-不要把未跑的 `pnpm test:e2e` / `package:*` 写成通过。
+`pnpm test` 构建服务依赖一次并执行测试；`pnpm build` 只构建和检查生成物。干净候选的 `pnpm check` 在构建后执行测试并组装绑定 SHA 的正式候选。未提交开发使用 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；不得为了运行 `pnpm check` 自动提交。`pnpm test:e2e*` 自带桌面 build，不需要紧邻先执行另一次桌面 build。
 
-文档收尾若只核「Demo 能否接正式库」，读 [API adapter 衔接](reference-api-adapter-handoff.md)：结论是不能直插，也不要把本页静态检查写成九端口已接通。
+PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测试结果实际有用例且无跳过。真实包 runner 继续只在既有明确授权入口运行，不由 CI 启用。
+
+未运行的 Electron、打包或设备验证不得写成通过。

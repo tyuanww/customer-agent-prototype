@@ -144,11 +144,38 @@ describe('Windows local-unsigned packaging contract', () => {
     }
   });
 
+  it('prepares Electron license inputs before packaging a fresh checkout without a prior launch', async () => {
+    const packageRunner = await import(
+      pathToFileURL(path.join(root, 'scripts/package-windows.mjs')).href
+    );
+    let distributionReady = false;
+    let packaged = false;
+    const cleanup = vi.fn();
+    const environment = { SYNTHETIC_CA: 'prepared' };
+    packageRunner.packageWindows('local', {
+      prepareSystemCa: () => ({ environment, cleanup }),
+      runCommand: (_executable: string, args: string[], options: { env: object }) => {
+        if (args[0] === 'node_modules/electron/install.js') {
+          expect(options.env).toBe(environment);
+          distributionReady = true;
+        }
+        if (args[0] === 'node_modules/electron-builder/out/cli/cli.js') {
+          if (!distributionReady) throw new Error('Missing Electron license inputs');
+          packaged = true;
+        }
+      },
+      resetOutput: vi.fn(),
+    });
+    expect(packaged).toBe(true);
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
   it.each([
-    { stage: 'icon generation', failAtCommand: 1 },
-    { stage: 'renderer build', failAtCommand: 2 },
-    { stage: 'electron-builder', failAtCommand: 3 },
-    { stage: 'package verifier', failAtCommand: 4 },
+    { stage: 'Electron distribution preparation', failAtCommand: 1 },
+    { stage: 'icon generation', failAtCommand: 2 },
+    { stage: 'renderer build', failAtCommand: 3 },
+    { stage: 'electron-builder', failAtCommand: 4 },
+    { stage: 'package verifier', failAtCommand: 5 },
   ])('cleans the temporary CA state when $stage fails and stops later commands', async ({
     failAtCommand,
   }) => {
@@ -192,12 +219,12 @@ describe('Windows local-unsigned packaging contract', () => {
 
     expect(cleanup).toHaveBeenCalledOnce();
     expect(runCommand).toHaveBeenCalledTimes(failAtCommand);
-    if (failAtCommand < 3) {
+    if (failAtCommand < 4) {
       expect(resetOutput).not.toHaveBeenCalled();
     } else {
       expect(resetOutput).toHaveBeenCalledOnce();
     }
-    if (failAtCommand < 4) {
+    if (failAtCommand < 5) {
       expect(runCommand.mock.calls.some(([, args]) =>
         args.includes('scripts/verify-windows-package.mjs'))).toBe(false);
     }
@@ -236,7 +263,7 @@ describe('Windows local-unsigned packaging contract', () => {
     })).toThrow(failure);
 
     expect(cleanup).toHaveBeenCalledOnce();
-    expect(runCommand).toHaveBeenCalledTimes(2);
+    expect(runCommand).toHaveBeenCalledTimes(3);
   });
 
   it('fail-closes against incomplete or update-enabled Windows package fixtures', async () => {

@@ -1,5 +1,7 @@
 # 真实 G1a 搜索准入与离线影子执行计划
 
+> **历史实施记录：** 本文批准范围、设计和按版本记录的事实保留；正文中的“当前”、等待与分支均指记录形成时。恢复任务请只从[当前执行清单](2026-09-06-execution-goal.md)进入，不从本页推导新授权或重复执行已完成步骤。
+
 > **状态：** `APPROVED · G1A-E0 ONLY`
 > **实施状态：** `T1～T3 COMPLETE · MERGED SYNTHETIC EVIDENCE`（PR #21 · `main@be33c0e` · post-merge CI run `33849888116` 三条 lane 全绿）
 > **真实准入状态：** `T4 BLOCKED / RISK REVALIDATION REQUIRED · T5 ATTEMPTED / BLOCKED · T6 NOT SIGNED · G1a NOT_EVALUATED`（2026-09-05；历史验收保留，当前包不能据此重跑；治理仓拥有批准与真实证据）

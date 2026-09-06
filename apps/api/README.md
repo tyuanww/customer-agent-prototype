@@ -84,3 +84,12 @@ pnpm workspace:check
 两个输入文件均采用 JCS 单行 JSON 加一个 LF。`owner-acceptance.json` 必须为既有 `OwnerAcceptanceRecord`，不会由装包器生成。`assembly.json` 的闭合根键为 `schema`（`customer-agent/g1a-owner-assembly/v1`）、`manifest`、`content`、`cases`、`expectations`。后三者使用 v3 同名内容数组；`manifest` 使用 v3 元数据，但禁止传入派生键 `schema/files/content_snapshot_sha256/source_binding_hash`。每条 content 禁止传入 `content_hash`、`review_mode`、全部 primary/secondary reviewer 字段以及 `owner_acceptance_record_sha256`；question 禁止传入 `question_hash`。装包器从规范化字段与批准记录派生这些值，不修改业务文本、风险、来源、版本或期限。
 
 输出通过现有 v3 读取器的完整 scope、有效期、独立性与文件校验后，才打印 `ASSEMBLED_NOT_EVALUATED`、新目录和 manifest 摘要。失败清理本次新目录；旧脚本、旧包和批准记录不覆盖。收据摘要是新包完整性锚点，不是 T5 运行批准；后续运行仍需核对对应批准和清理条件。入口与验证证据见 [B4 实施记录](../../docs/plans/2026-09-06-owner-package-assembler.md)。
+
+
+## 安全报告交付
+
+`report-contract.ts` 是测试专用报告合同的唯一所有者，冻结阈值和结果映射由评测器复用。受控 runner 在完成 PG 清理后只输出一条 `G1A_E0_DELIVERY ` 前缀的 `customer-agent/g1a-safe-delivery/v1` JSON。它包含报告和 runtime；标识值按 manifest 锚点哈希化，保留50题、分层、计数、候选排序与失败码，拒绝正文、未知字段和不一致状态。`case_id`、`script_id`、`release_id`、`stratum_id` 等字段在交付格式中均为 SHA-256 引用，不能作为原始 ID 使用。
+
+宿主通过 `node scripts/read-g1a-delivery.mjs <manifest-sha256>` 从 stdin 读取进程输出或回读内容；输出为校验后的 JSON。落盘 JSON 回读时先加同一前缀。缺失、重复、未知版本、锚点不符、坏字段或清理失败返回1，仅输出固定错误码；合法业务 FAIL 是可保存报告，不等于进程或合同故障。该入口只读 stdin，不读真实输入包、不连接 PG、不签发批准。
+
+此格式取代旧 `G1A_E0_REPORT` 输出。仓外旧 v4 消费者冻结，不能解析此新版本；配套 v5 调用产品读取器，保留原授权、沙箱及排他保存边界。历史真实配置和报告不自动迁移；新候选合并后按具体批准绑定匹配版本。`pnpm test:g1a:e0:ci` 会在纯合成包上实跑 PG、导出、独立 CLI 消费、落盘回读及失败清理，并拒绝真实输入环境变量、零用例或跳过。

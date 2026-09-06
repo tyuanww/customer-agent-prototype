@@ -90,7 +90,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 `DEV-M1 W3/W4` 由 `EventRepository` 拥有 runtime `PoolClient` 事务、版本化 HMAC 幂等、fencing 和事件状态机。搜索在同一事务内完成受控检索、`query_events`、精确候选四元组和 `idempotency_complete`；当前只放行 synthetic，查询文本固定 suppressed。来源拒绝先回滚业务事务，再用新连接写不含原文/定位符的审计。Adoption 由数据库唯一键保证 first-wins，`adopted` 只代表成功复制；Escalation 保持非终态并按 query/action 返回稳定事实。只有搜索成功而 telemetry INSERT 单独不可用时返回零事件的 `collection_disabled`。
 
-`G1A-E0 T1～T3` 只存在于 API 测试支持目录：读取器要求仓外绝对规范路径、0700 根目录、0600 当前用户普通文件、固定四成员、无软/硬链、大小/LF/canonical JSON、仓外 manifest SHA-256 锚点、与实际 ID 清单绑定的 comparison manifest hash、DLP/独立性 EVD 和 20+12+18 冻结分母；装载器在一次性 PostgreSQL 15 中用正式 question/governance hash 与四域 source gate 做事务内后验，任一失败整批回滚。runner 以 `REPEATABLE READ READ ONLY` 事务调用同一 `SearchBackend/SearchRepository`，保持 HTTP、事件和桌面不参与。Node 网络守卫的观察面显式为 `NODE_TCP_FETCH_GUARD_ONLY`，`process_guard_attempts=0` 不能冒充宿主级零出站或 OS 沙箱；成功或失败都必须关闭 client、停止集群并删除临时目录，报告只保留白名单聚合字段。T3 仅自动评估 `expected_search_action`，其候选结论写入 `search_action_result`；`downstream_action` 在 T5 前保持 `NOT_EVALUATED`，因此整体 `decision` 不得提前通过，硬失败还会使受控包命令非零退出。该实现不进入 `apps/api/dist`，纯合成结果固定为 `NOT_SIGNED / NOT_EVALUATED`。
+`G1A-E0 T1～T3` 只存在于 API 测试支持目录：读取器要求仓外绝对规范路径、0700 根目录、0600 当前用户普通文件、固定四成员、无软/硬链、大小/LF/canonical JSON、仓外 manifest SHA-256 锚点、与实际 ID 清单绑定的 comparison manifest hash、DLP/独立性 EVD 和 20+12+18 冻结分母；装载器在一次性 PostgreSQL 15 中用正式 question/governance hash 与四域 source gate 做事务内后验，任一失败整批回滚。runner 以 `REPEATABLE READ READ ONLY` 事务调用同一 `SearchBackend/SearchRepository`，保持 HTTP、事件和桌面不参与。Node 网络守卫的观察面显式为 `NODE_TCP_FETCH_GUARD_ONLY`，`process_guard_attempts=0` 不能冒充宿主级零出站或 OS 沙箱；成功或失败都必须关闭 client、停止集群并删除临时目录，内部报告保留聚合及逐题候选观测；输出通过版本化安全交付合同。T3 仅自动评估 `expected_search_action`，其候选结论写入 `search_action_result`；`downstream_action` 在 T5 前保持 `NOT_EVALUATED`，因此整体 `decision` 不得提前通过，硬失败还会使受控包命令非零退出。该实现不进入 `apps/api/dist`，纯合成结果固定为 `NOT_SIGNED / NOT_EVALUATED`。
 
 `负责人承接 B1/B2` 接收固定 source Git 的 OpenAPI 1.12.0 / schema.v1.15，根接收器校验版本和双路径的封闭配对。生成器保持 0001–0011 不变，把六段 owner 增量提取为一个原子 0012；数据库后验涵盖新增两表、NOLOGIN 登记角色及函数/触发器/ACL，API readiness 把四个新增搜索依赖加入受信摘要。登记能力不授予 runtime；输入与 loader 由下述 B3 接续，真实准入仍由后续独立切片负责。实施证据见 [B1/B2 记录](plans/2026-09-06-owner-contract-consumption.md)。
 
@@ -215,3 +215,12 @@ Fox presence 的纯姿态解析、deadline 计算与数值几何保留在 `apps/
 - [`@customer-agent/database` 使用与边界](../packages/database/README.md)
 
 B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化输入到唯一新 v3 包的派生、完整读取校验与失败清理；复用 content-identity 和输入读取器，不拥有批准签发、真实资料抽取或评测运行。操作入口只在显式环境开关下执行，留在 test-support 边界内，不进入 API 产物。详见 [B4 实施记录](plans/2026-09-06-owner-package-assembler.md)。
+
+
+### 离线报告交付的唯一所有者
+
+`apps/api/tests/support/g1a-e0/report-contract.ts` 拥有失败码、冻结阈值、搜索结果状态映射、报告类型、输出字段校验、标识哈希化与逐题/分层/聚合一致性；评测器拥有搜索执行和实际观测，runner 拥有 PG 生命周期与清理。合同只在 test-support 使用，不进入 API dist，也不新增 HTTP 或 renderer 能力。
+
+链路为 `verified package → actual PG runner → serializeG1aDelivery → G1A_E0_DELIVERY line → read-g1a-delivery.mjs → host exclusive save/readback`。正文和包内原始标识不会进入新 stdout；完整报告仍保持 NOT_SIGNED，下游动作只是期望且未执行。失败报告在正常清理后可以导出；清理失败则不输出可消费报告。
+
+交付格式、读取方式及兼容边界见 [API 说明](../apps/api/README.md#安全报告交付)。外层操作器只拥有批准、宿主沙箱、进程、0600 排他保存与恢复；不读取 TS 源码推导 enum，也不重算业务结论。旧操作器与旧证据冻结，新候选必须使用匹配的新消费者，不把旧真实运行配置自动切换到未合并代码。

@@ -1,5 +1,7 @@
 # DEV-M0-W3 Application API / config bootstrap 执行记录
 
+> **当前进度入口：** 本页保存形成时的计划、批准范围或证据，不维护最新进度；当前动作统一见[执行清单](2026-09-06-execution-goal.md)。已批准范围继续有效，历史状态不覆盖新的具体授权与实测。
+
 > **文档状态：** `EXECUTION RECORD`
 > **切片状态：** `RELEASE CANDIDATE · VALIDATED`
 > **开工输入：** 用户于 2026-09-02 在 W2 Review、合并、分支清理与“进入下一开发切片”的有序步骤后明确表示“都授权了”

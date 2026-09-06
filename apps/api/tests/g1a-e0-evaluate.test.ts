@@ -1,3 +1,4 @@
+import { G1A_DELIVERY_PREFIX, readG1aDelivery, serializeG1aDelivery, type G1aCompletedRun } from './support/g1a-e0/report-contract.js';
 import { performance } from 'node:perf_hooks';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SearchBackend } from '../src/search-service.js';
@@ -441,5 +442,81 @@ describe('G1A-E0 aggregate evaluator', () => {
     );
 
     expect(() => assertScrubbedG1aReport(report)).toThrow('G1A_REPORT_NOT_SCRUBBED');
+  });
+});
+
+
+describe('versioned safe G1a delivery contract', () => {
+  async function completed(options: Parameters<typeof backend>[0] = {}): Promise<G1aCompletedRun> {
+    return { report: await evaluateG1aPackage(backend(options), evaluationPackage('approved_redacted'), { eventWrites: 0, processGuardAttempts: 0 }),
+      // Unit fixture only. Actual PG15 evidence is exercised in the integration suite.
+      runtime: { postgres_major: 15, transaction_timestamp: '2026-09-06T00:00:00.000Z', transaction_isolation: 'read committed',
+        transaction_read_only: true, event_rows_before: 0, event_rows_after: 0, network_boundary: 'NODE_TCP_FETCH_GUARD_ONLY', cleanup_verified: true } };
+  }
+  it.each([{}, { emptyCaseNumbers: [1] }, { failedCaseNumbers: [1] }, { emptyCaseNumbers: Array.from({ length: 20 }, (_, i) => i + 1) }])('retains complete observations and legitimate failures: %j', async (options) => {
+    const run = await completed(options);
+    const line = serializeG1aDelivery(run);
+    const delivery = readG1aDelivery(line,run.report.manifest_sha256);
+    expect(delivery.report.case_results).toHaveLength(50);
+    expect(delivery.report.raw).toEqual(run.report.raw);
+    expect(delivery.report.decision).toEqual(run.report.decision);
+    expect(line).not.toContain(SCRIPT_ID);
+    expect(line).not.toContain(RELEASE_ID);
+    expect(delivery.report.case_results[0]?.case_id).toMatch(/^[a-f0-9]{64}$/);
+  });
+  it('rejects missing rows, contradictions, unknown fields, unsupported versions and failed cleanup', async () => {
+    const run = await completed();
+    const line = serializeG1aDelivery(run);
+    const safe = readG1aDelivery(line,run.report.manifest_sha256);
+    const mutations: Array<(value: typeof safe) => void> = [
+      (v) => { Object.assign(v, { schema: 'unsupported' }); },
+      (v) => { Object.assign(v.report, { answer_text: 'sensitive text' }); },
+      (v) => { Object.assign(v.report, { denominator: 49 }); },
+      (v) => { Object.assign(v.report.raw, { positive_top3_hits: 19 }); },
+      (v) => { Object.assign(v.report.case_results[0]!, { search_action_correct: false }); },
+      (v) => { Object.assign(v.report.case_results[0]!, { expected_downstream_action: 'send_automatically' }); },
+      (v) => { Object.assign(v.report.case_results[0]!, { case_id: 'private text' }); },
+      (v) => { Object.assign(v.report.case_results[0]!.candidates[0]!, { answer_text: 'private text' }); },
+      (v) => { Object.assign(v.report, { case_results: v.report.case_results.slice(1) }); },
+      (v) => { Object.assign(v.report, { case_results: [v.report.case_results[1], ...v.report.case_results.slice(1)] }); },
+      (v) => { Object.assign(v.runtime, { cleanup_verified: false }); },
+      (v) => { Object.assign(v.runtime, { transaction_read_only: false }); },
+      (v) => { Object.assign(v.runtime, { event_rows_after: 1 }); },
+      (v) => { Object.assign(v.report, { decision: 'FAIL' }); },
+      (v) => { Object.assign(v.report.thresholds, { positive_top3_minimum: 1 }); },
+    ];
+    for (const mutate of mutations) {
+      const value = structuredClone(safe); mutate(value);
+      expect(() => readG1aDelivery(G1A_DELIVERY_PREFIX + JSON.stringify(value),run.report.manifest_sha256)).toThrow('G1A_DELIVERY_INVALID');
+    }
+    expect(() => readG1aDelivery(line + line,run.report.manifest_sha256)).toThrow('G1A_DELIVERY_INVALID');
+    expect(() => readG1aDelivery('',run.report.manifest_sha256)).toThrow('G1A_DELIVERY_INVALID');
+    expect(() => readG1aDelivery(line,'f'.repeat(64))).toThrow('G1A_DELIVERY_INVALID');
+    expect(() => serializeG1aDelivery({ ...run,runtime: { ...run.runtime,cleanup_verified: false } } as unknown as G1aCompletedRun)).toThrow('G1A_DELIVERY_INVALID');
+  });
+  it('rejects a release mismatch claiming valid provenance at both delivery boundaries', async () => {
+    const run = await completed();
+    const changed = structuredClone(run);
+    Object.assign(changed.report.case_results[0]!.candidates[0]!, { release_id: 'rel_different' });
+    expect(() => serializeG1aDelivery(changed)).toThrow('G1A_DELIVERY_INVALID');
+    const safe = structuredClone(readG1aDelivery(serializeG1aDelivery(run),run.report.manifest_sha256));
+    Object.assign(safe.report.case_results[0]!.candidates[0]!, { release_id: 'f'.repeat(64) });
+    expect(() => readG1aDelivery(G1A_DELIVERY_PREFIX + JSON.stringify(safe),run.report.manifest_sha256)).toThrow('G1A_DELIVERY_INVALID');
+  });
+  it('preserves legitimate release provenance failures as complete failed reports', async () => {
+    const run = await completed({ candidateReleaseId: 'rel_different' });
+    const safe = readG1aDelivery(serializeG1aDelivery(run),run.report.manifest_sha256);
+    expect(safe.report.decision).toBe('FAIL');
+    expect(safe.report.case_results).toHaveLength(50);
+    expect(safe.report.case_results[0]!.candidates[0]!).toMatchObject({ provenance_valid: false });
+    expect(safe.report.case_results[0]!.candidates[0]!.release_id).not.toBe(safe.report.release_id);
+    expect(safe.report.case_results[0]!.failure_codes).toContain('CANDIDATE_PROVENANCE_INVALID');
+    expect(safe.report.raw.source_correct).toBe(0);
+  });
+  it('rejects a missing aggregate failure even when another hard failure remains', async () => {
+    const run = await completed({ emptyCaseNumbers: Array.from({length:20},(_,i) => i + 1) });
+    const safe = structuredClone(readG1aDelivery(serializeG1aDelivery(run),run.report.manifest_sha256));
+    Object.assign(safe.report,{ failures: safe.report.failures.filter((f) => f.code !== 'POSITIVE_THRESHOLD_MISSED') });
+    expect(() => readG1aDelivery(G1A_DELIVERY_PREFIX + JSON.stringify(safe),run.report.manifest_sha256)).toThrow('G1A_DELIVERY_INVALID');
   });
 });

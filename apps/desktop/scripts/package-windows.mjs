@@ -53,6 +53,14 @@ export function packageWindows(
   buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
 
   try {
+    // Electron 43 installs lazily; packaging owns its license inputs and must
+    // work before any smoke test or application launch has prepared the dist.
+    runCommand(process.execPath, ['node_modules/electron/install.js'], {
+      cwd: desktopRoot,
+      env: buildEnvironment,
+      stdio: 'inherit',
+    });
+
     runCommand(process.execPath, ['scripts/generate-app-icons.mjs'], {
       cwd: desktopRoot,
       env: buildEnvironment,

@@ -17,19 +17,8 @@ import {
 import { loadG1aEvaluationRelease } from './loader.js';
 import { installG1aNetworkGuard } from './network-guard.js';
 
-export type G1aCompletedRun = Readonly<{
-  report: G1aEvaluationReport;
-  runtime: Readonly<{
-    postgres_major: 15;
-    transaction_timestamp: string;
-    transaction_isolation: 'repeatable read' | 'read committed';
-    transaction_read_only: true;
-    event_rows_before: 0;
-    event_rows_after: 0;
-    network_boundary: 'NODE_TCP_FETCH_GUARD_ONLY';
-    cleanup_verified: true;
-  }>;
-}>;
+import type { G1aCompletedRun } from './report-contract.js';
+export type { G1aCompletedRun } from './report-contract.js';
 
 export type RunG1aPackageOptions = Readonly<{
   inputRoot: string;

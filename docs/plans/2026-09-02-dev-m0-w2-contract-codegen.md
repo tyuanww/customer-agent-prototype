@@ -1,5 +1,7 @@
 # DEV-M0-W2 合同 codegen 与 runtime validation 执行记录
 
+> **当前进度入口：** 本页保存形成时的计划、批准范围或证据，不维护最新进度；当前动作统一见[执行清单](2026-09-06-execution-goal.md)。已批准范围继续有效，历史状态不覆盖新的具体授权与实测。
+
 > **文档状态：** `EXECUTION RECORD`
 > **切片状态：** `MERGED · PR #10 · main 1a77297`
 > **开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”

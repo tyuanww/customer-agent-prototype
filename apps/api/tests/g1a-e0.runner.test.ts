@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { serializeG1aDelivery } from './support/g1a-e0/report-contract.js';
 import { describe, expect, it } from 'vitest';
 import { assertExecutableG1aControlledReport } from './support/g1a-e0/evaluate.js';
 import { runG1aEvaluationPackage } from './support/g1a-e0/runner.js';
@@ -23,7 +24,7 @@ describeControlledPackage('G1A-E0 controlled package runner', () => {
       repositoryRoot: path.resolve(import.meta.dirname, '../../..'),
     });
 
-    process.stdout.write(`G1A_E0_REPORT ${JSON.stringify(completed)}\n`);
+    process.stdout.write(serializeG1aDelivery(completed));
     assertExecutableG1aControlledReport(completed.report);
     expect(completed.report).toMatchObject({
       classification: 'approved_redacted',

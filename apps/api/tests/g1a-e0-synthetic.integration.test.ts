@@ -1,10 +1,15 @@
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { serializeG1aDelivery, readG1aDelivery, G1A_DELIVERY_PREFIX } from './support/g1a-e0/report-contract.js';
+import { jsonLine, jsonLines } from './support/g1a-e0/content-identity.js';
 import { readdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { Client } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   readG1aEvaluationPackage,
   type G1aEvaluationPackage,
@@ -275,4 +280,76 @@ describeSyntheticRunner('G1A-E0 full synthetic substitute', () => {
       await packageFixture.cleanup();
     }
   }, 120_000);
+});
+
+
+describeSyntheticRunner('PG15 to safe delivery and durable consumer', () => {
+  it('does not emit a delivery when the real PG cleanup reports failure', async () => {
+    const before = await pg15Roots();
+    const fixture = await createSyntheticG1aE0Package(new Date(),true,true);
+    const stop = Pg15Harness.prototype.stop;
+    const failedStop = vi.spyOn(Pg15Harness.prototype,'stop').mockImplementation(function (this: Pg15Harness) {
+      stop.call(this);
+      throw new Error('synthetic cleanup failure after resource removal');
+    });
+    let emitted = '';
+    try {
+      await expect((async () => {
+        const completed = await runG1aEvaluationPackage({...fixture,repositoryRoot:path.resolve(import.meta.dirname,'../../..')});
+        emitted = serializeG1aDelivery(completed);
+      })()).rejects.toThrow('G1A_RUNTIME_CLEANUP_FAILED');
+      expect(emitted).toBe('');
+    } finally { failedStop.mockRestore(); await fixture.cleanup(); }
+    expect(await pg15Roots()).toEqual(before);
+  },120_000);
+
+  it.each(['all_match','retrieval_miss','safety_failure'] as const)('retains %s through the actual CLI consumer and private readback', async (scenario) => {
+    const before = await pg15Roots();
+    const fixture = await createSyntheticG1aE0Package(new Date(),true,true);
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(),'g1a-delivery-'));
+    try {
+      const input = await readG1aEvaluationPackage(fixture.inputRoot,{...fixture,repositoryRoot: path.resolve(import.meta.dirname,'../../..')});
+      const cases = structuredClone(input.cases);
+      const expectations = structuredClone(input.expectations);
+      const positive = cases.find((row) => row.stratum === 'positive')!;
+      if (scenario === 'retrieval_miss') Object.assign(positive,{ query_text: 'syntheticnomatchingphraseabcdef' });
+      if (scenario === 'safety_failure') {
+        const safety = cases.find((row) => row.stratum === 'safety_negative')!;
+        Object.assign(safety,{ query_text: positive.query_text,platform: positive.platform,product_context_type: positive.product_context_type,product_context_ref: positive.product_context_ref });
+        Object.assign(expectations.find((row) => row.case_id === safety.case_id)!,{
+          forbidden_script_ids: expectations.find((row) => row.case_id === positive.case_id)!.acceptable_script_ids });
+      }
+      // Only this fresh synthetic fixture exercises the controlled grading branch.
+      // This is not real content, an approval or a retry of any controlled run.
+      const manifest = structuredClone(input.manifest);
+      Object.assign(manifest,{ classification: 'approved_redacted' });
+      for (const [name, rows] of [['cases.jsonl',cases],['expectations.jsonl',expectations]] as const) {
+        const bytes = jsonLines(rows);
+        await writeFile(path.join(fixture.inputRoot,name),bytes);
+        Object.assign(manifest.files,{ [name]: { sha256: createHash('sha256').update(bytes).digest('hex'),bytes: Buffer.byteLength(bytes),records: rows.length } });
+      }
+      const manifestBytes = jsonLine(manifest);
+      await writeFile(path.join(fixture.inputRoot,'manifest.json'),manifestBytes);
+      const anchor = createHash('sha256').update(manifestBytes).digest('hex');
+      const completed = await runG1aEvaluationPackage({...fixture,expectedManifestSha256:anchor,repositoryRoot:path.resolve(import.meta.dirname,'../../..')});
+      const line = serializeG1aDelivery(completed);
+      const consumer = spawnSync(process.execPath,['scripts/read-g1a-delivery.mjs',anchor],{
+        cwd: path.resolve(import.meta.dirname,'../../..'),input:line,encoding:'utf8' });
+      expect(consumer.status,consumer.stderr).toBe(0);
+      const destination = path.join(outputRoot,'delivery.json');
+      await writeFile(destination,consumer.stdout,{mode:0o600,flag:'wx'});
+      expect((await stat(destination)).mode & 0o777).toBe(0o600);
+      const delivery = readG1aDelivery(G1A_DELIVERY_PREFIX + (await readFile(destination,'utf8')).trim(),anchor);
+      expect(delivery.report.case_results).toHaveLength(50);
+      expect(delivery.report.raw).toEqual(completed.report.raw);
+      expect(delivery.runtime).toMatchObject({postgres_major:15,transaction_isolation:'read committed',transaction_read_only:true,cleanup_verified:true,event_rows_before:0,event_rows_after:0});
+      expect(delivery.report.raw.positive_top3_hits).toBe(scenario === 'retrieval_miss' ? 19 : 20);
+      expect(delivery.report.raw.safety_no_hits).toBe(scenario === 'safety_failure' ? 11 : 12);
+      expect(delivery.report.runner_result).toBe(scenario === 'safety_failure' ? 'FAILED' : 'EXECUTABLE');
+      await expect(writeFile(destination,'overwrite',{flag:'wx'})).rejects.toMatchObject({code:'EEXIST'});
+      const duplicate = spawnSync(process.execPath,['scripts/read-g1a-delivery.mjs',anchor],{cwd:path.resolve(import.meta.dirname,'../../..'),input:line+line,encoding:'utf8'});
+      expect(duplicate.status).toBe(1); expect(duplicate.stdout).toBe(''); expect(duplicate.stderr).not.toContain(anchor);
+    } finally { await fixture.cleanup(); await rm(outputRoot,{recursive:true,force:true}); }
+    expect(await pg15Roots()).toEqual(before);
+  },120_000);
 });

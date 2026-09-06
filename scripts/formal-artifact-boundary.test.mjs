@@ -141,3 +141,46 @@ test('rejects a symlinked formal candidate root', () => {
     );
   });
 });
+
+test('canonical candidate checks build once, test that build, then bind the copied bytes to HEAD', async () => {
+  const { buildM0FormalCandidate } = await import('./build-m0-formal-candidate.mjs');
+  const { execFileSync } = await import('node:child_process');
+  const { readFileSync, chmodSync } = await import('node:fs');
+  const sandbox = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-build-order-'));
+  const projectRoot = path.join(sandbox,'project');
+  const bin = path.join(sandbox,'bin');
+  const previousPath = process.env.PATH;
+  mkdirSync(projectRoot); mkdirSync(bin);
+  const git = (...args) => execFileSync('git',args,{cwd:projectRoot,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+  try {
+    git('init');
+    mkdirSync(path.join(projectRoot,'contracts/upstream/customer-agent'),{recursive:true});
+    writeFileSync(path.join(projectRoot,'contracts/upstream/customer-agent/contract-set.lock.json'),JSON.stringify({contract_set_id:'synthetic',source_git_sha:'a'.repeat(40)}));
+    writeFileSync(path.join(projectRoot,'.gitignore'),'apps/\npackages/\nrelease/\ncommands.json\n');
+    git('add','.gitignore','contracts');
+    git('-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid','-c','core.hooksPath=/dev/null','commit','-m','synthetic fixture');
+    writeFileSync(path.join(bin,'pnpm'),`#!/usr/bin/env node
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+const commands = existsSync('commands.json') ? JSON.parse(readFileSync('commands.json','utf8')) : [];
+commands.push(process.argv[2]); writeFileSync('commands.json',JSON.stringify(commands));
+if (process.argv[2] === 'build') {
+  for (const dir of ['apps/api/dist','packages/contracts/dist','packages/database/dist']) {
+    mkdirSync(dir,{recursive:true}); writeFileSync(dir+'/index.js','export const build = "fresh";');
+  }
+} else if (process.argv[2] !== 'test:built' || !readFileSync('apps/api/dist/index.js','utf8').includes('fresh')) process.exitCode = 1;
+`);
+    chmodSync(path.join(bin,'pnpm'),0o700);
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    const result = buildM0FormalCandidate({projectRoot,check:true});
+    assert.deepEqual(JSON.parse(readFileSync(path.join(projectRoot,'commands.json'),'utf8')),['build','test:built']);
+    assert.equal(result.manifest.build_git_sha,git('rev-parse','HEAD'));
+    assert.equal(result.manifest.deployable,false);
+    assert.equal(readFileSync(path.join(result.candidateRoot,'apps/api/dist/index.js'),'utf8'),'export const build = "fresh";');
+    writeFileSync(path.join(projectRoot,'dirty.txt'),'uncommitted');
+    assert.throws(() => buildM0FormalCandidate({projectRoot,check:true}),/REQUIRES_CLEAN_WORKTREE/u);
+    assert.deepEqual(JSON.parse(readFileSync(path.join(projectRoot,'commands.json'),'utf8')),['build','test:built']);
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath;
+    rmSync(sandbox,{recursive:true,force:true});
+  }
+});

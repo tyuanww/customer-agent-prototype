@@ -4,6 +4,19 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+### Changed
+
+- Unified the current execution entry and separated historical plans from live status; documentation checks validate links, anchors and declared workspace commands.
+- Routed known documentation changes through lightweight CI checks, kept full Linux/PostgreSQL/Windows verification for runtime and unknown paths, and added an aggregate fail-closed CI gate.
+- Reused builds within each verification and packaging command while retaining clean formal-candidate builds, fresh tests and artifact hash checks.
+
+### Fixed
+
+- Made Windows packaging prepare Electron distribution and license inputs before building, removing its dependency on a previous application launch or smoke run.
+- Rejected contradictory release/provenance claims while preserving legitimate provenance failure reports.
+- Made G1a evaluation reports use one versioned, strictly validated delivery contract shared by the producer and reader, preserving complete reports for both successful and failed evaluations.
+- Required synthetic E0 CI to execute all PostgreSQL delivery cases without skips, including failure reporting and cleanup refusal.
+
 ### Added
 
 - Added an operator-only owner package assembler that derives approved content identities, validates a fresh private five-file package, and preserves historical packages; independently anchored records and all evaluation gates remain required.
