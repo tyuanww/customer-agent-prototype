@@ -576,3 +576,71 @@ describe('G1A-E0 input package boundary', () => {
     expect(JSON.stringify(error)).not.toContain(canary);
   });
 });
+
+
+describe('owner acceptance external anchors', () => {
+  async function ownerFixture() {
+    const created = await createSyntheticG1aE0Package(new Date(), true, true);
+    cleanups.push(created.cleanup);
+    return created;
+  }
+  it('accepts the exact externally anchored owner scope including high risk', async () => {
+    const f = await ownerFixture();
+    const input = await readG1aEvaluationPackage(f.inputRoot, { ...f, repositoryRoot: REPOSITORY_ROOT });
+    expect(input.manifest.schema).toBe('customer-agent/g1a-evaluation-manifest/v3');
+    expect(input.content[0]?.risk_level).toBe('high');
+    expect(input.owner_acceptance?.record_sha256).toBe(f.expectedOwnerAcceptanceSha256);
+  });
+  it('rejects absent and mismatched independent approval anchors', async () => {
+    const f = await ownerFixture();
+    for (const anchors of [{}, { expectedOwnerAcceptanceSha256: '0'.repeat(64), expectedOwnerSubjectHash: f.expectedOwnerSubjectHash! },
+      { expectedOwnerAcceptanceSha256: f.expectedOwnerAcceptanceSha256!, expectedOwnerSubjectHash: '0'.repeat(64) }]) {
+      await expect(readG1aEvaluationPackage(f.inputRoot, { repositoryRoot: REPOSITORY_ROOT,
+        expectedManifestSha256: f.expectedManifestSha256, ...anchors })).rejects.toMatchObject({ code: 'G1A_INPUT_OWNER_ACCEPTANCE_INVALID' });
+    }
+  });
+  it.each(['body', 'version', 'risk', 'owner', 'evidence', 'conflict', 'omit', 'extra'])('rejects %s changes even when payload and manifest hashes are refreshed', async (change) => {
+    const f = await ownerFixture();
+    const manifestSha = await rewritePayload(f.inputRoot, 'content.jsonl', (rows) => {
+      const item = rows[0]!;
+      if (change === 'body') item.answer_text = '篡改后的纯合成回答';
+      if (change === 'version') item.script_version = 2;
+      if (change === 'risk') item.risk_categories = ['legal_commitment'];
+      if (change === 'owner') item.primary_reviewer_id_hash = '0'.repeat(64);
+      if (change === 'evidence') item.primary_review_evd = 'EVD-SYNTHETIC-OTHER-OWNER';
+      if (change === 'conflict') item.has_conflict = true;
+      if (change === 'omit') rows.pop();
+      if (change === 'extra') rows.push({ ...item, script_id: 'script_synthetic_extra' });
+    });
+    await expect(readG1aEvaluationPackage(f.inputRoot, { ...f, expectedManifestSha256: manifestSha,
+      repositoryRoot: REPOSITORY_ROOT })).rejects.toBeInstanceOf(G1aInputError);
+  });
+  it.each(['future', 'expired'])('rejects an externally anchored but %s acceptance period', async (change) => {
+    const f = await ownerFixture();
+    const member = path.join(f.inputRoot, 'owner-acceptance.json');
+    const record = JSON.parse(await readFile(member, 'utf8'));
+    if (change === 'future') record.accepted_at = '2099-01-01T00:00:00.000Z';
+    else record.expires_at = '2020-01-01T00:00:00.000Z';
+    const bytes = jcs(record) + '\n';
+    await writeFile(member, bytes);
+    const expectedOwnerAcceptanceSha256 = sha256(bytes);
+    const expectedManifestSha256 = await rewriteManifest(f.inputRoot, (m) => {
+      (m.files as MutableRecord)['owner-acceptance.json'] = { sha256: sha256(bytes), bytes: Buffer.byteLength(bytes), records: 1 };
+    });
+    await expect(readG1aEvaluationPackage(f.inputRoot, { ...f, expectedOwnerAcceptanceSha256,
+      expectedManifestSha256, repositoryRoot: REPOSITORY_ROOT })).rejects.toMatchObject({ code: 'G1A_INPUT_OWNER_ACCEPTANCE_INVALID' });
+  });
+  it('rejects record edits under an unchanged external record anchor', async () => {
+    const f = await ownerFixture();
+    const member = path.join(f.inputRoot, 'owner-acceptance.json');
+    const record = JSON.parse(await readFile(member, 'utf8'));
+    record.approval_evidence_id = 'EVD-SYNTHETIC-FORGED-OWNER';
+    const bytes = jcs(record) + '\n';
+    await writeFile(member, bytes);
+    const expectedManifestSha256 = await rewriteManifest(f.inputRoot, (m) => {
+      (m.files as MutableRecord)['owner-acceptance.json'] = { sha256: sha256(bytes), bytes: Buffer.byteLength(bytes), records: 1 };
+    });
+    await expect(readG1aEvaluationPackage(f.inputRoot, { ...f, expectedManifestSha256,
+      repositoryRoot: REPOSITORY_ROOT })).rejects.toMatchObject({ code: 'G1A_INPUT_OWNER_ACCEPTANCE_INVALID' });
+  });
+});

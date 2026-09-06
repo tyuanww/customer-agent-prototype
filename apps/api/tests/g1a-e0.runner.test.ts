@@ -18,6 +18,8 @@ describeControlledPackage('G1A-E0 controlled package runner', () => {
     const completed = await runG1aEvaluationPackage({
       inputRoot,
       expectedManifestSha256,
+      ...(process.env.CUSTOMER_AGENT_G1A_OWNER_ACCEPTANCE_SHA256 ? { expectedOwnerAcceptanceSha256: process.env.CUSTOMER_AGENT_G1A_OWNER_ACCEPTANCE_SHA256 } : {}),
+      ...(process.env.CUSTOMER_AGENT_G1A_OWNER_SUBJECT_HASH ? { expectedOwnerSubjectHash: process.env.CUSTOMER_AGENT_G1A_OWNER_SUBJECT_HASH } : {}),
       repositoryRoot: path.resolve(import.meta.dirname, '../../..'),
     });
 
@@ -32,7 +34,7 @@ describeControlledPackage('G1A-E0 controlled package runner', () => {
     });
     expect(completed.runtime).toMatchObject({
       postgres_major: 15,
-      transaction_isolation: 'repeatable read',
+      transaction_isolation: process.env.CUSTOMER_AGENT_G1A_OWNER_ACCEPTANCE_SHA256 ? 'read committed' : 'repeatable read',
       transaction_read_only: true,
       event_rows_before: 0,
       event_rows_after: 0,

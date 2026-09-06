@@ -22,7 +22,7 @@ export type G1aCompletedRun = Readonly<{
   runtime: Readonly<{
     postgres_major: 15;
     transaction_timestamp: string;
-    transaction_isolation: 'repeatable read';
+    transaction_isolation: 'repeatable read' | 'read committed';
     transaction_read_only: true;
     event_rows_before: 0;
     event_rows_after: 0;
@@ -35,6 +35,8 @@ export type RunG1aPackageOptions = Readonly<{
   inputRoot: string;
   repositoryRoot: string;
   expectedManifestSha256: string;
+  expectedOwnerAcceptanceSha256?: string;
+  expectedOwnerSubjectHash?: string;
   now?: Date;
 }>;
 
@@ -100,6 +102,7 @@ async function closeClient(client: Client | undefined, errors: unknown[]): Promi
 export async function runVerifiedG1aEvaluation(
   input: G1aEvaluationPackage,
 ): Promise<G1aCompletedRun> {
+  const isolation = input.owner_acceptance ? 'read committed' : 'repeatable read';
   const harness = new Pg15Harness();
   let owner: Client | undefined;
   let runtime: Client | undefined;
@@ -124,7 +127,10 @@ export async function runVerifiedG1aEvaluation(
     await owner.query(`CREATE ROLE ${runtimeRole} LOGIN`);
     await owner.query(`GRANT app_runtime TO ${runtimeRole}`);
     runtime = await harness.connect({ ...database.config, user: runtimeRole });
-    await runtime.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    // Owner admission holds source/revocation fences and requires fresh READ COMMITTED snapshots.
+    await runtime.query(input.owner_acceptance
+      ? 'BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY'
+      : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     runtimeTransactionOpen = true;
     const runtimeState = await runtime.query<{
       transaction_timestamp: Date | string;
@@ -140,7 +146,7 @@ export async function runVerifiedG1aEvaluation(
     `);
     const runtimeRow = runtimeState.rows[0];
     if (!runtimeRow
-      || runtimeRow.transaction_isolation !== 'repeatable read'
+      || runtimeRow.transaction_isolation !== isolation
       || runtimeRow.transaction_read_only !== 'on'
       || Math.trunc(Number(runtimeRow.server_version_num) / 10_000) !== 15) {
       throw new G1aRunError('G1A_RUNTIME_TIME_INVALID');
@@ -200,7 +206,7 @@ export async function runVerifiedG1aEvaluation(
     runtime: Object.freeze({
       postgres_major: 15,
       transaction_timestamp: transactionTimestamp,
-      transaction_isolation: 'repeatable read',
+      transaction_isolation: isolation,
       transaction_read_only: true,
       event_rows_before: 0,
       event_rows_after: 0,
@@ -218,6 +224,8 @@ export async function runG1aEvaluationPackage(
     repositoryRoot: options.repositoryRoot,
     expectedManifestSha256: options.expectedManifestSha256,
     ...(options.now ? { now: options.now } : {}),
+    ...(options.expectedOwnerAcceptanceSha256 !== undefined ? { expectedOwnerAcceptanceSha256: options.expectedOwnerAcceptanceSha256 } : {}),
+    ...(options.expectedOwnerSubjectHash !== undefined ? { expectedOwnerSubjectHash: options.expectedOwnerSubjectHash } : {}),
   });
   return runVerifiedG1aEvaluation(input);
 }
