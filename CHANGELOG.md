@@ -6,6 +6,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Added
 
+- Added an operator-only owner package assembler that derives approved content identities, validates a fresh private five-file package, and preserves historical packages; independently anchored records and all evaluation gates remain required.
+
 - Added test-only owner-acceptance v3 packages with independent external anchors, exact scope checks and atomic offline registration; synthetic PG15 tests cover tampering, rollback, revocation and source fences while preserving v2 behavior.
 
 - Consumed the immutable OpenAPI 1.12.0 / schema.v1.15 owner-acceptance contract from source commit `2c75d8e7670134e6aa95a4780ff09fe0422a65e8`, generating 133 component validators without runtime activation.
