@@ -29,6 +29,7 @@ const MANIFEST_FILE = 'contract-set.json';
 const INTAKE_STATUS = 'VERIFIED_NOT_ACTIVATED';
 const OPENAPI_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/openapi.v1.yaml';
 const DATABASE_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/33-schema-v1-草案.sql';
+const OWNER_SOURCE_ROOT = 'business-docs/01-客服Agent项目/30-开发-进行中';
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTRACT_SET_ID_PATTERN = /^cs-ai-c11-openapi-(\d+\.\d+\.\d+)-schema-(\d+\.\d+)-([0-9a-f]{12})$/;
@@ -164,13 +165,18 @@ function validateManifest(rawManifest) {
   if (openapi.version !== idMatch[1] || openapi.file !== 'openapi.v1.yaml') {
     throw new Error('OpenAPI descriptor does not match contract_set_id');
   }
-  if (openapi.source_path !== OPENAPI_SOURCE_PATH) {
-    throw new Error('OpenAPI source_path is invalid');
-  }
   if (database.version !== `schema.v${idMatch[2]}` || database.file !== `schema-v${idMatch[2]}.sql`) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
-  if (database.source_path !== DATABASE_SOURCE_PATH) {
+  // Version and both paths form one reviewed pair. Never accept a mixed legacy/owner set.
+  const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
+  const legacyPair = openapi.version === '1.11.0'
+    && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
+  if (!ownerPair && !legacyPair) throw new Error('Unsupported contract version pair');
+  if (openapi.source_path !== (ownerPair ? `${OWNER_SOURCE_ROOT}/openapi.v1.12.yaml` : OPENAPI_SOURCE_PATH)) {
+    throw new Error('OpenAPI source_path is invalid');
+  }
+  if (database.source_path !== (ownerPair ? `${OWNER_SOURCE_ROOT}/schema.v1.15.sql` : DATABASE_SOURCE_PATH)) {
     throw new Error('Database source_path is invalid');
   }
   return rawManifest;

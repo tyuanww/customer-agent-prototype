@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
   existsSync,
+  cpSync,
+  chmodSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -178,6 +180,28 @@ function createContractSet({
 }
 
 describe('customer-agent contract-set intake', () => {
+  it('accepts the owner pair and rejects mixed or unreviewed version/source pairs', () => {
+    const source = path.join(repositoryRoot, 'contracts/upstream/customer-agent',
+      'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701');
+    const directory = temporaryDirectory('owner-pair');
+    cpSync(source, directory, { recursive: true });
+    expect(() => contractSet.verifyContractSetDirectory(directory)).not.toThrow();
+    const manifestPath = path.join(directory, 'contract-set.json');
+    chmodSync(manifestPath, 0o600);
+    const original = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    for (const field of ['openapi', 'database']) {
+      const changed = structuredClone(original);
+      changed[field].source_path = field === 'openapi' ? OPENAPI_SOURCE_PATH : DATABASE_SOURCE_PATH;
+      writeFileSync(manifestPath, JSON.stringify(changed));
+      expect(() => contractSet.verifyContractSetDirectory(directory)).toThrow(/source_path/);
+    }
+    const mixed = structuredClone(original);
+    mixed.openapi.version = '1.11.0';
+    mixed.contract_set_id = mixed.contract_set_id.replace('openapi-1.12.0', 'openapi-1.11.0');
+    writeFileSync(manifestPath, JSON.stringify(mixed));
+    expect(() => contractSet.verifyContractSetDirectory(directory)).toThrow(/version pair/);
+  });
+
   it('accepts the pnpm argument separator before intake options', () => {
     expect(
       contractSet.parseCliArguments([
@@ -441,8 +465,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.11.0-schema-1.14-1af001b8b0ce',
-      source_git_sha: '1af001b8b0ce95aac0c42f42251a38feb85f3e26',
+      contract_set_id: 'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701',
+      source_git_sha: '2c75d8e7670134e6aa95a4780ff09fe0422a65e8',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -452,13 +476,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      'd330ea214ed87b30aa2f457db162b1ff468444444849237eaec39f475bcb534d',
+      'e7c209c210f6b2db6618d8f6d3700327ec234e93a8be1878c39378cd9f8635ee',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      '06698f233702591c8f981c7b08ebac4b7d5bc5cc2d69d36014ef2a9f5a6802e4',
+      '361f20128c88143eb87370f136b67c4de8c1ed5fc02c7072f62c16545951315c',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.14.sql')))).toBe(
-      'edf909bf9450b5745a85ced4a75a2e2de3e5b061847562cd3a68c9c7c226da99',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.15.sql')))).toBe(
+      '859c4a4757d87e642e797ad8a26cfb334c49ae7f8f263966099eb89e6750b38b',
     );
   });
 });

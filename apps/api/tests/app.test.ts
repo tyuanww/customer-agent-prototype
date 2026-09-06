@@ -826,7 +826,7 @@ describe('ServiceRepository readiness', () => {
     return {
       database_probe: 1,
       server_version_num: 150_013,
-      schema_comment: 'CS-AI-C11 schema.v1.14; synthetic unit fixture',
+      schema_comment: 'CS-AI-C11 schema.v1.15; synthetic unit fixture',
       repository_boundary_present: true,
       runtime_identity_safe: true,
       runtime_effective_acl_safe: true,
@@ -1593,6 +1593,24 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await expectSchemaNotReady();
       await owner.query(originalPublicQuestionsDefinition);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+
+      for (const signature of [
+        'public.owner_acceptance_release_ready(text)',
+        'public.owner_acceptance_active_record(text,text,text)',
+        'public.owner_acceptance_sources_ready(text,jsonb)',
+        'public.owner_acceptance_instant(jsonb)',
+      ]) {
+        const saved = await owner.query<{ definition: string }>(
+          'SELECT pg_catalog.pg_get_functiondef($1::regprocedure) AS definition', [signature],
+        );
+        try {
+          await owner.query(`ALTER FUNCTION ${signature} SET search_path = public, pg_catalog`);
+          await expectSchemaNotReady();
+        } finally {
+          await owner.query(saved.rows[0]!.definition);
+        }
+        await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+      }
 
       await owner.query('CREATE ROLE w5_alternate_definer NOLOGIN');
       await owner.query(`

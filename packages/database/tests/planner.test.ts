@@ -30,7 +30,7 @@ describe('database migration planner', () => {
     const partial = deriveMigrationStatus([ledgerRow(0), ledgerRow(1)], generatedMigrationCatalogue);
     expect(partial.state).toBe('PARTIAL');
     expect(partial.pending[0]?.id).toBe('0003_events_and_metrics');
-    expect(planMigrationCatalogue(partial).migrations).toHaveLength(9);
+    expect(planMigrationCatalogue(partial).migrations).toHaveLength(10);
 
     const complete = deriveMigrationStatus(
       generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)),
@@ -39,7 +39,7 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 2-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 3-migration current suffix',
     );
   });
 
@@ -55,6 +55,7 @@ describe('database migration planner', () => {
     expect(status.pending.map(({ id }) => id)).toEqual([
       '0010_search_projection_v1_13',
       '0011_search_no_hit_context_v1_14',
+      '0012_owner_acceptance_v1_15',
     ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
@@ -128,7 +129,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(11);
+    expect(status.pending).toHaveLength(12);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });

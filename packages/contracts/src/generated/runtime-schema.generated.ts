@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.11.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.12.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -77,6 +77,7 @@ export const COMPONENT_SCHEMA_NAMES = [
   "OfflineSnapshotLeaseToken",
   "OkResponse",
   "OverloadedErrorEnvelope",
+  "OwnerAcceptanceRecord",
   "Phase1HardOffPolicyFlagKey",
   "PlaceholderKey",
   "Platform",
@@ -139,7 +140,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.11.0:components",
+  "$id": "urn:customer-agent:openapi:1.12.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -2655,6 +2656,167 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "OwnerAcceptanceRecord": {
+      "title": "G1a bounded owner acceptance metadata (not runtime authorization)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "review_mode",
+        "purpose",
+        "owner_subject_hash",
+        "approval_evidence_id",
+        "accepted_at",
+        "expires_at",
+        "scope"
+      ],
+      "properties": {
+        "schema": {
+          "const": "customer-agent/owner-acceptance/v1"
+        },
+        "review_mode": {
+          "const": "owner_acceptance"
+        },
+        "purpose": {
+          "const": "g1a_offline_only"
+        },
+        "owner_subject_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "approval_evidence_id": {
+          "type": "string",
+          "pattern": "^EVD-[A-Z0-9-]{6,127}$"
+        },
+        "accepted_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "expires_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_bindings",
+            "items"
+          ],
+          "properties": {
+            "source_bindings": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "domain",
+                  "source_version_id",
+                  "snapshot_sha256",
+                  "review_due_at"
+                ],
+                "properties": {
+                  "domain": {
+                    "enum": [
+                      "aftersale",
+                      "campaign",
+                      "presale",
+                      "product"
+                    ]
+                  },
+                  "source_version_id": {
+                    "type": "string",
+                    "pattern": "^srcv_[A-Za-z0-9][A-Za-z0-9._-]{7,126}$"
+                  },
+                  "snapshot_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "review_due_at": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+                  }
+                }
+              }
+            },
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5000,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "script_id",
+                  "script_version",
+                  "domain",
+                  "source_version_id",
+                  "review_input_sha256",
+                  "risk_level",
+                  "risk_categories",
+                  "has_conflict"
+                ],
+                "properties": {
+                  "script_id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_-]{7,127}$"
+                  },
+                  "script_version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "domain": {
+                    "enum": [
+                      "aftersale",
+                      "campaign",
+                      "presale",
+                      "product"
+                    ]
+                  },
+                  "source_version_id": {
+                    "type": "string",
+                    "pattern": "^srcv_[A-Za-z0-9][A-Za-z0-9._-]{7,126}$"
+                  },
+                  "review_input_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "risk_level": {
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "risk_categories": {
+                    "type": "array",
+                    "maxItems": 7,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "refund_compensation",
+                        "price_discount",
+                        "campaign_rules",
+                        "efficacy_safety_claim",
+                        "account_privacy",
+                        "complaint_escalation",
+                        "legal_commitment"
+                      ]
+                    }
+                  },
+                  "has_conflict": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Phase1HardOffPolicyFlagKey": {
       "type": "string",
       "enum": [
@@ -3044,7 +3206,8 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
       "type": "string",
       "enum": [
         "single",
-        "dual"
+        "dual",
+        "owner_acceptance"
       ]
     },
     "RiskCategories": {
