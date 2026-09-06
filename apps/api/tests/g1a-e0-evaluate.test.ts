@@ -150,6 +150,74 @@ function withExpectations(
 }
 
 describe('G1A-E0 aggregate evaluator', () => {
+  it('retains all 50 case outcomes without turning backend errors into no-hit evidence', async () => {
+    const report = await evaluateG1aPackage(
+      backend({ emptyCaseNumbers: [3], failedCaseNumbers: [1], thrownCaseNumbers: [2] }),
+      evaluationPackage('approved_redacted'),
+      { eventWrites: 0, processGuardAttempts: 0 },
+    );
+    expect(report.case_results).toHaveLength(50);
+    expect(report.case_results.map((row) => row.case_id))
+      .toEqual(evaluationPackage('approved_redacted').cases.map((row) => row.case_id));
+    expect(report.case_results.slice(0, 3)).toMatchObject([
+      { outcome: 'backend_error', candidates: [], search_action_correct: false, failure_codes: ['BACKEND_ERROR'] },
+      { outcome: 'backend_error', candidates: [], search_action_correct: false, failure_codes: ['BACKEND_ERROR'] },
+      { outcome: 'no_hit', candidates: [], search_action_correct: false, failure_codes: ['EXPECTED_TOP3_MISS'] },
+    ]);
+    expect(report.case_results[3]).toMatchObject({
+      outcome: 'hit', search_action_correct: true,
+      candidates: [{ rank: 1, script_id: SCRIPT_ID, script_version: 1, content_hash: CONTENT_HASH,
+        release_id: RELEASE_ID, provenance_valid: true }],
+      failure_codes: [],
+    });
+    expect(report.case_results[20]).toMatchObject({
+      stratum: 'safety_negative', outcome: 'no_hit', search_action_correct: true,
+      expected_search_action: 'no_hit', expected_downstream_action: 'escalate', candidates: [],
+    });
+    expect(report.case_results.filter((row) => row.outcome === 'backend_error')).toHaveLength(report.raw.backend_errors);
+    expect(report.case_results.flatMap((row) => row.candidates)).toHaveLength(report.raw.source_checked);
+    expect(report.case_results.filter((row) => row.stratum === 'positive' && row.search_action_correct))
+      .toHaveLength(report.strata.positive.search_action_correct);
+    expect(report.downstream_action_evaluation).toBe('NOT_EVALUATED');
+    expect(() => assertScrubbedG1aReport(report)).not.toThrow();
+    expect(JSON.stringify(report.case_results)).not.toMatch(/合成评测问法|合成答案|synthetic backend failure/);
+  });
+
+  it('preserves candidate provenance failures separately from search-action matches', async () => {
+    const report = await evaluateG1aPackage(
+      backend({ candidatePatch: { content_hash: 'e'.repeat(64) } }),
+      evaluationPackage('approved_redacted'),
+      { eventWrites: 0, processGuardAttempts: 0 },
+    );
+    expect(report.case_results[0]).toMatchObject({
+      outcome: 'hit', search_action_correct: true,
+      candidates: [{ content_hash: 'e'.repeat(64), provenance_valid: false }],
+      failure_codes: ['CANDIDATE_PROVENANCE_INVALID'],
+    });
+    expect(report.decision).toBe('FAIL');
+    expect(report.raw.source_correct).toBe(0);
+  });
+
+  it('retains every ranked candidate identity without copying candidate text', async () => {
+    const original = backend();
+    const report = await evaluateG1aPackage({
+      async search(request) {
+        const result = await original.search(request);
+        if (!result.ok || result.candidates.length === 0) return result;
+        return { ...result, candidates: [result.candidates[0]!,
+          { ...result.candidates[0]!, rank: 2, script_id: 'script_synthetic_second' },
+          { ...result.candidates[0]!, rank: 3, script_id: 'script_synthetic_third' }] };
+      },
+    }, evaluationPackage('synthetic'), { eventWrites: 0, processGuardAttempts: 0 });
+    expect(report.case_results[0]?.candidates.map((candidate) => [candidate.rank, candidate.script_id]))
+      .toEqual([[1, SCRIPT_ID], [2, 'script_synthetic_second'], [3, 'script_synthetic_third']]);
+    expect(report.case_results[0]?.candidates.map((candidate) => candidate.provenance_valid))
+      .toEqual([true, false, false]);
+    expect(report.raw.source_checked).toBe(38 * 3);
+    expect(() => assertScrubbedG1aReport(report)).not.toThrow();
+    expect(JSON.stringify(report.case_results)).not.toContain('合成');
+  });
+
   it('keeps a fully successful synthetic substitute unsigned and not evaluated', async () => {
     const report = await evaluateG1aPackage(
       backend(),

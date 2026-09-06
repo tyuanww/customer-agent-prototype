@@ -36,6 +36,28 @@ export type G1aEvaluationFailure = Readonly<{
   stratum_id: string | null;
 }>;
 
+/** ID-only observations in frozen input order; expected actions are not executed actions. */
+type G1aCaseResult = Readonly<{
+  case_id: string;
+  stratum: G1aStratum;
+  stratum_id: string;
+  expected_search_action: G1aExpectation['expected_search_action'];
+  expected_downstream_action: G1aExpectation['downstream_action'];
+  outcome: 'hit' | 'no_hit' | 'backend_error';
+  acceptable_candidate_returned: boolean;
+  forbidden_candidate_returned: boolean;
+  search_action_correct: boolean;
+  candidates: readonly Readonly<{
+    rank: number;
+    script_id: string;
+    script_version: number;
+    content_hash: string;
+    release_id: string;
+    provenance_valid: boolean;
+  }>[];
+  failure_codes: readonly G1aEvaluationFailureCode[];
+}>;
+
 export type G1aEvaluationReport = Readonly<{
   schema: 'customer-agent/g1a-evaluation-report/v1';
   status: 'NOT_SIGNED';
@@ -74,6 +96,7 @@ export type G1aEvaluationReport = Readonly<{
     hit_at_3: number;
     ratio: number;
   }>[];
+  case_results: readonly G1aCaseResult[];
   raw: Readonly<{
     positive_top3_hits: number;
     safety_no_hits: number;
@@ -184,6 +207,7 @@ export async function evaluateG1aPackage(
   evidence: EvaluationEvidenceSource,
 ): Promise<G1aEvaluationReport> {
   const failures: G1aEvaluationFailure[] = [];
+  const caseResults: G1aCaseResult[] = [];
   const totals: Record<G1aStratum, { total: number; correct: number }> = {
     positive: { total: 0, correct: 0 },
     safety_negative: { total: 0, correct: 0 },
@@ -201,6 +225,7 @@ export async function evaluateG1aPackage(
 
   for (const [index, testCase] of input.cases.entries()) {
     const expectation = input.expectations[index]!;
+    const failureOffset = failures.length;
     totals[testCase.stratum].total += 1;
     const stratumId = `${testCase.platform}:${testCase.core_intent_id}`;
     if (testCase.stratum === 'positive') {
@@ -210,7 +235,7 @@ export async function evaluateG1aPackage(
     }
 
     const startedAt = performance.now();
-    let result: Awaited<ReturnType<SearchBackend['search']>>;
+    let result: Awaited<ReturnType<SearchBackend['search']>> | null = null;
     try {
       result = await backend.search({
         normalizedQuery: testCase.query_text,
@@ -220,15 +245,26 @@ export async function evaluateG1aPackage(
         topK: 3,
       });
     } catch {
-      durations.push(performance.now() - startedAt);
-      backendErrors += 1;
-      failures.push(failure('BACKEND_ERROR', { case_id: testCase.case_id, backend_code: 'THREW' }));
-      continue;
+      // A thrown backend error shares the failed-query outcome; never retain its text.
     }
     durations.push(performance.now() - startedAt);
-    if (!result.ok) {
+    const caseIdentity = {
+      case_id: testCase.case_id,
+      stratum: testCase.stratum,
+      stratum_id: stratumId,
+      expected_search_action: expectation.expected_search_action,
+      expected_downstream_action: expectation.downstream_action,
+    };
+    if (result === null || !result.ok) {
       backendErrors += 1;
-      failures.push(failure('BACKEND_ERROR', { case_id: testCase.case_id, backend_code: result.code }));
+      failures.push(failure('BACKEND_ERROR', {
+        case_id: testCase.case_id, backend_code: result === null ? 'THREW' : result.code,
+      }));
+      caseResults.push(Object.freeze({
+        ...caseIdentity, outcome: 'backend_error', search_action_correct: false,
+        acceptable_candidate_returned: false, forbidden_candidate_returned: false,
+        candidates: Object.freeze([]), failure_codes: Object.freeze(['BACKEND_ERROR'] as const),
+      }));
       continue;
     }
 
@@ -239,14 +275,21 @@ export async function evaluateG1aPackage(
     if (result.sourceBindingHash !== input.manifest.source_binding_hash) {
       failures.push(failure('SOURCE_BINDING_MISMATCH', { case_id: testCase.case_id, actual_script_ids: actualIds }));
     }
+    const observedCandidates: G1aCaseResult['candidates'][number][] = [];
     for (const candidate of result.candidates) {
       sourceChecked += 1;
-      if (candidateIsCorrect(
+      const provenanceValid = candidateIsCorrect(
         testCase,
         contentById.get(candidate.script_id),
         candidate,
         input.manifest.release_id,
-      )) {
+      );
+      // Keep the immutable candidate identity needed for review, never the response body.
+      observedCandidates.push(Object.freeze({
+        rank: candidate.rank, script_id: candidate.script_id, script_version: candidate.script_version,
+        content_hash: candidate.content_hash, release_id: candidate.release_id, provenance_valid: provenanceValid,
+      }));
+      if (provenanceValid) {
         sourceCorrect += 1;
       } else {
         failures.push(failure('CANDIDATE_PROVENANCE_INVALID', {
@@ -267,7 +310,8 @@ export async function evaluateG1aPackage(
       positiveStrata.get(stratumId)!.hit += 1;
     }
     if (testCase.stratum === 'safety_negative' && actualIds.length === 0) safetyNoHits += 1;
-    if (isCaseCorrect(expectation, actualIds, forbiddenReturned)) {
+    const searchActionCorrect = isCaseCorrect(expectation, actualIds, forbiddenReturned);
+    if (searchActionCorrect) {
       totals[testCase.stratum].correct += 1;
     } else if (!forbiddenReturned) {
       failures.push(failure(
@@ -275,6 +319,15 @@ export async function evaluateG1aPackage(
         { case_id: testCase.case_id, actual_script_ids: actualIds },
       ));
     }
+    caseResults.push(Object.freeze({
+      ...caseIdentity,
+      outcome: actualIds.length === 0 ? 'no_hit' : 'hit',
+      acceptable_candidate_returned: hitAt3,
+      forbidden_candidate_returned: forbiddenReturned,
+      search_action_correct: searchActionCorrect,
+      candidates: Object.freeze(observedCandidates),
+      failure_codes: Object.freeze(failures.slice(failureOffset).map((item) => item.code)),
+    }));
   }
 
   const positiveStrataReport = Object.freeze([...positiveStrata.entries()]
@@ -361,6 +414,7 @@ export async function evaluateG1aPackage(
       }),
     }),
     positive_strata: positiveStrataReport,
+    case_results: Object.freeze(caseResults),
     raw: Object.freeze({
       positive_top3_hits: positiveTop3Hits,
       safety_no_hits: safetyNoHits,
