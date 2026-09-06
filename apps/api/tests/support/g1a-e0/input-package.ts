@@ -1,3 +1,5 @@
+import { validateContractSchema, type components } from '@customer-agent/contracts';
+import { ownerReviewInputHash } from './content-identity.js';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, open, readdir, realpath } from 'node:fs/promises';
@@ -9,6 +11,9 @@ const DOMAINS = Object.freeze(['aftersale', 'campaign', 'presale', 'product'] as
 const COMPARISON_SETS = Object.freeze(['dev_synthetic', 'train', 'g1b'] as const);
 const COMPARISON_STATUSES = Object.freeze(['PRESENT', 'NOT_PRESENT'] as const);
 const EVALUATION_MANIFEST_SCHEMA = 'customer-agent/g1a-evaluation-manifest/v2' as const;
+const OWNER_MANIFEST_SCHEMA = 'customer-agent/g1a-evaluation-manifest/v3' as const;
+const OWNER_FILE = 'owner-acceptance.json';
+const OWNER_MAX_BYTES = 2 * 1024 * 1024;
 const COMPARISON_MANIFEST_SCHEMA = 'customer-agent/g1a-comparison-manifest/v2' as const;
 const SHA256 = /^[0-9a-f]{64}$/;
 const OPAQUE_ID = /^[a-z][a-z0-9_-]{7,127}$/;
@@ -58,7 +63,8 @@ export type G1aContentItem = Readonly<{
   product_scope_type: 'storewide' | 'category' | 'sku'; product_scope_refs: readonly string[];
   intent_taxonomy_version: string; intent_id: string; intent_label: string;
   risk_level: 'low' | 'medium' | 'high'; risk_categories: readonly string[]; has_conflict: boolean;
-  review_mode: 'single' | 'dual'; primary_reviewer_id_hash: string;
+  review_mode: 'single' | 'dual' | 'owner_acceptance'; primary_reviewer_id_hash: string;
+  owner_acceptance_record_sha256?: string;
   primary_reviewer_role: 'ROLE-CONTENT-LEAD'; primary_review_evd: string;
   secondary_reviewer_id_hash: string | null; secondary_reviewer_role: 'ROLE-CS-MANAGER' | null;
   secondary_review_evd: string | null; placeholder_keys: readonly ('order_id' | 'date')[];
@@ -80,7 +86,7 @@ type ComparisonSet = Readonly<{
   source_ids: readonly string[]; semantic_cluster_ids: readonly string[];
 }>;
 export type G1aManifest = Readonly<{
-  schema: typeof EVALUATION_MANIFEST_SCHEMA; eval_set_id: string;
+  schema: typeof EVALUATION_MANIFEST_SCHEMA | typeof OWNER_MANIFEST_SCHEMA; eval_set_id: string;
   classification: 'synthetic' | 'approved_redacted'; purpose: 'g1a_search_eval_only';
   release_id: string; release_title: string; release_seq: number; content_snapshot_id: string;
   content_snapshot_sha256: string; source_binding_hash: string; created_at: string; expires_at: string;
@@ -88,21 +94,27 @@ export type G1aManifest = Readonly<{
   implementer_subject_hash: string; business_owner_subject_hash: string; business_owner_role: string;
   blind_reviewer_subject_hash: string; blind_reviewer_role: string; independence_evidence_id: string;
   independence_evidence_sha256: string; source_bindings: readonly G1aSourceBinding[];
-  comparison_sets: readonly ComparisonSet[]; files: Readonly<Record<PayloadName, FileDescriptor>>;
+  comparison_sets: readonly ComparisonSet[]; files: Readonly<Record<PayloadName, FileDescriptor> & { 'owner-acceptance.json'?: FileDescriptor }>;
+}>;
+export type G1aOwnerAcceptance = Readonly<{
+  record: components['schemas']['OwnerAcceptanceRecord']; raw_record: string;
+  record_sha256: string; expected_owner_subject_hash: string;
 }>;
 export type G1aEvaluationPackage = Readonly<{
   manifest_sha256: string; manifest: G1aManifest; content: readonly G1aContentItem[];
   cases: readonly G1aCase[]; expectations: readonly G1aExpectation[];
+  owner_acceptance?: G1aOwnerAcceptance;
 }>;
 export type ReadG1aPackageOptions = Readonly<{
   repositoryRoot: string; expectedManifestSha256: string; now?: Date;
+  expectedOwnerAcceptanceSha256?: string; expectedOwnerSubjectHash?: string;
 }>;
 export type G1aInputErrorCode =
   | 'G1A_INPUT_ROOT_INVALID' | 'G1A_INPUT_INSIDE_REPOSITORY' | 'G1A_INPUT_MEMBER_SET_INVALID'
   | 'G1A_INPUT_MEMBER_INSECURE' | 'G1A_INPUT_SIZE_INVALID' | 'G1A_INPUT_FORMAT_INVALID'
   | 'G1A_INPUT_MANIFEST_INVALID' | 'G1A_INPUT_HASH_MISMATCH' | 'G1A_INPUT_CONTENT_INVALID'
   | 'G1A_INPUT_CASE_INVALID' | 'G1A_INPUT_EXPECTATION_INVALID' | 'G1A_INPUT_DENOMINATOR_INVALID'
-  | 'G1A_INPUT_INDEPENDENCE_INVALID' | 'G1A_INPUT_LEAK_CANARY';
+  | 'G1A_INPUT_INDEPENDENCE_INVALID' | 'G1A_INPUT_LEAK_CANARY' | 'G1A_INPUT_OWNER_ACCEPTANCE_INVALID';
 
 export class G1aInputError extends Error {
   readonly code: G1aInputErrorCode;
@@ -306,7 +318,7 @@ function parseManifest(value: unknown, now: Date): G1aManifest {
     'blind_reviewer_role', 'independence_evidence_id', 'independence_evidence_sha256',
     'source_bindings', 'comparison_sets', 'files',
   ], 'G1A_INPUT_MANIFEST_INVALID');
-  if (record.schema !== EVALUATION_MANIFEST_SCHEMA || record.purpose !== 'g1a_search_eval_only'
+  if (![EVALUATION_MANIFEST_SCHEMA, OWNER_MANIFEST_SCHEMA].includes(record.schema as typeof EVALUATION_MANIFEST_SCHEMA) || record.purpose !== 'g1a_search_eval_only'
     || (record.classification !== 'synthetic' && record.classification !== 'approved_redacted')) fail('G1A_INPUT_MANIFEST_INVALID');
   const createdAt = isoInstant(record.created_at, 'G1A_INPUT_MANIFEST_INVALID');
   const expiresAt = isoInstant(record.expires_at, 'G1A_INPUT_MANIFEST_INVALID');
@@ -326,16 +338,18 @@ function parseManifest(value: unknown, now: Date): G1aManifest {
   if (!Array.isArray(record.comparison_sets) || record.comparison_sets.length !== 3) fail('G1A_INPUT_INDEPENDENCE_INVALID');
   const comparisons = Object.freeze(record.comparison_sets.map(parseComparison));
   if (comparisons.some((comparison, index) => comparison.set !== COMPARISON_SETS[index])) fail('G1A_INPUT_INDEPENDENCE_INVALID');
-  const fileRecord = exactKeys(record.files, PAYLOAD_NAMES, 'G1A_INPUT_MANIFEST_INVALID');
+  const ownerMode = record.schema === OWNER_MANIFEST_SCHEMA;
+  const fileRecord = exactKeys(record.files, ownerMode ? [...PAYLOAD_NAMES, OWNER_FILE] : PAYLOAD_NAMES, 'G1A_INPUT_MANIFEST_INVALID');
   const files = Object.freeze({
     'content.jsonl': parseDescriptor(fileRecord['content.jsonl'], CONTENT_MAX_BYTES),
     'cases.jsonl': parseDescriptor(fileRecord['cases.jsonl'], CASES_MAX_BYTES),
     'expectations.jsonl': parseDescriptor(fileRecord['expectations.jsonl'], EXPECTATIONS_MAX_BYTES),
+    ...(ownerMode ? { 'owner-acceptance.json': parseDescriptor(fileRecord[OWNER_FILE], OWNER_MAX_BYTES) } : {}),
   });
   const bindingHash = requiredString(record.source_binding_hash, 'G1A_INPUT_MANIFEST_INVALID', { pattern: SHA256 });
   if (sourceBindingHash(bindings) !== bindingHash) fail('G1A_INPUT_HASH_MISMATCH');
   return Object.freeze({
-    schema: EVALUATION_MANIFEST_SCHEMA,
+    schema: record.schema as G1aManifest['schema'],
     eval_set_id: opaqueIdentifier(record.eval_set_id, 'G1A_INPUT_MANIFEST_INVALID'),
     classification: record.classification, purpose: 'g1a_search_eval_only',
     release_id: opaqueIdentifier(record.release_id, 'G1A_INPUT_MANIFEST_INVALID'),
@@ -377,7 +391,9 @@ function parseQuestion(value: unknown): G1aQuestion {
     intent_id: requiredString(record.intent_id, 'G1A_INPUT_CONTENT_INVALID', { pattern: INTENT_ID }),
   });
 }
-function parseContent(value: unknown): G1aContentItem {
+function parseContent(value: unknown, ownerAllowed = false): G1aContentItem {
+  const ownerMode = isRecord(value) && value.review_mode === 'owner_acceptance';
+  if (ownerMode && !ownerAllowed) fail('G1A_INPUT_CONTENT_INVALID');
   const record = exactKeys(value, [
     'script_id', 'script_version', 'content_hash', 'answer_text', 'title', 'domain', 'source_version_id',
     'owner_role', 'review_due_at', 'questions', 'platform_scope', 'product_scope_type',
@@ -385,9 +401,10 @@ function parseContent(value: unknown): G1aContentItem {
     'risk_categories', 'has_conflict', 'review_mode', 'primary_reviewer_id_hash',
     'primary_reviewer_role', 'primary_review_evd', 'secondary_reviewer_id_hash',
     'secondary_reviewer_role', 'secondary_review_evd', 'placeholder_keys', 'effective_from', 'effective_to',
+    ...(ownerMode ? ['owner_acceptance_record_sha256'] : []),
   ], 'G1A_INPUT_CONTENT_INVALID');
   if (!DOMAINS.includes(record.domain as G1aDomain) || !['storewide', 'category', 'sku'].includes(record.product_scope_type as string)
-    || !['low', 'medium', 'high'].includes(record.risk_level as string) || !['single', 'dual'].includes(record.review_mode as string)
+    || !['low', 'medium', 'high'].includes(record.risk_level as string) || !['single', 'dual', 'owner_acceptance'].includes(record.review_mode as string)
     || typeof record.has_conflict !== 'boolean' || !Array.isArray(record.questions)
     || record.questions.length < 1 || record.questions.length > 100) fail('G1A_INPUT_CONTENT_INVALID');
   const questions = Object.freeze(record.questions.map(parseQuestion));
@@ -407,7 +424,8 @@ function parseContent(value: unknown): G1aContentItem {
   if ((record.risk_level === 'high') !== (riskCategories.length > 0)) fail('G1A_INPUT_CONTENT_INVALID');
   const primaryHash = requiredString(record.primary_reviewer_id_hash, 'G1A_INPUT_CONTENT_INVALID', { pattern: SHA256 });
   const dualRequired = record.risk_level === 'high' || record.has_conflict === true;
-  if (dualRequired !== (record.review_mode === 'dual') || record.primary_reviewer_role !== 'ROLE-CONTENT-LEAD') fail('G1A_INPUT_CONTENT_INVALID');
+  if ((ownerMode ? record.has_conflict !== false : dualRequired !== (record.review_mode === 'dual'))
+    || record.primary_reviewer_role !== 'ROLE-CONTENT-LEAD') fail('G1A_INPUT_CONTENT_INVALID');
   let secondaryHash: string | null = null;
   if (record.review_mode === 'dual') {
     secondaryHash = requiredString(record.secondary_reviewer_id_hash, 'G1A_INPUT_CONTENT_INVALID', { pattern: SHA256 });
@@ -435,6 +453,7 @@ function parseContent(value: unknown): G1aContentItem {
     product_scope_refs: productScopeRefs, intent_taxonomy_version: taxonomyVersion, intent_id: intentId,
     intent_label: safeText(record.intent_label, 'G1A_INPUT_CONTENT_INVALID', 200), risk_level: record.risk_level as G1aContentItem['risk_level'],
     risk_categories: riskCategories, has_conflict: record.has_conflict, review_mode: record.review_mode as G1aContentItem['review_mode'],
+    ...(ownerMode ? { owner_acceptance_record_sha256: requiredString(record.owner_acceptance_record_sha256, 'G1A_INPUT_CONTENT_INVALID', { pattern: SHA256 }) } : {}),
     primary_reviewer_id_hash: primaryHash, primary_reviewer_role: 'ROLE-CONTENT-LEAD',
     primary_review_evd: requiredString(record.primary_review_evd, 'G1A_INPUT_CONTENT_INVALID', { pattern: EVD_ID }),
     secondary_reviewer_id_hash: secondaryHash, secondary_reviewer_role: record.secondary_reviewer_role as G1aContentItem['secondary_reviewer_role'],
@@ -523,6 +542,40 @@ function validateJoinedPackage(manifest: G1aManifest, content: readonly G1aConte
   ]);
 }
 
+function parseOwnerAcceptance(
+  raw: string, manifest: G1aManifest, content: readonly G1aContentItem[], options: ReadG1aPackageOptions,
+): G1aOwnerAcceptance {
+  const code = 'G1A_INPUT_OWNER_ACCEPTANCE_INVALID';
+  if (!options.expectedOwnerAcceptanceSha256 || !SHA256.test(options.expectedOwnerAcceptanceSha256)
+    || !options.expectedOwnerSubjectHash || !SHA256.test(options.expectedOwnerSubjectHash)
+    || sha256(raw) !== options.expectedOwnerAcceptanceSha256) fail(code);
+  const value = canonicalJson(raw.slice(0, -1), code);
+  if (!validateContractSchema('OwnerAcceptanceRecord', value).ok) fail(code);
+  const record = value as components['schemas']['OwnerAcceptanceRecord'];
+  if (record.owner_subject_hash !== options.expectedOwnerSubjectHash
+    || record.owner_subject_hash !== manifest.business_owner_subject_hash
+    || Date.parse(isoInstant(record.accepted_at, code)) > Date.parse(manifest.created_at)
+    || Date.parse(isoInstant(record.expires_at, code)) < Date.parse(manifest.expires_at)) fail(code);
+  const ownerItems = content.filter((item) => item.review_mode === 'owner_acceptance');
+  if (ownerItems.length === 0 || ownerItems.some((item) => item.owner_acceptance_record_sha256 !== options.expectedOwnerAcceptanceSha256
+    || item.primary_reviewer_id_hash !== record.owner_subject_hash
+    || item.primary_review_evd !== record.approval_evidence_id)) fail(code);
+  const observed = {
+    source_bindings: manifest.source_bindings.map(({ domain, source_version_id, snapshot_sha256, review_due_at }) => (
+      { domain, source_version_id, snapshot_sha256, review_due_at }
+    )),
+    items: [...ownerItems].sort((a, b) => a.script_id < b.script_id ? -1 : a.script_id > b.script_id ? 1 : 0).map((item) => {
+      const binding = manifest.source_bindings.find((b) => b.domain === item.domain)!;
+      return { script_id: item.script_id, script_version: item.script_version, domain: item.domain,
+        source_version_id: item.source_version_id, review_input_sha256: ownerReviewInputHash(item, binding.source_ref),
+        risk_level: item.risk_level, risk_categories: [...item.risk_categories].sort(), has_conflict: item.has_conflict };
+    }),
+  };
+  if (jcs(record.scope) !== jcs(observed)) fail(code);
+  return Object.freeze({ record, raw_record: raw, record_sha256: options.expectedOwnerAcceptanceSha256,
+    expected_owner_subject_hash: options.expectedOwnerSubjectHash });
+}
+
 export async function readG1aEvaluationPackage(inputRoot: string, options: ReadG1aPackageOptions): Promise<G1aEvaluationPackage> {
   if (process.platform === 'win32' || !path.isAbsolute(inputRoot) || inputRoot.split(path.sep).includes('..')
     || !path.isAbsolute(options.repositoryRoot) || !SHA256.test(options.expectedManifestSha256)) fail('G1A_INPUT_ROOT_INVALID');
@@ -538,12 +591,16 @@ export async function readG1aEvaluationPackage(inputRoot: string, options: ReadG
   }
   if (isInside(repositoryRoot, resolvedRoot) || isInside(resolvedRoot, repositoryRoot)) fail('G1A_INPUT_INSIDE_REPOSITORY');
   const members = (await readdir(resolvedRoot)).sort();
-  if (members.length !== FILE_NAMES.length || members.some((name, index) => name !== FILE_NAMES[index])) fail('G1A_INPUT_MEMBER_SET_INVALID');
+  if (!members.includes('manifest.json')) fail('G1A_INPUT_MEMBER_SET_INVALID');
   const manifestBytes = await readSecureMember(resolvedRoot, 'manifest.json', MANIFEST_MAX_BYTES);
   if (sha256(manifestBytes) !== options.expectedManifestSha256) fail('G1A_INPUT_HASH_MISMATCH');
   const manifestText = decodeUtf8(manifestBytes, 'G1A_INPUT_MANIFEST_INVALID');
   if (manifestText.slice(0, -1).includes('\n')) fail('G1A_INPUT_FORMAT_INVALID');
   const manifest = parseManifest(canonicalJson(manifestText.slice(0, -1), 'G1A_INPUT_MANIFEST_INVALID'), options.now ?? new Date());
+  const ownerMode = manifest.schema === OWNER_MANIFEST_SCHEMA;
+  const expectedMembers = ownerMode ? [...FILE_NAMES, OWNER_FILE].sort() : FILE_NAMES;
+  if (members.length !== expectedMembers.length || members.some((name, index) => name !== expectedMembers[index])) fail('G1A_INPUT_MEMBER_SET_INVALID');
+  if (!ownerMode && (options.expectedOwnerAcceptanceSha256 !== undefined || options.expectedOwnerSubjectHash !== undefined)) fail('G1A_INPUT_OWNER_ACCEPTANCE_INVALID');
   const payload = new Map<PayloadName, Buffer>(); let total = manifestBytes.byteLength;
   for (const name of PAYLOAD_NAMES) {
     const maximum = name === 'content.jsonl' ? CONTENT_MAX_BYTES : name === 'cases.jsonl' ? CASES_MAX_BYTES : EXPECTATIONS_MAX_BYTES;
@@ -554,14 +611,23 @@ export async function readG1aEvaluationPackage(inputRoot: string, options: ReadG
     payload.set(name, bytes);
   }
   if (manifest.content_snapshot_sha256 !== manifest.files['content.jsonl'].sha256) fail('G1A_INPUT_HASH_MISMATCH');
-  const content = Object.freeze(parseJsonLines(payload.get('content.jsonl')!, 'G1A_INPUT_CONTENT_INVALID').map(parseContent));
+  const content = Object.freeze(parseJsonLines(payload.get('content.jsonl')!, 'G1A_INPUT_CONTENT_INVALID').map((item) => parseContent(item, ownerMode)));
   const cases = Object.freeze(parseJsonLines(payload.get('cases.jsonl')!, 'G1A_INPUT_CASE_INVALID').map(parseCase));
   const expectations = Object.freeze(parseJsonLines(payload.get('expectations.jsonl')!, 'G1A_INPUT_EXPECTATION_INVALID').map(parseExpectation));
   if (manifest.files['content.jsonl'].records !== content.length || manifest.files['cases.jsonl'].records !== cases.length
     || manifest.files['expectations.jsonl'].records !== expectations.length) fail('G1A_INPUT_HASH_MISMATCH');
   validateJoinedPackage(manifest, content, cases, expectations);
+  let ownerAcceptance: G1aOwnerAcceptance | undefined;
+  if (ownerMode) {
+    const bytes = await readSecureMember(resolvedRoot, OWNER_FILE, OWNER_MAX_BYTES);
+    const descriptor = manifest.files[OWNER_FILE]!;
+    if (total + bytes.byteLength > TOTAL_MAX_BYTES + OWNER_MAX_BYTES) fail('G1A_INPUT_SIZE_INVALID');
+    if (descriptor.records !== 1 || descriptor.bytes !== bytes.byteLength || descriptor.sha256 !== sha256(bytes)) fail('G1A_INPUT_HASH_MISMATCH');
+    ownerAcceptance = parseOwnerAcceptance(decodeUtf8(bytes, 'G1A_INPUT_OWNER_ACCEPTANCE_INVALID'), manifest, content, options);
+  }
   const rootAfter = await lstat(resolvedRoot, { bigint: true });
   if (rootAfter.dev !== rootBefore.dev || rootAfter.ino !== rootBefore.ino || rootAfter.mtimeNs !== rootBefore.mtimeNs
     || rootAfter.ctimeNs !== rootBefore.ctimeNs) fail('G1A_INPUT_MEMBER_INSECURE');
-  return Object.freeze({ manifest_sha256: sha256(manifestBytes), manifest, content, cases, expectations });
+  return Object.freeze({ manifest_sha256: sha256(manifestBytes), manifest, content, cases, expectations,
+    ...(ownerAcceptance ? { owner_acceptance: ownerAcceptance } : {}) });
 }

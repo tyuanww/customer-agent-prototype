@@ -92,7 +92,9 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 `G1A-E0 T1～T3` 只存在于 API 测试支持目录：读取器要求仓外绝对规范路径、0700 根目录、0600 当前用户普通文件、固定四成员、无软/硬链、大小/LF/canonical JSON、仓外 manifest SHA-256 锚点、与实际 ID 清单绑定的 comparison manifest hash、DLP/独立性 EVD 和 20+12+18 冻结分母；装载器在一次性 PostgreSQL 15 中用正式 question/governance hash 与四域 source gate 做事务内后验，任一失败整批回滚。runner 以 `REPEATABLE READ READ ONLY` 事务调用同一 `SearchBackend/SearchRepository`，保持 HTTP、事件和桌面不参与。Node 网络守卫的观察面显式为 `NODE_TCP_FETCH_GUARD_ONLY`，`process_guard_attempts=0` 不能冒充宿主级零出站或 OS 沙箱；成功或失败都必须关闭 client、停止集群并删除临时目录，报告只保留白名单聚合字段。T3 仅自动评估 `expected_search_action`，其候选结论写入 `search_action_result`；`downstream_action` 在 T5 前保持 `NOT_EVALUATED`，因此整体 `decision` 不得提前通过，硬失败还会使受控包命令非零退出。该实现不进入 `apps/api/dist`，纯合成结果固定为 `NOT_SIGNED / NOT_EVALUATED`。
 
-`负责人承接 B1/B2` 接收固定 source Git 的 OpenAPI 1.12.0 / schema.v1.15，根接收器校验版本和双路径的封闭配对。生成器保持 0001–0011 不变，把六段 owner 增量提取为一个原子 0012；数据库后验涵盖新增两表、NOLOGIN 登记角色及函数/触发器/ACL，API readiness 把四个新增搜索依赖加入受信摘要。登记能力不授予 runtime；G1a 输入、loader 与真实准入仍由后续独立切片负责。实施证据见 [B1/B2 记录](plans/2026-09-06-owner-contract-consumption.md)。
+`负责人承接 B1/B2` 接收固定 source Git 的 OpenAPI 1.12.0 / schema.v1.15，根接收器校验版本和双路径的封闭配对。生成器保持 0001–0011 不变，把六段 owner 增量提取为一个原子 0012；数据库后验涵盖新增两表、NOLOGIN 登记角色及函数/触发器/ACL，API readiness 把四个新增搜索依赖加入受信摘要。登记能力不授予 runtime；输入与 loader 由下述 B3 接续，真实准入仍由后续独立切片负责。实施证据见 [B1/B2 记录](plans/2026-09-06-owner-contract-consumption.md)。
+
+`负责人承接 B3` 仅扩展测试支持链：闭合 v3 第五文件和独立外部记录/主体锚点；内容身份模块统一 canonical JSON、审核前投影与最终摘要。loader 使用实际来源确定 tenant，在同一事务以登记角色写入，再由数据库独立校验实际内容和完整 scope，失败整批回滚。owner 评测采用 `READ COMMITTED READ ONLY` 保持来源/撤销 fence，v2 行为不变；未新增生产 API、runtime 权限或桌面接入。验证见 [B3 记录](plans/2026-09-06-owner-acceptance-loader.md)。
 
 ## 3. 三个窗口和安全边界
 

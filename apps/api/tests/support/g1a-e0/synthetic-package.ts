@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { chmod, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +7,7 @@ import {
   readSyntheticG1aCases,
 } from '../synthetic-g1a.js';
 import { g1aComparisonManifestSha256 } from './input-package.js';
+import { sha256, jsonLine, jsonLines, questionHash, governanceHash, ownerReviewInputHash, type JsonValue } from './content-identity.js';
 
 const INTENT_TAXONOMY_VERSION = 'itax_synthetic_g1a_e0_v1';
 const INTENT_ID = 'intent_synthetic_g1a_e0';
@@ -15,89 +15,10 @@ const OWNER_ROLE = 'ROLE-CONTENT-LEAD';
 const PRIMARY_REVIEWER = sha256('synthetic-g1a-e0-primary-reviewer');
 const REVIEW_DUE_AT = '2099-01-01T00:00:00.000Z';
 
-type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
-
-function sha256(value: string | Buffer): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-
-function jcs(value: JsonValue): string {
-  if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) return `[${value.map(jcs).join(',')}]`;
-  const record = value as { readonly [key: string]: JsonValue };
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${jcs(record[key]!)}`).join(',')}}`;
-}
-
-function jsonLine(value: JsonValue): string {
-  return `${jcs(value)}\n`;
-}
-
-function jsonLines(values: readonly JsonValue[]): string {
-  return values.map((value) => jcs(value)).join('\n') + '\n';
-}
-
-function postgresTimestamp(value: string): string {
-  return new Date(value).toISOString().replace(/\.(\d{3})Z$/, '.$1000Z');
-}
-
 function sourceFor(domain: string): Readonly<{ sourceRef: string; sourceVersionId: string }> {
   const binding = SYNTHETIC_G1A_SOURCE_BINDINGS.find(([bindingDomain]) => bindingDomain === domain);
   if (!binding) throw new Error('SYNTHETIC_G1A_SOURCE_BINDING_MISSING');
   return Object.freeze({ sourceVersionId: binding[1], sourceRef: binding[2] });
-}
-
-function questionHash(question: Readonly<Record<string, JsonValue>>): string {
-  return sha256(jcs({
-    intent_id: question.intent_id!,
-    intent_taxonomy_version: question.intent_taxonomy_version!,
-    origin_fingerprint: question.origin_fingerprint!,
-    origin_fingerprint_key_version: question.origin_fingerprint_key_version!,
-    question_id: question.question_id!,
-    question_text: question.question_text!,
-    question_version: question.question_version!,
-    semantic_family_id: question.semantic_family_id!,
-    source: question.source!,
-    source_asset_id: question.source_asset_id!,
-  }));
-}
-
-function governanceHash(
-  item: Readonly<Record<string, JsonValue>>,
-  sourceRef: string,
-): string {
-  const snapshot: JsonValue = {
-    answer_text: item.answer_text!,
-    category: item.domain!,
-    effective_from: postgresTimestamp(item.effective_from as string),
-    effective_to: item.effective_to === null ? null : postgresTimestamp(item.effective_to as string),
-    has_conflict: item.has_conflict!,
-    intent_id: item.intent_id!,
-    intent_taxonomy_version: item.intent_taxonomy_version!,
-    owner_role: item.owner_role!,
-    placeholder_keys: [...(item.placeholder_keys as readonly string[])].sort(),
-    platform_scope: [...(item.platform_scope as readonly string[])].sort(),
-    primary_reviewer_id: item.primary_reviewer_id_hash!,
-    primary_reviewer_role: item.primary_reviewer_role!,
-    primary_review_evd: item.primary_review_evd!,
-    product_scope_refs: [...(item.product_scope_refs as readonly string[])].sort(),
-    product_scope_type: item.product_scope_type!,
-    questions: [...(item.questions as readonly Readonly<Record<string, JsonValue>>[])]
-      .sort((left, right) => String(left.question_id).localeCompare(String(right.question_id), 'en')),
-    review_due_at: postgresTimestamp(item.review_due_at as string),
-    review_mode: item.review_mode!,
-    risk_categories: [...(item.risk_categories as readonly string[])].sort(),
-    risk_level: item.risk_level!,
-    script_id: item.script_id!,
-    secondary_reviewer_id: item.secondary_reviewer_id_hash!,
-    secondary_reviewer_role: item.secondary_reviewer_role!,
-    secondary_review_evd: item.secondary_review_evd!,
-    source_ref: sourceRef,
-    source_version_id: item.source_version_id!,
-    title: item.title!,
-  };
-  return sha256(jcs(snapshot));
 }
 
 function buildContent(sharedSourceRef?: string): readonly Readonly<Record<string, JsonValue>>[] {
@@ -190,9 +111,11 @@ function buildCasesAndExpectations(
   });
 }
 
-export async function createSyntheticG1aE0Package(now = new Date(), sharedWorkbook = false): Promise<Readonly<{
+export async function createSyntheticG1aE0Package(now = new Date(), sharedWorkbook = false, ownerAcceptance = false): Promise<Readonly<{
   inputRoot: string;
   expectedManifestSha256: string;
+  expectedOwnerAcceptanceSha256?: string;
+  expectedOwnerSubjectHash?: string;
   cleanup: () => Promise<void>;
 }>> {
   const createdRoot = await mkdtemp(path.join(os.tmpdir(), 'customer-agent-g1a-e0-input-'));
@@ -203,13 +126,8 @@ export async function createSyntheticG1aE0Package(now = new Date(), sharedWorkbo
   const inputRoot = await realpath(createdRoot);
   try {
     const sharedSourceRef = sharedWorkbook ? 'SRC-SYNTHETIC-SHARED-WORKBOOK' : undefined;
-    const content = buildContent(sharedSourceRef);
+    let content = buildContent(sharedSourceRef);
     const { cases, expectations } = await buildCasesAndExpectations(now);
-    const payload = {
-      'content.jsonl': jsonLines(content),
-      'cases.jsonl': jsonLines(cases),
-      'expectations.jsonl': jsonLines(expectations),
-    } as const;
     const sourceBindings = SYNTHETIC_G1A_SOURCE_BINDINGS.map(([domain, sourceVersionId, sourceRef]) => ({
       domain,
       source_ref: sharedSourceRef ?? sourceRef,
@@ -218,8 +136,47 @@ export async function createSyntheticG1aE0Package(now = new Date(), sharedWorkbo
       approval_evd: `EVD-SYNTHETIC-G1A-E0-${domain.toUpperCase()}`,
       review_due_at: REVIEW_DUE_AT,
     }));
+    const ownerSubject = sha256('synthetic-g1a-e0-business-owner');
+    let ownerText: string | undefined;
+    let ownerSha: string | undefined;
+    if (ownerAcceptance) {
+      content = content.map((item, index) => ({ ...item, review_mode: 'owner_acceptance',
+        primary_reviewer_id_hash: ownerSubject, primary_review_evd: 'EVD-SYNTHETIC-G1A-E0-OWNER',
+        ...(index === 0 ? { risk_level: 'high', risk_categories: ['price_discount'] } : {}),
+      }));
+      const record: JsonValue = {
+        schema: 'customer-agent/owner-acceptance/v1', review_mode: 'owner_acceptance',
+        purpose: 'g1a_offline_only', owner_subject_hash: ownerSubject,
+        approval_evidence_id: 'EVD-SYNTHETIC-G1A-E0-OWNER',
+        accepted_at: new Date(now.valueOf() - 120_000).toISOString(),
+        expires_at: new Date(now.valueOf() + 24 * 60 * 60_000).toISOString(),
+        scope: {
+          source_bindings: sourceBindings.map(({ domain, source_version_id, snapshot_sha256, review_due_at }) => (
+            { domain, source_version_id, snapshot_sha256, review_due_at }
+          )),
+          items: [...content].sort((a, b) => String(a.script_id) < String(b.script_id) ? -1 : 1).map((item) => ({
+            script_id: item.script_id!, script_version: item.script_version!, domain: item.domain!,
+            source_version_id: item.source_version_id!,
+            review_input_sha256: ownerReviewInputHash(item, sharedSourceRef ?? sourceFor(String(item.domain)).sourceRef),
+            risk_level: item.risk_level!, risk_categories: item.risk_categories!, has_conflict: false,
+          })),
+        },
+      };
+      ownerText = jsonLine(record); ownerSha = sha256(ownerText);
+      content = content.map((item) => {
+        const bound = { ...item, owner_acceptance_record_sha256: ownerSha! };
+        return Object.freeze({ ...bound,
+          content_hash: governanceHash(bound, sharedSourceRef ?? sourceFor(String(item.domain)).sourceRef) });
+      });
+    }
+    const payload = {
+      'content.jsonl': jsonLines(content),
+      'cases.jsonl': jsonLines(cases),
+      'expectations.jsonl': jsonLines(expectations),
+      ...(ownerText ? { 'owner-acceptance.json': ownerText } : {}),
+    };
     const manifest: JsonValue = {
-      schema: 'customer-agent/g1a-evaluation-manifest/v2',
+      schema: ownerAcceptance ? 'customer-agent/g1a-evaluation-manifest/v3' : 'customer-agent/g1a-evaluation-manifest/v2',
       eval_set_id: 'eval_set_synthetic_g1a_e0_v2',
       classification: 'synthetic',
       purpose: 'g1a_search_eval_only',
@@ -282,6 +239,7 @@ export async function createSyntheticG1aE0Package(now = new Date(), sharedWorkbo
     return Object.freeze({
       inputRoot,
       expectedManifestSha256: sha256(manifestText),
+      ...(ownerSha ? { expectedOwnerAcceptanceSha256: ownerSha, expectedOwnerSubjectHash: ownerSubject } : {}),
       cleanup: () => rm(inputRoot, { recursive: true, force: true }),
     });
   } catch (error: unknown) {

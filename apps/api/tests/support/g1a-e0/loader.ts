@@ -73,13 +73,17 @@ async function governanceHash(
 ): Promise<string> {
   const binding = sourceBindingFor(input, item);
   const result = await owner.query<{ content_hash: string }>(`
-    SELECT public.content_governance_hash(
+    WITH observed AS (SELECT public.content_governance_snapshot(
       $1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text,
       $8::timestamptz, $9::text[], $10::text, $11::text[], $12::timestamptz,
       $13::timestamptz, $14::text, $15::text, $16::text, $17::text[], $18::boolean,
       $19::text, $20::text, $21::text, $22::text, $23::text, $24::text, $25::text,
       $26::text[], $27::jsonb
-    ) AS content_hash
+    ) AS snapshot)
+    SELECT CASE WHEN $28::text IS NULL
+      THEN pg_catalog.encode(public.digest(pg_catalog.convert_to(public.jsonb_jcs(snapshot), 'UTF8'), 'sha256'), 'hex')
+      ELSE public.owner_acceptance_content_hash(snapshot, $29::integer, $28::text)
+    END AS content_hash FROM observed
   `, [
     item.script_id,
     item.domain,
@@ -108,6 +112,8 @@ async function governanceHash(
     item.secondary_review_evd,
     [...item.placeholder_keys],
     JSON.stringify(item.questions),
+    item.owner_acceptance_record_sha256 ?? null,
+    item.script_version,
   ]);
   const computed = result.rows[0]?.content_hash;
   if (!computed) fail('G1A_LOAD_CONTRACT_INVALID');
@@ -247,7 +253,7 @@ async function insertReleaseItem(
       risk_level, risk_categories, has_conflict, review_mode, primary_reviewer_id,
       primary_reviewer_role, primary_review_evd, secondary_reviewer_id,
       secondary_reviewer_role, secondary_review_evd, placeholder_keys, questions_json,
-      search_document, search_fallback_text
+      search_document, search_fallback_text, owner_acceptance_record_sha256
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7,
       $8, $9, $10, $11::timestamptz, $12::timestamptz, $13::timestamptz,
@@ -258,7 +264,7 @@ async function insertReleaseItem(
       pg_catalog.setweight(pg_catalog.to_tsvector('simple', $31), 'A')
         || pg_catalog.setweight(pg_catalog.to_tsvector('simple', $32), 'B')
         || pg_catalog.setweight(pg_catalog.to_tsvector('simple', $33), 'C'),
-      $34
+      $34, $35
     )
   `, [
     input.manifest.release_id,
@@ -295,6 +301,7 @@ async function insertReleaseItem(
     titleTokens,
     answerTokens,
     fallbackText(item),
+    item.owner_acceptance_record_sha256 ?? null,
   ]);
 }
 
@@ -306,8 +313,10 @@ async function assertPostconditions(owner: Client, input: G1aEvaluationPackage):
     item_count: number;
     suspension_count: number;
     governance_mismatch_count: number;
+    owner_content_ready: boolean;
   }>(`
     SELECT
+      public.owner_acceptance_release_content_ready($1) AS owner_content_ready,
       (SELECT current_release_id FROM public.content_current WHERE id = 1) AS current_release_id,
       (SELECT source_gate_ready FROM public.v_release_source_gate WHERE release_id = $1) AS source_gate_ready,
       (SELECT source_binding_hash FROM public.v_release_source_gate WHERE release_id = $1) AS source_binding_hash,
@@ -322,7 +331,7 @@ async function assertPostconditions(owner: Client, input: G1aEvaluationPackage):
       (
         SELECT pg_catalog.count(*)::integer
         FROM public.release_items item
-        WHERE item.release_id = $1
+        WHERE item.release_id = $1 AND item.review_mode <> 'owner_acceptance'
           AND item.content_hash IS DISTINCT FROM public.content_governance_hash(
             item.script_id, item.category, item.title, item.answer_text, item.source_ref,
             item.source_version_id, item.owner_role, item.review_due_at, item.platform_scope,
@@ -340,7 +349,33 @@ async function assertPostconditions(owner: Client, input: G1aEvaluationPackage):
     || row.source_binding_hash !== input.manifest.source_binding_hash
     || row.item_count !== input.content.length
     || row.suspension_count !== 0
-    || row.governance_mismatch_count !== 0) fail('G1A_LOAD_POSTCONDITION_FAILED');
+    || row.governance_mismatch_count !== 0 || !row.owner_content_ready) fail('G1A_LOAD_POSTCONDITION_FAILED');
+}
+
+async function registerOwnerAcceptance(owner: Client, input: G1aEvaluationPackage): Promise<void> {
+  const acceptance = input.owner_acceptance;
+  const ownerItems = input.content.filter((item) => item.review_mode === 'owner_acceptance');
+  if (!acceptance) {
+    if (ownerItems.length || input.manifest.schema !== 'customer-agent/g1a-evaluation-manifest/v2') fail('G1A_LOAD_CONTRACT_INVALID');
+    return;
+  }
+  if (input.manifest.schema !== 'customer-agent/g1a-evaluation-manifest/v3' || !ownerItems.length
+    || input.content.some((item) => item.review_mode === 'owner_acceptance'
+      ? item.owner_acceptance_record_sha256 !== acceptance.record_sha256
+      : item.owner_acceptance_record_sha256 !== undefined)) fail('G1A_LOAD_CONTRACT_INVALID');
+  const tenants = await owner.query<{ tenant_id: string }>(
+    'SELECT DISTINCT tenant_id FROM public.authoritative_source_versions WHERE source_version_id = ANY($1::text[])',
+    [input.manifest.source_bindings.map((binding) => binding.source_version_id)],
+  );
+  if (tenants.rows.length !== 1) fail('G1A_LOAD_CONTRACT_INVALID');
+  // Only this isolated migration-owner session borrows the offline capability;
+  // runtime/login roles never receive registrar membership.
+  await owner.query('SET LOCAL ROLE app_owner_acceptance_registrar');
+  await owner.query('SELECT public.register_owner_acceptance($1,$2,$3,$4)', [
+    tenants.rows[0]!.tenant_id, acceptance.raw_record, acceptance.record_sha256,
+    acceptance.expected_owner_subject_hash,
+  ]);
+  await owner.query('RESET ROLE');
 }
 
 /** Loads one already-verified package as a single immutable evaluation release. */
@@ -348,11 +383,12 @@ export async function loadG1aEvaluationRelease(
   owner: Client,
   input: G1aEvaluationPackage,
 ): Promise<void> {
-  await owner.query('BEGIN');
+  await owner.query('BEGIN ISOLATION LEVEL READ COMMITTED');
   try {
     await owner.query("SELECT pg_catalog.set_config('app.publishing', 'on', true)");
     await owner.query("SELECT pg_catalog.set_config('app.semantic_asset_write', 'publish', true)");
     await insertSourceBindings(owner, input);
+    await registerOwnerAcceptance(owner, input);
     await insertTaxonomy(owner, input);
     await insertSemanticAssets(owner, input);
     await insertRelease(owner, input);
