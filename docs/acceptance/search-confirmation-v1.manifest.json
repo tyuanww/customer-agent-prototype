@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "suite_id": "search-confirmation-v1",
+  "status": "FROZEN_BEFORE_CANDIDATE_RUN",
+  "fixture_file": "search-confirmation-v1.json",
+  "fixture_sha256": "49a775f0664ab60fe9be540cf818faa66a850e7eec62adbfa746f6077ab17da8",
+  "sources": 6,
+  "cases": 48,
+  "expected_counts": {
+    "show": 27,
+    "reject": 19,
+    "clarify_or_no_result": 2
+  },
+  "required_coverage": [
+    "keyword",
+    "natural_question",
+    "unambiguous_typo",
+    "confirmation_of_false_proposition",
+    "contradictory_assertion",
+    "contradictory_assertion_with_separate_question",
+    "confirmation_of_true_proposition",
+    "source_does_not_answer",
+    "different_product",
+    "insufficient_context",
+    "source_gate",
+    "ambiguous_confirmation_or_assertion",
+    "different_operation_object"
+  ],
+  "pass_requirement": "All case outcomes satisfy their frozen expected value; show preserves complete source; gate failures always reject. This necessary policy suite alone is insufficient for full search acceptance.",
+  "stop_condition": "A candidate with any failing case cannot pass this suite; retain failures and review the route without changing this frozen input or expected labels.",
+  "candidate_run": "NOT_RUN",
+  "latency_scope": "No latency measured by fixture creation; full search keeps the existing p95 target below 300ms.",
+  "policy_file": "../plans/2026-09-07-natural-language-search.md",
+  "policy_sha256": "7af43221b0b180957ea1ace7410bd324950c684c246bd30de365aa32b3cc92bd"
+}

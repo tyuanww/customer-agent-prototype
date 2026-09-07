@@ -1,0 +1,433 @@
+{
+  "schema_version": 1,
+  "suite_id": "search-confirmation-v1",
+  "classification": "SYNTHETIC",
+  "purpose": "Approved display-policy clarification; not algorithm or G1a acceptance",
+  "independent_holdout": false,
+  "policy_reference": "../plans/2026-09-07-natural-language-search.md",
+  "candidate_result": "NOT_RUN",
+  "sources": [
+    {
+      "id": "invoice",
+      "question": "发票申请与开具责任",
+      "answer": "采购方向供货方申请发票；供货方向采购方开具发票。",
+      "scope": "synthetic_topic_invoice"
+    },
+    {
+      "id": "refund",
+      "question": "共享雨伞押金退回",
+      "answer": "租借人向门店支付押金；归还雨伞并完成检查后，门店向租借人退回押金。",
+      "scope": "synthetic_topic_refund"
+    },
+    {
+      "id": "headset",
+      "question": "耳麦接口兼容范围",
+      "answer": "此耳麦仅支持USB-C接口，不支持无线蓝牙连接。",
+      "scope": "synthetic_topic_headset"
+    },
+    {
+      "id": "booking",
+      "question": "预约取消时间",
+      "answer": "预约开始前可以申请取消；预约开始后不接受取消申请。",
+      "scope": "synthetic_topic_booking"
+    },
+    {
+      "id": "promotion",
+      "question": "地垫赠送活动",
+      "answer": "购买六块地垫赠送三块同款地垫。赠品不能抵扣货款。",
+      "scope": "synthetic_topic_promotion"
+    },
+    {
+      "id": "router",
+      "question": "路由器恢复出厂设置",
+      "answer": "恢复出厂设置会删除自定义网络名称和上网账号，不会改变路由器硬件版本。",
+      "scope": "synthetic_topic_router"
+    }
+  ],
+  "cases": [
+    {
+      "id": "invoice-keyword",
+      "source_id": "invoice",
+      "query": "发票开具责任",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "invoice-natural_question",
+      "source_id": "invoice",
+      "query": "发票应该由哪一方开具",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "invoice-unambiguous_typo",
+      "source_id": "invoice",
+      "query": "发漂由谁开具",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "invoice-confirmation_of_false_proposition",
+      "source_id": "invoice",
+      "query": "采购方需要给供货方开具发票吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "invoice-contradictory_assertion",
+      "source_id": "invoice",
+      "query": "采购方向供货方开具发票",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "invoice-contradictory_assertion_with_separate_question",
+      "source_id": "invoice",
+      "query": "采购方向供货方开具发票，记录在哪里查？",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "refund-keyword",
+      "source_id": "refund",
+      "query": "共享雨伞押金退回",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "refund-natural_question",
+      "source_id": "refund",
+      "query": "共享雨伞归还检查完成后押金由谁退回",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "refund-unambiguous_typo",
+      "source_id": "refund",
+      "query": "共享雨伞押今怎么退回",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "refund-confirmation_of_false_proposition",
+      "source_id": "refund",
+      "query": "共享雨伞归还并检查完成后，是租借人向门店退回押金吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "refund-contradictory_assertion",
+      "source_id": "refund",
+      "query": "共享雨伞归还并检查完成后，租借人向门店退回押金",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "refund-contradictory_assertion_with_separate_question",
+      "source_id": "refund",
+      "query": "共享雨伞由租借人向门店退回押金，收据在哪里查？",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "headset-keyword",
+      "source_id": "headset",
+      "query": "耳麦接口兼容",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "headset-natural_question",
+      "source_id": "headset",
+      "query": "这款耳麦能连接哪些接口",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "headset-unambiguous_typo",
+      "source_id": "headset",
+      "query": "耳麦接扣兼容范围",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "headset-confirmation_of_false_proposition",
+      "source_id": "headset",
+      "query": "这款耳麦是否支持无线蓝牙连接",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "headset-contradictory_assertion",
+      "source_id": "headset",
+      "query": "这款耳麦支持无线蓝牙连接",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "headset-contradictory_assertion_with_separate_question",
+      "source_id": "headset",
+      "query": "这款耳麦支持无线蓝牙连接，包装在哪里？",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "booking-keyword",
+      "source_id": "booking",
+      "query": "预约取消时间",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "booking-natural_question",
+      "source_id": "booking",
+      "query": "预约取消需要在什么时候提交申请",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "booking-unambiguous_typo",
+      "source_id": "booking",
+      "query": "预约取销的时间条件",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "booking-confirmation_of_false_proposition",
+      "source_id": "booking",
+      "query": "预约已经开始后还能申请取消吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "booking-contradictory_assertion",
+      "source_id": "booking",
+      "query": "预约开始之后可以申请取消",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "booking-contradictory_assertion_with_separate_question",
+      "source_id": "booking",
+      "query": "预约开始之后可以申请取消，记录在哪里看？",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "promotion-keyword",
+      "source_id": "promotion",
+      "query": "地垫赠送活动",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "promotion-natural_question",
+      "source_id": "promotion",
+      "query": "地垫要买多少块才有赠品",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "promotion-unambiguous_typo",
+      "source_id": "promotion",
+      "query": "地垫赠颂活动",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "promotion-confirmation_of_false_proposition",
+      "source_id": "promotion",
+      "query": "地垫活动是购买三块赠送六块吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "promotion-contradictory_assertion",
+      "source_id": "promotion",
+      "query": "地垫购买三块赠送六块",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "promotion-contradictory_assertion_with_separate_question",
+      "source_id": "promotion",
+      "query": "地垫购买三块赠送六块，包装在哪里？",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "router-keyword",
+      "source_id": "router",
+      "query": "路由器恢复出厂设置",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "router-natural_question",
+      "source_id": "router",
+      "query": "路由器恢复出厂设置会影响哪些内容",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "router-unambiguous_typo",
+      "source_id": "router",
+      "query": "路由器恢复出厂设制",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "router-confirmation_of_false_proposition",
+      "source_id": "router",
+      "query": "路由器恢复出厂以后上网账号还会保留吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "router-contradictory_assertion",
+      "source_id": "router",
+      "query": "路由器恢复出厂以后保留上网账号",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "router-contradictory_assertion_with_separate_question",
+      "source_id": "router",
+      "query": "路由器恢复出厂以后保留上网账号，包装在哪里？",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "invoice-negated-confirmation",
+      "source_id": "invoice",
+      "query": "难道不是采购方给供货方开具发票吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "headset-correct-negative",
+      "source_id": "headset",
+      "query": "这款耳麦不支持无线蓝牙连接，对吗",
+      "category": "confirmation_of_true_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "booking-true-confirmation",
+      "source_id": "booking",
+      "query": "预约开始前可以申请取消吗",
+      "category": "confirmation_of_true_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "router-missing-fact",
+      "source_id": "router",
+      "query": "路由器恢复出厂设置会清除手机上的照片吗",
+      "category": "source_does_not_answer",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "router-wrong-product",
+      "source_id": "router",
+      "query": "手机恢复出厂设置会删除上网账号吗",
+      "category": "different_product",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "headset-no-intent",
+      "source_id": "headset",
+      "query": "这个怎么办",
+      "category": "insufficient_context",
+      "source_gate": "eligible",
+      "expected": "clarify_or_no_result"
+    },
+    {
+      "id": "invoice-revoked",
+      "source_id": "invoice",
+      "query": "采购方需要给供货方开具发票吗",
+      "category": "source_gate",
+      "source_gate": "revoked",
+      "expected": "reject"
+    },
+    {
+      "id": "invoice-expired",
+      "source_id": "invoice",
+      "query": "采购方需要给供货方开具发票吗",
+      "category": "source_gate",
+      "source_gate": "expired",
+      "expected": "reject"
+    },
+    {
+      "id": "invoice-platform",
+      "source_id": "invoice",
+      "query": "采购方需要给供货方开具发票吗",
+      "category": "source_gate",
+      "source_gate": "cross_platform",
+      "expected": "reject"
+    },
+    {
+      "id": "invoice-scope",
+      "source_id": "invoice",
+      "query": "采购方需要给供货方开具发票吗",
+      "category": "source_gate",
+      "source_gate": "outside_authorized_scope",
+      "expected": "reject"
+    },
+    {
+      "id": "invoice-ambiguous-fragment",
+      "source_id": "invoice",
+      "query": "“采购方向供货方开票”这句话",
+      "category": "ambiguous_confirmation_or_assertion",
+      "source_gate": "eligible",
+      "expected": "clarify_or_no_result"
+    },
+    {
+      "id": "router-different-operation",
+      "source_id": "router",
+      "query": "路由器怎样更换电源适配器",
+      "category": "different_operation_object",
+      "source_gate": "eligible",
+      "expected": "reject"
+    }
+  ]
+}
