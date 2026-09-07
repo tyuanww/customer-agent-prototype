@@ -6,6 +6,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Changed
 
+- Corrected current API setup and contract-version documentation, and separated completed cleanup from search candidates that still fail delivery review.
+
 - Unified the current execution entry and separated historical plans from live status; documentation checks validate links, anchors and declared workspace commands.
 - Routed known documentation changes through lightweight CI checks, kept full Linux/PostgreSQL/Windows verification for runtime and unknown paths, and added an aggregate fail-closed CI gate.
 - Reused builds within each verification and packaging command while retaining clean formal-candidate builds, fresh tests and artifact hash checks.

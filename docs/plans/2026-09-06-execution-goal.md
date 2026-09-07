@@ -2,7 +2,7 @@
 
 > **状态：APPROVED · EXECUTION MANAGEMENT ONLY**
 > 执行方法统一使用[工程工作流程](../reference-engineering-workflow.md)。本文件只维护完整目标、当前执行清单与历史事实，不新增真实运行、签发、合并或发布授权。
-> **当前分类：PR #29～#41 已合并。origin/main 交接为 `699cdd8b80249fc039669fa9bec24b1f2b269982`（#41 leftover/对象 Hamming-1）。owner-t5-006 已单次执行，EVALUATED_NOT_SIGNED（正例 20/20，稳健性 8/18，安全负例 12/12，forbidden 0），绑定 `699cdd8`。不是 T6。T6、正式接入和可试装真实安装包尚未完成。**
+> **当前分类：PR #29～#42 已合并。origin/main 交接为 `92e4a5299f57bd604710b0de9a936a63e98b48b1`（#42 中性问法包装）。owner-t5-006 已单次执行，EVALUATED_NOT_SIGNED（正例 20/20，稳健性 8/18，安全负例 12/12，forbidden 0），绑定 `699cdd8`。不是 T6。T6、正式接入和可试装真实安装包尚未完成。**
 
 ## 可粘贴到应用的目标
 
@@ -37,7 +37,7 @@
 | 单轮本地训练及评估 | 用户明确回复“训练”后执行300步，105.92秒结束；基础权重/输入未变。新40题由训练前20/20正向、3/20拒绝变为19/20、9/20，仍FAIL_NOT_ADOPTED；实际训练与评估证据见搜索研究，不属于已交付算法 |
 | 搜索候选（门禁池 + 判定） | [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) 已 squash 合并为 `61afa36d3abc782453710bdd6acef79df3bbf444`；文档 [PR #38](https://github.com/weiweity/customer-agent-prototype/pull/38) 已 squash 为 `a00ba1edeb824dc8695f982c3128cb7cd7b36139`。冻结 48 题 48/48；合成 G1a 50/50；合入 main 不是一期完成 |
 | leftover 范围检查 | [PR #40](https://github.com/weiweity/customer-agent-prototype/pull/40) 已 squash 合并为 `df675768786b0b0a7e4e8438f824921f9642d7ac`。其后文档 #39 曾使 main 为 `95ca1b0`。合成绿不是 005 已修好 |
-| leftover 对象 Hamming-1 | [PR #41](https://github.com/weiweity/customer-agent-prototype/pull/41) 已 squash 为 `699cdd8b80249fc039669fa9bec24b1f2b269982`；合并后 main CI [34118646662](https://github.com/weiweity/customer-agent-prototype/actions/runs/34118646662) SUCCESS（Windows 首次 electron fetch 失败后重跑）。功能分支 `codex/leftover-verification` 未删 |
+| leftover 对象 Hamming-1 | [PR #41](https://github.com/weiweity/customer-agent-prototype/pull/41) 已 squash 为 `699cdd8b80249fc039669fa9bec24b1f2b269982`；合并后 main CI [34118646662](https://github.com/weiweity/customer-agent-prototype/actions/runs/34118646662) SUCCESS（Windows 首次 electron fetch 失败后重跑） |
 | owner-t5-005 单次真实离线复验 | 绑定 `a00ba1e`，FAILED_NOT_SIGNED。正例 20/20，稳健性 16/18，安全负例 7/12，forbidden 1，p95 47.62ms。不是 leftover 后的实测 |
 | owner-t5-006 单次真实离线复验 | 用户批准后执行一次，v5 操作器，产品 `699cdd8`，新包 `g1a-owner-v3-h7O0Oz`，清理 PASS，未超时。正例 20/20，稳健性 8/18，安全负例 12/12，forbidden 0，来源 26/26，p95 43.676ms。操作器 `EVALUATED_NOT_SIGNED`，决策 REVIEW_REQUIRED / CANDIDATE_ONLY，下游 NOT_EVALUATED，T6 未签。未重试、未覆盖旧包。结构诊断：9 项稳健性 top3 miss 均 query 含标题且 leftover 包装未解释；1 项稳健性 no_hit miss |
 
@@ -45,9 +45,15 @@
 
 用户已经明确批准004并要求同范围后续工作持续执行；不再把004写成待授权或把复核人写成未知。已获批阶段的实现、必要验证、文档及commit / push / PR授权持续有效；新的范围、合并、签发、真实运行和发布仍按对应授权核对。
 
-当前可执行：006 结构诊断后的 leftover 问法包装中性化（标题已在查询中时，不把「怎么办 / 请说明 / 适用条件」等问法包装当未解释业务条件）；无新的真实运行。`owner-t5-005`/`owner-t5-006` 授权已使用，不得重试或换配置再跑。不要部署或发布、不要代签 T6。不要重复请求 004/005/006 运行、复核人身份或 #35–#41 合并。
+中性问法包装已由 [PR #42](https://github.com/weiweity/customer-agent-prototype/pull/42) 合并，main CI [34123250637](https://github.com/weiweity/customer-agent-prototype/actions/runs/34123250637) SUCCESS。2026-09-07 已按用户批准修正五份当前文档，归档并回读核验后移除八个旧 worktree、十九个本地分支、七个远端分支；保留主目录既有改动、006 绑定工作区与当前工作区。文档修正单独交付，搜索候选不进入该文档 PR。
 
-006 安全 12/12、forbidden 0，不能写成 T6。稳健性 8/18（9 项含标题的问法包装被 leftover 拒绝，1 项预期 no_hit 却 SHOW）须由独立业务/QA 处置；本轮只修通用 leftover 包装，不得用 006 题面写特例，也不得把修后合成绿写成 007。新的真实离线复验需要新 `run_id`（owner-t5-007）及有效包窗口。
+**搜索候选尚未通过交付审查。** 虽然已见合成 30/48/50 题曾通过，独立交付审查随后证明长度门槛、首个操作词和查询前缀边界三种补丁仍会误判。最新候选把已包含操作的查询误拦截；四项合成失败回归已留存，代码及补丁在本地保留，未提交或推送。此前“本地修复完成 / 无阻断”的判断已失效；后续先形成完整的需求信息判定方案，不继续按个别词或题号补例外。冻结题集、期望和历史真实证据均未改。
+
+业务范围是 Menokin 护肤品/化妆品。已有通用物品测试只用于工程边界回归，不是客服实际话术；新增面向业务的回归须显式标为合成，真实验收只使用获批受控输入。005/006 的脱敏结果与 17 个失败题索引已在仓外整理并回读校验，复核人仍按既有指定；用户要求继续工作，不等于提供业务/QA复核意见或签收。
+
+无新的真实运行。`owner-t5-005`/`owner-t5-006` 授权已使用，不得重试或换配置再跑。不要部署或发布、不要代签 T6；不要重复请求 004/005/006 运行、复核人身份或 #35–#42 合并。
+
+006 安全 12/12、forbidden 0，不能写成 T6。稳健性 8/18（9 项含标题的问法包装被 leftover 拒绝，1 项预期 no_hit 却 SHOW）须由独立业务/QA 处置；本轮按冻结合同修复合成验收缺陷，不得用 006 题面写特例，也不得把修后合成绿写成 007。新的真实离线复验需要新 `run_id`（owner-t5-007）及有效包窗口。
 
 角色后缀（台/客）、量词单位（盒）、入场/核销时间窗、免费/付费与不会删除极性、秒级时长、以及「这一句」引述已作为一般判定补强写入搜索模块，48 题与 G1a 合成仍须通过。仓外 55 题仍是已见数据，不得再跑后称为独立验证。
 

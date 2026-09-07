@@ -120,11 +120,11 @@ contracts/upstream/customer-agent/<contract_set_id>
   ──VERIFIED_NOT_ACTIVATED──> packages/contracts codegen
                                 ├─ bundle.generated.yaml
                                 ├─ openapi.generated.ts
-                                └─ 132 component runtime schemas
+                                └─ 133 component runtime schemas
                                           ├─ HealthResponse ──> apps/api GET /health
                                           └─ Ready/NotReady ──> apps/api GET /ready
 
-v1.14 migrated PG15
+v1.15 migrated PG15
   ├─ app_runtime pool ──> readiness + policy read + controlled SearchRepository
   └─ isolated app_content_admin pool ──> set_policy_flag（唯一受控写入口）
 
@@ -155,7 +155,7 @@ manual        真 macOS / Windows、Stage Manager、Dock、签名与合成器
 
 ```bash
 pnpm test             # contracts + API + desktop unit/component；不含 Electron E2E
-pnpm test:contract    # 生成物、132 个 component schema 与正反边界
+pnpm test:contract    # 生成物、133 个 component schema 与正反边界
 pnpm test:api         # 配置拒启、未注册路由、合同 health 与真实 loopback
 pnpm --filter @customer-agent/api test:integration # 隔离 PG15 runtime pool/schema/ACL
 pnpm test:g1a:e0    # 真实包同形的纯合成 E0：输入边界、PG15、同一 SearchBackend、清理
