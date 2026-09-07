@@ -197,6 +197,29 @@ describe('search decision', () => {
     });
   });
 
+  it('keeps a title-contained paraphrase showable while extra conditions still reject', () => {
+    const tile = candidate(
+      'tile',
+      '树脂瓦安装坡度',
+      '树脂瓦安装坡度',
+      '树脂瓦安装坡度不得小于十五度；小于十五度不得安装。坡度按屋脊到檐口计算。',
+    );
+    expect(judgeSearch('我想仔细了解树脂瓦安装坡度，请说明适用条件和处理方式', [tile])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['tile'],
+    });
+    expect(judgeSearch('关于树脂瓦安装坡度，可以换一种说法说明吗', [tile])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['tile'],
+    });
+    expect(judgeSearch('树脂瓦安装坡度怎么办', [tile])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['tile'],
+    });
+    expect(judgeSearch('竞品树脂瓦安装坡度', [tile]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('必须无条件按十二度安装树脂瓦', [tile]).shownScriptIds).toEqual([]);
+  });
+
   it('rejects a different object even when leftover shares the later procedure span', () => {
     const pole = candidate(
       'pole',

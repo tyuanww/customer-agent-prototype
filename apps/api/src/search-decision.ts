@@ -751,7 +751,9 @@ function leftoverUnsupported(queryCompact: string, candidate: JudgableCandidate)
       if (index < explained.length) explained[index] = true;
     }
   };
-  for (const word of [...FUNCTION_WORDS, '也', '还', '又', '谢谢', '麻烦', '请帮我', '帮我', '查询']) {
+  for (const word of [...FUNCTION_WORDS, '也', '还', '又', '谢谢', '麻烦', '请帮我', '帮我', '查询',
+    '怎么办', '请说明', '仔细了解', '换一种说法', '适用条件', '处理方式', '我想仔细了解',
+    '可以换一种说法说明', '关于']) {
     const needle = Array.from(word);
     if (needle.length === 0) continue;
     for (let index = 0; index + needle.length <= chars.length; index += 1) {
