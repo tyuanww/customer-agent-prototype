@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "suite_id": "leftover-unseen-v1",
+  "classification": "SYNTHETIC",
+  "purpose": "Unseen leftover/typo/conflict policy check after #40; not G1a, T6, or real acceptance",
+  "independent_holdout": true,
+  "used_for_implementation_choice": false,
+  "policy_reference": "../plans/2026-09-07-natural-language-search.md",
+  "candidate_result": "NOT_RUN",
+  "sources": [
+    {
+      "id": "petri",
+      "question": "实验室培养皿退换规则",
+      "answer": "培养皿开封后不可退换；未开封可在购买后十五日内凭小票退回。",
+      "scope": "synthetic_topic_petri"
+    },
+    {
+      "id": "solder",
+      "question": "焊锡丝买赠活动",
+      "answer": "购买四卷焊锡丝赠送一卷同款焊锡丝。赠品不能兑换现金。",
+      "scope": "synthetic_topic_solder"
+    },
+    {
+      "id": "pole",
+      "question": "登山杖锁紧方向",
+      "answer": "登山杖中管旋钮顺时针锁紧；逆时针松开后可调节长度。锁紧后承重不超过使用者体重。",
+      "scope": "synthetic_topic_pole"
+    },
+    {
+      "id": "ice",
+      "question": "生物冰袋续冻时间",
+      "answer": "生物冰袋入场前可以申请续冻；入场后不接受续冻申请。",
+      "scope": "synthetic_topic_ice"
+    },
+    {
+      "id": "kiln",
+      "question": "陶窑保温时限",
+      "answer": "陶窑保温最长八小时；超过八小时必须停窑。保温不会改变釉色配方。",
+      "scope": "synthetic_topic_kiln"
+    }
+  ],
+  "cases": [
+    {
+      "id": "petri-keyword",
+      "source_id": "petri",
+      "query": "培养皿退换",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "petri-natural_question",
+      "source_id": "petri",
+      "query": "未开封的培养皿还能退吗",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "petri-unambiguous_typo",
+      "source_id": "petri",
+      "query": "培养皿开封后不可退焕",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "petri-confirmation_true",
+      "source_id": "petri",
+      "query": "培养皿开封后不可退换，对吗",
+      "category": "confirmation_of_true_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "petri-source_does_not_answer",
+      "source_id": "petri",
+      "query": "培养皿可以用微波炉消毒吗",
+      "category": "source_does_not_answer",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "petri-extra_condition",
+      "source_id": "petri",
+      "query": "培养皿以外的耗材怎么退",
+      "category": "source_does_not_answer",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "petri-source_gate",
+      "source_id": "petri",
+      "query": "培养皿退换",
+      "category": "source_gate",
+      "source_gate": "revoked",
+      "expected": "reject"
+    },
+    {
+      "id": "solder-keyword",
+      "source_id": "solder",
+      "query": "焊锡丝买赠",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "solder-confirmation_of_false_proposition",
+      "source_id": "solder",
+      "query": "焊锡丝是买一卷送四卷吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "solder-contradictory_assertion",
+      "source_id": "solder",
+      "query": "焊锡丝购买一卷赠送四卷",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "solder-contradictory_assertion_with_separate_question",
+      "source_id": "solder",
+      "query": "焊锡丝购买一卷赠送四卷，包装在哪里",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "pole-keyword",
+      "source_id": "pole",
+      "query": "登山杖锁紧",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "pole-natural_question",
+      "source_id": "pole",
+      "query": "登山杖中管旋钮怎么锁紧",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "pole-unambiguous_typo",
+      "source_id": "pole",
+      "query": "登山杖中管旋钮顺时针锁禁",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "pole-different_operation_object",
+      "source_id": "pole",
+      "query": "滑雪杖中管旋钮怎么锁紧",
+      "category": "different_operation_object",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "ice-keyword",
+      "source_id": "ice",
+      "query": "生物冰袋续冻",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "ice-confirmation_of_false_proposition",
+      "source_id": "ice",
+      "query": "入场后还能给冰袋续冻吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "ice-contradictory_assertion",
+      "source_id": "ice",
+      "query": "入场后可以申请续冻",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "ice-extra_condition",
+      "source_id": "ice",
+      "query": "能保证入场后也可以续冻吗",
+      "category": "source_does_not_answer",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "ice-competitor",
+      "source_id": "ice",
+      "query": "竞品生物冰袋续冻时间",
+      "category": "different_product",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "kiln-keyword",
+      "source_id": "kiln",
+      "query": "陶窑保温时限",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "kiln-natural_question",
+      "source_id": "kiln",
+      "query": "陶窑保温最长多久",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "kiln-confirmation_of_false_proposition",
+      "source_id": "kiln",
+      "query": "保温会改变釉色配方吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "kiln-insufficient_context",
+      "source_id": "kiln",
+      "query": "陶窑",
+      "category": "insufficient_context",
+      "source_gate": "eligible",
+      "expected": "clarify_or_no_result"
+    },
+    {
+      "id": "kiln-source_gate",
+      "source_id": "kiln",
+      "query": "陶窑保温时限",
+      "category": "source_gate",
+      "source_gate": "expired",
+      "expected": "reject"
+    }
+  ]
+}

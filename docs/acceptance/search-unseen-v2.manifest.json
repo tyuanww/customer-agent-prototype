@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "suite_id": "search-unseen-v2",
+  "status": "FROZEN_BEFORE_CANDIDATE_RUN",
+  "fixture_file": "search-unseen-v2.json",
+  "fixture_sha256": "08ae494dc735d367b53a0b46803020f9a8e81421de900600e4a42e47065df564",
+  "sources": 5,
+  "cases": 30,
+  "expected_counts": {
+    "show": 13,
+    "reject": 16,
+    "clarify_or_no_result": 1
+  },
+  "required_coverage": [
+    "confirmation_of_false_proposition",
+    "confirmation_of_true_proposition",
+    "contradictory_assertion",
+    "contradictory_assertion_with_separate_question",
+    "different_operation_object",
+    "different_product",
+    "insufficient_context",
+    "keyword",
+    "natural_question",
+    "source_does_not_answer",
+    "source_gate",
+    "unambiguous_typo"
+  ],
+  "pass_requirement": "All case outcomes satisfy their frozen expected value; show preserves complete source; gate failures always reject. Passing this suite does not prove leftover-unseen-v1, owner-t5-005, or T6.",
+  "stop_condition": "Do not change frozen input or expected labels after seeing results. Failures stay failures; general-mechanism fixes are allowed, retuning on this suite is not independent verification.",
+  "candidate_run": "NOT_RUN",
+  "policy_file": "../plans/2026-09-07-natural-language-search.md"
+}

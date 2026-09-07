@@ -22,6 +22,7 @@ const FUNCTION_WORDS = Object.freeze([
   '应该', '可以', '这款', '这个', '那个', '哪里', '时候', '提交', '申请',
   '影响', '内容', '完成', '归还', '检查', '兼容', '范围', '连接', '哪些',
   '记录', '包装', '这句话', '这一句', '请问', '您好',
+  '多久',
   '吗', '呢', '啊', '吧', '嘛', '的', '了', '还', '能', '在', '谁', '并',
   '后', '要', '才', '有', '是', '会', '到', '与', '和', '或', '由', '向', '给',
 ]);
@@ -111,6 +112,35 @@ function hamming1Matches(token: string, vocab: ReadonlySet<string>): readonly st
   return Object.freeze(matches);
 }
 
+const PROTECTED_SWAP_CHARS = '前后是否能否可不上下内外加减有无对错开关增减顺逆一二三四五六七八九十两零〇';
+
+function isUnsafeTypoPair(from: string, to: string): boolean {
+  if (from.length !== to.length) return false;
+  if (/\p{N}/u.test(from) || /\p{N}/u.test(to)) return true;
+  const fromChars = Array.from(from);
+  const toChars = Array.from(to);
+  for (let index = 0; index < fromChars.length; index += 1) {
+    if (fromChars[index] === toChars[index]) continue;
+    const left = fromChars[index] ?? '';
+    const right = toChars[index] ?? '';
+    if (PROTECTED_SWAP_CHARS.includes(left) && PROTECTED_SWAP_CHARS.includes(right)) return true;
+  }
+  return false;
+}
+
+function uniqueSafeHamming1(token: string, vocab: ReadonlySet<string>): string | undefined {
+  const matches = hamming1Matches(token, vocab).filter((term) => (
+    term === token || !isUnsafeTypoPair(token, term)
+  ));
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+const FUNCTION_CHAR_BLOCKLIST = '的了吗呢啊吧嘛不也可在是有和与或由向给后要才到';
+
+function isFunctionCharToken(token: string): boolean {
+  return Array.from(token).some((char) => FUNCTION_CHAR_BLOCKLIST.includes(char));
+}
+
 export function repairUnambiguousTypos(
   compactQuery: string,
   vocab: ReadonlySet<string>,
@@ -123,16 +153,22 @@ export function repairUnambiguousTypos(
     covered[index] = true;
     covered[index + 1] = true;
   }
-  let repaired = compactQuery;
   for (let index = 0; index + 1 < chars.length; index += 1) {
     if (covered[index] || covered[index + 1]) continue;
     const token = `${chars[index]}${chars[index + 1]}`;
-    const matches = hamming1Matches(token, vocab);
-    if (matches.length !== 1) continue;
-    const chosen = matches[0];
-    if (chosen !== undefined && chosen !== token) repaired = repaired.replaceAll(token, chosen);
+    if (isFunctionCharToken(token)) continue;
+    const chosen = uniqueSafeHamming1(token, vocab);
+    if (chosen === undefined || chosen === token) continue;
+    const chosenChars = Array.from(chosen);
+    const first = chosenChars[0];
+    const second = chosenChars[1];
+    if (first === undefined || second === undefined) continue;
+    chars[index] = first;
+    chars[index + 1] = second;
+    covered[index] = true;
+    covered[index + 1] = true;
   }
-  return repaired;
+  return chars.join('');
 }
 
 function splitClauses(query: string): readonly string[] {
@@ -160,7 +196,7 @@ function clauseAct(clause: string): SpeechAct {
   ) {
     return 'confirmation';
   }
-  if (/[?？]$/u.test(normalized) || /哪|什么时候|哪些|怎样|怎么|如何|谁|多少/u.test(normalized)) {
+  if (/[?？]$/u.test(normalized) || /哪|什么时候|哪些|怎样|怎么|如何|谁|多少|多久/u.test(normalized)) {
     return 'info_question';
   }
   if (stripFunctionWords(compact).length < 2) return 'underspecified';
@@ -303,7 +339,7 @@ function extractDirected(text: string): readonly DirectedFact[] {
 function extractQuantities(text: string): readonly QuantityFact[] {
   const facts: QuantityFact[] = [];
   const compact = compactSearchText(text);
-  const pattern = /(?:买|购买)([一二三四五六七八九十两\d]+)[块件个盒].*?(?:赠送|送)([一二三四五六七八九十两\d]+)/gu;
+  const pattern = /(?:买|购买)([一二三四五六七八九十两\d]+)[块件个盒卷].*?(?:赠送|送)([一二三四五六七八九十两\d]+)/gu;
   for (const match of compact.matchAll(pattern)) {
     const buy = parseNumberToken(match[1] ?? '');
     const give = parseNumberToken(match[2] ?? '');
@@ -356,18 +392,19 @@ function extractPolar(text: string): readonly PolarFact[] {
   else if (/退货/u.test(compact) && /可以退货/u.test(compact)) {
     facts.push(Object.freeze({ polarity: 'pos' as const, predicate: '退货' }));
   }
+  for (const match of compact.matchAll(/不要([\p{L}\p{N}]{2,8})/gu)) push('neg', match[1]);
   return Object.freeze(facts);
 }
 
 function extractTime(text: string): readonly TimeFact[] {
   const compact = compactSearchText(stripClauseNoise(text));
   const facts: TimeFact[] = [];
-  if (/(?:开始|入场|核销)前/u.test(compact) && /可以|申请/u.test(compact)) {
+  if (/(?:开始|入场|核销|到期)前/u.test(compact) && /可以|申请/u.test(compact)) {
     facts.push(Object.freeze({ window: 'before_start' as const, allowed: true }));
   }
   if (
-    /(?:已经)?(?:开始|入场|核销)后/u.test(compact)
-    || /(?:开始|入场)之后/u.test(compact)
+    /(?:已经)?(?:开始|入场|核销|到期)后/u.test(compact)
+    || /(?:开始|入场|到期)之后/u.test(compact)
     || /核销入场后/u.test(compact)
   ) {
     const denied = /不接受|不能|不[能可]/u.test(compact);
@@ -591,7 +628,7 @@ const QUERY_CONDITION_MARKERS = Object.freeze([
 ]);
 
 function extraQueryCondition(queryCompact: string, sourceCompact: string): boolean {
-  const timeWindowPresent = /(?:开始|入场|核销)前|(?:开始|入场|核销)后|已经开始/u.test(queryCompact);
+  const timeWindowPresent = /(?:开始|入场|核销|到期)前|(?:开始|入场|核销|到期)后|已经开始/u.test(queryCompact);
   return QUERY_CONDITION_MARKERS.some((marker) => {
     if (timeWindowPresent && marker === '前') return false;
     return queryCompact.includes(marker) && !sourceCompact.includes(marker);
@@ -614,13 +651,45 @@ function unseparatedPoliteProduct(queryCompact: string, sourceCompact: string): 
   return false;
 }
 
+function sourceHasUniqueTypoPhrase(needle: string, sourceCompact: string): boolean {
+  const needleChars = Array.from(needle);
+  const sourceChars = Array.from(sourceCompact);
+  if (needleChars.length < 2 || sourceChars.length < needleChars.length) return false;
+  for (let index = 0; index + needleChars.length <= sourceChars.length; index += 1) {
+    const slice = sourceChars.slice(index, index + needleChars.length).join('');
+    if (slice === needle) return true;
+    if (hamming1(slice, needle) && !isUnsafeTypoPair(slice, needle)) return true;
+  }
+  return false;
+}
+
 function negationMismatch(queryCompact: string, sourceCompact: string): boolean {
   const matches = queryCompact.matchAll(/不([\p{L}]{2,6})/gu);
   for (const match of matches) {
     const negated = match[1];
     if (negated === undefined) continue;
     if (/^(是|会|能|要|该)/u.test(negated)) continue;
-    if (!sourceCompact.includes(`不${negated}`)) return true;
+    const original = `不${negated}`;
+    if (sourceHasUniqueTypoPhrase(original, sourceCompact)) continue;
+    return true;
+  }
+  return false;
+}
+
+function sourceBanIgnored(queryCompact: string, sourceCompact: string): boolean {
+  const marker = '不要';
+  let from = 0;
+  while (from < sourceCompact.length) {
+    const index = sourceCompact.indexOf(marker, from);
+    if (index < 0) break;
+    const rest = sourceCompact.slice(index + marker.length);
+    for (let length = Math.min(12, rest.length); length >= 2; length -= 1) {
+      const predicate = rest.slice(0, length);
+      if (!queryCompact.includes(predicate)) continue;
+      if (queryCompact.includes(`不要${predicate}`) || queryCompact.includes(`不${predicate}`)) continue;
+      return true;
+    }
+    from = index + marker.length;
   }
   return false;
 }
@@ -695,7 +764,7 @@ function leftoverUnsupported(queryCompact: string, candidate: JudgableCandidate)
   }
   for (let index = 0; index + 1 < chars.length; index += 1) {
     const gram = `${chars[index]}${chars[index + 1]}`;
-    if (allGrams.has(gram) || hamming1Matches(gram, titleQuestionGrams).length === 1) markRange(index, 2);
+    if (allGrams.has(gram) || uniqueSafeHamming1(gram, titleQuestionGrams) !== undefined) markRange(index, 2);
   }
   let cursor = 0;
   while (cursor < chars.length) {
@@ -737,6 +806,31 @@ function siblingVariantMismatch(
           if (queryCompact.includes(gram) && !self.includes(gram)) return true;
         }
       }
+    }
+  }
+  return false;
+}
+
+function substitutedObjectToken(queryCompact: string, sourceTitle: string): boolean {
+  const queryChars = Array.from(queryCompact);
+  const sourceChars = Array.from(sourceTitle);
+  for (const objectLength of [3, 2]) {
+    if (sourceChars.length < objectLength) continue;
+    const object = sourceChars.slice(0, objectLength).join('');
+    const tail = sourceChars.slice(objectLength).join('');
+    for (let start = 0; start + objectLength <= queryChars.length; start += 1) {
+      const span = queryChars.slice(start, start + objectLength).join('');
+      if (span === object) continue;
+      if (!hamming1(span, object) || isUnsafeTypoPair(span, object)) continue;
+      const after = queryChars.slice(start + objectLength).join('');
+      if (objectLength >= 3) {
+        if (tail.length === 0) return true;
+        if (after.startsWith(tail)) return true;
+        if (after.length >= 2 && tail.startsWith(after)) return true;
+        continue;
+      }
+      if (tail.length < 2) continue;
+      if (after.startsWith(tail)) return true;
     }
   }
   return false;
@@ -792,14 +886,16 @@ function candidateConflict(
   const prefix = sharedNounPrefixMismatch(queryCompact, compactSearchText(candidate.title));
   const packaging = missingPackagingVariant(queryCompact, matchCorpus(candidate));
   const leftoverQuery = repairedCompact.length >= 4 ? repairedCompact : queryCompact;
-  const leftoverHit = leftoverUnsupported(leftoverQuery, candidate);
+  const leftoverHit = leftoverUnsupported(queryCompact, candidate)
+    || leftoverUnsupported(leftoverQuery, candidate);
   const leftover = leftoverHit && !(
     intent.act === 'confirmation'
     && (inverted || qty || polar || time || duration)
   );
+  const swappedObject = substitutedObjectToken(queryCompact, compactSearchText(candidate.title));
+  const ignoredBan = intent.act === 'assertion' && sourceBanIgnored(queryCompact, sourceCompact);
 
-
-  if (ops || missing || product || override || extraCondition || politeProduct || negated || sibling || prefix || packaging || leftover) {
+  if (ops || missing || product || override || extraCondition || politeProduct || negated || sibling || prefix || packaging || leftover || swappedObject || ignoredBan) {
     return true;
   }
   if (intent.act === 'assertion' || intent.hasConflictingAssertionShape) {
@@ -916,7 +1012,10 @@ export function judgeSearch(
   const distinctive = distinctiveGrams(candidates);
 
   const verdicts: CandidateVerdict[] = candidates.map((candidate) => {
-    const repairedCompact = repairUnambiguousTypos(originalCompact, repairVocabulary([candidate]));
+    const titleCompact = compactSearchText(candidate.title);
+    const repairedCompact = substitutedObjectToken(originalCompact, titleCompact)
+      ? originalCompact
+      : repairUnambiguousTypos(originalCompact, repairVocabulary([candidate]));
     const repairedNormalized = repairedCompact.length > 0 ? repairedCompact : normalized;
     const sourceCompact = matchCorpus(candidate);
     const overlap = overlapScore(repairedCompact, sourceCompact);

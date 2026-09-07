@@ -162,6 +162,83 @@ describe('search decision', () => {
     expect(judgeSearch('耳积连接方式', [headset, mic]).shownScriptIds).toEqual([]);
   });
 
+  it('does not treat time-window or digit Hamming-1 as unique typos', () => {
+    const parking = candidate(
+      'parking',
+      '停车月卡续费时间',
+      '停车月卡续费时间',
+      '月卡到期前七天可以申请续费；到期后不接受续费申请。',
+    );
+    expect(judgeSearch('月卡到期后可以申请续费', [parking]).decision).toBe('reject');
+    expect(judgeSearch('月卡到期后还可以续费吗', [parking])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['parking'],
+    });
+    const watt = candidate(
+      'watt',
+      '标签机额定功率75瓦',
+      '标签机额定功率75瓦',
+      '标签机额定功率75瓦，更换色带不会改变额定功率。',
+    );
+    expect(judgeSearch('标签机额定功率95瓦', [watt]).shownScriptIds).toEqual([]);
+  });
+
+  it('rejects an assertion that drops 不要 from the source ban', () => {
+    const printer = candidate(
+      'printer',
+      '标签机条码覆盖',
+      '标签机条码覆盖',
+      '标签机不要覆盖原条码；破损条码应另打新标。',
+    );
+    expect(judgeSearch('标签机覆盖原条码', [printer]).decision).toBe('reject');
+    expect(judgeSearch('标签机可以覆盖原条码吗', [printer])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['printer'],
+    });
+  });
+
+  it('rejects a different object even when leftover shares the later procedure span', () => {
+    const pole = candidate(
+      'pole',
+      '登山杖锁紧方向',
+      '登山杖锁紧方向',
+      '登山杖中管旋钮顺时针锁紧；逆时针松开后可调节长度。锁紧后承重不超过使用者体重。',
+    );
+    expect(judgeSearch('滑雪杖中管旋钮怎么锁紧', [pole]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('登高杖锁紧方向', [pole]).shownScriptIds).toEqual([]);
+  });
+
+  it('does not map a unique Hamming-1 onto a different object with the same template tail', () => {
+    const kettle = candidate(
+      'kettle',
+      '恒温壶出厂温度',
+      '恒温壶出厂温度',
+      '恒温壶出厂默认七十五度。',
+    );
+    expect(judgeSearch('恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('请问恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('这个恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('恒温杯出厂温度是多少', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('恒温杯出厂', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('请问恒温杯出厂', [kettle]).shownScriptIds).toEqual([]);
+    const kettleName = candidate(
+      'kettle-name',
+      '恒温壶',
+      '恒温壶',
+      '恒温壶出厂默认七十五度。',
+    );
+    expect(judgeSearch('请问恒温杯出厂温度', [kettleName]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('这个恒温杯出厂温度', [kettleName]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('恒温杯出厂温度是多少', [kettleName]).shownScriptIds).toEqual([]);
+    const poleName = candidate(
+      'pole-name',
+      '登山杖',
+      '登山杖',
+      '登山杖中管旋钮顺时针锁紧。',
+    );
+    expect(judgeSearch('登高杖锁紧方向', [poleName]).shownScriptIds).toEqual([]);
+  });
+
   it('keeps an assertion of inverted invoice roles rejected', () => {
     const invoice = candidate(
       'invoice',

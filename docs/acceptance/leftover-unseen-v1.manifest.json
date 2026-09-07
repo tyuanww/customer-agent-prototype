@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "suite_id": "leftover-unseen-v1",
+  "status": "FROZEN_BEFORE_CANDIDATE_RUN",
+  "fixture_file": "leftover-unseen-v1.json",
+  "fixture_sha256": "1f502a1c31f3e4c86cd75eca7a554306e684f8174131e8974a2e3805a2de714a",
+  "sources": 5,
+  "cases": 25,
+  "expected_counts": {
+    "show": 14,
+    "reject": 10,
+    "clarify_or_no_result": 1
+  },
+  "required_coverage": [
+    "keyword",
+    "natural_question",
+    "unambiguous_typo",
+    "confirmation_of_false_proposition",
+    "confirmation_of_true_proposition",
+    "contradictory_assertion",
+    "contradictory_assertion_with_separate_question",
+    "source_does_not_answer",
+    "different_product",
+    "different_operation_object",
+    "insufficient_context",
+    "source_gate"
+  ],
+  "pass_requirement": "All case outcomes satisfy their frozen expected value; show preserves complete source; gate failures always reject. Passing this suite does not prove leftover fixed owner-t5-005 or T6.",
+  "stop_condition": "Do not change frozen input or expected labels after seeing results. Failures stay failures; general-mechanism fixes are allowed, retuning on this suite is not independent verification.",
+  "candidate_run": "NOT_RUN",
+  "policy_file": "../plans/2026-09-07-natural-language-search.md"
+}

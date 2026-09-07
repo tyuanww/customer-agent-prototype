@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "suite_id": "search-unseen-v2",
+  "classification": "SYNTHETIC",
+  "purpose": "Unseen policy holdout after #41 object-tail hardening; not leftover-unseen-v1, G1a, T6, or real acceptance",
+  "independent_holdout": true,
+  "used_for_implementation_choice": false,
+  "policy_reference": "../plans/2026-09-07-natural-language-search.md",
+  "candidate_result": "NOT_RUN",
+  "sources": [
+    {
+      "id": "burette",
+      "question": "滴定管校准周期",
+      "answer": "滴定管校准有效十二个月；过期必须停用，不得继续用于定量滴定。",
+      "scope": "synthetic_topic_burette"
+    },
+    {
+      "id": "wrap",
+      "question": "蜂蜡布买赠活动",
+      "answer": "购买四盒蜂蜡布赠送一盒同款蜂蜡布。赠品不能兑换现金。",
+      "scope": "synthetic_topic_wrap"
+    },
+    {
+      "id": "lab",
+      "question": "标本送检报告责任",
+      "answer": "化验方向送检方出具检测报告；送检方不向化验方出具报告。",
+      "scope": "synthetic_topic_lab"
+    },
+    {
+      "id": "watch",
+      "question": "潜水表排气时机",
+      "answer": "潜水表入水前可以排气；入水后不接受排气申请。",
+      "scope": "synthetic_topic_watch"
+    },
+    {
+      "id": "tile",
+      "question": "树脂瓦安装坡度",
+      "answer": "树脂瓦安装坡度不得小于十五度；小于十五度不得安装。坡度按屋脊到檐口计算。",
+      "scope": "synthetic_topic_tile"
+    }
+  ],
+  "cases": [
+    {
+      "id": "burette-keyword",
+      "source_id": "burette",
+      "query": "滴定管校准",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "burette-natural_question",
+      "source_id": "burette",
+      "query": "滴定管校准多久有效",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "burette-unambiguous_typo",
+      "source_id": "burette",
+      "query": "滴定管校椎有效十二个月",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "burette-confirmation_true",
+      "source_id": "burette",
+      "query": "滴定管过期必须停用，对吗",
+      "category": "confirmation_of_true_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "burette-different_object",
+      "source_id": "burette",
+      "query": "滴定瓶校准周期",
+      "category": "different_operation_object",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "burette-different_object_short",
+      "source_id": "burette",
+      "query": "请问滴定瓶校准",
+      "category": "different_operation_object",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "burette-source_does_not_answer",
+      "source_id": "burette",
+      "query": "滴定管可以用超声波清洗吗",
+      "category": "source_does_not_answer",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "burette-source_gate",
+      "source_id": "burette",
+      "query": "滴定管校准",
+      "category": "source_gate",
+      "source_gate": "expired",
+      "expected": "reject"
+    },
+    {
+      "id": "wrap-keyword",
+      "source_id": "wrap",
+      "query": "蜂蜡布买赠",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "wrap-unambiguous_typo",
+      "source_id": "wrap",
+      "query": "蜂蜡布买赠活劫",
+      "category": "unambiguous_typo",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "wrap-confirmation_false",
+      "source_id": "wrap",
+      "query": "蜂蜡布是买一盒送四盒吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "wrap-quantity_assertion",
+      "source_id": "wrap",
+      "query": "蜂蜡布购买一盒赠送四盒",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "wrap-quantity_mixed",
+      "source_id": "wrap",
+      "query": "蜂蜡布购买一盒赠送四盒，包装在哪里",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "wrap-different_object",
+      "source_id": "wrap",
+      "query": "蜂蜡杯买赠活动",
+      "category": "different_operation_object",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "lab-keyword",
+      "source_id": "lab",
+      "query": "标本送检报告",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "lab-role_confirmation",
+      "source_id": "lab",
+      "query": "送检方需要向化验方出具检测报告吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "lab-role_assertion",
+      "source_id": "lab",
+      "query": "送检方向化验方出具检测报告",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "lab-role_mixed",
+      "source_id": "lab",
+      "query": "送检方向化验方出具检测报告，编号在哪里",
+      "category": "contradictory_assertion_with_separate_question",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "watch-keyword",
+      "source_id": "watch",
+      "query": "潜水表排气",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "watch-natural_question",
+      "source_id": "watch",
+      "query": "潜水表入水前可以排气吗",
+      "category": "natural_question",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "watch-confirmation_false",
+      "source_id": "watch",
+      "query": "入水后还能给潜水表排气吗",
+      "category": "confirmation_of_false_proposition",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "watch-time_assertion",
+      "source_id": "watch",
+      "query": "潜水表入水后可以申请排气",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "tile-keyword",
+      "source_id": "tile",
+      "query": "树脂瓦坡度",
+      "category": "keyword",
+      "source_gate": "eligible",
+      "expected": "show"
+    },
+    {
+      "id": "tile-negation_assertion",
+      "source_id": "tile",
+      "query": "树脂瓦可以小于十五度安装",
+      "category": "contradictory_assertion",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "tile-extra_condition",
+      "source_id": "tile",
+      "query": "必须无条件按十二度安装树脂瓦",
+      "category": "source_does_not_answer",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "tile-competitor",
+      "source_id": "tile",
+      "query": "竞品树脂瓦安装坡度",
+      "category": "different_product",
+      "source_gate": "eligible",
+      "expected": "reject"
+    },
+    {
+      "id": "tile-insufficient",
+      "source_id": "tile",
+      "query": "树脂瓦",
+      "category": "insufficient_context",
+      "source_gate": "eligible",
+      "expected": "clarify_or_no_result"
+    },
+    {
+      "id": "tile-source_gate_revoked",
+      "source_id": "tile",
+      "query": "树脂瓦坡度",
+      "category": "source_gate",
+      "source_gate": "revoked",
+      "expected": "reject"
+    },
+    {
+      "id": "tile-source_gate_platform",
+      "source_id": "tile",
+      "query": "树脂瓦坡度",
+      "category": "source_gate",
+      "source_gate": "cross_platform",
+      "expected": "reject"
+    },
+    {
+      "id": "tile-source_gate_scope",
+      "source_id": "tile",
+      "query": "树脂瓦坡度",
+      "category": "source_gate",
+      "source_gate": "outside_authorized_scope",
+      "expected": "reject"
+    }
+  ]
+}
