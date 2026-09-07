@@ -77,12 +77,19 @@ function compactCorpus(candidate: JudgableCandidate): string {
   return compactSearchText(corpusOf(candidate));
 }
 
+function addSegmentGrams(terms: Set<string>, field: string): void {
+  for (const segment of field.split(/\s+/u)) {
+    const compact = compactSearchText(segment);
+    if (compact.length < 2) continue;
+    for (const gram of ngrams(compact, 2)) terms.add(gram);
+  }
+}
+
 function repairVocabulary(candidates: readonly JudgableCandidate[]): ReadonlySet<string> {
   const terms = new Set<string>();
   for (const candidate of candidates) {
-    for (const field of [candidate.title, ...candidate.questionTexts]) {
-      for (const gram of ngrams(compactSearchText(field), 2)) terms.add(gram);
-    }
+    addSegmentGrams(terms, candidate.title);
+    for (const question of candidate.questionTexts) addSegmentGrams(terms, question);
   }
   return terms;
 }
@@ -104,16 +111,9 @@ function hamming1Matches(token: string, vocab: ReadonlySet<string>): readonly st
   return Object.freeze(matches);
 }
 
-function titleTexts(candidates: readonly JudgableCandidate[]): readonly string[] {
-  return Object.freeze(candidates.flatMap((candidate) => (
-    [compactSearchText(candidate.title), ...candidate.questionTexts.map(compactSearchText)]
-  )));
-}
-
 export function repairUnambiguousTypos(
   compactQuery: string,
   vocab: ReadonlySet<string>,
-  titles: readonly string[] = [],
 ): string {
   const chars = Array.from(compactQuery);
   const covered = chars.map(() => false);
@@ -128,23 +128,9 @@ export function repairUnambiguousTypos(
     if (covered[index] || covered[index + 1]) continue;
     const token = `${chars[index]}${chars[index + 1]}`;
     const matches = hamming1Matches(token, vocab);
-    if (matches.length === 0) continue;
-    let chosen: string | null = null;
-    if (matches.length === 1) {
-      chosen = matches[0] ?? null;
-    } else if (titles.length > 0) {
-      const scored = matches.map((candidate) => {
-        const trial = repaired.replaceAll(token, candidate);
-        const score = titles.reduce((best, title) => Math.max(best, title.includes(trial) ? trial.length : overlapScore(trial, title)), 0);
-        return { candidate, score };
-      }).sort((left, right) => right.score - left.score);
-      const best = scored[0];
-      const second = scored[1];
-      if (best !== undefined && (second === undefined || best.score > second.score)) {
-        chosen = best.candidate;
-      }
-    }
-    if (chosen !== null && chosen !== token) repaired = repaired.replaceAll(token, chosen);
+    if (matches.length !== 1) continue;
+    const chosen = matches[0];
+    if (chosen !== undefined && chosen !== token) repaired = repaired.replaceAll(token, chosen);
   }
   return repaired;
 }
@@ -533,7 +519,7 @@ function isPhraseMatch(queryCompact: string, queryNormalized: string, candidate:
   if (queryCompact.length === 0 && queryNormalized.length > 0) {
     return rawFields.some((field) => field.includes(queryNormalized));
   }
-  if (queryCompact.length < 2) return false;
+  if (queryCompact.length < 4) return false;
   const fields = rawFields.map(compactSearchText);
   return fields.some((field) => field.includes(queryCompact) || queryCompact.includes(field) && field.length >= 4);
 }
@@ -574,6 +560,8 @@ type CandidateVerdict = Readonly<{
   show: boolean;
   exactQuestion: boolean;
   exactTitle: boolean;
+  originalExact: boolean;
+  repairedCompact: string;
   phraseQuestion: boolean;
   phraseTitle: boolean;
   overlap: number;
@@ -598,13 +586,16 @@ function factsOf(text: string): Readonly<{
   });
 }
 
-const QUERY_CONDITION_MARKERS = Object.freeze(['前', '全', '必须', '无条件', '绝对', '保证']);
+const QUERY_CONDITION_MARKERS = Object.freeze([
+  '前', '全', '必须', '无条件', '绝对', '保证', '以外', '之外', '竞品', '其他',
+]);
 
 function extraQueryCondition(queryCompact: string, sourceCompact: string): boolean {
-  if (/(?:开始|入场|核销)前|(?:开始|入场|核销)后|已经开始/u.test(queryCompact)) return false;
-  return QUERY_CONDITION_MARKERS.some((marker) => (
-    queryCompact.includes(marker) && !sourceCompact.includes(marker)
-  ));
+  const timeWindowPresent = /(?:开始|入场|核销)前|(?:开始|入场|核销)后|已经开始/u.test(queryCompact);
+  return QUERY_CONDITION_MARKERS.some((marker) => {
+    if (timeWindowPresent && marker === '前') return false;
+    return queryCompact.includes(marker) && !sourceCompact.includes(marker);
+  });
 }
 
 function differentIntentOverride(queryText: string): boolean {
@@ -656,7 +647,69 @@ function isWeakGram(gram: string): boolean {
     || gram === '说明'
     || gram === '流程'
     || gram === '如何'
-    || gram === '什么';
+    || gram === '什么'
+    || gram === '条件';
+}
+
+function leftoverFields(candidate: JudgableCandidate): readonly string[] {
+  return Object.freeze([
+    compactSearchText(candidate.title),
+    compactSearchText(candidate.answerText),
+    ...candidate.questionTexts.map(compactSearchText),
+    ...candidate.searchFallbackText.split(/\s+/u).map(compactSearchText),
+  ].filter((field) => field.length > 0));
+}
+
+function leftoverUnsupported(queryCompact: string, candidate: JudgableCandidate): boolean {
+  const chars = Array.from(queryCompact);
+  if (chars.length === 0) return false;
+  const explained = chars.map(() => false);
+  const fields = leftoverFields(candidate);
+  const titleQuestionGrams = new Set<string>();
+  for (const field of [compactSearchText(candidate.title), ...candidate.questionTexts.map(compactSearchText)]) {
+    for (const gram of ngrams(field, 2)) titleQuestionGrams.add(gram);
+  }
+  const allGrams = new Set<string>();
+  for (const field of fields) {
+    for (const gram of ngrams(field, 2)) allGrams.add(gram);
+  }
+  const nearbyChars = new Set(Array.from(compactSearchText(
+    `${candidate.title}${candidate.answerText}${candidate.questionTexts.join('')}`,
+  )));
+  const markRange = (start: number, length: number): void => {
+    for (let offset = 0; offset < length; offset += 1) {
+      const index = start + offset;
+      if (index < explained.length) explained[index] = true;
+    }
+  };
+  for (const word of [...FUNCTION_WORDS, '也', '还', '又', '谢谢', '麻烦', '请帮我', '帮我', '查询']) {
+    const needle = Array.from(word);
+    if (needle.length === 0) continue;
+    for (let index = 0; index + needle.length <= chars.length; index += 1) {
+      if (chars.slice(index, index + needle.length).join('') === word) markRange(index, needle.length);
+    }
+  }
+  for (let index = 0; index + 1 < chars.length; index += 1) {
+    const gram = `${chars[index]}${chars[index + 1]}`;
+    if (isWeakGram(gram)) markRange(index, 2);
+  }
+  for (let index = 0; index + 1 < chars.length; index += 1) {
+    const gram = `${chars[index]}${chars[index + 1]}`;
+    if (allGrams.has(gram) || hamming1Matches(gram, titleQuestionGrams).length === 1) markRange(index, 2);
+  }
+  let cursor = 0;
+  while (cursor < chars.length) {
+    if (explained[cursor] === true) {
+      cursor += 1;
+      continue;
+    }
+    let end = cursor;
+    while (end < chars.length && explained[end] !== true) end += 1;
+    const cleaned = chars.slice(cursor, end).join('').replace(/[^\p{L}\p{N}]+/gu, '');
+    if (cleaned.length > 1 || (cleaned.length === 1 && !nearbyChars.has(cleaned))) return true;
+    cursor = end;
+  }
+  return false;
 }
 
 function missingPackagingVariant(queryCompact: string, sourceCompact: string): boolean {
@@ -715,6 +768,7 @@ function candidateConflict(
   queryText: string,
   candidate: JudgableCandidate,
   pool: readonly JudgableCandidate[],
+  repairedCompact: string,
 ): boolean {
   const sourceText = corpusOf(candidate);
   const sourceCompact = compactCorpus(candidate);
@@ -737,8 +791,15 @@ function candidateConflict(
   const sibling = siblingVariantMismatch(queryCompact, candidate, pool);
   const prefix = sharedNounPrefixMismatch(queryCompact, compactSearchText(candidate.title));
   const packaging = missingPackagingVariant(queryCompact, matchCorpus(candidate));
+  const leftoverQuery = repairedCompact.length >= 4 ? repairedCompact : queryCompact;
+  const leftoverHit = leftoverUnsupported(leftoverQuery, candidate);
+  const leftover = leftoverHit && !(
+    intent.act === 'confirmation'
+    && (inverted || qty || polar || time || duration)
+  );
 
-  if (ops || missing || product || override || extraCondition || politeProduct || negated || sibling || prefix || packaging) {
+
+  if (ops || missing || product || override || extraCondition || politeProduct || negated || sibling || prefix || packaging || leftover) {
     return true;
   }
   if (intent.act === 'assertion' || intent.hasConflictingAssertionShape) {
@@ -811,9 +872,14 @@ function dropAmbiguousVariants(
       const leftTitle = compactSearchText(byId.get(left.scriptId)?.title ?? '');
       const rightTitle = compactSearchText(byId.get(right.scriptId)?.title ?? '');
       if (!(hamming1(leftTitle, rightTitle) || singleInfix(leftTitle, rightTitle))) continue;
-      const leftExact = left.exactQuestion || left.exactTitle || queryCompact === leftTitle;
-      const rightExact = right.exactQuestion || right.exactTitle || queryCompact === rightTitle;
+      const leftExact = left.originalExact || queryCompact === leftTitle;
+      const rightExact = right.originalExact || queryCompact === rightTitle;
       if (leftExact || rightExact) continue;
+      if (
+        left.repairedCompact.length >= 4
+        && left.repairedCompact === right.repairedCompact
+        && left.repairedCompact !== queryCompact
+      ) continue;
       if (queryNormalized.length > 0 && (leftTitle.includes(queryCompact) || rightTitle.includes(queryCompact))) {
         continue;
       }
@@ -837,33 +903,40 @@ export function judgeSearch(
     return Object.freeze({ decision: 'reject', shownScriptIds: Object.freeze([]) });
   }
 
-  const vocab = repairVocabulary(candidates);
-  const repairedCompact = repairUnambiguousTypos(
-    compactSearchText(rawQuery),
-    vocab,
-    titleTexts(candidates),
-  );
-  const repairedNormalized = repairedCompact.length > 0 ? repairedCompact : normalized;
+  const originalCompact = compactSearchText(rawQuery);
+  if (originalCompact.length > 0 && originalCompact.length < 3) {
+    const exact = candidates.some((candidate) => (
+      isExactQuestion(normalized, candidate) || isExactTitle(normalized, candidate)
+    ));
+    if (!exact) {
+      return Object.freeze({ decision: 'clarify_or_no_result', shownScriptIds: Object.freeze([]) });
+    }
+  }
   const queryForFacts = intent.clauses.join('，');
   const distinctive = distinctiveGrams(candidates);
 
   const verdicts: CandidateVerdict[] = candidates.map((candidate) => {
+    const repairedCompact = repairUnambiguousTypos(originalCompact, repairVocabulary([candidate]));
+    const repairedNormalized = repairedCompact.length > 0 ? repairedCompact : normalized;
     const sourceCompact = matchCorpus(candidate);
     const overlap = overlapScore(repairedCompact, sourceCompact);
     const exactQuestion = isExactQuestion(normalized, candidate) || isExactQuestion(repairedNormalized, candidate);
     const exactTitle = isExactTitle(normalized, candidate) || isExactTitle(repairedNormalized, candidate);
+    const originalExact = isExactQuestion(normalized, candidate) || isExactTitle(normalized, candidate);
     const phraseQuestion = candidate.questionTexts.some((question) => (
       compactSearchText(question).includes(repairedCompact)
     ));
     const phraseTitle = compactSearchText(candidate.title).includes(repairedCompact);
     const relevant = isRelevant(repairedCompact, normalized, candidate, distinctive)
       || isRelevant(repairedCompact, repairedNormalized, candidate, distinctive);
-    const conflict = candidateConflict(intent, queryForFacts, candidate, candidates);
+    const conflict = candidateConflict(intent, queryForFacts, candidate, candidates, repairedCompact);
     return Object.freeze({
       scriptId: candidate.scriptId,
       show: relevant && !conflict,
       exactQuestion,
       exactTitle,
+      originalExact,
+      repairedCompact,
       phraseQuestion,
       phraseTitle,
       overlap,
@@ -874,7 +947,7 @@ export function judgeSearch(
   const shown = dropAmbiguousVariants(
     verdicts.filter((verdict) => verdict.show).sort(compareVerdicts),
     normalized,
-    repairedCompact,
+    originalCompact,
     candidates,
   );
   if (shown.length > 0) {
