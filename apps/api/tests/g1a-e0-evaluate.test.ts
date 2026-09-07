@@ -134,6 +134,7 @@ function backend(options: Readonly<{
         ok: true as const,
         releaseId: options.resultReleaseId ?? RELEASE_ID,
         sourceBindingHash: options.sourceBindingHash ?? SOURCE_BINDING_HASH,
+        decision: candidates.length > 0 ? 'show' as const : 'reject' as const,
         candidates,
       });
     },

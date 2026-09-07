@@ -408,8 +408,36 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
       ok: true,
       releaseId: RELEASE_ID,
       sourceBindingHash: sourceBindingHash(),
+      decision: 'reject',
       candidates: [],
     });
+  });
+
+  it('keeps the gated pool plus in-process judgement under the 300ms p95 budget', async () => {
+    const samples: number[] = [];
+    const queries = [
+      '什么时候发货',
+      '退货运费',
+      '可以不退货',
+      '合成分类专用',
+      '完全不存在的合成查询',
+    ];
+    for (let index = 0; index < 40; index += 1) {
+      const query = queries[index % queries.length] ?? '什么时候发货';
+      const started = performance.now();
+      const result = await backend.search({
+        normalizedQuery: query,
+        platform: 'qianniu',
+        productContextType: null,
+        productContextRef: null,
+        topK: 3,
+      });
+      samples.push(performance.now() - started);
+      expect(result.ok).toBe(true);
+    }
+    const sorted = [...samples].sort((left, right) => left - right);
+    const p95 = sorted[Math.ceil(sorted.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY;
+    expect(p95).toBeLessThan(300);
   });
 
   it('keeps database-side Top 3 limiting inside the controlled PG15 execution budget', async () => {
@@ -419,11 +447,8 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
         'qianniu',
         null,
         null,
-        '什么 & 么时 & 时候 & 候发 & 发货',
-        '%什么时候发货%',
-        '什么时候发货',
-        3,
         false,
+        512,
       ],
     );
     const result = explained.rows[0]?.['QUERY PLAN'][0];
@@ -439,13 +464,11 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     '无条件保证今天必须发货',
     '请问合成单品专用如何查询',
     '您好请问怎么用呢',
-    '什么时候法货',
     '合成杯售后流程',
     '可以退货',
     '买1件送11件',
     '付款前发货',
     '可以退全款',
-    '退货运费',
     '买一件送一件',
     '你好杯退货流程',
     '我想了解合成分类专用,请说明流程',
@@ -455,6 +478,38 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
   ])('does not recall a different business condition from a near-match query: %s', async (normalizedQuery) => {
     await expect(backend.search({ normalizedQuery, platform: 'qianniu', productContextType: null, productContextRef: null, topK: 3 }))
       .resolves.toMatchObject({ ok: true, candidates: [] });
+  });
+
+  it('shows a conditioned source for a broader freight keyword without rewriting it', async () => {
+    await expect(backend.search({
+      normalizedQuery: '退货运费',
+      platform: 'qianniu',
+      productContextType: null,
+      productContextRef: null,
+      topK: 3,
+    })).resolves.toMatchObject({
+      ok: true,
+      decision: 'show',
+      candidates: [{ script_id: 'script_17_free_shipping_phrase', answer_text: '合成回答 17' }],
+    });
+  });
+
+  it('repairs an unambiguous shipping typo without treating it as a different condition', async () => {
+    await expect(backend.search({
+      normalizedQuery: '什么时候法货',
+      platform: 'qianniu',
+      productContextType: null,
+      productContextRef: null,
+      topK: 3,
+    })).resolves.toMatchObject({
+      ok: true,
+      decision: 'show',
+      candidates: [
+        { script_id: 'script_01_exact_question' },
+        { script_id: 'script_02_exact_title' },
+        { script_id: 'script_03_phrase_question' },
+      ],
+    });
   });
 
   it('does not prevent a literal negative question from matching the approved phrase', async () => {

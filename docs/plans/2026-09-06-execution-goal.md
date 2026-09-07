@@ -2,7 +2,7 @@
 
 > **状态：APPROVED · EXECUTION MANAGEMENT ONLY**
 > 执行方法统一使用[工程工作流程](../reference-engineering-workflow.md)。本文件只维护完整目标、当前执行清单与历史事实，不新增真实运行、签发、合并或发布授权。
-> **当前分类：三个指定 PR 已合并，四个指定旧远端分支已删除，004 已执行，独立业务/QA复核人已明确；真实搜索仍未达标。关键词、自然语言与错字的合成候选实验失败，单轮本地训练已获批执行，评估仍失败；T6、正式接入和可试装真实安装包尚未完成。**
+> **当前分类：PR #29～#36 已合并。搜索候选 [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) OPEN / MERGEABLE，合并待该候选的明确批准。004 已执行，独立业务/QA复核人已明确；真实搜索仍为 EVALUATED_NOT_SIGNED / REVIEW_REQUIRED。T6、正式接入和可试装真实安装包尚未完成。**
 
 ## 可粘贴到应用的目标
 
@@ -33,23 +33,26 @@
 | 指定旧远端分支清理 | codex/g1a-case-report、codex/owner-package-assembler、codex/owner-acceptance-loader、codex/owner-contract-consumption 已按明确授权删除；本次远端复核均不存在。本地工作区、旧运行绑定及既有改动保留 |
 | 第四次真实离线补证 | 用户明确授权后已执行 owner-t5-004；退出0、无超时、清理PASS。正例19/20，稳健性4/18，安全负例12/12，来源19/19，后端错误、事件、禁止候选和网络守卫尝试均0，p95 10.84ms。EVALUATED_NOT_SIGNED / REVIEW_REQUIRED，下游仍为NOT_EVALUATED |
 | 004逐题失败与复核交接 | 15个未达预期项均为no-hit；稳健性通过的4项是预期澄清/无结果，14个稳健性正向目标均未召回。独立业务/QA复核人已由用户明确，身份和完整交接保留仓外；尚未取得事后复核意见或T6签发 |
-| 候选展示规则与合成研究 | 用户确认同时支持关键词、完整问句和错字；允许展示保留完整适用条件的相关原文，明确冲突仍拒绝。[PR #35](https://github.com/weiweity/customer-agent-prototype/pull/35) 记录规则和实验，尚未合并。新增60题为正向25/30、拒绝26/30，仍FAIL，未接入产品；详见[搜索研究](2026-09-07-natural-language-search.md) |
+| 候选展示规则与确认问句冻结 | [PR #35](https://github.com/weiweity/customer-agent-prototype/pull/35) 与 [PR #36](https://github.com/weiweity/customer-agent-prototype/pull/36) 已合并到 `main@c61834ba8b45f6009d6239a7ff6c1998fb4ec793`。规则真源为[自然语言搜索计划](2026-09-07-natural-language-search.md)；48 题冻结对照为 `docs/acceptance/search-confirmation-v1.json`，哈希 `49a775f0664ab60fe9be540cf818faa66a850e7eec62adbfa746f6077ab17da8` |
 | 单轮本地训练及评估 | 用户明确回复“训练”后执行300步，105.92秒结束；基础权重/输入未变。新40题由训练前20/20正向、3/20拒绝变为19/20、9/20，仍FAIL_NOT_ADOPTED；实际训练与评估证据见搜索研究，不属于已交付算法 |
+| 搜索候选（门禁池 + 判定） | [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) OPEN。数据库仍只做来源/发布/平台/商品/有效期门禁；`search-decision` 拥有相关性、唯一等长错字修复、确认/断言冲突与 Top3。冻结 48 题 48/48；合成 G1a 50/50；PG15 搜索/事件回归通过。仓外 55 题 holdout 只评估一次 37/55，已见、不得再称独立验证。不是一期完成，未进入 main |
 
 ### 可执行与下一动作
 
 用户已经明确批准004并要求同范围后续工作持续执行；不再把004写成待授权或把复核人写成未知。已获批阶段的实现、必要验证、文档及commit / push / PR授权持续有效；新的范围、合并、签发、真实运行和发布仍按对应授权核对。
 
-本轮已授权的研究结果整理、当前入口修正、差异审查和PR更新在现有PR #35内完成；远端必需CI须绑定该PR最新头。已见题集上的提示优化不能作为独立验证，前缀删除、条件省略或放宽冲突判定不因漏召回而自动采用。
+当前可执行：无独立编码阻塞。等待 [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) 的**合并**批准。不要重复请求 004 运行、复核人身份或 #35/#36 合并。不要 land #37。不要新跑真实评测或续期旧包。
 
-单轮本地纯合成LoRA提案随后获得用户明确“训练”批准，已执行并评估；结果与限制见[训练结论](2026-09-07-natural-language-search.md#单轮本地训练执行与评估)。原G1a排除训练的边界未被一般执行授权扩大；本次按具体新批准完成单轮，不能自动覆盖再次训练、真实输入或产品接线。当前仍无达到要求的搜索候选，下一技术方案应重新评审数据与判定机制，不能靠重复训练、调低阈值或修改测试期望声称收口。
+已提交可审阅合并材料：头提交与 CI 见下表「搜索候选 PR」。真实复验材料见 [复核材料](../reviews/2026-09-07-search-candidate-validation.md)；新真实运行仍需单次授权、包有效期新鲜核验，且必须绑定合并后的产品 SHA。
+
+角色后缀（台/客）、量词单位（盒）、入场/核销时间窗、免费/付费与不会删除极性、秒级时长、以及「这一句」引述已作为一般判定补强写入搜索模块，48 题与 G1a 合成仍须通过。仓外 55 题仍是已见数据，不得再跑后称为独立验证。
 
 ### 待人工决定
 
 | 待办 | 所缺内容 | 仅阻塞的动作 |
 | --- | --- | --- |
 | 独立业务/QA事后复核 | 复核人已明确，仍缺实际复核意见及失败处置结论 | 业务/QA签收及其后的T6决定；不能由实现者代审或用训练结果代签 |
-| PR #35合并 | 搜索规则、研究证据与当前执行入口文档候选的合并尚未获明确批准 | 该文档候选进入main；commit / push / PR更新无需重复确认 |
+| PR #37 合并 | 候选 [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) OPEN；#36 的合并批准不覆盖本 PR | 该候选进入 main；合并后才能把算法用于新的真实离线复验 |
 
 ### 依赖未满足
 

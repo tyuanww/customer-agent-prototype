@@ -9,9 +9,11 @@ function candidate(overrides: Partial<SearchRepositoryCandidate> = {}): SearchRe
     scriptId: 'script-synthetic-001',
     scriptVersion: 1,
     contentHash: 'a'.repeat(64),
-    title: '合成标题',
+    title: '合成退款标题',
     category: 'product',
     answerText: '合成回答原文',
+    questionTexts: ['合成退款标题'],
+    searchFallbackText: '合成退款标题',
     platformScope: ['qianniu'],
     productScopeType: 'storewide',
     productScopeRefs: [],
@@ -51,11 +53,8 @@ describe('search backend', () => {
       platform: 'qianniu',
       productContextType: null,
       productContextRef: null,
-      normalizedQuery: 'a%_\\退款',
-      bigramTsquery: '退款',
-      escapedFallbackPattern: '%a\\%\\_\\\\退款%',
-      topK: 3,
       suppressMatches: false,
+      poolLimit: 512,
     });
     expect(result).toMatchObject({
       ok: true,
@@ -81,8 +80,8 @@ describe('search backend', () => {
     await backend.search({ ...request, normalizedQuery: '请问怎么用呢' });
 
     expect(searchCandidates).toHaveBeenCalledWith(expect.objectContaining({
-      normalizedQuery: '请问怎么用呢',
       suppressMatches: true,
+      poolLimit: 512,
     }));
   });
 
@@ -96,8 +95,8 @@ describe('search backend', () => {
     const backend = createSearchBackend({ searchCandidates });
     await backend.search({ ...request, normalizedQuery: '%' });
     expect(searchCandidates).toHaveBeenCalledWith(expect.objectContaining({
-      bigramTsquery: null,
-      escapedFallbackPattern: '%\\%%',
+      suppressMatches: false,
+      poolLimit: 512,
     }));
   });
 

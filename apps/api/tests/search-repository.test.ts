@@ -30,6 +30,8 @@ function candidateRow() {
     risk_categories: [],
     has_conflict: false,
     placeholder_keys: [],
+    questions: [{ question_text: '合成发货时效' }],
+    search_fallback_text: '合成发货时效',
     private_source_ref: 'must-not-cross-repository-port',
   };
 }
@@ -38,11 +40,8 @@ const request = Object.freeze({
   platform: 'qianniu' as const,
   productContextType: null,
   productContextRef: null,
-  normalizedQuery: '什么时候发货',
-  bigramTsquery: '什么 & 么时 & 时候 & 候发 & 发货',
-  escapedFallbackPattern: '%什么时候发货%',
-  topK: 3 as const,
   suppressMatches: false,
+  poolLimit: 512,
 });
 
 describe('search repository', () => {
@@ -54,12 +53,12 @@ describe('search repository', () => {
 
     expect(query).toHaveBeenCalledOnce();
     expect(query).toHaveBeenCalledWith(SEARCH_CANDIDATES_SQL, [
-      'qianniu', null, null, request.bigramTsquery, '%什么时候发货%', '什么时候发货', 3, false,
+      'qianniu', null, null, false, 512,
     ]);
-    expect(SEARCH_CANDIDATES_SQL).toContain('LIMIT $7::integer');
-    expect(SEARCH_CANDIDATES_SQL).toContain("ILIKE $5::text ESCAPE '\\'");
-    expect(SEARCH_CANDIDATES_SQL).toContain('NOT EXISTS (SELECT 1 FROM primary_matches)');
-    expect(SEARCH_CANDIDATES_SQL).toContain('AND NOT $8::boolean');
+    expect(SEARCH_CANDIDATES_SQL).toContain('LIMIT $5::integer');
+    expect(SEARCH_CANDIDATES_SQL).toContain('AND NOT $4::boolean');
+    expect(SEARCH_CANDIDATES_SQL).toContain('search_recommendable_scripts($1::text, $2::text, $3::text)');
+    expect(result.ok && result.candidates[0]?.questionTexts).toEqual(['合成发货时效']);
     expect(result).toMatchObject({
       ok: true,
       releaseId: context.release_id,
@@ -78,6 +77,7 @@ describe('search repository', () => {
           'answer_text', 'platform_scope', 'product_scope_type', 'product_scope_refs',
           'effective_from', 'effective_to', 'intent_taxonomy_version', 'intent_id',
           'risk_level', 'risk_categories', 'has_conflict', 'placeholder_keys',
+          'questions', 'search_fallback_text',
         ].map((key) => [key, null])),
       }] }),
     } as never);

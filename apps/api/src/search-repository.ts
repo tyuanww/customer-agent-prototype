@@ -1,14 +1,13 @@
 import type { QueryResultRow } from 'pg';
 
+export const SEARCH_SCOPED_POOL_LIMIT = 512;
+
 export type SearchRepositoryRequest = Readonly<{
   platform: 'qianniu' | 'douyin';
   productContextType: 'category' | 'sku' | null;
   productContextRef: string | null;
-  normalizedQuery: string;
-  bigramTsquery: string | null;
-  escapedFallbackPattern: string;
-  topK: 1 | 2 | 3;
   suppressMatches: boolean;
+  poolLimit: number;
 }>;
 
 export type SearchRepositoryCandidate = Readonly<{
@@ -31,6 +30,8 @@ export type SearchRepositoryCandidate = Readonly<{
   riskCategories: readonly string[];
   hasConflict: boolean;
   placeholderKeys: readonly string[];
+  questionTexts: readonly string[];
+  searchFallbackText: string;
 }>;
 
 export type SearchRepositoryResult =
@@ -70,90 +71,27 @@ interface SearchRow extends QueryResultRow {
   risk_categories: string[] | null;
   has_conflict: boolean | null;
   placeholder_keys: string[] | null;
+  questions: unknown;
+  search_fallback_text: string | null;
 }
 
 /*
  * The function owns current-release/source/scope/effective-date filtering.
- * This outer statement owns bigram primary recall, exact/phrase ranking,
- * fallback-only-on-primary-miss, stable ties and the database-side Top 3.
+ * This outer statement returns the gated candidate pool; recall, conflict
+ * judgement and Top 3 belong to the search module.
  */
 export const SEARCH_CANDIDATES_SQL = `
 WITH scoped AS MATERIALIZED (
   SELECT *
   FROM public.search_recommendable_scripts($1::text, $2::text, $3::text)
 ),
-search_input AS MATERIALIZED (
-  SELECT CASE
-    WHEN $4::text IS NULL THEN NULL::tsquery
-    ELSE pg_catalog.to_tsquery('simple', $4::text)
-  END AS ts_query
-),
 candidate_pool AS MATERIALIZED (
   SELECT scoped.*
   FROM scoped
   WHERE scoped.is_candidate
-    AND NOT $8::boolean
-),
-primary_matches AS MATERIALIZED (
-  SELECT candidate_pool.*, search_input.ts_query
-  FROM candidate_pool
-  CROSS JOIN search_input
-  WHERE search_input.ts_query IS NOT NULL
-    AND candidate_pool.search_document @@ search_input.ts_query
-),
-fallback_matches AS MATERIALIZED (
-  SELECT candidate_pool.*, NULL::tsquery AS ts_query
-  FROM candidate_pool
-  WHERE NOT EXISTS (SELECT 1 FROM primary_matches)
-    AND candidate_pool.search_fallback_text ILIKE $5::text ESCAPE '\\'
-),
-matches AS MATERIALIZED (
-  SELECT * FROM primary_matches
-  UNION ALL
-  SELECT * FROM fallback_matches
-),
-scored AS (
-  SELECT
-    matches.*,
-    EXISTS (
-      SELECT 1
-      FROM pg_catalog.jsonb_array_elements(matches.questions) AS question(value)
-      WHERE pg_catalog.lower(question.value ->> 'question_text') = $6::text
-    ) AS exact_question,
-    pg_catalog.lower(matches.title) = $6::text AS exact_title,
-    EXISTS (
-      SELECT 1
-      FROM pg_catalog.jsonb_array_elements(matches.questions) AS question(value)
-      WHERE pg_catalog.strpos(pg_catalog.lower(question.value ->> 'question_text'), $6::text) > 0
-    ) AS phrase_question,
-    pg_catalog.strpos(pg_catalog.lower(matches.title), $6::text) > 0 AS phrase_title,
-    CASE
-      WHEN matches.ts_query IS NULL THEN 0::real
-      ELSE pg_catalog.ts_rank_cd(matches.search_document, matches.ts_query)
-    END AS text_rank
-  FROM matches
-),
-ranked AS (
-  SELECT
-    pg_catalog.row_number() OVER (
-      ORDER BY
-        scored.exact_question DESC,
-        scored.exact_title DESC,
-        scored.phrase_question DESC,
-        scored.phrase_title DESC,
-        scored.text_rank DESC,
-        scored.script_id ASC
-    )::integer AS rank,
-    scored.*
-  FROM scored
-  ORDER BY
-    scored.exact_question DESC,
-    scored.exact_title DESC,
-    scored.phrase_question DESC,
-    scored.phrase_title DESC,
-    scored.text_rank DESC,
-    scored.script_id ASC
-  LIMIT $7::integer
+    AND NOT $4::boolean
+  ORDER BY scoped.script_id ASC
+  LIMIT $5::integer
 ),
 current_context AS (
   SELECT scoped.release_id, scoped.source_binding_hash
@@ -163,28 +101,44 @@ current_context AS (
 SELECT
   current_context.release_id,
   current_context.source_binding_hash,
-  ranked.rank,
-  ranked.script_id,
-  ranked.script_version,
-  ranked.content_hash,
-  ranked.title,
-  ranked.category,
-  ranked.answer_text,
-  ranked.platform_scope,
-  ranked.product_scope_type,
-  ranked.product_scope_refs,
-  ranked.effective_from,
-  ranked.effective_to,
-  ranked.intent_taxonomy_version,
-  ranked.intent_id,
-  ranked.risk_level,
-  ranked.risk_categories,
-  ranked.has_conflict,
-  ranked.placeholder_keys
+  CASE
+    WHEN candidate_pool.script_id IS NULL THEN NULL
+    ELSE pg_catalog.row_number() OVER (ORDER BY candidate_pool.script_id ASC)::integer
+  END AS rank,
+  candidate_pool.script_id,
+  candidate_pool.script_version,
+  candidate_pool.content_hash,
+  candidate_pool.title,
+  candidate_pool.category,
+  candidate_pool.answer_text,
+  candidate_pool.platform_scope,
+  candidate_pool.product_scope_type,
+  candidate_pool.product_scope_refs,
+  candidate_pool.effective_from,
+  candidate_pool.effective_to,
+  candidate_pool.intent_taxonomy_version,
+  candidate_pool.intent_id,
+  candidate_pool.risk_level,
+  candidate_pool.risk_categories,
+  candidate_pool.has_conflict,
+  candidate_pool.placeholder_keys,
+  candidate_pool.questions,
+  candidate_pool.search_fallback_text
 FROM current_context
-LEFT JOIN ranked ON TRUE
-ORDER BY ranked.rank NULLS LAST
+LEFT JOIN candidate_pool ON TRUE
+ORDER BY candidate_pool.script_id NULLS LAST
 `;
+
+function questionTextsFrom(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  const texts: string[] = [];
+  for (const item of value) {
+    if (item === null || typeof item !== 'object') continue;
+    const questionText = Reflect.get(item, 'question_text');
+    if (typeof questionText === 'string' && questionText.length > 0) texts.push(questionText);
+  }
+  return Object.freeze(texts);
+}
 
 function requireCandidateRow(row: SearchRow): SearchRepositoryCandidate {
   if (
@@ -228,6 +182,8 @@ function requireCandidateRow(row: SearchRow): SearchRepositoryCandidate {
     riskCategories: Object.freeze([...row.risk_categories]),
     hasConflict: row.has_conflict,
     placeholderKeys: Object.freeze([...row.placeholder_keys]),
+    questionTexts: questionTextsFrom(row.questions),
+    searchFallbackText: row.search_fallback_text ?? '',
   });
 }
 
@@ -240,11 +196,8 @@ export function createSearchRepository(client: SearchQueryClient): Readonly<{
         request.platform,
         request.productContextType,
         request.productContextRef,
-        request.bigramTsquery,
-        request.escapedFallbackPattern,
-        request.normalizedQuery,
-        request.topK,
         request.suppressMatches,
+        request.poolLimit,
       ]);
       const context = result.rows[0];
       if (!context) return Object.freeze({ ok: false, code: 'SOURCE_GATE_NOT_READY' });

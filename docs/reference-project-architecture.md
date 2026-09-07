@@ -86,7 +86,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 `DEV-M1 W0/W1` 在不改写上述历史切片的前提下前滚到 `schema.v1.13`：第十段 migration 只替换受控 search projection 与 schema comment，精确的 v1.12 ledger 只计划 `0010`。API 新增进程内 opaque mock session、成对 mock header、策略只读路由和 Owner-only 管理写入口。私有 bootstrap 在任何 pool/Fastify 构造前验证两条不同登录 DSN 指向同一数据库目标、总连接预算和互不复用的 HMAC 域；管理 SQL 每次写入前同时证明登录、`app_content_admin`、`cs_ai_definer`、`set_policy_flag` 定义和 ACL，任一角色或函数漂移均失败关闭。未捕获请求异常只返回稳定 500 合同，不回显原始错误；空 JSON、坏 JSON、超大正文和不支持的媒体类型统一返回稳定 400。
 
-`DEV-M1 W2` 继续以追加方式接收 `schema.v1.14`：第十一段 migration 只增加 ready-no-hit 上下文，精确 v1.12/v1.13 ledger 分别只规划缺失后缀。API 的 `SearchRepository` 在一条参数化 SQL 内完成 scope-only 快照读取、bigram primary、字面转义 fallback、确定性排序与数据库侧 Top 3；`SearchService` 只映射公开候选字段。W2 结束时 `/v1/search` 已有鉴权、输入门禁、脱敏/HMAC 与稳定错误壳，但 operation 暂时固定 503；该临时边界已由下述 W3/W4 事务接线取代。
+`DEV-M1 W2` 继续以追加方式接收 `schema.v1.14`：第十一段 migration 只增加 ready-no-hit 上下文，精确 v1.12/v1.13 ledger 分别只规划缺失后缀。API 的 `SearchRepository` 在一条参数化 SQL 内完成 scope-only 快照读取并返回已门禁候选池；`search-decision` 拥有相关性、确认/断言冲突与 Top 3；`SearchService` 映射公开候选字段。历史 bigram AND + ILIKE 主召回已由该判定层取代，来源/平台/商品/有效期门禁仍只在数据库。W2 结束时 `/v1/search` 已有鉴权、输入门禁、脱敏/HMAC 与稳定错误壳，但 operation 暂时固定 503；该临时边界已由下述 W3/W4 事务接线取代。
 
 `DEV-M1 W3/W4` 由 `EventRepository` 拥有 runtime `PoolClient` 事务、版本化 HMAC 幂等、fencing 和事件状态机。搜索在同一事务内完成受控检索、`query_events`、精确候选四元组和 `idempotency_complete`；当前只放行 synthetic，查询文本固定 suppressed。来源拒绝先回滚业务事务，再用新连接写不含原文/定位符的审计。Adoption 由数据库唯一键保证 first-wins，`adopted` 只代表成功复制；Escalation 保持非终态并按 query/action 返回稳定事实。只有搜索成功而 telemetry INSERT 单独不可用时返回零事件的 `collection_disabled`。
 
