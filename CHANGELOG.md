@@ -19,6 +19,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Added
 
+- Landed the search candidate that judges confirmation queries and conflicting assertions after database source/release/platform/product/expiry gates, without rewriting source text (`#37`, `61afa36`).
 - Added an operator-only owner package assembler that derives approved content identities, validates a fresh private five-file package, and preserves historical packages; independently anchored records and all evaluation gates remain required.
 
 - Added test-only owner-acceptance v3 packages with independent external anchors, exact scope checks and atomic offline registration; synthetic PG15 tests cover tampering, rollback, revocation and source fences while preserving v2 behavior.
