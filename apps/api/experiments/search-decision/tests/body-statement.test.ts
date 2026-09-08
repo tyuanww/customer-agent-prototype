@@ -5,7 +5,7 @@ import { decideSearch, toJudgableAlias } from '../decide.js';
 import { loadJson, loadSources } from '../evaluate.js';
 import { loadLabSearch } from '../lab-search.js';
 import { reportRoot } from '../paths.js';
-import { extractBodyRelationPolar } from '../relation-polar.js';
+import { extractBodyRelationPolar } from '../../../src/search-relations.js';
 import type { SyntheticSource } from '../types.js';
 
 function slim(fact: { polarity: string; relation: string; argument: string; marker: string | null | undefined }) {

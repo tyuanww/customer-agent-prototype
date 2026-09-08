@@ -32,24 +32,32 @@ describe('pinned product baseline', () => {
   it('matches frozen SHA-256 and materializes a diagnostic copy without absolute paths', () => {
     const baseline = assertPinnedHashes();
     assertFixtureHashes();
-    expect(baseline.product_commit).toBe('0f9862adfd4a90e5416c1237f0a85c88535c9c2c');
+    expect(baseline.product_base_commit).toBe('1ed7b00b258752c11ac7d034a744b6c247616b0b');
     expect(loadBaseline().n_cases.ids).toHaveLength(23);
-    expect(loadBaseline().n_cases.known_unresolved).toEqual(['N10', 'N19']);
-    expect(loadBaseline().files['apps/api/src/search-decision.ts']).toBe(
-      'fa8aac418f9fd7687bbb13c256cc54b7a9ae23a4dcb5861db4f0d95cab78a70b',
-    );
+    expect(loadBaseline().n_cases.known_unresolved).toEqual([]);
+    expect(Object.keys(loadBaseline().files)).toHaveLength(3);
     const generated = applyLabInstrumentation(readFileSync(PRODUCT_SEARCH_DECISION, 'utf8'));
-    expect(generated).toContain('extractBodyRelationPolar');
+    expect(generated).toContain('analyzeRelationQuery');
     expect(generated).not.toContain('/Users/');
     const path = materializeLabSearch();
     expect(readFileSync(path, 'utf8')).toBe(generated);
   });
 
+  it('rejects changed import counts and embedded absolute paths', () => {
+    const source = readFileSync(PRODUCT_SEARCH_DECISION, 'utf8');
+    expect(() => applyLabInstrumentation(source.replaceAll("from './search-text.js'", "from './other.js'")))
+      .toThrow(/PATCH_TEXT_IMPORT/);
+    expect(() => applyLabInstrumentation(source.replace("from './search-relations.js'", "from './other.js'")))
+      .toThrow(/PATCH_RELATION_IMPORT/);
+    expect(() => applyLabInstrumentation(`${source}\n// /Users/synthetic/source`))
+      .toThrow(/PATCH_ABSOLUTE_PATH/);
+  });
+
   it('fails closed when a patch anchor is missing from the product source', () => {
     const source = readFileSync(PRODUCT_SEARCH_DECISION, 'utf8').replace(
-      'function candidateConflict(',
-      'function candidateConflictBroken(',
+      'export function inspectSearch(',
+      'export function inspectSearchBroken(',
     );
-    expect(() => applyLabInstrumentation(source)).toThrow(/SEARCH_DECISION_LAB_PATCH_CONFLICT/);
+    expect(() => applyLabInstrumentation(source)).toThrow(/SEARCH_DECISION_LAB_PATCH_INSPECTION/);
   });
 });

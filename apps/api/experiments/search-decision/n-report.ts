@@ -8,6 +8,7 @@ export type NAcceptanceSets = {
   expectedKnown: string[];
   unresolvedReasons: Record<string, string>;
   totals: { n: number; failed: number; passed: number };
+  productBinding: { baseCommit: string; files: Record<string, string> };
 };
 
 function asUniqueStringArray(value: unknown, label: string): string[] {
@@ -74,6 +75,7 @@ export function readNAcceptanceReport(raw: unknown): NAcceptanceSets {
       failed: totalsDoc.failed,
       passed: totalsDoc.passed,
     },
+    productBinding: readProductBinding(doc.productBinding),
   };
   const passedSet = new Set(payload.passed);
   const failedSet = new Set(payload.failed);
@@ -104,6 +106,23 @@ export function readNAcceptanceReport(raw: unknown): NAcceptanceSets {
     throw new Error('SEARCH_DECISION_LAB_REPORT_NOT_EXHAUSTIVE');
   }
   return payload;
+}
+
+function readProductBinding(raw: unknown): NAcceptanceSets['productBinding'] {
+  if (raw === null || typeof raw !== 'object') throw new Error('SEARCH_DECISION_LAB_REPORT_PRODUCT_BINDING');
+  const doc = raw as Record<string, unknown>;
+  if (typeof doc.baseCommit !== 'string' || !/^[a-f0-9]{40}$/u.test(doc.baseCommit)
+    || doc.files === null || typeof doc.files !== 'object' || Array.isArray(doc.files)) {
+    throw new Error('SEARCH_DECISION_LAB_REPORT_PRODUCT_BINDING');
+  }
+  const files: Record<string, string> = {};
+  for (const [key, value] of Object.entries(doc.files)) {
+    if (typeof value !== 'string' || !/^[a-f0-9]{64}$/u.test(value)) {
+      throw new Error('SEARCH_DECISION_LAB_REPORT_PRODUCT_HASH');
+    }
+    files[key] = value;
+  }
+  return { baseCommit: doc.baseCommit, files };
 }
 
 export function assertFrozenNUniverse(

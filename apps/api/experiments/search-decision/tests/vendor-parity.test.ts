@@ -6,13 +6,13 @@ import { loadLabSearch } from '../lab-search.js';
 import type { CaseSpec } from '../types.js';
 
 describe('lab judgeSearch vs product judgeSearch', () => {
-  it('inspect wraps lab judge; product differs only on intended polar id S16 in interface+v3 pools', async () => {
+  it('inspection and product share one policy on every interface and v3 pool', async () => {
     const lab = await loadLabSearch();
     const sources = loadSources();
     const byId = sourceMap(sources);
     const interfaceCases = loadJson<{ cases: CaseSpec[] }>('cases-interface.json').cases;
     const v3Cases = loadJson<{ cases: CaseSpec[] }>('cases-v3-regression.json').cases;
-    const allowedProductDiff = new Set(['S16']);
+    const allowedProductDiff = new Set<string>();
     const mismatches: string[] = [];
     const productDiffs = new Set<string>();
     for (const spec of [...interfaceCases, ...v3Cases]) {
@@ -34,6 +34,6 @@ describe('lab judgeSearch vs product judgeSearch', () => {
       }
     }
     expect(mismatches).toEqual([]);
-    expect([...productDiffs].sort()).toEqual(['S16']);
+    expect([...productDiffs].sort()).toEqual([]);
   });
 });

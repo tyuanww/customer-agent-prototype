@@ -20,6 +20,7 @@ describe('N-case fact-level diagnostics', () => {
     const sources = loadSources();
     const byId = sourceMap(sources);
     const nCases = loadJson<{ cases: NCase[] }>('cases-n.json').cases;
+    const round2 = loadJson<{ overrides: Record<string, { compatConflict: boolean; requiresClarification: boolean }> }>('diagnostics-round2.json').overrides;
     const lab = await loadLabSearch();
     const problems: string[] = [];
     const rows: unknown[] = [];
@@ -28,6 +29,8 @@ describe('N-case fact-level diagnostics', () => {
         problems.push(`${spec.id} missing expectedFacts`);
         continue;
       }
+      const override = round2[spec.id];
+      const expectedFacts = { ...spec.expectedFacts, ...(override ?? {}) };
       const pool = poolOf(spec, byId);
       const decided = await decideSearch(spec.query, pool);
       const inspection = lab.inspectSearch(
@@ -41,42 +44,44 @@ describe('N-case fact-level diagnostics', () => {
         continue;
       }
       const queryGot = row.queryFacts.map(slim);
-      const queryWant = spec.expectedFacts.query.map(slim);
+      const queryWant = expectedFacts.query.map(slim);
       if (JSON.stringify(queryGot) !== JSON.stringify(queryWant)) {
         problems.push(`${spec.id} queryFacts ${JSON.stringify(queryGot)} != ${JSON.stringify(queryWant)}`);
       }
       const sourceGot = row.sourceFacts.map(slim);
-      const sourceWant = spec.expectedFacts.source
+      const sourceWant = expectedFacts.source
         .filter((fact) => fact.sourceId === primary)
         .map(slim);
       if (JSON.stringify(sourceGot) !== JSON.stringify(sourceWant)) {
         problems.push(`${spec.id} sourceFacts ${JSON.stringify(sourceGot)} != ${JSON.stringify(sourceWant)}`);
       }
-      if (row.sameRelArg !== spec.expectedFacts.sameRelArg) problems.push(`${spec.id} sameRelArg ${row.sameRelArg}`);
-      if (row.polarConflict !== spec.expectedFacts.polarConflict) problems.push(`${spec.id} polarConflict ${row.polarConflict}`);
-      if (row.exceptionEligible !== spec.expectedFacts.exceptionEligible) {
+      if (row.sameRelArg !== expectedFacts.sameRelArg) problems.push(`${spec.id} sameRelArg ${row.sameRelArg}`);
+      if (row.polarConflict !== expectedFacts.polarConflict) problems.push(`${spec.id} polarConflict ${row.polarConflict}`);
+      if (row.exceptionEligible !== expectedFacts.exceptionEligible) {
         problems.push(`${spec.id} exceptionEligible ${row.exceptionEligible}`);
       }
-      if (spec.expectedFacts.leftoverHit !== null && row.leftoverHit !== spec.expectedFacts.leftoverHit) {
+      if (expectedFacts.leftoverHit !== null && row.leftoverHit !== expectedFacts.leftoverHit) {
         problems.push(`${spec.id} leftoverHit ${row.leftoverHit}`);
       }
-      const waivedWant = spec.expectedFacts.leftoverHit === null
+      const waivedWant = expectedFacts.leftoverHit === null
         ? row.leftoverHit && row.exceptionEligible
-        : spec.expectedFacts.waivedLeftover;
+        : expectedFacts.waivedLeftover;
       if (row.waivedLeftover !== waivedWant) {
         problems.push(`${spec.id} waivedLeftover ${row.waivedLeftover} want ${waivedWant}`);
       }
-      if (spec.expectedFacts.compatConflict !== null && row.conflict !== spec.expectedFacts.compatConflict) {
+      if (expectedFacts.compatConflict !== null && row.conflict !== expectedFacts.compatConflict) {
         problems.push(`${spec.id} compatConflict ${row.conflict}`);
       }
-      for (const banned of spec.expectedFacts.sourceMustNotContain ?? []) {
+      for (const banned of expectedFacts.sourceMustNotContain ?? []) {
         if (row.sourceFacts.some((fact) => fact.polarity === banned.polarity && fact.relation === banned.relation && fact.argument === banned.argument)) {
           problems.push(`${spec.id} source must not contain ${JSON.stringify(banned)}`);
         }
       }
+      if (override && row.requiresClarification !== override.requiresClarification) problems.push(`${spec.id} requiresClarification`);
       rows.push({
         id: spec.id,
-        unresolved: spec.unresolved,
+        round1Unresolved: spec.unresolved,
+        requiresClarification: row.requiresClarification,
         expected: spec.expected.decision,
         actual: decided.decision,
         step: decided.step,
@@ -91,7 +96,7 @@ describe('N-case fact-level diagnostics', () => {
         compatConflict: row.conflict,
       });
     }
-    writeFileSync(join(reportRoot(), 'n-results.json'), `${JSON.stringify({ kind: 'N_ROUND1', rows }, null, 2)}\n`);
+    writeFileSync(join(reportRoot(), 'n-results.json'), `${JSON.stringify({ kind: 'N_ROUND2', rows }, null, 2)}\n`);
     expect(problems).toEqual([]);
   });
 });

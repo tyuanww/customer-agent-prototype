@@ -1,6 +1,7 @@
 # 合成搜索判定实验工具
 
-> **状态：** `APPROVED · SYNTHETIC EXPERIMENT TOOL ONLY`
+> **状态：** `APPROVED · SYNTHETIC EXPERIMENT TOOL ONLY`（PR #44 的历史交付范围）
+> 后续否定语义修复及命令迁移见[当前修复计划](2026-09-08-search-negation-repair.md)；以下保留 #44 的原始失败状态。
 > 不是正式产品能力、业务验收、007、T6 或 runtime 接入批准。
 > 基线：`origin/main@0f9862adfd4a90e5416c1237f0a85c88535c9c2c`。
 > 范围：仓内可复现实验/验收工具。不改变 `apps/api/src` 搜索行为。

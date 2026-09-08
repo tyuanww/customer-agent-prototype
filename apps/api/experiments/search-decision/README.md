@@ -1,35 +1,31 @@
 # 合成搜索判定实验
 
-状态：`SYNTHETIC` / `EXPERIMENT_NOT_RUNTIME`。不是正式能力、业务验收、007 或 T6。
+状态：`SYNTHETIC` / `EXPERIMENT_NOT_RUNTIME`。当前修复范围见[否定语义计划](../../../../docs/plans/2026-09-08-search-negation-repair.md)，历史工具交付见[原计划](../../../../docs/plans/2026-09-08-search-decision-lab.md)。合成结果不代表真实业务验收、007 或 T6。
 
-工具批准范围见[实施计划](../../../../docs/plans/2026-09-08-search-decision-lab.md)。
-
-产品 `apps/api/src/search-decision.ts` 仍是判定所有者。本目录用固定 SHA-256 + 最小补丁在 `.generated/` 生成诊断副本；产品文件漂移则失败关闭，不会默默对照变化的 main。不进入 `dist` 或正式候选包。
-
-N10（没/未）与 N19（negationMismatch）保持已知失败。通过本工具不等于否定语义完成。
+`apps/api/src/search-decision.ts` 是产品与实验共用的判定所有者；`search-relations.ts` 拥有有界正文事实与否定语义。实验中的来源注解与需求判定未进入正式 API。诊断副本仅重定位相对 import，不再修改判定逻辑，产品与副本的纯判定必须完全一致。基线记录父提交与实际源码 SHA-256，源码漂移时失败关闭。
 
 ## 命令
 
-在仓库根、Node 24：
+仓库根、Node 24：
 
 ```bash
 pnpm test:search-decision
-pnpm test:search-decision:round1
 pnpm test:search-decision:acceptance
-pnpm test:search-decision:known-fail
+pnpm test:search-decision:proof
+pnpm test:search-decision:round1
 ```
 
-- `test:search-decision`：工具自身、接口题、事实诊断、正文陈述边界、S16 限定产品差异、变异门禁、已知失败 CLI 证明、生成判定模块类型检查。成功为 0。
-- `test:search-decision:acceptance`：完整 N 验收。N10/N19 必须导致非零。结果写该次运行的 `n-acceptance.json`。
-- `test:search-decision:known-fail`：真实 acceptance 子进程须以预期失败码退出，并核对同一次运行的 JSON：冻结 23 题全集、分母与通过/失败集合一致，失败集合恰为 N10/N19。启动失败、报告缺失/陈旧/截断或意外失败都不能当作证明通过。
-- `test:search-decision:round1`：首轮关闭范围，不含 N10/N19，成功为 0。
+- `test:search-decision`：工具、75 条接口题、事实/正文边界、独立合成否定回归、产品一致性、故障注入及生成模块类型检查。
+- `acceptance`：运行完整冻结 23 题；任一业务预期不符都非零退出。本版本目标包括 N10/N19，不再排除它们。
+- `proof`：另建临时目录运行真实 acceptance CLI，要求退出 0，并读取同次新报告核验 23 题全集、通过/失败集合、分母和实际产品源码哈希。缺失、陈旧、截断、错误版本或任何失败均拒绝证明。
+- `round1`：回归原首轮范围；不是当前完整验收。旧 `known-fail` 命令以 2 退出并提示迁移到 `proof`，不会把成功验收包装成已知失败。
 
-`pnpm typecheck` 会先物化 `.generated/search-decision.ts` 再对其做 tsc；不必手工生成。不要用日志关键词代替 JSON 集合。
+## 冻结与证据
 
-默认报告目录为仓库内 `apps/api/experiments/search-decision/.generated/reports/`：普通工具测试生成 `run.json`（汇总）和 `cases.jsonl`（逐题）；完整 N 验收生成 `n-acceptance.json`（题目全集、通过/失败集合、原因与分母）。重复运行会覆盖同名报告；可用 `SEARCH_DECISION_LAB_REPORT_DIR` 指定独立输出目录。已知失败证明始终另建系统临时目录 `search-decision-lab-known-fail-*`，只读取其真实 acceptance 子进程新生成的 `n-acceptance.json`，不复用上述默认报告。
+原 `cases-n.json` 的 query/pool/expected 与 round1 诊断原字节保留。修复前冻结的 `diagnostics-round2.json` 只记录 N10/N19 新诊断；额外的 `negation-regression.json` 是已见合成回归，不是业务 holdout。历史 #44 的 21/23 和已知失败证明仍可在该 Git 版本复现，不追溯改分。
 
-正常验收锁定 `baseline.json` 中的 fixture 哈希和 23 题 N 全集；`SEARCH_DECISION_LAB_FIXTURE_ROOT` 只能指向满足该哈希的副本。`SEARCH_DECISION_LAB_TEST_UNFROZEN=1` 仅供内部变异测试，不能作为验收证据；acceptance / round1 / known-fail CLI 均清除此开关，known-fail 子进程还清除 fixture 路径覆盖，强制使用仓内冻结全集。所有输入继续仅限合成 fixture。
+默认输出在 `apps/api/experiments/search-decision/.generated/reports/`：`run.json` 汇总、`cases.jsonl` 逐题、`n-acceptance.json` 完整 N 集合与产品版本绑定。重复运行覆盖同名报告；设置 `SEARCH_DECISION_LAB_REPORT_DIR` 可选择独立目录。proof 总在新的系统临时目录 `search-decision-lab-proof-*` 读取自己的子进程报告。
 
-## 边界选择
+`baseline.json` 冻结来源、题集、诊断和源码哈希。`SEARCH_DECISION_LAB_FIXTURE_ROOT` 仅接受同哈希副本。`SEARCH_DECISION_LAB_TEST_UNFROZEN=1` 只供内部故障注入，不可作验收；所有普通 CLI 清除此开关，proof 子进程还清除 fixture 路径覆盖。源码更新必须明确更新基线并重新验证；报告记录 base commit 与实际源码哈希，父提交不冒充候选源码版本。
 
-比较过两种做法：独立复制整份判定模块，或固定产品基线加最小补丁生成诊断副本。采用后者，避免产品第二真源。关系抽取与陈述门在 `relation-polar.ts`；诊断接线只存在于生成副本。
+`pnpm typecheck` 物化并实际检查 `.generated/search-decision.ts`。生成报告及副本不进入 Git；实验及合成夹具不进入 API dist 或正式候选包。共用的纯判定源码按产品模块正常构建。公开 API 仍返回 hit/no_hit 与完整原文，没有来源注解或诊断字段。

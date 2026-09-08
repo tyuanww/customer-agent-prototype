@@ -1,3 +1,4 @@
+import type { RelationPolarFact } from '../../src/search-relations.js';
 import type { JudgableCandidate } from '../../src/search-decision.js';
 
 export type { JudgableCandidate };
@@ -50,12 +51,7 @@ export type PipelineResult = Readonly<{
   step: string;
 }>;
 
-export type RelationPolarFact = Readonly<{
-  polarity: 'pos' | 'neg';
-  relation: string;
-  argument: string;
-  marker: '不' | null;
-}>;
+export type { RelationPolarFact };
 
 export type CandidateInspection = Readonly<{
   scriptId: string;
@@ -70,6 +66,7 @@ export type CandidateInspection = Readonly<{
   leftoverHit: boolean;
   exceptionEligible: boolean;
   waivedLeftover: boolean;
+  requiresClarification: boolean;
 }>;
 
 export type SearchInspection = Readonly<{

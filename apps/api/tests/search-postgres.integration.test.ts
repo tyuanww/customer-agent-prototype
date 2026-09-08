@@ -35,6 +35,7 @@ type CandidateFixture = Readonly<{
   question: string;
   searchable: string;
   fallback: string;
+  answer?: string;
   platformScope?: readonly ('qianniu' | 'douyin')[];
   productScopeType?: 'storewide' | 'category' | 'sku';
   productScopeRefs?: readonly string[];
@@ -222,7 +223,7 @@ async function seedCandidate(owner: Client, fixture: CandidateFixture, index: nu
     RELEASE_ID,
     fixture.id,
     sha256(`synthetic-content-${suffix}`),
-    `合成回答 ${suffix}`,
+    fixture.answer ?? `合成回答 ${suffix}`,
     fixture.title,
     [...platformScope],
     productScopeType,
@@ -236,7 +237,7 @@ async function seedCandidate(owner: Client, fixture: CandidateFixture, index: nu
   ]);
 }
 
-async function seedSearchRelease(owner: Client): Promise<void> {
+async function seedSearchRelease(owner: Client, fixtures: readonly CandidateFixture[] = CANDIDATES): Promise<void> {
   await owner.query('BEGIN');
   try {
     await owner.query("SELECT pg_catalog.set_config('app.publishing', 'on', true)");
@@ -276,7 +277,7 @@ async function seedSearchRelease(owner: Client): Promise<void> {
         VALUES ($1, $2, $3)
       `, [RELEASE_ID, domain, sourceVersionId]);
     }
-    for (const [index, candidate] of CANDIDATES.entries()) {
+    for (const [index, candidate] of fixtures.entries()) {
       await seedCandidate(owner, candidate, index);
     }
     await owner.query(`
@@ -516,6 +517,52 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     await expect(backend.search({ normalizedQuery: '可以不退货', platform: 'qianniu', productContextType: null, productContextRef: null, topK: 3 }))
       .resolves.toMatchObject({ ok: true, candidates: [{ script_id: 'script_13_negative_phrase' }] });
   });
+
+  it('keeps negation confirmation behind actual PostgreSQL source/platform/SKU gates', async () => {
+    // Capability-role installation is cluster-wide and must precede login grants.
+    const isolated = new Pg15Harness();
+    isolated.start();
+    const db = isolated.createDatabase('negation_boundary');
+    const writer = await isolated.connect(db.config);
+    let reader: Client | undefined;
+    const answer = '合成粉扑R接触面板；收纳时保持干燥。';
+    try {
+      await applyDatabaseMigrations(writer);
+      await writer.query('CREATE ROLE negation_runtime LOGIN');
+      await writer.query('GRANT app_runtime TO negation_runtime');
+      await seedSearchRelease(writer, [{
+        id: 'script_synthetic_negation', title: '合成粉扑R接触说明',
+        question: '合成粉扑R怎么收纳', searchable: '合成 粉扑 接触 面板',
+        fallback: '合成粉扑R接触说明', answer,
+        productScopeType: 'sku', productScopeRefs: ['sku-synthetic-negation'],
+      }]);
+      reader = await isolated.connect({ ...db.config, user: 'negation_runtime' });
+      const repository = createSearchRepository(reader as never);
+      const scoped = createSearchBackend({ searchCandidates: repository.search });
+      const request = {
+        normalizedQuery: '合成粉扑R不接触面板吗', platform: 'qianniu' as const,
+        productContextType: 'sku' as const, productContextRef: 'sku-synthetic-negation', topK: 3 as const,
+      };
+      await expect(scoped.search(request)).resolves.toMatchObject({
+        ok: true, decision: 'show', candidates: [{ script_id: 'script_synthetic_negation', answer_text: answer }],
+      });
+      for (const overrides of [
+        { normalizedQuery: '合成粉扑R不接触面板' },
+        { platform: 'douyin' as const },
+        { productContextRef: 'sku-synthetic-other' },
+      ]) {
+        await expect(scoped.search({ ...request, ...overrides })).resolves.toMatchObject({ ok: true, candidates: [] });
+      }
+      await writer.query(`SELECT public.suspend_authoritative_source(
+        'srcv_synth_presale_v1', 'SOURCE_REVOKED', 'EVD-SYNTHETIC-SUSPENSION', 'synthetic-owner', 'owner'
+      )`);
+      await expect(scoped.search(request)).resolves.toEqual({ ok: false, code: 'SOURCE_GATE_NOT_READY' });
+    } finally {
+      await reader?.end();
+      await writer.end();
+      isolated.stop();
+    }
+  }, 120_000);
 
   it('fails closed without inventing no-hit semantics when the four-source gate becomes unavailable', async () => {
     await owner.query(`

@@ -9,9 +9,9 @@ import { EXPERIMENT_ROOT } from '../paths.js';
 import {
   EXPECTED_ACCEPTANCE_EXIT,
   assertFreshAcceptanceReport,
-  assertKnownFailContract,
-  proveKnownFail,
-} from '../prove-known-fail.js';
+  assertAcceptanceContract,
+  proveAcceptance,
+} from '../prove-acceptance.js';
 
 async function withEnv<T>(
   overrides: Record<string, string | undefined>,
@@ -63,35 +63,36 @@ function frozenContractPayload(overrides: Record<string, unknown> = {}): Record<
     expectedKnown: known,
     unresolvedReasons: { ...baseline.n_cases.unresolved_reasons },
     totals: { n: ids.length, failed: known.length, passed: passed.length },
+    productBinding: { baseCommit: baseline.product_base_commit, files: { ...baseline.files } },
     ...overrides,
   };
 }
 
-describe('known N-fail proof', () => {
-  it('uses the real acceptance CLI, expected exit 1, and that run\'s frozen 23-case JSON', async () => {
+describe('full N acceptance proof', () => {
+  it('uses the real acceptance CLI, expected exit 0, and that run\'s frozen 23-case JSON', async () => {
     const fixtures = copyFixtures();
     truncateToKnownFails(fixtures);
     try {
       const result = await withEnv({
         SEARCH_DECISION_LAB_FIXTURE_ROOT: fixtures,
         SEARCH_DECISION_LAB_TEST_UNFROZEN: '1',
-      }, () => proveKnownFail());
+      }, () => proveAcceptance());
       expect(result.acceptanceExit).toBe(EXPECTED_ACCEPTANCE_EXIT);
       const disk = readNAcceptanceReport(JSON.parse(readFileSync(result.reportPath, 'utf8')));
       expect(disk).toEqual(result.payload);
       expect(result.payload.totals.n).toBe(23);
       expect(result.payload.caseIds).toHaveLength(23);
-      expect(result.payload.failed).toEqual(['N10', 'N19']);
-      expect(result.payload.passed).toHaveLength(21);
-      expect(result.payload.passed).not.toContain('N10');
-      expect(result.payload.passed).not.toContain('N19');
+      expect(result.payload.failed).toEqual([]);
+      expect(result.payload.passed).toHaveLength(23);
+      expect(result.payload.passed).toContain('N10');
+      expect(result.payload.passed).toContain('N19');
       expect(result.payload.unexpectedFailed).toEqual([]);
     } finally {
       rmSync(fixtures, { recursive: true, force: true });
     }
   }, 120_000);
 
-  it('rejects truncated fixtures on the frozen path and as a known-fail contract', async () => {
+  it('rejects truncated fixtures on the frozen path and as a acceptance contract', async () => {
     const fixtures = copyFixtures();
     const reports = mkdtempSync(join(tmpdir(), 'search-decision-lab-known-fail-rep-'));
     truncateToKnownFails(fixtures);
@@ -109,9 +110,9 @@ describe('known N-fail proof', () => {
         SEARCH_DECISION_LAB_TEST_UNFROZEN: '1',
       }, () => evaluateNAcceptance());
       expect(truncated.totals.n).toBe(2);
-      expect(truncated.passed).toEqual([]);
-      expect(truncated.failed).toEqual(['N10', 'N19']);
-      expect(() => assertKnownFailContract(truncated)).toThrow(/SEARCH_DECISION_LAB_REPORT_FROZEN_IDS/);
+      expect(truncated.passed).toEqual(['N10', 'N19']);
+      expect(truncated.failed).toEqual([]);
+      expect(() => assertAcceptanceContract(truncated)).toThrow(/SEARCH_DECISION_LAB_REPORT_FROZEN_IDS/);
     } finally {
       rmSync(fixtures, { recursive: true, force: true });
       rmSync(reports, { recursive: true, force: true });
@@ -119,12 +120,14 @@ describe('known N-fail proof', () => {
   }, 60_000);
 
   it('rejects truncated, overlapping, duplicate, and unexpected-failure reports', () => {
+    const wrongProduct = frozenContractPayload({ productBinding: { baseCommit: 'a'.repeat(40), files: {} } });
+    expect(() => assertAcceptanceContract(readNAcceptanceReport(wrongProduct))).toThrow(/PRODUCT_BINDING/);
     const truncated = frozenContractPayload({
       caseIds: ['N10', 'N19'],
-      passed: [],
-      totals: { n: 2, failed: 2, passed: 0 },
+      passed: ['N10', 'N19'],
+      totals: { n: 2, failed: 0, passed: 2 },
     });
-    expect(() => assertKnownFailContract(readNAcceptanceReport(truncated))).toThrow(
+    expect(() => assertAcceptanceContract(readNAcceptanceReport(truncated))).toThrow(
       /SEARCH_DECISION_LAB_REPORT_FROZEN_IDS/,
     );
     expect(() => readNAcceptanceReport(frozenContractPayload({
@@ -137,22 +140,32 @@ describe('known N-fail proof', () => {
       caseIds: ['N01', 'N01'],
     }))).toThrow(/SEARCH_DECISION_LAB_REPORT_CASE_IDS_DUPLICATE/);
     const unexpected = frozenContractPayload({
-      failed: ['N01', 'N10', 'N19'],
+      failed: ['N01'],
       unexpectedFailed: ['N01'],
-      passed: loadBaseline().n_cases.ids.filter((id) => id !== 'N01' && id !== 'N10' && id !== 'N19').slice().sort(),
-      totals: { n: 23, failed: 3, passed: 20 },
+      passed: loadBaseline().n_cases.ids.filter((id) => id !== 'N01').slice().sort(),
+      totals: { n: 23, failed: 1, passed: 22 },
     });
     const parsedUnexpected = readNAcceptanceReport(unexpected);
-    expect(() => assertKnownFailContract(parsedUnexpected)).toThrow(/SEARCH_DECISION_LAB_KNOWN_FAIL_UNEXPECTED/);
+    expect(() => assertAcceptanceContract(parsedUnexpected)).toThrow(/SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_UNEXPECTED/);
     const missingKnown = frozenContractPayload({
       failed: ['N10'],
       knownFailed: ['N10'],
       passed: loadBaseline().n_cases.ids.filter((id) => id !== 'N10').slice().sort(),
       totals: { n: 23, failed: 1, passed: 22 },
     });
-    expect(() => assertKnownFailContract(readNAcceptanceReport(missingKnown))).toThrow(
-      /SEARCH_DECISION_LAB_KNOWN_FAIL/,
+    expect(() => assertAcceptanceContract(readNAcceptanceReport(missingKnown))).toThrow(
+      /SEARCH_DECISION_LAB_ACCEPTANCE_PROOF/,
     );
+  });
+
+  it('rejects missing and malformed product provenance', () => {
+    for (const productBinding of [undefined, null, {}, { baseCommit: 'short', files: {} },
+      { baseCommit: 'a'.repeat(40), files: [] }]) {
+      expect(() => readNAcceptanceReport(frozenContractPayload({ productBinding }))).toThrow(/PRODUCT_BINDING/);
+    }
+    expect(() => readNAcceptanceReport(frozenContractPayload({
+      productBinding: { baseCommit: 'a'.repeat(40), files: { source: 'not-sha256' } },
+    }))).toThrow(/PRODUCT_HASH/);
   });
 
   it('rejects missing, stale, and invalid acceptance reports', () => {

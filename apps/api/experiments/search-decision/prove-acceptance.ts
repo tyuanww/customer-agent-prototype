@@ -6,7 +6,7 @@ import { loadBaseline } from './instrument.js';
 import { assertFrozenNUniverse, readNAcceptanceReport, type NAcceptanceSets } from './n-report.js';
 import { API_ROOT, EXPERIMENT_ROOT } from './paths.js';
 
-export const EXPECTED_ACCEPTANCE_EXIT = 1;
+export const EXPECTED_ACCEPTANCE_EXIT = 0;
 const CLI = join(EXPERIMENT_ROOT, 'cli.mjs');
 const STALE_SKEW_MS = 5_000;
 const SPAWN_TIMEOUT_MS = 120_000;
@@ -21,45 +21,49 @@ function sameSorted(left: readonly string[], right: readonly string[]): boolean 
 }
 
 /**
- * Known-fail contract against a parsed report and the frozen N universe.
- * Kept here so the JSON reader does not own N10/N19 policy.
+ * Full acceptance contract against a parsed report and the frozen N universe.
+ * Kept here so the JSON reader does not own current acceptance policy.
  */
-export function assertKnownFailContract(payload: NAcceptanceSets): void {
+export function assertAcceptanceContract(payload: NAcceptanceSets): void {
   const baseline = loadBaseline();
   const frozenIds = baseline.n_cases.ids;
   const known = baseline.n_cases.known_unresolved;
   const reasons = baseline.n_cases.unresolved_reasons;
   assertFrozenNUniverse(payload, frozenIds);
+  if (payload.productBinding.baseCommit !== baseline.product_base_commit
+    || JSON.stringify(Object.entries(payload.productBinding.files).sort()) !== JSON.stringify(Object.entries(baseline.files).sort())) {
+    throw new Error('SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_PRODUCT_BINDING');
+  }
   if (payload.unexpectedFailed.length > 0) {
-    throw new Error(`SEARCH_DECISION_LAB_KNOWN_FAIL_UNEXPECTED:${JSON.stringify(payload.unexpectedFailed)}`);
+    throw new Error(`SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_UNEXPECTED:${JSON.stringify(payload.unexpectedFailed)}`);
   }
   if (!sameSorted(payload.knownFailed, known)) {
-    throw new Error(`SEARCH_DECISION_LAB_KNOWN_FAIL_KNOWN:${JSON.stringify(payload.knownFailed)}`);
+    throw new Error(`SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_KNOWN:${JSON.stringify(payload.knownFailed)}`);
   }
   if (!sameSorted(payload.expectedKnown, known)) {
-    throw new Error(`SEARCH_DECISION_LAB_KNOWN_FAIL_EXPECTED_KNOWN:${JSON.stringify(payload.expectedKnown)}`);
+    throw new Error(`SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_EXPECTED_KNOWN:${JSON.stringify(payload.expectedKnown)}`);
   }
   if (!sameSorted(payload.failed, known)) {
-    throw new Error(`SEARCH_DECISION_LAB_KNOWN_FAIL_FAILED:${JSON.stringify(payload.failed)}`);
+    throw new Error(`SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_FAILED:${JSON.stringify(payload.failed)}`);
   }
   const passedWant = frozenIds.filter((id) => !known.includes(id));
   if (!sameSorted(payload.passed, passedWant)) {
-    throw new Error(`SEARCH_DECISION_LAB_KNOWN_FAIL_PASSED:${JSON.stringify(payload.passed)}`);
+    throw new Error(`SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_PASSED:${JSON.stringify(payload.passed)}`);
   }
   for (const [id, reason] of Object.entries(reasons)) {
     if (payload.unresolvedReasons[id] !== reason) {
-      throw new Error(`SEARCH_DECISION_LAB_KNOWN_FAIL_REASON:${id}`);
+      throw new Error(`SEARCH_DECISION_LAB_ACCEPTANCE_PROOF_REASON:${id}`);
     }
   }
 }
 
-export type KnownFailProof = Readonly<{
+export type AcceptanceProof = Readonly<{
   acceptanceExit: number;
   reportPath: string;
   payload: NAcceptanceSets;
 }>;
 
-/** Missing, stale, or unreadable JSON cannot be treated as a known-fail proof. */
+/** Missing, stale, or unreadable JSON cannot be treated as a acceptance proof. */
 export function assertFreshAcceptanceReport(reportPath: string, startedMs: number): unknown {
   if (!existsSync(reportPath)) {
     throw new Error('SEARCH_DECISION_LAB_ACCEPTANCE_REPORT_MISSING');
@@ -76,12 +80,12 @@ export function assertFreshAcceptanceReport(reportPath: string, startedMs: numbe
 }
 
 /**
- * Fresh-run owner for the known-fail proof: spawn the real acceptance CLI,
- * require its expected non-zero exit, then read that run's JSON.
+ * Fresh-run owner for the acceptance proof: spawn the real acceptance CLI,
+ * require its zero exit, then read that run's JSON.
  * Ordinary fixture overrides and the test-only unfreeze flag are stripped.
  */
-export function proveKnownFail(): KnownFailProof {
-  const reportDir = mkdtempSync(join(tmpdir(), 'search-decision-lab-known-fail-'));
+export function proveAcceptance(): AcceptanceProof {
+  const reportDir = mkdtempSync(join(tmpdir(), 'search-decision-lab-proof-'));
   const reportPath = join(reportDir, 'n-acceptance.json');
   const env: NodeJS.ProcessEnv = { ...process.env };
   env.SEARCH_DECISION_LAB_REPORT_DIR = reportDir;
@@ -108,6 +112,6 @@ export function proveKnownFail(): KnownFailProof {
   }
   const parsed = assertFreshAcceptanceReport(reportPath, started);
   const payload = readNAcceptanceReport(parsed);
-  assertKnownFailContract(payload);
+  assertAcceptanceContract(payload);
   return Object.freeze({ acceptanceExit: result.status, reportPath, payload });
 }

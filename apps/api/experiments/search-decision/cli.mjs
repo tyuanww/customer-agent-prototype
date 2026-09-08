@@ -14,13 +14,15 @@ let files;
 if (command === 'acceptance') {
   env.CUSTOMER_AGENT_SEARCH_DECISION_FULL_ACCEPTANCE = '1';
   files = [path.join(experimentRoot, 'tests/full-acceptance.test.ts')];
-} else if (command === 'known-fail') {
-  env.CUSTOMER_AGENT_SEARCH_DECISION_PROVE_KNOWN = '1';
-  files = [path.join(experimentRoot, 'tests/known-fail.test.ts')];
+} else if (command === 'proof') {
+  files = [path.join(experimentRoot, 'tests/acceptance-proof.test.ts')];
 } else if (command === 'round1') {
   files = [path.join(experimentRoot, 'tests/round1-scope.test.ts')];
+} else if (command === 'known-fail') {
+  console.error('N10/N19 are repaired. Use pnpm test:search-decision:proof; historical known-fail belongs to PR #44.');
+  process.exit(2);
 } else {
-  console.error('usage: cli.mjs acceptance|known-fail|round1');
+  console.error('usage: cli.mjs acceptance|proof|round1');
   process.exit(2);
 }
 

@@ -92,7 +92,8 @@ export async function decideSearch(
     if (role === 'unusable' || role === 'undetermined') continue;
     const row = rows.get(source.id);
     if (row === undefined || row.conflict) continue;
-    if (role === 'complete') completeIds.push(source.id);
+    if (row.requiresClarification) insufficientIds.push(source.id);
+    else if (role === 'complete') completeIds.push(source.id);
     else if (role === 'insufficient') insufficientIds.push(source.id);
   }
 

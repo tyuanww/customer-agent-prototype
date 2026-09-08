@@ -1,0 +1,8 @@
+{
+  "kind": "SYNTHETIC_N_ROUND2_DIAGNOSTICS",
+  "basis": "2026-09-08-search-negation-repair; frozen before implementation; original business expectations and round1 diagnostics unchanged",
+  "overrides": {
+    "N10": { "compatConflict": false, "requiresClarification": true },
+    "N19": { "compatConflict": false, "requiresClarification": false }
+  }
+}

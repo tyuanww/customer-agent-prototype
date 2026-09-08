@@ -1,28 +1,48 @@
 {
   "kind": "SYNTHETIC_SEARCH_DECISION_LAB",
   "status": "EXPERIMENT_NOT_RUNTIME",
-  "product_commit": "0f9862adfd4a90e5416c1237f0a85c88535c9c2c",
   "files": {
-    "apps/api/src/search-decision.ts": "fa8aac418f9fd7687bbb13c256cc54b7a9ae23a4dcb5861db4f0d95cab78a70b",
-    "apps/api/src/search-text.ts": "89e52dc082378a8ff68a13f8045ea8ca8ad8402d6747600d3141300ea8baa229"
+    "apps/api/src/search-decision.ts": "01da5f2ef8ff7d806c40b28ffc6138f6229f48c66cd162b53c9a57187919e246",
+    "apps/api/src/search-text.ts": "89e52dc082378a8ff68a13f8045ea8ca8ad8402d6747600d3141300ea8baa229",
+    "apps/api/src/search-relations.ts": "f5d0f45db93edfc9687c242493eb8974c727d6b1618b97686d4ff50c5ec325cf"
   },
   "fixtures": {
     "fixtures/sources.json": "e0b677dde39ba4757bb9ba0dc9c5e2e3905ee66bc71ff569e79840b43380a3c0",
     "fixtures/cases-n.json": "084d6bbca949102e7d54a9782f23132aeefced2707eccfa984e67a05fab584ef",
     "fixtures/cases-interface.json": "c42bc68fc11c555e76e6e01979a295c47252fb97c1483c2689801f500a386074",
     "fixtures/cases-v3-regression.json": "1ef128f5b836b6cc5b823339e2a74bf3b75fa98b2afff972db38e9db5a28b028",
-    "fixtures/cases-body-statement.json": "60d1161ff6caf6e0ac5afd76b895a8213dd58e9ea647671f81198a13da412683"
+    "fixtures/cases-body-statement.json": "60d1161ff6caf6e0ac5afd76b895a8213dd58e9ea647671f81198a13da412683",
+    "fixtures/diagnostics-round2.json": "073a7124f26c8ea52bd6e1dc6937fe401f4fbf443b1d8c93464a79d821d24988",
+    "fixtures/negation-regression.json": "020e6ac0171dd17d3848b249e85d2fa86e23beedf5763172374af72835f1d477"
   },
   "n_cases": {
     "ids": [
-      "N01", "N02", "N03", "N04", "N05", "N06", "N07", "N08", "N09",
-      "N10", "N11", "N12", "N13", "N14", "N15", "N16", "N17", "N18",
-      "N19", "N20", "N21", "N22", "N23"
+      "N01",
+      "N02",
+      "N03",
+      "N04",
+      "N05",
+      "N06",
+      "N07",
+      "N08",
+      "N09",
+      "N10",
+      "N11",
+      "N12",
+      "N13",
+      "N14",
+      "N15",
+      "N16",
+      "N17",
+      "N18",
+      "N19",
+      "N20",
+      "N21",
+      "N22",
+      "N23"
     ],
-    "known_unresolved": ["N10", "N19"],
-    "unresolved_reasons": {
-      "N10": "mei-wei-marker",
-      "N19": "negation-mismatch"
-    }
-  }
+    "known_unresolved": [],
+    "unresolved_reasons": {}
+  },
+  "product_base_commit": "1ed7b00b258752c11ac7d034a744b6c247616b0b"
 }

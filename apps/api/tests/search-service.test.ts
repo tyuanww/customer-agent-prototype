@@ -38,6 +38,49 @@ const request = Object.freeze({
 });
 
 describe('search backend', () => {
+  it.each([
+    '合成粉扑R不接触面板吗，合成粉扑R浸水',
+    '合成粉扑R浸水，合成粉扑R不接触面板吗',
+    '合成粉扑R不接触面板。浸水吗',
+    '合成粉扑R不接触面板.浸水吗',
+  ])('does not waive an independent conflicting assertion: %s', async (normalizedQuery) => {
+    const backend = createSearchBackend({ searchCandidates: async () => ({
+      ok: true, releaseId: 'rel-synthetic-001', sourceBindingHash: 'b'.repeat(64),
+      candidates: [candidate({
+        title: '合成粉扑R接触说明', answerText: '合成粉扑R接触面板；不浸水；收纳时保持干燥。',
+        questionTexts: ['合成粉扑R怎么收纳'], searchFallbackText: '合成粉扑R接触说明',
+      })],
+    }) });
+    await expect(backend.search({ ...request, normalizedQuery })).resolves.toMatchObject({ ok: true, candidates: [] });
+  });
+
+  it.each([
+    ['合成粉扑R不接触面板吗', 'show'],
+    ['合成粉扑R不接触面板，对吗', 'show'],
+    ['合成粉扑R不接触面板', 'reject'],
+    ['合成粉扑S不接触面板吗', 'reject'],
+    ['合成粉扑R不接触玻璃吗', 'reject'],
+  ])('uses only existing candidate fields for %s', async (normalizedQuery, decision) => {
+    const answer = '合成粉扑R接触面板；收纳时保持干燥。';
+    const backend = createSearchBackend({
+      searchCandidates: async () => ({
+        ok: true,
+        releaseId: 'rel-synthetic-001',
+        sourceBindingHash: 'b'.repeat(64),
+        candidates: [candidate({
+          title: '合成粉扑R接触说明', answerText: answer,
+          questionTexts: ['合成粉扑R怎么收纳'], searchFallbackText: '合成粉扑R接触说明',
+        })],
+      }),
+    });
+    const result = await backend.search({ ...request, normalizedQuery });
+    expect(result).toMatchObject({ ok: true, decision });
+    if (!result.ok) throw new Error(result.code);
+    expect(result.candidates).toHaveLength(decision === 'show' ? 1 : 0);
+    if (decision === 'show') expect(result.candidates[0]?.answer_text).toBe(answer);
+    expect(JSON.stringify(result)).not.toMatch(/annotation|queryFacts|sourceFacts|requiresClarification/);
+  });
+
   it('builds deterministic bigrams/escaped fallback and explicitly maps the public whitelist', async () => {
     const searchCandidates = vi.fn().mockResolvedValue({
       ok: true,

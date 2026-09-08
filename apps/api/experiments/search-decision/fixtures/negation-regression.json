@@ -1,0 +1,243 @@
+{
+  "kind": "SYNTHETIC_INDEPENDENT_NEGATION_CHECK",
+  "frozenAt": "2026-09-08T01:40:23.809810+00:00",
+  "scope": "bounded semantic regression; not business holdout, real G1a or generalization evidence",
+  "sources": [
+    {
+      "id": "synthetic-contact",
+      "kind": "SYNTHETIC",
+      "title": "合成粉扑R接触说明",
+      "body": "合成粉扑R接触面板；收纳时保持干燥。",
+      "questions": [
+        "合成粉扑R怎么收纳"
+      ],
+      "annotation": {
+        "producer": "independent-synthetic-review",
+        "subjects": [
+          "合成粉扑R",
+          "粉扑R"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "收纳"
+        ],
+        "constraints": [
+          "接触面板"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "synthetic-soak",
+      "kind": "SYNTHETIC",
+      "title": "合成清洁刷T更换说明",
+      "body": "合成清洁刷T不浸水；更换时按箭头方向。",
+      "questions": [
+        "合成清洁刷T怎么更换"
+      ],
+      "annotation": {
+        "producer": "independent-synthetic-review",
+        "subjects": [
+          "合成清洁刷T",
+          "清洁刷T"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "更换"
+        ],
+        "constraints": [
+          "不浸水"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "R01",
+      "query": "合成清洁刷T没浸水",
+      "pool": [
+        "synthetic-soak"
+      ],
+      "allowedDecisions": [
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R02",
+      "query": "合成清洁刷T未浸水",
+      "pool": [
+        "synthetic-soak"
+      ],
+      "allowedDecisions": [
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R03",
+      "query": "合成清洁刷T没有浸水",
+      "pool": [
+        "synthetic-soak"
+      ],
+      "allowedDecisions": [
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R04",
+      "query": "合成粉扑R不接触面板吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "show"
+      ],
+      "shownScriptIds": [
+        "synthetic-contact"
+      ]
+    },
+    {
+      "id": "R05",
+      "query": "合成粉扑R不接触面板，对吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "show"
+      ],
+      "shownScriptIds": [
+        "synthetic-contact"
+      ]
+    },
+    {
+      "id": "R06",
+      "query": "合成粉扑R不接触面板对吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "show"
+      ],
+      "shownScriptIds": [
+        "synthetic-contact"
+      ]
+    },
+    {
+      "id": "R07",
+      "query": "合成粉扑R不接触面板",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R08",
+      "query": "合成粉扑R不接触面板，收纳记录在哪里",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R09",
+      "query": "合成粉扑R不接触玻璃吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R10",
+      "query": "合成粉扑S不接触面板吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R11",
+      "query": "合成粉扑R不接触面板而且外接电源吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": []
+    },
+    {
+      "id": "R12",
+      "query": "合成粉扑R不接触面板吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": [],
+      "bodyOverride": "合成粉扑R接触面板吗？"
+    },
+    {
+      "id": "R13",
+      "query": "合成粉扑R不接触面板吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": [],
+      "bodyOverride": "有人说“合成粉扑R接触面板”。"
+    },
+    {
+      "id": "R14",
+      "query": "合成粉扑R不接触面板吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": [],
+      "bodyOverride": "“合成粉扑R接触面板”。"
+    },
+    {
+      "id": "R15",
+      "query": "合成粉扑R不接触面板吗",
+      "pool": [
+        "synthetic-contact"
+      ],
+      "allowedDecisions": [
+        "reject",
+        "clarify_or_no_result"
+      ],
+      "shownScriptIds": [],
+      "bodyOverride": "有人声称合成粉扑R接触面板。"
+    }
+  ]
+}

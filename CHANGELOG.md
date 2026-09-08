@@ -14,6 +14,9 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Fixed
 
+- Unified search negation and body evidence in the API decision owner: occurrence negation requests clarification without showing results, and negative confirmation requires matching statement evidence. Mixed assertions, quoted/conditional text and different product subjects retain their boundaries.
+- Replaced the historical expected-failure proof with full 23-case acceptance, product hashes and fail-closed report consumption while keeping frozen round-one inputs unchanged.
+
 - Made Windows packaging prepare Electron distribution and license inputs before building, removing its dependency on a previous application launch or smoke run.
 - Rejected contradictory release/provenance claims while preserving legitimate provenance failure reports.
 - Made G1a evaluation reports use one versioned, strictly validated delivery contract shared by the producer and reader, preserving complete reports for both successful and failed evaluations.

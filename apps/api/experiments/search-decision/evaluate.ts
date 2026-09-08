@@ -68,6 +68,7 @@ export type NCase = {
 };
 
 export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
+  const baseline = assertPinnedHashes();
   requireFrozenFixtures();
   const sources = loadSources();
   const byId = sourceMap(sources);
@@ -78,9 +79,11 @@ export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
   const passed: string[] = [];
   const unresolvedReasons: Record<string, string> = {};
   const caseIds: string[] = [];
+  const current = loadBaseline().n_cases;
   for (const spec of nCases) {
     caseIds.push(spec.id);
-    if (spec.unresolved) unresolvedReasons[spec.id] = String(spec.unresolved);
+    const unresolved = current.known_unresolved.includes(spec.id);
+    if (unresolved) unresolvedReasons[spec.id] = current.unresolved_reasons[spec.id] ?? 'unresolved';
     const decided = await decideSearch(spec.query, poolOf(spec, byId));
     const match = decided.decision === spec.expected.decision
       && sameIds(decided.shownScriptIds, spec.expected.shownScriptIds);
@@ -89,7 +92,7 @@ export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
       continue;
     }
     failed.push(spec.id);
-    if (spec.unresolved) knownFailed.push(spec.id);
+    if (unresolved) knownFailed.push(spec.id);
     else unexpectedFailed.push(spec.id);
   }
   const payload: NAcceptanceSets = {
@@ -99,9 +102,10 @@ export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
     unexpectedFailed: [...unexpectedFailed].sort(),
     failed: [...failed].sort(),
     passed: [...passed].sort(),
-    expectedKnown: nCases.filter((spec) => spec.unresolved).map((spec) => spec.id).sort(),
+    expectedKnown: [...current.known_unresolved].sort(),
     unresolvedReasons,
     totals: { n: nCases.length, failed: failed.length, passed: passed.length },
+    productBinding: { baseCommit: baseline.product_base_commit, files: { ...baseline.files } },
   };
   readNAcceptanceReport(payload);
   const reports = reportRoot();
@@ -196,7 +200,8 @@ export async function runInterfaceExperiment(): Promise<{
   const report = {
     kind: 'SYNTHETIC_SEARCH_DECISION_LAB',
     status: 'EXPERIMENT_NOT_RUNTIME',
-    pinned_product_commit: baseline.product_commit,
+    pinned_product_base_commit: baseline.product_base_commit,
+    productFiles: baseline.files,
     hashes: {
       sources_json: sha256(readFileSync(join(fixtureRoot(), 'sources.json'))),
       cases_interface_json: sha256(interfaceJson),

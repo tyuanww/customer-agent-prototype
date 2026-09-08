@@ -23,14 +23,15 @@
     "test:g1a:synthetic": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_G1A_RUNNER=1 vitest run tests/g1a-synthetic.runner.test.ts",
     "test:g1a:e0:synthetic": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_G1A_E0_SYNTHETIC=1 vitest run tests/g1a-e0-input-package.test.ts tests/g1a-e0-boundary.test.ts tests/g1a-e0-evaluate.test.ts tests/g1a-e0-synthetic.integration.test.ts",
     "test:g1a:e0:package": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_G1A_E0_PACKAGE=1 vitest run tests/g1a-e0.runner.test.ts",
-    "test:search-decision": "vitest run experiments/search-decision/tests/pin.test.ts experiments/search-decision/tests/interface.test.ts experiments/search-decision/tests/round1-scope.test.ts experiments/search-decision/tests/n-facts.test.ts experiments/search-decision/tests/body-statement.test.ts experiments/search-decision/tests/vendor-parity.test.ts experiments/search-decision/tests/fail-gates.test.ts experiments/search-decision/tests/known-fail.test.ts experiments/search-decision/tests/generated-types.test.ts",
+    "test:search-decision": "vitest run experiments/search-decision/tests/pin.test.ts experiments/search-decision/tests/interface.test.ts experiments/search-decision/tests/round1-scope.test.ts experiments/search-decision/tests/n-facts.test.ts experiments/search-decision/tests/body-statement.test.ts experiments/search-decision/tests/vendor-parity.test.ts experiments/search-decision/tests/fail-gates.test.ts experiments/search-decision/tests/acceptance-proof.test.ts experiments/search-decision/tests/generated-types.test.ts experiments/search-decision/tests/negation-regression.test.ts",
     "test:search-decision:acceptance": "node experiments/search-decision/cli.mjs acceptance",
     "test:search-decision:known-fail": "node experiments/search-decision/cli.mjs known-fail",
     "test:search-decision:round1": "node experiments/search-decision/cli.mjs round1",
     "test": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && vitest run && pnpm test:package",
     "assemble:g1a:owner": "pnpm --filter @customer-agent/contracts build:runtime && CUSTOMER_AGENT_G1A_ASSEMBLE=1 vitest run tests/g1a-owner-assembly.runner.test.ts",
     "test:package:built": "node --test tests/package-entry.smoke.mjs tests/main-entry.smoke.mjs",
-    "test:built": "vitest run && pnpm test:package:built"
+    "test:built": "vitest run && pnpm test:package:built",
+    "test:search-decision:proof": "node experiments/search-decision/cli.mjs proof"
   },
   "dependencies": {
     "@customer-agent/contracts": "workspace:*",

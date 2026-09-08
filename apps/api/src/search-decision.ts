@@ -1,4 +1,5 @@
 import { normalizeSearchText } from './search-text.js';
+import { analyzeRelationQuery, type RelationPolarFact } from './search-relations.js';
 
 export type SearchDisplayDecision = 'show' | 'reject' | 'clarify_or_no_result';
 
@@ -13,6 +14,34 @@ export type JudgableCandidate = Readonly<{
 export type JudgedSearch = Readonly<{
   decision: SearchDisplayDecision;
   shownScriptIds: readonly string[];
+}>;
+
+export type { RelationPolarFact } from './search-relations.js';
+
+export type CandidateInspection = Readonly<{
+  scriptId: string;
+  relevant: boolean;
+  conflict: boolean;
+  showBeforeAmbiguity: boolean;
+  overlap: number;
+  queryFacts: readonly RelationPolarFact[];
+  sourceFacts: readonly RelationPolarFact[];
+  sameRelArg: boolean;
+  polarConflict: boolean;
+  leftoverHit: boolean;
+  exceptionEligible: boolean;
+  waivedLeftover: boolean;
+  requiresClarification: boolean;
+}>;
+
+export type SearchInspection = Readonly<{
+  decision: SearchDisplayDecision;
+  shownScriptIds: readonly string[];
+  act: 'confirmation' | 'assertion' | 'info_question' | 'quoted' | 'underspecified';
+  shownBeforeAmbiguity: readonly string[];
+  shownAfterAmbiguity: readonly string[];
+  ambiguityEmptied: boolean;
+  candidates: readonly CandidateInspection[];
 }>;
 
 const FUNCTION_WORDS = Object.freeze([
@@ -173,7 +202,7 @@ export function repairUnambiguousTypos(
 
 function splitClauses(query: string): readonly string[] {
   return normalizeSearchText(query)
-    .split(/[，。；;,]+/u)
+    .split(/[，。；;,]+|(?<!\d)\.|\.(?!\d)/u)
     .map((clause) => clause.trim())
     .filter((clause) => clause.length > 0);
 }
@@ -242,7 +271,7 @@ function interpretQuery(query: string): QueryIntent {
   const hasSideQuestion = clauses.some((clause, index) => (
     acts[index] === 'info_question' && SIDE_QUESTION.test(clause)
   ));
-  if (assertionClauses.length > 0 && (hasSideQuestion || headActs.includes('assertion'))) {
+  if (assertionClauses.length > 0 && (hasSideQuestion || headActs.includes('assertion') || acts.includes('confirmation'))) {
     return Object.freeze({
       act: 'assertion',
       clauses: Object.freeze(assertionClauses),
@@ -595,6 +624,7 @@ function singleInfix(left: string, right: string): boolean {
 type CandidateVerdict = Readonly<{
   scriptId: string;
   show: boolean;
+  relevant: boolean;
   exactQuestion: boolean;
   exactTitle: boolean;
   originalExact: boolean;
@@ -603,6 +633,7 @@ type CandidateVerdict = Readonly<{
   phraseTitle: boolean;
   overlap: number;
   conflict: boolean;
+  analysis: ConflictAnalysis;
 }>;
 
 function factsOf(text: string): Readonly<{
@@ -859,22 +890,39 @@ function sharedNounPrefixMismatch(queryCompact: string, sourceTitle: string): bo
   return false;
 }
 
-function candidateConflict(
+type ConflictAnalysis = Readonly<{
+  conflict: boolean;
+  leftoverHit: boolean;
+  polarConflict: boolean;
+  sameRelArg: boolean;
+  queryFacts: readonly RelationPolarFact[];
+  sourceFacts: readonly RelationPolarFact[];
+  exceptionEligible: boolean;
+  waivedLeftover: boolean;
+  requiresClarification: boolean;
+}>;
+
+function analyzeConflict(
   intent: QueryIntent,
   queryText: string,
   candidate: JudgableCandidate,
   pool: readonly JudgableCandidate[],
   repairedCompact: string,
-): boolean {
+): ConflictAnalysis {
   const sourceText = corpusOf(candidate);
   const sourceCompact = compactCorpus(candidate);
   const queryCompact = compactSearchText(queryText);
   const queryFacts = factsOf(queryText);
   const sourceFacts = factsOf(sourceText);
+  const relation = analyzeRelationQuery(queryText, candidate.answerText, intent.act === 'confirmation');
+  const queryRel = relation.queryFacts;
+  const sourceRel = relation.sourceFacts;
+  const sameRelArg = relation.sameRelArg;
+  const relationPolar = relation.polarConflict;
   const inverted = directedConflict(queryFacts.directed, sourceFacts.directed)
     && !directedAligned(queryFacts.directed, sourceFacts.directed);
   const qty = quantityConflict(queryFacts.quantity, sourceFacts.quantity);
-  const polar = polarConflict(queryFacts.polar, sourceFacts.polar);
+  const polar = polarConflict(queryFacts.polar, sourceFacts.polar) || relationPolar;
   const time = timeConflict(queryFacts.time, sourceFacts.time);
   const duration = durationConflict(queryFacts.duration, sourceFacts.duration);
   const ops = operationMismatch(queryFacts.operations, sourceFacts.operations, sourceCompact);
@@ -883,28 +931,40 @@ function candidateConflict(
   const extraCondition = extraQueryCondition(queryCompact, sourceCompact);
   const override = differentIntentOverride(queryText);
   const politeProduct = unseparatedPoliteProduct(queryCompact, matchCorpus(candidate));
-  const negated = negationMismatch(queryCompact, compactCorpus(candidate));
+  const negated = negationMismatch(relation.negationQuery, sourceCompact)
+    || relation.unansweredConfirmation;
   const sibling = siblingVariantMismatch(queryCompact, candidate, pool);
   const prefix = sharedNounPrefixMismatch(queryCompact, compactSearchText(candidate.title));
   const packaging = missingPackagingVariant(queryCompact, matchCorpus(candidate));
   const leftoverQuery = repairedCompact.length >= 4 ? repairedCompact : queryCompact;
   const leftoverHit = leftoverUnsupported(queryCompact, candidate)
     || leftoverUnsupported(leftoverQuery, candidate);
-  const leftover = leftoverHit && !(
+  const effectiveLeftover = relation.requiresClarification
+    ? leftoverUnsupported(relation.leftoverQuery, candidate)
+    : leftoverHit;
+  const leftover = effectiveLeftover && !(
     intent.act === 'confirmation'
     && (inverted || qty || polar || time || duration)
   );
   const swappedObject = substitutedObjectToken(queryCompact, compactSearchText(candidate.title));
   const ignoredBan = intent.act === 'assertion' && sourceBanIgnored(queryCompact, sourceCompact);
-
-  if (ops || missing || product || override || extraCondition || politeProduct || negated || sibling || prefix || packaging || leftover || swappedObject || ignoredBan) {
-    return true;
-  }
-  if (intent.act === 'assertion' || intent.hasConflictingAssertionShape) {
-    return inverted || qty || polar || time || duration;
-  }
-  return false;
+  const early = ops || missing || product || override || extraCondition || politeProduct || negated || sibling || prefix || packaging || leftover || swappedObject || ignoredBan;
+  const assertionPolar = (intent.act === 'assertion' || intent.hasConflictingAssertionShape)
+    && (inverted || qty || polar || time || duration);
+  const exceptionEligible = intent.act === 'confirmation' && relationPolar;
+  return Object.freeze({
+    conflict: Boolean(early || assertionPolar),
+    leftoverHit,
+    polarConflict: relationPolar,
+    sameRelArg,
+    queryFacts: queryRel,
+    sourceFacts: sourceRel,
+    exceptionEligible,
+    waivedLeftover: leftoverHit && exceptionEligible,
+    requiresClarification: relation.requiresClarification,
+  });
 }
+
 
 function sharedContentCount(
   queryCompact: string,
@@ -988,17 +1048,37 @@ function dropAmbiguousVariants(
   return Object.freeze(shown.filter((verdict) => !dropped.has(verdict.scriptId)));
 }
 
-export function judgeSearch(
+function emptyInspection(
+  decision: SearchDisplayDecision,
+  act: SearchInspection['act'],
+): SearchInspection {
+  return Object.freeze({
+    decision,
+    shownScriptIds: Object.freeze([]),
+    act,
+    shownBeforeAmbiguity: Object.freeze([]),
+    shownAfterAmbiguity: Object.freeze([]),
+    ambiguityEmptied: false,
+    candidates: Object.freeze([]),
+  });
+}
+
+/**
+ * Internal pure decision trace for synthetic diagnostics; never part of HTTP.
+ * The same analysis owns production decisions and the lab comparison.
+ * Source arrays retain rank order; clarification never carries shown IDs.
+ */
+export function inspectSearch(
   rawQuery: string,
   candidates: readonly JudgableCandidate[],
-): JudgedSearch {
+): SearchInspection {
   const normalized = normalizeSearchText(rawQuery);
   const intent = interpretQuery(rawQuery);
   if (intent.act === 'underspecified' || intent.act === 'quoted') {
-    return Object.freeze({ decision: 'clarify_or_no_result', shownScriptIds: Object.freeze([]) });
+    return emptyInspection('clarify_or_no_result', intent.act);
   }
   if (candidates.length === 0) {
-    return Object.freeze({ decision: 'reject', shownScriptIds: Object.freeze([]) });
+    return emptyInspection('reject', intent.act);
   }
 
   const originalCompact = compactSearchText(rawQuery);
@@ -1007,7 +1087,7 @@ export function judgeSearch(
       isExactQuestion(normalized, candidate) || isExactTitle(normalized, candidate)
     ));
     if (!exact) {
-      return Object.freeze({ decision: 'clarify_or_no_result', shownScriptIds: Object.freeze([]) });
+      return emptyInspection('clarify_or_no_result', intent.act);
     }
   }
   const queryForFacts = intent.clauses.join('，');
@@ -1019,8 +1099,7 @@ export function judgeSearch(
       ? originalCompact
       : repairUnambiguousTypos(originalCompact, repairVocabulary([candidate]));
     const repairedNormalized = repairedCompact.length > 0 ? repairedCompact : normalized;
-    const sourceCompact = matchCorpus(candidate);
-    const overlap = overlapScore(repairedCompact, sourceCompact);
+    const overlap = overlapScore(repairedCompact, matchCorpus(candidate));
     const exactQuestion = isExactQuestion(normalized, candidate) || isExactQuestion(repairedNormalized, candidate);
     const exactTitle = isExactTitle(normalized, candidate) || isExactTitle(repairedNormalized, candidate);
     const originalExact = isExactQuestion(normalized, candidate) || isExactTitle(normalized, candidate);
@@ -1030,10 +1109,12 @@ export function judgeSearch(
     const phraseTitle = compactSearchText(candidate.title).includes(repairedCompact);
     const relevant = isRelevant(repairedCompact, normalized, candidate, distinctive)
       || isRelevant(repairedCompact, repairedNormalized, candidate, distinctive);
-    const conflict = candidateConflict(intent, queryForFacts, candidate, candidates, repairedCompact);
+    const analysis = analyzeConflict(intent, queryForFacts, candidate, candidates, repairedCompact);
+    const conflict = analysis.conflict;
     return Object.freeze({
       scriptId: candidate.scriptId,
-      show: relevant && !conflict,
+      show: relevant && !conflict && !analysis.requiresClarification,
+      relevant,
       exactQuestion,
       exactTitle,
       originalExact,
@@ -1042,20 +1123,54 @@ export function judgeSearch(
       phraseTitle,
       overlap,
       conflict,
+      analysis,
     });
   });
 
-  const shown = dropAmbiguousVariants(
-    verdicts.filter((verdict) => verdict.show).sort(compareVerdicts),
+  const shownBefore = verdicts.filter((verdict) => verdict.show).sort(compareVerdicts);
+  const shownAfter = dropAmbiguousVariants(
+    shownBefore,
     normalized,
     originalCompact,
     candidates,
   );
-  if (shown.length > 0) {
-    return Object.freeze({
-      decision: 'show',
-      shownScriptIds: Object.freeze(shown.map((verdict) => verdict.scriptId)),
-    });
-  }
-  return Object.freeze({ decision: 'reject', shownScriptIds: Object.freeze([]) });
+  const decision: SearchDisplayDecision = shownAfter.length > 0
+    ? 'show'
+    : verdicts.some((row) => row.relevant && !row.conflict && row.analysis.requiresClarification)
+      ? 'clarify_or_no_result'
+      : 'reject';
+  return Object.freeze({
+    decision,
+    shownScriptIds: Object.freeze(shownAfter.map((verdict) => verdict.scriptId)),
+    act: intent.act,
+    shownBeforeAmbiguity: Object.freeze(shownBefore.map((verdict) => verdict.scriptId)),
+    shownAfterAmbiguity: Object.freeze(shownAfter.map((verdict) => verdict.scriptId)),
+    ambiguityEmptied: shownBefore.length > 0 && shownAfter.length === 0,
+    candidates: Object.freeze(verdicts.map((verdict) => Object.freeze({
+      scriptId: verdict.scriptId,
+      relevant: verdict.relevant,
+      conflict: verdict.conflict,
+      showBeforeAmbiguity: verdict.show,
+      overlap: verdict.overlap,
+      queryFacts: verdict.analysis.queryFacts,
+      sourceFacts: verdict.analysis.sourceFacts,
+      sameRelArg: verdict.analysis.sameRelArg,
+      polarConflict: verdict.analysis.polarConflict,
+      leftoverHit: verdict.analysis.leftoverHit,
+      exceptionEligible: verdict.analysis.exceptionEligible,
+      waivedLeftover: verdict.analysis.waivedLeftover,
+      requiresClarification: verdict.analysis.requiresClarification,
+    }))),
+  });
+}
+
+export function judgeSearch(
+  rawQuery: string,
+  candidates: readonly JudgableCandidate[],
+): JudgedSearch {
+  const inspected = inspectSearch(rawQuery, candidates);
+  return Object.freeze({
+    decision: inspected.decision,
+    shownScriptIds: inspected.shownScriptIds,
+  });
 }

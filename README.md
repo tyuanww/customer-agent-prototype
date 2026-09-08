@@ -28,7 +28,7 @@
 | 核对 API 命名 profile、变量与失败关闭矩阵 | [docs/reference-api-runtime-config.md](docs/reference-api-runtime-config.md) |
 | 恢复当前一期任务、核对证据与下一动作 | [当前执行清单](docs/plans/2026-09-06-execution-goal.md) |
 | 核对关键词与自然语言搜索的候选展示规则（仅规则获批，算法未达标） | [候选展示规则与实现入口](docs/plans/2026-09-07-natural-language-search.md) |
-| 运行合成搜索判定实验、查看报告及 N10/N19 已知失败证明 | [实验工具说明](apps/api/experiments/search-decision/README.md) |
+| 运行合成搜索判定实验、完整 N 验收及报告证明 | [实验工具说明](apps/api/experiments/search-decision/README.md) |
 | 已暂停的探索备忘：教师辅助选句与合成材料（不是上线前置条件） | [docs/plans/2026-09-05-script-selection-preparation.md](docs/plans/2026-09-05-script-selection-preparation.md) |
 | 追溯 DEV-M0 历史切片与基线证据 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
 | 查看 W2 合同 codegen / runtime validation 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md](docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md) |
