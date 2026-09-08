@@ -19,6 +19,9 @@ try {
   if (summary.success !== true || summary.numTotalTests < 1 || summary.numPendingTests !== 0
     || integration.length !== 1 || integration[0].assertionResults.length < 10
     || integration[0].assertionResults.some((entry) => entry.status !== 'passed')) throw new Error('G1A_CI_MISSING_OR_SKIPPED_TESTS');
+  const comparison = summary.testResults.filter((entry) => entry.name.endsWith('/g1a-comparison.integration.test.ts'));
+  if (comparison.length !== 1 || comparison[0].assertionResults.length < 5
+    || comparison[0].assertionResults.some((entry) => entry.status !== 'passed')) throw new Error('G1A_CI_COMPARISON_CASE_MISSING');
   for (const scenario of ['all_match','retrieval_miss','safety_failure']) {
     if (!integration[0].assertionResults.some((entry) => entry.fullName.includes(`retains ${scenario} through the actual CLI`))) throw new Error('G1A_CI_DELIVERY_CASE_MISSING');
   }

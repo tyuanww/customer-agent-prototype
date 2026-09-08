@@ -1,3 +1,4 @@
+import { createKeywordBaseline } from './keyword-baseline/backend.js';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import type { Client } from 'pg';
@@ -88,9 +89,10 @@ async function closeClient(client: Client | undefined, errors: unknown[]): Promi
  * durable database. A result is returned only after every client and the
  * temporary PostgreSQL root have been cleaned up.
  */
-export async function runVerifiedG1aEvaluation(
+async function runEvaluationSession(
   input: G1aEvaluationPackage,
-): Promise<G1aCompletedRun> {
+  compare: boolean,
+): Promise<Readonly<{ candidate: G1aCompletedRun; baseline: G1aCompletedRun | null }>> {
   const isolation = input.owner_acceptance ? 'read committed' : 'repeatable read';
   const harness = new Pg15Harness();
   let owner: Client | undefined;
@@ -98,6 +100,7 @@ export async function runVerifiedG1aEvaluation(
   let guard: ReturnType<typeof installG1aNetworkGuard> | undefined;
   let runtimeTransactionOpen = false;
   let report: G1aEvaluationReport | undefined;
+  let baselineReport: G1aEvaluationReport | undefined;
   let transactionTimestamp = '';
   let eventRowsBefore = -1;
   let eventRowsAfter = -1;
@@ -145,6 +148,16 @@ export async function runVerifiedG1aEvaluation(
 
     eventRowsBefore = await eventRowCount(owner);
     if (eventRowsBefore !== 0) throw new G1aRunError('G1A_RUNTIME_EVENT_STATE_INVALID');
+    // Both algorithms share this transaction and qualification gate. Each lane
+    // measures its own searches; no current ranking policy enters the baseline.
+    if (compare) {
+      baselineReport = await evaluateG1aPackage(createKeywordBaseline(runtime), input, async () => {
+        eventRowsAfter = await eventRowCount(owner!);
+        return Object.freeze({ eventWrites: eventRowsAfter - eventRowsBefore, processGuardAttempts: guard!.attempts() });
+      });
+      assertScrubbedG1aReport(baselineReport);
+      if (eventRowsAfter !== 0) throw new G1aRunError('G1A_RUNTIME_EVENT_STATE_INVALID');
+    }
     const repository = createSearchRepository(runtime as never);
     const backend = createSearchBackend({ searchCandidates: repository.search });
     report = await evaluateG1aPackage(backend, input, async () => {
@@ -190,7 +203,7 @@ export async function runVerifiedG1aEvaluation(
     throw new G1aRunError('G1A_RUNTIME_EVENT_STATE_INVALID');
   }
 
-  return Object.freeze({
+  const candidate: G1aCompletedRun = Object.freeze({
     report,
     runtime: Object.freeze({
       postgres_major: 15,
@@ -203,6 +216,22 @@ export async function runVerifiedG1aEvaluation(
       cleanup_verified: true,
     }),
   });
+  return Object.freeze({ candidate, baseline: baselineReport
+    ? Object.freeze({ report: baselineReport, runtime: candidate.runtime }) : null });
+}
+
+/** Original single-lane contract remains unchanged. */
+export async function runVerifiedG1aEvaluation(input: G1aEvaluationPackage): Promise<G1aCompletedRun> {
+  return (await runEvaluationSession(input, false)).candidate;
+}
+
+/** Test-only comparison returns only after the shared session was cleaned up. */
+export async function runVerifiedG1aComparison(input: G1aEvaluationPackage): Promise<Readonly<{
+  baseline: G1aCompletedRun; candidate: G1aCompletedRun;
+}>> {
+  const session = await runEvaluationSession(input, true);
+  if (!session.baseline) throw new Error('G1A_COMPARISON_BASELINE_MISSING');
+  return Object.freeze({ baseline: session.baseline, candidate: session.candidate });
 }
 
 /** Verifies the package before any PostgreSQL resource is constructed. */

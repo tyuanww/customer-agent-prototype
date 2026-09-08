@@ -1,0 +1,26 @@
+{
+  "schema": "customer-agent/keyword-baseline-provenance/v1",
+  "algorithm_id": "dev-m1-keyword-362e53c",
+  "source_commit": "362e53c8eaf4995774eeb0c46660c54c316ecd04",
+  "qualification": "historical keyword algorithm with current shared source and governance gate",
+  "adaptations": [
+    "search-service database-contract-errors import relocated; ranking and normalization unchanged"
+  ],
+  "files": {
+    "search-text.ts": {
+      "source_path": "apps/api/src/search-text.ts",
+      "original_sha256": "e4c71d895c67a73ebb1f8bf561c98c18eec61a757c5acd065cd4f0262b23ec93",
+      "vendored_sha256": "e4c71d895c67a73ebb1f8bf561c98c18eec61a757c5acd065cd4f0262b23ec93"
+    },
+    "search-repository.ts": {
+      "source_path": "apps/api/src/search-repository.ts",
+      "original_sha256": "14d0e333c4cec223e0c292ed27464c19067cbbaafb2c78cccb37a5c55f3175a2",
+      "vendored_sha256": "14d0e333c4cec223e0c292ed27464c19067cbbaafb2c78cccb37a5c55f3175a2"
+    },
+    "search-service.ts": {
+      "source_path": "apps/api/src/search-service.ts",
+      "original_sha256": "994cdd62996dcf04a16fea618b5dd96ee966799eccf33055be6b31e5502dd72b",
+      "vendored_sha256": "ad715e410147b31e3a99608bb70605f4726b6b9cf2a0c7ae49fa2047838a14e2"
+    }
+  }
+}

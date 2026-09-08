@@ -63,7 +63,8 @@
     "verify:plan": "node scripts/verification-policy.mjs plan",
     "test:workflow": "node --test scripts/verification-policy.test.mjs",
     "test:g1a:e0:ci": "node scripts/run-g1a-synthetic.mjs",
-    "test:search-decision:proof": "pnpm --filter @customer-agent/api test:search-decision:proof"
+    "test:search-decision:proof": "pnpm --filter @customer-agent/api test:search-decision:proof",
+    "test:g1a:comparison:package": "pnpm --filter @customer-agent/api test:g1a:comparison:package"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

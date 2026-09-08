@@ -4,6 +4,9 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+- Added an offline same-session keyword comparison with pinned historical ranking, independently bound report consumption, and synthetic PostgreSQL verification. No real admission or runtime activation is implied.
+
+
 ### Changed
 
 - Corrected current API setup and contract-version documentation, and separated completed cleanup from search candidates that still fail delivery review.
