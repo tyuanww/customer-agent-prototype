@@ -3,7 +3,7 @@
   "status": "EXPERIMENT_NOT_RUNTIME",
   "files": {
     "apps/api/src/search-decision.ts": "01da5f2ef8ff7d806c40b28ffc6138f6229f48c66cd162b53c9a57187919e246",
-    "apps/api/src/search-text.ts": "89e52dc082378a8ff68a13f8045ea8ca8ad8402d6747600d3141300ea8baa229",
+    "apps/api/src/search-text.ts": "016ad9b747c31fdaee2d69bd8c9c9dc0eb64ab5929d5a7b497875fc34ff3c603",
     "apps/api/src/search-relations.ts": "f5d0f45db93edfc9687c242493eb8974c727d6b1618b97686d4ff50c5ec325cf"
   },
   "fixtures": {
@@ -44,5 +44,5 @@
     "known_unresolved": [],
     "unresolved_reasons": {}
   },
-  "product_base_commit": "1ed7b00b258752c11ac7d034a744b6c247616b0b"
+  "product_base_commit": "69c6044fd2ac097131fd325b1df94550c85b1064"
 }

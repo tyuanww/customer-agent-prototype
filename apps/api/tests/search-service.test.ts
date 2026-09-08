@@ -128,6 +128,20 @@ describe('search backend', () => {
     }));
   });
 
+  it('does not let a generic stored question resolve an unspecified support reference', async () => {
+    const normalizedQuery = '这类服务问题该如何解决';
+    const searchCandidates = vi.fn().mockImplementation(async ({ suppressMatches }) => ({
+      ok: true, releaseId: 'rel-synthetic-001', sourceBindingHash: 'b'.repeat(64),
+      candidates: suppressMatches ? [] : [candidate({
+        title: '合成收纳袋拉链维修', questionTexts: [normalizedQuery],
+        searchFallbackText: normalizedQuery,
+      })],
+    }));
+    const result = await createSearchBackend({ searchCandidates }).search({ ...request, normalizedQuery });
+    expect(searchCandidates).toHaveBeenCalledWith(expect.objectContaining({ suppressMatches: true }));
+    expect(result).toMatchObject({ ok: true, releaseId: 'rel-synthetic-001', candidates: [] });
+  });
+
   it('uses escaped fallback only for a one-code-point query', async () => {
     const searchCandidates = vi.fn().mockResolvedValue({
       ok: true,

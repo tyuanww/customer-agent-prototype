@@ -564,6 +564,43 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     }
   }, 120_000);
 
+  it('suppresses unresolved support requests in PostgreSQL without bypassing source readiness', async () => {
+    const isolated = new Pg15Harness();
+    isolated.start();
+    const db = isolated.createDatabase('support_reference');
+    const writer = await isolated.connect(db.config);
+    let reader: Client | undefined;
+    const vague = '这类服务问题该如何解决';
+    try {
+      await applyDatabaseMigrations(writer);
+      await writer.query('CREATE ROLE support_runtime LOGIN');
+      await writer.query('GRANT app_runtime TO support_runtime');
+      await seedSearchRelease(writer, [{
+        id: 'script_synthetic_support', title: '合成收纳袋拉链维修',
+        question: vague, searchable: '合成 收纳 拉链 维修',
+        fallback: '合成收纳袋拉链维修', answer: '合成收纳袋拉链卡住时请停止拉扯。',
+      }]);
+      reader = await isolated.connect({ ...db.config, user: 'support_runtime' });
+      const repository = createSearchRepository(reader as never);
+      const scoped = createSearchBackend({ searchCandidates: repository.search });
+      const request = {
+        normalizedQuery: vague, platform: 'qianniu' as const,
+        productContextType: null, productContextRef: null, topK: 3 as const,
+      };
+      await expect(scoped.search(request)).resolves.toMatchObject({ ok: true, releaseId: RELEASE_ID, candidates: [] });
+      await expect(scoped.search({ ...request, normalizedQuery: '合成收纳袋拉链维修' }))
+        .resolves.toMatchObject({ ok: true, candidates: [{ script_id: 'script_synthetic_support' }] });
+      await writer.query(`SELECT public.suspend_authoritative_source(
+        'srcv_synth_presale_v1', 'SOURCE_REVOKED', 'EVD-SYNTHETIC-SUSPENSION', 'synthetic-owner', 'owner'
+      )`);
+      await expect(scoped.search(request)).resolves.toEqual({ ok: false, code: 'SOURCE_GATE_NOT_READY' });
+    } finally {
+      await reader?.end();
+      await writer.end();
+      isolated.stop();
+    }
+  }, 120_000);
+
   it('fails closed without inventing no-hit semantics when the four-source gate becomes unavailable', async () => {
     await owner.query(`
       SELECT public.suspend_authoritative_source(

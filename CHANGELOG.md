@@ -14,6 +14,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Fixed
 
+- Suppressed unresolved support references before candidate matching, while preserving concrete product, symptom and action queries and the existing source readiness checks.
+
 - Unified search negation and body evidence in the API decision owner: occurrence negation requests clarification without showing results, and negative confirmation requires matching statement evidence. Mixed assertions, quoted/conditional text and different product subjects retain their boundaries.
 - Replaced the historical expected-failure proof with full 23-case acceptance, product hashes and fail-closed report consumption while keeping frozen round-one inputs unchanged.
 

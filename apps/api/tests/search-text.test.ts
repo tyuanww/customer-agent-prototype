@@ -31,6 +31,28 @@ describe('DEV-M1 Chinese search text contract', () => {
     expect(isEntityFreeGenericSearchText('云朵会员周活动什么时候结束')).toBe(false);
   });
 
+  it.each([
+    '这类服务问题该如何解决',
+    '请问这种情况怎么处理呢',
+    '怎么解决这类质量问题',
+    '麻烦问一下那个问题应该如何处理',
+    '这个该怎么办',
+    '售前问题如何处理',
+  ])('suppresses unresolved support references: %s', (query) => {
+    expect(isEntityFreeGenericSearchText(query)).toBe(true);
+  });
+
+  it.each([
+    '合成收纳袋拉链卡住这个问题怎么处理',
+    '这类质量问题怎么申请退款',
+    '这个商品开封后还能退吗',
+    '合成面霜泵头按不出来该怎么处理',
+    '这个问题会不会影响退款',
+    '订单延迟怎么处理',
+  ])('keeps a concrete object, symptom or operation: %s', (query) => {
+    expect(isEntityFreeGenericSearchText(query)).toBe(false);
+  });
+
   it('binds the normalized redacted text to a secret and key version', () => {
     expect(hmacRedactedQuery('[REDACTED]，退款', 'hmac-v1', 'synthetic-test-key'))
       .toBe('f1c43255846110026686a6d33d729f484fdc4063b79d50d2eaa58f1faefa14b0');

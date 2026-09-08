@@ -32,7 +32,7 @@ describe('pinned product baseline', () => {
   it('matches frozen SHA-256 and materializes a diagnostic copy without absolute paths', () => {
     const baseline = assertPinnedHashes();
     assertFixtureHashes();
-    expect(baseline.product_base_commit).toBe('1ed7b00b258752c11ac7d034a744b6c247616b0b');
+    expect(baseline.product_base_commit).toBe('69c6044fd2ac097131fd325b1df94550c85b1064');
     expect(loadBaseline().n_cases.ids).toHaveLength(23);
     expect(loadBaseline().n_cases.known_unresolved).toEqual([]);
     expect(Object.keys(loadBaseline().files)).toHaveLength(3);
