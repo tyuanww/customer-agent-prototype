@@ -18,6 +18,7 @@ export default tseslint.config(
       'packages/database/src/generated/**',
       '.codegraph/**',
       '.gstack/**',
+      '**/experiments/**/.generated/**',
     ],
   },
   eslint.configs.recommended,

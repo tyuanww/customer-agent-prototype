@@ -1,0 +1,1212 @@
+{
+  "kind": "SYNTHETIC_INTERFACE_V4",
+  "disclaimer": "Interface decision-table cases. Q01-Q03 expected follow INTERFACE Q1 not v3. S16 keeps v3 reject and is not an allowed diff. v3 originals remain in cases-v3-regression.json.",
+  "cases": [
+    {
+      "id": "S01",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "subject-only",
+      "query": "合成面霜A",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Only the object name. Procedure source must not be treated as a complete demand."
+    },
+    {
+      "id": "S02",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "subject-plus-need",
+      "query": "合成面霜A怎么使用",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Explicit need. Multi-operation title must not intercept."
+    },
+    {
+      "id": "S03",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "polite-wrapper",
+      "query": "请问一下合成面霜A呢",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Polite wrapping does not add a need."
+    },
+    {
+      "id": "S04",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "overview",
+      "query": "合成面霜A",
+      "pool": [
+        "cream-use-store",
+        "cream-overview"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-overview"
+        ]
+      },
+      "note": "Subject-only may show an overview source, not the procedure source."
+    },
+    {
+      "id": "S05",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "subject-plus-need",
+      "query": "合成面霜A怎么使用",
+      "pool": [
+        "cream-use-store",
+        "cream-overview"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Need present: show the procedure source, not the overview."
+    },
+    {
+      "id": "S06",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "short-complete",
+      "query": "保质期",
+      "pool": [
+        "shelf-life"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "shelf-life"
+        ]
+      },
+      "note": "Short complete topic equals the source question."
+    },
+    {
+      "id": "S07",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "punctuation",
+      "query": "保质期？",
+      "pool": [
+        "shelf-life"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "shelf-life"
+        ]
+      },
+      "note": "Question mark does not change a complete short request."
+    },
+    {
+      "id": "R01",
+      "family": "regression",
+      "seen": true,
+      "bucket": "multi-operation-regression",
+      "query": "净水壶清洗",
+      "pool": [
+        "reg-filter-clean"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "reg-filter-clean"
+        ]
+      },
+      "note": "Four-item stash failure: explicit 清洗 vs title 清洗保养."
+    },
+    {
+      "id": "R02",
+      "family": "regression",
+      "seen": true,
+      "bucket": "multi-operation-regression",
+      "query": "遮阳棚安装",
+      "pool": [
+        "reg-canopy-install"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "reg-canopy-install"
+        ]
+      },
+      "note": "Four-item stash failure: explicit 安装 vs title 安装使用."
+    },
+    {
+      "id": "R03",
+      "family": "regression",
+      "seen": true,
+      "bucket": "multi-operation-regression",
+      "query": "面霜使用",
+      "pool": [
+        "reg-cream-use"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "reg-cream-use"
+        ]
+      },
+      "note": "Four-item stash failure: explicit 使用 vs title 使用存放."
+    },
+    {
+      "id": "R04",
+      "family": "regression",
+      "seen": true,
+      "bucket": "multi-operation-regression",
+      "query": "洁面仪清洗",
+      "pool": [
+        "reg-cleanser-clean"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "reg-cleanser-clean"
+        ]
+      },
+      "note": "Four-item stash failure: explicit 清洗 vs title 清洗保养."
+    },
+    {
+      "id": "R05",
+      "family": "regression",
+      "seen": true,
+      "bucket": "subject-only",
+      "query": "遮阳棚",
+      "pool": [
+        "reg-canopy-install"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Three-character object name is still subject-only against a procedure source."
+    },
+    {
+      "id": "S08",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "polite-wrapper",
+      "query": "请帮我查询合成爽肤水C怎么使用",
+      "pool": [
+        "toner-use"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "toner-use"
+        ]
+      },
+      "note": "Polite request plus an explicit need remains answered."
+    },
+    {
+      "id": "S09",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "punctuation",
+      "query": "合成爽肤水C使用说明，谢谢",
+      "pool": [
+        "toner-use"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "toner-use"
+        ]
+      },
+      "note": "Thanks and punctuation are wrappers."
+    },
+    {
+      "id": "S10",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "alias",
+      "query": "A霜怎么使用",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Alias is produced by the source annotation, not inferred from the query."
+    },
+    {
+      "id": "S11",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "operation-in-name",
+      "query": "去角质乳",
+      "pool": [
+        "scrub-use"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Object name contains 去角质. That is not a user need."
+    },
+    {
+      "id": "S12",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "operation-in-name",
+      "query": "去角质乳怎么使用",
+      "pool": [
+        "scrub-use"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "scrub-use"
+        ]
+      },
+      "note": "Need 使用 is explicit after the object name."
+    },
+    {
+      "id": "S13",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "same-name-objects",
+      "query": "合成水乳B",
+      "pool": [
+        "milk-cleanse",
+        "milk-lotion"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Shared prefix is not a complete subject of either source."
+    },
+    {
+      "id": "S14",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "same-name-objects",
+      "query": "合成水乳B洁面怎么使用",
+      "pool": [
+        "milk-cleanse",
+        "milk-lotion"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "milk-cleanse"
+        ]
+      },
+      "note": "Disambiguated object plus need."
+    },
+    {
+      "id": "S15",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "same-name-objects",
+      "query": "合成水乳B乳液怎么使用",
+      "pool": [
+        "milk-cleanse",
+        "milk-lotion"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "milk-lotion"
+        ]
+      },
+      "note": "The other same-name object plus need."
+    },
+    {
+      "id": "R06",
+      "family": "regression",
+      "seen": true,
+      "bucket": "quantity-assertion",
+      "query": "便签购买两盒赠送五盒",
+      "pool": [
+        "notes-gift"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Inverted gift quantity assertion."
+    },
+    {
+      "id": "R07",
+      "family": "regression",
+      "seen": true,
+      "bucket": "confirmation",
+      "query": "便签活动是买两盒送五盒，对不对",
+      "pool": [
+        "notes-gift"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "notes-gift"
+        ]
+      },
+      "note": "Confirmation of a wrong quantity may still show the source."
+    },
+    {
+      "id": "R08",
+      "family": "regression",
+      "seen": true,
+      "bucket": "role-assertion",
+      "query": "借用证交回核对完成后，访客向前台退还押金",
+      "pool": [
+        "badge-deposit"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Inverted desk/visitor roles."
+    },
+    {
+      "id": "R09",
+      "family": "regression",
+      "seen": true,
+      "bucket": "confirmation",
+      "query": "借用证交回核对完成后，是访客向前台退还押金吗",
+      "pool": [
+        "badge-deposit"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "badge-deposit"
+        ]
+      },
+      "note": "Confirmation of inverted roles may show."
+    },
+    {
+      "id": "R10",
+      "family": "regression",
+      "seen": true,
+      "bucket": "quoted",
+      "query": "“访客给前台退押金”这一句",
+      "pool": [
+        "badge-deposit"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Quoted fragment is not an assertion."
+    },
+    {
+      "id": "S16",
+      "family": "regression",
+      "seen": true,
+      "bucket": "negation-condition",
+      "query": "合成面霜A用于眼周",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Assertion 用于眼周 vs source 不用于眼周. v3 reject. Not an allowed strategy diff. If candidateConflict does not block, this case FAILs."
+    },
+    {
+      "id": "S17",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "confirmation",
+      "query": "合成面霜A是不用于眼周吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Confirmation of the constraint."
+    },
+    {
+      "id": "S18",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "missing-annotation",
+      "query": "合成唇膏E怎么使用",
+      "pool": [
+        "missing-ann"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Missing annotation fail-closed. Baseline may still show."
+    },
+    {
+      "id": "S19",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "conflict-annotation",
+      "query": "合成眼霜F怎么使用",
+      "pool": [
+        "conflict-ann"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Conflicting annotation fail-closed."
+    },
+    {
+      "id": "S20",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-candidates",
+      "query": "合成唇膏E怎么使用",
+      "pool": [
+        "cream-use-store",
+        "missing-ann"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Unannotated source in a mixed pool is not shown."
+    },
+    {
+      "id": "S21",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-candidates",
+      "query": "合成面霜A怎么使用",
+      "pool": [
+        "cream-use-store",
+        "missing-ann",
+        "conflict-ann"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Annotated hit still shows when mixed with invalid annotations."
+    },
+    {
+      "id": "R11",
+      "family": "regression",
+      "seen": true,
+      "bucket": "safety-reject",
+      "query": "竞品合成面霜A使用",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Competitor leftover still rejects."
+    },
+    {
+      "id": "R12",
+      "family": "regression",
+      "seen": true,
+      "bucket": "safety-reject",
+      "query": "合成面霜A无条件使用",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Unconditional leftover still rejects."
+    },
+    {
+      "id": "R13",
+      "family": "regression",
+      "seen": true,
+      "bucket": "different-object",
+      "query": "合成洁面乳D怎么使用",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Different object, even with the same later procedure word."
+    },
+    {
+      "id": "R14",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-hamming",
+      "query": "恒温杯出厂温度",
+      "pool": [
+        "cup-thermo",
+        "pot-thermo"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cup-thermo"
+        ]
+      },
+      "note": "Object Hamming-1 must not swap 杯/壶."
+    },
+    {
+      "id": "R15",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-hamming",
+      "query": "恒温壶出厂温度",
+      "pool": [
+        "cup-thermo",
+        "pot-thermo"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "pot-thermo"
+        ]
+      },
+      "note": "The other object of the Hamming-1 pair."
+    },
+    {
+      "id": "R16",
+      "family": "regression",
+      "seen": true,
+      "bucket": "safety-reject",
+      "query": "竞品耳麦接口兼容范围",
+      "pool": [
+        "headset-compat"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Title-contained competitor query still rejects."
+    },
+    {
+      "id": "R17",
+      "family": "regression",
+      "seen": true,
+      "bucket": "leftover-wrapper",
+      "query": "请帮我查询发票开具责任",
+      "pool": [
+        "invoice-duty"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "invoice-duty"
+        ]
+      },
+      "note": "Ask-wrapper leftover-neutral on a complete need."
+    },
+    {
+      "id": "S22",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "leftover-wrapper",
+      "query": "合成面霜A怎么办",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "怎么办 is a wrapper, not a need."
+    },
+    {
+      "id": "R18",
+      "family": "regression",
+      "seen": true,
+      "bucket": "time-window",
+      "query": "预约开始后也可以取消",
+      "pool": [
+        "booking-window"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Time-window assertion inverts the source rule."
+    },
+    {
+      "id": "R19",
+      "family": "regression",
+      "seen": true,
+      "bucket": "time-window",
+      "query": "预约开始后也可以取消吗",
+      "pool": [
+        "booking-window"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "booking-window"
+        ]
+      },
+      "note": "Confirmation of the inverted time window may show."
+    },
+    {
+      "id": "S23",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "store-need",
+      "query": "合成面霜A怎么存放",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Second operation on a multi-operation source."
+    },
+    {
+      "id": "C01",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-confirm-review",
+      "query": "合成面霜A吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Codex P1: object plus 吗 is not a confirmable fact."
+    },
+    {
+      "id": "C02",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-confirm-review",
+      "query": "合成面霜A对吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Codex P1 variant: 对吗 does not add a fact."
+    },
+    {
+      "id": "C03",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-confirm-review",
+      "query": "合成面霜A是吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Seen variant of object-only confirmation."
+    },
+    {
+      "id": "C04",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-confirm-review",
+      "query": "合成面霜A对不对",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Seen variant: 对不对 is confirmation packaging, not a fact."
+    },
+    {
+      "id": "C05",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-confirm-review",
+      "query": "A霜吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Codex probe alias-confirm: alias plus 吗 is still subject-only."
+    },
+    {
+      "id": "C06",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-confirm-review",
+      "query": "合成面霜A吗",
+      "pool": [
+        "cream-use-store",
+        "cream-overview"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-overview"
+        ]
+      },
+      "note": "Object-only confirmation may show an overview, not the procedure source."
+    },
+    {
+      "id": "C07",
+      "family": "regression",
+      "seen": true,
+      "bucket": "object-confirm-review",
+      "query": "请问合成面霜A吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Polite plus object-only confirmation still has no fact."
+    },
+    {
+      "id": "Q01",
+      "family": "regression",
+      "seen": true,
+      "bucket": "quoted-annotation",
+      "query": "“合成唇膏E怎么使用”这一句",
+      "pool": [
+        "missing-ann"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Quoted query still fail-closed when the only source lacks annotation. INTERFACE Q1 quoted before unusable drop; v3 expected reject kept in cases-v3-regression.json"
+    },
+    {
+      "id": "Q02",
+      "family": "regression",
+      "seen": true,
+      "bucket": "quoted-annotation",
+      "query": "“合成眼霜F怎么使用”这一句",
+      "pool": [
+        "conflict-ann"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Quoted query still fail-closed on conflict annotation. INTERFACE Q1"
+    },
+    {
+      "id": "Q03",
+      "family": "regression",
+      "seen": true,
+      "bucket": "quoted-annotation",
+      "query": "合成唇膏E怎么使用这一句",
+      "pool": [
+        "missing-ann"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "这一句 tail does not bypass missing annotation. INTERFACE Q1"
+    },
+    {
+      "id": "B01",
+      "family": "regression",
+      "seen": true,
+      "bucket": "annotation-boundary",
+      "query": "合成喷雾G怎么使用",
+      "pool": [
+        "empty-subjects"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "status=ok but empty subjects cannot locate an object."
+    },
+    {
+      "id": "F01",
+      "family": "regression",
+      "seen": true,
+      "bucket": "incomplete-confirm-review",
+      "query": "合成面霜A用于吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Codex P1: 用于 is a fragment of 不用于眼周, not a complete fact."
+    },
+    {
+      "id": "F02",
+      "family": "regression",
+      "seen": true,
+      "bucket": "incomplete-confirm-review",
+      "query": "合成面霜A瓶身吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Codex P1: 瓶身 is a body mention, not a confirmable proposition."
+    },
+    {
+      "id": "F03",
+      "family": "regression",
+      "seen": true,
+      "bucket": "incomplete-confirm-review",
+      "query": "合成面霜A用于对吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Isomorphic packaging of F01."
+    },
+    {
+      "id": "F04",
+      "family": "regression",
+      "seen": true,
+      "bucket": "incomplete-confirm-review",
+      "query": "请问合成面霜A瓶身吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Isomorphic packaging of F02."
+    },
+    {
+      "id": "F05",
+      "family": "regression",
+      "seen": true,
+      "bucket": "incomplete-confirm-review",
+      "query": "合成面霜A是用于吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Copula does not complete the missing argument of 用于."
+    },
+    {
+      "id": "F06",
+      "family": "regression",
+      "seen": true,
+      "bucket": "incomplete-confirm-review",
+      "query": "合成面霜A步骤吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Another body fragment (步骤) is not a fact unit."
+    },
+    {
+      "id": "P01",
+      "family": "regression",
+      "seen": true,
+      "bucket": "complete-confirm-review",
+      "query": "合成面霜A用于眼周吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Complete confirmation of the constraint; source can correct the premise."
+    },
+    {
+      "id": "P03",
+      "family": "regression",
+      "seen": true,
+      "bucket": "complete-confirm-review",
+      "query": "合成面霜A用于眼周对吗",
+      "pool": [
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Same complete fact with 对吗 packaging."
+    },
+    {
+      "id": "MX01",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-complete-irrelevant",
+      "query": "合成面霜A怎么使用",
+      "pool": [
+        "cream-use-store",
+        "headset-compat"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Complete A + irrelevant B: show A. B must not veto."
+    },
+    {
+      "id": "MX02",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-insufficient-irrelevant",
+      "query": "合成面霜A吗",
+      "pool": [
+        "cream-use-store",
+        "headset-compat"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Insufficient A + irrelevant B: clarify. B must not veto."
+    },
+    {
+      "id": "MX03",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-leftover-confirm",
+      "query": "竞品合成面霜A吗",
+      "pool": [
+        "cream-use-store",
+        "headset-compat"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Leftover vs the would-be source blocks it; no remaining safe insufficient/complete."
+    },
+    {
+      "id": "MX04",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-complete-irrelevant",
+      "query": "合成面霜A怎么使用",
+      "pool": [
+        "notes-gift",
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Irrelevant notes must not veto complete cream."
+    },
+    {
+      "id": "MX05",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-confirmation",
+      "query": "便签活动是买两盒送五盒，对不对",
+      "pool": [
+        "notes-gift",
+        "headset-compat"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "notes-gift"
+        ]
+      },
+      "note": "Valid confirmation of inverted quantity; leftover exception inside judgeSearch."
+    },
+    {
+      "id": "MX06",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-assertion",
+      "query": "便签购买两盒赠送五盒",
+      "pool": [
+        "notes-gift",
+        "cream-use-store"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Conflict drops notes; cream has no complete/insufficient safe contribution."
+    },
+    {
+      "id": "MX07",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "empty-pool",
+      "query": "合成面霜A",
+      "pool": [],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Legal empty pool, not quoted: Q3 reject. Not an auth/DB failure."
+    },
+    {
+      "id": "MX08",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "quoted-empty-pool",
+      "query": "“访客给前台退押金”这一句",
+      "pool": [],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Quoted + empty pool: Q1, not Q3. Strategy vs v3 unusable-quoted reject."
+    },
+    {
+      "id": "MX09",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "quoted-unusable",
+      "query": "“合成唇膏E怎么使用”这一句",
+      "pool": [
+        "missing-ann"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "note": "Quoted + unusable: Q1. Same input as v3 Q01 which stays reject in regression file."
+    },
+    {
+      "id": "MX10",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "mixed-assertion-then-complete",
+      "query": "合成面霜A怎么使用",
+      "pool": [
+        "notes-gift",
+        "cream-use-store",
+        "headset-compat"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "cream-use-store"
+        ]
+      },
+      "note": "Drop conflict/irrelevant others; remaining complete source still shows."
+    },
+    {
+      "id": "QX01",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "quantity-assertion",
+      "query": "便签买两盒送五盒",
+      "pool": [
+        "notes-gift"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Quantity-inverted assertion. Compatibility must block; leftover coverage is not enough for Q5."
+    },
+    {
+      "id": "QX02",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "quantity-assertion",
+      "query": "便签购买两盒送五盒",
+      "pool": [
+        "notes-gift"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Same assertion with 购买/送. Must reject, not clarify."
+    },
+    {
+      "id": "QX03",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "ambiguity-then-insufficient",
+      "query": "合成阀怎么安装",
+      "pool": [
+        "valve-core",
+        "valve-cover",
+        "valve-tag"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "note": "Hamming-1 complete pair (阀芯/阀盖) dropped by product ambiguity; remaining insufficient valve-tag must not take Q5."
+    },
+    {
+      "id": "QX04",
+      "family": "synthetic-new",
+      "seen": true,
+      "bucket": "quantity-confirmation",
+      "query": "便签活动是买两盒送五盒，对不对",
+      "pool": [
+        "notes-gift"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "notes-gift"
+        ]
+      },
+      "note": "Legal confirmation of inverted quantity; same input as MX05 without mixed pool."
+    }
+  ]
+}

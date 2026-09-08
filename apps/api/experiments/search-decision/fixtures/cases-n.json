@@ -1,0 +1,967 @@
+{
+  "kind": "SYNTHETIC_S16_NEGATION_PLAN_S2",
+  "disclaimer": "N01-N19 query/pool/expected unchanged from revised freeze. N19 unresolved negation-mismatch. Fact fields split exceptionEligible/waivedLeftover. N20-N23 added. Not implemented.",
+  "cases": [
+    {
+      "id": "N01",
+      "query": "合成耳罩H接触皮肤",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": true,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N02",
+      "query": "合成耳罩H不接触皮肤",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": false,
+        "compatConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      },
+      "note": "Aligned 不. Must not newly block."
+    },
+    {
+      "id": "N03",
+      "query": "合成耳罩H接触皮肤吗",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "muff-contact"
+        ]
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "show",
+        "step": "Q4a",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": false,
+        "exceptionEligible": true,
+        "leftoverHit": false,
+        "waivedLeftover": false
+      },
+      "note": "Baseline already show. Pass only if polarConflict and confirmationException both true."
+    },
+    {
+      "id": "N04",
+      "query": "合成耳罩H是不接触皮肤吗",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "muff-contact"
+        ]
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "show",
+        "step": "Q4a",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": false,
+        "compatConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": false,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N05",
+      "query": "合成耳罩H接触吗",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "compatConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      },
+      "note": "Fragment. No query RelationPolarFact."
+    },
+    {
+      "id": "N06",
+      "query": "合成耳罩H接触皮肤",
+      "pool": [
+        "muff-contact",
+        "clip-bind"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": true,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N07",
+      "query": "合成滤芯K浸水",
+      "pool": [
+        "filter-soak"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": true,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "浸水",
+            "argument": "",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "filter-soak",
+            "polarity": "neg",
+            "relation": "浸水",
+            "argument": "",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N08",
+      "query": "合成滤芯K浸水吗",
+      "pool": [
+        "filter-soak"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "filter-soak"
+        ]
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "show",
+        "step": "Q4a",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "浸水",
+            "argument": "",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "filter-soak",
+            "polarity": "neg",
+            "relation": "浸水",
+            "argument": "",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": false,
+        "exceptionEligible": true,
+        "leftoverHit": false,
+        "waivedLeftover": false
+      },
+      "note": "Baseline already show. Require polarConflict and confirmationException."
+    },
+    {
+      "id": "N09",
+      "query": "合成滤芯K浸吗",
+      "pool": [
+        "filter-soak"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "filter-soak",
+            "polarity": "neg",
+            "relation": "浸水",
+            "argument": "",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "compatConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N10",
+      "query": "合成滤芯K没浸水",
+      "pool": [
+        "filter-soak"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": "mei-wei-marker",
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "reject",
+        "step": "Q6",
+        "conflict": true,
+        "leftoverUnsupported": true
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "filter-soak",
+            "polarity": "neg",
+            "relation": "浸水",
+            "argument": "",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": true,
+        "waivedLeftover": false
+      },
+      "note": "Original expected clarify kept. v5 leftover already rejects. 没/未 unresolved. Do not recast expected to reject. Round 1 will still FAIL this id."
+    },
+    {
+      "id": "N11",
+      "query": "合成灯管M外接电源",
+      "pool": [
+        "lamp-power"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": true,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "外接",
+            "argument": "电源",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "lamp-power",
+            "polarity": "neg",
+            "relation": "外接",
+            "argument": "电源",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N12",
+      "query": "合成灯管M外接电源吗",
+      "pool": [
+        "lamp-power"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "lamp-power"
+        ]
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "show",
+        "step": "Q4a",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "外接",
+            "argument": "电源",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "lamp-power",
+            "polarity": "neg",
+            "relation": "外接",
+            "argument": "电源",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": false,
+        "exceptionEligible": true,
+        "leftoverHit": false,
+        "waivedLeftover": false
+      },
+      "note": "Baseline already show. Require polarConflict and confirmationException."
+    },
+    {
+      "id": "N13",
+      "query": "合成灯管M外接电源吗",
+      "pool": [
+        "lamp-power",
+        "clip-bind"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "lamp-power"
+        ]
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "show",
+        "step": "Q4a",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "外接",
+            "argument": "电源",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "lamp-power",
+            "polarity": "neg",
+            "relation": "外接",
+            "argument": "电源",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": false,
+        "exceptionEligible": true,
+        "leftoverHit": false,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N14",
+      "query": "合成耳罩H不过敏",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "reject",
+        "step": "Q6",
+        "conflict": true,
+        "leftoverUnsupported": true
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": true,
+        "waivedLeftover": false
+      },
+      "note": "Reject is leftover 过敏. polarConflict must stay false. 不 must not bind 接触."
+    },
+    {
+      "id": "N15",
+      "query": "合成耳罩H吗",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": false
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "compatConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      }
+    },
+    {
+      "id": "N16",
+      "query": "合成耳罩H不接触皮肤",
+      "pool": [
+        "muff-allow"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": true,
+      "v5_baseline": null,
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-allow",
+            "polarity": "pos",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": null
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      },
+      "note": "Reverse of N01: query neg, source pos."
+    },
+    {
+      "id": "N17",
+      "query": "合成耳罩H接触皮肤表面",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": null,
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "接触",
+            "argument": "皮肤表面",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": true,
+        "waivedLeftover": false
+      },
+      "note": "Different arguments. includes would conflict; exact must not. Reject may be leftover 表面."
+    },
+    {
+      "id": "N18",
+      "query": "合成灯管M外接电源适配器",
+      "pool": [
+        "lamp-power"
+      ],
+      "expected": {
+        "decision": "reject",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": null,
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "pos",
+            "relation": "外接",
+            "argument": "电源适配器",
+            "marker": null
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "lamp-power",
+            "polarity": "neg",
+            "relation": "外接",
+            "argument": "电源",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "compatConflict": true,
+        "exceptionEligible": false,
+        "leftoverHit": true,
+        "waivedLeftover": false
+      },
+      "note": "Argument inclusion 电源 ⊂ 电源适配器. Exact match must not polar-conflict. leftover 适配器 may reject."
+    },
+    {
+      "id": "N19",
+      "query": "合成耳罩H不接触皮肤吗",
+      "pool": [
+        "muff-allow"
+      ],
+      "expected": {
+        "decision": "show",
+        "shownScriptIds": [
+          "muff-allow"
+        ]
+      },
+      "unresolved": "negation-mismatch",
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "reject",
+        "step": "Q6",
+        "conflict": true,
+        "negationMismatch": true
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-allow",
+            "polarity": "pos",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": null
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": true,
+        "compatConflict": true,
+        "exceptionEligible": true,
+        "leftoverHit": null,
+        "waivedLeftover": false
+      },
+      "note": "Expected show kept. v5 negationMismatch=true reject. Leftover exception does not waive negated. Round 1 unresolved FAIL. Do not recast expected to reject."
+    },
+    {
+      "id": "N20",
+      "query": "合成耳罩H不接触皮肤",
+      "pool": [
+        "muff-asked"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": null
+      },
+      "expectedFacts": {
+        "query": [
+          {
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "source": [
+          {
+            "sourceId": "muff-asked",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不",
+            "field": "answerText"
+          }
+        ],
+        "sameRelArg": true,
+        "polarConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false,
+        "compatConflict": false,
+        "sourceMustNotContain": [
+          {
+            "polarity": "pos",
+            "relation": "接触",
+            "argument": "皮肤"
+          }
+        ]
+      },
+      "note": "Body ¬接触皮肤; question 接触皮肤吗 must not yield a pos source fact."
+    },
+    {
+      "id": "N21",
+      "query": "合成耳罩H不不接触皮肤",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": null
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false,
+        "compatConflict": null
+      },
+      "note": "Nested 不不. Query facts must be []. Polar must not fire. Final may follow leftover/negated. v5 baseline Q5 clarify. Polar must stay none; do not newly reject."
+    },
+    {
+      "id": "N22",
+      "query": "合成耳罩H不是不接触皮肤",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": null
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false,
+        "compatConflict": null
+      },
+      "note": "不是不. Query facts []. Do not skip 不是 and extract 不接触皮肤. v5 baseline Q5 clarify. Polar must stay none; do not newly reject."
+    },
+    {
+      "id": "N23",
+      "query": "合成耳罩H不要接触皮肤",
+      "pool": [
+        "muff-contact"
+      ],
+      "expected": {
+        "decision": "clarify_or_no_result",
+        "shownScriptIds": []
+      },
+      "unresolved": false,
+      "round1_closes_gap": false,
+      "v5_baseline": {
+        "decision": "clarify_or_no_result",
+        "step": "Q5",
+        "conflict": null
+      },
+      "expectedFacts": {
+        "query": [],
+        "source": [
+          {
+            "sourceId": "muff-contact",
+            "polarity": "neg",
+            "relation": "接触",
+            "argument": "皮肤",
+            "marker": "不"
+          }
+        ],
+        "sameRelArg": false,
+        "polarConflict": false,
+        "exceptionEligible": false,
+        "leftoverHit": null,
+        "waivedLeftover": false,
+        "compatConflict": null
+      },
+      "note": "不要. Query relation facts []. ignoredBan/leftover may still reject. v5 baseline Q5 clarify. Polar must stay none; do not newly reject."
+    }
+  ]
+}

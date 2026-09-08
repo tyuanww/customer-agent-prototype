@@ -1,0 +1,192 @@
+{
+  "kind": "BODY_STATEMENT_CONTRASTS",
+  "frozenBeforeImpl": true,
+  "disclaimer": "Inputs and expected facts/finals frozen before extractor change. Seen contrasts, not holdout. Not contract, 007, or T6.",
+  "query": "合成耳罩H接触皮肤",
+  "baseSourceId": "muff-contact",
+  "queryFacts": [
+    {
+      "polarity": "pos",
+      "relation": "接触",
+      "argument": "皮肤",
+      "marker": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "B01",
+      "body": "合成耳罩H是否不接触皮肤",
+      "reason": "question-after-object",
+      "expectedFacts": [],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤" }
+      ],
+      "sameRelArg": false,
+      "polarConflict": false,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": false,
+      "expected": { "decision": "clarify_or_no_result", "shownScriptIds": [] },
+      "expectedStep": "Q5"
+    },
+    {
+      "id": "B02",
+      "body": "客户说：“合成耳罩H不接触皮肤”",
+      "reason": "attributed-quote",
+      "expectedFacts": [],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤" }
+      ],
+      "sameRelArg": false,
+      "polarConflict": false,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": false,
+      "expected": { "decision": "clarify_or_no_result", "shownScriptIds": [] },
+      "expectedStep": "Q5"
+    },
+    {
+      "id": "B03",
+      "body": "客户说：“合成耳罩H不接触皮肤，本品不浸水”",
+      "reason": "quote-spanning-clauses",
+      "expectedFacts": [],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤" },
+        { "polarity": "neg", "relation": "浸水", "argument": "" }
+      ],
+      "sameRelArg": false,
+      "polarConflict": false,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": false,
+      "expected": { "decision": "clarify_or_no_result", "shownScriptIds": [] },
+      "expectedStep": "Q5"
+    },
+    {
+      "id": "B04",
+      "body": "合成耳罩H不接触皮肤",
+      "reason": "ordinary-negative-statement",
+      "expectedFacts": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤", "marker": "不" }
+      ],
+      "sourceMustNotContain": [],
+      "sameRelArg": true,
+      "polarConflict": true,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": true,
+      "expected": { "decision": "reject", "shownScriptIds": [] },
+      "expectedStep": "Q6"
+    },
+    {
+      "id": "B05",
+      "body": "合成耳罩H接触皮肤",
+      "reason": "ordinary-positive-statement",
+      "expectedFacts": [
+        { "polarity": "pos", "relation": "接触", "argument": "皮肤", "marker": null }
+      ],
+      "sourceMustNotContain": [],
+      "sameRelArg": true,
+      "polarConflict": false,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": false,
+      "expected": { "decision": "clarify_or_no_result", "shownScriptIds": [] },
+      "expectedStep": "Q5"
+    },
+    {
+      "id": "B06",
+      "body": "合成耳罩H不接触皮肤吗",
+      "reason": "body-final-ma",
+      "expectedFacts": [],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤" }
+      ],
+      "sameRelArg": false,
+      "polarConflict": false,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": false,
+      "expected": { "decision": "clarify_or_no_result", "shownScriptIds": [] },
+      "expectedStep": "Q5"
+    },
+    {
+      "id": "B07",
+      "body": "合成耳罩H不接触皮肤？",
+      "reason": "body-final-question-mark",
+      "expectedFacts": [],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤" }
+      ],
+      "sameRelArg": false,
+      "polarConflict": false,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": false,
+      "expected": { "decision": "clarify_or_no_result", "shownScriptIds": [] },
+      "expectedStep": "Q5"
+    },
+    {
+      "id": "B08",
+      "body": "合成耳罩H不接触皮肤。是否外接电源？",
+      "reason": "statement-then-question",
+      "expectedFacts": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤", "marker": "不" }
+      ],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "外接", "argument": "电源" }
+      ],
+      "sameRelArg": true,
+      "polarConflict": true,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": true,
+      "expected": { "decision": "reject", "shownScriptIds": [] },
+      "expectedStep": "Q6"
+    },
+    {
+      "id": "B09",
+      "body": "客户说：“合成耳罩H不浸水”。合成耳罩H不接触皮肤",
+      "reason": "quote-then-statement",
+      "expectedFacts": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤", "marker": "不" }
+      ],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "浸水", "argument": "" }
+      ],
+      "sameRelArg": true,
+      "polarConflict": true,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": true,
+      "expected": { "decision": "reject", "shownScriptIds": [] },
+      "expectedStep": "Q6"
+    },
+    {
+      "id": "B10",
+      "body": "客户说合成耳罩H不接触皮肤",
+      "reason": "speech-introducer-without-quotes",
+      "expectedFacts": [],
+      "sourceMustNotContain": [
+        { "polarity": "neg", "relation": "接触", "argument": "皮肤" }
+      ],
+      "sameRelArg": false,
+      "polarConflict": false,
+      "exceptionEligible": false,
+      "leftoverHit": false,
+      "waivedLeftover": false,
+      "compatConflict": false,
+      "expected": { "decision": "clarify_or_no_result", "shownScriptIds": [] },
+      "expectedStep": "Q5"
+    }
+  ]
+}

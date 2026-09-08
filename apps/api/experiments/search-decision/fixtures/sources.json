@@ -1,0 +1,725 @@
+{
+  "kind": "SYNTHETIC",
+  "producer": "synthetic-reviewer-v1",
+  "disclaimer": "Fictional skincare/cosmetic and generic engineering sources. Not Menokin content. No medical or efficacy advice.",
+  "sources": [
+    {
+      "id": "cream-use-store",
+      "kind": "SYNTHETIC",
+      "title": "合成面霜A使用与存放说明",
+      "body": "合成回答 cream-use-store。合成面霜A按瓶身步骤使用；用后盖紧存放。不用于眼周。",
+      "questions": [
+        "合成面霜A怎么使用",
+        "合成面霜A如何存放"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成面霜A",
+          "面霜A"
+        ],
+        "aliases": [
+          "A霜"
+        ],
+        "answerable_needs": [
+          "使用",
+          "存放"
+        ],
+        "constraints": [
+          "不用于眼周"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "cream-overview",
+      "kind": "SYNTHETIC",
+      "title": "合成面霜A产品概览",
+      "body": "合成回答 cream-overview。合成面霜A是虚构对照商品，本页只提供商品识别信息。",
+      "questions": [
+        "合成面霜A是什么"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成面霜A",
+          "面霜A"
+        ],
+        "aliases": [
+          "A霜"
+        ],
+        "answerable_needs": [],
+        "constraints": [],
+        "overview_showable": true,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "shelf-life",
+      "kind": "SYNTHETIC",
+      "title": "保质期",
+      "body": "合成回答 shelf-life。本虚构来源只说明包装标注的保质期位置。",
+      "questions": [
+        "保质期"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "保质期"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "保质期"
+        ],
+        "constraints": [],
+        "overview_showable": true,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "toner-use",
+      "kind": "SYNTHETIC",
+      "title": "合成爽肤水C使用说明",
+      "body": "合成回答 toner-use。合成爽肤水C按瓶身步骤使用。",
+      "questions": [
+        "合成爽肤水C怎么使用"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成爽肤水C",
+          "爽肤水C"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "使用"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "scrub-use",
+      "kind": "SYNTHETIC",
+      "title": "去角质乳使用说明",
+      "body": "合成回答 scrub-use。去角质乳是虚构商品名，名称本身不是使用需求。按瓶身步骤使用。",
+      "questions": [
+        "去角质乳怎么使用"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "去角质乳"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "使用"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "milk-cleanse",
+      "kind": "SYNTHETIC",
+      "title": "合成水乳B洁面使用说明",
+      "body": "合成回答 milk-cleanse。合成水乳B洁面按瓶身步骤使用。",
+      "questions": [
+        "合成水乳B洁面怎么使用"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成水乳B洁面"
+        ],
+        "aliases": [
+          "水乳B洁面"
+        ],
+        "answerable_needs": [
+          "使用"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "milk-lotion",
+      "kind": "SYNTHETIC",
+      "title": "合成水乳B乳液使用说明",
+      "body": "合成回答 milk-lotion。合成水乳B乳液按瓶身步骤使用。",
+      "questions": [
+        "合成水乳B乳液怎么使用"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成水乳B乳液"
+        ],
+        "aliases": [
+          "水乳B乳液"
+        ],
+        "answerable_needs": [
+          "使用"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "missing-ann",
+      "kind": "SYNTHETIC",
+      "title": "合成唇膏E使用说明",
+      "body": "合成回答 missing-ann。合成唇膏E按瓶身步骤使用。",
+      "questions": [
+        "合成唇膏E怎么使用"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成唇膏E"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "使用"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "missing"
+      }
+    },
+    {
+      "id": "conflict-ann",
+      "kind": "SYNTHETIC",
+      "title": "合成眼霜F使用说明",
+      "body": "合成回答 conflict-ann。标注自相矛盾，判定不得伪造结论。",
+      "questions": [
+        "合成眼霜F怎么使用"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成眼霜F"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "使用"
+        ],
+        "constraints": [
+          "本页不回答使用"
+        ],
+        "overview_showable": true,
+        "status": "conflict"
+      }
+    },
+    {
+      "id": "reg-filter-clean",
+      "kind": "SYNTHETIC",
+      "title": "净水壶清洗保养说明",
+      "body": "合成回答 reg-filter-clean。净水壶清洗与保养步骤见本页。",
+      "questions": [
+        "净水壶清洗保养说明"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "净水壶"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "清洗",
+          "保养"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "reg-canopy-install",
+      "kind": "SYNTHETIC",
+      "title": "遮阳棚安装使用说明",
+      "body": "合成回答 reg-canopy-install。遮阳棚安装与使用步骤见本页。",
+      "questions": [
+        "遮阳棚安装使用说明"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "遮阳棚"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "安装",
+          "使用"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "reg-cream-use",
+      "kind": "SYNTHETIC",
+      "title": "面霜使用存放说明",
+      "body": "合成回答 reg-cream-use。面霜使用与存放步骤见本页。",
+      "questions": [
+        "面霜使用存放说明"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "面霜"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "使用",
+          "存放"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "reg-cleanser-clean",
+      "kind": "SYNTHETIC",
+      "title": "洁面仪清洗保养说明",
+      "body": "合成回答 reg-cleanser-clean。洁面仪清洗与保养步骤见本页。",
+      "questions": [
+        "洁面仪清洗保养说明"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "洁面仪"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "清洗",
+          "保养"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "badge-deposit",
+      "kind": "SYNTHETIC",
+      "title": "借用证押金退还流程",
+      "body": "访客离馆时将借用证交回前台；前台收到借用证并核对后，向访客退还押金。",
+      "questions": [
+        "借用证押金退还流程"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "借用证",
+          "押金"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "退还",
+          "流程"
+        ],
+        "constraints": [
+          "前台向访客退还押金"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "notes-gift",
+      "kind": "SYNTHETIC",
+      "title": "便签赠送活动",
+      "body": "购买五盒便签赠送两盒同款便签。赠品不能兑换现金。",
+      "questions": [
+        "便签赠送活动"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "便签"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "赠送",
+          "活动"
+        ],
+        "constraints": [
+          "买五赠二"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "invoice-duty",
+      "kind": "SYNTHETIC",
+      "title": "发票申请与开具责任",
+      "body": "采购方向供货方申请发票；供货方向采购方开具发票。",
+      "questions": [
+        "发票申请与开具责任"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "发票"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "申请",
+          "开具",
+          "责任"
+        ],
+        "constraints": [
+          "供货方开具"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "headset-compat",
+      "kind": "SYNTHETIC",
+      "title": "耳麦接口兼容范围",
+      "body": "此耳麦仅支持USB-C接口，不支持无线蓝牙连接。",
+      "questions": [
+        "耳麦接口兼容范围"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "耳麦"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "接口",
+          "兼容",
+          "范围"
+        ],
+        "constraints": [
+          "仅USB-C"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "cup-thermo",
+      "kind": "SYNTHETIC",
+      "title": "恒温杯出厂温度",
+      "body": "合成回答 cup-thermo。恒温杯出厂温度见铭牌。",
+      "questions": [
+        "恒温杯出厂温度"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "恒温杯"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "出厂温度",
+          "温度"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "booking-window",
+      "kind": "SYNTHETIC",
+      "title": "预约取消时间",
+      "body": "预约开始前可以申请取消；预约开始后不接受取消申请。",
+      "questions": [
+        "预约取消时间"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "预约"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "取消",
+          "时间"
+        ],
+        "constraints": [
+          "开始前可取消",
+          "开始后不可取消"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "pot-thermo",
+      "kind": "SYNTHETIC",
+      "title": "恒温壶出厂温度",
+      "body": "合成回答 pot-thermo。恒温壶出厂温度见铭牌。",
+      "questions": [
+        "恒温壶出厂温度"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "恒温壶"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "出厂温度",
+          "温度"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "empty-subjects",
+      "kind": "SYNTHETIC",
+      "title": "合成喷雾G使用说明",
+      "body": "合成回答 empty-subjects。合成喷雾G按瓶身步骤使用。",
+      "questions": [
+        "合成喷雾G怎么使用"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [],
+        "aliases": [],
+        "answerable_needs": [
+          "使用"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "valve-core",
+      "kind": "SYNTHETIC",
+      "title": "合成阀芯安装步骤",
+      "body": "合成回答 valve-core。合成阀芯按铭牌步骤安装。",
+      "questions": [
+        "合成阀芯怎么安装"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成阀芯",
+          "合成阀"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "安装步骤",
+          "安装"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "valve-cover",
+      "kind": "SYNTHETIC",
+      "title": "合成阀盖安装步骤",
+      "body": "合成回答 valve-cover。合成阀盖按铭牌步骤安装。",
+      "questions": [
+        "合成阀盖怎么安装"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成阀盖",
+          "合成阀"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "安装步骤",
+          "安装"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "valve-tag",
+      "kind": "SYNTHETIC",
+      "title": "合成阀识别信息",
+      "body": "合成回答 valve-tag。本页只识别合成阀对象；安装步骤见对应零件页。",
+      "questions": [
+        "合成阀是什么",
+        "怎么安装"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-v1",
+        "subjects": [
+          "合成阀"
+        ],
+        "aliases": [],
+        "answerable_needs": [],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "muff-contact",
+      "kind": "SYNTHETIC",
+      "title": "合成耳罩H接触说明",
+      "body": "合成回答 muff-contact。合成耳罩H不接触皮肤；佩戴时保持干燥。",
+      "questions": [
+        "合成耳罩H怎么佩戴"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-s16-plan",
+        "subjects": [
+          "合成耳罩H",
+          "耳罩H"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "佩戴"
+        ],
+        "constraints": [
+          "不接触皮肤"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "muff-allow",
+      "kind": "SYNTHETIC",
+      "title": "合成耳罩H接触许可",
+      "body": "合成回答 muff-allow。合成耳罩H接触皮肤；佩戴时保持干燥。",
+      "questions": [
+        "合成耳罩H怎么佩戴"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-s16-plan",
+        "subjects": [
+          "合成耳罩H",
+          "耳罩H"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "佩戴"
+        ],
+        "constraints": [
+          "接触皮肤"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "filter-soak",
+      "kind": "SYNTHETIC",
+      "title": "合成滤芯K更换说明",
+      "body": "合成回答 filter-soak。合成滤芯K不浸水；更换时按箭头方向。",
+      "questions": [
+        "合成滤芯K怎么更换"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-s16-plan",
+        "subjects": [
+          "合成滤芯K",
+          "滤芯K"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "更换"
+        ],
+        "constraints": [
+          "不浸水"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "lamp-power",
+      "kind": "SYNTHETIC",
+      "title": "合成灯管M安装说明",
+      "body": "合成回答 lamp-power。合成灯管M不外接电源；只使用配套底座。",
+      "questions": [
+        "合成灯管M怎么安装"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-s16-plan",
+        "subjects": [
+          "合成灯管M",
+          "灯管M"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "安装"
+        ],
+        "constraints": [
+          "不外接电源"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "clip-bind",
+      "kind": "SYNTHETIC",
+      "title": "合成夹子N装订说明",
+      "body": "合成回答 clip-bind。合成夹子N用于装订纸张，与皮肤、滤芯、灯管无关。",
+      "questions": [
+        "合成夹子N怎么装订"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-s16-plan",
+        "subjects": [
+          "合成夹子N",
+          "夹子N"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "装订"
+        ],
+        "constraints": [],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    },
+    {
+      "id": "muff-asked",
+      "kind": "SYNTHETIC",
+      "title": "合成耳罩H接触说明",
+      "body": "合成回答 muff-asked。合成耳罩H不接触皮肤；佩戴时保持干燥。",
+      "questions": [
+        "合成耳罩H怎么佩戴",
+        "合成耳罩H接触皮肤吗"
+      ],
+      "annotation": {
+        "producer": "synthetic-reviewer-s16-plan",
+        "subjects": [
+          "合成耳罩H",
+          "耳罩H"
+        ],
+        "aliases": [],
+        "answerable_needs": [
+          "佩戴"
+        ],
+        "constraints": [
+          "不接触皮肤"
+        ],
+        "overview_showable": false,
+        "status": "ok"
+      }
+    }
+  ]
+}

@@ -59,6 +59,7 @@ function createWorkspaceFixture() {
   for (const relativePath of [
     'release/local-unsigned/package.bin',
     'apps/api/dist/main.js',
+    'apps/api/experiments/search-decision/.generated/search-decision.ts',
     'apps/api/node_modules/fastify/runtime.js',
     'packages/database/dist/index.js',
     'packages/database/node_modules/pg/runtime.js',
@@ -432,6 +433,7 @@ describe('workspace hygiene', () => {
 
     expect(existsSync(path.join(root, 'release/local-unsigned'))).toBe(false);
     expect(existsSync(path.join(root, 'apps/api/dist'))).toBe(false);
+    expect(existsSync(path.join(root, 'apps/api/experiments/search-decision/.generated'))).toBe(false);
     expect(existsSync(path.join(root, 'apps/api/node_modules/fastify/runtime.js'))).toBe(true);
     expect(existsSync(path.join(root, 'packages/database/dist'))).toBe(false);
     expect(existsSync(path.join(root, 'packages/database/node_modules/pg/runtime.js'))).toBe(true);

@@ -28,6 +28,9 @@ electron-builder.env.*
 # must never enter this repository or a release artifact.
 /clawd-on-desk-0.15.0.zip
 
+# Search-decision lab diagnostic copy and reports. Regenerated from pinned product SHA + patch.
+/apps/api/experiments/search-decision/.generated/
+
 # gstack 的运行输出留在本机；仅跟踪产品版本清单定位，冻结验收证据放在 evidence/qa/。
 .gstack/*
 !.gstack/package-json-path

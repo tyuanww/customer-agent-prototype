@@ -58,6 +58,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm check
+      - if: needs.changes.outputs.mode == 'full'
+        run: pnpm --filter @customer-agent/api test:search-decision
 
   postgres-15:
     needs: changes

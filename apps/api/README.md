@@ -1,6 +1,6 @@
 # `@customer-agent/api`
 
-本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.15` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。G1A-E0 的仓外输入验证和离线评测只位于 `tests/support/g1a-e0/`，不会进入本包正式构建。
+本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.15` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。G1A-E0 的仓外输入验证和离线评测只位于 `tests/support/g1a-e0/`，不会进入本包正式构建。合成搜索判定实验位于 `experiments/search-decision/`，同样不进入 `dist` 或正式候选包；它不改变 `src/search-decision.ts` 的产品行为。
 
 当前不是业务 API：
 
@@ -60,6 +60,10 @@ pnpm test:api
 pnpm --filter @customer-agent/api test:integration
 pnpm test:g1a:synthetic
 pnpm test:g1a:e0
+pnpm test:search-decision
+pnpm test:search-decision:round1
+pnpm test:search-decision:acceptance
+pnpm test:search-decision:known-fail
 pnpm typecheck
 pnpm build
 pnpm workspace:check
