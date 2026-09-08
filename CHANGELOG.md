@@ -4,6 +4,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+- Recorded the backend identity and content closed-loop implementation plan, including T1–T6 order and remaining DRAFT contract boundaries. No DEV-M2 start, runtime activation, or contract freeze is implied.
 - Added an offline same-session keyword comparison with pinned historical ranking, independently bound report consumption, and synthetic PostgreSQL verification. No real admission or runtime activation is implied.
 
 
