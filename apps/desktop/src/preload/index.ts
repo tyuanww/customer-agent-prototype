@@ -1,5 +1,6 @@
 import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
 import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isProductAnnounceInvalidation, type ProductAnnounceInvalidation } from '../shared/product-announce';
+import { helpFailure, isProductEscalateRequest, isProductEscalateResult, isProductTerminalRequest, isProductTerminalResult } from '../shared/product-help';
 import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
@@ -91,6 +92,24 @@ const api: CustomerAgentApi = {
       } catch { return announceFailure('UNAVAILABLE', request); }
     },
     onInvalidated(listener) { announceListeners.add(listener); return () => { announceListeners.delete(listener); }; },
+  },
+  productHelp: {
+    async escalate(request) {
+      if (!isProductEscalateRequest(request)) return helpFailure('VALIDATION', { sessionEpoch: 0, generation: 0 });
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_ESCALATE, request);
+        return isProductEscalateResult(value) && value.sessionEpoch === request.sessionEpoch && value.generation === request.generation
+          ? value : helpFailure('UNAVAILABLE', request);
+      } catch { return helpFailure('UNAVAILABLE', request); }
+    },
+    async recordTerminal(request) {
+      if (!isProductTerminalRequest(request)) return helpFailure('VALIDATION', { sessionEpoch: 0, generation: 0 });
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RECORD_TERMINAL, request);
+        return isProductTerminalResult(value) && value.sessionEpoch === request.sessionEpoch && value.generation === request.generation
+          ? value : helpFailure('UNAVAILABLE', request);
+      } catch { return helpFailure('UNAVAILABLE', request); }
+    },
   },
   copyText(text: string): Promise<CopyTextResult> {
     if (typeof text !== 'string') {

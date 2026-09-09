@@ -33,6 +33,7 @@ export type CustomerAgentApi = {
   product?: import('./product-session').ProductSessionApi;
   productSearch?: ProductSearchApi;
   productAnnounce?: import('./product-announce').ProductAnnounceApi;
+  productHelp?: import('./product-help').ProductHelpApi;
   copyText: (text: string) => Promise<CopyTextResult>;
   getWindowContext: () => Promise<WindowContext>;
   openSearch: (visualTransform?: FoxVisualTransform) => Promise<void>;

@@ -7,6 +7,7 @@ import { registerProductIpc } from './product-ipc';
 import { readProductClientId } from './product-client-id';
 import { ProductAnnounce } from './product-announce';
 import { registerProductAnnounceIpc } from './product-announce-ipc';
+import { openSyntheticHelp } from './product-help-open';
 import { app, Menu, session } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
@@ -156,7 +157,8 @@ if (!gotLock) {
       await productSession.restore();
     }
     registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
-      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
+      identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],

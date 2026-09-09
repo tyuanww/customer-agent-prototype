@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COPY_SUCCESS_MESSAGE, IPC_CHANNEL_WHITELIST, IPC_CHANNELS } from '../../src/shared/contracts';
+import { ALLOWED_HELP_STATUS, FORBIDDEN_HELP_PHRASES } from '../../src/shared/product-help';
 
 describe('IPC whitelist', () => {
   it('only allows the typed overlay and clipboard channels', () => {
@@ -13,6 +14,8 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.PRODUCT_SESSION_CHANGED,
       IPC_CHANNELS.PRODUCT_ANNOUNCE_REFRESH,
       IPC_CHANNELS.PRODUCT_ANNOUNCE_INVALIDATED,
+      IPC_CHANNELS.PRODUCT_ESCALATE,
+      IPC_CHANNELS.PRODUCT_RECORD_TERMINAL,
       IPC_CHANNELS.COPY_TEXT,
       IPC_CHANNELS.GET_WINDOW_CONTEXT,
       IPC_CHANNELS.OPEN_SEARCH,
@@ -33,5 +36,12 @@ describe('IPC whitelist', () => {
   it('uses 已复制 as the only success copy label', () => {
     expect(COPY_SUCCESS_MESSAGE).toBe('已复制');
     expect(COPY_SUCCESS_MESSAGE).not.toContain('已发送');
+  });
+
+  it('keeps help status off transfer-success copy', () => {
+    expect(ALLOWED_HELP_STATUS).toEqual(['待核实', '已打开入口', '已复制联系方式']);
+    for (const phrase of FORBIDDEN_HELP_PHRASES) {
+      expect(ALLOWED_HELP_STATUS.join('\n')).not.toContain(phrase);
+    }
   });
 });

@@ -10,7 +10,8 @@ it('rejects Fox, unknown windows, subframes, extra arguments and unsigned Query'
   const fox = { ...query, id: 2 } as WebContents;
   registerProductSearchIpc(null, null, () => [query, fox], wc => wc.id === 1 ? 'query' : 'fox', () => 'http://127.0.0.1:5173/');
   const event = (sender: WebContents, senderFrame: unknown = frame) => ({ sender, senderFrame }) as IpcMainInvokeEvent;
-  for (const channel of [IPC_CHANNELS.PRODUCT_SEARCH, IPC_CHANNELS.PRODUCT_COPY_ADOPT, IPC_CHANNELS.PRODUCT_CANCEL_SEARCH]) {
+  for (const channel of [IPC_CHANNELS.PRODUCT_SEARCH, IPC_CHANNELS.PRODUCT_COPY_ADOPT, IPC_CHANNELS.PRODUCT_CANCEL_SEARCH,
+    IPC_CHANNELS.PRODUCT_ESCALATE, IPC_CHANNELS.PRODUCT_RECORD_TERMINAL]) {
     const invoke = handlers.get(channel)!;
     expect(await invoke(event(fox), {})).toMatchObject({ code: 'FORBIDDEN' });
     expect(await invoke(event(query, {}), {})).toMatchObject({ code: 'FORBIDDEN' });

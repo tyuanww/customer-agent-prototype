@@ -1443,6 +1443,24 @@
   font-weight: 700;
 }
 
+.no-hit-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.no-hit-help .retry-btn {
+  margin-top: 0;
+}
+
+.no-hit-help .help-status {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+
 @keyframes no-hit-arrive {
   from {
     opacity: 0;

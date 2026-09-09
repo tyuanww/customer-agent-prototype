@@ -242,4 +242,12 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 ### D2 桌面候选与复制所有权
 
-`main/product-search.ts` 持有按 sender、sessionEpoch、generation 绑定的后端候选，验证平台、商品范围、有效期与占位符后写剪贴板，再调用 adoption。取消、身份变化或窗口销毁使旧候选失效；复制与事件结果分开。`product-search-ipc.ts` 只允许 Query 主 frame 调用查询、取消和复制；接入 profile 禁止旧 `copyText` 任意正文入口。Query 只展示原文和类别，不展示数值分数。公告租约和人工求助由 D3/D4 后续接线。
+`main/product-search.ts` 持有按 sender、sessionEpoch、generation 绑定的后端候选，验证平台、商品范围、有效期与占位符后写剪贴板，再调用 adoption。取消、身份变化或窗口销毁使旧候选失效；复制与事件结果分开。`product-search-ipc.ts` 只允许 Query 主 frame 调用查询、取消、复制、escalate 和 terminal；接入 profile 禁止旧 `copyText` 任意正文入口。Query 只展示原文和类别，不展示数值分数。
+
+### D3 桌面公告租约所有权
+
+`main/product-announce.ts` 持有 current/snapshot/ACK 与离线租约；renderer 只看到脱敏发布视图。ACK 不续租，也不表示已读。租约绑定 sessionEpoch；失效后清候选。
+
+### D4 桌面合成求助入口
+
+无匹配时 Query 展示「没找到可用话术」，可复制合成联系方式或打开隔离的 `{identityOrigin}/synthetic-help` 窗。`opened` 只表示入口动作；状态限于「已打开入口 / 已复制联系方式 / 待核实」。`POST /v1/events/escalate` 是辅助动作，不冒充 terminal；用户明确离开无匹配结果时才记 `no_hit_exit`。

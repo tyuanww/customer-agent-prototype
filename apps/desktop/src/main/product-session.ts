@@ -78,7 +78,7 @@ export class ProductSession {
   /** Main-only capability. Credentials remain private; late responses cannot cross identities. */
   async request(epoch: number, path: string, options: {
     body?: unknown; signal?: AbortSignal; method?: string;
-    headers?: Partial<Record<'x-client-id' | 'x-snapshot-lease' | 'if-none-match', string>>;
+    headers?: Partial<Record<'x-client-id' | 'x-snapshot-lease' | 'if-none-match' | 'idempotency-key', string>>;
   } = {}) {
     if (!this.view().signedIn || !this.token) throw new ProductHttpError('UNAUTHORIZED');
     if (epoch !== this.epoch) throw new ProductHttpError('STALE');

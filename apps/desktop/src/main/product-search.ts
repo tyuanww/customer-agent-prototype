@@ -5,25 +5,45 @@ import type { ProductSession } from './product-session';
 import { queryFailure, type ProductCandidate, type ProductSearchRequest, type ProductCopyRequest,
   type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
 import type { AnnounceGate } from '../shared/product-announce';
+import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
+  type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
+
+export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
 type SearchState = QueryIdentity & { controller: AbortController; result?: Extract<ProductSearchResult, { ok: true }>;
   copying: boolean; terminal: boolean; platform?: ProductSearchRequest['platform']; productType?: ProductSearchRequest['productContextType']; productRef?: string | null };
 /** Owns per-window candidate provenance and native copy ordering. Renderer never supplies answer text. */
 export class ProductSearch {
   private states = new Map<number, SearchState>();
+  private last = new Map<number, SearchState>();
   constructor(
     private readonly session: ProductSession,
     private readonly writeClipboard: (text: string) => void,
     private readonly announce: AnnounceGate,
+    private readonly help: SearchHelp = { openEntry: () => false },
   ) {
     const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
       this.states.clear();
+      this.last.clear();
     };
     session.subscribe(forget);
     announce.subscribe(forget);
   }
-  forget(sender: number) { this.states.get(sender)?.controller.abort(); this.states.delete(sender); }
+  forget(sender: number) {
+    this.states.get(sender)?.controller.abort();
+    this.states.delete(sender);
+    this.last.delete(sender);
+  }
+  private completed(sender: number, request: QueryIdentity): SearchState {
+    const match = (state: SearchState | undefined) =>
+      state && state.generation === request.generation && state.sessionEpoch === request.sessionEpoch && state.result ? state : undefined;
+    const state = match(this.states.get(sender)) ?? match(this.last.get(sender));
+    if (!state) throw new ProductHttpError('STALE');
+    if (this.session.view().sessionEpoch !== state.sessionEpoch) throw new ProductHttpError('STALE');
+    if (!this.session.view().signedIn) throw new ProductHttpError('UNAUTHORIZED');
+    return state;
+  }
   private advance(sender: number, identity: QueryIdentity): SearchState {
     const view = this.session.view();
     if (!view.signedIn) throw new ProductHttpError('UNAUTHORIZED');
@@ -66,7 +86,7 @@ export class ProductSearch {
         || response.candidates.some(c => c.release_id !== response.release_id || !this.usable(c, state))) throw new ProductHttpError('VALIDATION');
       const result: Extract<ProductSearchResult, { ok: true }> = { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
         queryId, hitStatus: response.hit_status, releaseId: response.release_id, telemetryStatus: response.telemetry_status, candidates: response.candidates };
-      state.result = structuredClone(result); return result;
+      state.result = structuredClone(result); this.last.set(sender, state); return result;
     } catch (error) { return this.failure(error, request); }
   }
   async copy(sender: number, request: ProductCopyRequest): Promise<ProductCopyResult> {
@@ -93,7 +113,9 @@ export class ProductSearch {
       let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result!.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';
       if (eventStatus !== 'disabled') {
         try {
-          const response = await this.session.request(request.sessionEpoch, '/v1/events/adoption', { body: {
+          const response = await this.session.request(request.sessionEpoch, '/v1/events/adoption', {
+            headers: { 'idempotency-key': randomUUID() },
+            body: {
             query_id: request.queryId, outcome: 'adopted', chosen_rank: request.rank, chosen_script_id: request.scriptId, push_method: 'clipboard',
           } });
           const receipt = parseContractSchema('AdoptionEventResponse', response.value);
@@ -103,5 +125,57 @@ export class ProductSearch {
       return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, copied: true, eventStatus };
     } catch (error) { return this.failure(error, request); }
     finally { if (state && acquired) state.copying = false; }
+  }
+  async escalate(sender: number, request: ProductEscalateRequest): Promise<ProductEscalateResult> {
+    try {
+      const state = this.completed(sender, request);
+      const result = state.result;
+      if (!result || result.queryId !== request.queryId || result.hitStatus !== 'no_hit') throw new ProductHttpError('STALE');
+      if (state.terminal) throw new ProductHttpError('CONFLICT');
+      if (!this.announce.allows(result.releaseId)) throw new ProductHttpError('STALE');
+      let opened = false;
+      if (request.action === 'copy_contact') {
+        try { this.writeClipboard(SYNTHETIC_HELP_CONTACT); opened = true; }
+        catch { throw new ProductHttpError('CLIPBOARD_FAILED'); }
+      } else {
+        opened = await Promise.resolve(this.help.openEntry());
+        if (!opened) throw new ProductHttpError('UNAVAILABLE');
+      }
+      let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';
+      let escalateId = `esc_local_${request.queryId}`;
+      if (eventStatus !== 'disabled') {
+        try {
+          const response = await this.session.request(request.sessionEpoch, '/v1/events/escalate', {
+            headers: { 'idempotency-key': randomUUID() },
+            body: { query_id: request.queryId, action: request.action },
+          });
+          const receipt = parseContractSchema('EscalationResponse', response.value);
+          if (receipt.query_id === request.queryId && receipt.action === request.action) {
+            eventStatus = 'recorded'; escalateId = receipt.escalate_id;
+          }
+        } catch { /* Native entry action already happened. */ }
+      }
+      return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, escalateId, action: request.action, opened, eventStatus };
+    } catch (error) { return this.failure(error, request); }
+  }
+  async recordTerminal(sender: number, request: ProductTerminalRequest): Promise<ProductTerminalResult> {
+    try {
+      const state = this.completed(sender, request);
+      const result = state.result;
+      if (!result || result.queryId !== request.queryId) throw new ProductHttpError('STALE');
+      if (request.outcome === 'no_hit_exit' && result.hitStatus !== 'no_hit') throw new ProductHttpError('VALIDATION');
+      if (request.outcome === 'dismissed' && result.hitStatus === 'no_hit') throw new ProductHttpError('VALIDATION');
+      if (state.terminal) throw new ProductHttpError('CONFLICT');
+      state.terminal = true;
+      if (result.telemetryStatus === 'collection_disabled') return { ok: true, ...request, recorded: false };
+      try {
+        const response = await this.session.request(request.sessionEpoch, '/v1/events/adoption', {
+          headers: { 'idempotency-key': randomUUID() },
+          body: { query_id: request.queryId, outcome: request.outcome, chosen_rank: null, chosen_script_id: null, push_method: null },
+        });
+        const receipt = parseContractSchema('AdoptionEventResponse', response.value);
+        return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, recorded: receipt.query_id === request.queryId };
+      } catch { return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, recorded: false }; }
+    } catch (error) { return this.failure(error, request); }
   }
 }

@@ -1,5 +1,6 @@
 import type { ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
+import type { HelpAction, HelpStatus } from '@shared/product-help';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
@@ -113,6 +114,14 @@ export function QueryApp() {
   const [announce, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
   const announceGenerationRef = useRef(0);
   const announceReleaseRef = useRef<string | null>(null);
+  const [helpStatus, setHelpStatus] = useState<HelpStatus>('待核实');
+  const lastProductQueryRef = useRef<{
+    sessionEpoch: number;
+    generation: number;
+    queryId: string;
+    hitStatus: 'hit' | 'no_hit';
+  } | null>(null);
+  const helpInFlightRef = useRef(false);
   const searchTimerRef = useRef<number | null>(null);
   const dismissTimerRef = useRef<number | null>(null);
   const resultFocusFrameRef = useRef<number | null>(null);
@@ -155,10 +164,25 @@ export function QueryApp() {
     setCopiedRank(null);
     setErrorMessage('');
     setInvalidMessage('');
+    setHelpStatus('待核实');
+    lastProductQueryRef.current = null;
     setLayoutReady(true);
     layoutSequenceRef.current = 0;
     lastAppliedLayoutSequenceRef.current = 0;
     resultCountRef.current = 0;
+  }, []);
+
+  const recordNoHitExit = useCallback(() => {
+    const last = lastProductQueryRef.current;
+    const api = window.customerAgent?.productHelp;
+    if (!last || last.hitStatus !== 'no_hit' || !api) return;
+    lastProductQueryRef.current = null;
+    void api.recordTerminal({
+      sessionEpoch: last.sessionEpoch,
+      generation: last.generation,
+      queryId: last.queryId,
+      outcome: 'no_hit_exit',
+    });
   }, []);
 
   const cancelScheduledCollapseContent = useCallback((finish: boolean) => {
@@ -353,6 +377,7 @@ export function QueryApp() {
         cancelScheduledOpening();
         cancelScheduledInputFocus();
         cancelScheduledCollapseContent(true);
+        recordNoHitExit();
         activeHandoffIdRef.current = command.handoffId;
         queryInteractiveRef.current = false;
         openingRef.current = false;
@@ -440,6 +465,7 @@ export function QueryApp() {
         cancelScheduledOpening();
         cancelScheduledInputFocus();
         cancelScheduledCollapseContent(false);
+        recordNoHitExit();
         if (command.handoffId !== undefined) {
           activeHandoffIdRef.current = command.handoffId;
         }
@@ -541,6 +567,7 @@ export function QueryApp() {
     cancelScheduledResultFocus,
     finishCollapseContent,
     focusQueryInput,
+    recordNoHitExit,
     reportHandoffMilestone,
   ]);
 
@@ -692,6 +719,12 @@ export function QueryApp() {
       cancelScheduledResultFocus();
       cancelPendingSearch();
       cancelPendingCopy();
+      if (phase === 'EMPTY') {
+        recordNoHitExit();
+      } else {
+        lastProductQueryRef.current = null;
+      }
+      setHelpStatus('待核实');
       setQuery(nextQuery);
       setResults([]);
       setErrorMessage('');
@@ -700,7 +733,7 @@ export function QueryApp() {
         reportPhase('SEARCH_INPUT');
       }
     },
-    [cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, phase, reportPhase],
+    [cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, phase, recordNoHitExit, reportPhase],
   );
 
   const refreshAnnounce = useCallback(async (sessionEpoch: number) => {
@@ -724,7 +757,7 @@ export function QueryApp() {
     if (value.sessionEpoch < productEpochRef.current) return;
     if (productEpochRef.current !== value.sessionEpoch) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({}); setAnnounce(null);
-      announceReleaseRef.current = null;
+      announceReleaseRef.current = null; lastProductQueryRef.current = null; setHelpStatus('待核实');
     }
     productEpochRef.current = value.sessionEpoch;
     setProductState(value);
@@ -744,6 +777,7 @@ export function QueryApp() {
       if (value.sessionEpoch !== productEpochRef.current) return;
       announceGenerationRef.current += 1; announceReleaseRef.current = null;
       setAnnounce(null); cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
+      lastProductQueryRef.current = null; setHelpStatus('待核实');
       setErrorMessage('当前版本已失效，请重新核验'); reportPhase('ERROR');
     });
   }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
@@ -779,6 +813,7 @@ export function QueryApp() {
         setResults([]); setErrorMessage('请确认平台、具体商品和客户的问题；问题最多 500 字。无具体商品时仅查询全店话术。'); reportPhase('ERROR'); return;
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+      lastProductQueryRef.current = null; setHelpStatus('待核实');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
       const search = () => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
@@ -799,6 +834,7 @@ export function QueryApp() {
           productCopy: { sessionEpoch, generation, queryId: result.queryId, rank: c.rank, scriptId: c.script_id, scriptVersion: c.script_version, contentHash: c.content_hash },
           placeholderKeys: c.placeholder_keys,
         }));
+        lastProductQueryRef.current = { sessionEpoch, generation, queryId: result.queryId, hitStatus: result.hitStatus };
         setResults(items); reportPhase(items.length ? 'RESULTS' : 'EMPTY', items.length as ResultCount);
       }).catch(() => {
         if (generation === searchGenerationRef.current) { setErrorMessage('查询服务暂不可用，请重试'); reportPhase('ERROR'); }
@@ -982,6 +1018,38 @@ export function QueryApp() {
   const dismiss = useCallback(() => {
     void window.customerAgent?.dismiss();
   }, []);
+
+  const runHelp = useCallback(async (action: HelpAction, openedStatus: HelpStatus, failedMessage: string) => {
+    const last = lastProductQueryRef.current;
+    const api = window.customerAgent?.productHelp;
+    if (!last || last.hitStatus !== 'no_hit' || !api || helpInFlightRef.current) return;
+    helpInFlightRef.current = true;
+    try {
+      const result = await api.escalate({
+        sessionEpoch: last.sessionEpoch, generation: last.generation, queryId: last.queryId, action,
+      });
+      if (lastProductQueryRef.current?.queryId !== last.queryId) return;
+      if (!result.ok) { setErrorMessage(result.message); return; }
+      if (!result.opened) { setErrorMessage(failedMessage); return; }
+      setErrorMessage('');
+      setHelpStatus(openedStatus);
+    } finally {
+      helpInFlightRef.current = false;
+    }
+  }, []);
+
+  const copyContact = useCallback(() => {
+    void runHelp('copy_contact', '已复制联系方式', '联系方式未复制');
+  }, [runHelp]);
+
+  const openHelp = useCallback(() => {
+    void runHelp('open_feishu', '已打开入口', '入口未打开');
+  }, [runHelp]);
+
+  const leaveNoHit = useCallback(() => {
+    recordNoHitExit();
+    dismiss();
+  }, [dismiss, recordNoHitExit]);
 
   const drag = useWindowDrag(
     (dx, dy, finished) => {
@@ -1364,10 +1432,14 @@ export function QueryApp() {
             results={results}
             copying={copying}
             copiedRank={copiedRank}
+            helpStatus={helpStatus}
             onRetry={retry}
             onCopy={(item, trigger) => {
               void copyScript(item, trigger);
             }}
+            onCopyContact={window.customerAgent?.productHelp ? copyContact : undefined}
+            onOpenHelp={window.customerAgent?.productHelp ? openHelp : undefined}
+            onLeaveNoHit={window.customerAgent?.productHelp ? leaveNoHit : undefined}
           />
         ) : null}
         {showQueryResizeGrip ? (

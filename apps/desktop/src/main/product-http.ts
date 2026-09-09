@@ -13,7 +13,7 @@ export function loopbackOrigin(value: string): string {
   }
   return url.origin;
 }
-const EXTRA_HEADERS = ['x-client-id', 'x-snapshot-lease', 'if-none-match'] as const;
+const EXTRA_HEADERS = ['x-client-id', 'x-snapshot-lease', 'if-none-match', 'idempotency-key'] as const;
 export type ProductHttpResult = {
   status: number; value: unknown;
   etag?: string; leaseToken?: string; leaseExpiresAt?: string;

@@ -8,6 +8,8 @@ export const IPC_CHANNELS = {
   PRODUCT_SESSION_CHANGED: 'product:session-changed',
   PRODUCT_ANNOUNCE_REFRESH: 'product:announce-refresh',
   PRODUCT_ANNOUNCE_INVALIDATED: 'product:announce-invalidated',
+  PRODUCT_ESCALATE: 'product:escalate',
+  PRODUCT_RECORD_TERMINAL: 'product:record-terminal',
   COPY_TEXT: 'clipboard:copy-text',
   GET_WINDOW_CONTEXT: 'overlay:get-window-context',
   OPEN_SEARCH: 'overlay:open-search',

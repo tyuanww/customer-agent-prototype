@@ -120,12 +120,14 @@ describe('QueryApp', () => {
     };
   });
 
-  function connectProduct() {
+  function connectProduct(options: { noHit?: boolean } = {}) {
     const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString() };
     window.customerAgent!.product = { sessionStatus: vi.fn().mockResolvedValue(view), login: vi.fn().mockResolvedValue(view), logout: vi.fn(), onSessionChanged: () => () => {} };
     const search = vi.fn(async (r: import('../../src/shared/product-search').ProductSearchRequest) => ({
-      ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, queryId: '11111111-1111-4111-8111-111111111111', hitStatus: 'hit' as const,
-      releaseId: 'rel-synthetic', telemetryStatus: 'recorded' as 'recorded' | 'collection_disabled', candidates: [{ rank: 1, release_id: 'rel-synthetic', script_id: 'script-synthetic', script_version: 1,
+      ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, queryId: '11111111-1111-4111-8111-111111111111',
+      hitStatus: options.noHit ? 'no_hit' as const : 'hit' as const,
+      releaseId: 'rel-synthetic', telemetryStatus: 'recorded' as 'recorded' | 'collection_disabled',
+      candidates: options.noHit ? [] : [{ rank: 1, release_id: 'rel-synthetic', script_id: 'script-synthetic', script_version: 1,
         content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const, answer_text: '合成订单 {订单号}', platform_scope: [r.platform],
         product_scope_type: 'storewide' as const, product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
         intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const] }],
@@ -138,7 +140,15 @@ describe('QueryApp', () => {
         leaseExpiresAt: new Date(Date.now() + 600_000).toISOString(), announcement: { title: '合成公告', summary: '只读', createdAt: '2026-09-09T00:00:00.000Z' } })),
       onInvalidated(listener) { invalidate.push(listener); return () => {}; },
     };
-    return { search, copyAdopt, invalidate };
+    const escalate = vi.fn(async (r: import('../../src/shared/product-help').ProductEscalateRequest) => ({
+      ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, escalateId: 'esc_synthetic',
+      action: r.action, opened: true, eventStatus: 'recorded' as const,
+    }));
+    const recordTerminal = vi.fn(async (r: import('../../src/shared/product-help').ProductTerminalRequest) => ({
+      ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, recorded: true,
+    }));
+    window.customerAgent!.productHelp = { escalate, recordTerminal };
+    return { search, copyAdopt, invalidate, escalate, recordTerminal };
   }
   async function prepareProductQuery() {
     render(<QueryApp />); await screen.findByRole('button', { name: 'agent · 退出' });
@@ -206,6 +216,48 @@ describe('QueryApp', () => {
     expect(screen.getByLabelText('合成订单号')).toBeDisabled();
     expect(f.copyAdopt).toHaveBeenCalledWith(expect.objectContaining({ placeholderValues: { order_id: 'SYNTHETIC-B' } }));
     await act(async () => pending.resolve(await response(f.copyAdopt.mock.calls[0][0])));
+  });
+
+  it('offers synthetic help on no-hit without claiming a transfer', async () => {
+    const f = connectProduct({ noHit: true });
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('no-hit')).toHaveTextContent('没找到可用话术');
+    expect(screen.getByTestId('help-status')).toHaveTextContent('待核实');
+    expect(screen.queryByText('已转交成功')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('copy-contact-button'));
+    await waitFor(() => expect(screen.getByTestId('help-status')).toHaveTextContent('已复制联系方式'));
+    expect(f.escalate).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'copy_contact', queryId: '11111111-1111-4111-8111-111111111111',
+    }));
+    fireEvent.click(screen.getByTestId('open-help-button'));
+    await waitFor(() => expect(screen.getByTestId('help-status')).toHaveTextContent('已打开入口'));
+    expect(f.escalate).toHaveBeenCalledWith(expect.objectContaining({ action: 'open_feishu' }));
+    expect(f.recordTerminal).not.toHaveBeenCalled();
+    expect(screen.queryByText('已转交成功')).not.toBeInTheDocument();
+  });
+
+  it('records no_hit_exit when leaving empty results and surfaces an open failure', async () => {
+    const f = connectProduct({ noHit: true });
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('no-hit-help');
+    f.escalate.mockResolvedValueOnce({
+      ok: true as const, sessionEpoch: 10, generation: 1, escalateId: 'esc_synthetic',
+      action: 'open_feishu' as const, opened: false, eventStatus: 'recorded' as const,
+    });
+    fireEvent.click(screen.getByTestId('open-help-button'));
+    await screen.findByText('入口未打开');
+    expect(screen.getByTestId('help-status')).toHaveTextContent('待核实');
+    fireEvent.click(screen.getByTestId('no-hit-exit-button'));
+    expect(f.recordTerminal).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'no_hit_exit' }));
+    expect(dismiss).toHaveBeenCalled();
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+      }
+    });
+    expect(f.recordTerminal).toHaveBeenCalledTimes(1);
   });
 
   it('blocks fixture search in product mode and exposes login/logout without credentials', async () => {
@@ -818,7 +870,8 @@ describe('QueryApp', () => {
     render(<QueryApp />);
     await user.type(screen.getByTestId('question-input'), '青禾会员日积分怎么兑');
     await user.click(screen.getByTestId('search-button'));
-    expect(await screen.findByTestId('no-hit')).toHaveTextContent('没找到合适话术');
+    expect(await screen.findByTestId('no-hit')).toHaveTextContent('没找到可用话术');
+    expect(screen.queryByTestId('no-hit-help')).not.toBeInTheDocument();
     expect(screen.queryByText(/QINGHE_EXPIRED_DEMO_BODY/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
   });
