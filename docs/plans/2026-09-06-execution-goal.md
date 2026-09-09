@@ -2,7 +2,7 @@
 
 > **状态：APPROVED · EXECUTION MANAGEMENT ONLY**
 > 执行方法统一使用[工程工作流程](../reference-engineering-workflow.md)。本文件只维护完整目标、当前执行清单与历史事实，不新增真实运行、签发、合并或发布授权。
-> **当前分类（2026-09-09）：后端 T0–T6 与收尾已合并。产品 main `40a7808fe38b385d913eb7e7f9383740251c847d`（D1 PR #61）五项 CI 通过；治理 main `0904a0aa11f2dc29ae7700871a943c41295cd329`。桌面接入方案见 [2026-09-09 准备](2026-09-09-desktop-integration-preparation.md)，状态 APPROVED；用户已授权 D1–D5 纯合成实施及逐切片 commit / push / PR / 合并。真实身份/数据、Windows 实机和部署尚未开工。旧记录保留历史语义。**
+> **当前分类（2026-09-10）：后端 T0–T6 已完成。桌面 D0–D5 工程已合并到产品 `main@5d6a8023d734e7ee3c83364944adada7751c0d93`（D5 PR #66；合并后 CI run [`34371293392`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34371293392) 五项 SUCCESS）。D2 经 PR #63 修复后通过，不得把 #62 原始合并写成 Windows smoke 已绿。用户反馈已完成本机合成人工观察，边界见当前执行清单。Windows 安装包与实机方案见 [DRAFT](2026-09-10-windows-package-and-device-verification.md)，未批准开工。治理 PR #80 与 BACKEND-CI-503 保持 OPEN。旧记录保留历史语义。**
 
 ## 可粘贴到应用的目标
 
@@ -20,16 +20,47 @@
 
 ## 当前执行清单
 
-> 核对日期：2026-09-09。恢复工作先看本节；下面旧日期的执行记录不覆盖新状态。
+> 核对日期：2026-09-10。恢复工作先看本节；下面旧日期的执行记录不覆盖新状态。不得重做已完成的 D1–D5。
 
 | 项目 | 当前事实 / 下一动作 |
 | --- | --- |
-| 后端 T0–T6 | 产品 PR #51–#57 已合并；收尾 PR #58 为 `de0a92ca607412a99c3729becce9484635533008`。其后 PR #59 合并为 `bb7a14b565553dc689823e54b0218d1d24c47095`，合并后五项 CI 全部通过。不得重复实施后端 |
+| 后端 T0–T6 | 已完成。产品 PR #51–#57 已合并；收尾 PR #58 为 `de0a92ca607412a99c3729becce9484635533008`。其后 PR #59 合并为 `bb7a14b565553dc689823e54b0218d1d24c47095`，合并后五项 CI 全部通过。不得重复实施后端 |
 | 合同 | 治理 PR #74/#75 已合并；来源 `0904a0aa11f2dc29ae7700871a943c41295cd329`，OpenAPI 1.13.0 / schema.v1.17；产品十四条 migration，旧十三条不得改写 |
-| Git | 两仓独立历史。D0 在 `codex/desktop-integration-plan` 交付批准方案；用户已授权本轮各切片 commit / push / PR / 合并 |
-| 桌面接入方案 | [准备文件](2026-09-09-desktop-integration-preparation.md) 已批准为 APPROVED。D0–D4 已合并：D4 PR #65 squash 为 `74390c038f074a1cdf47e407c2c62b7c7095e884`。BACKEND-CI-503 保持 OPEN。D5 同一 SHA 合成整链本切片交付。人工观察未确认。治理 PR #80 已创建、不得合并 |
-| BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。本地/PR/合并 CI 通过不代表已修复 |
-| 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实机、部署、自动外发、许可证 |
+| Git | 两仓独立历史。产品仓 D1–D5 切片 worktree 与远端分支已清理；无仍在运行的 D1–D5 切片。产品仓 D0 遗留分支 `codex/desktop-integration-plan` 已按下方核验删除本地与 origin；治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。本轮文档在 `codex/closeout-windows-draft` |
+| 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。工程已全部合并到产品 `main@5d6a8023d734e7ee3c83364944adada7751c0d93`。证据分账见下表；不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
+| 人工观察 | **用户反馈已完成观察**（本机合成环境；无仓内独立观察报告；不是本次重新实测；不是 Windows 实机）。用户反馈覆盖：登录、命中复制、无匹配联系卡、回退后仍能查询发货话术、退出后再查被拦。「回退后仍查到同一句话术」只证明回退后查询可用，不能单凭这一点声称旧候选缓存失效（STALE）已被人工验证 |
+| Windows 下一阶段 | [安装包与实机方案](2026-09-10-windows-package-and-device-verification.md) 状态 **DRAFT**，未批准开工。本次不打包、不安装、不签名、不公证、不部署 |
+| BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。本地/PR/合并 CI 通过不代表已修复，不得用 CI 绿关闭 |
+| 登录残留提示 | 用户反馈登录成功后仍残留红色「合成登录…」提示。已登记为 [独立待办](../../TODOS.md#login-residual-invalid-banner)，本次不修复 |
+| 治理 PR #80 | 保持 OPEN，不得合并，不得触发 GitHub Pages 发布 |
+| 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实现/打包/安装/签名/公证/部署、自动外发、治理 #80 合并、Pages 发布、BACKEND-CI-503 修复、登录残留修复、删除其他分支/worktree/桌面材料 |
+
+### D0–D5 工程证据（自动化，不是人工观察或 Windows 实机）
+
+| 切片 | PR | 合并 SHA | 合并后 CI | 不得写成 |
+| --- | --- | --- | --- | --- |
+| D0 方案 | [#60](https://github.com/weiweity/customer-agent-prototype/pull/60) | `3d4cfcd23f193d1495a81043c878196a95bb0ab6` | [`34349757408`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34349757408) 五项 SUCCESS | 实现完成或人工验收 |
+| D1 会话 | [#61](https://github.com/weiweity/customer-agent-prototype/pull/61) | `40a7808fe38b385d913eb7e7f9383740251c847d` | [`34351864815`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34351864815) 五项 SUCCESS | 真实身份 |
+| D2 查询复制（原始合并） | [#62](https://github.com/weiweity/customer-agent-prototype/pull/62) | `1705027c174e3a7816d2c70bdf4a1b21f83988f4` | [`34359707280`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34359707280) **FAILURE**（Windows feasibility smoke 与 CI gate 失败） | **#62 原始合并 Windows smoke 已绿** |
+| D2 打包修复 | [#63](https://github.com/weiweity/customer-agent-prototype/pull/63) | `18f2ad6dc8c848ed4fb35d75db26c187e3a750e8` | [`34362857422`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34362857422) 五项 SUCCESS | 把 #62 事后改写成全绿 |
+| D3 公告租约 | [#64](https://github.com/weiweity/customer-agent-prototype/pull/64) | `fcdcdfe8176030d0fe792f3862e8afaf1f97b7ab` | [`34364826257`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34364826257) 五项 SUCCESS | 人工观察 STALE |
+| D4 无匹配求助 | [#65](https://github.com/weiweity/customer-agent-prototype/pull/65) | `74390c038f074a1cdf47e407c2c62b7c7095e884` | [`34368973681`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34368973681) 五项 SUCCESS | 已转交成功 |
+| D5 同一 SHA 整链 | [#66](https://github.com/weiweity/customer-agent-prototype/pull/66) | `5d6a8023d734e7ee3c83364944adada7751c0d93` | [`34371293392`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34371293392) 五项 SUCCESS（含 `backend-runtime.e2e.test.ts`） | Windows 实机或真实飞书 |
+
+Windows hosted-runner smoke 只证明 clean-checkout 的 Windows 运行路径与未签名产物后验，见 [如何验证](../how-to-verify-desktop.md#33-pnpm-packagewin)。
+
+### 产品仓 D0 遗留分支核验（2026-09-10）
+
+仅处理产品仓 `codex/desktop-integration-plan`。治理仓同名分支是 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80) 的 head，未删除。
+
+| 检查 | 结果 |
+| --- | --- |
+| 对应产品 D0 PR | [#60](https://github.com/weiweity/customer-agent-prototype/pull/60) MERGED，squash `3d4cfcd23f193d1495a81043c878196a95bb0ab6`（2026-09-09） |
+| 删除前 tip | 本地与 `origin` 均为 `59038e78e4dfb46004261dd871c66f6f242b7d12` |
+| squash 后是否有新提交 | `git log origin/main..codex/desktop-integration-plan` 只有该 D0 提交；它不是 main 祖先（squash 预期），但 tip 树哈希与 squash 同为 `317f4b5bedc4743b50235276c7c58e7b854c5b59`，`git diff 3d4cfcd 59038e7` 为空 |
+| 有价值变更是否已被 main 接收 | squash `3d4cfcd` 是 `origin/main` 祖先；main 其后还有 D1–D5 超集 |
+| worktree / 占用 | 无 worktree 检出该分支；产品仓无开放 PR；无仍在运行的 D1–D5 切片 |
+| 结论 | 无独有待保留内容，已删除产品仓本地与 origin 该分支。未删除其他分支、worktree 或桌面材料 |
 
 完整后端验证见[后端实施计划](2026-09-08-backend-runtime-plan.md#2026-09-09-收尾复核与修复)。治理签发仍由对应批准记录拥有；代码合并不代表真实运行激活。
 

@@ -18,9 +18,9 @@
 - `PROJECT_CHARTER.md`、`DESIGN.md`、`DEVELOPMENT_BRIEF.md` 和 `docs/reference-*.md` 是产品当前边界、交互和工程知识的稳定文档。
 - 源码、测试和构建证据记录“产品实现事实”；它们不能替代批准记录、G0 / Ddev 或生产验收证据。
 - `CHANGELOG.md`、`TODOS.md` 和带日期的审查/验证材料保留历史变化；历史材料可以追加勘误，但不覆盖已发生的记录。
-- 当前桌面 v3 运行模式仍是 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`；NO BACKEND 仅指桌面未连接后端，不代表独立 Application API、合同、数据库与 Search + Events 未实现。合成 fixture、Dashboard manifest 和本地运行结果不得写成真实接入、上线或客户验证。
+- 当前桌面默认仍是 `DEMO · MOCK AUTH · SYNTHETIC DATA`；未设置 loopback 时走编译期 fixture（NO BACKEND 仅指该默认 profile）。显式 loopback 接入 profile 已接线 D1–D5 合成 adapter，仍不是真实后端、正式运行或上线。合成 fixture、Dashboard manifest 和本地运行结果不得写成真实接入、上线或客户验证。
 
-当前一期任务统一从[执行清单](plans/2026-09-06-execution-goal.md)恢复。下一阶段桌面接入方案以 [获批方案](plans/2026-09-09-desktop-integration-preparation.md) 为唯一计划真源，仅按获批纯合成范围实施。章程和 README 只链接入口；带日期的计划保存当时的批准、设计和证据，页头明确历史属性。功能说明随功能交付；merge SHA / CI 由 GitHub 和既有交付证据记录，不为同步每个 SHA 循环新增文档 PR。
+当前一期任务统一从[执行清单](plans/2026-09-06-execution-goal.md)恢复。D0–D5 合成桌面工程已合并；该阶段设计真源仍是 [2026-09-09 准备](plans/2026-09-09-desktop-integration-preparation.md)。Windows 安装包与实机以 [2026-09-10 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) 为计划入口，状态 DRAFT，不得当作已批准开工。章程和 README 只链接入口；带日期的计划保存当时的批准、设计和证据，页头明确历史属性。功能说明随功能交付；merge SHA / CI 由 GitHub 和既有交付证据记录，不为同步每个 SHA 循环新增文档 PR。
 
 ## 3. 修改与交接规则
 

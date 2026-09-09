@@ -27,6 +27,7 @@
 | 生成、核验并在隔离 PostgreSQL 15 中测试 W4 migration | [packages/database/README.md](packages/database/README.md) |
 | 核对 API 命名 profile、变量与失败关闭矩阵 | [docs/reference-api-runtime-config.md](docs/reference-api-runtime-config.md) |
 | 恢复当前一期任务、核对证据与下一动作 | [当前执行清单](docs/plans/2026-09-06-execution-goal.md) |
+| 审阅 Windows 安装包与实机方案（DRAFT，未批准开工） | [docs/plans/2026-09-10-windows-package-and-device-verification.md](docs/plans/2026-09-10-windows-package-and-device-verification.md) |
 | 核对关键词与自然语言搜索的候选展示规则（仅规则获批，算法未达标） | [候选展示规则与实现入口](docs/plans/2026-09-07-natural-language-search.md) |
 | 运行合成搜索判定实验、完整 N 验收及报告证明 | [实验工具说明](apps/api/experiments/search-decision/README.md) |
 | 已暂停的探索备忘：教师辅助选句与合成材料（不是上线前置条件） | [docs/plans/2026-09-05-script-selection-preparation.md](docs/plans/2026-09-05-script-selection-preparation.md) |
@@ -88,7 +89,7 @@ curl --fail --silent http://127.0.0.1:3100/health
 curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/审核/发布与 announce 读取；部署型 profile 和 Feishu auth 在监听前拒启，桌面未接线。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
+`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/审核/发布与 announce 读取；部署型 profile 和 Feishu auth 在监听前拒启。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 W4 数据库包只接受调用方提供的已连接 migration-owner `pg.Client`；下面的命令只生成/核验不可变 catalogue，并在隔离临时 PostgreSQL 15 cluster 中测试，不会访问共享本机或生产数据库：
 
@@ -218,7 +219,7 @@ pnpm test:e2e
 
 ## Windows 打包现状
 
-`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
+`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。安装包与实机阶段方案见 [DRAFT](docs/plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工；本文不授权打包或试装。
 
 ## macOS 打包与发布
 
@@ -240,6 +241,6 @@ pnpm package:mac
 
 ## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search、query/impression/adoption/escalate 的事务与幂等，以及通过正式 PostgreSQL 搜索主链执行的 50 条纯合成 runner；runner 只报告 `NOT_SIGNED` 原始分母，不证明真实业务准确率。查询文本仍不落库，桌面也未接线。真实飞书鉴权、storage/content readiness、桌面 adapter 与 runtime activation 仍不存在。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」仍不成立：后续还需 M2 桌面 adapter、飞书会话、正式内容/数据门与独立真实 G1a。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search、query/impression/adoption/escalate 的事务与幂等，以及通过正式 PostgreSQL 搜索主链执行的 50 条纯合成 runner；runner 只报告 `NOT_SIGNED` 原始分母，不证明真实业务准确率。查询文本仍不落库。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已合并合成桌面 adapter，不等于正式运行激活。真实飞书鉴权、storage/content readiness 与 runtime activation 仍未放行。向量检索、LLM、自动学习与自动发送仍需专项批准。把现有原型「换成 adapter 就能接库」仍不成立：已合并的是合成 loopback adapter，后续还需正式运行 adapter、飞书会话、正式内容/数据门与独立真实 G1a。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。

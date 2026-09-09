@@ -1,6 +1,6 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。D1 已实现 product:session-status/login/logout/session-changed，会话状态无 token，query-only 登录/退出、fox/query 读状态；检索 / 公告 IPC 尚未实现。后续获批方案见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)，实施前不得当作现行通道。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated`、`product:escalate/record-terminal`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 无 preload。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 
@@ -26,7 +26,7 @@ D1 另有临时独立登录窗，由 `product-login-window.ts` 持有非持久 p
 
 共同锁定（`lockRendererWindow`）：拒绝 `window.open`、拦截 `will-navigate`、拦截 `will-attach-webview`。会话级（`applySessionSecurity`）：权限请求 / 权限检查一律 false。
 
-CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；D1 main-process HTTP adapter 仅在显式纯合成接入 profile 持有会话，D2 查询与复制已接线。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
+CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；显式纯合成接入 profile 下 main 持有会话、查询复制、公告租约与合成求助，打包态若设置 origin 会拒启。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
 
 ---
 

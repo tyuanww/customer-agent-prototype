@@ -2,7 +2,7 @@
 
 本页按「要证明什么 → 跑哪条命令 → 它实际证明了什么」组织。命令都可以复制。先看本机静态 / 自动化结果，再单独列出只有真实设备才能证明的门禁。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)
 
 > 本 Demo 是合成数据、无后端、不代发。验证通过不等于可以正式发包，也不等于真实 OS 焦点 / 台前调度已被证明。
 
@@ -191,7 +191,7 @@ node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/script
 
 它**不能**证明：PE 可执行文件内部图标资源、Authenticode / EV 签名、真实 Windows 安装、任务栏图标。对应验收必须在 Windows 设备上做。禁止把未签名产物写成已签名。
 
-W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上执行 `pnpm test:e2e:windows-feasibility` 与 `pnpm package:win`。定向 E2E 会实际启动 `apps/desktop/out/main/index.js`，不经过 `apps/desktop/node_modules/@customer-agent/*` 的嵌套解析；`package:win` 先构建 `packages/contracts` runtime `dist`，再让 electron-vite 把该包内联进 main，并在打包前检查产物不含 workspace 裸导入。该路径确认 Fox / Query 两个 overlay 使用透明背景、快捷键注册成功、查询窗可打开并能干净退出；它比“脚本存在”多证明一次 clean-checkout 的 Windows 运行路径与未签名产物后验，但仍不是企业坐席真机、IME/DPI/读屏、真实 OS 按键投递、GPU 合成观感、签名、更新或 Pilot 验收。
+W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上执行 `pnpm test:e2e:windows-feasibility` 与 `pnpm package:win`。定向 E2E 会实际启动 `apps/desktop/out/main/index.js`，不经过 `apps/desktop/node_modules/@customer-agent/*` 的嵌套解析；`package:win` 先构建 `packages/contracts` runtime `dist`，再让 electron-vite 把该包内联进 main，并在打包前检查产物不含 workspace 裸导入。该路径确认 Fox / Query 两个 overlay 使用透明背景、快捷键注册成功、查询窗可打开并能干净退出；它比“脚本存在”多证明一次 clean-checkout 的 Windows 运行路径与未签名产物后验，但仍不是企业坐席真机、IME/DPI/读屏、真实 OS 按键投递、GPU 合成观感、签名、更新、Pilot 或 D1–D5 产品会话验收。安装包与实机方案见 [DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工，本页命令不得当作已授权打包。
 
 ### 3.4 W6 正式服务候选产物
 
@@ -265,7 +265,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 仅开发态显式设置 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 后运行 `pnpm dev`。两者必须是含端口的 `http://127.0.0.1:端口` origin，分别对应已经启动的 formal-dev API 与合成身份提供方；不能使用真实飞书地址或凭据。缺一项、非 loopback 或打包态拒启。无配置继续显式 S0 开发模式；接入模式故障不回退 S0。
 
-Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。D1 尚未接通后端搜索，登录后提示等待 D2。
+Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。D2 起登录后可查询复制；不得再写成 D1 之后仍未接通搜索。打包态若设置上述变量会拒启，因此当前未签名 Windows 包不能用于产品会话验收。
 
 自动化窗口验收：`pnpm --filter @customer-agent/desktop build` 后运行 `pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts`。该测试使用真实 Electron 与合成 HTTP double，校验加密文件生命周期、Query 状态及 token 不跨 preload；不等于真实身份、PG 整链或人工/Windows 验收。
 

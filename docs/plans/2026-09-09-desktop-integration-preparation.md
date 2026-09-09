@@ -1,8 +1,8 @@
 # 桌面与后端接入：下一阶段准备
 
 > 状态：**APPROVED · SYNTHETIC DESKTOP DEVELOPMENT ONLY**。
-> 本文件是下一阶段桌面接入方案的唯一计划真源。用户于 2026-09-09 明确确认批准 D1–D5 纯合成实施及逐切片 Git 交付。批准摘要由治理仓 `DEC-DESKTOP-SYNTHETIC-20260909` 拥有；批准不等于实现完成。
-> 当前执行状态统一由[执行清单](2026-09-06-execution-goal.md#当前执行清单)拥有。授权 D1–D5 实施，每切片测试、OCR 审查、修复复审后依次 commit / push / PR / 合并。冻结合同、真实数据、真实飞书凭据、Windows 实机接入和部署不在范围。
+> 本文件是 D0–D5 桌面接入方案的设计真源，不是当前动作清单。用户于 2026-09-09 明确确认批准 D1–D5 纯合成实施及逐切片 Git 交付。批准摘要由治理仓 `DEC-DESKTOP-SYNTHETIC-20260909` 拥有。
+> 2026-09-10：D0–D5 工程已合并；当前动作与证据分账见[执行清单](2026-09-06-execution-goal.md#当前执行清单)。Windows 安装包与实机见 [DRAFT](2026-09-10-windows-package-and-device-verification.md)，本文件不授权其开工。冻结合同、真实数据、真实飞书凭据、Windows 实现和部署仍不在范围。
 
 核对日期：2026-09-09。候选基线：产品 `main@bb7a14b565553dc689823e54b0218d1d24c47095`（PR #59），治理 `main@0904a0aa11f2dc29ae7700871a943c41295cd329`（PR #75）。冻结合同：OpenAPI 1.13.0 / schema.v1.17，`cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2`。
 
@@ -375,6 +375,8 @@ Step 0：最小变化是 main adapter + 窄 IPC，不新建桌面框架、不放
 2026-09-09 用户明确确认本方案 APPROVED，授权 D1–D5 纯合成开发；每切片测试 → OCR 审查 → 修复复审 → commit → push → PR → 合并。真实数据、真实飞书凭据、Windows 实机接入和部署排除。治理批准摘要：`DEC-DESKTOP-SYNTHETIC-20260909` / `EVD-DESKTOP-SYNTHETIC-AUTH-20260909`。
 
 D0：产品 PR #60 已合并为 `3d4cfcd`，合并后 CI `34349757408` SUCCESS。治理批准与状态候选完整 release 通过，因自动 Pages 发布边界暂缓合并。D1 已通过 PR #61 合并为 `40a7808`，合并 CI 34351864815 SUCCESS；D2 查询/复制本地实施，Git 连接超时，尚未 PR；D3–D5 尚未实施。D1–D5 按依赖串行推进；真实人工观察尚未完成时保留未确认，不以自动化代替。BACKEND-CI-503 保持 OPEN。
+
+上段是 2026-09-09 当日快照，保留不改写。2026-09-10 起以[执行清单](2026-09-06-execution-goal.md#当前执行清单)为准：D0–D5 工程已合并到 `main@5d6a802`；D2 经 PR #63 修复后通过，不得把 #62 原始合并写成 Windows smoke 已绿；用户反馈已完成观察（非独立报告、非 Windows 实机；回退后仍能查询只证明查询可用）。治理 PR #80 与 BACKEND-CI-503 保持 OPEN。
 
 以下评审表为批准前准备过程的历史记录，不覆盖本节授权。
 
