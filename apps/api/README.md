@@ -65,7 +65,11 @@ T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/
 
 ## 合成 worker 与受限审核（T3）
 
-独立 worker 进程使用 `CONTENT_WORKER_DATABASE_URL`（`app_backend_worker`）claim/heartbeat/`lease_version` fencing、冻结质量计划，并调用 `backend_review.park` / `finish`。解析 CSV 或带 csv 成员的有界 XLSX zip（解压累计 50 MiB、最多 128 个 ZIP 条目、解析 60 秒），不在长事务中做文件 I/O。审核 HTTP 在 `/v1/admin/content/reviews*`，使用 `CONTENT_REVIEW_DATABASE_URL`（`app_backend_review`）记录决定与质量证据、resume/cancel。高风险/冲突必须两个不同 `subject_hash`；取消后不得留下 staging。product+review 时 API 默认 runtime 12 + admin 2 + auth 2 + review 2 = 18，给 worker 进程预留 2。发布/读取不在本切片。
+独立 worker 进程使用 `CONTENT_WORKER_DATABASE_URL`（`app_backend_worker`）claim/heartbeat/`lease_version` fencing、冻结质量计划，并调用 `backend_review.park` / `finish`。解析 CSV 或带 csv 成员的有界 XLSX zip（解压累计 50 MiB、最多 128 个 ZIP 条目、解析 60 秒），不在长事务中做文件 I/O。审核 HTTP 在 `/v1/admin/content/reviews*`，使用 `CONTENT_REVIEW_DATABASE_URL`（`app_backend_review`）记录决定与质量证据、resume/cancel。高风险/冲突必须两个不同 `subject_hash`；取消后不得留下 staging。product+review 时 API 默认 runtime 12 + admin 2 + auth 2 + review 2 = 18，给 worker 进程预留 2。
+
+## 合成发布与回退（T4）
+
+Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用冻结 `publish_content_release` / `rollback_content_release`。复用已有 `CONTENT_ADMIN_DATABASE_URL` 连接池，不新增池。CAS 校验 `base_release_id`，并发发布 409；回退创建新的 `release_seq` 并记录 `rollback_of_release_id`。来源拒绝写入独立 `record_admin_source_denial_audit` 事务，审计失败不得返回成功。一期仅 owner。读取/ready 不在本切片。content_releases 的延迟约束触发器在 COMMIT 时以当前角色执行，合成测试为 `app_content_admin` 补了触发器只读所需的表/digest 授权；冻结合同 EXECUTE-only ACL 本身不够。
 
 ## 验证
 

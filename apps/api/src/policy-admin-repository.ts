@@ -298,8 +298,8 @@ export function createPolicyAdminRepository(
     connectionString: config.connectionString,
     max: config.poolMax,
     connectionTimeoutMillis: config.connectionTimeoutMs,
-    query_timeout: config.readinessTimeoutMs,
-    statement_timeout: config.readinessTimeoutMs,
+    query_timeout: 30_000,
+    statement_timeout: 30_000,
     idle_in_transaction_session_timeout: 10_000,
     application_name: 'cs-ai-api-policy-admin',
     maxLifetimeSeconds: 300,
@@ -307,11 +307,20 @@ export function createPolicyAdminRepository(
 }
 
 /** Internal deterministic test seam; not exported from the package entrypoint. */
+const sharedAdminPools = new WeakMap<PolicyAdminRepository, Pool>();
+
 export function createPolicyAdminRepositoryForPool(
   pool: PolicyAdminPool,
   diagnosticSink: ApiRuntimeDiagnosticSink = () => undefined,
 ): PolicyAdminRepository {
-  return new PostgresPolicyAdminRepository(pool, diagnosticSink);
+  const repository = new PostgresPolicyAdminRepository(pool, diagnosticSink);
+  if (pool instanceof Pool) sharedAdminPools.set(repository, pool);
+  return repository;
+}
+
+/** Shared app_content_admin pool. Publish/rollback reuse it instead of opening a second pool. */
+export function sharedPolicyAdminPool(repository: PolicyAdminRepository): Pool | undefined {
+  return sharedAdminPools.get(repository);
 }
 
 export function createUnavailablePolicyAdminRepository(): PolicyAdminRepository {

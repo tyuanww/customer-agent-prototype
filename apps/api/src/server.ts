@@ -3,6 +3,8 @@ import { createSyntheticIdentityProvider } from './synthetic-identity-provider.j
 import { createContentObjectStore } from './content-object-store.js';
 import { createContentImportService } from './content-import-service.js';
 import { createContentReviewService } from './content-review-service.js';
+import { createContentReleaseServiceForPool } from './content-release-service.js';
+import { sharedPolicyAdminPool } from './policy-admin-repository.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
 import {
@@ -69,11 +71,17 @@ export async function startApi(
         const contentReview = bootstrap.contentReview === undefined ? undefined : {
           service: createContentReviewService(bootstrap.contentReview.database),
         };
+        const adminPool = sharedPolicyAdminPool(policyAdminRepository);
+        const contentRelease = adminPool === undefined ? undefined : {
+          service: createContentReleaseServiceForPool(
+            adminPool, bootstrap.idempotencyHmac, bootstrap.logHash, false,
+          ),
+        };
         return createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
-          contentImport, contentReview);
+          contentImport, contentReview, contentRelease);
       } catch (error) {
         await auth?.close();
         throw error;

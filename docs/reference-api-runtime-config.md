@@ -37,7 +37,7 @@
 | `CUSTOMER_AGENT_API_PORT` | formal-dev 默认 `3100`；两者范围均为 `1024..65535`，test 另可用 `0` 做 ephemeral 监听 | 不回显非法原值 |
 | `CUSTOMER_AGENT_BUILD_VERSION` | 可省略，默认 `dev-m0`；1–64 位安全版本字符 | 仅合法值进入 `/health.version` |
 | `DATABASE_URL` | 必填；runtime 登录 DSN，只接受 loopback PostgreSQL URL、非空登录名与数据库路径；不得带 fragment 或驱动控制参数 | 只保留在私有 bootstrap config，不回显原值 |
-| `CONTENT_ADMIN_DATABASE_URL` | 必填；独立 `app_content_admin` 登录 DSN，格式同上；DSN/登录名必须与 runtime 不同，但解析后的精确 host/port/database 目标必须相同（不把 `localhost` 与 `127.0.0.1` 猜成同一实例） | 同上 |
+| `CONTENT_ADMIN_DATABASE_URL` | 必填；独立 `app_content_admin` 登录 DSN，格式同上；DSN/登录名必须与 runtime 不同，但解析后的精确 host/port/database 目标必须相同（不把 `localhost` 与 `127.0.0.1` 猜成同一实例）。T4 发布/回退复用该池，不另开连接 | 同上 |
 | `DB_POOL_MAX` | 可省略，runtime 默认 `18`（product 会话模式为 `16`，再配置审核池时为 `12`）；只接受 `1..20` 正整数 | 不进入公开 config 或响应 |
 | `CONTENT_ADMIN_DB_POOL_MAX` | 可省略，admin 默认 `2`；只接受 `1..20`，且所有启用的 pool 合计不得超过 `20` | 同上 |
 | `DB_CONNECTION_TIMEOUT_MS` | 可省略，默认 `2000`，范围 `1..10000`；只约束连接获取 | 不进入公开 config 或响应 |
