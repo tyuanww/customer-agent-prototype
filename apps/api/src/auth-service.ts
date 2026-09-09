@@ -9,12 +9,26 @@ export type AuthenticatedUser = components['schemas']['CurrentUserResponse'];
 
 export type AuthReadiness = 'ok' | 'not_ready';
 
-export type AuthService = Readonly<{
-  createMockSession: (claims: UserClaims) => MockLoginResponse;
-  authenticate: (credentials: MockCredentials) => AuthenticatedUser | null;
+type SharedAuthService = Readonly<{
+  authenticate: (credentials: MockCredentials) => Promise<AuthenticatedUser | null>;
   readiness: () => AuthReadiness;
-  close: () => void;
+  close: () => void | Promise<void>;
 }>;
+
+export type MockAuthService = SharedAuthService & Readonly<{
+  kind: 'mock';
+  createMockSession: (claims: UserClaims) => MockLoginResponse;
+}>;
+
+export type ProductAuthService = SharedAuthService & Readonly<{
+  kind: 'product';
+  createLogin: (challenge: string) => Promise<components['schemas']['LoginCreated']>;
+  callback: (state: string, code: string | undefined) => Promise<void>;
+  exchange: (loginId: string, verifier: string) => Promise<components['schemas']['LoginSession'] | null>;
+  logout: (token: string) => Promise<void>;
+}>;
+
+export type AuthService = MockAuthService | ProductAuthService;
 
 export type MockCredentials = Readonly<{
   authorization?: string | readonly string[];
@@ -28,7 +42,8 @@ function frozenClaims(claims: UserClaims): UserClaims {
   return Object.freeze({ user_id: claims.user_id, role: claims.role });
 }
 
-class InMemoryMockAuthService implements AuthService {
+class InMemoryMockAuthService implements MockAuthService {
+  readonly kind = 'mock' as const;
   private readonly sessions = new Map<string, UserClaims>();
   private closed = false;
 
@@ -49,7 +64,7 @@ class InMemoryMockAuthService implements AuthService {
     return Object.freeze({ token, user });
   }
 
-  authenticate(credentials: MockCredentials): AuthenticatedUser | null {
+  async authenticate(credentials: MockCredentials): Promise<AuthenticatedUser | null> {
     if (this.closed) return null;
     const hasBearer = credentials.authorization !== undefined;
     const hasMockHeaders = credentials.mockUser !== undefined || credentials.mockRole !== undefined;
@@ -87,7 +102,7 @@ class InMemoryMockAuthService implements AuthService {
 
 export function createMockAuthService(
   tokenFactory: TokenFactory = randomUUID,
-): AuthService {
+): MockAuthService {
   return new InMemoryMockAuthService(tokenFactory);
 }
 
@@ -100,7 +115,7 @@ export function bearerToken(authorization: string | undefined): string | null {
 export function authenticateRequestHeaders(
   authService: AuthService,
   headers: IncomingHttpHeaders,
-): AuthenticatedUser | null {
+): Promise<AuthenticatedUser | null> {
   return authService.authenticate({
     ...(headers.authorization === undefined ? {} : { authorization: headers.authorization }),
     ...(headers['x-mock-user'] === undefined ? {} : { mockUser: headers['x-mock-user'] }),

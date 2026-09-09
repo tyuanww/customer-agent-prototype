@@ -1,14 +1,14 @@
 # `@customer-agent/api`
 
-本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.15` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。G1A-E0 的仓外输入验证和离线评测只位于 `tests/support/g1a-e0/`，不会进入本包正式构建。合成搜索判定实验位于 `experiments/search-decision/`，同样不进入 `dist` 或正式候选包；它复用 `src/search-decision.ts` 与 `src/search-relations.ts` 的判定诊断，不再改写产品规则；来源注解与需求判定只在实验内使用。
+本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.16` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。G1A-E0 的仓外输入验证和离线评测只位于 `tests/support/g1a-e0/`，不会进入本包正式构建。合成搜索判定实验位于 `experiments/search-decision/`，同样不进入 `dist` 或正式候选包；它复用 `src/search-decision.ts` 与 `src/search-relations.ts` 的判定诊断，不再改写产品规则；来源注解与需求判定只在实验内使用。
 
-当前不是业务 API：
+当前开发边界：
 
 - 只允许 `CUSTOMER_AGENT_PROFILE=formal-dev|test`、`AUTH_MODE=mock` 和 `127.0.0.1`。
 - `demo` 属于桌面合成运行链，不允许启动本服务。
 - `single-host`、`multi-instance`、`production` 与 `AUTH_MODE=feishu` 尚未具备后续依赖，监听前失败关闭。
 - `/health` 不访问数据库；`/ready` 只把 database/schema/auth 的真实结果写入合同响应。
-- auth 已由当前 mock service 返回 `ok`；storage/content 尚未实现，因此 `/ready` 正常结果仍是 503，而不是业务已可用。
+- auth 由所选身份服务返回实际状态；storage/content 尚未实现，因此 `/ready` 正常结果仍是 503，而不是业务已可用。
 - `/v1/search` 仅接受 `collection_mode=synthetic`，原始输入只在 HTTP 边界内参与版本化 HMAC，`query_events` 固定以 `text_storage_status=suppressed` 记录，不持久化查询原文或其可关联文本 hash。搜索、query、impression 与幂等完成同事务提交；来源门失败先回滚，再由独立短事务写安全拒绝审计。
 - `/v1/events/adoption` 的 `adopted` 只表示候选成功复制，且每个 query 仅允许一个 terminal；`/v1/events/escalate` 是非终态辅助动作，同一 `(query_id, action)` 返回同一事实。无状态 `collection_disabled` 搜索不会留下 query/idempotency，后续事件返回 404。
 - migration 自动执行、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
@@ -21,7 +21,7 @@
 
 ## 本地运行
 
-先准备一个已应用十二段 migration 的本机隔离 PostgreSQL 15 数据库，并分别提供属于 `app_runtime` 与 `app_content_admin` 的两个登录角色。连接串和 HMAC key 只通过本机环境注入，不写入仓库：
+先准备一个已应用十三段 migration 的本机隔离 PostgreSQL 15 数据库，并分别提供属于 `app_runtime` 与 `app_content_admin` 的两个登录角色。连接串和 HMAC key 只通过本机环境注入，不写入仓库：
 
 ```bash
 CUSTOMER_AGENT_PROFILE=formal-dev \
@@ -52,6 +52,12 @@ curl --silent --include http://127.0.0.1:3100/ready
 ```
 
 当前 `/ready` 会显示 database/schema/auth 的真实状态，但 storage/content 仍为 `not_ready`，所以返回 503。
+
+## 合成产品会话（T1）
+
+在上述本机开发配置上显式设置 `AUTH_SESSION_MODE=product`，并提供独立 `AUTH_DATABASE_URL`（仅属于 `app_backend_auth` 的无特权登录角色）及 `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN=http://127.0.0.1:<port>`。完整变量约束见配置 SSOT。没有提供这两项时拒启，不能退回 mock-login。`AUTH_MODE` 仍为 `mock`，如实说明身份来源是合成提供方；产品会话模式不接受 X-Mock-User/Role，也不注册 `/v1/auth/mock-login`。
+
+T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/auth/me` → logout。会话落在 PostgreSQL，数据库仅存 token 摘要；兑换成功响应丢失后重新登录，不能重放获取 bearer。提供方是本机合成测试服务，其 `/exchange` 只返回 `{provider: "synthetic", binding_id: "synthetic_..."}`，不存在真实飞书适配。实际启动入口及此 wire 已在隔离 PG15 合成集成测试贯通；本节不提供真实凭据或运行激活。
 
 ## 验证
 

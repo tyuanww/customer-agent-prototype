@@ -21,7 +21,7 @@ export function registerAuthRoutes(
   app: FastifyInstance,
   authService: AuthService,
 ): void {
-  app.post('/v1/auth/mock-login', async (request, reply) => {
+  if (authService.kind === 'mock') app.post('/v1/auth/mock-login', async (request, reply) => {
     if (!hasExactKeys(request.body, ['user_id', 'role'])) return sendValidationError(reply);
     const requestContract = validateContractSchema('MockLoginRequest', request.body);
     if (!requestContract.ok) return sendValidationError(reply);
@@ -39,7 +39,8 @@ export function registerAuthRoutes(
   });
 
   app.get('/v1/auth/me', async (request, reply) => {
-    const user = authenticateRequestHeaders(authService, request.headers);
+    reply.header('cache-control', 'no-store');
+    const user = await authenticateRequestHeaders(authService, request.headers);
     if (user === null) return sendUnauthorized(reply);
 
     const payload = parseContractSchema('CurrentUserResponse', {

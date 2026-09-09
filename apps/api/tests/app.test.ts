@@ -1,3 +1,4 @@
+import { createMockAuthService } from '../src/auth-service.js';
 import {
   afterAll,
   afterEach,
@@ -1732,4 +1733,19 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await owner.end();
     }
   }, 120_000);
+});
+
+
+describe('identity shutdown ownership', () => {
+  it('closes both repositories even when identity shutdown rejects', async () => {
+    const auth = createMockAuthService();
+    const repository = stubRepository();
+    const admin = stubPolicyAdminRepository();
+    vi.spyOn(auth, 'close').mockImplementation(() => { throw new Error('synthetic shutdown failure'); });
+    const app = createApiApp(parseApiRuntimeConfig(databaseEnvironment()), repository, undefined, auth, admin);
+    await app.ready();
+    await expect(app.close()).rejects.toThrow('API resource shutdown failed');
+    expect(repository.close).toHaveBeenCalledOnce();
+    expect(admin.close).toHaveBeenCalledOnce();
+  });
 });

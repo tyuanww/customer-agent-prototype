@@ -1,3 +1,5 @@
+import { createProductAuthService } from './product-auth-service.js';
+import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
 import {
@@ -28,7 +30,7 @@ type ApiAppFactory = (
   repository: ServiceRepository,
   policyAdminRepository: PolicyAdminRepository,
   bootstrap: ApiPrivateBootstrapConfig,
-) => FastifyInstance;
+) => FastifyInstance | Promise<FastifyInstance>;
 type ServiceRepositoryFactory = (
   config: ApiDatabaseBootstrapConfig,
 ) => ServiceRepository;
@@ -44,22 +46,24 @@ export async function startApi(
 ): Promise<StartedApi> {
   return startApiWithFactory(
     options,
-    (config, repository, policyAdminRepository, bootstrap) => createApiApp(
-      config,
-      repository,
-      undefined,
-      undefined,
-      policyAdminRepository,
-      {
-        operation: { execute: (request) => repository.executeSearch(request) },
-        logHash: bootstrap.logHash,
-        idempotencyHmac: bootstrap.idempotencyHmac,
-      },
-      {
-        repository,
-        idempotencyHmac: bootstrap.idempotencyHmac,
-      },
-    ),
+    async (config, repository, policyAdminRepository, bootstrap) => {
+      let auth;
+      if (config.sessionMode === 'product') {
+        if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
+        auth = await createProductAuthService(bootstrap.productIdentity.database,
+          createSyntheticIdentityProvider(bootstrap.productIdentity.providerOrigin,
+            `http://${config.host}:${config.port}/v1/auth/callback`));
+      }
+      try {
+        return createApiApp(config, repository, undefined, auth, policyAdminRepository,
+          { operation: { execute: (request) => repository.executeSearch(request) },
+            logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
+          { repository, idempotencyHmac: bootstrap.idempotencyHmac });
+      } catch (error) {
+        await auth?.close();
+        throw error;
+      }
+    },
   );
 }
 
@@ -82,7 +86,7 @@ export async function startApiWithFactory(
   try {
     repository = buildRepository(bootstrap.runtimeDatabase);
     policyAdminRepository = buildPolicyAdminRepository(bootstrap.policyAdminDatabase);
-    const builtApp = buildApp(config, repository, policyAdminRepository, bootstrap);
+    const builtApp = await buildApp(config, repository, policyAdminRepository, bootstrap);
     app = builtApp;
     const address = await builtApp.listen({ host: config.host, port: config.port });
     return Object.freeze({

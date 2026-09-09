@@ -19,6 +19,7 @@ export type ApiRuntimeEnvironment = Readonly<Record<string, string | undefined>>
 export type ApiRuntimeConfig = Readonly<{
   profile: ApiProfile;
   authMode: 'mock';
+  sessionMode?: 'product';
   host: '127.0.0.1';
   port: number;
   buildVersion: string;
@@ -41,6 +42,7 @@ export type ApiHmacKeyRing = Readonly<{
 
 /** Private, process-local capability configuration. It must never cross the composition root. */
 export type ApiPrivateBootstrapConfig = Readonly<{
+  productIdentity?: Readonly<{ database: ApiDatabaseBootstrapConfig; providerOrigin: string }>;
   runtimeDatabase: ApiDatabaseBootstrapConfig;
   policyAdminDatabase: ApiDatabaseBootstrapConfig;
   idempotencyHmac: ApiHmacKeyRing;
@@ -401,6 +403,13 @@ export function parseApiRuntimeConfig(
   const issues: ApiConfigIssue[] = [];
   const profile = parseProfile(environment, issues);
   const authMode = parseAuthMode(environment, issues);
+  const sessionMode = environment.AUTH_SESSION_MODE;
+  if (sessionMode !== undefined && sessionMode !== 'mock' && sessionMode !== 'product') {
+    issues.push(issue('AUTH_SESSION_MODE', 'invalid'));
+  }
+  if (sessionMode !== 'product' && (environment.AUTH_DATABASE_URL !== undefined || environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN !== undefined)) {
+    issues.push(issue('AUTH_SESSION_MODE', 'invalid'));
+  }
   const requestedHost = exactEnvironmentValue(
     environment,
     'CUSTOMER_AGENT_API_HOST',
@@ -429,6 +438,7 @@ export function parseApiRuntimeConfig(
   return Object.freeze({
     profile,
     authMode,
+    ...(sessionMode === 'product' ? { sessionMode } : {}),
     host: LOOPBACK_HOST,
     port,
     buildVersion,
@@ -459,13 +469,30 @@ export function parseApiPrivateBootstrapConfig(
   const runtimeDatabase = parseDatabaseConfig(environment, {
     connectionString: 'DATABASE_URL',
     poolMax: 'DB_POOL_MAX',
-    defaultPoolMax: DEFAULT_DB_POOL_MAX,
+    defaultPoolMax: environment.AUTH_SESSION_MODE === 'product' ? 16 : DEFAULT_DB_POOL_MAX,
   }, issues);
   const policyAdminDatabase = parseDatabaseConfig(environment, {
     connectionString: 'CONTENT_ADMIN_DATABASE_URL',
     poolMax: 'CONTENT_ADMIN_DB_POOL_MAX',
     defaultPoolMax: DEFAULT_POLICY_ADMIN_DB_POOL_MAX,
   }, issues);
+  let productIdentity: ApiPrivateBootstrapConfig['productIdentity'];
+  if (environment.AUTH_SESSION_MODE === 'product') {
+    const database = parseDatabaseConfig(environment, {
+      connectionString: 'AUTH_DATABASE_URL', poolMax: 'AUTH_DB_POOL_MAX', defaultPoolMax: 2,
+    }, issues);
+    let providerOrigin: string | undefined;
+    try {
+      const raw = environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN;
+      if (!raw) throw new Error('missing');
+      const url = new URL(raw);
+      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port
+        || Number(url.port) < 1024 || url.username || url.password || url.pathname !== '/'
+        || url.search || url.hash) throw new Error('invalid');
+      providerOrigin = url.origin;
+    } catch { issues.push(issue('SYNTHETIC_IDENTITY_PROVIDER_ORIGIN', 'invalid')); }
+    if (database && providerOrigin) productIdentity = Object.freeze({ database, providerOrigin });
+  }
   const idempotencyHmac = parseHmacKeyRing(environment, issues);
   const logHash = parseLogHashConfig(environment, issues);
 
@@ -482,6 +509,17 @@ export function parseApiPrivateBootstrapConfig(
       issues.push(issue('CONTENT_ADMIN_DB_POOL_MAX', 'invalid'));
     }
   }
+  if (productIdentity && runtimeDatabase && policyAdminDatabase) {
+    const auth = productIdentity.database;
+    if ([runtimeDatabase, policyAdminDatabase].some(other =>
+      postgresLoginName(auth.connectionString) === postgresLoginName(other.connectionString)
+      || postgresDatabaseTarget(auth.connectionString) !== postgresDatabaseTarget(other.connectionString))) {
+      issues.push(issue('AUTH_DATABASE_URL', 'invalid'));
+    }
+    if (auth.poolMax + runtimeDatabase.poolMax + policyAdminDatabase.poolMax > MAX_TOTAL_DB_POOL_CONNECTIONS) {
+      issues.push(issue('AUTH_DB_POOL_MAX', 'invalid'));
+    }
+  }
   if (idempotencyHmac && logHash
     && Object.values(idempotencyHmac.keys).includes(logHash.key)) {
     issues.push(issue('LOG_HASH_KEY', 'invalid'));
@@ -491,7 +529,9 @@ export function parseApiPrivateBootstrapConfig(
     || !idempotencyHmac || !logHash) {
     throw new ApiConfigError(issues);
   }
-  return Object.freeze({ runtimeDatabase, policyAdminDatabase, idempotencyHmac, logHash });
+  return Object.freeze({ runtimeDatabase, policyAdminDatabase, idempotencyHmac, logHash,
+    ...(productIdentity ? { productIdentity } : {}),
+  });
 }
 
 function createDiagnosticId(): string {

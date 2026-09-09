@@ -96,7 +96,7 @@ export function registerSearchRoute(
   dependencies?: SearchRouteDependencies,
 ): void {
   app.post('/v1/search', async (request, reply) => {
-    const actor = authenticateRequestHeaders(authService, request.headers);
+    const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
 
     const rawQueryText = request.body !== null && typeof request.body === 'object'

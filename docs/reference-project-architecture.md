@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1–T6 的 HTTP/worker 实施仍在后续切片，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链；桌面 adapter、正式飞书鉴权、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1 合成产品会话与异步认证已进入实施，T2–T6 内容 HTTP/worker 仍在后续切片，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链；桌面 adapter、正式飞书鉴权、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -37,12 +37,14 @@
 contracts/upstream（不可变输入；同一受锁 snapshot）
   ├─ packages/contracts（bundle / generated TS / runtime validator）
   │    └─ apps/api → health / ready / mock auth / policy（loopback only）
-  └─ packages/database（0001..0012 / catalogue / ledger / verify）
+  └─ packages/database（0001..0013 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
 apps/api（DEV-M1 COMPLETE）
   ├─ runtime pg.Pool → readiness + policy read + SearchBackend + Events
   ├─ isolated admin pg.Pool → PolicyAdminRepository → set_policy_flag only
+  ├─ product-auth-service → isolated auth pool → frozen identity SQL
+  │    └─ synthetic-identity-provider → bounded loopback code exchange
   └─ legacy synthetic G1a runner → isolated PG15 → same SearchBackend（NOT_EVALUATED）
 
 apps/api/tests/support/g1a-e0（test-only；不进入 dist）
@@ -226,3 +228,8 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 链路为 `verified package → actual PG runner → serializeG1aDelivery → G1A_E0_DELIVERY line → read-g1a-delivery.mjs → host exclusive save/readback`。正文和包内原始标识不会进入新 stdout；完整报告仍保持 NOT_SIGNED，下游动作只是期望且未执行。失败报告在正常清理后可以导出；清理失败则不输出可消费报告。
 
 交付格式、读取方式及兼容边界见 [API 说明](../apps/api/README.md#安全报告交付)。外层操作器只拥有批准、宿主沙箱、进程、0600 排他保存与恢复；不读取 TS 源码推导 enum，也不重算业务结论。旧操作器与旧证据冻结，新候选必须使用匹配的新消费者，不把旧真实运行配置自动切换到未合并代码。
+
+
+### T1 身份所有权
+
+`runtime-config.ts` 唯一解析显式产品会话配置和三池总预算；`server.ts` 组合受控提供方与身份服务，失败时不建 mock。`product-auth-service.ts` 封装持久登录、会话、最小数据库角色和关闭；`synthetic-identity-provider.ts` 仅拥有本机合成 wire 的 URL、响应和取消预算。`product-auth-routes.ts` 拥有封闭 HTTP 输入、静态完成页、错误响应和固定限流窗口。现有 auth/search/event/policy 路由统一等待异步认证；renderer 未接入这些能力。

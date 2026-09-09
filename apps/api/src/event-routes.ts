@@ -48,7 +48,7 @@ export function registerEventRoutes(
   dependencies?: EventRouteDependencies,
 ): void {
   app.post('/v1/events/adoption', async (request, reply) => {
-    const actor = authenticateRequestHeaders(authService, request.headers);
+    const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);
     if (key === null) return sendValidationError(reply);
@@ -72,7 +72,7 @@ export function registerEventRoutes(
   });
 
   app.post('/v1/events/escalate', async (request, reply) => {
-    const actor = authenticateRequestHeaders(authService, request.headers);
+    const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);
     if (key === null) return sendValidationError(reply);

@@ -23,7 +23,7 @@ export function registerPolicyReadRoute(
   authService: AuthService,
 ): void {
   app.get('/v1/policy', async (request, reply) => {
-    const actor = authenticateRequestHeaders(authService, request.headers);
+    const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
 
     const flags = await repository.readPolicyFlags();
@@ -64,7 +64,7 @@ export function registerPolicyWriteRoute(
   authService: AuthService,
 ): void {
   app.post('/v1/policy/flags', async (request, reply) => {
-    const actor = authenticateRequestHeaders(authService, request.headers);
+    const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!validIdempotencyKey(request.headers['idempotency-key'])
       || !hasExactUpdateShape(request.body)) {

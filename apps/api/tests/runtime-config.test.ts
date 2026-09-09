@@ -4,6 +4,7 @@ import {
   formatApiShutdownFailure,
   formatApiStartupFailure,
   parseApiRuntimeConfig,
+  parseApiPrivateBootstrapConfig,
 } from '../src/runtime-config.js';
 
 const FORMAL_DEV_ENV = Object.freeze({
@@ -184,5 +185,33 @@ describe('API runtime configuration', () => {
     const scrubbed = formatApiShutdownFailure('SIGINT', secret);
     expect(scrubbed).toMatch(/Diagnostic: diag_[0-9a-f]{32}$/);
     expect(scrubbed).not.toContain(secret);
+  });
+});
+
+
+describe('synthetic product identity bootstrap', () => {
+  const environment = {
+    ...FORMAL_DEV_ENV, AUTH_SESSION_MODE: 'product',
+    DATABASE_URL: 'postgresql://synthetic_runtime@127.0.0.1:44001/synthetic',
+    CONTENT_ADMIN_DATABASE_URL: 'postgresql://synthetic_admin@127.0.0.1:44001/synthetic',
+    AUTH_DATABASE_URL: 'postgresql://synthetic_auth@127.0.0.1:44001/synthetic',
+    SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: 'http://127.0.0.1:44002',
+    IDEMPOTENCY_HMAC_KEYS: JSON.stringify({ 'hmac-idempotency-v1': 'synthetic-idempotency-material-0001' }),
+    IDEMPOTENCY_HMAC_CURRENT_VERSION: 'hmac-idempotency-v1',
+    LOG_HASH_KEY: 'synthetic-log-hash-material-00000001', LOG_HASH_KEY_VERSION: 'hmac-log-v1',
+  };
+  it('requires explicit session mode and reserves a separate bounded capability pool', () => {
+    expect(parseApiRuntimeConfig(environment).sessionMode).toBe('product');
+    const config = parseApiPrivateBootstrapConfig(environment);
+    expect(config.runtimeDatabase.poolMax + config.policyAdminDatabase.poolMax + config.productIdentity!.database.poolMax).toBe(20);
+    for (const patch of [
+      { AUTH_DATABASE_URL: undefined }, { AUTH_DATABASE_URL: environment.DATABASE_URL },
+      { AUTH_DATABASE_URL: 'postgresql://synthetic_auth@127.0.0.1:44001/other' },
+      { SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: 'https://example.com' },
+      { SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: undefined }, { AUTH_DB_POOL_MAX: '3' },
+    ]) expect(() => parseApiPrivateBootstrapConfig({ ...environment, ...patch })).toThrow(ApiConfigError);
+    expect(() => parseApiRuntimeConfig({ ...environment, AUTH_SESSION_MODE: undefined })).toThrow(ApiConfigError);
+    expect(() => parseApiRuntimeConfig({ ...environment, AUTH_SESSION_MODE: 'typo' })).toThrow(ApiConfigError);
+    expect(() => parseApiRuntimeConfig({ ...environment, AUTH_MODE: 'feishu' })).toThrow(ApiConfigError);
   });
 });

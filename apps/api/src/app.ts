@@ -1,3 +1,5 @@
+import { IdentityFailure } from './product-auth-service.js';
+import { registerProductAuthRoutes, sendIdentityFailure } from './product-auth-routes.js';
 import fastify, { type FastifyInstance } from 'fastify';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { registerAuthRoutes } from './auth-routes.js';
@@ -45,11 +47,18 @@ export function createApiApp(
   config: ApiRuntimeConfig,
   repository: ServiceRepository,
   diagnosticSink: ApiRuntimeDiagnosticSink = reportApiRuntimeDiagnostic,
-  authService: AuthService = createMockAuthService(),
+  providedAuthService?: AuthService,
   policyAdminRepository: PolicyAdminRepository = createUnavailablePolicyAdminRepository(),
   searchDependencies?: SearchRouteDependencies,
   eventDependencies?: EventRouteDependencies,
 ): FastifyInstance {
+  if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
+    throw new Error('Product session mode requires explicit identity service');
+  }
+  if (config.sessionMode !== 'product' && providedAuthService?.kind === 'product') {
+    throw new Error('Product identity cannot be installed in mock session mode');
+  }
+  const authService = providedAuthService ?? createMockAuthService();
   const app = fastify({
     bodyLimit: HTTP_JSON_BODY_MAX_BYTES,
     exposeHeadRoutes: false,
@@ -57,6 +66,7 @@ export function createApiApp(
   });
 
   app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof IdentityFailure) return sendIdentityFailure(reply, error);
     if (isRequestBodyValidationError(error)) return sendValidationError(reply);
     try {
       diagnosticSink(createApiRuntimeDiagnostic('API_REQUEST_FAILED', error));
@@ -68,11 +78,15 @@ export function createApiApp(
   });
 
   app.addHook('onClose', async () => {
-    authService.close();
-    await Promise.all([repository.close(), policyAdminRepository.close()]);
+    const results = await Promise.allSettled([
+      () => authService.close(), () => repository.close(), () => policyAdminRepository.close(),
+    ].map(close => Promise.resolve().then(close)));
+    const failures = results.filter(result => result.status === 'rejected');
+    if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'API resource shutdown failed');
   });
 
   registerAuthRoutes(app, authService);
+  if (authService.kind === 'product') registerProductAuthRoutes(app, authService);
   registerPolicyReadRoute(app, config, repository, authService);
   registerPolicyWriteRoute(app, policyAdminRepository, authService);
   registerSearchRoute(app, authService, searchDependencies);
