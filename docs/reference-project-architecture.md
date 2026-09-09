@@ -36,8 +36,8 @@
 
 contracts/upstream（不可变输入；同一受锁 snapshot）
   ├─ packages/contracts（bundle / generated TS / runtime validator）
-  │    └─ apps/api → health / ready / mock auth / policy（loopback only）
-  └─ packages/database（0001..0013 / catalogue / ledger / verify）
+  │    └─ apps/api → 合成身份 / 内容闭环 / search / announce（loopback only）
+  └─ packages/database（0001..0014 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
 apps/api（DEV-M1 COMPLETE）
@@ -73,7 +73,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | 根 `scripts/` | 合同快照接收、workspace 卫生门、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
-| `packages/database/` | 在同一已验证快照内确定性生成十二段 migration；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成 migration（当前十四段）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -129,9 +129,10 @@ contracts/upstream/customer-agent/<contract_set_id>
                                           ├─ HealthResponse ──> apps/api GET /health
                                           └─ Ready/NotReady ──> apps/api GET /ready
 
-v1.15 migrated PG15
-  ├─ app_runtime pool ──> readiness + policy read + controlled SearchRepository
-  └─ isolated app_content_admin pool ──> set_policy_flag（唯一受控写入口）
+v1.17 migrated PG15
+  ├─ app_runtime pool ──> readiness / search / events / import / announce
+  ├─ isolated app_content_admin pool ──> policy / publish / rollback
+  └─ 独立 auth / worker / review 能力池 ──> 产品会话 / 导入处理 / 审核质量门
 
 /v1 search + events ──synthetic transaction 可用──> renderer 仍不允许直连
 /v1 desktop adapter ──尚未实现──> renderer 仍不允许直连
@@ -142,7 +143,7 @@ v1.15 migrated PG15
 
 `apps/desktop/src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有桌面合成搜索均未导入该包。当前 `/v1` 已实现 mock auth、policy、synthetic-only Search + Events 主链；桌面 adapter 仍不存在，真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有桌面合成搜索均未导入该包。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告及 synthetic-only Search + Events 主链；桌面 adapter 仍不存在，真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
 
 ## 5. 测试和验证层级
 

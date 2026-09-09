@@ -6,6 +6,8 @@ import { hmacSafeValue } from './idempotency.js';
 import type { OperationFailureCode } from './operation-result.js';
 import {
   createApiRuntimeDiagnostic,
+  reportApiRuntimeDiagnostic,
+  type ApiRuntimeDiagnosticCode,
   type ApiRuntimeDiagnosticSink,
 } from './runtime-diagnostics.js';
 
@@ -307,11 +309,11 @@ export function createAnnounceServiceForPool(
   pool: Pick<Pool, 'connect' | 'query' | 'end'>,
   logHash: Readonly<{ version: string; key: string }>,
   ownsPool: boolean,
-  diagnosticSink: ApiRuntimeDiagnosticSink = () => undefined,
+  diagnosticSink: ApiRuntimeDiagnosticSink = reportApiRuntimeDiagnostic,
 ): AnnounceService {
-  function report(error: unknown): void {
+  function report(error: unknown, code: ApiRuntimeDiagnosticCode = 'ANNOUNCE_FAILED'): void {
     try {
-      diagnosticSink(createApiRuntimeDiagnostic('ANNOUNCE_FAILED', error));
+      diagnosticSink(createApiRuntimeDiagnostic(code, error));
     } catch {
       // Observational.
     }
@@ -336,11 +338,16 @@ export function createAnnounceServiceForPool(
       logHash.version,
       logHash.key,
     );
-    const client = await pool.connect().catch(() => null);
+    const client = await pool.connect().catch((error: unknown) => {
+      report(error, 'ANNOUNCE_AUDIT_CONNECT_FAILED');
+      return null;
+    });
     if (client === null) return false;
     let broken = false;
+    let failureCode: ApiRuntimeDiagnosticCode = 'ANNOUNCE_AUDIT_BEGIN_FAILED';
     try {
       await client.query('BEGIN');
+      failureCode = 'ANNOUNCE_AUDIT_WRITE_FAILED';
       await client.query(
         `SELECT public.record_runtime_source_denial_audit($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9)`,
         [
@@ -355,11 +362,17 @@ export function createAnnounceServiceForPool(
           `diag_${diagnosticDigest.slice(0, 32)}`,
         ],
       );
+      failureCode = 'ANNOUNCE_AUDIT_COMMIT_FAILED';
       await client.query('COMMIT');
       return true;
     } catch (error) {
-      broken = !(await rollbackTxn(client));
-      report(error);
+      report(error, failureCode);
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        broken = true;
+        report(rollbackError, 'ANNOUNCE_AUDIT_ROLLBACK_FAILED');
+      }
       return false;
     } finally {
       client.release(broken);
@@ -390,7 +403,10 @@ export function createAnnounceServiceForPool(
 
   return Object.freeze({
     async current(request) {
-      const client = await pool.connect().catch(() => null);
+      const client = await pool.connect().catch((error: unknown) => {
+        report(error, 'ANNOUNCE_CONNECT_FAILED');
+        return null;
+      });
       if (client === null) return failure('OVERLOADED');
       try {
         const result = await client.query<CurrentRow>(
@@ -446,7 +462,10 @@ export function createAnnounceServiceForPool(
     },
 
     async snapshot(request) {
-      const client = await pool.connect().catch(() => null);
+      const client = await pool.connect().catch((error: unknown) => {
+        report(error, 'ANNOUNCE_CONNECT_FAILED');
+        return null;
+      });
       if (client === null) return failure('OVERLOADED');
       try {
         let result;
@@ -509,7 +528,10 @@ export function createAnnounceServiceForPool(
     },
 
     async ack(request) {
-      const client = await pool.connect().catch(() => null);
+      const client = await pool.connect().catch((error: unknown) => {
+        report(error, 'ANNOUNCE_CONNECT_FAILED');
+        return null;
+      });
       if (client === null) return failure('OVERLOADED');
       let broken = false;
       let denied: AnnounceFailure | undefined;

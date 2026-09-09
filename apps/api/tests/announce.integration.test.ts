@@ -17,6 +17,7 @@ import { createContentWorker } from '../src/content-worker.js';
 import { createProductAuthService } from '../src/product-auth-service.js';
 import { parseApiRuntimeConfig } from '../src/runtime-config.js';
 import { createServiceRepository, sharedRuntimePool } from '../src/service-repository.js';
+import type { ApiRuntimeDiagnostic } from '../src/runtime-diagnostics.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 const HMAC = Object.freeze({
@@ -50,8 +51,10 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
   let admin: Client;
   let app: FastifyInstance;
   let worker: ReturnType<typeof createContentWorker>;
+  let diagnostics: ApiRuntimeDiagnostic[];
 
   beforeEach(async () => {
+    diagnostics = [];
     harness = new Pg15Harness();
     harness.start();
     const db = harness.createDatabase('announce');
@@ -141,7 +144,7 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         { connectionString: conn('t5_admin'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 },
         HMAC, LOG_HASH,
       ) },
-      { service: createAnnounceServiceForPool(runtimePool, LOG_HASH, false) },
+      { service: createAnnounceServiceForPool(runtimePool, LOG_HASH, false, (entry) => diagnostics.push(entry)) },
     );
     worker = createContentWorker(
       { connectionString: conn('t5_worker'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 },
@@ -390,7 +393,7 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         'x-snapshot-lease': unknownLease,
       },
     });
-    expect(invalidLease.statusCode, JSON.stringify(invalidLease.json())).toBe(403);
+    expect(invalidLease.statusCode, JSON.stringify({ response: invalidLease.json(), diagnostics })).toBe(403);
     expect(invalidLease.json().error.details.reason).toBe('OFFLINE_LEASE_INVALID');
 
     const refreshed = await app.inject({

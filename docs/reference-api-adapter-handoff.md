@@ -2,7 +2,7 @@
 
 本页是当前 v3 原型到正式产品的迁移参考，不是 DEV-M0 开工授权。它用于防止把合成类型直接升格为正式合同，同时给本仓后续产品化实施保留明确入口。
 
-正式合同通过本仓 [contract-set.lock.json](../contracts/upstream/customer-agent/contract-set.lock.json) 与 [架构参考](reference-project-architecture.md#4-数据边界) 核对；治理仓负责上游批准，禁止实时跨仓读取或手改快照。当前 schema v1.15、十二段 migration 与组件生成物只证明开发/测试实现，锁定状态仍为 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。版本与来源以锁文件为准，本页不另列会漂移的上游版本表。
+正式合同通过本仓 [contract-set.lock.json](../contracts/upstream/customer-agent/contract-set.lock.json) 与 [架构参考](reference-project-architecture.md#4-数据边界) 核对；治理仓负责上游批准，禁止实时跨仓读取或手改快照。当前受锁合同、migration 与组件生成物只证明开发/测试实现，锁定状态仍为 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。版本与来源以锁文件为准，本页不另列会漂移的上游版本表。
 
 DEV-M1 已实现 synthetic-only Search + Events 事务与纯合成 runner；查询原文不落库，无状态降级不接受后续事件。桌面没有 API adapter，真实飞书鉴权与正式运行接入未放行。当前评测进度及下一动作只查阅[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)，不从历史准备记录推断当前状态。
 
@@ -14,12 +14,12 @@ DEV-M1 已实现 synthetic-only Search + Events 事务与纯合成 runner；查�
 
 | 问题 | 答案 |
 | --- | --- |
-| 正式机器合同是否已进入产品仓？ | **已接收 schema v1.15、按双哈希验证，并生成类型/组件校验器与十二段 migration，但未激活。** 当前输入见上述锁文件；旧十一段不变，v1.15 只追加 `0012`。本机 PG15 测试不是业务 runtime 或生产证据。 |
-| Demo 现在有没有 API adapter？ | **没有。** Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。并行 `apps/api` 已实现 `/health`、`/ready`、mock auth / policy 与 synthetic-only Search + Events，能够在批准的测试链路读取合成内容；桌面不连接它，正式真实内容运行接入未放行。 |
+| 正式机器合同是否已进入产品仓？ | **已按双哈希接收冻结合同并生成类型、组件校验器和迁移，但未激活。** 当前版本以锁文件和后端实施计划为准。本机 PG15 测试不是业务 runtime 或生产证据。 |
+| Demo 现在有没有 API adapter？ | **没有。** Query 同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。并行 `apps/api` 已实现合成身份、内容导入/审核/发布/回退、公告与 synthetic-only Search + Events，能够在批准的测试链路读取合成内容；桌面不连接它，正式真实内容运行接入未放行。 |
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
-| 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**类型、鉴权、事件、发布、租约必须重做**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
-| 本仓下一步该不该实现 adapter？ | **尚未进入该阶段。** 负责人承接消费与装包实现已合并；真实评测、独立业务/QA复核和下一运行批准按[当前执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)核对。DEV-M2、真实飞书 auth 与 Windows Main adapter 仍需后续独立授权，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面继续使用合成 profile。 |
+| 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**桌面类型映射、会话和事件接线、发布版本与租约消费必须按现有合同实施**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
+| 本仓下一步该不该实现 adapter？ | **尚未进入该阶段。** 后端 T0–T6 与收尾已合并；当前只进行计划准备和可靠性排查，桌面实施与下一运行批准按[当前执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)核对。DEV-M2、真实飞书 auth 与 Windows Main adapter 仍需后续独立授权，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面继续使用合成 profile。 |
 
 ---
 
