@@ -7,11 +7,11 @@
 - 只允许 `CUSTOMER_AGENT_PROFILE=formal-dev|test`、`AUTH_MODE=mock` 和 `127.0.0.1`。
 - `demo` 属于桌面合成运行链，不允许启动本服务。
 - `single-host`、`multi-instance`、`production` 与 `AUTH_MODE=feishu` 尚未具备后续依赖，监听前失败关闭。
-- `/health` 不访问数据库；`/ready` 只把 database/schema/auth 的真实结果写入合同响应。
-- auth 由所选身份服务返回实际状态；T2 已接通合成 CSV/XLSX 持久接收与 batch 状态/取消，但 `/ready` 的 storage/content 仍固定 `not_ready`，因此正常连库仍是 503。真实飞书导入、worker 解析和发布仍未实现。
+- `/health` 不访问数据库；`/ready` 的 database/schema 仍由 runtime 探针证明，auth/storage/content 由各自 owner 证明。未接线的 object store 或 announce 能力保持 `not_ready`。
+- auth 由所选身份服务返回实际状态；T2–T5 已接通合成导入、worker/审核、发布/回退、announce current/snapshot/ack。storage readiness 必须实际 persist/read/verify，content readiness 必须实际执行无副作用的 `search_recommendable_scripts`。真实飞书导入与运行激活仍未实现。
 - `/v1/search` 仅接受 `collection_mode=synthetic`，原始输入只在 HTTP 边界内参与版本化 HMAC，`query_events` 固定以 `text_storage_status=suppressed` 记录，不持久化查询原文或其可关联文本 hash。搜索、query、impression 与幂等完成同事务提交；来源门失败先回滚，再由独立短事务写安全拒绝审计。
 - `/v1/events/adoption` 的 `adopted` 只表示候选成功复制，且每个 query 仅允许一个 terminal；`/v1/events/escalate` 是非终态辅助动作，同一 `(query_id, action)` 返回同一事实。无状态 `collection_disabled` 搜索不会留下 query/idempotency，后续事件返回 404。
-- migration 自动执行、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
+- migration 自动执行、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
 - 启动与 readiness 失败只输出稳定字段，不回显环境变量值、token、DSN、SQL 或异常正文。
 - 同一时刻只运行一个 readiness 探针；连接等待与 readiness 响应分别由 `DB_CONNECTION_TIMEOUT_MS`、`DB_READINESS_TIMEOUT_MS` 控制，timer 与单调时钟都会拒绝 deadline 后才完成的成功结果。
 - schema 探针锁定 13 个 search/传递函数、2 个视图、`pgcrypto.digest` extension owner、双向角色成员与当前数据库/全部用户 schema 的精确有效 ACL；任意非 owner 的 `public CREATE` 失败关闭。
@@ -51,7 +51,7 @@ curl --silent --include http://127.0.0.1:3100/ready
 {"status":"ok","service":"cs-ai-api","version":"dev-m1-slice1"}
 ```
 
-当前 `/ready` 会显示 database/schema/auth 的真实状态，但 storage/content 仍为 `not_ready`，所以返回 503。
+当前 `/ready` 在合成对象存储目录已配置、runtime 探针通过、且 announce 读取边界可执行时可以返回 200；未配置存储或内容读取函数失败时对应检查仍为 `not_ready`。
 
 ## 合成产品会话（T1）
 
@@ -69,7 +69,11 @@ T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/
 
 ## 合成发布与回退（T4）
 
-Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用冻结 `publish_content_release` / `rollback_content_release`。复用已有 `CONTENT_ADMIN_DATABASE_URL` 连接池，不新增池。CAS 校验 `base_release_id`，并发发布 409；回退创建新的 `release_seq` 并记录 `rollback_of_release_id`。来源拒绝写入独立 `record_admin_source_denial_audit` 事务，审计失败不得返回成功。一期仅 owner。读取/ready 不在本切片。content_releases 的延迟约束触发器在 COMMIT 时以当前角色执行，合成测试为 `app_content_admin` 补了触发器只读所需的表/digest 授权；冻结合同 EXECUTE-only ACL 本身不够。
+Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用冻结 `publish_content_release` / `rollback_content_release`。复用已有 `CONTENT_ADMIN_DATABASE_URL` 连接池，不新增池。CAS 校验 `base_release_id`，并发发布 409；回退创建新的 `release_seq` 并记录 `rollback_of_release_id`。来源拒绝写入独立 `record_admin_source_denial_audit` 事务，审计失败不得返回成功。一期仅 owner。content_releases 的延迟约束触发器在 COMMIT 时以当前角色执行，合成测试为 `app_content_admin` 补了触发器只读所需的表/digest 授权；冻结合同 EXECUTE-only ACL 本身不够。
+
+## 合成读取与就绪（T5）
+
+认证客户端通过 `GET /v1/announce/current`、`GET /v1/announce/snapshot` 与 `POST /v1/announce/ack` 读取固定 release。current 只调用 `read_current_announcement_with_lease`，snapshot 只调用 `read_snapshot_page`，ACK 只调用 `ack_client_release`；app_runtime 不直读 SoR 底表。短租约 60–900 秒，默认 600；304 只回显仍有效的原 token，不续期。来源门/租约拒绝先回滚业务事务，再用独立短事务写 `record_runtime_source_denial_audit`。查询继续要求 `collection_mode=synthetic`，来源暂停后 search/current/snapshot 失败关闭。复用 runtime 池，不新增连接。真实数据模式仍关闭。
 
 ## 验证
 

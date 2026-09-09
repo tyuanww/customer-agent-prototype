@@ -219,6 +219,86 @@ describe('Application API bootstrap', () => {
     });
   });
 
+  it('lets storage and content owners replace repository placeholders', async () => {
+    const repository = stubRepository();
+    const app = createApiApp(
+      testConfig(),
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        service: {
+          acceptUpload: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+          readStatus: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+          cancel: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+          readiness: async () => 'ok' as const,
+        },
+      },
+      undefined,
+      undefined,
+      {
+        service: {
+          current: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
+          snapshot: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
+          ack: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
+          readiness: async () => 'ok' as const,
+          close: async () => undefined,
+        },
+      },
+    );
+    openApps.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/ready' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: 'ready',
+      checks: ALL_READY,
+    });
+  });
+
+  it('does not let the repository claim storage or content when owners are wired', async () => {
+    const repository = stubRepository(ALL_READY);
+    const app = createApiApp(
+      testConfig(),
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        service: {
+          acceptUpload: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+          readStatus: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+          cancel: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+          readiness: async () => 'not_ready' as const,
+        },
+      },
+      undefined,
+      undefined,
+      {
+        service: {
+          current: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
+          snapshot: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
+          ack: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
+          readiness: async () => 'not_ready' as const,
+          close: async () => undefined,
+        },
+      },
+    );
+    openApps.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/ready' });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({
+      status: 'not_ready',
+      checks: { ...ALL_READY, storage: 'not_ready', content: 'not_ready' },
+    });
+  });
+
   it('normalizes unhandled request failures without reflecting private error text', async () => {
     const diagnostics = vi.fn();
     const app = createApiApp(testConfig(), stubRepository(), diagnostics);

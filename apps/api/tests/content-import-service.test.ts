@@ -40,6 +40,7 @@ describe('content import receive policy', () => {
       writeReceipt: async () => undefined,
       readReceipt: async () => null,
       reclaim,
+      readiness: async () => 'ok' as const,
       rootDirectory: '/tmp/unused',
     } satisfies ContentObjectStore;
     const repository = {
@@ -72,6 +73,7 @@ describe('content import receive policy', () => {
       writeReceipt: async () => { throw new Error('disk full'); },
       readReceipt: async () => null,
       reclaim,
+      readiness: async () => 'ok' as const,
       rootDirectory: '/tmp/unused',
     } satisfies ContentObjectStore;
     const repository = {
@@ -108,6 +110,7 @@ describe('content import receive policy', () => {
       writeReceipt: async () => undefined,
       readReceipt: async () => null,
       reclaim,
+      readiness: async () => 'ok' as const,
       rootDirectory: '/tmp/unused',
     } satisfies ContentObjectStore;
     const repository = {

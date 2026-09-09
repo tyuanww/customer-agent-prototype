@@ -44,6 +44,7 @@ export type ContentImportService = Readonly<{
     reason: string | null;
     idempotencyKey: string;
   }>) => Promise<ContentImportServiceResult<CancelImportResponse>>;
+  readiness: () => Promise<'ok' | 'not_ready'>;
 }>;
 
 function importBatchId(): string {
@@ -267,5 +268,7 @@ export function createContentImportService(
         }, idempotencyHmac),
       );
     },
+
+    readiness: () => store.readiness(),
   });
 }

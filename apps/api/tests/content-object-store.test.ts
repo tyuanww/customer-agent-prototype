@@ -61,6 +61,11 @@ describe('content object store', () => {
     await expect(objects.persist(bytesOf(oversized), 'csv')).rejects.toThrow('CONTENT_UPLOAD_TOO_LARGE');
   });
 
+  it('proves readiness by persist, verify, reread and reclaim', async () => {
+    const objects = store();
+    await expect(objects.readiness()).resolves.toBe('ok');
+  });
+
   it('rejects a relative or NUL store root', () => {
     expect(() => createContentObjectStore('relative-store')).toThrow('CONTENT_STORE_INVALID');
     expect(() => createContentObjectStore(`/${'x'}\0y`)).toThrow('CONTENT_STORE_INVALID');

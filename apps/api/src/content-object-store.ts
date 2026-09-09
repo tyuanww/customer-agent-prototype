@@ -51,6 +51,7 @@ export type ContentObjectStore = Readonly<{
   writeReceipt: (receipt: ContentBatchReceipt) => Promise<void>;
   readReceipt: (importBatchId: string) => Promise<ContentBatchReceipt | null>;
   reclaim: (objectId: string) => Promise<'reclaimed' | 'retained'>;
+  readiness: () => Promise<'ok' | 'not_ready'>;
   rootDirectory: string;
 }>;
 
@@ -128,7 +129,7 @@ export function createContentObjectStore(rootDirectory: string): ContentObjectSt
     return referenced;
   }
 
-  return Object.freeze({
+  const store: ContentObjectStore = Object.freeze({
     rootDirectory: root,
     async persist(bytes, declaredType, options = {}) {
       const maxBytes = options.maxBytes ?? CONTENT_UPLOAD_MAX_BYTES;
@@ -248,5 +249,32 @@ export function createContentObjectStore(rootDirectory: string): ContentObjectSt
       await rm(resolveInside(tmpRoot, `${id}.part`), { force: true });
       return 'reclaimed';
     },
+
+    async readiness() {
+      const probe = Buffer.from('readiness,probe\n1,ok\n');
+      let objectId: string | undefined;
+      try {
+        const persisted = await store.persist((async function* persistProbe() {
+          yield probe;
+        })(), 'csv', { maxBytes: 256, timeoutMs: 1_000 });
+        objectId = persisted.objectId;
+        const verified = await store.verify(persisted.objectId, persisted.sha256, persisted.sizeBytes);
+        const roundTrip = await store.readPayload(persisted.objectId);
+        const digest = createHash('sha256').update(roundTrip).digest('hex');
+        if (!verified
+          || roundTrip.length !== persisted.sizeBytes
+          || digest !== persisted.sha256) {
+          return 'not_ready';
+        }
+        return 'ok';
+      } catch {
+        return 'not_ready';
+      } finally {
+        if (objectId !== undefined) {
+          await store.reclaim(objectId).catch(() => undefined);
+        }
+      }
+    },
   });
+  return store;
 }

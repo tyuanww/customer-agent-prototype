@@ -4,6 +4,7 @@ import { createContentObjectStore } from './content-object-store.js';
 import { createContentImportService } from './content-import-service.js';
 import { createContentReviewService } from './content-review-service.js';
 import { createContentReleaseServiceForPool } from './content-release-service.js';
+import { createAnnounceServiceForPool } from './announce-service.js';
 import { sharedPolicyAdminPool } from './policy-admin-repository.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
@@ -21,6 +22,7 @@ import {
 } from './policy-admin-repository.js';
 import {
   createServiceRepository,
+  sharedRuntimePool,
   type ServiceRepository,
 } from './service-repository.js';
 
@@ -77,11 +79,15 @@ export async function startApi(
             adminPool, bootstrap.idempotencyHmac, bootstrap.logHash, false,
           ),
         };
+        const runtimePool = sharedRuntimePool(repository);
+        const announce = runtimePool === undefined ? undefined : {
+          service: createAnnounceServiceForPool(runtimePool, bootstrap.logHash, false),
+        };
         return createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
-          contentImport, contentReview, contentRelease);
+          contentImport, contentReview, contentRelease, announce);
       } catch (error) {
         await auth?.close();
         throw error;

@@ -640,8 +640,8 @@ function freezeChecks(
   database: ServiceReadinessChecks['database'],
   schema: ServiceReadinessChecks['schema'],
 ): ServiceReadinessChecks {
-  // The repository only proves database/schema. App composition replaces auth
-  // with the auth service's own readiness; M2 owns storage and current content.
+  // The repository only proves database/schema. App composition replaces auth,
+  // storage and content with their owners; unwired owners stay not_ready.
   return Object.freeze({
     database,
     schema,
@@ -824,6 +824,8 @@ export function createServiceRepository(
 }
 
 /** Internal deterministic test seam; not exported from the package entrypoint. */
+const sharedRuntimePools = new WeakMap<ServiceRepository, Pool>();
+
 export function createServiceRepositoryForPool(
   pool: RuntimePool,
   options: Readonly<{
@@ -836,10 +838,17 @@ export function createServiceRepositoryForPool(
   if (!Number.isSafeInteger(readinessTimeoutMs) || readinessTimeoutMs <= 0) {
     throw new RangeError('readinessTimeoutMs must be a positive integer');
   }
-  return new PostgresServiceRepository(
+  const repository = new PostgresServiceRepository(
     pool,
     readinessTimeoutMs,
     options.diagnosticSink ?? (() => undefined),
     options.now ?? (() => performance.now()),
   );
+  if (pool instanceof Pool) sharedRuntimePools.set(repository, pool);
+  return repository;
+}
+
+/** Shared app_runtime pool. Announce/current/snapshot/ack reuse it instead of opening another pool. */
+export function sharedRuntimePool(repository: ServiceRepository): Pool | undefined {
+  return sharedRuntimePools.get(repository);
 }

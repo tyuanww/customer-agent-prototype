@@ -88,7 +88,7 @@ curl --fail --silent http://127.0.0.1:3100/health
 curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-`/health` 不访问 DB；`/ready` 实时核对 database/schema，mock auth 返回 `ok`，storage/content 仍为 `not_ready`，因此当前返回 503 不代表启动失败。已注册的 `/v1` 子集支持 mock auth、policy 与 synthetic-only Search + Events；部署型 profile 和 Feishu auth 在监听前拒启，桌面未接线。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
+`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/审核/发布与 announce 读取；部署型 profile 和 Feishu auth 在监听前拒启，桌面未接线。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 W4 数据库包只接受调用方提供的已连接 migration-owner `pg.Client`；下面的命令只生成/核验不可变 catalogue，并在隔离临时 PostgreSQL 15 cluster 中测试，不会访问共享本机或生产数据库：
 

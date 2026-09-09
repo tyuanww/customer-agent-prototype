@@ -33,6 +33,7 @@ import { registerEventRoutes, type EventRouteDependencies } from './event-routes
 import { registerContentImportRoutes, type ContentImportRouteDependencies } from './content-import-routes.js';
 import { registerContentReviewRoutes, type ContentReviewRouteDependencies } from './content-review-routes.js';
 import { registerContentReleaseRoutes, type ContentReleaseRouteDependencies } from './content-release-routes.js';
+import { registerAnnounceRoutes, type AnnounceRouteDependencies } from './announce-routes.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -57,6 +58,7 @@ export function createApiApp(
   contentImportDependencies?: ContentImportRouteDependencies,
   contentReviewDependencies?: ContentReviewRouteDependencies,
   contentReleaseDependencies?: ContentReleaseRouteDependencies,
+  announceDependencies?: AnnounceRouteDependencies,
 ): FastifyInstance {
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
@@ -88,6 +90,7 @@ export function createApiApp(
       () => authService.close(), () => repository.close(), () => policyAdminRepository.close(),
       () => contentReviewDependencies?.service.close(),
       () => contentReleaseDependencies?.service.close(),
+      () => announceDependencies?.service.close(),
     ].map(close => Promise.resolve().then(close)));
     const failures = results.filter(result => result.status === 'rejected');
     if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'API resource shutdown failed');
@@ -102,6 +105,7 @@ export function createApiApp(
   registerContentImportRoutes(app, authService, contentImportDependencies);
   registerContentReviewRoutes(app, authService, contentReviewDependencies);
   registerContentReleaseRoutes(app, authService, contentReleaseDependencies);
+  registerAnnounceRoutes(app, authService, announceDependencies);
 
   app.get('/health', async (_request, reply) => {
     const payload = parseContractSchema('HealthResponse', {
@@ -126,12 +130,18 @@ export function createApiApp(
       }
       return NOT_READY_CHECKS;
     });
+    const storage = contentImportDependencies === undefined
+      ? checks.storage
+      : await contentImportDependencies.service.readiness().catch(() => 'not_ready' as const);
+    const content = announceDependencies === undefined
+      ? checks.content
+      : await announceDependencies.service.readiness().catch(() => 'not_ready' as const);
     const composedChecks = Object.freeze({
       database: checks.database,
       schema: checks.schema,
       auth: authService.readiness(),
-      storage: checks.storage,
-      content: checks.content,
+      storage: storage === 'ok' ? 'ok' : 'not_ready',
+      content: content === 'ok' ? 'ok' : 'not_ready',
     }) satisfies ServiceReadinessChecks;
     const ready = allChecksReady(composedChecks);
     const payload = parseContractSchema(ready ? 'ReadyResponse' : 'NotReadyResponse', {
