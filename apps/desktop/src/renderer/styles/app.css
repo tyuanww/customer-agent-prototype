@@ -2083,5 +2083,6 @@ html[data-role='fox'] #root {
   border: 1px solid var(--hairline);
   border-radius: 8px;
 }
+.product-announce-banner { margin: 0 0 6px; font-size: 12px; color: var(--muted); }
 .product-query-context label { display: flex; align-items: center; gap: 6px; }
 .product-query-context input, .product-query-context select { max-width: 220px; min-height: 32px; color: inherit; background: var(--query-glass-solid); border: 1px solid var(--hairline); border-radius: 6px; }

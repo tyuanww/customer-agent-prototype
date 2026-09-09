@@ -26,6 +26,23 @@ test('product session native login, search, copy, logout and renderer isolation'
       res.statusCode = req.headers.authorization === `Bearer ${token}` && !revoked ? 200 : 401;
       res.end(JSON.stringify({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' }));
     } else if (url.pathname === '/v1/auth/logout') { revoked = true; res.statusCode = 204; res.end(); }
+    else if (url.pathname === '/v1/announce/current') {
+      const lease = `osl_${'c'.repeat(64)}`;
+      res.setHeader('etag', 'W/"13"');
+      res.end(JSON.stringify({
+        current_release_id: 'rel-synthetic-001', release_seq: 13, source_binding_hash: 'b'.repeat(64),
+        offline_lease: { token: lease, expires_at: new Date(Date.now() + 600_000).toISOString(), release_id: 'rel-synthetic-001', source_binding_hash: 'b'.repeat(64) },
+        announcement: { title: '合成公告', summary: '只读核验', created_at: '2026-09-09T00:00:00.000Z' },
+      }));
+    } else if (url.pathname === '/v1/announce/ack') {
+      res.end(JSON.stringify({ ok: true }));
+    } else if (url.pathname === '/v1/announce/snapshot') {
+      res.end(JSON.stringify({
+        release_id: 'rel-synthetic-001', release_seq: 13, source_binding_hash: 'b'.repeat(64),
+        offline_lease: { token: `osl_${'c'.repeat(64)}`, expires_at: new Date(Date.now() + 600_000).toISOString(), release_id: 'rel-synthetic-001', source_binding_hash: 'b'.repeat(64) },
+        items: [], next_cursor: null,
+      }));
+    }
     else if (url.pathname === '/v1/search') {
       let body = ''; req.on('data', chunk => { body += String(chunk); }); req.on('end', () => {
         const request = JSON.parse(body);
@@ -48,6 +65,7 @@ test('product session native login, search, copy, logout and renderer isolation'
     await query.evaluate(() => window.customerAgent!.openSearch());
     await query.getByRole('button', { name: '合成登录' }).click();
     await expect(query.getByRole('button', { name: 'agent · 退出' })).toBeVisible();
+    await expect(query.getByTestId('announce-banner')).toContainText('ACK 不是已读');
     const view = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());
     expect(JSON.stringify(view)).not.toContain(token);
     const loginWindows = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.webContents.getURL().includes('/authorize')).length);

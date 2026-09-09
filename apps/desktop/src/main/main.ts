@@ -4,6 +4,9 @@ import { ProductSession } from './product-session';
 import { createSessionStore } from './product-session-store';
 import { createLoginWindow } from './product-login-window';
 import { registerProductIpc } from './product-ipc';
+import { readProductClientId } from './product-client-id';
+import { ProductAnnounce } from './product-announce';
+import { registerProductAnnounceIpc } from './product-announce-ipc';
 import { app, Menu, session } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
@@ -56,6 +59,7 @@ if (!gotLock) {
   let desktopShell: DesktopShell | null = null;
   let controllerReady = false;
   let productSession: ProductSession | null = null;
+  let productAnnounce: ProductAnnounce | null = null;
   let pendingSecondInstance = false;
 
   app.setName('客服话术浮窗 Demo');
@@ -148,9 +152,12 @@ if (!gotLock) {
     if (productOrigin || identityOrigin) {
       if (!productOrigin || !identityOrigin || app.isPackaged) throw new Error('Synthetic desktop requires both loopback origins in development');
       productSession = new ProductSession(new ProductHttp(productOrigin), createSessionStore(app.getPath('userData')), createLoginWindow(identityOrigin, productOrigin));
+      productAnnounce = new ProductAnnounce(productSession, readProductClientId(app.getPath('userData')));
       await productSession.restore();
     }
-    registerProductSearchIpc(productSession, () => controller?.trustedContents() ?? [],
+    registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+    registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);

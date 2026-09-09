@@ -1,4 +1,5 @@
 import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
+import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isProductAnnounceInvalidation, type ProductAnnounceInvalidation } from '../shared/product-announce';
 import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
@@ -45,6 +46,10 @@ const sessionListeners = new Set<(value: ProductSessionResult) => void>();
 ipcRenderer.on(IPC_CHANNELS.PRODUCT_SESSION_CHANGED, (_event, value: unknown) => {
   if (isProductSessionResult(value)) for (const listener of sessionListeners) listener(value);
 });
+const announceListeners = new Set<(value: ProductAnnounceInvalidation) => void>();
+ipcRenderer.on(IPC_CHANNELS.PRODUCT_ANNOUNCE_INVALIDATED, (_event, value: unknown) => {
+  if (isProductAnnounceInvalidation(value)) for (const listener of announceListeners) listener(value);
+});
 const sessionInvoke = async (channel: string): Promise<ProductSessionResult> => {
   try {
     const value: unknown = await ipcRenderer.invoke(channel);
@@ -75,6 +80,17 @@ const api: CustomerAgentApi = {
     login: () => sessionInvoke(IPC_CHANNELS.PRODUCT_LOGIN),
     logout: () => sessionInvoke(IPC_CHANNELS.PRODUCT_LOGOUT),
     onSessionChanged(listener) { sessionListeners.add(listener); return () => { sessionListeners.delete(listener); }; },
+  },
+  productAnnounce: {
+    async refresh(request) {
+      if (!isProductAnnounceRequest(request)) return announceFailure('VALIDATION', { sessionEpoch: 0, generation: 0 });
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_ANNOUNCE_REFRESH, request);
+        return isProductAnnounceResult(value) && value.sessionEpoch === request.sessionEpoch && value.generation === request.generation
+          ? value : announceFailure('UNAVAILABLE', request);
+      } catch { return announceFailure('UNAVAILABLE', request); }
+    },
+    onInvalidated(listener) { announceListeners.add(listener); return () => { announceListeners.delete(listener); }; },
   },
   copyText(text: string): Promise<CopyTextResult> {
     if (typeof text !== 'string') {

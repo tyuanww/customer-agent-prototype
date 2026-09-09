@@ -59,6 +59,9 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `product:session-status` | invoke | trusted main-frame，fox/query，无参数；脱敏会话投影 |
 | `product:login` / `product:logout` | invoke | trusted main-frame，query-only，无参数 |
 | `product:session-changed` | Main → query | preload 精确校验，renderer 按 main epoch 拒绝旧状态 |
+| `product:search` / `product:cancel-search` / `product:copy-adopt` | invoke | trusted Query 主框；绑定 sessionEpoch/generation；复制不接受 renderer 正文 |
+| `product:announce-refresh` | invoke | trusted Query 主框；只回显 generation；成功投影无 lease token |
+| `product:announce-invalidated` | Main → query | preload 精确校验；过期/替换/来源门后停止使用旧候选 |
 | `clipboard:copy-text` | invoke | `isTrustedSender` + `role === 'query'` + `resolveClipboardWrite` |
 | `overlay:get-window-context` | invoke | 响应包含 `platform`；未受信 sender 返回带运行时平台、不可用快捷键状态的降级上下文 |
 | `overlay:open-search` | invoke | 若带 transform：必须 `role === 'fox'` 且 `isFoxVisualTransform` |

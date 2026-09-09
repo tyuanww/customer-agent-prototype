@@ -23,13 +23,15 @@ async function fixture(options: { disabled?: boolean; eventFail?: boolean; candi
   const session = new ProductSession(new ProductHttp('http://127.0.0.1:4100', transport as typeof fetch), {
     read: () => ({ access_token: 't'.repeat(43), expires_at: new Date(Date.now() + 899_000).toISOString() }), write: () => {}, clear: () => {},
   }, { open: async () => {} });
-  await session.restore(); const search = new ProductSearch(session, write);
+  await session.restore();
+  const announce = { allows: (releaseId: string) => releaseId === (options.candidate ?? candidate).release_id, subscribe: () => () => {} };
+  const search = new ProductSearch(session, write, announce);
   const request: ProductSearchRequest = { sessionEpoch: session.view().sessionEpoch, generation: 1, queryText: '合成发货问题', platform: 'qianniu', platformSource: 'manual', productContextType: null, productContextRef: null, parentQueryId: null };
   const result = await search.search(1, request);
   if (!result.ok) throw Error(result.code);
   const copy = { sessionEpoch: request.sessionEpoch, generation: 1, queryId: result.queryId, rank: 1, scriptId: candidate.script_id,
     scriptVersion: 1, contentHash: candidate.content_hash, placeholderValues: { order_id: 'SYNTHETIC-001' } };
-  return { search, session, request, copy, write, events, transport };
+  return { search, session, request, copy, write, events, transport, announce };
 }
 describe('product query and native copy provenance', () => {
   it('copies cached original then records one terminal, without placeholder values in HTTP', async () => {
@@ -85,5 +87,10 @@ describe('product query and native copy provenance', () => {
     expect(isProductSearchRequest({ ...f.request, queryText: '😀'.repeat(501) })).toBe(false);
     expect(isProductSearchRequest({ ...f.request, productContextType: 'sku' })).toBe(false);
     expect(isProductCopyRequest({ ...f.copy, answerText: 'injected' })).toBe(false); await f.session.logout();
+  });
+  it('rejects copy after the announce gate stops the release', async () => {
+    const f = await fixture(); f.announce.allows = () => false;
+    expect(await f.search.copy(1, f.copy)).toMatchObject({ code: 'STALE' });
+    expect(f.write).not.toHaveBeenCalled(); await f.session.logout();
   });
 });

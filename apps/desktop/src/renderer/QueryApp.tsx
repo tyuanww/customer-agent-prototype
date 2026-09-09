@@ -1,4 +1,5 @@
 import type { ProductSessionResult } from '@shared/product-session';
+import type { ProductAnnounceResult } from '@shared/product-announce';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
@@ -109,6 +110,9 @@ export function QueryApp() {
   const [productType, setProductType] = useState<'' | 'category' | 'sku'>('');
   const [productRef, setProductRef] = useState('');
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
+  const [announce, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
+  const announceGenerationRef = useRef(0);
+  const announceReleaseRef = useRef<string | null>(null);
   const searchTimerRef = useRef<number | null>(null);
   const dismissTimerRef = useRef<number | null>(null);
   const resultFocusFrameRef = useRef<number | null>(null);
@@ -699,19 +703,50 @@ export function QueryApp() {
     [cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, phase, reportPhase],
   );
 
+  const refreshAnnounce = useCallback(async (sessionEpoch: number) => {
+    const api = window.customerAgent?.productAnnounce;
+    if (!api) return null;
+    const generation = ++announceGenerationRef.current;
+    const result = await api.refresh({ sessionEpoch, generation });
+    if (generation !== announceGenerationRef.current || sessionEpoch !== productEpochRef.current) return null;
+    if (!result.ok) {
+      announceReleaseRef.current = null;
+      setAnnounce(null); setErrorMessage(result.message); reportPhase('ERROR'); return result;
+    }
+    if (announceReleaseRef.current && announceReleaseRef.current !== result.releaseId) {
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
+    }
+    announceReleaseRef.current = result.releaseId;
+    setAnnounce(result); setErrorMessage(''); return result;
+  }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
+
   const acceptProductSession = useCallback((value: ProductSessionResult) => {
     if (value.sessionEpoch < productEpochRef.current) return;
     if (productEpochRef.current !== value.sessionEpoch) {
-      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({}); setAnnounce(null);
+      announceReleaseRef.current = null;
     }
     productEpochRef.current = value.sessionEpoch;
     setProductState(value);
     if (!value.ok || (value.enabled && !value.signedIn)) {
-      cancelPendingSearch(); cancelPendingCopy(); setResults([]);
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
       setInvalidMessage(value.ok ? '请先合成登录' : value.message);
       reportPhase('SEARCH_INPUT');
+    } else if (value.ok && value.signedIn) {
+      void refreshAnnounce(value.sessionEpoch);
     }
-  }, [cancelPendingSearch, cancelPendingCopy, reportPhase]);
+  }, [cancelPendingSearch, cancelPendingCopy, reportPhase, refreshAnnounce]);
+
+  useEffect(() => {
+    const api = window.customerAgent?.productAnnounce;
+    if (!api) return;
+    return api.onInvalidated(value => {
+      if (value.sessionEpoch !== productEpochRef.current) return;
+      announceGenerationRef.current += 1; announceReleaseRef.current = null;
+      setAnnounce(null); cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
+      setErrorMessage('当前版本已失效，请重新核验'); reportPhase('ERROR');
+    });
+  }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
 
   useEffect(() => {
     const product = window.customerAgent?.product;
@@ -746,11 +781,15 @@ export function QueryApp() {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
-      void api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
-        productContextType: productType || null, productContextRef: productType ? productRef.trim() : null, parentQueryId: null }).then(result => {
-        if (generation !== searchGenerationRef.current || sessionEpoch !== productEpochRef.current) return;
+      const search = () => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
+        productContextType: productType || null, productContextRef: productType ? productRef.trim() : null, parentQueryId: null });
+      const run = window.customerAgent.productAnnounce && !announce
+        ? refreshAnnounce(sessionEpoch).then(result => { if (!result?.ok || generation !== searchGenerationRef.current) return null; return search(); })
+        : search();
+      void run.then(result => {
+        if (!result || generation !== searchGenerationRef.current || sessionEpoch !== productEpochRef.current) return;
         if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
-        if (result.generation !== generation || result.sessionEpoch !== sessionEpoch) return;
+        if (!('queryId' in result) || result.generation !== generation || result.sessionEpoch !== sessionEpoch) return;
         const domains = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
         const items: RankedScript[] = result.candidates.map(c => ({
           scriptId: c.script_id, domain: domains[c.category as keyof typeof domains] ?? '产品', questionVariants: [], answerText: c.answer_text,
@@ -834,7 +873,7 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, searchPlatform, productType, productRef, cancelPendingSearch]);
+  }, [announce, cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, searchPlatform, productType, productRef, cancelPendingSearch, refreshAnnounce]);
 
   const copyScript = useCallback(
     async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
@@ -1292,6 +1331,11 @@ export function QueryApp() {
         {shortcutFailed ? (
           <p ref={shortcutBannerRef} className="shortcut-banner" data-testid="shortcut-fallback">
             {shortcutHint || '全局快捷键注册失败，请点击狐狸头打开。'}
+          </p>
+        ) : null}
+        {announce ? (
+          <p className="product-announce-banner" data-testid="announce-banner" role="status">
+            版本 {announce.releaseSeq} · {announce.announcement?.title ?? '当前发布'} · 只读核验，ACK 不是已读
           </p>
         ) : null}
 

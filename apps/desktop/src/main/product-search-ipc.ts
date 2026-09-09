@@ -6,8 +6,9 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import type { OverlayRole } from '../shared/overlay-events';
 import type { ProductSession } from './product-session';
 import { ProductSearch } from './product-search';
-export function registerProductSearchIpc(session: ProductSession | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined) {
-  const search = session ? new ProductSearch(session, text => clipboard.writeText(text)) : null;
+import type { AnnounceGate } from '../shared/product-announce';
+export function registerProductSearchIpc(session: ProductSession | null, announce: AnnounceGate | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined) {
+  const search = session && announce ? new ProductSearch(session, text => clipboard.writeText(text), announce) : null;
   const seen = new WeakSet<WebContents>();
   for (const [channel, method] of [[IPC_CHANNELS.PRODUCT_SEARCH, 'search'], [IPC_CHANNELS.PRODUCT_CANCEL_SEARCH, 'cancel'], [IPC_CHANNELS.PRODUCT_COPY_ADOPT, 'copy']] as const) {
     ipcMain.handle(channel, async (event, ...args: unknown[]) => {

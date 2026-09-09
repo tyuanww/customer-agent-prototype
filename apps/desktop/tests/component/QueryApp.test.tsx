@@ -132,10 +132,17 @@ describe('QueryApp', () => {
     }));
     const copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus: 'recorded' as const }));
     window.customerAgent!.productSearch = { search, copyAdopt, cancelSearch: vi.fn(async r => ({ ok: true, ...r, cancelled: true })) };
-    return { search, copyAdopt };
+    const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' }) => void> = [];
+    window.customerAgent!.productAnnounce = {
+      refresh: vi.fn(async r => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, releaseId: 'rel-synthetic', releaseSeq: 13,
+        leaseExpiresAt: new Date(Date.now() + 600_000).toISOString(), announcement: { title: '合成公告', summary: '只读', createdAt: '2026-09-09T00:00:00.000Z' } })),
+      onInvalidated(listener) { invalidate.push(listener); return () => {}; },
+    };
+    return { search, copyAdopt, invalidate };
   }
   async function prepareProductQuery() {
     render(<QueryApp />); await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByTestId('announce-banner');
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
     fireEvent.change(await screen.findByLabelText('查询平台'), { target: { value: 'qianniu' } });
@@ -169,6 +176,18 @@ describe('QueryApp', () => {
     if (eventStatus === 'unrecorded') expect(screen.getByTestId('toast')).toHaveTextContent('事件未记录');
     if (eventStatus === 'disabled') expect(screen.getByTestId('match-reason-1')).toHaveTextContent('不记录事件');
     expect(copyText).not.toHaveBeenCalled(); expect(f.search).toHaveBeenCalledTimes(1);
+  });
+  it('clears candidates when the current announcement is invalidated', async () => {
+    const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('copy-button-1');
+    expect(screen.getByTestId('announce-banner')).toHaveTextContent('ACK 不是已读');
+    await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'expired' })); });
+    expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
+    expect(screen.getByText('当前版本已失效，请重新核验')).toBeInTheDocument();
+    expect(screen.queryByText('已读')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('retry-button'));
+    await screen.findByTestId('announce-banner');
+    expect(window.customerAgent!.productAnnounce!.refresh).toHaveBeenCalled();
   });
   it('reports a product network failure without using a matching S0 fixture', async () => {
     const f = connectProduct(); await prepareProductQuery();

@@ -27,7 +27,7 @@
 | 后端 T0–T6 | 产品 PR #51–#57 已合并；收尾 PR #58 为 `de0a92ca607412a99c3729becce9484635533008`。其后 PR #59 合并为 `bb7a14b565553dc689823e54b0218d1d24c47095`，合并后五项 CI 全部通过。不得重复实施后端 |
 | 合同 | 治理 PR #74/#75 已合并；来源 `0904a0aa11f2dc29ae7700871a943c41295cd329`，OpenAPI 1.13.0 / schema.v1.17；产品十四条 migration，旧十三条不得改写 |
 | Git | 两仓独立历史。D0 在 `codex/desktop-integration-plan` 交付批准方案；用户已授权本轮各切片 commit / push / PR / 合并 |
-| 桌面接入方案 | [准备文件](2026-09-09-desktop-integration-preparation.md) 已批准为 APPROVED。D0 PR #60 已合并；D1 PR #61 已合并为 `40a7808`，合并后 CI 34351864815 SUCCESS。D2 PR #62 已 squash 合并为 `1705027c174e3a7816d2c70bdf4a1b21f83988f4`。PR CI 的 PostgreSQL 15 再现 BACKEND-CI-503（预期 403、实际 503/OVERLOADED，保持 OPEN）；Windows smoke 因 `out/main` 外部导入 `@customer-agent/contracts` 无法启动。合并后 CI run 34359707280 的 PG15/Linux 已 SUCCESS，Windows 仍待本修复。人工观察未确认。D3–D5 随后。治理 PR #80 已创建、不得合并 |
+| 桌面接入方案 | [准备文件](2026-09-09-desktop-integration-preparation.md) 已批准为 APPROVED。D0 PR #60、D1 PR #61（`40a7808`，合并后 CI 34351864815 SUCCESS）已合并。D2 PR #62 squash 为 `1705027`。Windows smoke 因 main 外部导入 contracts 失败，已由 PR #63 squash 为 `18f2ad6dc8c848ed4fb35d75db26c187e3a750e8`；PR CI 五项 SUCCESS，合并后 CI 核验中。BACKEND-CI-503 保持 OPEN。D3 公告/租约/ACK 本切片交付。人工观察未确认。D4–D5 随后。治理 PR #80 已创建、不得合并 |
 | BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。本地/PR/合并 CI 通过不代表已修复 |
 | 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实机、部署、自动外发、许可证 |
 

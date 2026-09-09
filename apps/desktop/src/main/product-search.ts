@@ -4,17 +4,24 @@ import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 import { queryFailure, type ProductCandidate, type ProductSearchRequest, type ProductCopyRequest,
   type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
+import type { AnnounceGate } from '../shared/product-announce';
 
 type SearchState = QueryIdentity & { controller: AbortController; result?: Extract<ProductSearchResult, { ok: true }>;
   copying: boolean; terminal: boolean; platform?: ProductSearchRequest['platform']; productType?: ProductSearchRequest['productContextType']; productRef?: string | null };
 /** Owns per-window candidate provenance and native copy ordering. Renderer never supplies answer text. */
 export class ProductSearch {
   private states = new Map<number, SearchState>();
-  constructor(private readonly session: ProductSession, private readonly writeClipboard: (text: string) => void) {
-    session.subscribe(() => {
+  constructor(
+    private readonly session: ProductSession,
+    private readonly writeClipboard: (text: string) => void,
+    private readonly announce: AnnounceGate,
+  ) {
+    const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
       this.states.clear();
-    });
+    };
+    session.subscribe(forget);
+    announce.subscribe(forget);
   }
   forget(sender: number) { this.states.get(sender)?.controller.abort(); this.states.delete(sender); }
   private advance(sender: number, identity: QueryIdentity): SearchState {
@@ -55,7 +62,8 @@ export class ProductSearch {
       } });
       const response = parseContractSchema('SearchResponse', value);
       this.current(sender, state);
-      if (response.query_id !== queryId || response.candidates.some(c => c.release_id !== response.release_id || !this.usable(c, state))) throw new ProductHttpError('VALIDATION');
+      if (!this.announce.allows(response.release_id) || response.query_id !== queryId
+        || response.candidates.some(c => c.release_id !== response.release_id || !this.usable(c, state))) throw new ProductHttpError('VALIDATION');
       const result: Extract<ProductSearchResult, { ok: true }> = { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
         queryId, hitStatus: response.hit_status, releaseId: response.release_id, telemetryStatus: response.telemetry_status, candidates: response.candidates };
       state.result = structuredClone(result); return result;
@@ -71,7 +79,7 @@ export class ProductSearch {
       const result = state.result;
       const candidate = result?.queryId === request.queryId ? result.candidates.find(c => c.rank === request.rank && c.script_id === request.scriptId
         && c.script_version === request.scriptVersion && c.content_hash === request.contentHash) : undefined;
-      if (!candidate || !this.usable(candidate, state)) throw new ProductHttpError('STALE');
+      if (!candidate || !this.usable(candidate, state) || !this.announce.allows(candidate.release_id)) throw new ProductHttpError('STALE');
       if (Object.keys(request.placeholderValues).sort().join(',') !== [...candidate.placeholder_keys].sort().join(',')) throw new ProductHttpError('VALIDATION');
       const text = candidate.answer_text.replace(/\{(订单号|日期)\}/g, (_match, key: string) => request.placeholderValues[key === '订单号' ? 'order_id' : 'date'] ?? '');
       if (/[{}]/.test(text)) throw new ProductHttpError('VALIDATION');
@@ -79,7 +87,7 @@ export class ProductSearch {
       const status = await this.session.status();
       if (!status.ok || !status.signedIn) throw new ProductHttpError('UNAUTHORIZED');
       this.current(sender, state);
-      if (!this.usable(candidate, state)) throw new ProductHttpError('STALE');
+      if (!this.usable(candidate, state) || !this.announce.allows(candidate.release_id)) throw new ProductHttpError('STALE');
       try { this.writeClipboard(text); } catch { throw new ProductHttpError('CLIPBOARD_FAILED'); }
       state.terminal = true;
       let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result!.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';

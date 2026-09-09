@@ -98,4 +98,10 @@ describe('loopback transport', () => {
     await expect(http.request('/v1/auth/me')).rejects.toMatchObject({ code: 'OVERLOADED', message: '服务繁忙，请稍后重试' });
     expect(transport).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ redirect: 'error' }));
   });
+  it('maps source-gate 503 and keeps 304 bodies empty', async () => {
+    const gate = vi.fn(async () => Response.json({ error: { code: 'OVERLOADED', message: '当前内容来源校验未通过', details: { reason: 'SOURCE_GATE_NOT_READY' } } }, { status: 503 })) as unknown as typeof fetch;
+    await expect(new ProductHttp('http://127.0.0.1:4100', gate).request('/v1/announce/current')).rejects.toMatchObject({ code: 'SOURCE_GATE_NOT_READY' });
+    const notModified = vi.fn(async () => new Response(null, { status: 304, headers: { 'x-snapshot-lease': `osl_${'c'.repeat(64)}`, 'x-snapshot-lease-expires': '2026-09-09T00:10:00.000Z' } })) as unknown as typeof fetch;
+    await expect(new ProductHttp('http://127.0.0.1:4100', notModified).request('/v1/announce/current')).resolves.toMatchObject({ status: 304, value: null });
+  });
 });
