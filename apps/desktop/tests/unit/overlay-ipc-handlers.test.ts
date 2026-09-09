@@ -178,6 +178,23 @@ describe('overlay query layout IPC handlers', () => {
     });
   });
 
+  it('returns a typed fail-closed window context when the overlay controller is unavailable', () => {
+    registerOverlayIpc(() => null);
+    const query = createSender(7, 'query');
+
+    expect(capturedHandler(IPC_CHANNELS.GET_WINDOW_CONTEXT)(query.event)).toEqual({
+      role: 'query',
+      phase: 'FOX_IDLE',
+      platform: process.platform,
+      shortcut: {
+        registered: false,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '窗口上下文不可用',
+      },
+      testHarness: false,
+    });
+  });
+
   it('awaits dashboard opening and returns a typed failure to the trusted query', async () => {
     const fixture = createControllerFixture();
     fixture.openDashboard.mockResolvedValueOnce({

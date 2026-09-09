@@ -1198,6 +1198,79 @@ describe('QueryApp', () => {
     }
   });
 
+  it('keeps manual search usable when getWindowContext rejects', async () => {
+    getWindowContext.mockRejectedValueOnce(new Error('window context unavailable'));
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await waitFor(() => expect(getWindowContext).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('shortcut-fallback')).not.toBeInTheDocument();
+    await searchCleanser(user);
+    expect(screen.getByTestId('copy-button-1')).toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).toBeEnabled();
+  });
+
+  it('measures shortcut and ERROR banners as independent layout owners', async () => {
+    getWindowContext.mockResolvedValue({
+      role: 'query',
+      phase: 'SEARCH_INPUT',
+      platform: 'darwin',
+      shortcut: {
+        registered: false,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '全局快捷键注册失败',
+      },
+      testHarness: false,
+    });
+    copyText.mockResolvedValue({ ok: false, message: '复制失败，请重试' });
+    const offsetHeight = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockImplementation(function measuredHeight(this: HTMLElement) {
+        if (this.classList.contains('query-capsule')) return 88;
+        if (this.classList.contains('shortcut-banner')) return 24;
+        if (this.classList.contains('status-banner')) return 80;
+        return 0;
+      });
+    const domRect = (top: number, bottom: number) => ({
+      x: 0,
+      y: top,
+      top,
+      bottom,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: Math.max(0, bottom - top),
+      toJSON: () => ({}),
+    }) as DOMRect;
+    const boundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function measuredRect(this: HTMLElement) {
+        if (this.classList.contains('query-shell')) return domRect(40, 40);
+        if (this.classList.contains('shortcut-banner')) return domRect(208, 232);
+        if (this.classList.contains('status-banner')) return domRect(204, 284);
+        return domRect(200, 248);
+      });
+
+    try {
+      const user = userEvent.setup();
+      render(<QueryApp />);
+      expect(await screen.findByTestId('shortcut-fallback')).toBeVisible();
+      await searchCleanser(user);
+      await user.click(screen.getByTestId('copy-button-1'));
+      expect(await screen.findByTestId('error-state')).toBeVisible();
+      expect(screen.getByTestId('shortcut-fallback')).toBeVisible();
+      await waitFor(() => {
+        const errorRequest = reportQueryLayout.mock.calls
+          .map(([request]) => request as { phase: string; desiredHeight: number })
+          .reverse()
+          .find((request) => request.phase === 'ERROR');
+        expect(errorRequest?.desiredHeight).toBe(256);
+      });
+    } finally {
+      boundingClientRect.mockRestore();
+      offsetHeight.mockRestore();
+    }
+  });
+
   it('offers a secondary dashboard entry that does not search', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);

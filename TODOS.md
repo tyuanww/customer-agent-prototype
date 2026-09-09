@@ -1,56 +1,6 @@
 # TODOS
 
-> **复核：** 2026-08-30。下列四项已逐条对照当前测试，仍是未覆盖的 P3 窄分支；它们属于 Menokin `PILOT-S0` 合成基线的验证债务，不构成 G0 / Ddev 或正式 DEV-M0 授权。
-
-## Verification
-
-### Cover the unavailable WindowContext branch
-
-**What:** Add a handler-level test for `GET_WINDOW_CONTEXT` when the overlay controller is unavailable.
-
-**Why:** Preserve the typed fail-closed response at the Main IPC boundary.
-
-**Context:** The trusted and untrusted sender paths are covered in `apps/desktop/tests/unit/overlay-ipc-handlers.test.ts`; the controller-unavailable branch in `apps/desktop/src/main/overlay-ipc.ts` is the remaining narrow case.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-### Cover a rejected renderer WindowContext request
-
-**What:** Add a Query component test in which `getWindowContext()` rejects and the manual search interaction remains usable.
-
-**Why:** Prove renderer startup degrades safely when the context request itself fails.
-
-**Context:** Missing API and successful context responses are covered in `apps/desktop/tests/component/QueryApp.test.tsx`; this should remain a component-level error-path test rather than an Electron E2E.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-### Cover simultaneous shortcut and error banners
-
-**What:** Add a Query layout test for the shortcut warning and the `ERROR` result banner being visible together.
-
-**Why:** Lock the shared banner measurement owner against future height-accounting drift.
-
-**Context:** The equivalent `EMPTY` combination is covered in `apps/desktop/tests/component/QueryApp.test.tsx`; reuse that fixture with an error result instead of adding a browser test.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
-
-### Cover the test harness without a Fox window
-
-**What:** Add a unit test for `attachTestHarness()` when no Fox `BrowserWindow` is present.
-
-**Why:** Keep the optional E2E provenance helper fail-closed without expanding production behavior.
-
-**Context:** The current Stage Manager Electron test covers tracing with a live Fox window. Exercise the absent-window branch directly in a fake Main-process fixture.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
+> **复核：** 2026-09-10。四项 P3 窄分支已在 `codex/macos-p3-narrow-tests` 补齐自动化覆盖；它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。登录残留红字由独立切片处理。
 
 ## Completed
 
@@ -65,4 +15,52 @@
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
+**Status:** DONE
+
+### Cover the unavailable WindowContext branch
+
+**What:** Handler-level test for `GET_WINDOW_CONTEXT` when the overlay controller is unavailable.
+
+**Why:** Preserve the typed fail-closed response at the Main IPC boundary.
+
+**Context:** Added in `apps/desktop/tests/unit/overlay-ipc-handlers.test.ts` next to the trusted and untrusted sender cases.
+
+**Effort:** S
+**Priority:** P3
+**Status:** DONE
+
+### Cover a rejected renderer WindowContext request
+
+**What:** Query component test in which `getWindowContext()` rejects and the manual search interaction remains usable.
+
+**Why:** Prove renderer startup degrades safely when the context request itself fails.
+
+**Context:** Added in `apps/desktop/tests/component/QueryApp.test.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Status:** DONE
+
+### Cover simultaneous shortcut and error banners
+
+**What:** Query layout test for the shortcut warning and the `ERROR` result banner being visible together.
+
+**Why:** Lock the shared banner measurement owner against future height-accounting drift.
+
+**Context:** Reused the EMPTY layout fixture in `apps/desktop/tests/component/QueryApp.test.tsx` with a copy-failure ERROR result.
+
+**Effort:** S
+**Priority:** P3
+**Status:** DONE
+
+### Cover the test harness without a Fox window
+
+**What:** Unit test for `attachTestHarness()` when no Fox `BrowserWindow` is present.
+
+**Why:** Keep the optional E2E provenance helper fail-closed without expanding production behavior.
+
+**Context:** Added in `apps/desktop/tests/unit/overlay-test-harness.test.ts` with a fake Main-process fixture.
+
+**Effort:** S
+**Priority:** P3
 **Status:** DONE
