@@ -191,7 +191,7 @@ node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/script
 
 它**不能**证明：PE 可执行文件内部图标资源、Authenticode / EV 签名、真实 Windows 安装、任务栏图标。对应验收必须在 Windows 设备上做。禁止把未签名产物写成已签名。
 
-W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上执行 `pnpm test:e2e:windows-feasibility` 与 `pnpm package:win`。定向 E2E 会实际启动 Electron，确认 Fox / Query 两个 overlay 使用透明背景、快捷键注册成功、查询窗可打开并能干净退出；它比“脚本存在”多证明一次 clean-checkout 的 Windows 运行路径与未签名产物后验，但仍不是企业坐席真机、IME/DPI/读屏、真实 OS 按键投递、GPU 合成观感、签名、更新或 Pilot 验收。
+W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上执行 `pnpm test:e2e:windows-feasibility` 与 `pnpm package:win`。定向 E2E 会实际启动 `apps/desktop/out/main/index.js`，不经过 `apps/desktop/node_modules/@customer-agent/*` 的嵌套解析；`package:win` 先构建 `packages/contracts` runtime `dist`，再让 electron-vite 把该包内联进 main，并在打包前检查产物不含 workspace 裸导入。该路径确认 Fox / Query 两个 overlay 使用透明背景、快捷键注册成功、查询窗可打开并能干净退出；它比“脚本存在”多证明一次 clean-checkout 的 Windows 运行路径与未签名产物后验，但仍不是企业坐席真机、IME/DPI/读屏、真实 OS 按键投递、GPU 合成观感、签名、更新或 Pilot 验收。
 
 ### 3.4 W6 正式服务候选产物
 

@@ -1,8 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { prepareNodeSystemCaEnvironment } from './node-system-ca.mjs';
+import { assertMainBundleHasNoWorkspaceBareImports } from './assert-main-bundle.mjs';
+
+const require = createRequire(import.meta.url);
+const typescriptCompiler = require.resolve('typescript/bin/tsc');
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(desktopRoot, '../..');
@@ -48,6 +53,8 @@ export function packageWindows(
     ?? prepareNodeSystemCaEnvironment;
   const runCommand = dependencies.runCommand ?? execFileSync;
   const resetOutput = dependencies.resetOutput ?? resetWindowsPackageOutput;
+  const assertMainBundle = dependencies.assertMainBundle
+    ?? assertMainBundleHasNoWorkspaceBareImports;
   const systemCa = prepareSystemCa();
   const buildEnvironment = systemCa.environment;
   buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
@@ -67,6 +74,18 @@ export function packageWindows(
       stdio: 'inherit',
     });
 
+    // Clean Windows checkouts have no packages/contracts/dist; Vite cannot
+    // bundle the workspace export until the runtime build exists.
+    runCommand(
+      process.execPath,
+      [typescriptCompiler, '-p', 'tsconfig.build.json'],
+      {
+        cwd: path.join(repositoryRoot, 'packages/contracts'),
+        env: buildEnvironment,
+        stdio: 'inherit',
+      },
+    );
+
     runCommand(
       process.execPath,
       ['node_modules/electron-vite/bin/electron-vite.js', 'build'],
@@ -76,6 +95,7 @@ export function packageWindows(
         stdio: 'inherit',
       },
     );
+    assertMainBundle(desktopRoot);
 
     resetOutput(repositoryRoot);
 

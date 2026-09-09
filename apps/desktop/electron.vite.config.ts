@@ -4,7 +4,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // Workspace contracts must be inlined. Windows smoke launches out/main
+    // without nested apps/desktop/node_modules/@customer-agent/*, and the
+    // unsigned package only ships out/** plus package.json.
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts'] })],
     build: {
       rollupOptions: {
         input: {
