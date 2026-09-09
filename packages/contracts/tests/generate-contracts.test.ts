@@ -43,8 +43,15 @@ describe('contract runtime schema transformation', () => {
     expect(transformed).not.toHaveProperty('x-annotation-only');
   });
 
+  it('preserves composite uniqueness and rejects ambiguous field lists', () => {
+    expect(generator.toRuntimeSchema({ 'x-unique-by': ['script_id', 'content_hash'] })).toEqual({ 'x-unique-by': ['script_id', 'content_hash'] });
+    for (const value of [[], ['domain', 'domain'], [42]]) {
+      expect(() => generator.toRuntimeSchema({ 'x-unique-by': value })).toThrow();
+    }
+  });
+
   it('fails closed for malformed validation extensions and non-schema references', () => {
-    expect(() => generator.toRuntimeSchema({ 'x-unique-by': ['domain'] })).toThrow(
+    expect(() => generator.toRuntimeSchema({ 'x-unique-by': [''] })).toThrow(
       /x-unique-by must be a non-empty string/,
     );
     expect(() => generator.toRuntimeSchema({ $ref: '#/components/responses/Invalid' })).toThrow(

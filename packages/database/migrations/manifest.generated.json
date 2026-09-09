@@ -1,9 +1,9 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701",
-  "source_git_sha": "2c75d8e7670134e6aa95a4780ff09fe0422a65e8",
-  "source_schema_sha256": "859c4a4757d87e642e797ad8a26cfb334c49ae7f8f263966099eb89e6750b38b",
-  "upgrade_source_sha256": "66030b044efe1eadd9361385dbf7d7c8f38e0b14444274ddc83be27e52d6e4f0",
+  "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e",
+  "source_git_sha": "6f7d18e59f2e8b510daa23a3d606163227350a40",
+  "source_schema_sha256": "0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f",
+  "upgrade_source_sha256": "4ff4475ed9bdd45f27249775d3da29435c79b45cfa8c77ea2d616713c1864f75",
   "compatibility": {
     "current": "N",
     "prior_signed_baseline": {
@@ -24,6 +24,12 @@
         "source_git_sha": "1af001b8b0ce95aac0c42f42251a38feb85f3e26",
         "source_schema_sha256": "edf909bf9450b5745a85ced4a75a2e2de3e5b061847562cd3a68c9c7c226da99",
         "migration_count": 11
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701",
+        "source_git_sha": "2c75d8e7670134e6aa95a4780ff09fe0422a65e8",
+        "source_schema_sha256": "859c4a4757d87e642e797ad8a26cfb334c49ae7f8f263966099eb89e6750b38b",
+        "migration_count": 12
       }
     ]
   },
@@ -236,6 +242,8 @@
       "position": 12,
       "id": "0012_owner_acceptance_v1_15",
       "file": "0012_owner_acceptance_v1_15.sql",
+      "sha256": "3bc06f81ed596049e0539a679e066b7a6c2d1814314c3d2ba9fd4d65f469be18",
+      "bytes": 128400,
       "source_ranges": [
         {
           "start_line": 7701,
@@ -266,11 +274,33 @@
           "end_line": 10171
         }
       ],
-      "sha256": "3bc06f81ed596049e0539a679e066b7a6c2d1814314c3d2ba9fd4d65f469be18",
-      "bytes": 128400,
       "contract_set_id": "cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701",
       "source_git_sha": "2c75d8e7670134e6aa95a4780ff09fe0422a65e8",
       "source_schema_sha256": "859c4a4757d87e642e797ad8a26cfb334c49ae7f8f263966099eb89e6750b38b"
+    },
+    {
+      "position": 13,
+      "id": "0013_backend_identity_content_v1_16",
+      "file": "0013_backend_identity_content_v1_16.sql",
+      "source_ranges": [
+        {
+          "start_line": 10183,
+          "end_line": 10334
+        },
+        {
+          "start_line": 10344,
+          "end_line": 10713
+        },
+        {
+          "start_line": 10719,
+          "end_line": 10719
+        }
+      ],
+      "sha256": "8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2",
+      "bytes": 40853,
+      "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e",
+      "source_git_sha": "6f7d18e59f2e8b510daa23a3d606163227350a40",
+      "source_schema_sha256": "0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f"
     }
   ]
 }

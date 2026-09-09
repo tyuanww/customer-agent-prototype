@@ -826,7 +826,7 @@ describe('ServiceRepository readiness', () => {
     return {
       database_probe: 1,
       server_version_num: 150_013,
-      schema_comment: 'CS-AI-C11 schema.v1.15; synthetic unit fixture',
+      schema_comment: 'CS-AI-C11 schema.v1.16; synthetic unit fixture',
       repository_boundary_present: true,
       runtime_identity_safe: true,
       runtime_effective_acl_safe: true,

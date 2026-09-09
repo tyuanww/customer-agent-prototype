@@ -1,6 +1,176 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
 export interface paths {
+    "/v1/admin/content/reviews/{batch_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a parked review wait and the underlying import batch */
+        post: operations["cancelReviewedImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/content/reviews/{batch_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume a fully reviewed immutable import */
+        post: operations["resumeReviewedImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/content/reviews/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a bounded immutable review page */
+        get: operations["readContentReviewPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/content/reviews/{batch_id}/quality-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** recordQualityEvidence */
+        post: operations["recordQualityEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/content/reviews/{batch_id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** recordReviewDecision */
+        post: operations["recordReviewDecision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/content/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** listContentReviews */
+        get: operations["listContentReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** receiveProviderCallback */
+        get: operations["receiveProviderCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** logoutSession */
+        post: operations["logoutSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/login-requests/{login_id}/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** exchangeLoginRequest */
+        post: operations["exchangeLoginRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/login-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** createLoginRequest */
+        post: operations["createLoginRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -669,6 +839,139 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ReviewResumed: {
+            job_id: string;
+        };
+        ReviewResume: {
+            review_revision: string;
+        };
+        QualityReceipt: {
+            receipt_id: string;
+            batch_id: string;
+            review_revision: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** @enum {unknown} */
+            quality_state: "passed" | "blocked" | "expansion_required" | "revision_required";
+        };
+        ReviewPage: {
+            batch_id: string;
+            review_revision: string;
+            items: components["schemas"]["ReviewPageItem"][];
+            next_after: number | null;
+            total: number;
+        };
+        ReviewPageItem: {
+            script_id: string;
+            content_hash: string;
+            title: string | null;
+            answer_text: string | null;
+            category: string | null;
+            product_scope_type: string | null;
+            effective_from: string | null;
+            effective_to: string | null;
+            risk_level: string | null;
+            quality_status: string | null;
+            position: number;
+            /** @enum {unknown} */
+            operation: "upsert" | "withdraw";
+            has_conflict: boolean | null;
+            platform_scope: string[] | null;
+            product_scope_refs: string[] | null;
+            placeholder_keys: string[] | null;
+            risk_categories: string[] | null;
+            initial_sample: boolean;
+            expanded_sample: boolean;
+            source_version_id: string | null;
+            owner_role: string | null;
+            review_due_at: string | null;
+            intent_id: string | null;
+            intent_taxonomy_version: string | null;
+            questions: {
+                question_id: string | null;
+                question_version: number | null;
+                question_text: string | null;
+                question_hash: string | null;
+                semantic_family_id: string | null;
+            }[];
+        };
+        CandidateError: {
+            error: {
+                /** @enum {unknown} */
+                code: "VALIDATION" | "UNAUTHORIZED" | "FORBIDDEN" | "CONFLICT" | "NOT_FOUND" | "RATE_LIMITED" | "OVERLOADED" | "GONE";
+                message: string;
+                details: {
+                    /** @enum {unknown} */
+                    reason: "LOGIN_INVALID" | "LOGIN_EXPIRED" | "LOGIN_CONSUMED" | "SESSION_INVALID" | "CAPABILITY_DENIED" | "REVIEW_STALE" | "IDEMPOTENCY_CONFLICT" | "REQUEST_INVALID" | "DEPENDENCY_UNAVAILABLE" | "RATE_LIMITED" | "REVIEW_EVIDENCE_MISSING" | "QUALITY_GATE_NOT_PASSED" | "QUALITY_SAMPLE_MISMATCH" | "QUALITY_EVIDENCE_INVALID" | "QUALITY_INITIAL_REQUIRED" | "QUALITY_EXPANSION_DENIED" | "OUTBOX_LEASE_LOST" | "QUALITY_POPULATION_MISMATCH" | "DUPLICATE_SCRIPT" | "DUPLICATE_CHECK" | "REVIEW_EVIDENCE_TRUST_BOUNDARY" | "READ_COMMITTED_REQUIRED" | "REVIEW_CANCELLED" | "QUALITY_EVIDENCE_IMMUTABLE";
+                };
+            };
+        };
+        ReviewReceipt: {
+            receipt_id: string;
+            batch_id: string;
+            review_revision: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        QualityEvidence: {
+            review_revision: string;
+            /** @enum {unknown} */
+            phase: "initial" | "expanded";
+            checks: components["schemas"]["QualityItem"][];
+            evidence_id: string;
+        };
+        QualityItem: {
+            script_id: string;
+            content_hash: string;
+            defect: boolean;
+        };
+        ReviewDecision: {
+            review_revision: string;
+            script_id: string;
+            content_hash: string;
+            /** @enum {unknown} */
+            decision: "approved" | "rejected";
+            evidence_id: string;
+        };
+        ReviewList: {
+            items: components["schemas"]["ReviewSummary"][];
+            next_cursor: string | null;
+        };
+        ReviewSummary: {
+            batch_id: string;
+            review_revision: string;
+            /** @enum {unknown} */
+            state: "waiting" | "resumed" | "cancelled";
+            candidate_count: number;
+        };
+        LoginSession: {
+            access_token: string;
+            /** @constant */
+            token_type: "Bearer";
+            /** Format: date-time */
+            expires_at: string;
+        };
+        LoginPending: {
+            /** @constant */
+            status: "pending";
+            /** @constant */
+            retry_after_seconds: 2;
+        };
+        LoginExchange: {
+            client_verifier: string;
+        };
+        LoginCreated: {
+            login_id: string;
+            /** Format: uri */
+            authorize_url: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        LoginCreate: {
+            client_challenge: string;
+            /** @constant */
+            challenge_method: "S256";
+        };
         /** G1a bounded owner acceptance metadata (not runtime authorization) */
         OwnerAcceptanceRecord: {
             /** @constant */
@@ -2107,6 +2410,1027 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    cancelReviewedImport: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Gateway-scoped replay key; repeated cancel is a no-op */
+                "Idempotency-Key": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Cancelled; repeated cancel is a no-op */
+            204: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            401: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            403: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            404: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            409: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    resumeReviewedImport: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Gateway-scoped replay key; SQL resume is unique per batch/revision and returns the same job_id */
+                "Idempotency-Key": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewResume"];
+            };
+        };
+        responses: {
+            /** @description Candidate success */
+            200: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewResumed"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            401: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            403: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            404: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            409: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    readContentReviewPage: {
+        parameters: {
+            query: {
+                review_revision: string;
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Candidate success */
+            200: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewPage"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            401: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            403: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            404: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            409: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    recordQualityEvidence: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QualityEvidence"];
+            };
+        };
+        responses: {
+            /** @description Candidate success */
+            200: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityReceipt"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            401: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            403: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            404: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            409: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    recordReviewDecision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDecision"];
+            };
+        };
+        responses: {
+            /** @description Candidate success */
+            200: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewReceipt"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            401: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            403: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            404: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            409: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    listContentReviews: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Candidate success */
+            200: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewList"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            401: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            403: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    receiveProviderCallback: {
+        parameters: {
+            query: {
+                code?: string;
+                state: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fixed HTML completion page; never reflects provider input */
+            200: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    logoutSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Completed */
+            204: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            401: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            403: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    exchangeLoginRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                login_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginExchange"];
+            };
+        };
+        responses: {
+            /** @description Candidate success */
+            200: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginSession"];
+                };
+            };
+            /** @description Awaiting callback */
+            202: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPending"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            404: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            409: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            410: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
+    createLoginRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginCreate"];
+            };
+        };
+        responses: {
+            /** @description Candidate success */
+            201: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginCreated"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            400: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            429: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            503: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+            /** @description Existing error.code/message/details envelope with candidate reasons */
+            default: {
+                headers: {
+                    /** @description Credentials and review responses are never cached */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateError"];
+                };
+            };
+        };
+    };
     getHealth: {
         parameters: {
             query?: never;

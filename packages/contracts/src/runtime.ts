@@ -51,14 +51,17 @@ function scalarIdentity(value: unknown): string | undefined {
   return undefined;
 }
 
-function hasUniquePropertyValues(propertyName: string, items: unknown[]): boolean {
+function hasUniquePropertyValues(propertyName: string | string[], items: unknown[]): boolean {
+  const properties = typeof propertyName === 'string' ? [propertyName] : propertyName;
   const seen = new Set<string>();
   for (const item of items) {
-    if (!isRecord(item) || !Object.hasOwn(item, propertyName)) {
+    if (!isRecord(item) || !properties.every((name) => Object.hasOwn(item, name))) {
       continue;
     }
-    const identity = scalarIdentity(item[propertyName]);
-    if (identity === undefined || seen.has(identity)) {
+    const values = properties.map((name) => scalarIdentity(item[name]));
+    // Tuple encoding preserves boundaries even when string values contain separators.
+    const identity = JSON.stringify(values);
+    if (values.includes(undefined) || seen.has(identity)) {
       return false;
     }
     seen.add(identity);
@@ -92,7 +95,11 @@ function buildValidationRuntime(): ValidationRuntime {
   ajv.addKeyword({
     keyword: UNIQUE_BY_KEYWORD,
     type: 'array',
-    schemaType: 'string',
+    schemaType: ['string', 'array'],
+    metaSchema: { anyOf: [
+      { type: 'string', minLength: 1 },
+      { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', minLength: 1 } },
+    ] },
     errors: false,
     validate: hasUniquePropertyValues,
   });

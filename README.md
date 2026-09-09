@@ -204,7 +204,7 @@ pnpm test:e2e
 
 | 命令 | 实际覆盖 | 不要误读成 |
 | --- | --- | --- |
-| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；133 个 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
+| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；150 个 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
 | `pnpm db:migrations:check` / `pnpm test:db` | 已验证 DDL 被确定性分成十二段且来源完整覆盖；PG15 临时 cluster 中的 v1.15 clean install、精确 v1.12/v1.13/v1.14→v1.15 后缀升级、双客户端串行化、账本/DDL 原子回滚、精确 ACL/函数/触发器/seed 漂移拒绝与 SQLSTATE 后验通过 | 已连接真实业务库、备份恢复或生产就绪 |
 | `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
 | `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |

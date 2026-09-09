@@ -180,9 +180,11 @@ function createContractSet({
 }
 
 describe('customer-agent contract-set intake', () => {
-  it('accepts the owner pair and rejects mixed or unreviewed version/source pairs', () => {
-    const source = path.join(repositoryRoot, 'contracts/upstream/customer-agent',
-      'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701');
+  it.each([
+    'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701',
+    'cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e',
+  ])('accepts %s and rejects mixed or unreviewed version/source pairs', (id) => {
+    const source = path.join(repositoryRoot, 'contracts/upstream/customer-agent', id);
     const directory = temporaryDirectory('owner-pair');
     cpSync(source, directory, { recursive: true });
     expect(() => contractSet.verifyContractSetDirectory(directory)).not.toThrow();
@@ -197,7 +199,7 @@ describe('customer-agent contract-set intake', () => {
     }
     const mixed = structuredClone(original);
     mixed.openapi.version = '1.11.0';
-    mixed.contract_set_id = mixed.contract_set_id.replace('openapi-1.12.0', 'openapi-1.11.0');
+    mixed.contract_set_id = mixed.contract_set_id.replace(/openapi-1\.(12|13)\.0/, 'openapi-1.11.0');
     writeFileSync(manifestPath, JSON.stringify(mixed));
     expect(() => contractSet.verifyContractSetDirectory(directory)).toThrow(/version pair/);
   });
@@ -465,8 +467,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701',
-      source_git_sha: '2c75d8e7670134e6aa95a4780ff09fe0422a65e8',
+      contract_set_id: 'cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e',
+      source_git_sha: '6f7d18e59f2e8b510daa23a3d606163227350a40',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -476,13 +478,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      'e7c209c210f6b2db6618d8f6d3700327ec234e93a8be1878c39378cd9f8635ee',
+      '952076e396ca360eaeaabfe59e030713ae1d0af82270ff51baac551ce223b47b',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      '361f20128c88143eb87370f136b67c4de8c1ed5fc02c7072f62c16545951315c',
+      'c3c14659261ed01ff4f0c187026601844f59d3cd26be605a34f647bc130cc94c',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.15.sql')))).toBe(
-      '859c4a4757d87e642e797ad8a26cfb334c49ae7f8f263966099eb89e6750b38b',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.16.sql')))).toBe(
+      '0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f',
     );
   });
 });

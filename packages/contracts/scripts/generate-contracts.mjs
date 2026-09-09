@@ -107,7 +107,14 @@ export function toRuntimeSchema(value) {
     if (key === '$ref') {
       transformed[key] = rewriteComponentReference(requireString(child, '$ref'));
     } else if (VALIDATION_EXTENSION_SCHEMA_KEYS.has(key)) {
-      transformed[key] = requireString(child, key);
+      if (Array.isArray(child)) {
+        if (child.length === 0 || new Set(child).size !== child.length) {
+          throw new Error(`${key} must contain distinct non-empty property names`);
+        }
+        transformed[key] = child.map((name) => requireString(name, key));
+      } else {
+        transformed[key] = requireString(child, key);
+      }
     } else {
       transformed[key] = toRuntimeSchema(child);
     }

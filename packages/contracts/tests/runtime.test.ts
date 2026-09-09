@@ -46,18 +46,18 @@ describe('generated customer-agent runtime contracts', () => {
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
-      contract_set_id: 'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701',
-      source_git_sha: '2c75d8e7670134e6aa95a4780ff09fe0422a65e8',
-      openapi_sha256: '361f20128c88143eb87370f136b67c4de8c1ed5fc02c7072f62c16545951315c',
-      database_sha256: '859c4a4757d87e642e797ad8a26cfb334c49ae7f8f263966099eb89e6750b38b',
+      contract_set_id: 'cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e',
+      source_git_sha: '6f7d18e59f2e8b510daa23a3d606163227350a40',
+      openapi_sha256: 'c3c14659261ed01ff4f0c187026601844f59d3cd26be605a34f647bc130cc94c',
+      database_sha256: '0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
     });
     const runtimeDefinitions = (OPENAPI_RUNTIME_SCHEMA_DOCUMENT as {
       $defs: Record<string, unknown>;
     }).$defs;
-    expect(contractSchemaNames).toHaveLength(133);
-    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(133);
+    expect(contractSchemaNames).toHaveLength(150);
+    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(150);
     expect(Object.keys(runtimeDefinitions)).toEqual([...contractSchemaNames]);
     expect(runtimeDefinitions).toMatchObject({
       FileImportRequest: {
@@ -80,7 +80,18 @@ describe('generated customer-agent runtime contracts', () => {
     }).not.toThrow();
   });
 
-  it('accepts a contract-valid search request', () => {
+  it('rejects repeated quality identities while allowing distinct tuples', () => {
+    const item = { script_id: 'SYN-A', content_hash: 'a'.repeat(64), defect: false };
+    const envelope = { review_revision: 'b'.repeat(64), phase: 'initial', evidence_id: 'EVD-SYNTHETIC' };
+    for (const other of [{ ...item, content_hash: 'c'.repeat(64) }, { ...item, script_id: 'SYN-B' }]) {
+      expect(validateContractSchema('QualityEvidence', { ...envelope, checks: [item, other] }).ok).toBe(true);
+    }
+    const result = validateContractSchema('QualityEvidence', { ...envelope, checks: [item, { ...item, defect: true }] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues[0]?.keyword).toBe('x-unique-by');
+  });
+
+  it('accepts a contract-valid search request' , () => {
     expect(validateContractSchema('SearchRequest', validSearchRequest)).toEqual({
       ok: true,
       value: validSearchRequest,

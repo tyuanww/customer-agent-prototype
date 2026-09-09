@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.12.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.13.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -14,6 +14,7 @@ export const COMPONENT_SCHEMA_NAMES = [
   "AuthoritativeSourceVersionId",
   "CancelImportRequest",
   "CancelImportResponse",
+  "CandidateError",
   "CollectionMode",
   "ConflictErrorEnvelope",
   "ContentHash",
@@ -60,6 +61,11 @@ export const COMPONENT_SCHEMA_NAMES = [
   "IterationTaskListResponse",
   "IterationTaskStartRequest",
   "IterationTaskStatus",
+  "LoginCreate",
+  "LoginCreated",
+  "LoginExchange",
+  "LoginPending",
+  "LoginSession",
   "MetricCandidate",
   "MetricsStreamItem",
   "MetricsStreamResponse",
@@ -94,13 +100,24 @@ export const COMPONENT_SCHEMA_NAMES = [
   "PublishRequest",
   "PublishResponse",
   "PushMethod",
+  "QualityEvidence",
+  "QualityItem",
+  "QualityReceipt",
   "QuestionSource",
   "Rate",
   "RateLimitedErrorEnvelope",
   "ReadyCheckStatus",
   "ReadyChecks",
   "ReadyResponse",
+  "ReviewDecision",
+  "ReviewList",
   "ReviewMode",
+  "ReviewPage",
+  "ReviewPageItem",
+  "ReviewReceipt",
+  "ReviewResume",
+  "ReviewResumed",
+  "ReviewSummary",
   "RiskCategories",
   "RiskCategory",
   "RiskLevel",
@@ -140,7 +157,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.12.0:components",
+  "$id": "urn:customer-agent:openapi:1.13.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -342,6 +359,80 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         },
         "status": {
           "const": "failed"
+        }
+      }
+    },
+    "CandidateError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "message",
+            "details"
+          ],
+          "properties": {
+            "code": {
+              "enum": [
+                "VALIDATION",
+                "UNAUTHORIZED",
+                "FORBIDDEN",
+                "CONFLICT",
+                "NOT_FOUND",
+                "RATE_LIMITED",
+                "OVERLOADED",
+                "GONE"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "enum": [
+                    "LOGIN_INVALID",
+                    "LOGIN_EXPIRED",
+                    "LOGIN_CONSUMED",
+                    "SESSION_INVALID",
+                    "CAPABILITY_DENIED",
+                    "REVIEW_STALE",
+                    "IDEMPOTENCY_CONFLICT",
+                    "REQUEST_INVALID",
+                    "DEPENDENCY_UNAVAILABLE",
+                    "RATE_LIMITED",
+                    "REVIEW_EVIDENCE_MISSING",
+                    "QUALITY_GATE_NOT_PASSED",
+                    "QUALITY_SAMPLE_MISMATCH",
+                    "QUALITY_EVIDENCE_INVALID",
+                    "QUALITY_INITIAL_REQUIRED",
+                    "QUALITY_EXPANSION_DENIED",
+                    "OUTBOX_LEASE_LOST",
+                    "QUALITY_POPULATION_MISMATCH",
+                    "DUPLICATE_SCRIPT",
+                    "DUPLICATE_CHECK",
+                    "REVIEW_EVIDENCE_TRUST_BOUNDARY",
+                    "READ_COMMITTED_REQUIRED",
+                    "REVIEW_CANCELLED",
+                    "QUALITY_EVIDENCE_IMMUTABLE"
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2113,6 +2204,99 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "wont_fix"
       ]
     },
+    "LoginCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client_challenge": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "challenge_method": {
+          "const": "S256"
+        }
+      },
+      "required": [
+        "client_challenge",
+        "challenge_method"
+      ]
+    },
+    "LoginCreated": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "login_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "authorize_url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "login_id",
+        "authorize_url",
+        "expires_at"
+      ]
+    },
+    "LoginExchange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client_verifier": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._~-]{43,128}$"
+        }
+      },
+      "required": [
+        "client_verifier"
+      ]
+    },
+    "LoginPending": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "const": "pending"
+        },
+        "retry_after_seconds": {
+          "const": 2
+        }
+      },
+      "required": [
+        "status",
+        "retry_after_seconds"
+      ]
+    },
+    "LoginSession": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "access_token": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "token_type": {
+          "const": "Bearer"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "access_token",
+        "token_type",
+        "expires_at"
+      ]
+    },
     "MetricCandidate": {
       "type": "object",
       "required": [
@@ -3078,6 +3262,106 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         null
       ]
     },
+    "QualityEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "review_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "phase": {
+          "enum": [
+            "initial",
+            "expanded"
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5000,
+          "items": {
+            "$ref": "#/$defs/QualityItem"
+          },
+          "x-unique-by": [
+            "script_id",
+            "content_hash"
+          ]
+        },
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^EVD-[A-Z0-9-]{6,127}$"
+        }
+      },
+      "required": [
+        "review_revision",
+        "phase",
+        "checks",
+        "evidence_id"
+      ]
+    },
+    "QualityItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "script_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "defect": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "script_id",
+        "content_hash",
+        "defect"
+      ]
+    },
+    "QualityReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "batch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "review_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "recorded_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "quality_state": {
+          "enum": [
+            "passed",
+            "blocked",
+            "expansion_required",
+            "revision_required"
+          ]
+        }
+      },
+      "required": [
+        "receipt_id",
+        "batch_id",
+        "review_revision",
+        "recorded_at",
+        "quality_state"
+      ]
+    },
     "QuestionSource": {
       "type": "string",
       "enum": [
@@ -3202,12 +3486,453 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "ReviewDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "review_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "script_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "rejected"
+          ]
+        },
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^EVD-[A-Z0-9-]{6,127}$"
+        }
+      },
+      "required": [
+        "review_revision",
+        "script_id",
+        "content_hash",
+        "decision",
+        "evidence_id"
+      ]
+    },
+    "ReviewList": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/ReviewSummary"
+          }
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        }
+      },
+      "required": [
+        "items",
+        "next_cursor"
+      ]
+    },
     "ReviewMode": {
       "type": "string",
       "enum": [
         "single",
         "dual",
         "owner_acceptance"
+      ]
+    },
+    "ReviewPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batch_id",
+        "review_revision",
+        "items",
+        "next_after",
+        "total"
+      ],
+      "properties": {
+        "batch_id": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1
+        },
+        "review_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/ReviewPageItem"
+          }
+        },
+        "next_after": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "ReviewPageItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "script_id",
+        "content_hash",
+        "title",
+        "answer_text",
+        "category",
+        "product_scope_type",
+        "effective_from",
+        "effective_to",
+        "risk_level",
+        "quality_status",
+        "position",
+        "operation",
+        "has_conflict",
+        "platform_scope",
+        "product_scope_refs",
+        "placeholder_keys",
+        "risk_categories",
+        "initial_sample",
+        "expanded_sample",
+        "source_version_id",
+        "owner_role",
+        "review_due_at",
+        "intent_id",
+        "intent_taxonomy_version",
+        "questions"
+      ],
+      "properties": {
+        "script_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "answer_text": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "product_scope_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "effective_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "effective_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "risk_level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "quality_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 10000
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "operation": {
+          "enum": [
+            "upsert",
+            "withdraw"
+          ]
+        },
+        "has_conflict": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "platform_scope": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "maxItems": 1000
+        },
+        "product_scope_refs": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "maxItems": 1000
+        },
+        "placeholder_keys": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "maxItems": 1000
+        },
+        "risk_categories": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "maxItems": 1000
+        },
+        "initial_sample": {
+          "type": "boolean"
+        },
+        "expanded_sample": {
+          "type": "boolean"
+        },
+        "source_version_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "owner_role": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "review_due_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "intent_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "intent_taxonomy_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "questions": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "question_id",
+              "question_version",
+              "question_text",
+              "question_hash",
+              "semantic_family_id"
+            ],
+            "properties": {
+              "question_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              },
+              "question_version": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "question_text": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              },
+              "question_hash": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              },
+              "semantic_family_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 500
+              }
+            }
+          }
+        }
+      }
+    },
+    "ReviewReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "batch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "review_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "recorded_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "receipt_id",
+        "batch_id",
+        "review_revision",
+        "recorded_at"
+      ]
+    },
+    "ReviewResume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_revision"
+      ],
+      "properties": {
+        "review_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "ReviewResumed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "ReviewSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "batch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "review_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "state": {
+          "enum": [
+            "waiting",
+            "resumed",
+            "cancelled"
+          ]
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      },
+      "required": [
+        "batch_id",
+        "review_revision",
+        "state",
+        "candidate_count"
       ]
     },
     "RiskCategories": {

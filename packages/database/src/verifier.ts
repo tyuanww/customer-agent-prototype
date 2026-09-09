@@ -80,8 +80,9 @@ const REQUIRED_FUNCTIONS = Object.freeze(
   REQUIRED_FUNCTION_SIGNATURES.map((signature) => signature.slice(0, signature.indexOf('('))),
 );
 const REQUIRED_SCHEMA_COMMENT_FRAGMENTS = Object.freeze([
-  'schema.v1.15',
-  'Phase1 rewrite/auto_send/training hard-off',
+  'schema.v1.16',
+  'synthetic backend development only',
+  'runtime activation and production NOT_CERTIFIED',
 ]);
 const REQUIRED_POLICY_KEYS = Object.freeze([
   'auto_send',
@@ -90,14 +91,14 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
   'metrics_experimental_kpi',
   'rewrite',
 ]);
-const EXPECTED_ACL_MANIFEST_ENTRIES = 170;
-const EXPECTED_ACL_MANIFEST_SHA256 = '240420b33a1cbc170aaa1931440cc3f526db3444f2f79e00f06005610b327ceb';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1446;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '6f7a7228db055670afd252b0ebe515609f1f11b489f1bcc704df05ca61cc75ae';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 159;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '82bdd31352628619c81cd8f2464d99813f5e67ec82b2da142bed8f142e969992';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 31;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'ff9f0bd07849fa9847655d02bc0fff32e5d2b5d988beb942120eadc504a33991';
+const EXPECTED_ACL_MANIFEST_ENTRIES = 193;
+const EXPECTED_ACL_MANIFEST_SHA256 = 'a85c4c2ae3a938361ff7c891e9b4ab47be6bebba90383bc2650602be66317cd9';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1661;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '7a2974cbfa9c2e1c07396225b09ad0a4522f66d9f93f7923b60fd74655832c1a';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 181;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = 'ab0e05a487ac90cf8aaf5728d9aef167f53d11eb10d7b85371c835c3b2256699';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 35;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = '237047c1c7b4512b7ae7647caeaad7bb3cc84b0ab10c383ada6f504426978669';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -137,9 +138,9 @@ export async function verifyMigrationCatalogue(
 
   const inventoryResult = await verifyQuery<InventoryRow>(client, `
       SELECT
-        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname='public' AND relation.relkind IN ('r','p')) AS tables,
-        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname='public' AND relation.relkind='v') AS views,
-        (SELECT count(*)::int FROM pg_catalog.pg_proc procedure JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace WHERE namespace.nspname='public') AS functions,
+        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review') AND relation.relkind IN ('r','p')) AS tables,
+        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review') AND relation.relkind='v') AS views,
+        (SELECT count(*)::int FROM pg_catalog.pg_proc procedure JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review')) AS functions,
         (SELECT extversion FROM pg_catalog.pg_extension WHERE extname='pgcrypto') AS pgcrypto,
         (SELECT extversion FROM pg_catalog.pg_extension WHERE extname='pg_trgm') AS pg_trgm
     `);
@@ -155,11 +156,11 @@ export async function verifyMigrationCatalogue(
           FROM pg_catalog.pg_auth_members membership
           JOIN pg_catalog.pg_roles member_role ON member_role.oid=membership.member
           JOIN pg_catalog.pg_roles granted_role ON granted_role.oid=membership.roleid
-          WHERE member_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar')
-             OR granted_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar')
+          WHERE member_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker')
+             OR granted_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker')
         ) AS memberships
       FROM pg_catalog.pg_roles role
-      WHERE role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar')
+      WHERE role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker')
     `);
   const aclResult = await verifyQuery<ManifestRow>(client, `
     WITH acl_entries(entry) AS (
@@ -175,7 +176,7 @@ export async function verifyMigrationCatalogue(
         COALESCE(namespace.nspacl, acldefault('n', namespace.nspowner))
       ) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
         AND acl.grantee <> namespace.nspowner
 
       UNION ALL
@@ -199,7 +200,7 @@ export async function verifyMigrationCatalogue(
         )
       )) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
         AND relation.relkind IN ('r','p','v','m','S','f')
         AND acl.grantee <> relation.relowner
 
@@ -219,7 +220,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace
       CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
         AND attribute.attnum > 0
         AND NOT attribute.attisdropped
         AND acl.grantee <> relation.relowner
@@ -241,7 +242,7 @@ export async function verifyMigrationCatalogue(
         COALESCE(procedure.proacl, acldefault('f', procedure.proowner))
       ) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
         AND acl.grantee <> procedure.proowner
 
       UNION ALL
@@ -583,7 +584,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace
       JOIN pg_catalog.pg_roles owner_role ON owner_role.oid=procedure.proowner
       JOIN pg_catalog.pg_language language_object ON language_object.oid=procedure.prolang
-      WHERE namespace.nspname='public'
+      WHERE namespace.nspname IN ('public','backend_identity','backend_review')
     )
     SELECT
       COALESCE(string_agg(entry, E'\\n' ORDER BY entry), '') AS manifest,
@@ -608,7 +609,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace table_namespace ON table_namespace.oid=relation.relnamespace
       JOIN pg_catalog.pg_proc procedure ON procedure.oid=trigger.tgfoid
       JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid=procedure.pronamespace
-      WHERE table_namespace.nspname='public' AND NOT trigger.tgisinternal
+      WHERE table_namespace.nspname IN ('public','backend_identity','backend_review') AND NOT trigger.tgisinternal
     )
     SELECT
       COALESCE(string_agg(entry, E'\\n' ORDER BY entry), '') AS manifest,
@@ -667,10 +668,10 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 42 || inventory.views !== 2 || inventory.functions !== 159 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 49 || inventory.views !== 2 || inventory.functions !== 181 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
-  if (!roles || roles.total !== 6 || roles.safe !== 6 || roles.memberships !== 0) {
+  if (!roles || roles.total !== 9 || roles.safe !== 9 || roles.memberships !== 0) {
     failures.push('capability role safety');
   }
   if (!acl || acl.entries !== EXPECTED_ACL_MANIFEST_ENTRIES || sha256(acl.manifest) !== EXPECTED_ACL_MANIFEST_SHA256) {

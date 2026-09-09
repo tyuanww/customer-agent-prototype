@@ -168,15 +168,25 @@ function validateManifest(rawManifest) {
   if (database.version !== `schema.v${idMatch[2]}` || database.file !== `schema-v${idMatch[2]}.sql`) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
-  // Version and both paths form one reviewed pair. Never accept a mixed legacy/owner set.
+  // Version and both paths form one reviewed pair; mixed generations fail closed.
+  const backendPair = openapi.version === '1.13.0' && database.version === 'schema.v1.16';
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (!ownerPair && !legacyPair) throw new Error('Unsupported contract version pair');
-  if (openapi.source_path !== (ownerPair ? `${OWNER_SOURCE_ROOT}/openapi.v1.12.yaml` : OPENAPI_SOURCE_PATH)) {
+  if (!backendPair && !ownerPair && !legacyPair) throw new Error('Unsupported contract version pair');
+  let openapiPath = OPENAPI_SOURCE_PATH;
+  let databasePath = DATABASE_SOURCE_PATH;
+  if (backendPair) {
+    openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.13.yaml`;
+    databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.16.sql`;
+  } else if (ownerPair) {
+    openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.12.yaml`;
+    databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.15.sql`;
+  }
+  if (openapi.source_path !== openapiPath) {
     throw new Error('OpenAPI source_path is invalid');
   }
-  if (database.source_path !== (ownerPair ? `${OWNER_SOURCE_ROOT}/schema.v1.15.sql` : DATABASE_SOURCE_PATH)) {
+  if (database.source_path !== databasePath) {
     throw new Error('Database source_path is invalid');
   }
   return rawManifest;
