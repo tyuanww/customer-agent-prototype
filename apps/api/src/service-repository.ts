@@ -20,6 +20,10 @@ import {
   type SearchRepositoryRequest,
   type SearchRepositoryResult,
 } from './search-repository.js';
+import {
+  createContentImportRepository,
+  type ContentImportRepository,
+} from './content-import-repository.js';
 
 export type ServiceReadinessChecks = components['schemas']['ReadyChecks'];
 export type ServicePolicyFlags = Readonly<Omit<components['schemas']['PolicyResponse'], 'auth_mode'>>;
@@ -31,6 +35,7 @@ export type ServiceRepository = Readonly<{
   executeSearch: EventRepository['executeSearch'];
   recordAdoption: (request: PreparedAdoptionOperation) => ReturnType<EventRepository['recordAdoption']>;
   recordEscalation: (request: PreparedEscalationOperation) => ReturnType<EventRepository['recordEscalation']>;
+  contentImport: ContentImportRepository;
   close: () => Promise<void>;
 }>;
 
@@ -651,6 +656,7 @@ class PostgresServiceRepository implements ServiceRepository {
   private closePromise: Promise<void> | null = null;
   private readonly searchRepository: ReturnType<typeof createSearchRepository>;
   private readonly eventRepository: EventRepository;
+  readonly contentImport: ContentImportRepository;
   private activeProbe: Readonly<{
     operation: Promise<ServiceReadinessChecks>;
     response: Promise<ServiceReadinessChecks>;
@@ -664,6 +670,7 @@ class PostgresServiceRepository implements ServiceRepository {
   ) {
     this.searchRepository = createSearchRepository(this.pool);
     this.eventRepository = createEventRepository(this.pool, undefined, this.diagnosticSink);
+    this.contentImport = createContentImportRepository(this.pool, this.diagnosticSink);
     // node-postgres emits idle-client failures on Pool itself. Consume the event
     // so it cannot crash the process. pg-pool already evicts that idle client;
     // the next readiness request must run a fresh probe instead of inventing a

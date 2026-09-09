@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApiApp } from '../src/app.js';
 import type { SearchOperation } from '../src/search-routes.js';
 import { parseApiRuntimeConfig } from '../src/runtime-config.js';
+import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { ServiceRepository } from '../src/service-repository.js';
 
 const openApps: FastifyInstance[] = [];
@@ -21,6 +22,7 @@ function repository(): ServiceRepository {
     executeSearch: async () => ({ ok: false, code: 'OVERLOADED' }),
     recordAdoption: async () => ({ ok: false, code: 'OVERLOADED' }),
     recordEscalation: async () => ({ ok: false, code: 'OVERLOADED' }),
+    contentImport: unavailableContentImportRepository(),
     close: async () => undefined,
   };
 }

@@ -19,6 +19,7 @@ import {
   parseApiPrivateBootstrapConfig,
   parseApiRuntimeConfig,
 } from '../src/runtime-config.js';
+import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { PolicyAdminRepository } from '../src/policy-admin-repository.js';
 import {
   createPolicyAdminRepository,
@@ -103,6 +104,7 @@ function stubRepository(
       .mockResolvedValue(Object.freeze({ ok: false, code: 'OVERLOADED' })),
     recordEscalation: vi.fn<ServiceRepository['recordEscalation']>()
       .mockResolvedValue(Object.freeze({ ok: false, code: 'OVERLOADED' })),
+    contentImport: unavailableContentImportRepository(),
     close: vi.fn<ServiceRepository['close']>().mockResolvedValue(undefined),
   };
 }

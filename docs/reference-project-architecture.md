@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1 合成产品会话与异步认证已进入实施，T2–T6 内容 HTTP/worker 仍在后续切片，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链；桌面 adapter、正式飞书鉴权、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1 合成产品会话与异步认证已合并；T2 合成 CSV/XLSX 持久接收正在实施，T3–T6 仍在后续切片，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链；桌面 adapter、正式飞书鉴权、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -45,6 +45,7 @@ apps/api（DEV-M1 COMPLETE）
   ├─ isolated admin pg.Pool → PolicyAdminRepository → set_policy_flag only
   ├─ product-auth-service → isolated auth pool → frozen identity SQL
   │    └─ synthetic-identity-provider → bounded loopback code exchange
+  ├─ content-object-store + content-import-service → CSV/XLSX persist then runtime enqueue
   └─ legacy synthetic G1a runner → isolated PG15 → same SearchBackend（NOT_EVALUATED）
 
 apps/api/tests/support/g1a-e0（test-only；不进入 dist）
@@ -65,7 +66,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
-| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness、策略读写、受控搜索与事件事务边界 | 桌面 fixture、renderer、migration owner、正式 Feishu auth、真实数据、桌面 adapter 或外部 bind |
+| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness、策略读写、受控搜索与事件事务边界、合成 CSV/XLSX 持久接收 | 桌面 fixture、renderer、migration owner、正式 Feishu auth、真实数据、桌面 adapter、worker 解析或外部 bind |
 | `apps/api/tests/support/g1a-e0/` | 测试专用仓外输入校验、一次性 PG15 装载、同一 SearchBackend 评测、聚合报告与清理 | HTTP route、事件写入、桌面依赖、长期数据库、真实内容或正式构建产物 |
 | `apps/api/src/search-decision.ts`、`search-relations.ts` | 产品搜索判定、内部诊断，以及有界正文关系/否定/论元语义；实验复用同一规则 | 人工来源注解、实验 fixture、HTTP 诊断字段或绕过来源门禁 |
 | `apps/api/experiments/search-decision/` | 合成搜索判定实验与验收工具：固定产品源码哈希 + 仅重定位 import 的诊断副本、合成夹具、需求判定和事实/行为/失败门禁 | 产品 `src` 行为、SearchBackend、真实来源、runtime 依赖、正式构建产物 |

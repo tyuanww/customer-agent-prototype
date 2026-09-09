@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { CONTRACT_PROVENANCE } from '@customer-agent/contracts/provenance';
 
 export const CUSTOMER_AGENT_PROFILES = Object.freeze([
@@ -47,6 +48,7 @@ export type ApiPrivateBootstrapConfig = Readonly<{
   policyAdminDatabase: ApiDatabaseBootstrapConfig;
   idempotencyHmac: ApiHmacKeyRing;
   logHash: Readonly<{ version: string; key: string }>;
+  objectStoreDir?: string;
 }>;
 
 export type ApiConfigIssue = Readonly<{
@@ -495,6 +497,15 @@ export function parseApiPrivateBootstrapConfig(
   }
   const idempotencyHmac = parseHmacKeyRing(environment, issues);
   const logHash = parseLogHashConfig(environment, issues);
+  let objectStoreDir: string | undefined;
+  const objectStoreValue = exactEnvironmentValue(environment, 'CONTENT_OBJECT_STORE_DIR', issues);
+  if (objectStoreValue !== undefined) {
+    if (!path.isAbsolute(objectStoreValue) || objectStoreValue.includes('\0')) {
+      issues.push(issue('CONTENT_OBJECT_STORE_DIR', 'invalid'));
+    } else {
+      objectStoreDir = path.resolve(objectStoreValue);
+    }
+  }
 
   if (runtimeDatabase && policyAdminDatabase) {
     const runtimeLogin = postgresLoginName(runtimeDatabase.connectionString);
@@ -531,6 +542,7 @@ export function parseApiPrivateBootstrapConfig(
   }
   return Object.freeze({ runtimeDatabase, policyAdminDatabase, idempotencyHmac, logHash,
     ...(productIdentity ? { productIdentity } : {}),
+    ...(objectStoreDir ? { objectStoreDir } : {}),
   });
 }
 

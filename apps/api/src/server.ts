@@ -1,5 +1,7 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
+import { createContentObjectStore } from './content-object-store.js';
+import { createContentImportService } from './content-import-service.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
 import {
@@ -55,10 +57,19 @@ export async function startApi(
             `http://${config.host}:${config.port}/v1/auth/callback`));
       }
       try {
+        const contentImport = bootstrap.objectStoreDir === undefined ? undefined : {
+          service: createContentImportService(
+            createContentObjectStore(bootstrap.objectStoreDir),
+            repository.contentImport,
+            bootstrap.idempotencyHmac,
+            bootstrap.logHash,
+          ),
+        };
         return createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
-          { repository, idempotencyHmac: bootstrap.idempotencyHmac });
+          { repository, idempotencyHmac: bootstrap.idempotencyHmac },
+          contentImport);
       } catch (error) {
         await auth?.close();
         throw error;

@@ -214,4 +214,16 @@ describe('synthetic product identity bootstrap', () => {
     expect(() => parseApiRuntimeConfig({ ...environment, AUTH_SESSION_MODE: 'typo' })).toThrow(ApiConfigError);
     expect(() => parseApiRuntimeConfig({ ...environment, AUTH_MODE: 'feishu' })).toThrow(ApiConfigError);
   });
+
+  it('accepts an absolute object store directory and rejects a relative path', () => {
+    const config = parseApiPrivateBootstrapConfig({
+      ...environment,
+      CONTENT_OBJECT_STORE_DIR: '/tmp/customer-agent-objects',
+    });
+    expect(config.objectStoreDir).toBe('/tmp/customer-agent-objects');
+    expect(() => parseApiPrivateBootstrapConfig({
+      ...environment,
+      CONTENT_OBJECT_STORE_DIR: 'relative-objects',
+    })).toThrow(ApiConfigError);
+  });
 });

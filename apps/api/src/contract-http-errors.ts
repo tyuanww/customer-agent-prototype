@@ -9,11 +9,15 @@ const VALIDATION_ERROR_CODES = new Set([
   'FST_ERR_CTP_INVALID_MEDIA_TYPE',
 ]);
 
-export function sendValidationError(reply: FastifyReply): FastifyReply {
+export function sendValidationError(
+  reply: FastifyReply,
+  details?: Readonly<Record<string, unknown>>,
+): FastifyReply {
   return reply.code(400).send(parseContractSchema('ValidationErrorEnvelope', {
     error: {
       code: 'VALIDATION',
       message: '请求不符合已冻结合同',
+      ...(details === undefined ? {} : { details }),
     },
   }));
 }

@@ -30,6 +30,7 @@ import type {
 } from './service-repository.js';
 import { registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
 import { registerEventRoutes, type EventRouteDependencies } from './event-routes.js';
+import { registerContentImportRoutes, type ContentImportRouteDependencies } from './content-import-routes.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -51,6 +52,7 @@ export function createApiApp(
   policyAdminRepository: PolicyAdminRepository = createUnavailablePolicyAdminRepository(),
   searchDependencies?: SearchRouteDependencies,
   eventDependencies?: EventRouteDependencies,
+  contentImportDependencies?: ContentImportRouteDependencies,
 ): FastifyInstance {
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
@@ -91,6 +93,7 @@ export function createApiApp(
   registerPolicyWriteRoute(app, policyAdminRepository, authService);
   registerSearchRoute(app, authService, searchDependencies);
   registerEventRoutes(app, authService, eventDependencies);
+  registerContentImportRoutes(app, authService, contentImportDependencies);
 
   app.get('/health', async (_request, reply) => {
     const payload = parseContractSchema('HealthResponse', {

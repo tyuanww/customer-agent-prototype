@@ -13,6 +13,7 @@ import {
 import { hmacSafeValue, prepareIdempotencyHashes } from '../src/idempotency.js';
 import type { PreparedSearchOperation } from '../src/search-routes.js';
 import { parseApiRuntimeConfig } from '../src/runtime-config.js';
+import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { ServiceRepository } from '../src/service-repository.js';
 
 const describePg15 = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1'
@@ -479,6 +480,7 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
       executeSearch: repository.executeSearch,
       recordAdoption: repository.recordAdoption,
       recordEscalation: repository.recordEscalation,
+      contentImport: unavailableContentImportRepository(),
       close: async () => undefined,
     } satisfies ServiceRepository;
     const app = createApiApp(

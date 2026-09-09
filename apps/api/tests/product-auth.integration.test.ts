@@ -9,6 +9,7 @@ import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createApiApp } from '../src/app.js';
 import { createProductAuthService, type SyntheticIdentityProvider } from '../src/product-auth-service.js';
 import type { ApiDatabaseBootstrapConfig } from '../src/runtime-config.js';
+import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { ServiceRepository } from '../src/service-repository.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -21,6 +22,7 @@ const repository: ServiceRepository = {
   executeSearch: async () => ({ ok: false, code: 'OVERLOADED' }),
   recordAdoption: async () => ({ ok: false, code: 'OVERLOADED' }),
   recordEscalation: async () => ({ ok: false, code: 'OVERLOADED' }),
+  contentImport: unavailableContentImportRepository(),
   close: async () => undefined,
 };
 

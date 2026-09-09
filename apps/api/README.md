@@ -8,7 +8,7 @@
 - `demo` 属于桌面合成运行链，不允许启动本服务。
 - `single-host`、`multi-instance`、`production` 与 `AUTH_MODE=feishu` 尚未具备后续依赖，监听前失败关闭。
 - `/health` 不访问数据库；`/ready` 只把 database/schema/auth 的真实结果写入合同响应。
-- auth 由所选身份服务返回实际状态；storage/content 尚未实现，因此 `/ready` 正常结果仍是 503，而不是业务已可用。
+- auth 由所选身份服务返回实际状态；T2 已接通合成 CSV/XLSX 持久接收与 batch 状态/取消，但 `/ready` 的 storage/content 仍固定 `not_ready`，因此正常连库仍是 503。真实飞书导入、worker 解析和发布仍未实现。
 - `/v1/search` 仅接受 `collection_mode=synthetic`，原始输入只在 HTTP 边界内参与版本化 HMAC，`query_events` 固定以 `text_storage_status=suppressed` 记录，不持久化查询原文或其可关联文本 hash。搜索、query、impression 与幂等完成同事务提交；来源门失败先回滚，再由独立短事务写安全拒绝审计。
 - `/v1/events/adoption` 的 `adopted` 只表示候选成功复制，且每个 query 仅允许一个 terminal；`/v1/events/escalate` 是非终态辅助动作，同一 `(query_id, action)` 返回同一事实。无状态 `collection_disabled` 搜索不会留下 query/idempotency，后续事件返回 404。
 - migration 自动执行、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
@@ -58,6 +58,10 @@ curl --silent --include http://127.0.0.1:3100/ready
 在上述本机开发配置上显式设置 `AUTH_SESSION_MODE=product`，并提供独立 `AUTH_DATABASE_URL`（仅属于 `app_backend_auth` 的无特权登录角色）及 `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN=http://127.0.0.1:<port>`。完整变量约束见配置 SSOT。没有提供这两项时拒启，不能退回 mock-login。`AUTH_MODE` 仍为 `mock`，如实说明身份来源是合成提供方；产品会话模式不接受 X-Mock-User/Role，也不注册 `/v1/auth/mock-login`。
 
 T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/auth/me` → logout。会话落在 PostgreSQL，数据库仅存 token 摘要；兑换成功响应丢失后重新登录，不能重放获取 bearer。提供方是本机合成测试服务，其 `/exchange` 只返回 `{provider: "synthetic", binding_id: "synthetic_..."}`，不存在真实飞书适配。实际启动入口及此 wire 已在隔离 PG15 合成集成测试贯通；本节不提供真实凭据或运行激活。
+
+## 合成内容导入（T2）
+
+在已有 runtime pool 上接收 `POST /v1/content/import` 的 CSV/XLSX multipart（字段 `file`、`source_bindings`）。文件先写入 `CONTENT_OBJECT_STORE_DIR` 的不可变对象并校验摘要，随后才调用 `enqueue_content_import` 原子创建 batch、source bindings 与 outbox；事务提交成功后才返回 202。状态查询与取消走既有 SQL 投影；coach/owner 以外角色拒绝。单文件 10 MiB、上传 30 秒。解析/解压/审核/发布不在本切片。飞书 JSON 导入保持关闭。提交结果不确定时不得回收已接收对象。连接池预算不变：enqueue/status/cancel 复用 `app_runtime`。
 
 ## 验证
 

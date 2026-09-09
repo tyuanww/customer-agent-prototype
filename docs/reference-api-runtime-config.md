@@ -46,6 +46,7 @@
 | `IDEMPOTENCY_HMAC_CURRENT_VERSION` | 必填；必须命中上述 key ring；历史版本仅为 TTL 内重放保留 | 只存在于私有 bootstrap config |
 | `LOG_HASH_KEY` | 必填；32–128 UTF-8 byte，只用于脱敏 query 指纹；不得复用任何幂等密钥 | 不回显、不记录 |
 | `LOG_HASH_KEY_VERSION` | 必填；独立 `hmac-*` 版本 | 只存在于私有 bootstrap config |
+| `CONTENT_OBJECT_STORE_DIR` | 可省略；提供时必须是本机绝对目录，供 CSV/XLSX 不可变对象落盘。未设置时导入路由 503，不增加连接池。T5 前 `/ready` 的 storage/content 仍为 `not_ready` | 只存在于私有 bootstrap config，不回显原值 |
 
 公开解析结果不保留环境对象，也不包含 Feishu secret、DSN、HMAC 或 storage 凭证。私有 bootstrap config 只在 composition root 中分别进入 repository/后续 service factory，不进入 `StartedApi.config`、日志或 HTTP。合同来源由 `@customer-agent/contracts` provenance 注入；当前 `runtime_activated=false`。
 
