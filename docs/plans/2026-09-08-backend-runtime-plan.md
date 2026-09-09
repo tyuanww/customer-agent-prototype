@@ -359,8 +359,8 @@ T3 内部可以先完成审核 HTTP 的受限调用，再连接 worker；对外�
 | T2 | 已合并 | PR #53 |
 | T3 | 已合并 | PR #54 |
 | T4 | 已合并 | PR #55 |
-| T5 | 正在实现 current/snapshot/ACK 与 storage/content readiness | 测试、delegate、提交合并后进入 T6 |
-| T6 | 已批准，未实现 | T5 合并后按依赖推进 |
+| T5 | 已合并 | PR #56 |
+| T6 | 正在实现构建产物 API/worker 整链 | 测试、delegate、提交合并 |
 
 本地准备检查不替代正式来源交接、CI 或运行验收。整个目标仍在执行，不能把 T0 局部通过写为 T1–T6 完成。
 

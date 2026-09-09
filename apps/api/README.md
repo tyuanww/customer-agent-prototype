@@ -75,6 +75,16 @@ Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用�
 
 认证客户端通过 `GET /v1/announce/current`、`GET /v1/announce/snapshot` 与 `POST /v1/announce/ack` 读取固定 release。current 只调用 `read_current_announcement_with_lease`，snapshot 只调用 `read_snapshot_page`，ACK 只调用 `ack_client_release`；app_runtime 不直读 SoR 底表。短租约 60–900 秒，默认 600；304 只回显仍有效的原 token，不续期。来源门/租约拒绝先回滚业务事务，再用独立短事务写 `record_runtime_source_denial_audit`。查询继续要求 `collection_mode=synthetic`，来源暂停后 search/current/snapshot 失败关闭。复用 runtime 池，不新增连接。真实数据模式仍关闭。
 
+## 合成整链产物（T6）
+
+从本包 `dist/main.js` 与 `dist/content-worker-main.js` 拉起独立 API/worker 进程，在隔离 PG15 上跑导入→审核→发布→current/snapshot/ack→search，并覆盖 worker SIGKILL 恢复与取消后不得 staged。命令：
+
+```bash
+pnpm --filter @customer-agent/api test:e2e:backend
+```
+
+这只证明单主机合成开发测试闭环，不是真实飞书接入、Windows 或部署。
+
 ## 验证
 
 ```bash

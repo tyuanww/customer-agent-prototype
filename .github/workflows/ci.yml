@@ -105,6 +105,8 @@ jobs:
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm --filter @customer-agent/api test:integration
       - if: needs.changes.outputs.mode == 'full'
+        run: pnpm --filter @customer-agent/api test:e2e:backend
+      - if: needs.changes.outputs.mode == 'full'
         run: pnpm test:g1a:e0:ci
 
   windows-feasibility:
