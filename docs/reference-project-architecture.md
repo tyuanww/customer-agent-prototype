@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1–T6 合成身份、持久导入、worker/审核、发布/回退和读取及构建进程链已合并；schema.v1.17 / 第十四段 migration 已随收尾合入，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链。桌面仍走合成 fixture，adapter 尚未实现；下一阶段方案见 [获批桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)，D1–D5 纯合成实施已批准。正式飞书鉴权、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1–T6 合成身份、持久导入、worker/审核、发布/回退和读取及构建进程链已合并；schema.v1.17 / 第十四段 migration 已随收尾合入，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链。S0 桌面仍走合成 fixture；D1 在显式接入 profile 已实现 main 会话/HTTP adapter，搜索待 D2；下一阶段方案见 [获批桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)，D1–D5 纯合成实施已批准。正式飞书鉴权、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -53,13 +53,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；桌面 adapter 仍未接通，方案为 APPROVED。真实内容和正式飞书身份仍未接通。
+桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；D1 会话 adapter 已实现，搜索 adapter 待 D2，方案为 APPROVED。真实内容和正式飞书身份仍未接通。
 
 ## 2. 目录归属
 
 | 目录 | 只负责什么 | 不应该放什么 |
 | --- | --- | --- |
-| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全 | React 视图、业务 fixture、通用 HTTP 客户端 |
+| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 product-session/http/store/login-window 拥有合成会话 | React 视图、业务 fixture、通用 HTTP 客户端 |
 | `apps/desktop/src/preload/` | 把 `CustomerAgentApi` 的白名单能力暴露给 renderer | `ipcRenderer` 通用转发、Node 文件系统、token |
 | `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard 和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
 | `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何和状态纯函数 | 依赖 DOM、Electron、React 的实现 |
@@ -135,7 +135,7 @@ v1.17 migrated PG15
   └─ 独立 auth / worker / review 能力池 ──> 产品会话 / 导入处理 / 审核质量门
 
 /v1 search + events ──synthetic transaction 可用──> renderer 仍不允许直连
-/v1 desktop adapter ──尚未实现──> renderer 仍不允许直连
+/v1 auth adapter ──D1 main 已接线、search 待 D2──> renderer 仍不允许直连
 
 仓外 G1A-E0 package ──test-only verifier──> ephemeral PG15
   └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
@@ -143,7 +143,7 @@ v1.17 migrated PG15
 
 `apps/desktop/src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有桌面合成搜索均未导入该包。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告及 synthetic-only Search + Events 主链；桌面 adapter 仍不存在，接线方案为 APPROVED。真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；renderer、main、preload 和现有桌面合成搜索均未导入该包。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告及 synthetic-only Search + Events 主链；桌面 D1 会话/HTTP adapter 已实现，搜索接线待 D2，方案为 APPROVED。真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
 
 ## 5. 测试和验证层级
 
@@ -199,7 +199,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 DEV-M0 基线上完成 DEV-M1 W0～W5，并已合并 G1A-E0 T1～T3：合同接收、组件校验、migration 控制面、API host、runtime 读写能力、policy-admin 写能力、SearchBackend、event transaction、legacy synthetic runner 与 test-only E0 runner 各有单一 owner，两个 API pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；DEV-M1 最终 `main@5cf650c`、CI run `33785779859` 三路全绿，候选产物仍明确不可部署且 `runtime_activated=false`。E0 的成功/失败清理和 50 条同形合成闭环已本地通过，但仍为 `NOT_SIGNED / NOT_EVALUATED`；真实数据、正式飞书鉴权、桌面接线、生产部署和真实 Windows 门均未放行。
+当前目录结构已在 DEV-M0 基线上完成 DEV-M1 W0～W5，并已合并 G1A-E0 T1～T3：合同接收、组件校验、migration 控制面、API host、runtime 读写能力、policy-admin 写能力、SearchBackend、event transaction、legacy synthetic runner 与 test-only E0 runner 各有单一 owner，两个 API pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；DEV-M1 最终 `main@5cf650c`、CI run `33785779859` 三路全绿，候选产物仍明确不可部署且 `runtime_activated=false`。E0 的成功/失败清理和 50 条同形合成闭环已本地通过，但仍为 `NOT_SIGNED / NOT_EVALUATED`；真实数据、正式飞书鉴权、真实桌面接线、生产部署和真实 Windows 门均未放行。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 
@@ -234,4 +234,8 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 ### T1 身份所有权
 
-`runtime-config.ts` 唯一解析显式产品会话配置和三池总预算；`server.ts` 组合受控提供方与身份服务，失败时不建 mock。`product-auth-service.ts` 封装持久登录、会话、最小数据库角色和关闭；`synthetic-identity-provider.ts` 仅拥有本机合成 wire 的 URL、响应和取消预算。`product-auth-routes.ts` 拥有封闭 HTTP 输入、静态完成页、错误响应和固定限流窗口。现有 auth/search/event/policy 路由统一等待异步认证；renderer 未接入这些能力。
+`runtime-config.ts` 唯一解析显式产品会话配置和三池总预算；`server.ts` 组合受控提供方与身份服务，失败时不建 mock。`product-auth-service.ts` 封装持久登录、会话、最小数据库角色和关闭；`synthetic-identity-provider.ts` 仅拥有本机合成 wire 的 URL、响应和取消预算。`product-auth-routes.ts` 拥有封闭 HTTP 输入、静态完成页、错误响应和固定限流窗口。现有 auth/search/event/policy 路由统一等待异步认证；renderer 不直连；D1 Query 已通过窄 IPC 使用合成身份，其他产品接线按后续切片实施。
+
+### D1 桌面产品会话所有权
+
+`main/product-session.ts` 拥有 token、epoch、PKCE 与退出/过期；`product-http.ts` 拥有有界 loopback HTTP；`product-session-store.ts` 拥有 safeStorage 密文文件；`product-login-window.ts` 拥有独立登录窗及导航限制；`product-ipc.ts` 绑定 sender/main-frame 与能力。shared 只提供脱敏状态/失败合同，preload 校验投影，Query 不获得 token。无环境变量的 S0 搜索保持本地；显式接入 profile 在 D2 前阻断搜索，绝不因 API 失败回退 fixture。

@@ -1,6 +1,6 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。产品会话 / 检索 / 公告 IPC 尚未实现；获批方案见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)，实施前不得当作现行通道。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。D1 已实现 product:session-status/login/logout/session-changed，会话状态无 token，query-only 登录/退出、fox/query 读状态；检索 / 公告 IPC 尚未实现。后续获批方案见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)，实施前不得当作现行通道。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 
@@ -8,7 +8,7 @@
 
 ## 1. 三个窗口的职责与安全配置
 
-三个 `BrowserWindow`，同一份 renderer 入口 `apps/desktop/src/renderer/index.html`，用 `?role=` 分流（`apps/desktop/src/renderer/lib/window-role.ts`）。
+三个业务 `BrowserWindow` 使用同一份 renderer 入口 `apps/desktop/src/renderer/index.html`，用 `?role=` 分流（`apps/desktop/src/renderer/lib/window-role.ts`）。
 
 | | Fox | Query | Dashboard |
 | --- | --- | --- | --- |
@@ -22,9 +22,11 @@
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
 | webPreferences | `contextIsolation: true` `sandbox: true` `nodeIntegration: false` `spellcheck: false` | 同左；Query 另设 `backgroundThrottling: false` | `DASHBOARD_WINDOW_SECURITY`：同样三项 + `spellcheck: false`，**不设 preload** |
 
+D1 另有临时独立登录窗，由 `product-login-window.ts` 持有非持久 partition，无 preload/Node，sandbox 与 contextIsolation 开启；仅允许配置的合成 `/authorize` 和 API `/v1/auth/callback`，拒绝子窗和权限。
+
 共同锁定（`lockRendererWindow`）：拒绝 `window.open`、拦截 `will-navigate`、拦截 `will-attach-webview`。会话级（`applySessionSecurity`）：权限请求 / 权限检查一律 false。
 
-CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；本仓也没有 main-process HTTP adapter。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
+CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；D1 main-process HTTP adapter 仅在显式纯合成接入 profile 持有会话，搜索接线待 D2。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
 
 ---
 
@@ -54,6 +56,9 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 
 | Channel | 方向 | 额外门禁 |
 | --- | --- | --- |
+| `product:session-status` | invoke | trusted main-frame，fox/query，无参数；脱敏会话投影 |
+| `product:login` / `product:logout` | invoke | trusted main-frame，query-only，无参数 |
+| `product:session-changed` | Main → query | preload 精确校验，renderer 按 main epoch 拒绝旧状态 |
 | `clipboard:copy-text` | invoke | `isTrustedSender` + `role === 'query'` + `resolveClipboardWrite` |
 | `overlay:get-window-context` | invoke | 响应包含 `platform`；未受信 sender 返回带运行时平台、不可用快捷键状态的降级上下文 |
 | `overlay:open-search` | invoke | 若带 transform：必须 `role === 'fox'` 且 `isFoxVisualTransform` |

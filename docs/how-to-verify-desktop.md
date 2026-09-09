@@ -260,3 +260,11 @@ pnpm clean:preview
 PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测试结果实际有用例且无跳过。真实包 runner 继续只在既有明确授权入口运行，不由 CI 启用。
 
 未运行的 Electron、打包或设备验证不得写成通过。
+
+## 合成产品会话接入（D1）
+
+仅开发态显式设置 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 后运行 `pnpm dev`。两者必须是含端口的 `http://127.0.0.1:端口` origin，分别对应已经启动的 formal-dev API 与合成身份提供方；不能使用真实飞书地址或凭据。缺一项、非 loopback 或打包态拒启。无配置继续显式 S0 开发模式；接入模式故障不回退 S0。
+
+Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。D1 尚未接通后端搜索，登录后提示等待 D2。
+
+自动化窗口验收：`pnpm --filter @customer-agent/desktop build` 后运行 `pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts`。该测试使用真实 Electron 与合成 HTTP double，校验加密文件生命周期、Query 状态及 token 不跨 preload；不等于真实身份、PG 整链或人工/Windows 验收。

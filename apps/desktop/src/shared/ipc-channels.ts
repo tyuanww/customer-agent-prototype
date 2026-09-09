@@ -1,4 +1,8 @@
 export const IPC_CHANNELS = {
+  PRODUCT_SESSION_STATUS: 'product:session-status',
+  PRODUCT_LOGIN: 'product:login',
+  PRODUCT_LOGOUT: 'product:logout',
+  PRODUCT_SESSION_CHANGED: 'product:session-changed',
   COPY_TEXT: 'clipboard:copy-text',
   GET_WINDOW_CONTEXT: 'overlay:get-window-context',
   OPEN_SEARCH: 'overlay:open-search',

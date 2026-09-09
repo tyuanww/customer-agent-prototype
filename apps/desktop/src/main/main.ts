@@ -1,3 +1,8 @@
+import { ProductHttp } from './product-http';
+import { ProductSession } from './product-session';
+import { createSessionStore } from './product-session-store';
+import { createLoginWindow } from './product-login-window';
+import { registerProductIpc } from './product-ipc';
 import { app, Menu, session } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
@@ -49,6 +54,7 @@ if (!gotLock) {
   let controller: OverlayController | null = null;
   let desktopShell: DesktopShell | null = null;
   let controllerReady = false;
+  let productSession: ProductSession | null = null;
   let pendingSecondInstance = false;
 
   app.setName('客服话术浮窗 Demo');
@@ -82,6 +88,7 @@ if (!gotLock) {
   };
 
   const beginShutdown = (): void => {
+    void productSession?.shutdown();
     shuttingDown.begin();
     controllerReady = false;
     app.removeListener('activate', handleActivate);
@@ -134,6 +141,15 @@ if (!gotLock) {
       () => controller?.rendererDevServerUrl,
     );
     registerOverlayIpc(() => controller);
+    const productOrigin = process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
+    const identityOrigin = process.env.CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN;
+    if (productOrigin || identityOrigin) {
+      if (!productOrigin || !identityOrigin || app.isPackaged) throw new Error('Synthetic desktop requires both loopback origins in development');
+      productSession = new ProductSession(new ProductHttp(productOrigin), createSessionStore(app.getPath('userData')), createLoginWindow(identityOrigin, productOrigin));
+      await productSession.restore();
+    }
+    registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {
       if (controller === next) {

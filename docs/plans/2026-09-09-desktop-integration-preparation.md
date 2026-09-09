@@ -374,7 +374,7 @@ Step 0：最小变化是 main adapter + 窄 IPC，不新建桌面框架、不放
 
 2026-09-09 用户明确确认本方案 APPROVED，授权 D1–D5 纯合成开发；每切片测试 → OCR 审查 → 修复复审 → commit → push → PR → 合并。真实数据、真实飞书凭据、Windows 实机接入和部署排除。治理批准摘要：`DEC-DESKTOP-SYNTHETIC-20260909` / `EVD-DESKTOP-SYNTHETIC-AUTH-20260909`。
 
-D0：方案修订及批准记录交付中。D1–D5 按依赖串行推进；真实人工观察尚未完成时保留未确认，不以自动化代替。BACKEND-CI-503 保持 OPEN。
+D0：产品 PR #60 已合并为 `3d4cfcd`，合并后 CI `34349757408` SUCCESS。治理批准与状态候选完整 release 通过，因自动 Pages 发布边界暂缓合并。D1：会话、加密存储、受控登录窗、IPC 与 Query 登录阻断本地实现；D2–D5 尚未实施。D1–D5 按依赖串行推进；真实人工观察尚未完成时保留未确认，不以自动化代替。BACKEND-CI-503 保持 OPEN。
 
 以下评审表为批准前准备过程的历史记录，不覆盖本节授权。
 
@@ -394,3 +394,11 @@ D0：方案修订及批准记录交付中。D1–D5 按依赖串行推进；真�
   - 用户尚未批准本 DRAFT
   - 实施切片范围（D1–D5 或仅 D1）未授权
   - 实施阶段 Git 动作未授权
+
+## D1 实施证据（2026-09-09）
+
+main 的 ProductSession / ProductHttp 拥有 PKCE、token、会话 epoch、过期/撤销和有界请求；独立非持久登录窗只允许精确 loopback 授权与 callback 路径。safeStorage 不可用或 Linux basic_text 拒绝持久化。Query 只有脱敏会话状态与登录/退出按钮，Fox 只能查询状态，Dashboard 无 preload。
+
+通过双 loopback 环境变量显式进入接入 profile；配置不成对、非 loopback、打包态均拒启。该 profile 在 D2 前阻断检索，不允许回退 fixture。未设置变量保留原 S0 开发 profile。
+
+Node 24 下 lint/typecheck/build 通过；完整测试初次因新 worktree 缺 Electron 二进制失败，核对同版本并复用后通过。新增会话/IPC/存储/导航测试和 Query 组件通过；Electron 实际登录窗→callback→exchange→Query→logout 自动化通过，HTTP 为合成 wire double，不称 PG 整链或人工验收。Windows 实机、人工观察、真实身份与数据未执行。最终审查与 Git 状态以切片交付记录为准。

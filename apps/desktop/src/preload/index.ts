@@ -1,3 +1,4 @@
+import { isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC_CHANNELS,
@@ -39,7 +40,23 @@ ipcRenderer.on(IPC_CHANNELS.OVERLAY_COMMAND, (_event, payload: unknown) => {
   }
 });
 
+const sessionListeners = new Set<(value: ProductSessionResult) => void>();
+ipcRenderer.on(IPC_CHANNELS.PRODUCT_SESSION_CHANGED, (_event, value: unknown) => {
+  if (isProductSessionResult(value)) for (const listener of sessionListeners) listener(value);
+});
+const sessionInvoke = async (channel: string): Promise<ProductSessionResult> => {
+  try {
+    const value: unknown = await ipcRenderer.invoke(channel);
+    return isProductSessionResult(value) ? value : productFailure('UNAVAILABLE');
+  } catch { return productFailure('UNAVAILABLE'); }
+};
 const api: CustomerAgentApi = {
+  product: {
+    sessionStatus: () => sessionInvoke(IPC_CHANNELS.PRODUCT_SESSION_STATUS),
+    login: () => sessionInvoke(IPC_CHANNELS.PRODUCT_LOGIN),
+    logout: () => sessionInvoke(IPC_CHANNELS.PRODUCT_LOGOUT),
+    onSessionChanged(listener) { sessionListeners.add(listener); return () => { sessionListeners.delete(listener); }; },
+  },
   copyText(text: string): Promise<CopyTextResult> {
     if (typeof text !== 'string') {
       return Promise.resolve({ ok: false, message: '复制内容无效' });

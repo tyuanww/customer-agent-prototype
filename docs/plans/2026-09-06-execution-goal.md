@@ -27,7 +27,7 @@
 | 后端 T0–T6 | 产品 PR #51–#57 已合并；收尾 PR #58 为 `de0a92ca607412a99c3729becce9484635533008`。其后 PR #59 合并为 `bb7a14b565553dc689823e54b0218d1d24c47095`，合并后五项 CI 全部通过。不得重复实施后端 |
 | 合同 | 治理 PR #74/#75 已合并；来源 `0904a0aa11f2dc29ae7700871a943c41295cd329`，OpenAPI 1.13.0 / schema.v1.17；产品十四条 migration，旧十三条不得改写 |
 | Git | 两仓独立历史。D0 在 `codex/desktop-integration-plan` 交付批准方案；用户已授权本轮各切片 commit / push / PR / 合并 |
-| 桌面接入方案 | [准备文件](2026-09-09-desktop-integration-preparation.md) 已批准为 APPROVED：方案 A（main 持有会话与 HTTP）、D0–D5 切片、并行约束。D0 批准记录交付中，随后按依赖实施 D1–D5 |
+| 桌面接入方案 | [准备文件](2026-09-09-desktop-integration-preparation.md) 已批准为 APPROVED：方案 A（main 持有会话与 HTTP）、D0–D5 切片、并行约束。D0 产品 PR #60 已合并，CI 34349757408 SUCCESS；D1 本地实现与复审中，D2–D5 随后。治理 main 自动部署导致合并暂缓 |
 | BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。本地/PR/合并 CI 通过不代表已修复 |
 | 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实机、部署、自动外发、许可证 |
 

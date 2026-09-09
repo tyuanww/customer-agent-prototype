@@ -5,6 +5,7 @@ import { useWindowDrag } from '../../lib/use-window-drag';
 import type { QueryFoxVisualState } from './query-view';
 
 type QueryCapsuleProps = {
+  productControl?: React.ReactNode;
   foxVisualState: QueryFoxVisualState;
   foxDrag: ReturnType<typeof useWindowDrag>;
   deepThinkingInfoOpen: boolean;
@@ -27,6 +28,7 @@ type QueryCapsuleProps = {
 };
 
 export function QueryCapsule({
+  productControl,
   foxVisualState,
   foxDrag,
   deepThinkingInfoOpen,
@@ -125,6 +127,7 @@ export function QueryCapsule({
                 )}
               </p>
               <div className="capsule-tools">
+                {productControl}
                 <button
                   type="button"
                   className="dashboard-entry"

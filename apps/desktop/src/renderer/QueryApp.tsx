@@ -1,3 +1,4 @@
+import type { ProductSessionResult } from '@shared/product-session';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
@@ -52,6 +53,9 @@ import { isInteractiveTarget } from './lib/is-interactive-target';
 import { useWindowDrag } from './lib/use-window-drag';
 
 export function QueryApp() {
+  const [productState, setProductState] = useState<ProductSessionResult | null>(null);
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const productEpochRef = useRef(0);
   const [phase, setPhase] = useState<OverlayPhase>('SEARCH_INPUT');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RankedScript[]>([]);
@@ -683,7 +687,45 @@ export function QueryApp() {
     [cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, phase, reportPhase],
   );
 
+  const acceptProductSession = useCallback((value: ProductSessionResult) => {
+    if (value.sessionEpoch < productEpochRef.current) return;
+    productEpochRef.current = value.sessionEpoch;
+    setProductState(value);
+    if (!value.ok || (value.enabled && !value.signedIn)) {
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]);
+      setInvalidMessage(value.ok ? '请先合成登录' : value.message);
+      reportPhase('SEARCH_INPUT');
+    }
+  }, [cancelPendingSearch, cancelPendingCopy, reportPhase]);
+
+  useEffect(() => {
+    const product = window.customerAgent?.product;
+    if (!product) return;
+    let live = true;
+    const accept = (value: ProductSessionResult) => { if (live) acceptProductSession(value); };
+    const unsubscribe = product.onSessionChanged(accept);
+    void product.sessionStatus().then(accept);
+    const interval = window.setInterval(() => { void product.sessionStatus().then(accept); }, 10_000);
+    return () => { live = false; unsubscribe(); window.clearInterval(interval); };
+  }, [acceptProductSession]);
+
+  const sessionAction = async () => {
+    const product = window.customerAgent?.product; if (!product || sessionBusy) return;
+    setSessionBusy(true);
+    try {
+      const result = await (productState?.ok && productState.signedIn ? product.logout() : product.login());
+      if (result.sessionEpoch < productEpochRef.current) return;
+      acceptProductSession(result);
+      setInvalidMessage(result.ok ? result.signedIn ? '合成登录成功；后端查询接入待 D2' : '已退出，请先登录' : result.message);
+    } finally { setSessionBusy(false); }
+  };
+
   const runSearch = useCallback(() => {
+    if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
+      setInvalidMessage(productState?.ok && productState.signedIn ? '合成登录成功；后端查询接入待 D2' : '请先合成登录');
+      return;
+    }
+
     dashboardOpenFailedRef.current = false;
     if (searchInFlightRef.current) {
       return;
@@ -751,7 +793,7 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState]);
 
   const copyScript = useCallback(
     async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
@@ -1172,6 +1214,12 @@ export function QueryApp() {
       >
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
+          productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
+            <button type="button" className="deep-thinking-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
+              title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '仅使用合成身份'}>
+              {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : '合成登录'}
+            </button>
+          ) : null}
           foxVisualState={foxVisualState}
           foxDrag={drag}
           deepThinkingInfoOpen={deepThinkingInfoOpen}

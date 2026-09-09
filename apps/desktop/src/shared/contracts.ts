@@ -29,6 +29,7 @@ export { IPC_CHANNELS, IPC_CHANNEL_WHITELIST } from './ipc-channels';
 export type { IpcChannel } from './ipc-channels';
 
 export type CustomerAgentApi = {
+  product?: import('./product-session').ProductSessionApi;
   copyText: (text: string) => Promise<CopyTextResult>;
   getWindowContext: () => Promise<WindowContext>;
   openSearch: (visualTransform?: FoxVisualTransform) => Promise<void>;
