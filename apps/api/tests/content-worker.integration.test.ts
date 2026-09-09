@@ -163,12 +163,12 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
     return exchanged.json().access_token as string;
   }
 
-  function multipart(): Buffer {
+  function multipart(file = CSV, bindings: readonly { domain: string; source_version_id: string }[] = BINDINGS): Buffer {
     const boundary = '----t3boundary';
-    const json = JSON.stringify(BINDINGS.map(({ domain, source_version_id }) => ({ domain, source_version_id })));
+    const json = JSON.stringify(bindings.map(({ domain, source_version_id }) => ({ domain, source_version_id })));
     return Buffer.concat([
       Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="a.csv"\r\nContent-Type: text/csv\r\n\r\n`),
-      CSV,
+      file,
       Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="source_bindings"\r\n\r\n${json}\r\n--${boundary}--\r\n`),
     ]);
   }
@@ -187,6 +187,68 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
     expect(imported.statusCode).toBe(202);
     return imported.json().import_batch_id as string;
   }
+
+  it('validates 501-row pagination, expansion and revision_required without staging defects', async () => {
+    const file = Buffer.from([
+      CSV.toString().split('\n')[0],
+      ...Array.from({ length: 501 }, (_, i) => `scale-${i},presale,合成标题${i},合成回答${i},srcv_t3_presale_scale,SRC-T3-PRESALE,合成问题${i},low,false`),
+      '',
+    ].join('\n'));
+    const bindings = BINDINGS.map((b) => ({ ...b, source_version_id: b.source_version_id.replace('_v1', '_scale') }));
+    for (const b of bindings) await admin.query(`
+      INSERT INTO public.authoritative_source_versions(
+        source_version_id,source_ref,domain,upstream_version,snapshot_sha256,use_class,
+        owner_role,approval_evd,approved_by,approved_at,review_due_at
+      ) VALUES($1,$2,$3,'synthetic-scale',$4,'canonical','ROLE-CONTENT-LEAD',
+        'EVD-SCALE-SOURCE','synthetic-owner',clock_timestamp(),clock_timestamp()+interval '365 days')
+    `, [b.source_version_id,b.source_ref,b.domain,sha('sha256').update(file).digest('hex')]);
+    const lead = await productToken('synthetic_lead');
+    const quality = await productToken('synthetic_quality');
+    const uploaded = await app.inject({ method: 'POST', url: '/v1/content/import',
+      headers: { authorization: `Bearer ${lead}`, 'idempotency-key': 'scale-import',
+        'content-type': 'multipart/form-data; boundary=----t3boundary' }, payload: multipart(file, bindings) });
+    expect(uploaded.statusCode, uploaded.body).toBe(202);
+    const batchId = uploaded.json().import_batch_id as string;
+    expect(await worker.runOnce()).toBe('parked');
+    const listed = await app.inject({ url: '/v1/admin/content/reviews', headers: { authorization: `Bearer ${lead}` } });
+    const revision = listed.json().items[0].review_revision as string;
+    type Item = { script_id: string; content_hash: string; initial_sample: boolean; expanded_sample: boolean };
+    const items: Item[] = [];
+    let after: number | null = 0;
+    do {
+      const page = await app.inject({ url: `/v1/admin/content/reviews/${batchId}?review_revision=${revision}&after=${after}&limit=100`,
+        headers: { authorization: `Bearer ${lead}` } });
+      expect(page.statusCode, page.body).toBe(200);
+      expect(page.json().total).toBe(501);
+      items.push(...page.json().items as Item[]);
+      after = page.json().next_after as number | null;
+    } while (after !== null);
+    expect(items).toHaveLength(501);
+    expect(new Set(items.map(x => x.script_id)).size).toBe(501);
+    const initial = items.filter(x => x.initial_sample);
+    const expanded = items.filter(x => x.expanded_sample);
+    expect(initial.length).toBeGreaterThan(0);
+    expect(expanded.length).toBeGreaterThan(initial.length);
+    const defects = new Set(initial.slice(0, Math.ceil(initial.length * 0.03)).map(x => x.script_id));
+    const submit = (phase: string, sample: Item[]) => app.inject({
+      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/quality-evidence`,
+      headers: { authorization: `Bearer ${quality}`, 'idempotency-key': `scale-${phase}`, 'content-type': 'application/json' },
+      payload: { review_revision: revision, phase, evidence_id: 'EVD-SCALE-QUALITY-001',
+        checks: sample.map(x => ({ script_id: x.script_id, content_hash: x.content_hash, defect: defects.has(x.script_id) })) },
+    });
+    const first = await submit('initial', initial);
+    expect(first.statusCode, first.body).toBe(200);
+    expect(first.json().quality_state).toBe('expansion_required');
+    const second = await submit('expanded', expanded);
+    expect(second.statusCode, second.body).toBe(200);
+    expect(second.json().quality_state).toBe('revision_required');
+    const resume = await app.inject({ method: 'POST', url: `/v1/admin/content/reviews/${batchId}/resume`,
+      headers: { authorization: `Bearer ${quality}`, 'content-type': 'application/json' }, payload: { review_revision: revision } });
+    expect(resume.statusCode).toBe(409);
+    expect(resume.json().error.details.reason).toBe('QUALITY_GATE_NOT_PASSED');
+    expect(await worker.runOnce()).toBe('idle');
+    expect((await admin.query('SELECT count(*)::int AS n FROM public.staging_scripts WHERE import_batch_id=$1', [batchId])).rows[0].n).toBe(0);
+  }, 60_000);
 
   it('parks a claimed import, requires distinct dual reviewers, then resumes to staged', async () => {
     const owner = await productToken('synthetic_lead');

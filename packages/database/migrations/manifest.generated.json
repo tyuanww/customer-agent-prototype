@@ -1,9 +1,9 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e",
-  "source_git_sha": "6f7d18e59f2e8b510daa23a3d606163227350a40",
-  "source_schema_sha256": "0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f",
-  "upgrade_source_sha256": "4ff4475ed9bdd45f27249775d3da29435c79b45cfa8c77ea2d616713c1864f75",
+  "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2",
+  "source_git_sha": "0904a0aa11f2dc29ae7700871a943c41295cd329",
+  "source_schema_sha256": "419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133",
+  "upgrade_source_sha256": "5b2cb830846e0c38fcd0a6dc0a2b058a4eb822bbdfe93c3b59af232a0d3188bf",
   "compatibility": {
     "current": "N",
     "prior_signed_baseline": {
@@ -30,6 +30,12 @@
         "source_git_sha": "2c75d8e7670134e6aa95a4780ff09fe0422a65e8",
         "source_schema_sha256": "859c4a4757d87e642e797ad8a26cfb334c49ae7f8f263966099eb89e6750b38b",
         "migration_count": 12
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e",
+        "source_git_sha": "6f7d18e59f2e8b510daa23a3d606163227350a40",
+        "source_schema_sha256": "0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f",
+        "migration_count": 13
       }
     ]
   },
@@ -282,6 +288,8 @@
       "position": 13,
       "id": "0013_backend_identity_content_v1_16",
       "file": "0013_backend_identity_content_v1_16.sql",
+      "sha256": "8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2",
+      "bytes": 40853,
       "source_ranges": [
         {
           "start_line": 10183,
@@ -296,11 +304,25 @@
           "end_line": 10719
         }
       ],
-      "sha256": "8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2",
-      "bytes": 40853,
       "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e",
       "source_git_sha": "6f7d18e59f2e8b510daa23a3d606163227350a40",
       "source_schema_sha256": "0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f"
+    },
+    {
+      "position": 14,
+      "id": "0014_release_deferred_guard_v1_17",
+      "file": "0014_release_deferred_guard_v1_17.sql",
+      "source_ranges": [
+        {
+          "start_line": 10726,
+          "end_line": 10730
+        }
+      ],
+      "sha256": "ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339",
+      "bytes": 912,
+      "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2",
+      "source_git_sha": "0904a0aa11f2dc29ae7700871a943c41295cd329",
+      "source_schema_sha256": "419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133"
     }
   ]
 }

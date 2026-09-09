@@ -275,7 +275,10 @@ export function selectionManifestHash(
 ): string {
   const initial = sampleScriptIds(rows, seed, initialTarget);
   const expanded = sampleScriptIds(rows, seed, expandedTarget);
-  return sha256(`[${JSON.stringify(initial)}, ${JSON.stringify(expanded)}]`);
+  // PostgreSQL jsonb text separates every array element with comma-space.
+  // Compact JSON only happened to agree for zero/one-element samples.
+  const arrayText = (ids: readonly string[]) => `[${ids.map(id => JSON.stringify(id)).join(', ')}]`;
+  return sha256(`[${arrayText(initial)}, ${arrayText(expanded)}]`);
 }
 
 export function parkedRowPayload(row: NormalizedImportRow): Record<string, unknown> {

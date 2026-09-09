@@ -179,7 +179,11 @@ export function createContentWorker(
           intentTaxonomyVersion: options.intentTaxonomyVersion,
           intentId: options.intentId,
           ...(review === undefined ? {} : { review }),
-        });
+        }).map((row) => ({
+          ...row,
+          // Staging IDs are globally unique; retries of this batch retain the same identity.
+          staging_id: `stg_${sha256(`${batchId}:${row.staging_id}`)}`,
+        }));
         const ordinary = rows.filter((row) => row.risk_level !== 'high' && !row.has_conflict).length;
         const mandatory = rows.length - ordinary;
         const targets = qualityTargets(ordinary);

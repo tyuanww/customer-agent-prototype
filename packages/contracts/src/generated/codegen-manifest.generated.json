@@ -1,13 +1,13 @@
 {
   "schema": "customer-agent-contract-codegen/v1",
-  "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e",
+  "contract_set_id": "cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2",
   "source_repository": "ai-赋能立项",
-  "source_git_sha": "6f7d18e59f2e8b510daa23a3d606163227350a40",
-  "manifest_sha256": "952076e396ca360eaeaabfe59e030713ae1d0af82270ff51baac551ce223b47b",
+  "source_git_sha": "0904a0aa11f2dc29ae7700871a943c41295cd329",
+  "manifest_sha256": "bf12fc9a6a9869a5effce1dc7a5b55b1df0dc619e358a40b4af399d374196246",
   "openapi_version": "1.13.0",
   "openapi_sha256": "c3c14659261ed01ff4f0c187026601844f59d3cd26be605a34f647bc130cc94c",
-  "database_version": "schema.v1.16",
-  "database_sha256": "0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f",
+  "database_version": "schema.v1.17",
+  "database_sha256": "419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133",
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "runtime_activated": false,
   "runtime_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
@@ -36,7 +36,7 @@
     },
     "provenance": {
       "path": "packages/contracts/src/generated/provenance.generated.ts",
-      "sha256": "d76e1000ba077d6aa6b0317c833d56ed712727272bb0a395196bcd483c81f464",
+      "sha256": "e63bd9784f3f751c5b6a4ac5ad46fe13b041ff30e4e42ade3a1473fa80620d0a",
       "bytes": 1648
     }
   }

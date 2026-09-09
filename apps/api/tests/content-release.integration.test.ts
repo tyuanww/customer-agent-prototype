@@ -61,9 +61,6 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
       CREATE ROLE t4_auth LOGIN NOINHERIT; GRANT app_backend_auth TO t4_auth;
       CREATE ROLE t4_worker LOGIN NOINHERIT; GRANT app_backend_worker TO t4_worker;
       CREATE ROLE t4_review LOGIN NOINHERIT; GRANT app_backend_review TO t4_review;
-      GRANT SELECT ON public.release_source_bindings, public.authoritative_source_versions,
-        public.authoritative_source_suspensions TO app_content_admin;
-      GRANT EXECUTE ON FUNCTION public.digest(BYTEA, TEXT) TO app_content_admin;
     `);
     const socket = new URLSearchParams({ host: harness.socket, port: String(harness.port) });
     const conn = (user: string) => `postgresql://${user}@localhost/${db.name}?${socket}`;
@@ -273,5 +270,33 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
       payload: { target_release_id: 'rel_does_not_exist', title: '回滚缺失', summary: 'missing' },
     });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it('reimports identical content and rolls back to a new release sequence', async () => {
+    const batchId = await stageBatch('idem-t4-a');
+    const owner = await productToken('synthetic_owner');
+    const firstResponse = await app.inject({
+      method: 'POST', url: '/v1/content/publish',
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'pub-first', 'content-type': 'application/json' },
+      payload: { import_batch_id: batchId, title: '首版', summary: 'synthetic first' },
+    });
+    expect(firstResponse.statusCode, firstResponse.body).toBe(200);
+    const first = firstResponse.json() as { release_id: string; release_seq: number };
+    const secondBatch = await stageBatch('idem-t4-b');
+    const second = await app.inject({
+      method: 'POST', url: '/v1/content/publish',
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'pub-second', 'content-type': 'application/json' },
+      payload: { import_batch_id: secondBatch, title: '再次发布', summary: 'synthetic repeat' },
+    });
+    expect(second.statusCode, second.body).toBe(200);
+    const rollback = await app.inject({
+      method: 'POST', url: '/v1/content/rollback',
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'rb-first', 'content-type': 'application/json' },
+      payload: { target_release_id: first.release_id, title: '恢复首版', summary: 'synthetic rollback' },
+    });
+    expect(rollback.statusCode, rollback.body).toBe(200);
+    expect(rollback.json().release_seq).toBeGreaterThan(second.json().release_seq);
+    expect(rollback.json().release_id).not.toBe(first.release_id);
+
   });
 });

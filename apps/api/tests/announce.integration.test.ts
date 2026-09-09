@@ -63,9 +63,6 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
       CREATE ROLE t5_auth LOGIN NOINHERIT; GRANT app_backend_auth TO t5_auth;
       CREATE ROLE t5_worker LOGIN NOINHERIT; GRANT app_backend_worker TO t5_worker;
       CREATE ROLE t5_review LOGIN NOINHERIT; GRANT app_backend_review TO t5_review;
-      GRANT SELECT ON public.release_source_bindings, public.authoritative_source_versions,
-        public.authoritative_source_suspensions TO app_content_admin;
-      GRANT EXECUTE ON FUNCTION public.digest(BYTEA, TEXT) TO app_content_admin;
     `);
     const socket = new URLSearchParams({ host: harness.socket, port: String(harness.port) });
     const conn = (user: string) => `postgresql://${user}@localhost/${db.name}?${socket}`;

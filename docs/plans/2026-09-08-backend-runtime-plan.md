@@ -1,6 +1,6 @@
 # 正式身份与内容闭环：实施计划与工程评审
 
-> 状态：APPROVED · SYNTHETIC DEVELOPMENT ONLY · 合同正式组合与 intake 进行中。
+> 状态：APPROVED · SYNTHETIC DEVELOPMENT ONLY · 后端收尾验收记录见第 11 节。
 > 2026-09-09 用户批准单主机纯合成合同正式化与 T1–T6 开发测试；各切片须经测试、OCR、修复复审后依次提交合并。真实身份/数据、Windows、运行激活和部署不在范围。历史评审段落保留当时状态，当前进度以第 11 节为准。
 > 用户已选择“先后端闭环，桌面随后”。产品基线以合并后的 `main` 为准；治理候选在独立 PR 中交付。
 
@@ -360,7 +360,7 @@ T3 内部可以先完成审核 HTTP 的受限调用，再连接 worker；对外�
 | T3 | 已合并 | PR #54 |
 | T4 | 已合并 | PR #55 |
 | T5 | 已合并 | PR #56 |
-| T6 | 正在实现构建产物 API/worker 整链 | 测试、delegate、提交合并 |
+| T6 | 构建产物整链已合并 | PR #57；收尾缺口见下节 |
 
 本地准备检查不替代正式来源交接、CI 或运行验收。整个目标仍在执行，不能把 T0 局部通过写为 T1–T6 完成。
 
@@ -396,3 +396,16 @@ Node 24.19.0 / PostgreSQL 15.18，纯合成一次性集群。合同 19 项与包
 
 
 T1 本地最终门：Node 24.19.0 / PG15.18；全量 test、lint/typecheck/build、workspace/docs 通过，专项 API PG15 73 项通过（其中新增身份 7 项），提供方实际 5s 超时与关闭取消通过。delegate 12/12 可审文件，0 跳过；解析错误缺 details/no-store 与关闭失败阻断其余池清理的问题已修复并复核，未解决 C/H/M 为 0。证据位于仓外 backend-plan-review/t1-identity-delegate-20260909。干净工作树候选产物门随提交后执行，远端 CI/合并状态另记。实例重建验证不替代 T6 独立进程崩溃恢复；真实飞书和部署未执行。
+
+
+### 2026-09-09 收尾复核与修复
+
+T1–T6 已合并至产品 main `8814ce8ddaff5c74a02c3ed4b817c04d0aadf864`，但不以合并状态替代验收。复核确认三个缺口：延迟来源触发器依赖测试额外授权、重复导入 staging_id 跨批主键冲突、501 行抽样摘要的 JSONB 空格不一致。
+
+- 治理 PR #75：schema.v1.17 延迟触发器固定 definer/搜索路径和 PUBLIC 撤权，保留原版本。完整发布门、PG15 和 delegate 8/8 已通过；已合并为 `0904a0aa11f2dc29ae7700871a943c41295cd329`，产品已消费对应固定提交导出。
+- 产品修复：staging_id 纳入批次；抽样数组按 SQL JSONB 文本格式计算摘要；删除测试底表授权；补重复导入/回退新序号和构建进程链回退；审核错误保留 QUALITY_GATE_NOT_PASSED 等合同原因，不再误报 LOGIN_CONSUMED。
+- 已测：旧合同无测试授权时发布 403；隔离应用同一候选触发器修复后两个发布/回退用例通过。501 行分页、扩样、revision_required 拒绝恢复和无 staged 行通过；API TypeScript 检查通过。
+- 正式 intake 验证：新增 migration 0014，旧十三条迁移字节不变；数据库 PG15 15/15（含 v1.16 升级及权限漂移反例）、API PG15 89/89、构建 API/worker 整链通过。全量测试、lint/typecheck/build、workspace/docs 通过。501 行用例位于现有显式 integration 文件，随 CI 执行。
+- Delegate 审查覆盖 12/12 可审文件；测试、生成物与文档另行核对。固定提交、CI 和合并状态以本次产品 PR 为准，证据保存于仓外 backend-plan-review/closure-product-delegate-20260909。
+
+仅合成开发测试；不扩大真实数据、飞书、Windows 接入或部署范围。

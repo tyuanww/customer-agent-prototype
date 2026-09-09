@@ -88,7 +88,7 @@ describe('API runtime configuration', () => {
       host: '127.0.0.1',
       port: 3100,
       buildVersion: '0.2.0-w3',
-      contractSetId: 'cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e',
+      contractSetId: 'cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2',
       runtimeActivated: false,
     });
     expect(Object.isFrozen(config)).toBe(true);

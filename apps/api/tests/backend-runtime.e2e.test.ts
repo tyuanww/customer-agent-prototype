@@ -100,9 +100,6 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
       CREATE ROLE t6_auth LOGIN NOINHERIT; GRANT app_backend_auth TO t6_auth;
       CREATE ROLE t6_worker LOGIN NOINHERIT; GRANT app_backend_worker TO t6_worker;
       CREATE ROLE t6_review LOGIN NOINHERIT; GRANT app_backend_review TO t6_review;
-      GRANT SELECT ON public.release_source_bindings, public.authoritative_source_versions,
-        public.authoritative_source_suspensions TO app_content_admin;
-      GRANT EXECUTE ON FUNCTION public.digest(BYTEA, TEXT) TO app_content_admin;
     `);
     const socket = new URLSearchParams({ host: harness.socket, port: String(harness.port) });
     const conn = (user: string) => `postgresql://${user}@localhost/${db.name}?${socket}`;
@@ -307,13 +304,13 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
           }),
         },
       );
-      expect((await decide(lead, `dec-lead-${index}`)).status).toBe(200);
-      expect((await decide(manager, `dec-manager-${index}`)).status).toBe(200);
+      expect((await decide(lead, `dec-lead-${batchId}-${index}`)).status).toBe(200);
+      expect((await decide(manager, `dec-manager-${batchId}-${index}`)).status).toBe(200);
     }
     expect((await fetch(`${address}/v1/admin/content/reviews/${batchId}/quality-evidence`, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${quality}`, 'idempotency-key': 'qual-t6', 'content-type': 'application/json',
+        authorization: `Bearer ${quality}`, 'idempotency-key': `qual-t6-${batchId}`, 'content-type': 'application/json',
       },
       body: JSON.stringify({
         review_revision: revision, phase: 'initial', evidence_id: 'EVD-T6-QUALITY-001',
@@ -388,8 +385,32 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
       body: JSON.stringify({ import_batch_id: batchId, title: '合成整链', summary: 'T6' }),
     });
     expect(published.status).toBe(200);
-    const release = await published.json() as { release_id: string; release_seq: number };
+    let release = await published.json() as { release_id: string; release_seq: number };
     expect(release.release_seq).toBe(1);
+    const firstRelease = release;
+    const repeated = await importCsv(owner, 'idem-t6-repeat');
+    await expect.poll(async () => {
+      const listed = await fetch(`${address}/v1/admin/content/reviews`, { headers: { authorization: `Bearer ${leadForWait}` } });
+      const body = await listed.json() as { items: { batch_id: string }[] };
+      return body.items.some(item => item.batch_id === repeated);
+    }, { timeout: 20_000, interval: 200 }).toBe(true);
+    await reviewToStaged(repeated);
+    await waitStatus(owner, repeated, 'staged');
+    const republished = await fetch(`${address}/v1/content/publish`, {
+      method: 'POST', headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'pub-t6-repeat', 'content-type': 'application/json' },
+      body: JSON.stringify({ import_batch_id: repeated, title: '再次导入', summary: 'synthetic repeat' }),
+    });
+    expect(republished.status).toBe(200);
+    const secondRelease = await republished.json() as { release_id: string; release_seq: number };
+    const rolledBack = await fetch(`${address}/v1/content/rollback`, {
+      method: 'POST', headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'rollback-t6', 'content-type': 'application/json' },
+      body: JSON.stringify({ target_release_id: firstRelease.release_id, title: '回退首版', summary: 'synthetic rollback' }),
+    });
+    expect(rolledBack.status).toBe(200);
+    release = await rolledBack.json() as { release_id: string; release_seq: number };
+    expect(release.release_seq).toBeGreaterThan(secondRelease.release_seq);
+    expect(release.release_id).not.toBe(firstRelease.release_id);
+
 
     const current = await fetch(`${address}/v1/announce/current`, {
       headers: { authorization: `Bearer ${owner}`, 'x-client-id': CLIENT_ID },

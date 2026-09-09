@@ -183,6 +183,7 @@ describe('customer-agent contract-set intake', () => {
   it.each([
     'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701',
     'cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e',
+    'cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2',
   ])('accepts %s and rejects mixed or unreviewed version/source pairs', (id) => {
     const source = path.join(repositoryRoot, 'contracts/upstream/customer-agent', id);
     const directory = temporaryDirectory('owner-pair');
@@ -467,8 +468,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e',
-      source_git_sha: '6f7d18e59f2e8b510daa23a3d606163227350a40',
+      contract_set_id: 'cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2',
+      source_git_sha: '0904a0aa11f2dc29ae7700871a943c41295cd329',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -478,13 +479,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      '952076e396ca360eaeaabfe59e030713ae1d0af82270ff51baac551ce223b47b',
+      'bf12fc9a6a9869a5effce1dc7a5b55b1df0dc619e358a40b4af399d374196246',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
       'c3c14659261ed01ff4f0c187026601844f59d3cd26be605a34f647bc130cc94c',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.16.sql')))).toBe(
-      '0db44d4d44e968b24e90dda8bcd26a077dd33395ff5a31efb38d085254d4c44f',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.17.sql')))).toBe(
+      '419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133',
     );
   });
 });

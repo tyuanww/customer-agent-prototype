@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { validateContractSchema } from '@customer-agent/contracts';
+import { parseContractSchema, validateContractSchema } from '@customer-agent/contracts';
 import { authenticateRequestHeaders, bearerToken, type AuthService } from './auth-service.js';
 import { sendIdentityFailure } from './product-auth-routes.js';
 import { IdentityFailure } from './product-auth-service.js';
-import type { ContentReviewService } from './content-review-service.js';
+import { ContentReviewFailure, type ContentReviewService } from './content-review-service.js';
 import { sendUnauthorized } from './contract-http-errors.js';
 
 export type ContentReviewRouteDependencies = Readonly<{
@@ -23,8 +23,17 @@ export function registerContentReviewRoutes(
   dependencies?: ContentReviewRouteDependencies,
 ): void {
   app.register(async (scope) => {
-    scope.setErrorHandler((error, _request, reply) => sendIdentityFailure(reply,
-      error instanceof IdentityFailure ? error : new IdentityFailure('DEPENDENCY_UNAVAILABLE')));
+    scope.setErrorHandler((error, _request, reply) => {
+      if (error instanceof ContentReviewFailure) {
+        return reply.header('cache-control', 'no-store')
+          .code(error.code === 'VALIDATION' ? 400 : 409)
+          .send(parseContractSchema('CandidateError', {
+            error: { code: error.code, message: '内容审核请求未通过校验', details: { reason: error.reason } },
+          }));
+      }
+      return sendIdentityFailure(reply,
+        error instanceof IdentityFailure ? error : new IdentityFailure('DEPENDENCY_UNAVAILABLE'));
+    });
 
     scope.get('/v1/admin/content/reviews', async (request, reply) => {
       reply.header('cache-control', 'no-store');

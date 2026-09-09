@@ -13,7 +13,22 @@ export type ContentReviewService = Readonly<{
   close: () => Promise<void>;
 }>;
 
-function identityFailure(error: unknown): IdentityFailure {
+const REVIEW_REASONS = [
+  'REVIEW_STALE', 'IDEMPOTENCY_CONFLICT', 'REVIEW_CANCELLED',
+  'QUALITY_GATE_NOT_PASSED', 'REVIEW_EVIDENCE_MISSING', 'QUALITY_SAMPLE_MISMATCH',
+  'QUALITY_EVIDENCE_INVALID', 'QUALITY_INITIAL_REQUIRED', 'QUALITY_EXPANSION_DENIED',
+  'QUALITY_POPULATION_MISMATCH', 'DUPLICATE_SCRIPT', 'DUPLICATE_CHECK',
+  'REVIEW_EVIDENCE_TRUST_BOUNDARY', 'READ_COMMITTED_REQUIRED', 'QUALITY_EVIDENCE_IMMUTABLE',
+] as const;
+
+/** Closed review failures keep their recovery reason instead of impersonating a login failure. */
+export class ContentReviewFailure extends Error {
+  constructor(readonly reason: typeof REVIEW_REASONS[number], readonly code: 'VALIDATION' | 'CONFLICT') {
+    super(reason);
+  }
+}
+
+function reviewFailure(error: unknown): IdentityFailure | ContentReviewFailure {
   if (error instanceof IdentityFailure) return error;
   if (error !== null && typeof error === 'object') {
     const sqlState = String(Reflect.get(error, 'code') ?? '');
@@ -21,18 +36,16 @@ function identityFailure(error: unknown): IdentityFailure {
       String(Reflect.get(error, 'message') ?? ''),
       String(Reflect.get(error, 'detail') ?? ''),
     ];
+    const reviewReason = REVIEW_REASONS.find(reason => tokens.includes(reason));
+    if (reviewReason && (sqlState === 'ZA001' || sqlState === 'ZA003' || sqlState === 'ZA006')) {
+      return new ContentReviewFailure(reviewReason, sqlState === 'ZA001' ? 'VALIDATION' : 'CONFLICT');
+    }
     if (tokens.includes('SESSION_INVALID')) return new IdentityFailure('SESSION_INVALID');
     if (tokens.includes('CAPABILITY_DENIED') || sqlState === 'ZA005') {
       return new IdentityFailure('CAPABILITY_DENIED');
     }
     if (tokens.includes('LOGIN_INVALID') || tokens.includes('VALIDATION') || sqlState === 'ZA001') {
       return new IdentityFailure('REQUEST_INVALID');
-    }
-    if (sqlState === 'ZA003' || sqlState === 'ZA006' || tokens.some((token) => [
-      'REVIEW_STALE', 'IDEMPOTENCY_CONFLICT', 'REVIEW_CANCELLED',
-      'QUALITY_GATE_NOT_PASSED', 'REVIEW_EVIDENCE_MISSING',
-    ].includes(token))) {
-      return new IdentityFailure('LOGIN_CONSUMED');
     }
   }
   return new IdentityFailure('DEPENDENCY_UNAVAILABLE');
@@ -73,7 +86,7 @@ export function createContentReviewService(config: ApiDatabaseBootstrapConfig): 
       return result.rows[0] as T;
     } catch (error) {
       try { await client.query('ROLLBACK'); } catch { broken = true; }
-      throw identityFailure(error);
+      throw reviewFailure(error);
     } finally {
       client.release(broken);
     }
