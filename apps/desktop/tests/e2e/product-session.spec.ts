@@ -8,8 +8,8 @@ import { test, expect, _electron as electron, type ElectronApplication } from '@
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 /** Native IPC/login-window test. HTTP is a synthetic wire double; PG integration belongs to D5. */
-test('product session native login, logout and renderer isolation', async () => {
-  const token = 's'.repeat(43); let authorized = false; let revoked = false;
+test('product session native login, search, copy, logout and renderer isolation', async ({ browserName }, testInfo) => {
+  const token = 's'.repeat(43); let authorized = false; let revoked = false; let adopted = false;
   const server = createServer((req, res) => {
     const url = new URL(req.url!, `http://${req.headers.host}`);
     res.setHeader('content-type', 'application/json');
@@ -26,7 +26,16 @@ test('product session native login, logout and renderer isolation', async () => 
       res.statusCode = req.headers.authorization === `Bearer ${token}` && !revoked ? 200 : 401;
       res.end(JSON.stringify({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' }));
     } else if (url.pathname === '/v1/auth/logout') { revoked = true; res.statusCode = 204; res.end(); }
-    else { res.statusCode = 404; res.end('{}'); }
+    else if (url.pathname === '/v1/search') {
+      let body = ''; req.on('data', chunk => { body += String(chunk); }); req.on('end', () => {
+        const request = JSON.parse(body);
+        res.end(JSON.stringify({ query_id: request.query_id, hit_status: 'hit', release_id: 'rel-synthetic-001', source_binding_hash: 'b'.repeat(64), telemetry_status: 'recorded', candidates: [{
+          rank: 1, release_id: 'rel-synthetic-001', script_id: 'script-synthetic-001', script_version: 1, content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale', answer_text: '这是合成订单 {订单号}。', platform_scope: ['qianniu'], product_scope_type: 'storewide', product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null, intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low', risk_categories: [], has_conflict: false, placeholder_keys: ['order_id'],
+        }] }));
+      });
+    } else if (url.pathname === '/v1/events/adoption') {
+      let body = ''; req.on('data', chunk => { body += String(chunk); }); req.on('end', () => { adopted = true; res.end(JSON.stringify({ ok: true, query_id: JSON.parse(body).query_id })); });
+    } else { res.statusCode = 404; res.end('{}'); }
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -44,7 +53,24 @@ test('product session native login, logout and renderer isolation', async () => 
     const loginWindows = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.webContents.getURL().includes('/authorize')).length);
     expect(loginWindows).toBe(0);
     expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(true);
-    await query.getByRole('button', { name: 'agent · 退出' }).click();
+    await query.getByTestId('question-input').fill('合成发货问题');
+    await query.getByTestId('search-button').click();
+    await query.getByLabel('查询平台').selectOption('qianniu');
+    await query.getByTestId('search-button').click();
+    await expect(query.getByTestId('answer-text-1')).toHaveText('这是合成订单 {订单号}。');
+    await query.getByLabel('合成订单号').fill('SYNTHETIC-A');
+    await query.getByTestId('question-input').fill('第二个合成订单发货问题');
+    await query.getByTestId('search-button').click();
+    await expect(query.getByLabel('合成订单号')).toHaveValue('');
+    await query.getByLabel('合成订单号').fill('SYNTHETIC-B');
+    await expect(query.getByTestId('copy-button-1')).toBeVisible();
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true');
+    await query.screenshot({ path: testInfo.outputPath(`product-query-${browserName}.png`) });
+    expect(await query.evaluate(() => window.customerAgent!.copyText('绕过候选'))).toMatchObject({ ok: false });
+    await query.getByTestId('copy-button-1').click();
+    await expect.poll(() => adopted).toBe(true);
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('这是合成订单 SYNTHETIC-B。');
+    await query.evaluate(() => window.customerAgent!.product!.logout());
     await expect(query.getByRole('button', { name: '合成登录' })).toBeVisible();
     expect(revoked).toBe(true); expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(false);
   } finally {

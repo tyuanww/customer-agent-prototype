@@ -1,3 +1,4 @@
+import type { ProductCopyRequest } from '../../../shared/product-search';
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 export type ScriptDomain = '产品' | '活动' | '售前' | '售后';
@@ -40,6 +41,8 @@ export type MatchKind = 'exact' | 'alias' | 'semantic' | 'similar';
 export type RankedScript = Omit<ScriptFixture, 'search'> & {
   rank: 1 | 2 | 3;
   score: number;
+  productCopy?: Omit<ProductCopyRequest, 'placeholderValues'>;
+  placeholderKeys?: ('order_id' | 'date')[];
   matchKind: MatchKind;
   matchLabel: string;
 };

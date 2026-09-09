@@ -1,4 +1,5 @@
-import { isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
+import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
+import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC_CHANNELS,
@@ -50,7 +51,25 @@ const sessionInvoke = async (channel: string): Promise<ProductSessionResult> => 
     return isProductSessionResult(value) ? value : productFailure('UNAVAILABLE');
   } catch { return productFailure('UNAVAILABLE'); }
 };
+async function queryInvoke(channel: string, request: QueryIdentity) {
+  if (!isQueryIdentity(request)) return queryFailure('VALIDATION', { sessionEpoch: 0, generation: 0 });
+  const valid = channel === IPC_CHANNELS.PRODUCT_SEARCH ? isProductSearchRequest(request)
+    : channel === IPC_CHANNELS.PRODUCT_COPY_ADOPT ? isProductCopyRequest(request) : exactKeys(request, ['sessionEpoch', 'generation']);
+  if (!valid) return queryFailure('VALIDATION', request);
+  try {
+    const value: unknown = await ipcRenderer.invoke(channel, request);
+    if (!isProductQueryResult(value) || value.sessionEpoch !== request.sessionEpoch || value.generation !== request.generation) return queryFailure('UNAVAILABLE', request);
+    if (!value.ok) return value;
+    const matches = channel === IPC_CHANNELS.PRODUCT_SEARCH ? 'queryId' in value : channel === IPC_CHANNELS.PRODUCT_COPY_ADOPT ? 'copied' in value : 'cancelled' in value;
+    return matches ? value : queryFailure('UNAVAILABLE', request);
+  } catch { return queryFailure('UNAVAILABLE', request); }
+}
 const api: CustomerAgentApi = {
+  productSearch: {
+    search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
+    copyAdopt: request => queryInvoke(IPC_CHANNELS.PRODUCT_COPY_ADOPT, request) as Promise<ProductCopyResult>,
+    cancelSearch: request => queryInvoke(IPC_CHANNELS.PRODUCT_CANCEL_SEARCH, request) as Promise<ProductCancelResult>,
+  },
   product: {
     sessionStatus: () => sessionInvoke(IPC_CHANNELS.PRODUCT_SESSION_STATUS),
     login: () => sessionInvoke(IPC_CHANNELS.PRODUCT_LOGIN),

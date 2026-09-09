@@ -105,6 +105,10 @@ export function QueryApp() {
   const dashboardOpenFailedRef = useRef(false);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
+  const [searchPlatform, setSearchPlatform] = useState<'' | 'qianniu' | 'douyin'>('');
+  const [productType, setProductType] = useState<'' | 'category' | 'sku'>('');
+  const [productRef, setProductRef] = useState('');
+  const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
   const searchTimerRef = useRef<number | null>(null);
   const dismissTimerRef = useRef<number | null>(null);
   const resultFocusFrameRef = useRef<number | null>(null);
@@ -350,6 +354,8 @@ export function QueryApp() {
         openingRef.current = false;
         openingUserInteractionRef.current = false;
         searchGenerationRef.current += 1;
+        setPlaceholderValues({});
+        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
         searchInFlightRef.current = false;
         if (searchTimerRef.current !== null) {
           window.clearTimeout(searchTimerRef.current);
@@ -460,6 +466,8 @@ export function QueryApp() {
         });
         cancelScheduledResultFocus();
         searchGenerationRef.current += 1;
+        setPlaceholderValues({});
+        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
         copyGenerationRef.current += 1;
         searchInFlightRef.current = false;
         if (searchTimerRef.current !== null) {
@@ -621,6 +629,8 @@ export function QueryApp() {
   useEffect(
     () => () => {
       searchGenerationRef.current += 1;
+        setPlaceholderValues({});
+        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
       copyGenerationRef.current += 1;
       searchInFlightRef.current = false;
       copyInFlightRef.current = false;
@@ -651,6 +661,8 @@ export function QueryApp() {
 
   const cancelPendingSearch = useCallback(() => {
     searchGenerationRef.current += 1;
+        setPlaceholderValues({});
+        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
     searchInFlightRef.current = false;
     if (searchTimerRef.current !== null) {
       window.clearTimeout(searchTimerRef.current);
@@ -689,6 +701,9 @@ export function QueryApp() {
 
   const acceptProductSession = useCallback((value: ProductSessionResult) => {
     if (value.sessionEpoch < productEpochRef.current) return;
+    if (productEpochRef.current !== value.sessionEpoch) {
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
+    }
     productEpochRef.current = value.sessionEpoch;
     setProductState(value);
     if (!value.ok || (value.enabled && !value.signedIn)) {
@@ -716,13 +731,39 @@ export function QueryApp() {
       const result = await (productState?.ok && productState.signedIn ? product.logout() : product.login());
       if (result.sessionEpoch < productEpochRef.current) return;
       acceptProductSession(result);
-      setInvalidMessage(result.ok ? result.signedIn ? '合成登录成功；后端查询接入待 D2' : '已退出，请先登录' : result.message);
+      setInvalidMessage(result.ok ? result.signedIn ? '合成登录成功，请确认平台和商品后查询' : '已退出，请先登录' : result.message);
     } finally { setSessionBusy(false); }
   };
 
   const runSearch = useCallback(() => {
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
-      setInvalidMessage(productState?.ok && productState.signedIn ? '合成登录成功；后端查询接入待 D2' : '请先合成登录');
+      if (!(productState?.ok && productState.signedIn)) { setInvalidMessage('请先合成登录'); return; }
+      const api = window.customerAgent.productSearch;
+      const queryText = (inputRef.current?.value ?? query).trim();
+      if (!api || !searchPlatform || (productType && !productRef.trim()) || !queryText || [...queryText].length > 500) {
+        setResults([]); setErrorMessage('请确认平台、具体商品和客户的问题；问题最多 500 字。无具体商品时仅查询全店话术。'); reportPhase('ERROR'); return;
+      }
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+      const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
+      searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
+      void api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
+        productContextType: productType || null, productContextRef: productType ? productRef.trim() : null, parentQueryId: null }).then(result => {
+        if (generation !== searchGenerationRef.current || sessionEpoch !== productEpochRef.current) return;
+        if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
+        if (result.generation !== generation || result.sessionEpoch !== sessionEpoch) return;
+        const domains = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
+        const items: RankedScript[] = result.candidates.map(c => ({
+          scriptId: c.script_id, domain: domains[c.category as keyof typeof domains] ?? '产品', questionVariants: [], answerText: c.answer_text,
+          platform: searchPlatform === 'qianniu' ? '千牛' : '抖音', scopeLabel: c.title, riskLevel: c.risk_level,
+          effectiveFrom: c.effective_from, effectiveTo: c.effective_to ?? '', rank: c.rank as 1 | 2 | 3, score: 0,
+          matchKind: 'exact', matchLabel: result.telemetryStatus === 'collection_disabled' ? '后端候选 · 不记录事件' : '后端候选',
+          productCopy: { sessionEpoch, generation, queryId: result.queryId, rank: c.rank, scriptId: c.script_id, scriptVersion: c.script_version, contentHash: c.content_hash },
+          placeholderKeys: c.placeholder_keys,
+        }));
+        setResults(items); reportPhase(items.length ? 'RESULTS' : 'EMPTY', items.length as ResultCount);
+      }).catch(() => {
+        if (generation === searchGenerationRef.current) { setErrorMessage('查询服务暂不可用，请重试'); reportPhase('ERROR'); }
+      }).finally(() => { if (generation === searchGenerationRef.current) { searchInFlightRef.current = false; setSearching(false); } });
       return;
     }
 
@@ -793,7 +834,7 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, searchPlatform, productType, productRef, cancelPendingSearch]);
 
   const copyScript = useCallback(
     async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
@@ -822,13 +863,16 @@ export function QueryApp() {
 
       setCopying(true);
       try {
-        const result = await api.copyText(script.answerText);
+        const connected = !!api.product && !(productState?.ok && !productState.enabled);
+        const result = connected ? (script.productCopy && api.productSearch
+          ? await api.productSearch.copyAdopt({ ...script.productCopy, placeholderValues: Object.fromEntries((script.placeholderKeys ?? []).filter(k => placeholderValues[k]).map(k => [k, placeholderValues[k]!])) })
+          : { ok: false as const, message: '候选已失效，请重新查询' }) : await api.copyText(script.answerText);
         if (copyGeneration !== copyGenerationRef.current) {
           return;
         }
         if (result.ok) {
           setCopiedRank(script.rank);
-          setErrorMessage('');
+          setErrorMessage('eventStatus' in result && result.eventStatus === 'unrecorded' ? '已复制；事件未记录，请勿重复复制' : '');
           reportPhase('COPIED', resultCount);
           dismissTimerRef.current = window.setTimeout(() => {
             dismissTimerRef.current = null;
@@ -853,7 +897,7 @@ export function QueryApp() {
         }
       }
     },
-    [phase, reportPhase, results.length],
+    [phase, reportPhase, results.length, placeholderValues, productState],
   );
 
   const openDashboard = useCallback(() => {
@@ -1253,6 +1297,21 @@ export function QueryApp() {
 
         {expanded ? (
           <QueryResultsPane
+            contextControls={window.customerAgent?.productSearch && productState?.ok && productState.enabled ? (
+              <fieldset aria-label="查询范围" className="product-query-context">
+                <legend>查询范围 · 合成数据</legend>
+                <label>平台 <select aria-label="查询平台" value={searchPlatform} onChange={e => { setSearchPlatform(e.target.value as typeof searchPlatform); cancelPendingSearch(); cancelPendingCopy(); setResults([]); reportPhase('ERROR'); }}>
+                  <option value="">请选择</option><option value="qianniu">千牛</option><option value="douyin">抖音</option>
+                </select></label>
+                <label>商品范围 <select aria-label="商品范围" value={productType} onChange={e => { setProductType(e.target.value as typeof productType); cancelPendingSearch(); cancelPendingCopy(); setResults([]); reportPhase('ERROR'); }}>
+                  <option value="">无具体商品（仅全店话术）</option><option value="category">品类</option><option value="sku">具体款</option>
+                </select></label>
+                {productType ? <label>合成商品标识 <input aria-label="合成商品标识" value={productRef} onChange={e => { setProductRef(e.target.value); cancelPendingSearch(); cancelPendingCopy(); setResults([]); }} /></label> : null}
+                {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '合成订单号' : '日期'}
+                  <input disabled={copying} aria-label={key === 'order_id' ? '合成订单号' : '日期'} value={placeholderValues[key] ?? ''} onChange={e => setPlaceholderValues(v => ({ ...v, [key]: e.target.value }))} />
+                </label>)}
+              </fieldset>
+            ) : undefined}
             phase={phase}
             resultPaneRef={resultPaneRef}
             statusBannerRef={statusBannerRef}

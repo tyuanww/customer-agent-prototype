@@ -75,6 +75,20 @@ export class ProductSession {
       return this.view();
     } catch (error) { return this.fail(error, epoch); }
   }
+  /** Main-only capability. Credentials remain private; late responses cannot cross identities. */
+  async request(epoch: number, path: string, options: { body?: unknown; signal?: AbortSignal; method?: string } = {}) {
+    if (!this.view().signedIn || !this.token) throw new ProductHttpError('UNAUTHORIZED');
+    if (epoch !== this.epoch) throw new ProductHttpError('STALE');
+    const token = this.token;
+    try {
+      const result = await this.http.request(path, { ...options, token: token.access_token });
+      if (epoch !== this.view().sessionEpoch || token !== this.token) throw new ProductHttpError('STALE');
+      return result;
+    } catch (error) {
+      if (epoch === this.epoch && error instanceof ProductHttpError && error.code === 'UNAUTHORIZED') this.invalidate();
+      throw error;
+    }
+  }
   async login(): Promise<ProductSessionResult> {
     if (this.operation) return productFailure('CONFLICT', this.epoch);
     if (this.token) return this.status();

@@ -147,7 +147,7 @@ export function QueryCapsule({
                     <path d="M10 10.25h4.5M10 13.25h3" />
                   </svg>
                 </button>
-                <button
+                {!productControl ? <button
                   type="button"
                   className="deep-thinking-entry"
                   data-testid="deep-thinking-toggle"
@@ -159,7 +159,7 @@ export function QueryCapsule({
                   onClick={onToggleDeepThinking}
                 >
                   深度思考 <span>预留 · OFF</span>
-                </button>
+                </button> : null}
                 <div className="env-badges" data-testid="env-badges">
                   <span className="env-badge">DEMO</span>
                   <span className="env-badge">MOCK AUTH</span>

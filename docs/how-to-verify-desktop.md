@@ -268,3 +268,9 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。D1 尚未接通后端搜索，登录后提示等待 D2。
 
 自动化窗口验收：`pnpm --filter @customer-agent/desktop build` 后运行 `pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts`。该测试使用真实 Electron 与合成 HTTP double，校验加密文件生命周期、Query 状态及 token 不跨 preload；不等于真实身份、PG 整链或人工/Windows 验收。
+
+### D2 合成查询与复制验证
+
+沿用 D1 的两个 loopback 配置。登录后输入问题、点击查询，先选择平台；按需选择品类或具体款并填写对应合成标识，无具体商品仅查询全店话术。有占位符的候选须填写合成订单号或日期后复制。复制成功只表示剪贴板写入，不表示发送。
+
+`pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-search.test.ts` 检查候选归属、隔离、半开有效期、并发复制、取消及事件失败。`pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts` 在 build 后运行真实 Electron 登录/搜索/复制/退出，HTTP 为合成 double；不是 PG 整链、人工观察或 Windows 实机证据。

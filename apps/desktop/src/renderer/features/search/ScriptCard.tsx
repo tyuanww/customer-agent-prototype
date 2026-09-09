@@ -15,7 +15,8 @@ const RISK_COPY: Record<RiskLevel, { label: string; className: string }> = {
 };
 
 export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps) {
-  const validity = getValidityInfo(script.effectiveFrom, script.effectiveTo);
+  const validNow = Date.parse(script.effectiveFrom) <= Date.now() && (!script.effectiveTo || Date.now() < Date.parse(script.effectiveTo));
+  const validity = script.productCopy ? { kind: validNow ? 'active' : 'expired', text: validNow ? '当前有效' : '已失效，请重新查询' } : getValidityInfo(script.effectiveFrom, script.effectiveTo);
   const risk = RISK_COPY[script.riskLevel];
   const lead = script.rank === 1;
 
@@ -48,7 +49,7 @@ export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps)
           type="button"
           className={copied ? 'copy-btn is-copied' : 'copy-btn'}
           data-testid={`copy-button-${script.rank}`}
-          disabled={copying}
+          disabled={copying || (!!script.productCopy && !validNow)}
           aria-keyshortcuts={String(script.rank)}
           onClick={(event) => onCopy(script, event.currentTarget)}
         >

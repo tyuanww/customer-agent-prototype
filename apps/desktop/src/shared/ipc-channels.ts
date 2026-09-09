@@ -1,4 +1,7 @@
 export const IPC_CHANNELS = {
+  PRODUCT_SEARCH: 'product:search',
+  PRODUCT_CANCEL_SEARCH: 'product:cancel-search',
+  PRODUCT_COPY_ADOPT: 'product:copy-adopt',
   PRODUCT_SESSION_STATUS: 'product:session-status',
   PRODUCT_LOGIN: 'product:login',
   PRODUCT_LOGOUT: 'product:logout',

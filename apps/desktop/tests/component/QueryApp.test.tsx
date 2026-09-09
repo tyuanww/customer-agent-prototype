@@ -120,6 +120,75 @@ describe('QueryApp', () => {
     };
   });
 
+  function connectProduct() {
+    const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString() };
+    window.customerAgent!.product = { sessionStatus: vi.fn().mockResolvedValue(view), login: vi.fn().mockResolvedValue(view), logout: vi.fn(), onSessionChanged: () => () => {} };
+    const search = vi.fn(async (r: import('../../src/shared/product-search').ProductSearchRequest) => ({
+      ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, queryId: '11111111-1111-4111-8111-111111111111', hitStatus: 'hit' as const,
+      releaseId: 'rel-synthetic', telemetryStatus: 'recorded' as 'recorded' | 'collection_disabled', candidates: [{ rank: 1, release_id: 'rel-synthetic', script_id: 'script-synthetic', script_version: 1,
+        content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const, answer_text: '合成订单 {订单号}', platform_scope: [r.platform],
+        product_scope_type: 'storewide' as const, product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
+        intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const] }],
+    }));
+    const copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus: 'recorded' as const }));
+    window.customerAgent!.productSearch = { search, copyAdopt, cancelSearch: vi.fn(async r => ({ ok: true, ...r, cancelled: true })) };
+    return { search, copyAdopt };
+  }
+  async function prepareProductQuery() {
+    render(<QueryApp />); await screen.findByRole('button', { name: 'agent · 退出' });
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    fireEvent.change(await screen.findByLabelText('查询平台'), { target: { value: 'qianniu' } });
+  }
+  it('sends explicitly selected platform and SKU to the product adapter', async () => {
+    const f = connectProduct(); await prepareProductQuery();
+    fireEvent.change(screen.getByLabelText('查询平台'), { target: { value: 'douyin' } });
+    fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: 'sku' } });
+    fireEvent.change(screen.getByLabelText('合成商品标识'), { target: { value: 'sku_synthetic_blue' } });
+    fireEvent.click(screen.getByTestId('search-button')); await screen.findByTestId('copy-button-1');
+    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({ platform: 'douyin', productContextType: 'sku', productContextRef: 'sku_synthetic_blue', platformSource: 'manual' }));
+  });
+  it('ignores a late product search after the question changes, without fixture fallback', async () => {
+    const f = connectProduct(); await prepareProductQuery();
+    const pending = deferred<Awaited<ReturnType<typeof f.search>>>(); const response = f.search.getMockImplementation()!;
+    f.search.mockImplementationOnce(() => pending.promise); fireEvent.click(screen.getByTestId('search-button'));
+    const request = f.search.mock.calls[0][0];
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '另一个问题' } });
+    await act(async () => pending.resolve(await response(request)));
+    expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).toHaveValue('另一个问题');
+  });
+  it.each(['unrecorded', 'disabled'] as const)('shows copy as copy when the product event is %s', async eventStatus => {
+    const f = connectProduct();
+    if (eventStatus === 'disabled') { const response = f.search.getMockImplementation()!; f.search.mockImplementation(async r => ({ ...await response(r), telemetryStatus: 'collection_disabled' })); }
+    window.customerAgent!.productSearch!.copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus }));
+    await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button')); await screen.findByTestId('copy-button-1');
+    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-A' } });
+    fireEvent.click(screen.getByTestId('copy-button-1')); await screen.findByTestId('toast');
+    expect(screen.getByTestId('toast')).toHaveTextContent('已复制');
+    if (eventStatus === 'unrecorded') expect(screen.getByTestId('toast')).toHaveTextContent('事件未记录');
+    if (eventStatus === 'disabled') expect(screen.getByTestId('match-reason-1')).toHaveTextContent('不记录事件');
+    expect(copyText).not.toHaveBeenCalled(); expect(f.search).toHaveBeenCalledTimes(1);
+  });
+  it('reports a product network failure without using a matching S0 fixture', async () => {
+    const f = connectProduct(); await prepareProductQuery();
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '澄芽氨基酸洁面怎么用' } });
+    f.search.mockRejectedValueOnce(new Error('synthetic network failure')); fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByText('查询服务暂不可用，请重试'); expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
+  });
+  it('clears old order values on new queries and locks placeholders during copying', async () => {
+    const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button')); await screen.findByLabelText('合成订单号');
+    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-A' } });
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '第二个订单' } }); fireEvent.click(screen.getByTestId('search-button'));
+    expect(await screen.findByLabelText('合成订单号')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-B' } });
+    const pending = deferred<Awaited<ReturnType<typeof f.copyAdopt>>>(); const response = f.copyAdopt.getMockImplementation()!;
+    f.copyAdopt.mockImplementationOnce(() => pending.promise); fireEvent.click(screen.getByTestId('copy-button-1'));
+    expect(screen.getByLabelText('合成订单号')).toBeDisabled();
+    expect(f.copyAdopt).toHaveBeenCalledWith(expect.objectContaining({ placeholderValues: { order_id: 'SYNTHETIC-B' } }));
+    await act(async () => pending.resolve(await response(f.copyAdopt.mock.calls[0][0])));
+  });
+
   it('blocks fixture search in product mode and exposes login/logout without credentials', async () => {
     const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
     const signedIn = { ...signedOut, signedIn: true, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };

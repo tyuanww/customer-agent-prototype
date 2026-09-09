@@ -165,3 +165,7 @@ Publish 若出现，必须 disabled，并附 `演示禁用 · 正式需 owner + 
 | 落地 | 88px 窗内整头局部 follow；可中断 sleep / wake；press / drag / long-drag reaction；现有贴边 inward-ready + 半露 + peek / retract 作为本项目 mini mode |
 | 仅理念 | 动作优先级、左右镜像、被抓住暂停 ambient、睡眠被局部活动唤醒、free-roam 的可中断性（free-roam 未进入产品） |
 | 明确不做 | ZIP 资产 / 源码、全局追踪、真实 roam、双击 / 多击 accumulator、per-frame native window move、眼球追踪宣传 |
+
+### 显式合成后端接入 profile（D2）
+
+登录后的查询通过 main 获取 Top 3 原文，保留人在环和“已复制”语义。查询前手动确认平台及商品范围；无具体商品仅查全店话术。上下文控件和占位符输入位于结果区域，纳入既有 DOM 高度测量，不改变胶囊与原生窗几何合同。接入模式隐藏未启用的深度思考预留按钮，为登录和完整环境标识留出空间。接入故障显示可恢复错误，不回退本地 fixture；旧 S0 profile 保留原合成检索与预留入口。

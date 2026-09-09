@@ -26,7 +26,7 @@ D1 另有临时独立登录窗，由 `product-login-window.ts` 持有非持久 p
 
 共同锁定（`lockRendererWindow`）：拒绝 `window.open`、拦截 `will-navigate`、拦截 `will-attach-webview`。会话级（`applySessionSecurity`）：权限请求 / 权限检查一律 false。
 
-CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；D1 main-process HTTP adapter 仅在显式纯合成接入 profile 持有会话，搜索接线待 D2。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
+CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态额外允许本机 Vite HMR；生产态 `script-src 'self'`，`connect-src 'self'`。生产 renderer **不能**直连正式 `/v1`；D1 main-process HTTP adapter 仅在显式纯合成接入 profile 持有会话，D2 查询与复制已接线。字段与鉴权缺口见 [API adapter 衔接](reference-api-adapter-handoff.md)。
 
 ---
 
@@ -248,3 +248,9 @@ apps/desktop/scripts/verify-mac-release-env.mjs 正式外发前置（当前会�
 | `apps/desktop/src/renderer/index.html` | `apps/desktop/out/renderer/` |
 
 renderer 无 Node 权限。`apps/desktop/package.json` 的打包 `files` 只含 package-local `out/**/*` 与 `package.json`；狐狸 PNG 与第三方许可走 `extraResources`。产物在仓库中的实际路径是 `apps/desktop/out/`。
+
+### D2 查询与复制 IPC
+
+新增 `product:search`、`product:cancel-search`、`product:copy-adopt`，全部仅限可信 Query 主 frame。通过 `customerAgent.productSearch` 暴露窄方法。输入输出须绑定 sessionEpoch/generation；查询/取消严格递增，复制必须等于已保存候选。搜索文本上限为 500 Unicode code point；平台手选，商品上下文成对。本切片只提交 original 查询，parentQueryId 固定 null。
+
+复制只接受 queryId/rank/scriptId/scriptVersion/contentHash 和已声明占位符值，不接受正文。main 用缓存原文中的 `{订单号}`/`{日期}` 替换，先复制再记账；记账失败返回 copied=true/eventStatus=unrecorded，collection_disabled 不发事件。接入模式旧 clipboard:copy-text 被拒绝。S0 未接入 profile 保留原逻辑，HTTP 失败不得回退 S0。

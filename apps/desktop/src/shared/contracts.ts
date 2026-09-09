@@ -1,3 +1,4 @@
+import type { ProductSearchApi } from './product-search';
 import type { OpenDashboardResult } from './dashboard-access';
 import type {
   FoxDragSettleAck,
@@ -30,6 +31,7 @@ export type { IpcChannel } from './ipc-channels';
 
 export type CustomerAgentApi = {
   product?: import('./product-session').ProductSessionApi;
+  productSearch?: ProductSearchApi;
   copyText: (text: string) => Promise<CopyTextResult>;
   getWindowContext: () => Promise<WindowContext>;
   openSearch: (visualTransform?: FoxVisualTransform) => Promise<void>;

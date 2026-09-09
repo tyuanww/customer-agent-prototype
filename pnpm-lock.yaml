@@ -63,6 +63,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@customer-agent/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       react:
         specifier: ^18.3.1
         version: 18.3.1

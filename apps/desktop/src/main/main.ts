@@ -1,3 +1,4 @@
+import { registerProductSearchIpc } from './product-search-ipc';
 import { ProductHttp } from './product-http';
 import { ProductSession } from './product-session';
 import { createSessionStore } from './product-session-store';
@@ -139,6 +140,7 @@ if (!gotLock) {
       () => controller?.trustedContents() ?? [],
       (contents) => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl,
+      () => productSession !== null,
     );
     registerOverlayIpc(() => controller);
     const productOrigin = process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
@@ -148,6 +150,8 @@ if (!gotLock) {
       productSession = new ProductSession(new ProductHttp(productOrigin), createSessionStore(app.getPath('userData')), createLoginWindow(identityOrigin, productOrigin));
       await productSession.restore();
     }
+    registerProductSearchIpc(productSession, () => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     await next.start();

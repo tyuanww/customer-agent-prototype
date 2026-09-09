@@ -4,6 +4,9 @@ import { COPY_SUCCESS_MESSAGE, IPC_CHANNEL_WHITELIST, IPC_CHANNELS } from '../..
 describe('IPC whitelist', () => {
   it('only allows the typed overlay and clipboard channels', () => {
     expect(IPC_CHANNEL_WHITELIST).toEqual([
+      IPC_CHANNELS.PRODUCT_SEARCH,
+      IPC_CHANNELS.PRODUCT_CANCEL_SEARCH,
+      IPC_CHANNELS.PRODUCT_COPY_ADOPT,
       IPC_CHANNELS.PRODUCT_SESSION_STATUS,
       IPC_CHANNELS.PRODUCT_LOGIN,
       IPC_CHANNELS.PRODUCT_LOGOUT,

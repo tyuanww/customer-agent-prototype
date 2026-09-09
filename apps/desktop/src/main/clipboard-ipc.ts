@@ -12,6 +12,7 @@ export function registerClipboardIpc(
   getTrusted: () => WebContents[],
   getRole: (contents: WebContents) => OverlayRole | null,
   getDevServerUrl: () => string | undefined,
+  productConnected: () => boolean = () => false,
 ): void {
   const guard = (event: IpcMainInvokeEvent): boolean => {
     return isTrustedSender(event, getTrusted(), getDevServerUrl());
@@ -20,6 +21,7 @@ export function registerClipboardIpc(
   ipcMain.handle(
     IPC_CHANNELS.COPY_TEXT,
     async (event, text: unknown): Promise<CopyTextResult> => {
+      if (productConnected()) return { ok: false, message: '请从当前后端候选复制' };
       const trusted = guard(event);
       const role = getRole(event.sender);
       if (!canCopyText({ trusted, role })) {
