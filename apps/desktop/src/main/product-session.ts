@@ -102,7 +102,7 @@ export class ProductSession {
     try {
       const verifier = randomBytes(32).toString('base64url');
       const challenge = createHash('sha256').update(verifier).digest('base64url');
-      const { value: created } = await this.http.request('/v1/auth/login-requests', { body: { client_challenge: challenge }, signal: operation.signal });
+      const { value: created } = await this.http.request('/v1/auth/login-requests', { body: { client_challenge: challenge, challenge_method: 'S256' }, signal: operation.signal });
       if (!exactKeys(created, ['login_id', 'authorize_url', 'expires_at']) || typeof created.login_id !== 'string'
         || !/^login_[A-Za-z0-9_-]{43}$/.test(created.login_id) || typeof created.authorize_url !== 'string') throw new ProductHttpError('VALIDATION');
       await this.window.open(created.authorize_url, operation.signal);

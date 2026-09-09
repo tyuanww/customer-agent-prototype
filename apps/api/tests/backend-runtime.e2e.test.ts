@@ -388,6 +388,22 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     let release = await published.json() as { release_id: string; release_seq: number };
     expect(release.release_seq).toBe(1);
     const firstRelease = release;
+    const desktop = await connectDesktopAdapter(address);
+    const firstSearch = await desktop.search.search(1, {
+      sessionEpoch: desktop.epoch(), generation: 1, queryText: '什么时候发货', platform: 'qianniu',
+      platformSource: 'manual', productContextType: null, productContextRef: null, parentQueryId: null,
+    });
+    expect(firstSearch).toMatchObject({ ok: true, hitStatus: 'hit', releaseId: firstRelease.release_id });
+    if (!firstSearch.ok) throw new Error(JSON.stringify(firstSearch));
+    const firstCandidate = firstSearch.candidates[0]!;
+    const firstCopy = {
+      sessionEpoch: desktop.epoch(), generation: 1, queryId: firstSearch.queryId, rank: firstCandidate.rank,
+      scriptId: firstCandidate.script_id, scriptVersion: firstCandidate.script_version,
+      contentHash: firstCandidate.content_hash, placeholderValues: {},
+    };
+    expect(await desktop.search.copy(1, firstCopy)).toMatchObject({ ok: true, copied: true });
+    expect(desktop.clipboard.at(-1)).toContain('付款后发出');
+    expect(JSON.stringify(desktop.session.view())).not.toContain('access_token');
     const repeated = await importCsv(owner, 'idem-t6-repeat');
     await expect.poll(async () => {
       const listed = await fetch(`${address}/v1/admin/content/reviews`, { headers: { authorization: `Bearer ${leadForWait}` } });
@@ -410,7 +426,17 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     release = await rolledBack.json() as { release_id: string; release_seq: number };
     expect(release.release_seq).toBeGreaterThan(secondRelease.release_seq);
     expect(release.release_id).not.toBe(firstRelease.release_id);
-
+    const replaced = await desktop.announce.refresh({ sessionEpoch: desktop.epoch(), generation: 2 });
+    expect(replaced).toMatchObject({ ok: true, releaseId: release.release_id });
+    expect(await desktop.search.copy(1, firstCopy)).toMatchObject({ code: 'STALE' });
+    const secondSearch = await desktop.search.search(1, {
+      sessionEpoch: desktop.epoch(), generation: 3, queryText: '什么时候发货', platform: 'qianniu',
+      platformSource: 'manual', productContextType: null, productContextRef: null, parentQueryId: null,
+    });
+    expect(secondSearch).toMatchObject({ ok: true, hitStatus: 'hit', releaseId: release.release_id });
+    const loggedOut = await desktop.session.logout();
+    expect(loggedOut).toMatchObject({ ok: true, signedIn: false });
+    expect(desktop.store()).toBeNull();
 
     const current = await fetch(`${address}/v1/announce/current`, {
       headers: { authorization: `Bearer ${owner}`, 'x-client-id': CLIENT_ID },
@@ -472,3 +498,39 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     })).status).toBe(503);
   }, 180_000);
 });
+
+async function connectDesktopAdapter(origin: string) {
+  const main = new URL('../../desktop/src/main/', import.meta.url);
+  const [{ ProductHttp }, { ProductSession }, { ProductAnnounce }, { ProductSearch }] = await Promise.all([
+    import(new URL('product-http.ts', main).href),
+    import(new URL('product-session.ts', main).href),
+    import(new URL('product-announce.ts', main).href),
+    import(new URL('product-search.ts', main).href),
+  ]);
+  let stored: { access_token: string; expires_at: string } | null = null;
+  const session = new ProductSession(new ProductHttp(origin), {
+    read: () => stored, write: (value: { access_token: string; expires_at: string }) => { stored = value; },
+    clear: () => { stored = null; },
+  }, {
+    async open(url: string) {
+      const authorize = new URL(url);
+      const redirect = authorize.searchParams.get('redirect_uri');
+      const state = authorize.searchParams.get('state');
+      if (!redirect || !state) throw new Error('synthetic login window missing callback');
+      const callback = await fetch(`${redirect}?state=${encodeURIComponent(state)}&code=synthetic_owner`);
+      if (!callback.ok) throw new Error(`synthetic callback ${String(callback.status)}`);
+    },
+  });
+  const login = await session.login();
+  if (!login.ok || !login.signedIn) throw new Error(JSON.stringify(login));
+  const announce = new ProductAnnounce(session, `desk_${'c'.repeat(32)}`);
+  const clipboard: string[] = [];
+  const search = new ProductSearch(session, (text: string) => { clipboard.push(text); }, announce);
+  const refreshed = await announce.refresh({ sessionEpoch: session.view().sessionEpoch, generation: 0 });
+  if (!refreshed.ok) throw new Error(JSON.stringify(refreshed));
+  return {
+    session, announce, search, clipboard,
+    epoch: () => session.view().sessionEpoch,
+    store: () => stored,
+  };
+}

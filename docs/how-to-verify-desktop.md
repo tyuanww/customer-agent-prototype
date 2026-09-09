@@ -274,3 +274,7 @@ Query 的「合成登录」经过独立受控登录窗，返回后显示角色�
 沿用 D1 的两个 loopback 配置。登录后输入问题、点击查询，先选择平台；按需选择品类或具体款并填写对应合成标识，无具体商品仅查询全店话术。有占位符的候选须填写合成订单号或日期后复制。复制成功只表示剪贴板写入，不表示发送。
 
 `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-search.test.ts` 检查候选归属、隔离、半开有效期、并发复制、取消及事件失败。`pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts` 在 build 后运行真实 Electron 登录/搜索/复制/退出，HTTP 为合成 double；不是 PG 整链、人工观察或 Windows 实机证据。
+
+### D5 合成整链验证
+
+`CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api test:e2e:backend` 在同一 SHA 上跑导入→worker→审核→发布→桌面 adapter 查询复制→回退后旧候选 STALE→退出清空会话。桌面 adapter 经 loopback 调用已启动的 API 进程，不经 Dashboard，不等于人工观察、Windows 实机或真实飞书。

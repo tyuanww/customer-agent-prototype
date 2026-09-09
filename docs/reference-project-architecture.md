@@ -251,3 +251,7 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 ### D4 桌面合成求助入口
 
 无匹配时 Query 展示「没找到可用话术」，可复制合成联系方式或打开隔离的 `{identityOrigin}/synthetic-help` 窗。`opened` 只表示入口动作；状态限于「已打开入口 / 已复制联系方式 / 待核实」。`POST /v1/events/escalate` 是辅助动作，不冒充 terminal；用户明确离开无匹配结果时才记 `no_hit_exit`。
+
+### D5 合成整链
+
+`apps/api/tests/backend-runtime.e2e.test.ts` 在同一 PG15 进程链上跑导入、worker、审核、发布、回退，并用桌面 `ProductSession` / `ProductAnnounce` / `ProductSearch` 经 loopback 查询与复制。回退后旧候选 STALE；退出后本地会话清空。不经 Dashboard，不启动跨仓 runner。

@@ -29,7 +29,9 @@ describe('product session lifetime', () => {
     expect(login).toMatchObject({ ok: true, signedIn: true, role: 'agent', authMode: 'mock' });
     expect(isProductSessionResult(login)).toBe(true);
     expect(JSON.stringify(login)).not.toContain(token);
-    const challenge = JSON.parse(f.requests[0].init.body as string).client_challenge;
+    const created = JSON.parse(f.requests[0].init.body as string);
+    expect(created.challenge_method).toBe('S256');
+    const challenge = created.client_challenge;
     const verifier = JSON.parse(f.requests[1].init.body as string).client_verifier;
     expect(challenge).toMatch(/^[A-Za-z0-9_-]{43}$/); expect(verifier).not.toEqual(challenge);
     expect(f.store.write).toHaveBeenCalledWith(f.stored);
