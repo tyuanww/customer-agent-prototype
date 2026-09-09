@@ -215,6 +215,31 @@ describe('synthetic product identity bootstrap', () => {
     expect(() => parseApiRuntimeConfig({ ...environment, AUTH_MODE: 'feishu' })).toThrow(ApiConfigError);
   });
 
+  it('shrinks the runtime pool when a review capability is configured and keeps worker login distinct', () => {
+    const withReview = parseApiPrivateBootstrapConfig({
+      ...environment,
+      CONTENT_REVIEW_DATABASE_URL: 'postgresql://synthetic_review@127.0.0.1:44001/synthetic',
+      CONTENT_WORKER_DATABASE_URL: 'postgresql://synthetic_worker@127.0.0.1:44001/synthetic',
+    });
+    expect(withReview.runtimeDatabase.poolMax).toBe(12);
+    expect(withReview.contentReview?.database.poolMax).toBe(2);
+    expect(
+      withReview.runtimeDatabase.poolMax
+      + withReview.policyAdminDatabase.poolMax
+      + withReview.productIdentity!.database.poolMax
+      + (withReview.contentReview?.database.poolMax ?? 0),
+    ).toBe(18);
+    expect(() => parseApiPrivateBootstrapConfig({
+      ...environment,
+      CONTENT_REVIEW_DATABASE_URL: environment.DATABASE_URL,
+    })).toThrow(ApiConfigError);
+    expect(() => parseApiPrivateBootstrapConfig({
+      ...environment,
+      AUTH_SESSION_MODE: 'mock',
+      CONTENT_REVIEW_DATABASE_URL: 'postgresql://synthetic_review@127.0.0.1:44001/synthetic',
+    })).toThrow(ApiConfigError);
+  });
+
   it('accepts an absolute object store directory and rejects a relative path', () => {
     const config = parseApiPrivateBootstrapConfig({
       ...environment,

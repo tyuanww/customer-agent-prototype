@@ -35,6 +35,7 @@ describe('content import receive policy', () => {
     const reclaim = vi.fn(async () => 'reclaimed' as const);
     const store = {
       persist: async () => persisted,
+      readPayload: async () => Buffer.from('a,b\n'),
       verify: async () => true,
       writeReceipt: async () => undefined,
       readReceipt: async () => null,
@@ -66,6 +67,7 @@ describe('content import receive policy', () => {
     const reclaim = vi.fn(async () => 'reclaimed' as const);
     const store = {
       persist: async () => persisted,
+      readPayload: async () => Buffer.from('a,b\n'),
       verify: async () => true,
       writeReceipt: async () => { throw new Error('disk full'); },
       readReceipt: async () => null,
@@ -101,6 +103,7 @@ describe('content import receive policy', () => {
     const reclaim = vi.fn(async () => 'reclaimed' as const);
     const store = {
       persist: async () => persisted,
+      readPayload: async () => Buffer.from('a,b\n'),
       verify: async () => true,
       writeReceipt: async () => undefined,
       readReceipt: async () => null,

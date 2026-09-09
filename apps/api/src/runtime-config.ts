@@ -49,6 +49,8 @@ export type ApiPrivateBootstrapConfig = Readonly<{
   idempotencyHmac: ApiHmacKeyRing;
   logHash: Readonly<{ version: string; key: string }>;
   objectStoreDir?: string;
+  contentReview?: Readonly<{ database: ApiDatabaseBootstrapConfig }>;
+  contentWorker?: Readonly<{ database: ApiDatabaseBootstrapConfig }>;
 }>;
 
 export type ApiConfigIssue = Readonly<{
@@ -468,10 +470,15 @@ export function parseApiPrivateBootstrapConfig(
   environment: ApiRuntimeEnvironment,
 ): ApiPrivateBootstrapConfig {
   const issues: ApiConfigIssue[] = [];
+  const wantsReview = environment.CONTENT_REVIEW_DATABASE_URL !== undefined;
+  const wantsWorker = environment.CONTENT_WORKER_DATABASE_URL !== undefined;
+  const runtimeDefault = environment.AUTH_SESSION_MODE === 'product'
+    ? (wantsReview ? 12 : 16)
+    : DEFAULT_DB_POOL_MAX;
   const runtimeDatabase = parseDatabaseConfig(environment, {
     connectionString: 'DATABASE_URL',
     poolMax: 'DB_POOL_MAX',
-    defaultPoolMax: environment.AUTH_SESSION_MODE === 'product' ? 16 : DEFAULT_DB_POOL_MAX,
+    defaultPoolMax: runtimeDefault,
   }, issues);
   const policyAdminDatabase = parseDatabaseConfig(environment, {
     connectionString: 'CONTENT_ADMIN_DATABASE_URL',
@@ -531,6 +538,59 @@ export function parseApiPrivateBootstrapConfig(
       issues.push(issue('AUTH_DB_POOL_MAX', 'invalid'));
     }
   }
+  let contentReview: ApiPrivateBootstrapConfig['contentReview'];
+  if (wantsReview) {
+    if (environment.AUTH_SESSION_MODE !== 'product') {
+      issues.push(issue('CONTENT_REVIEW_DATABASE_URL', 'invalid'));
+    }
+    const database = parseDatabaseConfig(environment, {
+      connectionString: 'CONTENT_REVIEW_DATABASE_URL',
+      poolMax: 'CONTENT_REVIEW_DB_POOL_MAX',
+      defaultPoolMax: 2,
+    }, issues);
+    if (database && runtimeDatabase && policyAdminDatabase) {
+      const reviewLogin = postgresLoginName(database.connectionString);
+      const usedLogins = [
+        postgresLoginName(runtimeDatabase.connectionString),
+        postgresLoginName(policyAdminDatabase.connectionString),
+        productIdentity ? postgresLoginName(productIdentity.database.connectionString) : undefined,
+      ];
+      if (usedLogins.includes(reviewLogin)
+        || postgresDatabaseTarget(database.connectionString)
+          !== postgresDatabaseTarget(runtimeDatabase.connectionString)) {
+        issues.push(issue('CONTENT_REVIEW_DATABASE_URL', 'invalid'));
+      }
+      const used = runtimeDatabase.poolMax + policyAdminDatabase.poolMax
+        + (productIdentity?.database.poolMax ?? 0) + database.poolMax;
+      if (used > MAX_TOTAL_DB_POOL_CONNECTIONS - 2) {
+        issues.push(issue('CONTENT_REVIEW_DB_POOL_MAX', 'invalid'));
+      }
+      contentReview = Object.freeze({ database });
+    }
+  }
+  let contentWorker: ApiPrivateBootstrapConfig['contentWorker'];
+  if (wantsWorker) {
+    const database = parseDatabaseConfig(environment, {
+      connectionString: 'CONTENT_WORKER_DATABASE_URL',
+      poolMax: 'CONTENT_WORKER_DB_POOL_MAX',
+      defaultPoolMax: 2,
+    }, issues);
+    if (database && runtimeDatabase && policyAdminDatabase) {
+      const workerLogin = postgresLoginName(database.connectionString);
+      const usedLogins = [
+        postgresLoginName(runtimeDatabase.connectionString),
+        postgresLoginName(policyAdminDatabase.connectionString),
+        productIdentity ? postgresLoginName(productIdentity.database.connectionString) : undefined,
+        contentReview ? postgresLoginName(contentReview.database.connectionString) : undefined,
+      ];
+      if (usedLogins.includes(workerLogin)
+        || postgresDatabaseTarget(database.connectionString)
+          !== postgresDatabaseTarget(runtimeDatabase.connectionString)) {
+        issues.push(issue('CONTENT_WORKER_DATABASE_URL', 'invalid'));
+      }
+      contentWorker = Object.freeze({ database });
+    }
+  }
   if (idempotencyHmac && logHash
     && Object.values(idempotencyHmac.keys).includes(logHash.key)) {
     issues.push(issue('LOG_HASH_KEY', 'invalid'));
@@ -543,6 +603,8 @@ export function parseApiPrivateBootstrapConfig(
   return Object.freeze({ runtimeDatabase, policyAdminDatabase, idempotencyHmac, logHash,
     ...(productIdentity ? { productIdentity } : {}),
     ...(objectStoreDir ? { objectStoreDir } : {}),
+    ...(contentReview ? { contentReview } : {}),
+    ...(contentWorker ? { contentWorker } : {}),
   });
 }
 

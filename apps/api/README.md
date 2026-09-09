@@ -61,7 +61,11 @@ T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/
 
 ## 合成内容导入（T2）
 
-在已有 runtime pool 上接收 `POST /v1/content/import` 的 CSV/XLSX multipart（字段 `file`、`source_bindings`）。文件先写入 `CONTENT_OBJECT_STORE_DIR` 的不可变对象并校验摘要，随后才调用 `enqueue_content_import` 原子创建 batch、source bindings 与 outbox；事务提交成功后才返回 202。状态查询与取消走既有 SQL 投影；coach/owner 以外角色拒绝。单文件 10 MiB、上传 30 秒。解析/解压/审核/发布不在本切片。飞书 JSON 导入保持关闭。提交结果不确定时不得回收已接收对象。连接池预算不变：enqueue/status/cancel 复用 `app_runtime`。
+在已有 runtime pool 上接收 `POST /v1/content/import` 的 CSV/XLSX multipart（字段 `file`、`source_bindings`）。文件先写入 `CONTENT_OBJECT_STORE_DIR` 的不可变对象并校验摘要，随后才调用 `enqueue_content_import` 原子创建 batch、source bindings 与 outbox；事务提交成功后才返回 202。状态查询与取消走既有 SQL 投影；coach/owner 以外角色拒绝。单文件 10 MiB、上传 30 秒。飞书 JSON 导入保持关闭。提交结果不确定时不得回收已接收对象。连接池预算：enqueue/status/cancel 复用 `app_runtime`。
+
+## 合成 worker 与受限审核（T3）
+
+独立 worker 进程使用 `CONTENT_WORKER_DATABASE_URL`（`app_backend_worker`）claim/heartbeat/`lease_version` fencing、冻结质量计划，并调用 `backend_review.park` / `finish`。解析 CSV 或带 csv 成员的有界 XLSX zip（解压累计 50 MiB、最多 128 个 ZIP 条目、解析 60 秒），不在长事务中做文件 I/O。审核 HTTP 在 `/v1/admin/content/reviews*`，使用 `CONTENT_REVIEW_DATABASE_URL`（`app_backend_review`）记录决定与质量证据、resume/cancel。高风险/冲突必须两个不同 `subject_hash`；取消后不得留下 staging。product+review 时 API 默认 runtime 12 + admin 2 + auth 2 + review 2 = 18，给 worker 进程预留 2。发布/读取不在本切片。
 
 ## 验证
 

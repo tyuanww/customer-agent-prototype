@@ -2,6 +2,7 @@ import { createProductAuthService } from './product-auth-service.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
 import { createContentImportService } from './content-import-service.js';
+import { createContentReviewService } from './content-review-service.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
 import {
@@ -65,11 +66,14 @@ export async function startApi(
             bootstrap.logHash,
           ),
         };
+        const contentReview = bootstrap.contentReview === undefined ? undefined : {
+          service: createContentReviewService(bootstrap.contentReview.database),
+        };
         return createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
-          contentImport);
+          contentImport, contentReview);
       } catch (error) {
         await auth?.close();
         throw error;

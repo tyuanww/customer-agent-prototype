@@ -31,14 +31,14 @@
 | `AUTH_MODE` | 必填；当前只接受 `mock`，表示合成身份来源 | 只输出字段名和稳定拒绝原因 |
 | `AUTH_SESSION_MODE` | 可省略或 `mock` 保留进程内合成登录；`product` 显式启用持久产品会话。其它值、未选择 product 却提供产品身份配置均拒启 | 合法 product 模式可进入公开 config |
 | `AUTH_DATABASE_URL` | product 必填；独立无特权登录账号仅属于 app_backend_auth，与 runtime/admin 同库且登录名不同 | 仅私有 bootstrap |
-| `AUTH_DB_POOL_MAX` | product 默认 2；runtime 此时默认 16，admin 默认 2；三个池合计最多 20 | 不进入公开 config |
+| `AUTH_DB_POOL_MAX` | product 默认 2；runtime 此时默认 16（配置审核池时改为 12），admin 默认 2；API 进程启用的池合计最多 20，并给独立 worker 进程预留 2 | 不进入公开 config |
 | `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN` | product 必填；精确 http://127.0.0.1:port，无凭据、路径、query 或 fragment；只允许本机合成提供方 | 不回显原值 |
 | `CUSTOMER_AGENT_API_HOST` | 可省略，固定默认 `127.0.0.1`；其它值拒启 | 不回显原值 |
 | `CUSTOMER_AGENT_API_PORT` | formal-dev 默认 `3100`；两者范围均为 `1024..65535`，test 另可用 `0` 做 ephemeral 监听 | 不回显非法原值 |
 | `CUSTOMER_AGENT_BUILD_VERSION` | 可省略，默认 `dev-m0`；1–64 位安全版本字符 | 仅合法值进入 `/health.version` |
 | `DATABASE_URL` | 必填；runtime 登录 DSN，只接受 loopback PostgreSQL URL、非空登录名与数据库路径；不得带 fragment 或驱动控制参数 | 只保留在私有 bootstrap config，不回显原值 |
 | `CONTENT_ADMIN_DATABASE_URL` | 必填；独立 `app_content_admin` 登录 DSN，格式同上；DSN/登录名必须与 runtime 不同，但解析后的精确 host/port/database 目标必须相同（不把 `localhost` 与 `127.0.0.1` 猜成同一实例） | 同上 |
-| `DB_POOL_MAX` | 可省略，runtime 默认 `18`（product 会话模式为 `16`）；只接受 `1..20` 正整数 | 不进入公开 config 或响应 |
+| `DB_POOL_MAX` | 可省略，runtime 默认 `18`（product 会话模式为 `16`，再配置审核池时为 `12`）；只接受 `1..20` 正整数 | 不进入公开 config 或响应 |
 | `CONTENT_ADMIN_DB_POOL_MAX` | 可省略，admin 默认 `2`；只接受 `1..20`，且所有启用的 pool 合计不得超过 `20` | 同上 |
 | `DB_CONNECTION_TIMEOUT_MS` | 可省略，默认 `2000`，范围 `1..10000`；只约束连接获取 | 不进入公开 config 或响应 |
 | `DB_READINESS_TIMEOUT_MS` | 可省略，默认 `2000`，范围 `1..10000`；约束 readiness 响应、query timeout 与 statement timeout | 不进入公开 config 或响应 |
@@ -47,6 +47,12 @@
 | `LOG_HASH_KEY` | 必填；32–128 UTF-8 byte，只用于脱敏 query 指纹；不得复用任何幂等密钥 | 不回显、不记录 |
 | `LOG_HASH_KEY_VERSION` | 必填；独立 `hmac-*` 版本 | 只存在于私有 bootstrap config |
 | `CONTENT_OBJECT_STORE_DIR` | 可省略；提供时必须是本机绝对目录，供 CSV/XLSX 不可变对象落盘。未设置时导入路由 503，不增加连接池。T5 前 `/ready` 的 storage/content 仍为 `not_ready` | 只存在于私有 bootstrap config，不回显原值 |
+| `CONTENT_REVIEW_DATABASE_URL` | 可省略；提供时必须 `AUTH_SESSION_MODE=product`，独立无特权登录仅属于 app_backend_review，与 runtime 同库且登录名不同。未设置时审核路由 503 | 仅私有 bootstrap |
+| `CONTENT_REVIEW_DB_POOL_MAX` | 可省略，默认 2；与 runtime/admin/auth 合计不得超过 18，给独立 worker 预留 2 | 不进入公开 config |
+| `CONTENT_WORKER_DATABASE_URL` | 可省略；独立无特权登录仅属于 app_backend_worker，与 runtime 同库且登录名不同。API 进程不打开该池；worker 进程使用它 | 仅私有 bootstrap |
+| `CONTENT_WORKER_DB_POOL_MAX` | 可省略，默认 2；worker 是独立进程，不计入 API 进程池合计 | 不进入公开 config |
+| `CONTENT_INTENT_TAXONOMY_VERSION` / `CONTENT_INTENT_ID` | worker 进程使用的合成意图引用；缺省为合成 T3 固定值 | 不进入公开 config |
+| `CONTENT_REVIEW_LEAD_SUBJECT` / `CONTENT_REVIEW_MANAGER_SUBJECT` / `CONTENT_REVIEW_EVIDENCE_ID` | 合成预承诺：parked `content_hash` 必须等于 finalize 后的治理快照，因此 worker 把已知审核主体摘要与证据 ID 编入 hash，但不写入 parked JSON | 不进入公开 config |
 
 公开解析结果不保留环境对象，也不包含 Feishu secret、DSN、HMAC 或 storage 凭证。私有 bootstrap config 只在 composition root 中分别进入 repository/后续 service factory，不进入 `StartedApi.config`、日志或 HTTP。合同来源由 `@customer-agent/contracts` provenance 注入；当前 `runtime_activated=false`。
 

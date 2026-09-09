@@ -46,6 +46,7 @@ export type ContentObjectStore = Readonly<{
     declaredType: ContentSourceType,
     options?: Readonly<{ maxBytes?: number; timeoutMs?: number }>,
   ) => Promise<PersistedContentObject>;
+  readPayload: (objectId: string) => Promise<Buffer>;
   verify: (objectId: string, sha256: string, sizeBytes: number) => Promise<boolean>;
   writeReceipt: (receipt: ContentBatchReceipt) => Promise<void>;
   readReceipt: (importBatchId: string) => Promise<ContentBatchReceipt | null>;
@@ -182,6 +183,11 @@ export function createContentObjectStore(rootDirectory: string): ContentObjectSt
       } finally {
         clearTimeout(timer);
       }
+    },
+
+    async readPayload(id) {
+      assertObjectId(id);
+      return readFile(resolveInside(objectRoot, id));
     },
 
     async verify(id, sha256, sizeBytes) {

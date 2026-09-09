@@ -31,6 +31,7 @@ import type {
 import { registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
 import { registerEventRoutes, type EventRouteDependencies } from './event-routes.js';
 import { registerContentImportRoutes, type ContentImportRouteDependencies } from './content-import-routes.js';
+import { registerContentReviewRoutes, type ContentReviewRouteDependencies } from './content-review-routes.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -53,6 +54,7 @@ export function createApiApp(
   searchDependencies?: SearchRouteDependencies,
   eventDependencies?: EventRouteDependencies,
   contentImportDependencies?: ContentImportRouteDependencies,
+  contentReviewDependencies?: ContentReviewRouteDependencies,
 ): FastifyInstance {
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
@@ -82,6 +84,7 @@ export function createApiApp(
   app.addHook('onClose', async () => {
     const results = await Promise.allSettled([
       () => authService.close(), () => repository.close(), () => policyAdminRepository.close(),
+      () => contentReviewDependencies?.service.close(),
     ].map(close => Promise.resolve().then(close)));
     const failures = results.filter(result => result.status === 'rejected');
     if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'API resource shutdown failed');
@@ -94,6 +97,7 @@ export function createApiApp(
   registerSearchRoute(app, authService, searchDependencies);
   registerEventRoutes(app, authService, eventDependencies);
   registerContentImportRoutes(app, authService, contentImportDependencies);
+  registerContentReviewRoutes(app, authService, contentReviewDependencies);
 
   app.get('/health', async (_request, reply) => {
     const payload = parseContractSchema('HealthResponse', {
