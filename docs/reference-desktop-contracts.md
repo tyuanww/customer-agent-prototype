@@ -1,6 +1,6 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。产品会话 / 检索 / 公告 IPC 尚未实现；获批方案见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)，实施前不得当作现行通道。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 

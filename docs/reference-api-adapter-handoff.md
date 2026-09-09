@@ -4,7 +4,7 @@
 
 正式合同通过本仓 [contract-set.lock.json](../contracts/upstream/customer-agent/contract-set.lock.json) 与 [架构参考](reference-project-architecture.md#4-数据边界) 核对；治理仓负责上游批准，禁止实时跨仓读取或手改快照。当前受锁合同、migration 与组件生成物只证明开发/测试实现，锁定状态仍为 `VERIFIED_NOT_ACTIVATED`、`ddev_authorized=false`、`runtime_activated=false`。版本与来源以锁文件为准，本页不另列会漂移的上游版本表。
 
-DEV-M1 已实现 synthetic-only Search + Events 事务与纯合成 runner；查询原文不落库，无状态降级不接受后续事件。桌面没有 API adapter，真实飞书鉴权与正式运行接入未放行。当前评测进度及下一动作只查阅[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)，不从历史准备记录推断当前状态。
+后端 T0–T6 已实现 synthetic-only 身份、导入审核发布、Search + Events 与公告链路；查询原文不落库，无状态降级不接受后续事件。桌面没有 API adapter，真实飞书鉴权与正式运行接入未放行。下一阶段桌面接线方案见 [获批方案](plans/2026-09-09-desktop-integration-preparation.md)；当前动作只查阅[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)，不从历史准备记录推断当前状态。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [API 启动配置](reference-api-runtime-config.md) · [桌面合同](reference-desktop-contracts.md) · [README](../README.md)
 
@@ -19,7 +19,7 @@ DEV-M1 已实现 synthetic-only Search + Events 事务与纯合成 runner；查�
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard **无 preload**；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**桌面类型映射、会话和事件接线、发布版本与租约消费必须按现有合同实施**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
-| 本仓下一步该不该实现 adapter？ | **尚未进入该阶段。** 后端 T0–T6 与收尾已合并；当前只进行计划准备和可靠性排查，桌面实施与下一运行批准按[当前执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)核对。DEV-M2、真实飞书 auth 与 Windows Main adapter 仍需后续独立授权，不能把 runtime/admin pool 或 mock 会话直接暴露给 renderer。桌面继续使用合成 profile。 |
+| 本仓下一步该不该实现 adapter？ | **方案已批准，D1–D5 纯合成实施已授权。** 后端 T0–T6 与收尾已合并。桌面接线按 [接入准备](plans/2026-09-09-desktop-integration-preparation.md) 的 D0–D5 执行，仅按批准范围开工。DEV-M2、真实飞书 auth 与 Windows 实机仍需后续独立授权，不能把 runtime/admin pool 或 token 直接暴露给 renderer。桌面继续使用合成 profile，直到获批切片切换运行路径。 |
 
 ---
 
