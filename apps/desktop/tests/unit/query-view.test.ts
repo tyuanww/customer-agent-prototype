@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { queryHandoffGeometry } from '../../src/shared/fox-motion';
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
+import { PRODUCT_ERRORS } from '../../src/shared/product-session';
 import {
   COPY_FEEDBACK_MS,
   SEARCH_FEEDBACK_MS,
+  SESSION_NOTICE_TEXT,
   maxContentBottom,
   queryFoxVisualState,
   queryHandoffCssVars,
   queryShellClassName,
   resultCopyRankFromKey,
+  sessionNoticeForResult,
 } from '../../src/renderer/features/search/query-view';
 
 describe('query view leaves', () => {
@@ -84,5 +87,94 @@ describe('query view leaves', () => {
       { getBoundingClientRect: () => ({ bottom: 188 }) },
     ])).toBe(188);
     expect(maxContentBottom([null, undefined])).toBe(0);
+  });
+});
+
+describe('session notice projection', () => {
+  const unsigned = {
+    ok: true as const,
+    enabled: true,
+    signedIn: false,
+    sessionEpoch: 1,
+    userId: null,
+    role: null,
+    authMode: null,
+    expiresAt: null,
+  };
+  const signedIn = {
+    ...unsigned,
+    signedIn: true,
+    sessionEpoch: 4,
+    userId: 'usr_synthetic_agent',
+    role: 'agent' as const,
+    authMode: 'mock' as const,
+    expiresAt: '2026-09-10T12:00:00.000Z',
+  };
+
+  it('keeps restored signed-in sessions free of residual banners', () => {
+    expect(sessionNoticeForResult({
+      value: signedIn,
+      source: 'status',
+      wasSignedIn: false,
+      previous: null,
+    })).toBeNull();
+  });
+
+  it('shows success only for an explicit login, not for later status polls', () => {
+    const success = sessionNoticeForResult({
+      value: signedIn,
+      source: 'login',
+      wasSignedIn: false,
+      previous: { kind: 'unsigned', text: SESSION_NOTICE_TEXT.unsigned },
+    });
+    expect(success).toEqual({ kind: 'success', text: SESSION_NOTICE_TEXT.success });
+    expect(sessionNoticeForResult({
+      value: signedIn,
+      source: 'status',
+      wasSignedIn: true,
+      previous: success,
+    })).toEqual(success);
+  });
+
+  it('keeps unsigned and logout wording distinct from expiry and failure', () => {
+    expect(sessionNoticeForResult({
+      value: unsigned,
+      source: 'status',
+      wasSignedIn: false,
+      previous: null,
+    })).toEqual({ kind: 'unsigned', text: SESSION_NOTICE_TEXT.unsigned });
+    expect(sessionNoticeForResult({
+      value: { ...unsigned, sessionEpoch: 5 },
+      source: 'logout',
+      wasSignedIn: true,
+      previous: { kind: 'success', text: SESSION_NOTICE_TEXT.success },
+    })).toEqual({ kind: 'unsigned', text: SESSION_NOTICE_TEXT.loggedOut });
+    expect(sessionNoticeForResult({
+      value: { ...unsigned, sessionEpoch: 6 },
+      source: 'status',
+      wasSignedIn: true,
+      previous: { kind: 'success', text: SESSION_NOTICE_TEXT.success },
+    })).toEqual({ kind: 'expired', text: SESSION_NOTICE_TEXT.expired });
+  });
+
+  it('maps login failure, restore unauthorized, and other status failures separately', () => {
+    expect(sessionNoticeForResult({
+      value: { ok: false, sessionEpoch: 2, code: 'UNAVAILABLE', message: PRODUCT_ERRORS.UNAVAILABLE },
+      source: 'login',
+      wasSignedIn: false,
+      previous: { kind: 'unsigned', text: SESSION_NOTICE_TEXT.unsigned },
+    })).toEqual({ kind: 'failed', text: PRODUCT_ERRORS.UNAVAILABLE });
+    expect(sessionNoticeForResult({
+      value: { ok: false, sessionEpoch: 1, code: 'UNAUTHORIZED', message: PRODUCT_ERRORS.UNAUTHORIZED },
+      source: 'status',
+      wasSignedIn: false,
+      previous: null,
+    })).toEqual({ kind: 'expired', text: SESSION_NOTICE_TEXT.expired });
+    expect(sessionNoticeForResult({
+      value: { ok: false, sessionEpoch: 3, code: 'UNAVAILABLE', message: PRODUCT_ERRORS.UNAVAILABLE },
+      source: 'status',
+      wasSignedIn: false,
+      previous: null,
+    })).toEqual({ kind: 'failed', text: PRODUCT_ERRORS.UNAVAILABLE });
   });
 });

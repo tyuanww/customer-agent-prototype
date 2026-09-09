@@ -44,11 +44,15 @@ import {
   COPY_FEEDBACK_MS,
   DEEP_THINKING_DESCRIPTION,
   SEARCH_FEEDBACK_MS,
+  SESSION_NOTICE_TEXT,
   maxContentBottom,
   queryFoxVisualState,
   queryHandoffCssVars,
   queryShellClassName,
   resultCopyRankFromKey,
+  sessionNoticeForResult,
+  type SessionNotice,
+  type SessionNoticeSource,
 } from './features/search/query-view';
 import { isImeComposing, shouldSubmitOnEnter } from './lib/ime';
 import { isInteractiveTarget } from './lib/is-interactive-target';
@@ -62,6 +66,9 @@ export function QueryApp() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RankedScript[]>([]);
   const [invalidMessage, setInvalidMessage] = useState('');
+  const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
+  const sessionNoticeRef = useRef<SessionNotice | null>(null);
+  const signedInRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [copying, setCopying] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -753,7 +760,7 @@ export function QueryApp() {
     setAnnounce(result); setErrorMessage(''); return result;
   }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
 
-  const acceptProductSession = useCallback((value: ProductSessionResult) => {
+  const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
     if (value.sessionEpoch < productEpochRef.current) return;
     if (productEpochRef.current !== value.sessionEpoch) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({}); setAnnounce(null);
@@ -761,9 +768,20 @@ export function QueryApp() {
     }
     productEpochRef.current = value.sessionEpoch;
     setProductState(value);
+    const nextNotice = sessionNoticeForResult({
+      value,
+      source,
+      wasSignedIn: signedInRef.current,
+      previous: sessionNoticeRef.current,
+    });
+    signedInRef.current = Boolean(value.ok && value.signedIn);
+    sessionNoticeRef.current = nextNotice;
+    setSessionNotice(nextNotice);
+    if (source === 'login' && value.ok && value.signedIn) {
+      setInvalidMessage('');
+    }
     if (!value.ok || (value.enabled && !value.signedIn)) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
-      setInvalidMessage(value.ok ? '请先合成登录' : value.message);
       reportPhase('SEARCH_INPUT');
     } else if (value.ok && value.signedIn) {
       void refreshAnnounce(value.sessionEpoch);
@@ -796,23 +814,35 @@ export function QueryApp() {
   const sessionAction = async () => {
     const product = window.customerAgent?.product; if (!product || sessionBusy) return;
     setSessionBusy(true);
+    const signingOut = Boolean(productState?.ok && productState.signedIn);
     try {
-      const result = await (productState?.ok && productState.signedIn ? product.logout() : product.login());
+      const result = await (signingOut ? product.logout() : product.login());
       if (result.sessionEpoch < productEpochRef.current) return;
-      acceptProductSession(result);
-      setInvalidMessage(result.ok ? result.signedIn ? '合成登录成功，请确认平台和商品后查询' : '已退出，请先登录' : result.message);
+      acceptProductSession(result, signingOut ? 'logout' : 'login');
     } finally { setSessionBusy(false); }
   };
 
   const runSearch = useCallback(() => {
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
-      if (!(productState?.ok && productState.signedIn)) { setInvalidMessage('请先合成登录'); return; }
+      if (!(productState?.ok && productState.signedIn)) {
+        const current = sessionNoticeRef.current;
+        if (current?.kind !== 'expired' && current?.kind !== 'failed') {
+          const unsigned = { kind: 'unsigned' as const, text: SESSION_NOTICE_TEXT.unsigned };
+          sessionNoticeRef.current = unsigned;
+          setSessionNotice(unsigned);
+        }
+        return;
+      }
       const api = window.customerAgent.productSearch;
       const queryText = (inputRef.current?.value ?? query).trim();
       if (!api || !searchPlatform || (productType && !productRef.trim()) || !queryText || [...queryText].length > 500) {
         setResults([]); setErrorMessage('请确认平台、具体商品和客户的问题；问题最多 500 字。无具体商品时仅查询全店话术。'); reportPhase('ERROR'); return;
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+      if (sessionNoticeRef.current?.kind === 'success') {
+        sessionNoticeRef.current = null;
+        setSessionNotice(null);
+      }
       lastProductQueryRef.current = null; setHelpStatus('待核实');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
@@ -1378,6 +1408,7 @@ export function QueryApp() {
           query={query}
           inputRef={inputRef}
           invalidMessage={invalidMessage}
+          sessionNotice={sessionNotice}
           shortcutFailed={shortcutFailed}
           shortcutLabel={shortcutLabel}
           searching={searching}

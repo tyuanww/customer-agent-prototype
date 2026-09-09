@@ -1514,6 +1514,19 @@
   color: var(--danger);
 }
 
+.session-notice.is-success {
+  color: var(--success);
+}
+
+.session-notice.is-unsigned {
+  color: var(--ink);
+}
+
+.session-notice.is-expired,
+.session-notice.is-failed {
+  color: var(--danger);
+}
+
 .result-heading .copied-feedback {
   padding: 4px 9px;
   border: 1px solid rgba(72, 201, 169, 0.24);

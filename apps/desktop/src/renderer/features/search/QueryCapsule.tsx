@@ -2,7 +2,7 @@ import type { Ref } from 'react';
 import { MAX_QUERY_CHARS } from '@shared/contracts';
 import { FoxHead } from '../../components/FoxHead';
 import { useWindowDrag } from '../../lib/use-window-drag';
-import type { QueryFoxVisualState } from './query-view';
+import type { QueryFoxVisualState, SessionNotice } from './query-view';
 
 type QueryCapsuleProps = {
   productControl?: React.ReactNode;
@@ -13,6 +13,7 @@ type QueryCapsuleProps = {
   query: string;
   inputRef: Ref<HTMLInputElement>;
   invalidMessage: string;
+  sessionNotice: SessionNotice | null;
   shortcutFailed: boolean;
   shortcutLabel: string;
   searching: boolean;
@@ -36,6 +37,7 @@ export function QueryCapsule({
   query,
   inputRef,
   invalidMessage,
+  sessionNotice,
   shortcutFailed,
   shortcutLabel,
   searching,
@@ -113,11 +115,19 @@ export function QueryCapsule({
               <p
                 id="query-guidance"
                 className="capsule-hint"
-                aria-live={invalidMessage ? 'polite' : undefined}
+                aria-live={invalidMessage || sessionNotice ? 'polite' : undefined}
               >
                 {invalidMessage ? (
                   <span className="validation-error" data-testid="validation-error">
                     {invalidMessage}
+                  </span>
+                ) : sessionNotice ? (
+                  <span
+                    className={`session-notice is-${sessionNotice.kind}`}
+                    data-testid={`session-notice-${sessionNotice.kind}`}
+                    role="status"
+                  >
+                    {sessionNotice.text}
                   </span>
                 ) : (
                   <span>

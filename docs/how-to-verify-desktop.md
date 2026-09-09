@@ -265,7 +265,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 仅开发态显式设置 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 后运行 `pnpm dev`。两者必须是含端口的 `http://127.0.0.1:端口` origin，分别对应已经启动的 formal-dev API 与合成身份提供方；不能使用真实飞书地址或凭据。缺一项、非 loopback 或打包态拒启。无配置继续显式 S0 开发模式；接入模式故障不回退 S0。
 
-Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。D2 起登录后可查询复制；不得再写成 D1 之后仍未接通搜索。打包态若设置上述变量会拒启，因此当前未签名 Windows 包不能用于产品会话验收。
+Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。登录成功用非红色状态提示「合成登录成功，请确认平台和商品后查询」，不得占用输入校验红字；未登录、失效与失败分别提示，恢复已登录会话不得残留红字。D2 起登录后可查询复制；不得再写成 D1 之后仍未接通搜索。打包态若设置上述变量会拒启，因此当前未签名 Windows 包不能用于产品会话验收。
 
 自动化窗口验收：`pnpm --filter @customer-agent/desktop build` 后运行 `pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts`。该测试使用真实 Electron 与合成 HTTP double，校验加密文件生命周期、Query 状态及 token 不跨 preload；不等于真实身份、PG 整链或人工/Windows 验收。
 

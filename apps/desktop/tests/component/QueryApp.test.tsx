@@ -263,17 +263,89 @@ describe('QueryApp', () => {
   it('blocks fixture search in product mode and exposes login/logout without credentials', async () => {
     const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
     const signedIn = { ...signedOut, signedIn: true, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
-    window.customerAgent!.product = { sessionStatus: vi.fn().mockResolvedValue(signedOut), login: vi.fn().mockResolvedValue(signedIn), logout: vi.fn().mockResolvedValue({ ...signedOut, sessionEpoch: 2 }), onSessionChanged: () => () => {} };
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedOut),
+      login: vi.fn()
+        .mockResolvedValueOnce({ ...signedIn, sessionEpoch: 3 })
+        .mockResolvedValueOnce({ ...signedIn, sessionEpoch: 5 }),
+      logout: vi.fn().mockResolvedValue({ ...signedOut, sessionEpoch: 4 }),
+      onSessionChanged: () => () => {},
+    };
     render(<QueryApp />);
-    await screen.findByText('请先合成登录');
+    expect(await screen.findByTestId('session-notice-unsigned')).toHaveTextContent('请先合成登录');
+    expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '澄芽氨基酸洁面怎么用' } });
     fireEvent.click(screen.getByTestId('search-button'));
     expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
     await screen.findByRole('button', { name: 'agent · 退出' });
+    expect(screen.getByTestId('session-notice-success')).toHaveTextContent('合成登录成功，请确认平台和商品后查询');
+    expect(screen.getByTestId('session-notice-success')).toHaveClass('is-success');
+    expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
     expect(document.body.textContent).not.toContain('access_token');
     fireEvent.click(screen.getByRole('button', { name: 'agent · 退出' }));
-    await screen.findByText('已退出，请先登录');
+    expect(await screen.findByTestId('session-notice-unsigned')).toHaveTextContent('已退出，请先登录');
+    expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
+    expect(await screen.findByTestId('session-notice-success')).toHaveTextContent('合成登录成功，请确认平台和商品后查询');
+    expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
+  });
+
+  it('restores a signed-in session without a residual invalid banner', async () => {
+    connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-notice-unsigned')).not.toBeInTheDocument();
+    expect(screen.queryByText('合成登录成功，请确认平台和商品后查询')).not.toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('distinguishes expiry and login failure from unsigned guidance', async () => {
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
+    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 8, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+    let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedIn),
+      login: vi.fn().mockResolvedValue({
+        ok: false as const,
+        sessionEpoch: 10,
+        code: 'UNAVAILABLE' as const,
+        message: '服务暂不可用，请重试',
+      }),
+      logout: vi.fn(),
+      onSessionChanged: handler => { listener = handler; return () => {}; },
+    };
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    act(() => listener({ ...signedOut, sessionEpoch: 9 }));
+    expect(await screen.findByTestId('session-notice-expired')).toHaveTextContent('登录已失效，请重新登录');
+    expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '合成登录' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
+    expect(await screen.findByTestId('session-notice-failed')).toHaveTextContent('服务暂不可用，请重试');
+    expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('treats a restored unauthorized session as expired rather than login success', async () => {
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue({
+        ok: false as const,
+        sessionEpoch: 1,
+        code: 'UNAUTHORIZED' as const,
+        message: '请先登录，或重新登录后继续',
+      }),
+      login: vi.fn(),
+      logout: vi.fn(),
+      onSessionChanged: () => () => {},
+    };
+    render(<QueryApp />);
+    expect(await screen.findByTestId('session-notice-expired')).toHaveTextContent('登录已失效，请重新登录');
+    expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
   });
 
   it('ignores delayed old session events without clearing current UI', async () => {

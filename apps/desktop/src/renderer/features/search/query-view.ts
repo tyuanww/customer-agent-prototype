@@ -10,6 +10,7 @@ import {
 import { QUERY_WIDTH } from '@shared/overlay-geometry';
 import type { FoxVisualTransform, QueryAnchor } from '@shared/overlay-events';
 import type { OverlayPhase } from '@shared/overlay-machine';
+import type { ProductSessionResult } from '@shared/product-session';
 
 export type QueryFoxVisualState = 'SEARCHING' | 'RESULTS' | 'EMPTY' | 'COPIED' | 'IDLE';
 
@@ -106,4 +107,52 @@ export function maxContentBottom(
     }
   }
   return lastContentBottom;
+}
+
+export type SessionNoticeKind = 'unsigned' | 'expired' | 'success' | 'failed';
+export type SessionNotice = { kind: SessionNoticeKind; text: string };
+export type SessionNoticeSource = 'status' | 'login' | 'logout';
+
+export const SESSION_NOTICE_TEXT = {
+  unsigned: '请先合成登录',
+  loggedOut: '已退出，请先登录',
+  success: '合成登录成功，请确认平台和商品后查询',
+  expired: '登录已失效，请重新登录',
+} as const;
+
+export function sessionNoticeForResult(input: {
+  value: ProductSessionResult;
+  source: SessionNoticeSource;
+  wasSignedIn: boolean;
+  previous: SessionNotice | null;
+}): SessionNotice | null {
+  const { value, source, wasSignedIn, previous } = input;
+  if (!value.ok) {
+    if (source === 'login' || source === 'logout') {
+      return { kind: 'failed', text: value.message };
+    }
+    if (value.code === 'UNAUTHORIZED' || value.code === 'GONE' || wasSignedIn) {
+      return { kind: 'expired', text: SESSION_NOTICE_TEXT.expired };
+    }
+    return { kind: 'failed', text: value.message };
+  }
+  if (value.enabled && !value.signedIn) {
+    if (source === 'logout') {
+      return { kind: 'unsigned', text: SESSION_NOTICE_TEXT.loggedOut };
+    }
+    if (wasSignedIn) {
+      return { kind: 'expired', text: SESSION_NOTICE_TEXT.expired };
+    }
+    if (source === 'status' && (previous?.kind === 'unsigned' || previous?.kind === 'failed')) {
+      return previous;
+    }
+    return { kind: 'unsigned', text: SESSION_NOTICE_TEXT.unsigned };
+  }
+  if (value.signedIn) {
+    if (source === 'login') {
+      return { kind: 'success', text: SESSION_NOTICE_TEXT.success };
+    }
+    return previous?.kind === 'success' ? previous : null;
+  }
+  return null;
 }
