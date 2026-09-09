@@ -41,6 +41,102 @@ const DOMAINS = new Set(['presale', 'campaign', 'aftersale', 'product']);
 const REQUIRED = [
   'script_id', 'category', 'title', 'answer_text', 'source_version_id', 'source_ref', 'question_text',
 ] as const;
+const PRODUCT_SCOPE_TYPES = new Set(['storewide', 'category', 'sku']);
+const PLATFORMS = new Set(['qianniu', 'douyin']);
+const PLACEHOLDER_KEYS = new Set(['order_id', 'date']);
+/** The only display placeholders the frozen contract allows, keyed by machine name. */
+const PLACEHOLDER_TEXT: Readonly<Record<string, string>> = Object.freeze({
+  order_id: '{订单号}',
+  date: '{日期}',
+});
+
+/**
+ * Optional `effective_from` / `effective_to` columns. Absent `effective_from`
+ * keeps the historical "active since yesterday" default. Campaign content must
+ * declare an exclusive end, because the frozen schema requires a bounded window
+ * for that category — silently importing it as open-ended would fail later with
+ * an opaque staging error.
+ */
+function readEffectiveWindow(
+  record: Readonly<Record<string, string>>,
+  category: string,
+  now: Date,
+): Readonly<{ from: string; to: string | null }> {
+  const parse = (value: string, field: string): string => {
+    const trimmed = value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/u.test(trimmed)) {
+      throw new Error(`CONTENT_CONTRACT_INVALID:${field}`);
+    }
+    const parsed = new Date(trimmed.length === 10 ? `${trimmed}T00:00:00Z` : trimmed);
+    if (!Number.isFinite(parsed.getTime())) throw new Error(`CONTENT_CONTRACT_INVALID:${field}`);
+    return utcTimestampText(parsed);
+  };
+  const from = record.effective_from === undefined || record.effective_from.trim() === ''
+    ? utcTimestampText(new Date(now.getTime() - 24 * 3600 * 1000))
+    : parse(record.effective_from, 'effective_from');
+  const rawTo = record.effective_to?.trim() ?? '';
+  const to = rawTo === '' ? null : parse(rawTo, 'effective_to');
+  if (to !== null && !(Date.parse(from) < Date.parse(to))) {
+    throw new Error('CONTENT_CONTRACT_INVALID:effective_to');
+  }
+  if (category === 'campaign' && to === null) throw new Error('CONTENT_CONTRACT_INVALID:effective_to');
+  return Object.freeze({ from, to });
+}
+
+/**
+ * Optional `placeholder_keys` column (`|`-separated). Absent means no
+ * placeholders. A present column must agree exactly with the `{订单号}` /
+ * `{日期}` markers in the body, because the database enforces that invariant
+ * and a mismatch would otherwise surface as a confusing late batch failure.
+ */
+function readPlaceholderKeys(record: Readonly<Record<string, string>>, answer: string): readonly string[] {
+  const keys = record.placeholder_keys === undefined
+    ? []
+    : record.placeholder_keys.split('|').map((value) => value.trim()).filter((value) => value.length > 0);
+  if (new Set(keys).size !== keys.length || keys.some((value) => !PLACEHOLDER_KEYS.has(value))) {
+    throw new Error('CONTENT_CONTRACT_INVALID');
+  }
+  for (const key of PLACEHOLDER_KEYS) {
+    const marker = PLACEHOLDER_TEXT[key];
+    if (marker === undefined) continue;
+    if (answer.includes(marker) !== keys.includes(key)) throw new Error('CONTENT_CONTRACT_INVALID');
+  }
+  const stripped = answer.replaceAll('{订单号}', '').replaceAll('{日期}', '');
+  if (/[{}]/u.test(stripped)) throw new Error('CONTENT_CONTRACT_INVALID');
+  return Object.freeze(keys);
+}
+
+/**
+ * Optional CSV scope columns. Absent columns keep the historical single-platform
+ * storewide default so existing imports do not change meaning; a present column
+ * must be contract-valid, never silently ignored.
+ */
+function readScopeColumns(record: Readonly<Record<string, string>>): Readonly<{
+  platform_scope: readonly string[];
+  product_scope_type: string;
+  product_scope_refs: readonly string[];
+}> {
+  const platforms = record.platform_scope === undefined
+    ? ['qianniu']
+    : record.platform_scope.split('|').map((value) => value.trim()).filter((value) => value.length > 0);
+  if (platforms.length < 1 || platforms.length > 2 || new Set(platforms).size !== platforms.length
+    || platforms.some((value) => !PLATFORMS.has(value))) throw new Error('CONTENT_CONTRACT_INVALID');
+  const scopeType = record.product_scope_type === undefined
+    ? 'storewide'
+    : record.product_scope_type.trim();
+  if (!PRODUCT_SCOPE_TYPES.has(scopeType)) throw new Error('CONTENT_CONTRACT_INVALID');
+  const refs = record.product_scope_refs === undefined
+    ? []
+    : record.product_scope_refs.split('|').map((value) => value.trim()).filter((value) => value.length > 0);
+  if (new Set(refs).size !== refs.length
+    || refs.some((value) => value.length > 128 || value.includes(','))) throw new Error('CONTENT_CONTRACT_INVALID');
+  if ((scopeType === 'storewide') !== (refs.length === 0)) throw new Error('CONTENT_CONTRACT_INVALID');
+  return Object.freeze({
+    platform_scope: Object.freeze(platforms),
+    product_scope_type: scopeType,
+    product_scope_refs: Object.freeze(refs),
+  });
+}
 
 function sha256(value: string): string {
   return createSha('sha256').update(value).digest('hex');
@@ -349,9 +445,11 @@ export function parseImportFile(
     const riskLevel = (record.risk_level?.trim() || 'low') as NormalizedImportRow['risk_level'];
     if (!['low', 'medium', 'high'].includes(riskLevel)) throw new Error('CONTENT_CONTRACT_INVALID');
     const hasConflict = record.has_conflict === 'true';
+    const scope = readScopeColumns(record);
+    const placeholderKeys = readPlaceholderKeys(record, answer);
     const now = new Date();
     const due = utcTimestampText(new Date(now.getTime() + 365 * 24 * 3600 * 1000));
-    const from = utcTimestampText(new Date(now.getTime() - 24 * 3600 * 1000));
+    const window = readEffectiveWindow(record, category, now);
     const dual = riskLevel === 'high' || hasConflict;
     const questionBase = {
       question_id: `q_${scriptId}`,
@@ -375,11 +473,11 @@ export function parseImportFile(
       source_version_id: sourceVersionId,
       owner_role: 'ROLE-CONTENT-LEAD',
       review_due_at: due,
-      platform_scope: ['qianniu'],
-      product_scope_type: 'storewide',
-      product_scope_refs: [],
-      effective_from: from,
-      effective_to: null,
+      platform_scope: scope.platform_scope,
+      product_scope_type: scope.product_scope_type,
+      product_scope_refs: scope.product_scope_refs,
+      effective_from: window.from,
+      effective_to: window.to,
       intent_taxonomy_version: defaults.intentTaxonomyVersion,
       intent_id: defaults.intentId,
       risk_level: riskLevel,
@@ -392,7 +490,7 @@ export function parseImportFile(
       secondary_reviewer_id: dual ? defaults.review?.managerHash ?? null : null,
       secondary_reviewer_role: dual ? (defaults.review ? 'ROLE-CS-MANAGER' : null) : null,
       secondary_review_evd: dual ? defaults.review?.evidence ?? null : null,
-      placeholder_keys: [],
+      placeholder_keys: placeholderKeys,
       questions: [question],
     });
     return Object.freeze({
@@ -406,17 +504,17 @@ export function parseImportFile(
       source_version_id: sourceVersionId,
       owner_role: 'ROLE-CONTENT-LEAD',
       review_due_at: due,
-      platform_scope: Object.freeze(['qianniu']),
-      product_scope_type: 'storewide',
-      product_scope_refs: Object.freeze([] as string[]),
-      effective_from: from,
-      effective_to: null,
+      platform_scope: scope.platform_scope,
+      product_scope_type: scope.product_scope_type,
+      product_scope_refs: scope.product_scope_refs,
+      effective_from: window.from,
+      effective_to: window.to,
       intent_taxonomy_version: defaults.intentTaxonomyVersion,
       intent_id: defaults.intentId,
       risk_level: riskLevel,
       risk_categories: Object.freeze(riskLevel === 'high' ? ['legal_commitment'] : []),
       has_conflict: hasConflict,
-      placeholder_keys: Object.freeze([] as string[]),
+      placeholder_keys: placeholderKeys,
       questions_json: Object.freeze([question]),
       questions_grams_text: contentGrams(questionText),
       title_grams_text: contentGrams(title),

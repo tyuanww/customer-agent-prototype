@@ -30,6 +30,8 @@
 | 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。工程已全部合并到产品 `main@5d6a8023d734e7ee3c83364944adada7751c0d93`。证据分账见下表；不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
 | 人工观察 | **用户反馈已完成观察**（本机合成环境；无仓内独立观察报告；不是本次重新实测；不是 Windows 实机）。用户反馈覆盖：登录、命中复制、无匹配联系卡、回退后仍能查询发货话术、退出后再查被拦。「回退后仍查到同一句话术」只证明回退后查询可用，不能单凭这一点声称旧候选缓存失效（STALE）已被人工验证 |
 | Windows 下一阶段 | [安装包与实机方案](2026-09-10-windows-package-and-device-verification.md) 状态 **DRAFT**，未批准开工。本次不打包、不安装、不签名、不公证、不部署 |
+| macOS 合成栈（M1） | **已实施，PR 待合并**。`scripts/synthetic-stack/stack.ts` 提供 start/stop/restart/status/destroy/desktop；隔离 PG15 cluster（Unix socket only）+ 合成身份提供方 + API + worker + 真实导入审核发布播种。桌面开发态读 loopback 环境变量，打包态读自身 userData 的 `synthetic-stack.json`（仍只接受精确 loopback origin）。商品目录 SSOT 为 `apps/desktop/src/shared/synthetic-catalog.ts`，经 `product:catalog` 只读 IPC 供 renderer 消费 |
+| macOS 待办（M2–M5） | M2 查询体验与 P3 补测由 Grok 负责（PR #68/#69 已开）；M3 业务异常验证、M4 本机安装包、M5 实机验收待做 |
 | BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。本地/PR/合并 CI 通过不代表已修复，不得用 CI 绿关闭 |
 | 登录残留提示 | 用户反馈登录成功后仍残留红色「合成登录…」提示。已登记为 [独立待办](../../TODOS.md#login-residual-invalid-banner)，本次不修复 |
 | 治理 PR #80 | 保持 OPEN，不得合并，不得触发 GitHub Pages 发布 |

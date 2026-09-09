@@ -1,6 +1,7 @@
 import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
 import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isProductAnnounceInvalidation, type ProductAnnounceInvalidation } from '../shared/product-announce';
 import { helpFailure, isProductEscalateRequest, isProductEscalateResult, isProductTerminalRequest, isProductTerminalResult } from '../shared/product-help';
+import { catalogFailure, isProductCatalogResult } from '../shared/product-catalog';
 import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
@@ -109,6 +110,14 @@ const api: CustomerAgentApi = {
         return isProductTerminalResult(value) && value.sessionEpoch === request.sessionEpoch && value.generation === request.generation
           ? value : helpFailure('UNAVAILABLE', request);
       } catch { return helpFailure('UNAVAILABLE', request); }
+    },
+  },
+  productCatalog: {
+    async list() {
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_CATALOG);
+        return isProductCatalogResult(value) ? value : catalogFailure('UNAVAILABLE');
+      } catch { return catalogFailure('UNAVAILABLE'); }
     },
   },
   copyText(text: string): Promise<CopyTextResult> {

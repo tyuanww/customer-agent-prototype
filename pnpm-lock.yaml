@@ -17,6 +17,12 @@ importers:
       '@eslint/js':
         specifier: ^9.39.1
         version: 9.39.5
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(jiti@2.7.0)(supports-color@7.1.0)
@@ -29,6 +35,9 @@ importers:
       globals:
         specifier: ^16.4.0
         version: 16.4.0
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
       typescript-eslint:
         specifier: ^8.44.0
         version: 8.67.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.1.0))(supports-color@10.2.2)(typescript@5.9.2)

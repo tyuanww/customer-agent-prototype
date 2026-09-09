@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   PRODUCT_ANNOUNCE_INVALIDATED: 'product:announce-invalidated',
   PRODUCT_ESCALATE: 'product:escalate',
   PRODUCT_RECORD_TERMINAL: 'product:record-terminal',
+  PRODUCT_CATALOG: 'product:catalog',
   COPY_TEXT: 'clipboard:copy-text',
   GET_WINDOW_CONTEXT: 'overlay:get-window-context',
   OPEN_SEARCH: 'overlay:open-search',

@@ -34,6 +34,7 @@ export type CustomerAgentApi = {
   productSearch?: ProductSearchApi;
   productAnnounce?: import('./product-announce').ProductAnnounceApi;
   productHelp?: import('./product-help').ProductHelpApi;
+  productCatalog?: import('./product-catalog').ProductCatalogApi;
   copyText: (text: string) => Promise<CopyTextResult>;
   getWindowContext: () => Promise<WindowContext>;
   openSearch: (visualTransform?: FoxVisualTransform) => Promise<void>;

@@ -8,6 +8,8 @@ import { readProductClientId } from './product-client-id';
 import { ProductAnnounce } from './product-announce';
 import { registerProductAnnounceIpc } from './product-announce-ipc';
 import { openSyntheticHelp } from './product-help-open';
+import { registerProductCatalogIpc } from './product-catalog-ipc';
+import { developmentProductProfile, readPackagedProductProfile } from './product-runtime-config';
 import { app, Menu, session } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
@@ -148,12 +150,20 @@ if (!gotLock) {
       () => productSession !== null,
     );
     registerOverlayIpc(() => controller);
-    const productOrigin = process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
-    const identityOrigin = process.env.CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN;
-    if (productOrigin || identityOrigin) {
-      if (!productOrigin || !identityOrigin || app.isPackaged) throw new Error('Synthetic desktop requires both loopback origins in development');
-      productSession = new ProductSession(new ProductHttp(productOrigin), createSessionStore(app.getPath('userData')), createLoginWindow(identityOrigin, productOrigin));
-      productAnnounce = new ProductAnnounce(productSession, readProductClientId(app.getPath('userData')));
+    // Development reads loopback origins from the environment; a packaged build
+    // reads the same values from its own userData file so an installed client
+    // can run the synthetic chain without any environment setup. Both paths are
+    // validated to bare loopback origins, and a packaged build ignores the
+    // environment entirely, so neither can be repointed off-host.
+    const userDataDirectory = app.getPath('userData');
+    const productProfile = app.isPackaged
+      ? readPackagedProductProfile(userDataDirectory)
+      : developmentProductProfile(process.env);
+    const identityOrigin = productProfile?.identityOrigin;
+    if (productProfile) {
+      productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
+        createSessionStore(userDataDirectory), createLoginWindow(productProfile.identityOrigin, productProfile.apiOrigin));
+      productAnnounce = new ProductAnnounce(productSession, readProductClientId(userDataDirectory));
       await productSession.restore();
     }
     registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
@@ -162,6 +172,8 @@ if (!gotLock) {
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+    registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {

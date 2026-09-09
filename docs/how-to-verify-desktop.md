@@ -36,6 +36,7 @@ pnpm -v    # 项目锁定 11.19.0
 | W4 database 全门禁 | `pnpm test:db` | 不涉及桌面拖拽 | 否 | 会构建 database package，并启动一次性 PG15 cluster |
 | 全量 Electron Playwright | `pnpm test:e2e` | 含浮窗与 Dashboard smoke，仍不是真实设备门禁 | 否 | **是** |
 | 本机未签名 macOS 证明包 | `pnpm package:mac:local` | 否 | 会先 `generate:app-icons` | 会先 `pnpm build` |
+| 本机合成栈（M1） | `node scripts/synthetic-stack/stack.ts start` | 否 | 否 | 需要先 `pnpm build:services` |
 | 正式 macOS 外发门禁 | `pnpm package:mac` | 否 | 同上 | 同上，但当前会因 Demo `appId` fail-closed |
 | 本机未签名 Windows 证明包 | `pnpm package:win` | 否 | 会先生成 ICO | 会先 electron-vite build |
 
@@ -278,3 +279,40 @@ Query 的「合成登录」经过独立受控登录窗，返回后显示角色�
 ### D5 合成整链验证
 
 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api test:e2e:backend` 在同一 SHA 上跑导入→worker→审核→发布→桌面 adapter 查询复制→回退后旧候选 STALE→退出清空会话。桌面 adapter 经 loopback 调用已启动的 API 进程，不经 Dashboard，不等于人工观察、Windows 实机或真实飞书。
+
+## 本机合成栈（M1）
+
+`scripts/synthetic-stack/stack.ts` 启动一套属于本任务的本机合成环境：私有 PostgreSQL 15 cluster（仅 Unix socket，无 TCP 监听）、合成身份提供方、API、worker，并把合成话术通过真实的导入→worker→审核→发布链写入。
+
+```bash
+node scripts/synthetic-stack/stack.ts start     # 准备 + 启动 + 播种 + 自检
+node scripts/synthetic-stack/stack.ts status    # 逐项就绪情况
+node scripts/synthetic-stack/stack.ts restart
+node scripts/synthetic-stack/stack.ts stop      # 只停它自己启动的进程
+node scripts/synthetic-stack/stack.ts destroy   # 再删除隔离 cluster
+node scripts/synthetic-stack/stack.ts desktop   # 打印桌面客户端所需环境
+```
+
+| 能证明 | 不能证明 |
+| --- | --- |
+| 本机可重复启动/停止/重启；`/ready` 五项全 ok；登录→查询→复制在真实 PG 内容上跑通；端口占用 fail-closed 且给出可定位原因 | 真实飞书身份、真实客户数据、生产拓扑、Windows 实机 |
+| 停止只处理它自己记录并校验过启动签名的进程；从不连接或清理用户已有的 PostgreSQL 实例 | 其他程序或用户自己启动的服务 |
+
+数据与状态都在 `~/.customer-agent-synthetic-stack/`（`CUSTOMER_AGENT_STACK_ROOT` 可覆盖），日志在同目录 `logs/`。首次 `start` 会初始化 cluster 并播种；重复 `start` 复用已发布的当前版本，不会每次新增 release。
+
+双击 `启动客服Agent.command` 会先执行 `stack.ts start`，再用 `stack.ts desktop` 解析出的 origin 启动 Electron 客户端。
+
+桌面客户端消费的唯一配置来源：开发态读 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` / `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`，打包态读应用自身 userData 下的 `synthetic-stack.json`（由 `stack.ts` 写入）。两者都只接受精确 loopback origin，打包态完全忽略环境变量。
+
+商品目录的唯一来源是 `apps/desktop/src/shared/synthetic-catalog.ts`；显示名与后端 `product_scope_refs` 是同一份记录。renderer 通过 `product:catalog` 只读 IPC 取得，不自行硬编码 id 或名称。
+
+### 真实栈端到端
+
+栈已运行时：
+
+```bash
+pnpm --filter @customer-agent/desktop build
+pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/synthetic-stack.spec.ts
+```
+
+它在真实 API + 真实隔离 PG15 上跑 Electron 登录、读取目录、查询、复制、退出；仍不是人工观察，也不覆盖 Dock / Cmd+Tab / 中文输入 / 台前调度。
