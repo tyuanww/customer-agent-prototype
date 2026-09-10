@@ -8,6 +8,9 @@
  *   node scripts/synthetic-stack/stack.ts status    report readiness of each piece
  *   node scripts/synthetic-stack/stack.ts destroy   stop, then remove the isolated cluster
  *   node scripts/synthetic-stack/stack.ts desktop   print the desktop client env for this stack
+ *   node scripts/synthetic-stack/stack.ts anomaly   status | session-revoke | source-suspend <id>
+ *
+ * Full M3 check (separate entry): node scripts/synthetic-stack/anomaly-check.ts
  *
  * Ownership rules this command enforces:
  *   - It never touches the user's existing PostgreSQL installation or any
@@ -36,6 +39,7 @@ import {
   forgetProcess, isOwnedProcessLive, portInUse, readProcess, recordProcess, stopProcess, waitForHttp,
 } from './process.ts';
 import { loginAs, seedContentIfMissing } from './seed.ts';
+import { anomalyStatus, revokeSessions, suspendSource } from './anomaly.ts';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const API_ENTRY = path.join(repositoryRoot, 'apps/api/dist/main.js');
@@ -334,6 +338,35 @@ function commandDesktop(): void {
   process.stdout.write(`${desktopCommand(profile)}\n`);
 }
 
+/**
+ * Anomaly commands for the M3 verification pass. They report what changed and
+ * how to get back to a healthy stack, so a human never has to guess the
+ * recovery path. The source id is argv[4] because argv[3] is the subcommand.
+ */
+async function commandAnomaly(action: string | undefined): Promise<void> {
+  const profile = readProfile();
+  if (!profile) fail(`no profile at ${PROFILE_FILE}; run "start" first`);
+  if (action === 'status') {
+    for (const line of await anomalyStatus()) log(line);
+    return;
+  }
+  if (action === 'source-suspend') {
+    const sourceVersionId = process.argv[4];
+    if (!sourceVersionId) fail('Usage: stack.ts anomaly source-suspend <source_version_id>');
+    const result = await suspendSource(sourceVersionId);
+    log(`${result.action}: ${result.detail}`);
+    log(`recovery: ${result.recovery}`);
+    return;
+  }
+  if (action === 'session-revoke') {
+    const result = await revokeSessions();
+    log(`${result.action}: ${result.detail}`);
+    log(`recovery: ${result.recovery}`);
+    return;
+  }
+  fail('Usage: stack.ts anomaly <status|source-suspend <id>|session-revoke>');
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2];
   switch (command) {
@@ -343,8 +376,9 @@ async function main(): Promise<void> {
     case 'status': await commandStatus(); break;
     case 'destroy': await commandDestroy(); break;
     case 'desktop': commandDesktop(); break;
+    case 'anomaly': await commandAnomaly(process.argv[3]); break;
     default:
-      fail('Usage: node scripts/synthetic-stack/stack.ts <start|stop|restart|status|destroy|desktop>');
+      fail('Usage: node scripts/synthetic-stack/stack.ts <start|stop|restart|status|destroy|desktop|anomaly>');
   }
 }
 

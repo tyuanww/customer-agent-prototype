@@ -316,3 +316,20 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/synthetic-s
 ```
 
 它在真实 API + 真实隔离 PG15 上跑 Electron 登录、读取目录、查询、复制、退出；仍不是人工观察，也不覆盖 Dock / Cmd+Tab / 中文输入 / 台前调度。
+
+### M3 业务异常（自动化，不是人工验收）
+
+栈已运行时：
+
+```bash
+node scripts/synthetic-stack/anomaly-check.ts
+```
+
+| 能证明 | 不能证明 |
+| --- | --- |
+| 会话撤销后 `/auth/me` 与 `/v1/search` 401，重新登录恢复 | 真实飞书过期、人工点退出 |
+| 停 API 后不可达，`stack start` 后 `/ready` 200 | 真实网络分区、生产拓扑 |
+| 暂停权威来源后搜索 503 fail-closed；恢复只能 `destroy` + `start` | 人工在 Query 里看到的红字文案 |
+| 回退后桌面 `ProductSearch.copy` 对旧候选返回 `STALE`（`announce.allows()`） | 裸 `POST /v1/events/adoption` 拒绝旧 release；Mac 人工复制手感 |
+
+人工注入命令：`stack.ts anomaly status|session-revoke|source-suspend <id>`。`source-suspend` 的 id 是 argv[4]。暂停后不得靠 `start` 重新播种恢复。

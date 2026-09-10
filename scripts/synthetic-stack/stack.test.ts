@@ -159,3 +159,30 @@ describe('process ownership', () => {
     assert.equal(existsSync(path.join(process.cwd(), 'profile.json')), false);
   });
 });
+
+describe('anomaly checks', () => {
+  it('refuses to put non-Latin-1 text into an Authorization header', async () => {
+    const { requireHeaderByteString } = await import('./header-bytes.ts');
+    assert.doesNotThrow(() => requireHeaderByteString('token', 'a'.repeat(43)));
+    assert.throws(() => requireHeaderByteString('token', '什么时候发货'), /U\+4ec0/);
+  });
+
+  it('keeps rollback staleness on the desktop adapter, not raw adoption HTTP', () => {
+    const check = readFileSync(new URL('./anomaly-check.ts', import.meta.url), 'utf8');
+    const adapter = readFileSync(new URL('../../apps/desktop/tests/unit/stack-desktop-adapter.ts', import.meta.url), 'utf8');
+    const rollback = readFileSync(new URL('../../apps/desktop/tests/unit/stack-anomaly-rollback.test.ts', import.meta.url), 'utf8');
+    assert.match(adapter, /ProductSearch/);
+    assert.match(adapter, /ProductAnnounce/);
+    assert.match(check, /stack-anomaly-rollback\.test\.ts/);
+    assert.match(rollback, /code: 'STALE'/);
+    assert.match(rollback, /CUSTOMER_AGENT_STACK_ANOMALY/);
+    assert.equal(rollback.includes("fetch(`${profile.apiOrigin}/v1/events/adoption`"), false);
+    assert.equal(check.includes("search(await loginAs"), false);
+  });
+
+  it('reads the source-suspend id from argv[4]', () => {
+    const source = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.match(source, /sourceVersionId = process\.argv\[4\]/);
+    assert.match(source, /case 'anomaly': await commandAnomaly\(process\.argv\[3\]\)/);
+  });
+});
