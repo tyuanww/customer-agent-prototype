@@ -127,8 +127,8 @@ export function registerOverlayIpc(getController: () => OverlayController | null
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.DISMISS, (event): void => {
-    guard(event)?.dismiss();
+  ipcMain.handle(IPC_CHANNELS.DISMISS, (event, restorePreviousApp?: unknown): void => {
+    guard(event)?.dismiss(restorePreviousApp === true);
   });
 
   ipcMain.handle(

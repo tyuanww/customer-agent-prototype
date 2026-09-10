@@ -122,8 +122,8 @@ export function QueryApp() {
   const dashboardOpenFailedRef = useRef(false);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
-  const [searchPlatform, setSearchPlatform] = useState<'' | 'qianniu' | 'douyin'>('');
-  const [productType, setProductType] = useState<'' | 'category' | 'sku'>('');
+  const [searchPlatform, setSearchPlatform] = useState<'all' | 'qianniu' | 'douyin'>('all');
+  const [productType, setProductType] = useState<'all' | '' | 'category' | 'sku'>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedSkuId, setSelectedSkuId] = useState('');
   const [catalogEntries, setCatalogEntries] = useState<ProductCatalogEntry[]>([]);
@@ -894,7 +894,7 @@ export function QueryApp() {
         categoryId: selectedCategoryId,
         skuId: selectedSkuId,
       });
-      if (productType && catalogStatus !== 'ready') {
+      if ((productType === 'category' || productType === 'sku') && catalogStatus !== 'ready') {
         setResults([]);
         setErrorMessage(catalogStatusMessage(catalogStatus));
         reportPhase('ERROR');
@@ -903,8 +903,8 @@ export function QueryApp() {
       if (!scope.ok) {
         setResults([]); setErrorMessage(scope.message); reportPhase('ERROR'); return;
       }
-      if (!api || !searchPlatform || !queryText || [...queryText].length > 500) {
-        setResults([]); setErrorMessage('请确认平台、具体商品和客户的问题；问题最多 500 字。无具体商品时仅查询全店话术。'); reportPhase('ERROR'); return;
+      if (!api || !queryText || [...queryText].length > 500) {
+        setResults([]); setErrorMessage('请确认客户的问题；问题最多 500 字。需要时再筛选平台和商品。'); reportPhase('ERROR'); return;
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       if (sessionNoticeRef.current?.kind === 'success') {
@@ -915,7 +915,8 @@ export function QueryApp() {
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
       const search = () => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
-        productContextType: scope.productContextType, productContextRef: scope.productContextRef, parentQueryId: null });
+        productContextType: scope.productContextType, productContextRef: scope.productContextRef,
+        productUnscoped: productType === 'all', parentQueryId: null });
       const run = window.customerAgent.productAnnounce && !announce
         ? refreshAnnounce(sessionEpoch).then(result => { if (!result?.ok || generation !== searchGenerationRef.current) return null; return search(); })
         : search();
@@ -926,7 +927,8 @@ export function QueryApp() {
         const domains = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
         const items: RankedScript[] = result.candidates.map(c => ({
           scriptId: c.script_id, domain: domains[c.category as keyof typeof domains] ?? '产品', questionVariants: [], answerText: c.answer_text,
-          platform: searchPlatform === 'qianniu' ? '千牛' : '抖音', scopeLabel: c.title, riskLevel: c.risk_level,
+          platform: c.platform_scope.includes('qianniu') && c.platform_scope.includes('douyin') ? '千牛 / 抖音'
+            : c.platform_scope.includes('douyin') && searchPlatform !== 'qianniu' ? '抖音' : '千牛', scopeLabel: c.title, riskLevel: c.risk_level,
           effectiveFrom: c.effective_from, effectiveTo: c.effective_to ?? '', rank: c.rank as 1 | 2 | 3, score: 0,
           matchKind: 'exact', matchLabel: result.telemetryStatus === 'collection_disabled' ? '后端候选 · 不记录事件' : '后端候选',
           productCopy: { sessionEpoch, generation, queryId: result.queryId, rank: c.rank, scriptId: c.script_id, scriptVersion: c.script_version, contentHash: c.content_hash },
@@ -1050,7 +1052,7 @@ export function QueryApp() {
           dismissTimerRef.current = window.setTimeout(() => {
             dismissTimerRef.current = null;
             if (copyGeneration === copyGenerationRef.current) {
-              void window.customerAgent?.dismiss();
+              void window.customerAgent?.dismiss(true);
             }
           }, COPY_FEEDBACK_MS);
           return;
@@ -1512,18 +1514,18 @@ export function QueryApp() {
               <fieldset aria-label="查询范围" className="product-query-context">
                 <legend>查询范围 · 合成数据</legend>
                 <label>平台 <select aria-label="查询平台" value={searchPlatform} onChange={e => { setSearchPlatform(e.target.value as typeof searchPlatform); cancelPendingSearch(); cancelPendingCopy(); setResults([]); reportPhase('ERROR'); }}>
-                  <option value="">请选择</option><option value="qianniu">千牛</option><option value="douyin">抖音</option>
+                  <option value="all">全部平台</option><option value="qianniu">千牛</option><option value="douyin">抖音</option>
                 </select></label>
                 <label>商品范围 <select aria-label="商品范围" value={productType} onChange={e => {
                   const next = e.target.value as typeof productType;
                   setProductType(next);
-                  if (next === '') setSelectedCategoryId('');
+                  if (next === 'all' || next === '') setSelectedCategoryId('');
                   setSelectedSkuId('');
                   invalidateScope();
                 }}>
-                  <option value="">无具体商品（仅全店话术）</option><option value="category">品类</option><option value="sku">具体款</option>
+                  <option value="all">全部商品</option><option value="">无具体商品（仅全店话术）</option><option value="category">品类</option><option value="sku">具体款</option>
                 </select></label>
-                {productType ? <label>品类 <select aria-label="查询品类" value={selectedCategoryId} onChange={e => {
+                {productType === 'category' || productType === 'sku' ? <label>品类 <select aria-label="查询品类" value={selectedCategoryId} onChange={e => {
                   setSelectedCategoryId(e.target.value); setSelectedSkuId(''); invalidateScope();
                 }}>
                   <option value="">请选择</option>
@@ -1535,7 +1537,7 @@ export function QueryApp() {
                   <option value="">请选择</option>
                   {catalogSkus(catalogEntries, selectedCategoryId).map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
                 </select></label> : null}
-                {catalogStatus !== 'ready' && catalogStatus !== 'loading' && productType ? (
+                {catalogStatus !== 'ready' && catalogStatus !== 'loading' && (productType === 'category' || productType === 'sku') ? (
                   <p className="catalog-scope-error" data-testid="catalog-error" role="status">{catalogStatusMessage(catalogStatus)}</p>
                 ) : null}
                 {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '合成订单号' : '日期'}

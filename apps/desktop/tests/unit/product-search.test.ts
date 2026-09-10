@@ -8,16 +8,26 @@ const candidate: ProductCandidate = { rank: 1, release_id: 'rel-synthetic-001', 
   content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale', answer_text: '合成订单 {订单号}', platform_scope: ['qianniu'],
   product_scope_type: 'storewide', product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
   intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low', risk_categories: [], has_conflict: false, placeholder_keys: ['order_id'] };
-async function fixture(options: { disabled?: boolean; eventFail?: boolean; candidate?: ProductCandidate; noHit?: boolean; openEntry?: () => boolean | Promise<boolean> } = {}) {
+async function fixture(options: { disabled?: boolean; eventFail?: boolean; candidate?: ProductCandidate; noHit?: boolean; respectJob?: boolean; openEntry?: () => boolean | Promise<boolean> } = {}) {
   const events: unknown[] = []; const write = vi.fn();
   const transport = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const p = new URL(String(url)).pathname;
     if (p.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
     if (p.endsWith('/logout')) return new Response(null, { status: 204 });
     const body = JSON.parse(String(init?.body));
-    if (p === '/v1/search') return Response.json({ query_id: body.query_id, hit_status: options.noHit ? 'no_hit' : 'hit', release_id: candidate.release_id,
-      source_binding_hash: 'b'.repeat(64), telemetry_status: options.disabled ? 'collection_disabled' : 'recorded',
-      candidates: options.noHit ? [] : [options.candidate ?? candidate] });
+    if (p === '/v1/search') {
+      const row = options.candidate ?? candidate;
+      let hit = !options.noHit;
+      if (options.respectJob && !options.noHit) {
+        const type = body.product_context_type ?? null;
+        const ref = body.product_context_ref ?? null;
+        hit = row.platform_scope.includes(body.platform)
+          && (type === null ? row.product_scope_type === 'storewide' : row.product_scope_type === type && row.product_scope_refs.includes(ref));
+      }
+      return Response.json({ query_id: body.query_id, hit_status: hit ? 'hit' : 'no_hit', release_id: row.release_id,
+        source_binding_hash: 'b'.repeat(64), telemetry_status: options.disabled ? 'collection_disabled' : 'recorded',
+        candidates: hit ? [row] : [] });
+    }
     events.push(body);
     if (p === '/v1/events/escalate') {
       return options.eventFail ? new Response(null, { status: 503 })
@@ -33,7 +43,7 @@ async function fixture(options: { disabled?: boolean; eventFail?: boolean; candi
   const announce = { allows: (releaseId: string) => releaseId === (options.candidate ?? candidate).release_id, subscribe: () => () => {} };
   const help = { openEntry: options.openEntry ?? vi.fn(() => true) };
   const search = new ProductSearch(session, write, announce, help);
-  const request: ProductSearchRequest = { sessionEpoch: session.view().sessionEpoch, generation: 1, queryText: '合成发货问题', platform: 'qianniu', platformSource: 'manual', productContextType: null, productContextRef: null, parentQueryId: null };
+  const request: ProductSearchRequest = { sessionEpoch: session.view().sessionEpoch, generation: 1, queryText: '合成发货问题', platform: 'qianniu', platformSource: 'manual', productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null };
   const result = await search.search(1, request);
   if (!result.ok) throw Error(result.code);
   const copy = { sessionEpoch: request.sessionEpoch, generation: 1, queryId: result.queryId, rank: 1, scriptId: candidate.script_id,
@@ -94,6 +104,20 @@ describe('product query and native copy provenance', () => {
     expect(isProductSearchRequest({ ...f.request, queryText: '😀'.repeat(501) })).toBe(false);
     expect(isProductSearchRequest({ ...f.request, productContextType: 'sku' })).toBe(false);
     expect(isProductCopyRequest({ ...f.copy, answerText: 'injected' })).toBe(false); await f.session.logout();
+  });
+  it('fans out all-platform unscoped search and copies through the originating query', async () => {
+    const f = await fixture({ respectJob: true });
+    const result = await f.search.search(1, { ...f.request, generation: 2, platform: 'all', productUnscoped: true });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
+    const searchCalls = f.transport.mock.calls.filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls.length).toBeGreaterThan(2);
+    if (!result.ok || !result.candidates[0]) throw new Error('expected merged hit');
+    expect(await f.search.copy(1, {
+      sessionEpoch: f.request.sessionEpoch, generation: 2, queryId: result.queryId, rank: result.candidates[0].rank,
+      scriptId: result.candidates[0].script_id, scriptVersion: result.candidates[0].script_version,
+      contentHash: result.candidates[0].content_hash, placeholderValues: { order_id: 'SYNTHETIC-001' },
+    })).toMatchObject({ ok: true, copied: true });
+    await f.session.logout();
   });
   it('rejects copy after the announce gate stops the release', async () => {
     const f = await fixture(); f.announce.allows = () => false;

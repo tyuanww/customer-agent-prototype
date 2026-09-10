@@ -38,12 +38,12 @@ export function catalogStatusMessage(status: CatalogLoadStatus): string {
 
 export function resolveCatalogScope(input: {
   entries: readonly ProductCatalogEntry[];
-  productType: '' | 'category' | 'sku';
+  productType: 'all' | '' | 'category' | 'sku';
   categoryId: string;
   skuId: string;
 }): { ok: true; productContextType: 'category' | 'sku' | null; productContextRef: string | null }
   | { ok: false; message: string } {
-  if (input.productType === '') return { ok: true, productContextType: null, productContextRef: null };
+  if (input.productType === 'all' || input.productType === '') return { ok: true, productContextType: null, productContextRef: null };
   if (input.entries.length === 0) return { ok: false, message: CATALOG_SCOPE_MESSAGES.missing };
   if (!catalogIsConsistent(input.entries)) return { ok: false, message: CATALOG_SCOPE_MESSAGES.inconsistent };
   if (input.productType === 'category') {

@@ -140,8 +140,8 @@ const api: CustomerAgentApi = {
       .invoke(IPC_CHANNELS.OPEN_DASHBOARD)
       .then((value: unknown) => (isOpenDashboardResult(value) ? value : openDashboardUnavailable()));
   },
-  dismiss(): Promise<void> {
-    return ipcRenderer.invoke(IPC_CHANNELS.DISMISS);
+  dismiss(restorePreviousApp?: boolean): Promise<void> {
+    return ipcRenderer.invoke(IPC_CHANNELS.DISMISS, restorePreviousApp === true);
   },
   reportUiPhase(phase, resultCount = 0): Promise<void> {
     if (!isReportablePhase(phase) || !isResultCount(resultCount)) {

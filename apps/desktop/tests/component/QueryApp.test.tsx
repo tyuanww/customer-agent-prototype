@@ -130,7 +130,8 @@ describe('QueryApp', () => {
       hitStatus: options.noHit ? 'no_hit' as const : 'hit' as const,
       releaseId: 'rel-synthetic', telemetryStatus: 'recorded' as 'recorded' | 'collection_disabled',
       candidates: options.noHit ? [] : [{ rank: 1, release_id: 'rel-synthetic', script_id: 'script-synthetic', script_version: 1,
-        content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const, answer_text: '合成订单 {订单号}', platform_scope: [r.platform],
+        content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const, answer_text: '合成订单 {订单号}',
+        platform_scope: (r.platform === 'douyin' ? ['douyin'] : r.platform === 'qianniu' ? ['qianniu'] : ['qianniu', 'douyin']) as Array<'qianniu' | 'douyin'>,
         product_scope_type: 'storewide' as const, product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
         intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const] }],
     }));
@@ -160,8 +161,23 @@ describe('QueryApp', () => {
     await screen.findByTestId('announce-banner');
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
-    fireEvent.change(await screen.findByLabelText('查询平台'), { target: { value: 'qianniu' } });
+    await screen.findByLabelText('查询平台');
   }
+  it('searches every platform and product by default so login is enough to query', async () => {
+    const f = connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByTestId('announce-banner');
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('copy-button-1');
+    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({
+      platform: 'all', productUnscoped: true, productContextType: null, productContextRef: null, platformSource: 'manual',
+    }));
+    expect(screen.getByRole('option', { name: '全部平台' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '全部商品' })).toBeInTheDocument();
+  });
+
   it('sends explicitly selected platform and SKU to the product adapter', async () => {
     const f = connectProduct(); await prepareProductQuery();
     fireEvent.change(screen.getByLabelText('查询平台'), { target: { value: 'douyin' } });
@@ -190,6 +206,7 @@ describe('QueryApp', () => {
       ok: false as const, sessionEpoch: 0, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试',
     });
     await prepareProductQuery();
+    f.search.mockClear();
     fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: 'sku' } });
     expect(await screen.findByTestId('catalog-error')).toHaveTextContent(CATALOG_SCOPE_MESSAGES.missing);
     fireEvent.click(screen.getByTestId('search-button'));
@@ -198,12 +215,13 @@ describe('QueryApp', () => {
     fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: '' } });
     fireEvent.click(screen.getByTestId('search-button'));
     await screen.findByTestId('copy-button-1');
-    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({ productContextType: null, productContextRef: null }));
+    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({ productContextType: null, productContextRef: null, productUnscoped: false }));
   });
   it('refuses scoped search when catalog list rejects instead of guessing a product', async () => {
     const f = connectProduct();
     window.customerAgent!.productCatalog!.list = vi.fn().mockRejectedValue(new Error('ipc down'));
     await prepareProductQuery();
+    f.search.mockClear();
     fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: 'sku' } });
     expect(await screen.findByTestId('catalog-error')).toHaveTextContent(CATALOG_SCOPE_MESSAGES.missing);
     fireEvent.click(screen.getByTestId('search-button'));
@@ -212,6 +230,7 @@ describe('QueryApp', () => {
   });
   it('ignores a late product search after the question changes, without fixture fallback', async () => {
     const f = connectProduct(); await prepareProductQuery();
+    f.search.mockClear();
     const pending = deferred<Awaited<ReturnType<typeof f.search>>>(); const response = f.search.getMockImplementation()!;
     f.search.mockImplementationOnce(() => pending.promise); fireEvent.click(screen.getByTestId('search-button'));
     const request = f.search.mock.calls[0][0];
@@ -224,7 +243,7 @@ describe('QueryApp', () => {
     const f = connectProduct();
     if (eventStatus === 'disabled') { const response = f.search.getMockImplementation()!; f.search.mockImplementation(async r => ({ ...await response(r), telemetryStatus: 'collection_disabled' })); }
     window.customerAgent!.productSearch!.copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus }));
-    await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button')); await screen.findByTestId('copy-button-1');
+    await prepareProductQuery(); await screen.findByTestId('copy-button-1');
     fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-A' } });
     fireEvent.click(screen.getByTestId('copy-button-1')); await screen.findByTestId('toast');
     expect(screen.getByTestId('toast')).toHaveTextContent('已复制');
@@ -324,7 +343,7 @@ describe('QueryApp', () => {
     expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
     await screen.findByRole('button', { name: 'agent · 退出' });
-    expect(screen.getByTestId('session-notice-success')).toHaveTextContent('合成登录成功，请确认平台和商品后查询');
+    expect(screen.getByTestId('session-notice-success')).toHaveTextContent('合成登录成功，可以直接查询；需要时再筛选平台和商品');
     expect(screen.getByTestId('session-notice-success')).toHaveClass('is-success');
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
@@ -333,7 +352,7 @@ describe('QueryApp', () => {
     expect(await screen.findByTestId('session-notice-unsigned')).toHaveTextContent('已退出，请先登录');
     expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
-    expect(await screen.findByTestId('session-notice-success')).toHaveTextContent('合成登录成功，请确认平台和商品后查询');
+    expect(await screen.findByTestId('session-notice-success')).toHaveTextContent('合成登录成功，可以直接查询；需要时再筛选平台和商品');
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
   });
 
@@ -344,7 +363,7 @@ describe('QueryApp', () => {
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
     expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
     expect(screen.queryByTestId('session-notice-unsigned')).not.toBeInTheDocument();
-    expect(screen.queryByText('合成登录成功，请确认平台和商品后查询')).not.toBeInTheDocument();
+    expect(screen.queryByText('合成登录成功，可以直接查询；需要时再筛选平台和商品')).not.toBeInTheDocument();
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
   });
 
@@ -966,7 +985,7 @@ describe('QueryApp', () => {
     await user.click(screen.getByTestId('copy-button-1'));
     expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
     expect(dismiss).not.toHaveBeenCalled();
-    await waitFor(() => expect(dismiss).toHaveBeenCalledTimes(1), { timeout: 1_500 });
+    await waitFor(() => expect(dismiss).toHaveBeenCalledWith(true), { timeout: 1_500 });
   });
 
   it('locks every copy entry point during COPIED feedback', async () => {

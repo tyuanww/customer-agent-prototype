@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('electron', () => ({
   app: {
     focus: vi.fn(),
+    hide: vi.fn(),
     isReady: () => true,
   },
   BrowserWindow: {

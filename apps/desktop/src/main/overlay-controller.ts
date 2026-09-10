@@ -168,6 +168,7 @@ export class OverlayController {
   } | null = null;
   private queryLayoutFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private dashboardOpening: Promise<OpenDashboardResult> | null = null;
+  private restorePreviousAppOnIdle = false;
   private disposed = false;
   private readonly fence: ShutdownFence;
   private readonly scheduler = new GuardedScheduler();
@@ -306,10 +307,11 @@ export class OverlayController {
     this.applyEvent({ type: 'OPEN' });
   }
 
-  dismiss(): void {
+  dismiss(restorePreviousApp = false): void {
     if (this.isInactive()) {
       return;
     }
+    this.restorePreviousAppOnIdle = restorePreviousApp === true;
     this.finishOrClearQueryDrag();
     this.applyEvent({ type: 'DISMISS' });
   }
@@ -1105,6 +1107,22 @@ export class OverlayController {
       query.invalidateShadow();
     }
     query.hide();
+    // After a successful copy the operator is about to paste. Yield macOS
+    // key-window status to the previously frontmost app (千牛 / editor)
+    // without quitting; keep the idle fox visible with showInactive.
+    if (this.restorePreviousAppOnIdle) {
+      this.restorePreviousAppOnIdle = false;
+      if (process.platform === 'darwin') {
+        try {
+          app.hide();
+        } catch {
+          // hide() can throw if the Dock policy is already accessory.
+        }
+        if (this.live(fox)) {
+          fox.showInactive();
+        }
+      }
+    }
   }
 
   private focusQueryWindow(): void {

@@ -24,7 +24,7 @@ it.skipIf(!enabled)('refuses copy of a rolled-back release through the desktop a
   try {
     const firstSearch = await desktop.search.search(1, {
       sessionEpoch: desktop.epoch(), generation: 1, queryText: '什么时候发货', platform: 'qianniu',
-      platformSource: 'manual', productContextType: null, productContextRef: null, parentQueryId: null,
+      platformSource: 'manual', productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null,
     });
     expect(firstSearch).toMatchObject({ ok: true, hitStatus: 'hit' });
     if (!firstSearch.ok || !firstSearch.candidates[0]) throw new Error('expected a hit');
@@ -55,7 +55,7 @@ it.skipIf(!enabled)('refuses copy of a rolled-back release through the desktop a
     expect(desktop.clipboard).toHaveLength(1);
     const current = await desktop.search.search(1, {
       sessionEpoch: desktop.epoch(), generation: 3, queryText: '什么时候发货', platform: 'qianniu',
-      platformSource: 'manual', productContextType: null, productContextRef: null, parentQueryId: null,
+      platformSource: 'manual', productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null,
     });
     expect(current).toMatchObject({ ok: true, hitStatus: 'hit', releaseId: rolled.release_id });
   } finally {

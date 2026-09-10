@@ -279,13 +279,13 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 仅开发态显式设置 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 后运行 `pnpm dev`。两者必须是含端口的 `http://127.0.0.1:端口` origin，分别对应已经启动的 formal-dev API 与合成身份提供方；不能使用真实飞书地址或凭据。缺一项、非 loopback 或打包态拒启。无配置继续显式 S0 开发模式；接入模式故障不回退 S0。
 
-Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。登录成功用非红色状态提示「合成登录成功，请确认平台和商品后查询」，不得占用输入校验红字；未登录、失效与失败分别提示，恢复已登录会话不得残留红字。D2 起登录后可查询复制；不得再写成 D1 之后仍未接通搜索。打包态若设置上述变量会拒启，因此当前未签名 Windows 包不能用于产品会话验收。
+Query 的「合成登录」经过独立受控登录窗，返回后显示角色、退出按钮，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。登录成功用非红色状态提示「合成登录成功，可以直接查询；需要时再筛选平台和商品」，不得占用输入校验红字；未登录、失效与失败分别提示，恢复已登录会话不得残留红字。D2 起登录后可查询复制；不得再写成 D1 之后仍未接通搜索。打包态若设置上述变量会拒启，因此当前未签名 Windows 包不能用于产品会话验收。
 
 自动化窗口验收：`pnpm --filter @customer-agent/desktop build` 后运行 `pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts`。该测试使用真实 Electron 与合成 HTTP double，校验加密文件生命周期、Query 状态及 token 不跨 preload；不等于真实身份、PG 整链或人工/Windows 验收。
 
 ### D2 合成查询与复制验证
 
-沿用 D1 的两个 loopback 配置。登录后输入问题、点击查询，先选择平台；按需从合成目录选择品类或具体款（显示名为目录 label，回传 id 为 `productContextRef`），无具体商品仅查询全店话术。不得手填商品标识。目录缺失或不一致时明确提示，不猜测商品、不扩大为全店。有占位符的候选须填写合成订单号或日期后复制。复制成功只表示剪贴板写入，不表示发送。选择变化必须清掉旧结果并停止未完成的复制。
+沿用 D1 的两个 loopback 配置。登录后即可查询：默认「全部平台」「全部商品」，覆盖合成目录中的全店 / 品类 / 具体款话术。需要时再筛选平台、全店、品类或具体款（显示名为目录 label，回传 id 为 `productContextRef`）。不得手填商品标识。目录缺失或不一致时，品类/具体款查询明确提示，不猜测商品、不扩大为全店；默认「全部商品」在目录不可用时仍可走全店路径。有占位符的候选须填写合成订单号或日期后复制。复制成功只表示剪贴板写入，不表示发送；复制后收起 Query 时应把焦点还给刚才的页面，便于直接粘贴。选择变化必须清掉旧结果并停止未完成的复制。
 
 `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-search.test.ts` 检查候选归属、隔离、半开有效期、并发复制、取消及事件失败。`pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts` 在 build 后运行真实 Electron 登录/搜索/复制/退出，HTTP 为合成 double；不是 PG 整链、人工观察或 Windows 实机证据。
 

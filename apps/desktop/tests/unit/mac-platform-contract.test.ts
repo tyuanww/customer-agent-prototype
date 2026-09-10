@@ -265,6 +265,9 @@ describe('macOS runtime contract', () => {
       expect(controller).toContain(`screen.removeListener('${eventName}'`);
     }
     expect(controller).toContain('DISPLAY_RECONCILE_DELAY_MS = 100');
+    expect(controller).toContain('dismiss(restorePreviousApp = false)');
+    expect(controller).toContain('app.hide()');
+    expect(controller).toContain('restorePreviousAppOnIdle');
     expect(controller).toContain('if (this.chromeHandoffMode !== null)');
   });
 

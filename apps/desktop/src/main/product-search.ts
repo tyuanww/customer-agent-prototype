@@ -7,11 +7,47 @@ import { queryFailure, type ProductCandidate, type ProductSearchRequest, type Pr
 import type { AnnounceGate } from '../shared/product-announce';
 import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
+import { SYNTHETIC_CATALOG } from '../shared/synthetic-catalog';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
+type SearchJob = Readonly<{
+  platform: 'qianniu' | 'douyin';
+  productContextType: 'category' | 'sku' | null;
+  productContextRef: string | null;
+}>;
+
 type SearchState = QueryIdentity & { controller: AbortController; result?: Extract<ProductSearchResult, { ok: true }>;
-  copying: boolean; terminal: boolean; platform?: ProductSearchRequest['platform']; productType?: ProductSearchRequest['productContextType']; productRef?: string | null };
+  copying: boolean; terminal: boolean; platform?: ProductSearchRequest['platform']; productType?: ProductSearchRequest['productContextType'];
+  productRef?: string | null; unscopedProducts?: boolean; origins?: Map<string, string> };
+
+function searchJobs(request: ProductSearchRequest): SearchJob[] {
+  const platforms: Array<'qianniu' | 'douyin'> = request.platform === 'all' ? ['qianniu', 'douyin'] : [request.platform];
+  const scopes: Array<{ productContextType: SearchJob['productContextType']; productContextRef: string | null }> = request.productUnscoped
+    ? [
+      { productContextType: null, productContextRef: null },
+      ...SYNTHETIC_CATALOG.flatMap((category) => [
+        { productContextType: 'category' as const, productContextRef: category.id },
+        ...category.products.map((product) => ({ productContextType: 'sku' as const, productContextRef: product.id })),
+      ]),
+    ]
+    : [{ productContextType: request.productContextType, productContextRef: request.productContextRef }];
+  return platforms.flatMap((platform) => scopes.map((scope) => ({ platform, ...scope })));
+}
+
+function candidateLive(candidate: ProductCandidate): boolean {
+  const now = Date.now();
+  return Date.parse(candidate.effective_from) <= now && (candidate.effective_to === null || now < Date.parse(candidate.effective_to))
+    && !candidate.has_conflict;
+}
+
+function matchesJob(candidate: ProductCandidate, job: SearchJob): boolean {
+  return candidateLive(candidate)
+    && candidate.platform_scope.includes(job.platform)
+    && (job.productContextType === null
+      ? candidate.product_scope_type === 'storewide'
+      : candidate.product_scope_type === job.productContextType && candidate.product_scope_refs.includes(job.productContextRef ?? ''));
+}
 /** Owns per-window candidate provenance and native copy ordering. Renderer never supplies answer text. */
 export class ProductSearch {
   private states = new Map<number, SearchState>();
@@ -66,26 +102,60 @@ export class ProductSearch {
     catch (error) { return this.failure(error, identity); }
   }
   private usable(candidate: ProductCandidate, state: SearchState) {
-    const now = Date.now();
-    return Date.parse(candidate.effective_from) <= now && (candidate.effective_to === null || now < Date.parse(candidate.effective_to))
-      && !candidate.has_conflict && candidate.platform_scope.includes(state.platform!)
-      && (candidate.product_scope_type === 'storewide' || (candidate.product_scope_type === state.productType && candidate.product_scope_refs.includes(state.productRef ?? '')));
+    const platformOk = state.platform === 'all'
+      ? candidate.platform_scope.some((platform) => platform === 'qianniu' || platform === 'douyin')
+      : candidate.platform_scope.includes(state.platform as 'qianniu' | 'douyin');
+    const productOk = state.unscopedProducts
+      ? candidate.product_scope_type === 'storewide' || candidate.product_scope_type === 'category' || candidate.product_scope_type === 'sku'
+      : candidate.product_scope_type === 'storewide'
+        || (candidate.product_scope_type === state.productType && candidate.product_scope_refs.includes(state.productRef ?? ''));
+    return candidateLive(candidate) && platformOk && productOk;
   }
   async search(sender: number, request: ProductSearchRequest): Promise<ProductSearchResult> {
     try {
-      const state = this.advance(sender, request); state.platform = request.platform; state.productType = request.productContextType; state.productRef = request.productContextRef;
-      const queryId = randomUUID();
-      const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {
-        query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: request.queryText.trim(), collection_mode: 'synthetic',
-        detected_platform: request.platform, platform: request.platform, platform_source: 'manual', product_context_type: request.productContextType,
-        product_context_ref: request.productContextRef, top_k: 3,
-      } });
-      const response = parseContractSchema('SearchResponse', value);
-      this.current(sender, state);
-      if (!this.announce.allows(response.release_id) || response.query_id !== queryId
-        || response.candidates.some(c => c.release_id !== response.release_id || !this.usable(c, state))) throw new ProductHttpError('VALIDATION');
-      const result: Extract<ProductSearchResult, { ok: true }> = { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
-        queryId, hitStatus: response.hit_status, releaseId: response.release_id, telemetryStatus: response.telemetry_status, candidates: response.candidates };
+      const state = this.advance(sender, request);
+      state.platform = request.platform;
+      state.productType = request.productContextType;
+      state.productRef = request.productContextRef;
+      state.unscopedProducts = request.productUnscoped;
+      const jobs = searchJobs(request);
+      const pages = await Promise.all(jobs.map(async (job) => {
+        const queryId = randomUUID();
+        const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {
+          query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: request.queryText.trim(), collection_mode: 'synthetic',
+          detected_platform: job.platform, platform: job.platform, platform_source: 'manual',
+          product_context_type: job.productContextType, product_context_ref: job.productContextRef, top_k: 3,
+        } });
+        const response = parseContractSchema('SearchResponse', value);
+        this.current(sender, state);
+        if (!this.announce.allows(response.release_id) || response.query_id !== queryId
+          || response.candidates.some((candidate) => candidate.release_id !== response.release_id || !matchesJob(candidate, job))) {
+          throw new ProductHttpError('VALIDATION');
+        }
+        return { queryId, response };
+      }));
+      const origins = new Map<string, string>();
+      const merged: ProductCandidate[] = [];
+      for (const page of pages) {
+        for (const candidate of page.response.candidates) {
+          if (origins.has(candidate.script_id)) continue;
+          origins.set(candidate.script_id, page.queryId);
+          merged.push({ ...candidate, rank: (merged.length + 1) as 1 | 2 | 3 });
+          if (merged.length === 3) break;
+        }
+        if (merged.length === 3) break;
+      }
+      const primary = pages[0];
+      if (!primary) throw new ProductHttpError('VALIDATION');
+      const result: Extract<ProductSearchResult, { ok: true }> = {
+        ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
+        queryId: merged[0] ? origins.get(merged[0].script_id) ?? primary.queryId : primary.queryId,
+        hitStatus: merged.length > 0 ? 'hit' : 'no_hit',
+        releaseId: primary.response.release_id,
+        telemetryStatus: primary.response.telemetry_status,
+        candidates: merged,
+      };
+      state.origins = origins;
       state.result = structuredClone(result); this.last.set(sender, state); return result;
     } catch (error) { return this.failure(error, request); }
   }
@@ -97,9 +167,10 @@ export class ProductSearch {
       this.current(sender, state);
       if (state.copying || state.terminal) throw new ProductHttpError('CONFLICT');
       const result = state.result;
-      const candidate = result?.queryId === request.queryId ? result.candidates.find(c => c.rank === request.rank && c.script_id === request.scriptId
-        && c.script_version === request.scriptVersion && c.content_hash === request.contentHash) : undefined;
-      if (!candidate || !this.usable(candidate, state) || !this.announce.allows(candidate.release_id)) throw new ProductHttpError('STALE');
+      const candidate = result?.candidates.find((item) => item.rank === request.rank && item.script_id === request.scriptId
+        && item.script_version === request.scriptVersion && item.content_hash === request.contentHash);
+      if (!result || !candidate || !this.usable(candidate, state) || !this.announce.allows(candidate.release_id)) throw new ProductHttpError('STALE');
+      const impressionQueryId = state.origins?.get(candidate.script_id) ?? result.queryId;
       if (Object.keys(request.placeholderValues).sort().join(',') !== [...candidate.placeholder_keys].sort().join(',')) throw new ProductHttpError('VALIDATION');
       const text = candidate.answer_text.replace(/\{(订单号|日期)\}/g, (_match, key: string) => request.placeholderValues[key === '订单号' ? 'order_id' : 'date'] ?? '');
       if (/[{}]/.test(text)) throw new ProductHttpError('VALIDATION');
@@ -110,16 +181,16 @@ export class ProductSearch {
       if (!this.usable(candidate, state) || !this.announce.allows(candidate.release_id)) throw new ProductHttpError('STALE');
       try { this.writeClipboard(text); } catch { throw new ProductHttpError('CLIPBOARD_FAILED'); }
       state.terminal = true;
-      let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result!.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';
+      let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';
       if (eventStatus !== 'disabled') {
         try {
           const response = await this.session.request(request.sessionEpoch, '/v1/events/adoption', {
             headers: { 'idempotency-key': randomUUID() },
             body: {
-            query_id: request.queryId, outcome: 'adopted', chosen_rank: request.rank, chosen_script_id: request.scriptId, push_method: 'clipboard',
+            query_id: impressionQueryId, outcome: 'adopted', chosen_rank: request.rank, chosen_script_id: request.scriptId, push_method: 'clipboard',
           } });
           const receipt = parseContractSchema('AdoptionEventResponse', response.value);
-          if (receipt.query_id === request.queryId) eventStatus = 'recorded';
+          if (receipt.query_id === impressionQueryId) eventStatus = 'recorded';
         } catch { /* The clipboard write already succeeded. Never retry the native side effect. */ }
       }
       return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, copied: true, eventStatus };

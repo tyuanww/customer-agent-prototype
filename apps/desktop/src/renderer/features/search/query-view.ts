@@ -116,7 +116,7 @@ export type SessionNoticeSource = 'status' | 'login' | 'logout';
 export const SESSION_NOTICE_TEXT = {
   unsigned: '请先合成登录',
   loggedOut: '已退出，请先登录',
-  success: '合成登录成功，请确认平台和商品后查询',
+  success: '合成登录成功，可以直接查询；需要时再筛选平台和商品',
   expired: '登录已失效，请重新登录',
 } as const;
 

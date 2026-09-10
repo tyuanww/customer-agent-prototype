@@ -3,8 +3,9 @@ import { exactKeys, productFailure, type ProductFailure } from './product-sessio
 export type ProductCandidate = components['schemas']['SearchCandidate'];
 export type QueryIdentity = { sessionEpoch: number; generation: number };
 export type ProductSearchRequest = QueryIdentity & {
-  queryText: string; platform: 'qianniu' | 'douyin'; platformSource: 'manual';
-  productContextType: 'category' | 'sku' | null; productContextRef: string | null; parentQueryId: string | null;
+  queryText: string; platform: 'qianniu' | 'douyin' | 'all'; platformSource: 'manual';
+  productContextType: 'category' | 'sku' | null; productContextRef: string | null;
+  productUnscoped: boolean; parentQueryId: string | null;
 };
 export type ProductCopyRequest = QueryIdentity & {
   queryId: string; rank: number; scriptId: string; scriptVersion: number; contentHash: string;
@@ -22,11 +23,14 @@ export function isQueryIdentity(v: unknown): v is QueryIdentity & Record<string,
   return Number.isSafeInteger(x.sessionEpoch) && x.sessionEpoch >= 0 && Number.isSafeInteger(x.generation) && x.generation >= 0;
 }
 export function isProductSearchRequest(v: unknown): v is ProductSearchRequest {
-  return exactKeys(v, ['sessionEpoch', 'generation', 'queryText', 'platform', 'platformSource', 'productContextType', 'productContextRef', 'parentQueryId'])
+  return exactKeys(v, ['sessionEpoch', 'generation', 'queryText', 'platform', 'platformSource', 'productContextType', 'productContextRef', 'productUnscoped', 'parentQueryId'])
     && isQueryIdentity(v) && typeof v.queryText === 'string' && v.queryText.trim().length > 0 && [...v.queryText].length <= 500
-    && ['qianniu', 'douyin'].includes(v.platform as string) && v.platformSource === 'manual'
-    && ((v.productContextType === null && v.productContextRef === null) || (['category', 'sku'].includes(v.productContextType as string)
-      && typeof v.productContextRef === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(v.productContextRef)))
+    && ['qianniu', 'douyin', 'all'].includes(v.platform as string) && v.platformSource === 'manual'
+    && typeof v.productUnscoped === 'boolean'
+    && (v.productUnscoped
+      ? v.productContextType === null && v.productContextRef === null
+      : ((v.productContextType === null && v.productContextRef === null) || (['category', 'sku'].includes(v.productContextType as string)
+        && typeof v.productContextRef === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(v.productContextRef))))
     && v.parentQueryId === null;
 }
 export function isProductCopyRequest(v: unknown): v is ProductCopyRequest {

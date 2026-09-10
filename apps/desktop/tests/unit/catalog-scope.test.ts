@@ -33,6 +33,9 @@ describe('catalog scope', () => {
       entries, productType: '', categoryId: '', skuId: '',
     })).toEqual({ ok: true, productContextType: null, productContextRef: null });
     expect(resolveCatalogScope({
+      entries, productType: 'all', categoryId: '', skuId: '',
+    })).toEqual({ ok: true, productContextType: null, productContextRef: null });
+    expect(resolveCatalogScope({
       entries, productType: 'category', categoryId: 'cat_cleanser', skuId: '',
     })).toEqual({ ok: true, productContextType: 'category', productContextRef: 'cat_cleanser' });
     expect(resolveCatalogScope({
