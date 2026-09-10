@@ -35,7 +35,7 @@ pnpm -v    # 项目锁定 11.19.0
 | W6 统一非设备总门 | `pnpm check` | 含全量 unit/component，不含真实 OS 人工门 | 否 | 是；并生成/扫描非部署型正式服务候选 |
 | W4 database 全门禁 | `pnpm test:db` | 不涉及桌面拖拽 | 否 | 会构建 database package，并启动一次性 PG15 cluster |
 | 全量 Electron Playwright | `pnpm test:e2e` | 含浮窗与 Dashboard smoke，仍不是真实设备门禁 | 否 | **是** |
-| 本机未签名 macOS 证明包 | `pnpm package:mac:local` | 否 | 会先 `generate:app-icons` | 会先 `pnpm build` |
+| 本机未签名 macOS 证明包 | `pnpm package:mac:local` | 否 | 会先 `generate:app-icons` | 会先 `pnpm build:services` 再桌面 `pnpm build` |
 | 本机合成栈（M1） | `node scripts/synthetic-stack/stack.ts start` | 否 | 否 | 需要先 `pnpm build:services` |
 | 正式 macOS 外发门禁 | `pnpm package:mac` | 否 | 同上 | 同上，但当前会因 Demo `appId` fail-closed |
 | 本机未签名 Windows 证明包 | `pnpm package:win` | 否 | 会先生成 ICO | 会先 electron-vite build |
@@ -144,7 +144,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 - `release/local-unsigned/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.dmg`
 - `release/local-unsigned/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.zip`
-- `release/local-unsigned/mac-universal/*.app`
+- `release/local-unsigned/mac-universal/*.app`（后验读取此目录；也可从 DMG/ZIP 打开同一份 `.app`）
 
 构建后会跑 `apps/desktop/scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `apps/desktop/scripts/verify-mac-package.mjs local`。
 
@@ -153,9 +153,22 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 | Universal 可执行文件同时含 `arm64` 与 `x86_64` | Developer ID 签名、公证、Gatekeeper 对外部下载放行 |
 | 包内 `THIRD_PARTY_NOTICES.md` 与 Electron / Chromium 许可非空 | 本 Demo 自身已被授权分发给外包或客户 |
 | 品牌 ICNS 门禁通过；无 `app-update.yml` / `latest*.yml` / `.blockmap` | 真实机器上的 Dock 观感、第一次打开的系统对话框 |
-| 每个本地产物文件名带 `UNSIGNED`；`codesign --verify` **必须失败**（未签名） | 「可以发给别人试」 |
+| 每个本地产物文件名带 `UNSIGNED`；`codesign --verify` **必须失败**（未签名） | 「可以发给别人试」；Mac 人工验收 |
+| 打包应用只读 userData 下 `synthetic-stack.json` 的精确 loopback origin；文件缺失或非法则启动 fail-closed，不退回离线 S0，也不改读环境变量 | 环境变量可改打包客户端指向；未先跑合成栈也能当离线 Demo 启动 |
 
-该包禁止外发。经外部渠道下载后通常会被 Gatekeeper 拦截。
+该包禁止外发。经外部渠道下载后通常会被 Gatekeeper 拦截。自动化后验和本机构建图**不能**写成 Mac 人工验收。
+
+根命令 `pnpm package:mac:local` 会先 `pnpm build:services`。干净 worktree 若只跑桌面包脚本、未构建 `@customer-agent/contracts`，electron-vite 会在解析该包入口时失败。
+
+#### 打包态接到本机合成栈
+
+`pnpm package:mac:local` 只证明构建图。要用 UNSIGNED `.app` 跑合成查询链：
+
+1. `node scripts/synthetic-stack/stack.ts start`（写入 `~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`，只含 `mode` 与两个精确 loopback origin，无 token）
+2. 需要单独刷新或打印路径：`node scripts/synthetic-stack/stack.ts packaged-profile`（stdout 只有路径，不含开发态环境变量）
+3. 打开 `release/local-unsigned/mac-universal/客服话术浮窗 Demo.app`，或安装同一目录下的 UNSIGNED DMG/ZIP
+
+打包态**忽略** `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` / `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`。缺文件或 origin 不合法则拒启，不回退 S0 fixture。这仍不是签名、公证、外发或 M5 人工验收。
 
 ### 3.2 `pnpm package:mac`
 
@@ -290,7 +303,8 @@ node scripts/synthetic-stack/stack.ts status    # 逐项就绪情况
 node scripts/synthetic-stack/stack.ts restart
 node scripts/synthetic-stack/stack.ts stop      # 只停它自己启动的进程
 node scripts/synthetic-stack/stack.ts destroy   # 再删除隔离 cluster
-node scripts/synthetic-stack/stack.ts desktop   # 打印桌面客户端所需环境
+node scripts/synthetic-stack/stack.ts desktop           # 打印桌面客户端所需环境
+node scripts/synthetic-stack/stack.ts packaged-profile  # 写入并打印打包态 userData 配置路径
 ```
 
 | 能证明 | 不能证明 |
@@ -302,7 +316,7 @@ node scripts/synthetic-stack/stack.ts desktop   # 打印桌面客户端所需环
 
 双击 `启动客服Agent.command` 会先执行 `stack.ts start`，再用 `stack.ts desktop` 解析出的 origin 启动 Electron 客户端。
 
-桌面客户端消费的唯一配置来源：开发态读 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` / `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`，打包态读应用自身 userData 下的 `synthetic-stack.json`（由 `stack.ts` 写入）。两者都只接受精确 loopback origin，打包态完全忽略环境变量。
+桌面客户端消费的唯一配置来源：开发态读 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` / `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`，打包态读应用自身 userData 下的 `synthetic-stack.json`（由 `stack.ts start` / `desktop` / `packaged-profile` 写入）。两者都只接受精确 loopback origin，打包态完全忽略环境变量；文件缺失或非法时打包态 fail-closed 退出，不退回离线 S0。
 
 商品目录的唯一来源是 `apps/desktop/src/shared/synthetic-catalog.ts`；显示名与后端 `product_scope_refs` 是同一份记录。renderer 通过 `product:catalog` 只读 IPC 取得，不自行硬编码 id 或名称。
 

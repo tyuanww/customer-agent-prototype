@@ -7,8 +7,9 @@
  *   node scripts/synthetic-stack/stack.ts restart
  *   node scripts/synthetic-stack/stack.ts status    report readiness of each piece
  *   node scripts/synthetic-stack/stack.ts destroy   stop, then remove the isolated cluster
- *   node scripts/synthetic-stack/stack.ts desktop   print the desktop client env for this stack
- *   node scripts/synthetic-stack/stack.ts anomaly   status | session-revoke | source-suspend <id>
+ *   node scripts/synthetic-stack/stack.ts desktop           print the desktop client env for this stack
+ *   node scripts/synthetic-stack/stack.ts packaged-profile  write/print userData synthetic-stack.json path
+ *   node scripts/synthetic-stack/stack.ts anomaly           status | session-revoke | source-suspend <id>
  *
  * Full M3 check (separate entry): node scripts/synthetic-stack/anomaly-check.ts
  *
@@ -335,7 +336,16 @@ async function commandDestroy(): Promise<void> {
 function commandDesktop(): void {
   const profile = readProfile();
   if (!profile) fail(`no profile at ${PROFILE_FILE}; run "start" first`);
+  // Refresh the packaged client handoff file without extra stdout: callers
+  // parse this command's single line as development environment assignments.
+  writeDesktopPackagedProfile(profile);
   process.stdout.write(`${desktopCommand(profile)}\n`);
+}
+
+function commandPackagedProfile(): void {
+  const profile = readProfile();
+  if (!profile) fail(`no profile at ${PROFILE_FILE}; run "start" first`);
+  process.stdout.write(`${writeDesktopPackagedProfile(profile)}\n`);
 }
 
 /**
@@ -376,9 +386,10 @@ async function main(): Promise<void> {
     case 'status': await commandStatus(); break;
     case 'destroy': await commandDestroy(); break;
     case 'desktop': commandDesktop(); break;
+    case 'packaged-profile': commandPackagedProfile(); break;
     case 'anomaly': await commandAnomaly(process.argv[3]); break;
     default:
-      fail('Usage: node scripts/synthetic-stack/stack.ts <start|stop|restart|status|destroy|desktop|anomaly>');
+      fail('Usage: node scripts/synthetic-stack/stack.ts <start|stop|restart|status|destroy|desktop|packaged-profile|anomaly>');
   }
 }
 

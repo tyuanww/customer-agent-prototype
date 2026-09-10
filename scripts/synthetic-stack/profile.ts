@@ -84,7 +84,8 @@ export type StackProfile = Readonly<{
  * Where the packaged desktop client looks for its synthetic profile. Electron's
  * `app.getPath('userData')` on macOS is `~/Library/Application Support/<name>`,
  * and the name is fixed by `app.setName` in the main process. The stack writes
- * the file; the client re-validates every field before using it.
+ * the file; the client re-validates every field before using it and fail-closes
+ * if the file is missing or not an exact pair of loopback origins.
  *
  * `CUSTOMER_AGENT_DESKTOP_USERDATA` overrides the location for tests and for a
  * client launched with `--user-data-dir`.

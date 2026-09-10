@@ -26,6 +26,11 @@ try {
     buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
   }
 
+  execFileSync('pnpm', ['build:services'], {
+    cwd: repositoryRoot,
+    env: buildEnvironment,
+    stdio: 'inherit',
+  });
   execFileSync('pnpm', ['generate:app-icons'], {
     cwd: desktopRoot,
     env: buildEnvironment,

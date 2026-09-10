@@ -113,6 +113,7 @@ describe('macOS distribution contract', () => {
     expect(packageJson.scripts['package:mac']).toContain(
       'node scripts/package-macos.mjs distribution',
     );
+    expect(packageRunner).toContain("['build:services']");
     expect(packageRunner).toContain("buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false'");
     expect(packageRunner).toContain("'-c.mac.identity=null'");
     expect(packageRunner).toContain("'-c.mac.notarize=false'");

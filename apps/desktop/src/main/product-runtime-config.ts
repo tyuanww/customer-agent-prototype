@@ -19,12 +19,15 @@ import path from 'node:path';
  * packaged client at a non-loopback host, at a path or at a URL with
  * credentials — the same restrictions the development profile enforced.
  *
- * A missing or invalid file is not an error: the client simply starts in the
- * offline S0 profile, exactly as it does today with no environment set.
+ * A missing or invalid file is a startup error: the packaged client must not
+ * fall back to the offline S0 fixture, and it must not consult the environment
+ * as a substitute. Unpackaged development without both origins still stays S0.
  */
 export const SYNTHETIC_STACK_PROFILE_FILE = 'synthetic-stack.json';
 const MODE = 'synthetic-local';
 const MAX_BYTES = 4_096;
+const PACKAGED_PROFILE_ERROR =
+  'Packaged desktop requires a valid synthetic-stack.json under userData';
 
 export type PackagedProductProfile = Readonly<{
   apiOrigin: string;
@@ -42,8 +45,11 @@ function loopbackOrigin(value: unknown): string | undefined {
   return url.origin;
 }
 
-/** Read and validate the packaged synthetic profile, or `undefined` to stay offline. */
-export function readPackagedProductProfile(userDataDirectory: string): PackagedProductProfile | undefined {
+function failPackagedProfile(): never {
+  throw new Error(PACKAGED_PROFILE_ERROR);
+}
+
+function parsePackagedProductProfile(userDataDirectory: string): PackagedProductProfile | undefined {
   const file = path.join(userDataDirectory, SYNTHETIC_STACK_PROFILE_FILE);
   try {
     const stat = lstatSync(file);
@@ -57,8 +63,27 @@ export function readPackagedProductProfile(userDataDirectory: string): PackagedP
     if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) return undefined;
     return Object.freeze({ apiOrigin, identityOrigin });
   } catch {
+    // Missing, unreadable, or non-JSON files take the same fail-closed path.
     return undefined;
   }
+}
+
+/** Read and validate the packaged synthetic profile. Missing or invalid files fail closed. */
+export function readPackagedProductProfile(userDataDirectory: string): PackagedProductProfile {
+  return parsePackagedProductProfile(userDataDirectory) ?? failPackagedProfile();
+}
+
+/**
+ * Choose the product origin source. Packaged builds read only the userData
+ * file and ignore `environment`; unpackaged builds read loopback env vars.
+ */
+export function resolveProductProfile(
+  packaged: boolean,
+  userDataDirectory: string,
+  environment: NodeJS.ProcessEnv,
+): PackagedProductProfile | undefined {
+  if (packaged) return readPackagedProductProfile(userDataDirectory);
+  return developmentProductProfile(environment);
 }
 
 /**

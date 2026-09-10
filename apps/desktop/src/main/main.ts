@@ -9,7 +9,7 @@ import { ProductAnnounce } from './product-announce';
 import { registerProductAnnounceIpc } from './product-announce-ipc';
 import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
-import { developmentProductProfile, readPackagedProductProfile } from './product-runtime-config';
+import { resolveProductProfile } from './product-runtime-config';
 import { app, Menu, session } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
@@ -153,12 +153,11 @@ if (!gotLock) {
     // Development reads loopback origins from the environment; a packaged build
     // reads the same values from its own userData file so an installed client
     // can run the synthetic chain without any environment setup. Both paths are
-    // validated to bare loopback origins, and a packaged build ignores the
-    // environment entirely, so neither can be repointed off-host.
+    // validated to bare loopback origins. A packaged build ignores the
+    // environment entirely and fail-closes if the file is missing or invalid,
+    // so it cannot be repointed off-host or silently dropped to the S0 fixture.
     const userDataDirectory = app.getPath('userData');
-    const productProfile = app.isPackaged
-      ? readPackagedProductProfile(userDataDirectory)
-      : developmentProductProfile(process.env);
+    const productProfile = resolveProductProfile(app.isPackaged, userDataDirectory, process.env);
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),

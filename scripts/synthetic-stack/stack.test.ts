@@ -76,6 +76,7 @@ describe('stack profile', () => {
     // the location and the exact shape without disturbing a real installation.
     assert.match(path.basename(DESKTOP_PACKAGED_PROFILE_PATH), /^synthetic-stack\.json$/u);
     assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('Library/Application Support'));
+    assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('客服话术浮窗 Demo'));
     const source = readFileSync(new URL('./profile.ts', import.meta.url), 'utf8');
     const start = source.indexOf('export function writeDesktopPackagedProfile');
     assert.notEqual(start, -1);
@@ -88,6 +89,11 @@ describe('stack profile', () => {
     for (const forbidden of ['access_token', 'DATABASE_URL', 'IDEMPOTENCY_HMAC', 'LOG_HASH_KEY']) {
       assert.equal(written.includes(forbidden), false, `packaged profile must not carry ${forbidden}`);
     }
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    const desktop = stack.slice(stack.indexOf('function commandDesktop()'));
+    assert.ok(desktop.includes('writeDesktopPackagedProfile(profile)'), 'desktop handoff must refresh the packaged profile');
+    assert.ok(stack.includes("case 'packaged-profile': commandPackagedProfile()"), 'packaged-profile must print the userData file path');
+    assert.ok(stack.includes('<start|stop|restart|status|destroy|desktop|packaged-profile|anomaly>'));
   });
 
   it('rejects a profile file that is not the current version or root', () => {
