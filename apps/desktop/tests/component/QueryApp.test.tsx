@@ -9,6 +9,8 @@ import {
   MAX_QUERY_CHARS,
   QUERY_TOO_LONG_MESSAGE,
 } from '../../src/shared/contracts';
+import { productCatalogEntries } from '../../src/shared/product-catalog';
+import { CATALOG_SCOPE_MESSAGES } from '../../src/renderer/features/search/catalog-scope';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
@@ -148,6 +150,9 @@ describe('QueryApp', () => {
       ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, recorded: true,
     }));
     window.customerAgent!.productHelp = { escalate, recordTerminal };
+    window.customerAgent!.productCatalog = {
+      list: vi.fn().mockResolvedValue({ ok: true as const, entries: productCatalogEntries() }),
+    };
     return { search, copyAdopt, invalidate, escalate, recordTerminal };
   }
   async function prepareProductQuery() {
@@ -161,9 +166,49 @@ describe('QueryApp', () => {
     const f = connectProduct(); await prepareProductQuery();
     fireEvent.change(screen.getByLabelText('查询平台'), { target: { value: 'douyin' } });
     fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: 'sku' } });
-    fireEvent.change(screen.getByLabelText('合成商品标识'), { target: { value: 'sku_synthetic_blue' } });
+    fireEvent.change(await screen.findByLabelText('查询品类'), { target: { value: 'cat_cleanser' } });
+    fireEvent.change(screen.getByLabelText('查询具体款'), { target: { value: 'sku_chengyajiemian' } });
     fireEvent.click(screen.getByTestId('search-button')); await screen.findByTestId('copy-button-1');
-    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({ platform: 'douyin', productContextType: 'sku', productContextRef: 'sku_synthetic_blue', platformSource: 'manual' }));
+    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({ platform: 'douyin', productContextType: 'sku', productContextRef: 'sku_chengyajiemian', platformSource: 'manual' }));
+    expect(screen.queryByLabelText('合成商品标识')).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '澄芽氨基酸洁面乳' })).toBeInTheDocument();
+  });
+
+  it('sends a selected category id and clears stale results when the pick changes', async () => {
+    const f = connectProduct(); await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('search-button')); await screen.findByTestId('copy-button-1');
+    fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: 'category' } });
+    expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText('查询品类'), { target: { value: 'cat_essence' } });
+    fireEvent.click(screen.getByTestId('search-button')); await screen.findByTestId('copy-button-1');
+    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({ productContextType: 'category', productContextRef: 'cat_essence' }));
+  });
+
+  it('refuses scoped search when the catalog is missing instead of guessing a product', async () => {
+    const f = connectProduct();
+    window.customerAgent!.productCatalog!.list = vi.fn().mockResolvedValue({
+      ok: false as const, sessionEpoch: 0, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试',
+    });
+    await prepareProductQuery();
+    fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: 'sku' } });
+    expect(await screen.findByTestId('catalog-error')).toHaveTextContent(CATALOG_SCOPE_MESSAGES.missing);
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('error-state')).toHaveTextContent(CATALOG_SCOPE_MESSAGES.missing);
+    expect(f.search).toHaveBeenCalledTimes(0);
+    fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('copy-button-1');
+    expect(f.search).toHaveBeenCalledWith(expect.objectContaining({ productContextType: null, productContextRef: null }));
+  });
+  it('refuses scoped search when catalog list rejects instead of guessing a product', async () => {
+    const f = connectProduct();
+    window.customerAgent!.productCatalog!.list = vi.fn().mockRejectedValue(new Error('ipc down'));
+    await prepareProductQuery();
+    fireEvent.change(screen.getByLabelText('商品范围'), { target: { value: 'sku' } });
+    expect(await screen.findByTestId('catalog-error')).toHaveTextContent(CATALOG_SCOPE_MESSAGES.missing);
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('error-state')).toHaveTextContent(CATALOG_SCOPE_MESSAGES.missing);
+    expect(f.search).toHaveBeenCalledTimes(0);
   });
   it('ignores a late product search after the question changes, without fixture fallback', async () => {
     const f = connectProduct(); await prepareProductQuery();
