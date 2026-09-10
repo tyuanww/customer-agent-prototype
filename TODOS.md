@@ -1,6 +1,6 @@
 # TODOS
 
-> **复核：** 2026-09-10。四项 P3 窄分支已在 `codex/macos-p3-narrow-tests` 补齐自动化覆盖；它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。登录残留红字由独立切片处理。
+> **复核：** 2026-09-10。四项 P3 窄分支已由产品 PR #69 合并。登录残留红字已由 PR #68 修复（本页 Login residual 为 DONE）。它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。macOS M5 人工勾选见 `docs/how-to-verify-macos-m5.md`，清单进仓不等于验收通过。
 
 ## Completed
 

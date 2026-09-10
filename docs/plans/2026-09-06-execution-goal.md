@@ -2,7 +2,7 @@
 
 > **状态：APPROVED · EXECUTION MANAGEMENT ONLY**
 > 执行方法统一使用[工程工作流程](../reference-engineering-workflow.md)。本文件只维护完整目标、当前执行清单与历史事实，不新增真实运行、签发、合并或发布授权。
-> **当前分类（2026-09-10）：后端 T0–T6 已完成。桌面 D0–D5 工程已合并到产品 `main@5d6a8023d734e7ee3c83364944adada7751c0d93`（D5 PR #66；合并后 CI run [`34371293392`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34371293392) 五项 SUCCESS）。D2 经 PR #63 修复后通过，不得把 #62 原始合并写成 Windows smoke 已绿。用户反馈已完成本机合成人工观察，边界见当前执行清单。Windows 安装包与实机方案见 [DRAFT](2026-09-10-windows-package-and-device-verification.md)，未批准开工。治理 PR #80 与 BACKEND-CI-503 保持 OPEN。旧记录保留历史语义。**
+> **当前分类（2026-09-10 复核）：后端 T0–T6 已完成。桌面 D0–D5 工程已合并到 `5d6a802`（D5 PR #66）。macOS 合成栈 M1–M4 工程与 M5 人工清单已合并到产品 `main@f64765387c34374dadd42584b49f953b7c737cc8`（#74；合并后 CI [`34433421332`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34433421332) 五项 SUCCESS）。D2 经 PR #63 修复后通过，不得把 #62 原始合并写成 Windows smoke 已绿。登录残留红字已由 PR #68 修复。用户反馈的本机合成观察仍有效，但不覆盖目录点选、打包态 `synthetic-stack.json`，也不能单凭「回退后仍能查到发货话术」勾选 STALE。M5 清单进仓不等于人工验收通过。Windows 安装包见 [DRAFT](2026-09-10-windows-package-and-device-verification.md)，未批准开工。治理 PR #80 与 BACKEND-CI-503 保持 OPEN。旧记录保留历史语义。**
 
 ## 可粘贴到应用的目标
 
@@ -20,22 +20,23 @@
 
 ## 当前执行清单
 
-> 核对日期：2026-09-10。恢复工作先看本节；下面旧日期的执行记录不覆盖新状态。不得重做已完成的 D1–D5。
+> 核对日期：2026-09-10（macOS 合成栈合入后复核）。恢复工作先看本节；下面旧日期的执行记录不覆盖新状态。不得重做已完成的 D1–D5 或已合并的 macOS M1–M4 工程。
 
 | 项目 | 当前事实 / 下一动作 |
 | --- | --- |
 | 后端 T0–T6 | 已完成。产品 PR #51–#57 已合并；收尾 PR #58 为 `de0a92ca607412a99c3729becce9484635533008`。其后 PR #59 合并为 `bb7a14b565553dc689823e54b0218d1d24c47095`，合并后五项 CI 全部通过。不得重复实施后端 |
 | 合同 | 治理 PR #74/#75 已合并；来源 `0904a0aa11f2dc29ae7700871a943c41295cd329`，OpenAPI 1.13.0 / schema.v1.17；产品十四条 migration，旧十三条不得改写 |
-| Git | 两仓独立历史。产品仓 D1–D5 切片 worktree 与远端分支已清理；无仍在运行的 D1–D5 切片。产品仓 D0 遗留分支 `codex/desktop-integration-plan` 已按下方核验删除本地与 origin；治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。本轮文档在 `codex/closeout-windows-draft` |
-| 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。工程已全部合并到产品 `main@5d6a8023d734e7ee3c83364944adada7751c0d93`。证据分账见下表；不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
-| 人工观察 | **用户反馈已完成观察**（本机合成环境；无仓内独立观察报告；不是本次重新实测；不是 Windows 实机）。用户反馈覆盖：登录、命中复制、无匹配联系卡、回退后仍能查询发货话术、退出后再查被拦。「回退后仍查到同一句话术」只证明回退后查询可用，不能单凭这一点声称旧候选缓存失效（STALE）已被人工验证 |
+| Git | 两仓独立历史。产品仓当前无开放 PR。治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。Windows 方案文档已随产品 PR #67 合并，状态仍是 DRAFT |
+| 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。D0–D5 工程在 `5d6a802`。macOS 合成栈工程在 `main@f64765387c34374dadd42584b49f953b7c737cc8`。不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
+| 人工观察 | 早先用户反馈覆盖开发态：登录、命中复制、无匹配联系卡、回退后仍能查询发货话术、退出后再查被拦。那次观察**没有**覆盖目录下拉点选、打包态 `synthetic-stack.json`，也**不能**把「回退后仍能查到同一句发货话术」写成 STALE 已人工验证。下一动作是按 [M5 清单](../how-to-verify-macos-m5.md) 做一次真人勾选；清单进仓不等于 M5 通过 |
 | Windows 下一阶段 | [安装包与实机方案](2026-09-10-windows-package-and-device-verification.md) 状态 **DRAFT**，未批准开工。本次不打包、不安装、不签名、不公证、不部署 |
-| macOS 合成栈（M1） | **已实施，PR 待合并**。`scripts/synthetic-stack/stack.ts` 提供 start/stop/restart/status/destroy/desktop；隔离 PG15 cluster（Unix socket only）+ 合成身份提供方 + API + worker + 真实导入审核发布播种。桌面开发态读 loopback 环境变量，打包态读自身 userData 的 `synthetic-stack.json`（仍只接受精确 loopback origin）。商品目录 SSOT 为 `apps/desktop/src/shared/synthetic-catalog.ts`，经 `product:catalog` 只读 IPC 供 renderer 消费 |
-| macOS 待办（M2–M5） | M2 查询体验与 P3 补测由 Grok 负责（PR #68/#69 已开）；M3 业务异常验证、M4 本机安装包、M5 实机验收待做 |
-| BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。本地/PR/合并 CI 通过不代表已修复，不得用 CI 绿关闭 |
-| 登录残留提示 | 用户反馈登录成功后仍残留红色「合成登录…」提示。已登记为 [独立待办](../../TODOS.md#login-residual-invalid-banner)，本次不修复 |
+| macOS 合成栈（M1） | **已合并**（PR #70 → `75f100d`）。`scripts/synthetic-stack/stack.ts`：start/stop/restart/status/destroy/desktop/packaged-profile/anomaly。隔离 PG15（Unix socket only）+ 合成身份 + API + worker + 真实导入审核发布播种。开发态读 loopback 环境变量；打包态只读 userData `synthetic-stack.json`，缺文件 fail-closed |
+| macOS M2–M4 工程 | **已合并**：登录提示 #68、P3 四项测试 #69、目录选择 #72、业务异常自动化 #71、本机未签名包 #74。证据见下表。Query 不再手填商品标识。M3 自动化不是 Mac 人工 STALE |
+| macOS M5 | 清单已合并（PR #73）。**实机勾选未做**。不得把 unit/CI/Playwright 或本文件更新写成人工验收通过 |
+| 登录残留提示 | **已修复**（PR #68 → `54fce22`）。成功提示不再占用红色 `invalidMessage`。TODOS 中该项为 DONE。不是 Windows 实机证据 |
+| BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。#71 同头曾先红后绿，仍不得用 CI 绿关闭 |
 | 治理 PR #80 | 保持 OPEN，不得合并，不得触发 GitHub Pages 发布 |
-| 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实现/打包/安装/签名/公证/部署、自动外发、治理 #80 合并、Pages 发布、BACKEND-CI-503 修复、登录残留修复、删除其他分支/worktree/桌面材料 |
+| 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实现/打包/安装/签名/公证/部署、自动外发、治理 #80 合并、Pages 发布、BACKEND-CI-503 修复、删除其他分支/worktree/桌面材料 |
 
 ### D0–D5 工程证据（自动化，不是人工观察或 Windows 实机）
 
@@ -50,6 +51,22 @@
 | D5 同一 SHA 整链 | [#66](https://github.com/weiweity/customer-agent-prototype/pull/66) | `5d6a8023d734e7ee3c83364944adada7751c0d93` | [`34371293392`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34371293392) 五项 SUCCESS（含 `backend-runtime.e2e.test.ts`） | Windows 实机或真实飞书 |
 
 Windows hosted-runner smoke 只证明 clean-checkout 的 Windows 运行路径与未签名产物后验，见 [如何验证](../how-to-verify-desktop.md#33-pnpm-packagewin)。
+
+### macOS 合成栈工程证据（自动化 / 清单，不是 M5 人工验收）
+
+产品仓当前头：`main@f64765387c34374dadd42584b49f953b7c737cc8`。
+
+| 切片 | PR | 合并 SHA | 合并后 CI | 不得写成 |
+| --- | --- | --- | --- | --- |
+| M2 登录提示 | [#68](https://github.com/weiweity/customer-agent-prototype/pull/68) | `54fce220a9ade24b0264910b63727e2c0bbfe82f` | [`34393720350`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34393720350) 五项 SUCCESS | 已按 M5 清单复测 |
+| P3 四项窄测试 | [#69](https://github.com/weiweity/customer-agent-prototype/pull/69) | `5a04ce5ef048100423f256e380dc3ba9cb2333cf` | [`34395221257`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34395221257) 五项 SUCCESS | 正式 DEV-M0 |
+| M1 合成栈 | [#70](https://github.com/weiweity/customer-agent-prototype/pull/70) | `75f100d3656d6b5285fde0210b5fba399e32874d` | [`34395736103`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34395736103) 五项 SUCCESS | 真实飞书身份 |
+| M2 目录选择 | [#72](https://github.com/weiweity/customer-agent-prototype/pull/72) | `b28ae56279a73c3389b5d2413968b14eee90b6bb` | [`34431769668`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34431769668) 五项 SUCCESS | 已人工点选目录 |
+| M3 业务异常 | [#71](https://github.com/weiweity/customer-agent-prototype/pull/71) | `2f921b5380c6ce4d0418d0755214f8a66e924b37` | [`34432453142`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34432453142) 五项 SUCCESS | Mac 人工 STALE；BACKEND-CI-503 已关闭 |
+| M5 人工清单 | [#73](https://github.com/weiweity/customer-agent-prototype/pull/73) | `3436667816fd66edb1e3bffd8baacf4aa2bb9950` | [`34433351725`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34433351725) 五项 SUCCESS | M5 已通过 |
+| M4 本机未签名包 | [#74](https://github.com/weiweity/customer-agent-prototype/pull/74) | `f64765387c34374dadd42584b49f953b7c737cc8` | [`34433421332`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34433421332) 五项 SUCCESS | 可外发、已签名、已公证 |
+
+M5 清单正文：[如何核验 macOS M5](../how-to-verify-macos-m5.md)。
 
 ### 产品仓 D0 遗留分支核验（2026-09-10）
 
