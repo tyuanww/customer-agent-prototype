@@ -945,6 +945,26 @@ describe('ServiceRepository readiness', () => {
     });
   });
 
+  it('reuses an admitted idle client after the connect deadline', () => {
+    let now = 120;
+    const client: {
+      runtimeConnectionStartedAt: number;
+      runtimeConnectionAdmitted?: boolean;
+    } = { runtimeConnectionStartedAt: 100 };
+    const verify = createRuntimePoolVerify(50, () => now);
+    const first = vi.fn();
+    verify(client as never, first);
+    expect(first).toHaveBeenCalledOnce();
+    expect(first.mock.calls[0]?.[0]).toBeUndefined();
+    expect(client.runtimeConnectionAdmitted).toBe(true);
+
+    now = 200;
+    const second = vi.fn();
+    verify(client as never, second);
+    expect(second).toHaveBeenCalledOnce();
+    expect(second.mock.calls[0]?.[0]).toBeUndefined();
+  });
+
   it('fails closed when a successful probe settles at or after its response deadline', async () => {
     let now = 100;
     let resolveQuery!: (value: { rows: ReturnType<typeof schemaRow>[] }) => void;

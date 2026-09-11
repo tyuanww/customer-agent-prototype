@@ -9,11 +9,37 @@ for (const [key, value] of Object.entries(process.env)) {
     throw new Error('G1A_CI_REAL_INPUT_ENV_FORBIDDEN');
   }
 }
+function printG1aFailures(reportPath) {
+  try {
+    const summary = JSON.parse(readFileSync(reportPath, 'utf8'));
+    const failed = [];
+    for (const file of summary.testResults ?? []) {
+      for (const test of file.assertionResults ?? []) {
+        if (test.status === 'failed') failed.push(test.fullName);
+      }
+    }
+    if (failed.length > 0) {
+      console.error(`G1A CI failed tests (${failed.length}):`);
+      for (const name of failed) console.error(`  ${name}`);
+      return;
+    }
+    console.error('G1A CI failed; tests.json has no failed assertionResults');
+  } catch {
+    console.error('G1A CI failed; tests.json unreadable');
+  }
+}
+
 const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-e0-ci-'));
 try {
   const report = path.join(root,'tests.json');
-  const result = spawnSync('pnpm',['--filter','@customer-agent/api','test:g1a:e0:synthetic','--reporter=json',`--outputFile=${report}`],{stdio:'inherit',env:process.env});
-  if (result.error || result.signal || result.status !== 0) throw new Error('G1A_CI_SYNTHETIC_FAILED');
+  const result = spawnSync('pnpm',[
+    '--filter','@customer-agent/api','test:g1a:e0:synthetic',
+    '--reporter=default','--reporter=json',`--outputFile=${report}`,
+  ],{stdio:'inherit',env:{ ...process.env, TMPDIR: root, TEMP: root, TMP: root }});
+  if (result.error || result.signal || result.status !== 0) {
+    printG1aFailures(report);
+    throw new Error('G1A_CI_SYNTHETIC_FAILED');
+  }
   const summary = JSON.parse(readFileSync(report,'utf8'));
   const integration = summary.testResults.filter((entry) => entry.name.endsWith('/g1a-e0-synthetic.integration.test.ts'));
   if (summary.success !== true || summary.numTotalTests < 1 || summary.numPendingTests !== 0

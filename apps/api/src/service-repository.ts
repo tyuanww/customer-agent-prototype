@@ -43,7 +43,8 @@ type RuntimePool = Pick<Pool, 'query' | 'connect' | 'end' | 'on'>;
 type RuntimeClock = () => number;
 
 class RuntimePoolClient extends Client {
-  readonly runtimeConnectionStartedAt = performance.now();
+  runtimeConnectionStartedAt = performance.now();
+  runtimeConnectionAdmitted = false;
 }
 
 /** Internal deterministic test seam for pg-pool's late-connect race guard. */
@@ -61,11 +62,20 @@ function verifyRuntimeConnectionDeadline(
   now: number,
   done: (error?: Error) => void,
 ): void {
+  if (Reflect.get(client, 'runtimeConnectionAdmitted') === true) {
+    done();
+    return;
+  }
   const startedAt = Reflect.get(client, 'runtimeConnectionStartedAt');
   if (typeof startedAt !== 'number'
     || runtimeConnectionExceededDeadline(startedAt, timeoutMs, now)) {
     done(new Error('Runtime database connection exceeded its configured deadline'));
     return;
+  }
+  try {
+    Reflect.set(client, 'runtimeConnectionAdmitted', true);
+  } catch {
+    // Frozen test doubles cannot record admission.
   }
   done();
 }
