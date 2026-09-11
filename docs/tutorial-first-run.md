@@ -8,7 +8,7 @@
 > 复制成功只表示剪贴板写入成功，不表示已发送、已采纳或回答正确。
 > Dashboard 是交互式合成 BI / 架构故事，不是生产系统。
 
-相关文档：[如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
+相关文档：[如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
 
 ---
 
@@ -90,7 +90,7 @@ pnpm dev
 ### 4.1 打开查询
 
 1. 单击狐狸头（不要双击等待；首击必须立刻打开）。
-2. 成功标志：玻璃查询胶囊出现（约 600×88）；输入框自动聚焦；胶囊上有 `DEMO` / `MOCK AUTH` / `SYNTHETIC DATA` 徽标；「深度思考 · 预留 · OFF」可见。
+2. 成功标志：玻璃查询胶囊出现（约 600×88）；输入框自动聚焦；胶囊上有 `DEMO` / `MOCK AUTH` 徽标；「智能检索」默认 ON。话术卡片不再贴 `DEMO · 合成数据`。
 3. 提示文案包含「只复制不代发」。
 
 贴边半露、探头、睡眠表情不是本条主链的必做步骤。若狐狸贴在屏幕左右边缘，原生 88px 窗仍应完整留在工作区，看起来各露一半——这是 renderer 裁切，不是把窗推出屏外。

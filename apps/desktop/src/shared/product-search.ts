@@ -47,6 +47,8 @@ export type ProductSearchApi = {
   search(request: ProductSearchRequest): Promise<ProductSearchResult>;
   cancelSearch(request: QueryIdentity): Promise<ProductCancelResult>;
   copyAdopt(request: ProductCopyRequest): Promise<ProductCopyResult>;
+  retrievalPreference?(): Promise<import('./retrieval-preference').RetrievalPreference>;
+  setRetrievalPreference?(next: import('./retrieval-preference').RetrievalPreference): Promise<import('./retrieval-preference').RetrievalPreference>;
 };
 /** Main has validated the frozen HTTP contract; preload still rejects extra projection fields. */
 const keysMatch = (v: unknown, keys: string[]): boolean => exactKeys(v, keys);

@@ -119,3 +119,9 @@
 - 工具不可用时，区分必要信息与可选流程：缺少必要信息才停下询问；可选步骤可用等价方法完成或说明未执行，不伪报 Skill / 外部模型审查完成。
 
 任务对应的唯一 Skill 路由表见[工程工作流程](docs/reference-engineering-workflow.md#3-gstack-路由)。先确认任务范围，再执行适用步骤；Skill 名称、启动次数及报告数量不作为完成依据。
+
+## Health Stack
+
+- typecheck: pnpm typecheck
+- lint: pnpm lint
+- test: pnpm test

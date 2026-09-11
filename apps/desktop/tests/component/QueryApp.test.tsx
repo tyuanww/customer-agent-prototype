@@ -136,7 +136,11 @@ describe('QueryApp', () => {
         intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const] }],
     }));
     const copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus: 'recorded' as const }));
-    window.customerAgent!.productSearch = { search, copyAdopt, cancelSearch: vi.fn(async r => ({ ok: true, ...r, cancelled: true })) };
+    window.customerAgent!.productSearch = {
+      search, copyAdopt, cancelSearch: vi.fn(async r => ({ ok: true, ...r, cancelled: true })),
+      retrievalPreference: vi.fn(async () => ({ smartEnabled: true })),
+      setRetrievalPreference: vi.fn(async (next) => next),
+    };
     const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' }) => void> = [];
     window.customerAgent!.productAnnounce = {
       refresh: vi.fn(async r => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, releaseId: 'rel-synthetic', releaseSeq: 13,
@@ -233,6 +237,7 @@ describe('QueryApp', () => {
     f.search.mockClear();
     const pending = deferred<Awaited<ReturnType<typeof f.search>>>(); const response = f.search.getMockImplementation()!;
     f.search.mockImplementationOnce(() => pending.promise); fireEvent.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
     const request = f.search.mock.calls[0][0];
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '另一个问题' } });
     await act(async () => pending.resolve(await response(request)));
@@ -244,7 +249,7 @@ describe('QueryApp', () => {
     if (eventStatus === 'disabled') { const response = f.search.getMockImplementation()!; f.search.mockImplementation(async r => ({ ...await response(r), telemetryStatus: 'collection_disabled' })); }
     window.customerAgent!.productSearch!.copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus }));
     await prepareProductQuery(); await screen.findByTestId('copy-button-1');
-    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-A' } });
+    fireEvent.change(screen.getByLabelText('订单号'), { target: { value: 'SYNTHETIC-A' } });
     fireEvent.click(screen.getByTestId('copy-button-1')); await screen.findByTestId('toast');
     expect(screen.getByTestId('toast')).toHaveTextContent('已复制');
     if (eventStatus === 'unrecorded') expect(screen.getByTestId('toast')).toHaveTextContent('事件未记录');
@@ -270,14 +275,14 @@ describe('QueryApp', () => {
     await screen.findByText('查询服务暂不可用，请重试'); expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
   });
   it('clears old order values on new queries and locks placeholders during copying', async () => {
-    const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button')); await screen.findByLabelText('合成订单号');
-    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-A' } });
+    const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button')); await screen.findByLabelText('订单号');
+    fireEvent.change(screen.getByLabelText('订单号'), { target: { value: 'SYNTHETIC-A' } });
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '第二个订单' } }); fireEvent.click(screen.getByTestId('search-button'));
-    expect(await screen.findByLabelText('合成订单号')).toHaveValue('');
-    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-B' } });
+    expect(await screen.findByLabelText('订单号')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('订单号'), { target: { value: 'SYNTHETIC-B' } });
     const pending = deferred<Awaited<ReturnType<typeof f.copyAdopt>>>(); const response = f.copyAdopt.getMockImplementation()!;
     f.copyAdopt.mockImplementationOnce(() => pending.promise); fireEvent.click(screen.getByTestId('copy-button-1'));
-    expect(screen.getByLabelText('合成订单号')).toBeDisabled();
+    expect(screen.getByLabelText('订单号')).toBeDisabled();
     expect(f.copyAdopt).toHaveBeenCalledWith(expect.objectContaining({ placeholderValues: { order_id: 'SYNTHETIC-B' } }));
     await act(async () => pending.resolve(await response(f.copyAdopt.mock.calls[0][0])));
   });
@@ -684,32 +689,88 @@ describe('QueryApp', () => {
     expect(reportUiPhase).toHaveBeenCalledWith('SEARCH_INPUT', 0);
   });
 
-  it('keeps DeepSeek as an OFF disclosure-only reservation', async () => {
+  it('defaults smart retrieval ON and can turn it off without hiding the input', async () => {
     const user = userEvent.setup();
+    connectProduct();
     render(<QueryApp />);
-    const toggle = screen.getByTestId('deep-thinking-toggle');
+    const toggle = await screen.findByTestId('deep-thinking-toggle');
     reportUiPhase.mockClear();
 
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(toggle).toHaveAttribute('aria-describedby', 'deep-thinking-description');
-    expect(screen.queryByTestId('deep-thinking-panel')).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).toHaveTextContent('ON');
+    expect(screen.getByTestId('question-input')).toBeInTheDocument();
 
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('deep-thinking-panel')).toHaveTextContent('DeepSeek 辅助重排预留');
-    expect(screen.getByTestId('deep-thinking-panel')).toHaveTextContent(
-      '当前 OFF · 未接入 · 不生成 · 不改写 · 不发送',
-    );
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveTextContent('OFF');
+    expect(screen.getByTestId('question-input')).toBeInTheDocument();
+    expect(window.customerAgent?.productSearch?.setRetrievalPreference).toHaveBeenCalledWith({ smartEnabled: false });
     expect(reportUiPhase).not.toHaveBeenCalled();
     expect(copyText).not.toHaveBeenCalled();
     expect(openDashboard).not.toHaveBeenCalled();
-
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByTestId('question-input')).toBeInTheDocument();
   });
 
-  it('keeps the same fixture ranking after opening the DeepSeek reservation note', async () => {
+  it('does not show DEMO · 合成数据 on live script cards', async () => {
+    const f = connectProduct();
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('copy-button-1');
+    expect(screen.queryByText('DEMO · 合成数据')).not.toBeInTheDocument();
+    expect(screen.getByTestId('env-badges')).toHaveTextContent('DEMO');
+    expect(f.search).toHaveBeenCalled();
+  });
+
+  it('loads persisted smart retrieval OFF and reverts if the write fails', async () => {
+    connectProduct();
+    window.customerAgent!.productSearch!.retrievalPreference = vi.fn(async () => ({ smartEnabled: false }));
+    window.customerAgent!.productSearch!.setRetrievalPreference = vi.fn(async () => {
+      throw new Error('preference write failed');
+    });
+    render(<QueryApp />);
+    const toggle = await screen.findByTestId('deep-thinking-toggle');
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+    expect(toggle).toHaveTextContent('OFF');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+  });
+
+  it('cancels an in-flight search when smart retrieval is toggled', async () => {
+    const f = connectProduct();
+    const pending = deferred<Awaited<ReturnType<typeof f.search>>>();
+    f.search.mockImplementationOnce(() => pending.promise);
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByTestId('announce-banner');
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
+    const cancelSearch = window.customerAgent!.productSearch!.cancelSearch as ReturnType<typeof vi.fn>;
+    cancelSearch.mockClear();
+    fireEvent.click(screen.getByTestId('deep-thinking-toggle'));
+    expect(cancelSearch).toHaveBeenCalled();
+    pending.resolve({
+      ok: true, sessionEpoch: 10, generation: 1, queryId: '11111111-1111-4111-8111-111111111111',
+      hitStatus: 'hit', releaseId: 'rel-synthetic', telemetryStatus: 'recorded', candidates: [],
+    });
+  });
+
+  it('waits for the retrieval preference write before searching', async () => {
+    const f = connectProduct();
+    const pending = deferred<{ smartEnabled: boolean }>();
+    window.customerAgent!.productSearch!.setRetrievalPreference = vi.fn(() => pending.promise);
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByTestId('announce-banner');
+    fireEvent.click(screen.getByTestId('deep-thinking-toggle'));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(f.search).not.toHaveBeenCalled();
+    await act(async () => pending.resolve({ smartEnabled: false }));
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
+  });
+
+  it('keeps the same fixture ranking after toggling smart retrieval', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');

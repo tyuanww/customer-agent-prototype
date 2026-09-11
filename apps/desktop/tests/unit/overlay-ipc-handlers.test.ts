@@ -458,4 +458,20 @@ describe('overlay query layout IPC handlers', () => {
     expectRejectedAck(layout, { sessionId: 0, sequence: 0 });
     expectRejectedAck(resize, { sessionId: 0, sequence: 0 });
   });
+
+  it('forwards restorePreviousApp only when the Query renderer sends true', () => {
+    const fixture = createControllerFixture();
+    const dismiss = vi.fn();
+    Object.assign(fixture.controller, { dismiss });
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.DISMISS);
+    handler(fixture.query.event);
+    expect(dismiss).toHaveBeenCalledWith(false);
+    handler(fixture.query.event, true);
+    expect(dismiss).toHaveBeenCalledWith(true);
+    handler(fixture.query.event, 'true');
+    expect(dismiss).toHaveBeenLastCalledWith(false);
+    handler(createSender(99, 'query').event, true);
+    expect(dismiss).toHaveBeenCalledTimes(3);
+  });
 });

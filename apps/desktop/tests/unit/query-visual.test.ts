@@ -74,6 +74,7 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('background: var(--query-accent-control)');
     expect(css).toContain('.dashboard-entry');
     expect(css).toContain('.deep-thinking-entry');
+    expect(css).toContain('.capsule-session-entry');
     expect(css).toContain('background: var(--fox-soft)');
     expect(tokens).toContain('--ink: #f5f5f7');
     expect(tokens).toContain('--muted: #b9b5c0');
@@ -87,7 +88,7 @@ describe('query capsule visual contract', () => {
     expect(css).not.toContain('background: rgba(255, 255, 255, 0.72)');
     expect(css).not.toContain('color: #6543aa');
     expect(css).toContain('color: var(--query-success-ink)');
-    expect(css).toContain('.deep-thinking-entry span {\n  color: var(--query-rank-ink)');
+    expect(css).toContain(".deep-thinking-entry[aria-pressed='true'] span {\n  color: var(--query-rank-ink)");
   });
 
   it('provides glass fallbacks without changing the reduced-motion handoff snap', () => {

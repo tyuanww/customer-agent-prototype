@@ -8,6 +8,13 @@ import type { AnnounceGate } from '../shared/product-announce';
 import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
 import { SYNTHETIC_CATALOG } from '../shared/synthetic-catalog';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
+import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog';
+import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
+import { loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
+import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
@@ -57,6 +64,14 @@ export class ProductSearch {
     private readonly writeClipboard: (text: string) => void,
     private readonly announce: AnnounceGate,
     private readonly help: SearchHelp = { openEntry: () => false },
+    private readonly retrieve: SemanticRetriever = loadSemanticRetriever(),
+    private readonly hydrate: HydrateCatalog | null = loadHydrateCatalog(),
+    private readonly rerank: Reranker | null = loadMinimaxReranker(),
+    private readonly pipeline: RetrievalPipeline = loadRetrievalPipeline(),
+    private readonly preference: RetrievalPreferenceStore = loadRetrievalPreferenceStore(
+      process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE
+        ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-preference.json'),
+    ),
   ) {
     const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
@@ -118,11 +133,35 @@ export class ProductSearch {
       state.productType = request.productContextType;
       state.productRef = request.productContextRef;
       state.unscopedProducts = request.productUnscoped;
+      const queryText = request.queryText.trim();
+      const smartEnabled = this.preference.read().smartEnabled;
+      let ranked = await this.pipeline.run(queryText, smartEnabled, state.controller.signal);
+      if (ranked.length === 0) {
+        const rewritten = this.retrieve.rank(queryText);
+        ranked = smartEnabled && this.rerank && rewritten.length > 0
+          ? await this.rerank.rerank(queryText, rewritten, state.controller.signal)
+          : rewritten;
+      }
+      if (this.hydrate) {
+        const local = this.hydrate.hydrate(ranked)
+          .filter((candidate) => this.usable(candidate, state))
+          .slice(0, 3)
+          .map((candidate, index) => ({ ...candidate, rank: (index + 1) as 1 | 2 | 3 }));
+        if (local.length > 0) {
+          if (!this.announce.allows(local[0]!.release_id)) throw new ProductHttpError('STALE');
+          return this.finishLocal(sender, state, request, local[0]!.release_id, local);
+        }
+        if (!this.announce.allows(this.hydrate.releaseId)) throw new ProductHttpError('STALE');
+        return this.finishLocal(sender, state, request, this.hydrate.releaseId, []);
+      }
+      if ((process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim().length > 0) {
+        throw new ProductHttpError('UNAVAILABLE');
+      }
       const jobs = searchJobs(request);
       const pages = await Promise.all(jobs.map(async (job) => {
         const queryId = randomUUID();
         const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {
-          query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: request.queryText.trim(), collection_mode: 'synthetic',
+          query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: queryText, collection_mode: 'synthetic',
           detected_platform: job.platform, platform: job.platform, platform_source: 'manual',
           product_context_type: job.productContextType, product_context_ref: job.productContextRef, top_k: 3,
         } });
@@ -132,7 +171,7 @@ export class ProductSearch {
           || response.candidates.some((candidate) => candidate.release_id !== response.release_id || !matchesJob(candidate, job))) {
           throw new ProductHttpError('VALIDATION');
         }
-        return { queryId, response };
+        return { queryId, response, queryText };
       }));
       const origins = new Map<string, string>();
       const merged: ProductCandidate[] = [];
@@ -158,6 +197,26 @@ export class ProductSearch {
       state.origins = origins;
       state.result = structuredClone(result); this.last.set(sender, state); return result;
     } catch (error) { return this.failure(error, request); }
+  }
+  private finishLocal(
+    sender: number,
+    state: SearchState,
+    request: ProductSearchRequest,
+    releaseId: string,
+    candidates: ProductCandidate[],
+  ): Extract<ProductSearchResult, { ok: true }> {
+    this.current(sender, state);
+    const queryId = randomUUID();
+    const origins = new Map(candidates.map((candidate) => [candidate.script_id, queryId]));
+    const result: Extract<ProductSearchResult, { ok: true }> = {
+      ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
+      queryId, hitStatus: candidates.length > 0 ? 'hit' : 'no_hit', releaseId,
+      telemetryStatus: 'collection_disabled', candidates,
+    };
+    state.origins = origins;
+    state.result = structuredClone(result);
+    this.last.set(sender, state);
+    return result;
   }
   async copy(sender: number, request: ProductCopyRequest): Promise<ProductCopyResult> {
     let state: SearchState | undefined; let acquired = false;

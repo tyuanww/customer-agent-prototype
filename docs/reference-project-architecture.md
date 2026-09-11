@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1–T6 合成身份、持久导入、worker/审核、发布/回退和读取及构建进程链已合并；schema.v1.17 / 第十四段 migration 已随收尾合入，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链。S0 桌面默认仍走合成 fixture；显式 loopback 接入 profile 已合并 D1 会话/HTTP、D2 搜索复制、D3 公告/租约/ACK、D4 无匹配求助、D5 同一 SHA 合成整链。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。Windows 安装包见 [DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工。正式飞书鉴权、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1–T6 合成身份、持久导入、worker/审核、发布/回退和读取及构建进程链已合并；schema.v1.17 / 第十四段 migration 已随收尾合入，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链。S0 桌面默认仍走合成 fixture；显式 loopback 接入 profile 已合并 D1 会话/HTTP、D2 搜索复制、D3 公告/租约/ACK、D4 无匹配求助、D5 同一 SHA 合成整链。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。Windows 安装包见 [DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工。正式飞书鉴权、真实数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -24,7 +24,7 @@
 │ renderer                                                       │
 │  App.tsx 按 WindowRole 分发                                     │
 │   ├─ FoxApp       浮窗、拖拽、贴边、睡眠与交接                   │
-│   ├─ QueryApp     查询胶囊、本地合成检索、Top 3、复制            │
+│   ├─ QueryApp     查询胶囊、BM25/hydrate Top 3、复制            │
 │   └─ DashboardApp 静态合成工作台、主题与导航                      │
 └────────────────────────────────────────────────────────────────┘
                 │
@@ -53,16 +53,16 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；显式接入 profile 下 D1–D5 桌面 adapter 已接线，方案为 APPROVED 且工程已合并。真实内容和正式飞书身份仍未接通。
+桌面主链：狐狸浮窗打开查询 → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；显式接入 profile 下 D1–D5 桌面 adapter 已接线。真实内容和正式飞书身份仍未接通。
 
 ## 2. 目录归属
 
 | 目录 | 只负责什么 | 不应该放什么 |
 | --- | --- | --- |
-| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页、D4 合成求助入口、D5 经 API 消费发布链 | React 视图、业务 fixture、通用 HTTP 客户端 |
+| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页、D4 合成求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排 | React 视图、业务 fixture、通用 HTTP 客户端 |
 | `apps/desktop/src/preload/` | 把 `CustomerAgentApi` 的白名单能力暴露给 renderer | `ipcRenderer` 通用转发、Node 文件系统、token |
 | `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard 和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
-| `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何和状态纯函数 | 依赖 DOM、Electron、React 的实现 |
+| `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何、状态纯函数，以及 BM25+RRF `hybrid-retrieve` | 依赖 DOM、Electron、React 的实现 |
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
@@ -106,7 +106,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | WindowRole | Renderer | preload | 主要能力 |
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | 有 | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
-| `query` | `QueryApp` | 有 | 本地检索、复制、布局高度、打开 Dashboard |
+| `query` | `QueryApp` | 有 | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard |
 | `dashboard` | `DashboardApp` | 无 | 静态合成 Dashboard、主题和导航 |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
@@ -141,7 +141,7 @@ v1.17 migrated PG15
   └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
 ```
 
-`apps/desktop/src/renderer/features/search/search-service.ts` 是当前原型模式的本地 n-gram 检索器；它返回展示用 `RankedScript`，不等同正式 API 的 candidate。正式衔接必须在 `DEV-M0～M3` 的对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
+未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
 合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告及 synthetic-only Search + Events 主链；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，方案为 APPROVED。真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
 

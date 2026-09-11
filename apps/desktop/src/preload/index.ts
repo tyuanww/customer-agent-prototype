@@ -3,6 +3,7 @@ import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isP
 import { helpFailure, isProductEscalateRequest, isProductEscalateResult, isProductTerminalRequest, isProductTerminalResult } from '../shared/product-help';
 import { catalogFailure, isProductCatalogResult } from '../shared/product-catalog';
 import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
+import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC_CHANNELS,
@@ -71,11 +72,32 @@ async function queryInvoke(channel: string, request: QueryIdentity) {
     return matches ? value : queryFailure('UNAVAILABLE', request);
   } catch { return queryFailure('UNAVAILABLE', request); }
 }
+async function readRetrievalPreference() {
+  try {
+    const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
+    return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
+  } catch {
+    return DEFAULT_RETRIEVAL_PREFERENCE;
+  }
+}
 const api: CustomerAgentApi = {
   productSearch: {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
     copyAdopt: request => queryInvoke(IPC_CHANNELS.PRODUCT_COPY_ADOPT, request) as Promise<ProductCopyResult>,
     cancelSearch: request => queryInvoke(IPC_CHANNELS.PRODUCT_CANCEL_SEARCH, request) as Promise<ProductCancelResult>,
+    async retrievalPreference() {
+      return readRetrievalPreference();
+    },
+    async setRetrievalPreference(next) {
+      const parsed = parseRetrievalPreference(next);
+      if (!parsed) return readRetrievalPreference();
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET, parsed);
+        return parseRetrievalPreference(value) ?? await readRetrievalPreference();
+      } catch {
+        return readRetrievalPreference();
+      }
+    },
   },
   product: {
     sessionStatus: () => sessionInvoke(IPC_CHANNELS.PRODUCT_SESSION_STATUS),

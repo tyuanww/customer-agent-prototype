@@ -76,11 +76,11 @@ test('product session native login, search, copy, logout and renderer isolation'
     await query.getByLabel('查询平台').selectOption('qianniu');
     await query.getByTestId('search-button').click();
     await expect(query.getByTestId('answer-text-1')).toHaveText('这是合成订单 {订单号}。');
-    await query.getByLabel('合成订单号').fill('SYNTHETIC-A');
+    await query.getByLabel('订单号').fill('SYNTHETIC-A');
     await query.getByTestId('question-input').fill('第二个合成订单发货问题');
     await query.getByTestId('search-button').click();
-    await expect(query.getByLabel('合成订单号')).toHaveValue('');
-    await query.getByLabel('合成订单号').fill('SYNTHETIC-B');
+    await expect(query.getByLabel('订单号')).toHaveValue('');
+    await query.getByLabel('订单号').fill('SYNTHETIC-B');
     await expect(query.getByTestId('copy-button-1')).toBeVisible();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true');
     await query.screenshot({ path: testInfo.outputPath(`product-query-${browserName}.png`) });

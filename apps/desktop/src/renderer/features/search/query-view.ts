@@ -17,7 +17,7 @@ export type QueryFoxVisualState = 'SEARCHING' | 'RESULTS' | 'EMPTY' | 'COPIED' |
 export const SEARCH_FEEDBACK_MS = 280;
 export const COPY_FEEDBACK_MS = 900;
 export const DEEP_THINKING_DESCRIPTION =
-  'DeepSeek 仅作辅助重排预留，当前 OFF、未接入；不生成、不改写、不发送。';
+  '智能检索默认开启：MiniMax 只规划检索式并重排已有话术，不生成、不改写正文。关闭后仅用本地 BM25。';
 
 export function queryFoxVisualState(
   searching: boolean,

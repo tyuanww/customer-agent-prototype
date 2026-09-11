@@ -94,7 +94,7 @@ export function QueryApp() {
   const [handoffFoxTransform, setHandoffFoxTransform] = useState<FoxVisualTransform>(
     IDENTITY_FOX_VISUAL_TRANSFORM,
   );
-  const [deepThinkingInfoOpen, setDeepThinkingInfoOpen] = useState(false);
+  const [smartEnabled, setSmartEnabled] = useState(true);
   const [layoutReady, setLayoutReady] = useState(true);
   const [resizeEdge, setResizeEdge] = useState<QueryResizeEdge>('bottom');
   const [queryHeight, setQueryHeight] = useState(QUERY_INPUT_HEIGHT);
@@ -119,6 +119,7 @@ export function QueryApp() {
   const composingRef = useRef(false);
   const copyInFlightRef = useRef(false);
   const searchInFlightRef = useRef(false);
+  const preferenceWriteRef = useRef(Promise.resolve());
   const dashboardOpenFailedRef = useRef(false);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
@@ -389,6 +390,9 @@ export function QueryApp() {
       .catch(() => {
         // Click path still works.
       });
+    void api.productSearch?.retrievalPreference?.()
+      .then((preference) => setSmartEnabled(preference.smartEnabled))
+      .catch(() => undefined);
 
     return api.onOverlayCommand((command) => {
       if (command.type === 'prepare-search') {
@@ -430,7 +434,6 @@ export function QueryApp() {
           setResults([]);
           setInvalidMessage('');
           setErrorMessage('');
-          setDeepThinkingInfoOpen(false);
           setLayoutReady(true);
           layoutSequenceRef.current = 0;
           lastAppliedLayoutSequenceRef.current = 0;
@@ -533,7 +536,6 @@ export function QueryApp() {
         setCopying(false);
         setSearching(false);
         setInvalidMessage('');
-        setDeepThinkingInfoOpen(false);
         if (command.animate) {
           collapseCleanupTimerRef.current = window.setTimeout(() => {
             collapseCleanupTimerRef.current = null;
@@ -914,9 +916,9 @@ export function QueryApp() {
       lastProductQueryRef.current = null; setHelpStatus('待核实');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
-      const search = () => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
+      const search = () => preferenceWriteRef.current.then(() => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
         productContextType: scope.productContextType, productContextRef: scope.productContextRef,
-        productUnscoped: productType === 'all', parentQueryId: null });
+        productUnscoped: productType === 'all', parentQueryId: null }));
       const run = window.customerAgent.productAnnounce && !announce
         ? refreshAnnounce(sessionEpoch).then(result => { if (!result?.ok || generation !== searchGenerationRef.current) return null; return search(); })
         : search();
@@ -1466,15 +1468,15 @@ export function QueryApp() {
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
           productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
-            <button type="button" className="deep-thinking-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
+            <button type="button" className="capsule-session-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
               title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '仅使用合成身份'}>
               {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : '合成登录'}
             </button>
           ) : null}
           foxVisualState={foxVisualState}
           foxDrag={drag}
-          deepThinkingInfoOpen={deepThinkingInfoOpen}
           deepThinkingDescription={DEEP_THINKING_DESCRIPTION}
+          smartEnabled={smartEnabled}
           query={query}
           inputRef={inputRef}
           invalidMessage={invalidMessage}
@@ -1493,7 +1495,19 @@ export function QueryApp() {
           }}
           onKeyDown={onKeyDown}
           onOpenDashboard={openDashboard}
-          onToggleDeepThinking={() => setDeepThinkingInfoOpen((current) => !current)}
+          onToggleSmartRetrieval={() => {
+            const next = !smartEnabled;
+            setSmartEnabled(next);
+            cancelPendingSearch();
+            const write = window.customerAgent?.productSearch?.setRetrievalPreference?.({ smartEnabled: next })
+              .then((preference) => {
+                setSmartEnabled(preference.smartEnabled);
+              })
+              .catch(() => {
+                setSmartEnabled(!next);
+              });
+            preferenceWriteRef.current = write ?? Promise.resolve();
+          }}
           onSearch={runSearch}
         />
 
@@ -1512,7 +1526,7 @@ export function QueryApp() {
           <QueryResultsPane
             contextControls={window.customerAgent?.productSearch && productState?.ok && productState.enabled ? (
               <fieldset aria-label="查询范围" className="product-query-context">
-                <legend>查询范围 · 合成数据</legend>
+                <legend>查询范围</legend>
                 <label>平台 <select aria-label="查询平台" value={searchPlatform} onChange={e => { setSearchPlatform(e.target.value as typeof searchPlatform); cancelPendingSearch(); cancelPendingCopy(); setResults([]); reportPhase('ERROR'); }}>
                   <option value="all">全部平台</option><option value="qianniu">千牛</option><option value="douyin">抖音</option>
                 </select></label>
@@ -1540,8 +1554,8 @@ export function QueryApp() {
                 {catalogStatus !== 'ready' && catalogStatus !== 'loading' && (productType === 'category' || productType === 'sku') ? (
                   <p className="catalog-scope-error" data-testid="catalog-error" role="status">{catalogStatusMessage(catalogStatus)}</p>
                 ) : null}
-                {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '合成订单号' : '日期'}
-                  <input disabled={copying} aria-label={key === 'order_id' ? '合成订单号' : '日期'} value={placeholderValues[key] ?? ''} onChange={e => setPlaceholderValues(v => ({ ...v, [key]: e.target.value }))} />
+                {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '订单号' : '日期'}
+                  <input disabled={copying} aria-label={key === 'order_id' ? '订单号' : '日期'} value={placeholderValues[key] ?? ''} onChange={e => setPlaceholderValues(v => ({ ...v, [key]: e.target.value }))} />
                 </label>)}
               </fieldset>
             ) : undefined}

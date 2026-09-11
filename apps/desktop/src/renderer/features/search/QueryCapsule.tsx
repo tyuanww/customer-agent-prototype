@@ -8,8 +8,8 @@ type QueryCapsuleProps = {
   productControl?: React.ReactNode;
   foxVisualState: QueryFoxVisualState;
   foxDrag: ReturnType<typeof useWindowDrag>;
-  deepThinkingInfoOpen: boolean;
   deepThinkingDescription: string;
+  smartEnabled: boolean;
   query: string;
   inputRef: Ref<HTMLInputElement>;
   invalidMessage: string;
@@ -24,7 +24,7 @@ type QueryCapsuleProps = {
   onCompositionEnd: () => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   onOpenDashboard: () => void;
-  onToggleDeepThinking: () => void;
+  onToggleSmartRetrieval: () => void;
   onSearch: () => void;
 };
 
@@ -32,8 +32,8 @@ export function QueryCapsule({
   productControl,
   foxVisualState,
   foxDrag,
-  deepThinkingInfoOpen,
   deepThinkingDescription,
+  smartEnabled,
   query,
   inputRef,
   invalidMessage,
@@ -48,7 +48,7 @@ export function QueryCapsule({
   onCompositionEnd,
   onKeyDown,
   onOpenDashboard,
-  onToggleDeepThinking,
+  onToggleSmartRetrieval,
   onSearch,
 }: QueryCapsuleProps) {
   return (
@@ -69,18 +69,7 @@ export function QueryCapsule({
             <label className="sr-only" htmlFor="customer-question">
               客户问题
             </label>
-            {deepThinkingInfoOpen ? (
-              <div
-                id="deep-thinking-panel"
-                className="deep-thinking-note"
-                data-testid="deep-thinking-panel"
-                role="note"
-              >
-                <strong>DeepSeek 辅助重排预留</strong>
-                <span>当前 OFF · 未接入 · 不生成 · 不改写 · 不发送</span>
-              </div>
-            ) : (
-              <input
+            <input
                 id="customer-question"
                 ref={inputRef}
                 className="capsule-input"
@@ -107,7 +96,6 @@ export function QueryCapsule({
                 }}
                 onKeyDown={onKeyDown}
               />
-            )}
             <span id="deep-thinking-description" className="sr-only">
               {deepThinkingDescription}
             </span>
@@ -157,23 +145,21 @@ export function QueryCapsule({
                     <path d="M10 10.25h4.5M10 13.25h3" />
                   </svg>
                 </button>
-                {!productControl ? <button
+                <button
                   type="button"
                   className="deep-thinking-entry"
                   data-testid="deep-thinking-toggle"
-                  aria-label={`${deepThinkingInfoOpen ? '收起' : '查看'}深度思考预留说明，功能默认 OFF`}
-                  aria-pressed={deepThinkingInfoOpen}
-                  aria-expanded={deepThinkingInfoOpen}
-                  aria-controls="deep-thinking-panel"
+                  aria-label={`智能检索当前${smartEnabled ? '开启' : '关闭'}，点击切换。默认开启。`}
+                  aria-pressed={smartEnabled}
                   aria-describedby="deep-thinking-description"
-                  onClick={onToggleDeepThinking}
+                  title="智能检索：MiniMax 规划检索式并重排已有话术，不生成正文"
+                  onClick={onToggleSmartRetrieval}
                 >
-                  深度思考 <span>预留 · OFF</span>
-                </button> : null}
+                  智能检索 <span>{smartEnabled ? 'ON' : 'OFF'}</span>
+                </button>
                 <div className="env-badges" data-testid="env-badges">
                   <span className="env-badge">DEMO</span>
                   <span className="env-badge">MOCK AUTH</span>
-                  <span className="env-badge">SYNTHETIC DATA</span>
                 </div>
               </div>
             </div>

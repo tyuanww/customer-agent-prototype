@@ -38,7 +38,6 @@ export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps)
           <span className={risk.className} data-testid={`risk-${script.rank}`}>
             {risk.label}
           </span>
-          <span className="synthetic-tag">DEMO · 合成数据</span>
         </div>
       </div>
       <div className="card-answer-row">

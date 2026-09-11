@@ -1139,28 +1139,6 @@
   color: var(--muted);
 }
 
-.deep-thinking-note {
-  display: flex;
-  width: 100%;
-  height: 40px;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--fox) 22%, var(--hairline));
-  border-radius: 10px;
-  background: var(--fox-soft);
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 15px;
-}
-
-.deep-thinking-note strong {
-  flex: 0 0 auto;
-  color: var(--ink);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 .capsule-meta {
   display: flex;
   align-items: center;
@@ -1212,6 +1190,7 @@
   stroke-linejoin: round;
 }
 
+.capsule-session-entry,
 .deep-thinking-entry {
   min-height: 22px;
   padding: 0 7px;
@@ -1224,16 +1203,35 @@
   white-space: nowrap;
 }
 
-.deep-thinking-entry span {
-  color: var(--query-rank-ink);
-  font-size: 9px;
+.capsule-session-entry:hover,
+.deep-thinking-entry:hover {
+  border-color: color-mix(in srgb, var(--fox) 28%, var(--hairline));
+  background: var(--query-control-hover);
+  color: var(--ink);
 }
 
-.deep-thinking-entry:hover,
+.capsule-session-entry:active,
+.deep-thinking-entry:active {
+  background: var(--query-control-pressed);
+}
+
+.deep-thinking-entry span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .deep-thinking-entry[aria-pressed='true'] {
   border-color: color-mix(in srgb, var(--fox) 32%, var(--hairline));
   background: var(--fox-soft);
   color: var(--ink);
+}
+
+.deep-thinking-entry[aria-pressed='true'] span {
+  color: var(--query-rank-ink);
+}
+
+.deep-thinking-entry[aria-pressed='true']:hover {
+  background: color-mix(in srgb, var(--fox) 16%, var(--query-control-hover));
 }
 
 .capsule-hint {
@@ -1983,6 +1981,7 @@ html[data-role='fox'] #root {
 
   .capsule-field,
   .dashboard-entry,
+  .capsule-session-entry,
   .deep-thinking-entry,
   .env-badge,
   .status-banner,
@@ -1996,7 +1995,10 @@ html[data-role='fox'] #root {
     background: var(--glass-solid);
   }
 
-  .deep-thinking-entry:hover,
+  .deep-thinking-entry:hover {
+    background: var(--query-control);
+  }
+
   .deep-thinking-entry[aria-pressed='true'],
   .search-btn,
   .search-btn:hover,
@@ -2036,6 +2038,7 @@ html[data-role='fox'] #root {
   .capsule-field,
   .search-btn,
   .dashboard-entry,
+  .capsule-session-entry,
   .deep-thinking-entry,
   .script-card,
   .status-banner {

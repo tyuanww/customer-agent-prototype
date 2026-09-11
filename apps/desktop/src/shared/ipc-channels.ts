@@ -11,6 +11,8 @@ export const IPC_CHANNELS = {
   PRODUCT_ESCALATE: 'product:escalate',
   PRODUCT_RECORD_TERMINAL: 'product:record-terminal',
   PRODUCT_CATALOG: 'product:catalog',
+  PRODUCT_RETRIEVAL_PREFERENCE_GET: 'product:retrieval-preference-get',
+  PRODUCT_RETRIEVAL_PREFERENCE_SET: 'product:retrieval-preference-set',
   COPY_TEXT: 'clipboard:copy-text',
   GET_WINDOW_CONTEXT: 'overlay:get-window-context',
   OPEN_SEARCH: 'overlay:open-search',

@@ -4,6 +4,7 @@ import {
   catalogCategories,
   catalogIsConsistent,
   catalogSkus,
+  catalogStatusMessage,
   resolveCatalogScope,
 } from '../../src/renderer/features/search/catalog-scope';
 import { productCatalogEntries } from '../../src/shared/product-catalog';
@@ -44,5 +45,26 @@ describe('catalog scope', () => {
     expect(resolveCatalogScope({
       entries, productType: 'sku', categoryId: 'cat_essence', skuId: 'sku_chengyajiemian',
     })).toEqual({ ok: false, message: CATALOG_SCOPE_MESSAGES.unknown });
+  });
+
+  it('asks for category and sku picks and maps catalog status messages', () => {
+    expect(resolveCatalogScope({
+      entries, productType: 'category', categoryId: '', skuId: '',
+    })).toEqual({ ok: false, message: CATALOG_SCOPE_MESSAGES.pickCategory });
+    expect(resolveCatalogScope({
+      entries, productType: 'sku', categoryId: '', skuId: '',
+    })).toEqual({ ok: false, message: CATALOG_SCOPE_MESSAGES.pickCategory });
+    expect(resolveCatalogScope({
+      entries, productType: 'sku', categoryId: 'cat_cleanser', skuId: '',
+    })).toEqual({ ok: false, message: CATALOG_SCOPE_MESSAGES.pickSku });
+    expect(resolveCatalogScope({
+      entries: [{ type: 'sku', id: 'sku_orphan', label: '孤儿款', parentId: 'cat_missing' }],
+      productType: 'sku', categoryId: 'cat_missing', skuId: 'sku_orphan',
+    })).toEqual({ ok: false, message: CATALOG_SCOPE_MESSAGES.inconsistent });
+    expect(catalogStatusMessage('ready')).toBe('');
+    expect(catalogStatusMessage('loading')).toBe(CATALOG_SCOPE_MESSAGES.loading);
+    expect(catalogStatusMessage('inconsistent')).toBe(CATALOG_SCOPE_MESSAGES.inconsistent);
+    expect(catalogStatusMessage('failed')).toBe(CATALOG_SCOPE_MESSAGES.missing);
+    expect(catalogStatusMessage('missing')).toBe(CATALOG_SCOPE_MESSAGES.missing);
   });
 });

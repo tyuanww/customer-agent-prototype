@@ -26,7 +26,8 @@
 | --- | --- |
 | 后端 T0–T6 | 已完成。产品 PR #51–#57 已合并；收尾 PR #58 为 `de0a92ca607412a99c3729becce9484635533008`。其后 PR #59 合并为 `bb7a14b565553dc689823e54b0218d1d24c47095`，合并后五项 CI 全部通过。不得重复实施后端 |
 | 合同 | 治理 PR #74/#75 已合并；来源 `0904a0aa11f2dc29ae7700871a943c41295cd329`，OpenAPI 1.13.0 / schema.v1.17；产品十四条 migration，旧十三条不得改写 |
-| Git | 两仓独立历史。产品仓当前无开放 PR。治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。Windows 方案文档已随产品 PR #67 合并，状态仍是 DRAFT |
+| Git | 两仓独立历史。治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。Windows 方案文档已随产品 PR #67 合并，状态仍是 DRAFT。桌面检索在本地分支 `codex/macos-semantic-query`，先不 merge、不 push |
+| 桌面语义检索 | 本机冻结，见 [冻结点](2026-09-10-macos-semantic-query-freeze.md) 与 [检索参考](../reference-desktop-retrieval.md)。有 hydrate 时不打 leftover `/v1/search`。不要 `stack start`。下一动作：Doc2Query `questions[]`、第二路 embedding、hydrate 自动对齐 `content_current` |
 | 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。D0–D5 工程在 `5d6a802`。macOS 合成栈工程在 `main@f64765387c34374dadd42584b49f953b7c737cc8`。不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
 | 人工观察 | 早先用户反馈覆盖开发态：登录、命中复制、无匹配联系卡、回退后仍能查询发货话术、退出后再查被拦。那次观察**没有**覆盖目录下拉点选、打包态 `synthetic-stack.json`，也**不能**把「回退后仍能查到同一句发货话术」写成 STALE 已人工验证。下一动作是按 [M5 清单](../how-to-verify-macos-m5.md) 做一次真人勾选；清单进仓不等于 M5 通过 |
 | Windows 下一阶段 | [安装包与实机方案](2026-09-10-windows-package-and-device-verification.md) 状态 **DRAFT**，未批准开工。本次不打包、不安装、不签名、不公证、不部署 |

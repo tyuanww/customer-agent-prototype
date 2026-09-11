@@ -40,10 +40,9 @@ node -v    # 需要 v24.x
 pnpm -v    # 项目锁定 11.19.0
 ```
 
-合成栈必须已经在跑（隔离 PG15 + 合成身份 + API + worker + 已发布的合成话术）。启动与停止见 [如何验证 · 本机合成栈（M1）](how-to-verify-desktop.md#本机合成栈m1)，例如：
+合成栈必须已经在跑（隔离 PG15 + 合成身份 + API + worker + 已发布的合成话术）。启动与停止见 [如何验证 · 本机合成栈（M1）](how-to-verify-desktop.md#本机合成栈m1)。**当前若 `content_current` 已是 `rel_6` MENOKIN，不要 `stack.ts start`**，它会再种合成种子并把发布顶掉；只 `status`，API 必须是 `apps/api/dist/main.js`。检索开发浮窗见 [How to 启动检索浮窗](how-to-run-macos-semantic-query.md)。
 
 ```bash
-node scripts/synthetic-stack/stack.ts start
 node scripts/synthetic-stack/stack.ts status
 ```
 
@@ -96,7 +95,7 @@ node scripts/synthetic-stack/stack.ts status
 
 ## 3. 商品目录：只选自 SSOT，禁止手填商品标识
 
-商品范围控件在查询结果区，图例为 `查询范围 · 合成数据`。目录唯一来源是 `apps/desktop/src/shared/synthetic-catalog.ts`，下拉显示 **label**，回传 **id**。renderer 不得提供自由文本商品框。
+商品范围控件在查询结果区。目录唯一来源是 `apps/desktop/src/shared/synthetic-catalog.ts`，下拉显示 **label**，回传 **id**。renderer 不得提供自由文本商品框。查询范围图例不再要求 `查询范围 · 合成数据`。
 
 当前合成目录人眼应看到的 **中文 label**（不得把内部 id 当选项文案）：
 
@@ -142,7 +141,7 @@ node scripts/synthetic-stack/stack.ts status
 1. 命中一条候选，点「复制话术」（或数字键 1/2/3）。按钮变为「已复制」。
 2. 在「文本编辑」或其它应用里粘贴：必须是刚才那条话术原文。
 3. 确认没有把内容发到飞书、聊天工具或任何远端。本 Demo 无代发。
-4. 每张话术卡可见 `DEMO · 合成数据`。查询范围图例为 `查询范围 · 合成数据`。登录入口是「合成登录」。有占位符时输入框标签是「合成订单号」或「日期」，填的也是合成值。
+4. 话术卡不再贴 `DEMO · 合成数据`。登录入口仍是「合成登录」。胶囊可见 `DEMO` / `MOCK AUTH`。有占位符时输入框标签是「订单号」或「日期」，填的仍是合成值。
 5. **无命中辅导**：登录并选好平台后，查询一条合成栈不会命中的问题（不要用真实客户原话）。应看到「没找到可用话术」，以及请客户稍等、联系话术师/运营的辅导。若出现「复制合成联系方式」「打开合成入口」：
    - 复制联系方式只把合成联系卡写入剪贴板；
    - 打开入口只表示入口窗口已打开；
