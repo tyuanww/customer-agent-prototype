@@ -111,6 +111,9 @@ describe('packaged synthetic product profile', () => {
     };
     expect(packageJson.build.productName).toBe('客服话术浮窗 Demo');
     expect(main).toContain("app.setName('客服话术浮窗 Demo')");
+    expect(main.indexOf("app.setName('客服话术浮窗 Demo')")).toBeLessThan(
+      main.indexOf('app.requestSingleInstanceLock()'),
+    );
     expect(main).toContain('resolveProductProfile(app.isPackaged, userDataDirectory, process.env)');
     expect(main).not.toContain('developmentProductProfile(process.env)');
     expect(main).not.toContain('readPackagedProductProfile(userDataDirectory)');

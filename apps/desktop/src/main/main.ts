@@ -53,6 +53,12 @@ function applyContentSecurityPolicy(devServerUrl?: string): void {
   });
 }
 
+// Packaged userData is ~/Library/Application Support/<app.getName()>. The
+// synthetic stack writes synthetic-stack.json under 客服话术浮窗 Demo. Name
+// must be set before requestSingleInstanceLock(), which is the first API that
+// materializes that path; otherwise a packaged build looks under
+// @customer-agent/desktop and fail-closes.
+app.setName('客服话术浮窗 Demo');
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -64,8 +70,6 @@ if (!gotLock) {
   let productSession: ProductSession | null = null;
   let productAnnounce: ProductAnnounce | null = null;
   let pendingSecondInstance = false;
-
-  app.setName('客服话术浮窗 Demo');
 
   const handleActivate = (): void => {
     // The Dock icon represents the full application surface. Keep the global
