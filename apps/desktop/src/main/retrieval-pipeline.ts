@@ -5,6 +5,7 @@ import {
   type RankedRetrieval,
   type RetrievalScript,
 } from '../shared/hybrid-retrieve';
+import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index.ts';
 import { planQuery } from './minimax-plan';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat';
@@ -12,39 +13,6 @@ import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat';
 export type RetrievalPipeline = Readonly<{
   run(query: string, smartEnabled: boolean, signal?: AbortSignal): Promise<readonly RankedRetrieval[]>;
 }>;
-
-type IndexFile = Readonly<{
-  scripts: readonly RetrievalScript[];
-}>;
-
-function parseIndex(raw: string): readonly RetrievalScript[] {
-  const value: unknown = JSON.parse(raw);
-  if (!value || typeof value !== 'object') return Object.freeze([]);
-  const scripts = Reflect.get(value as IndexFile, 'scripts');
-  if (!Array.isArray(scripts)) return Object.freeze([]);
-  const rows: RetrievalScript[] = [];
-  for (const item of scripts) {
-    if (!item || typeof item !== 'object') continue;
-    const scriptId = Reflect.get(item, 'scriptId');
-    const title = Reflect.get(item, 'title');
-    const questionText = Reflect.get(item, 'questionText');
-    const answerText = Reflect.get(item, 'answerText');
-    if (typeof scriptId !== 'string' || scriptId.length < 1 || scriptId.length > 128) continue;
-    if (typeof title !== 'string' || title.trim().length < 1) continue;
-    const questionsRaw = Reflect.get(item, 'questions');
-    const questions = Array.isArray(questionsRaw)
-      ? questionsRaw.filter((row): row is string => typeof row === 'string' && row.trim().length > 0)
-      : [];
-    rows.push(Object.freeze({
-      scriptId,
-      title: title.trim(),
-      questionText: typeof questionText === 'string' ? questionText : '',
-      answerText: typeof answerText === 'string' ? answerText : '',
-      questions: Object.freeze(questions),
-    }));
-  }
-  return Object.freeze(rows);
-}
 
 export function createRetrievalPipeline(
   scripts: readonly RetrievalScript[],
@@ -74,7 +42,8 @@ export function loadRetrievalPipeline(
   });
   if (!indexPath || indexPath.trim().length === 0 || !existsSync(indexPath)) return empty;
   try {
-    const scripts = parseIndex(readFileSync(indexPath, 'utf8'));
+    const document = parseRetrievalIndex(readFileSync(indexPath, 'utf8'));
+    const scripts = document ? scriptsOf(document) : [];
     if (scripts.length === 0) return empty;
     return createRetrievalPipeline(scripts, options);
   } catch {

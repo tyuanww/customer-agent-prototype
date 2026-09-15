@@ -30,6 +30,7 @@
 | --- | --- | --- |
 | 智能检索开关 | 查询胶囊；IPC `product:retrieval-preference-get/set` | 默认 ON；无效 payload 不写入 |
 | `CUSTOMER_AGENT_RETRIEVAL_INDEX` | main `loadRetrievalPipeline` | 仓外 JSON；`scripts[]` 含 `scriptId` / `title` / `questionText` / `answerText` / 可选 `questions[]` |
+| `pnpm retrieval:questions` | `scripts/enrich-retrieval-questions.ts` | 只改仓外索引的 `questions[]`。输入是标题和快捷问法，不发送正文。缺 key / 生成失败不改该行。拒绝写进 git 工作树。`--dry-run` 只计数 |
 | `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型 |
 | `CUSTOMER_AGENT_RETRIEVAL_PREFERENCE` | 偏好文件路径 | 默认 `~/.customer-agent-synthetic-stack/retrieval-preference.json` |
 | `MINIMAX_API_KEY` | main `minimax-chat.ts` | 未设置则智能检索等同 OFF |
@@ -55,6 +56,6 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 
 ## Related
 
-- 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-search.ts`
-- 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`
+- 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-search.ts`、`doc2query-generate.ts`、`retrieval-index-store.ts`
+- 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`
 - 冻结 HTTP 判定仍在 `apps/api/src/search-decision.ts`，本页不修改它
