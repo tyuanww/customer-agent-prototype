@@ -33,7 +33,8 @@
 | `pnpm retrieval:questions` | `scripts/enrich-retrieval-questions.ts` | 只改仓外索引的 `questions[]`。输入是标题和快捷问法，不发送正文。缺 key / 生成失败不改该行。拒绝写进 git 工作树。`--dry-run` 只计数 |
 | `CUSTOMER_AGENT_EMBEDDING_INDEX` | main `loadDenseCatalog` | 仓外 JSON；`rows[]` 含 `scriptId` / `contentHash`=`sha256(answerText)` / `vector`。模型默认 `embo-01` |
 | `pnpm retrieval:embeddings` | `scripts/embed-retrieval-index.ts` | 把正文编成仓外向量（MiniMax `type=db`）。查询时 `type=query`。hash 对不上或查询失败则退回 BM25 正文 |
-| `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型 |
+| `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型。合成登录分页公告 snapshot 后自动对齐；空 snapshot 不覆盖 |
+| `pnpm retrieval:hydrate` | `scripts/sync-retrieval-hydrate.ts` | 手工把 snapshot JSON 写入仓外 hydrate。`--dry-run` 不写。拒绝写进 git 工作树 |
 | `CUSTOMER_AGENT_RETRIEVAL_PREFERENCE` | 偏好文件路径 | 默认 `~/.customer-agent-synthetic-stack/retrieval-preference.json` |
 | `MINIMAX_API_KEY` | main `minimax-chat.ts` | 未设置则智能检索等同 OFF |
 | `MINIMAX_BASE_URL` | 同上 | 默认 `https://api.minimaxi.com/v1` |
@@ -47,7 +48,7 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 
 | 情况 | 坐席看到 |
 | --- | --- |
-| hydrate 的 `releaseId` 不在当前公告允许集合 | `STALE`：内容已变化，请重新查询 |
+| hydrate 的 `releaseId` 不在当前公告允许集合，且磁盘上还没有对齐后的快照 | `STALE`：内容已变化，请重新查询。先合成登录让 snapshot 回写，不要 `stack start` |
 | 本地有排序但 hydrate 对不上 id，或过滤后为空 | `no_hit`，不打 leftover `/v1/search` |
 | MiniMax 超时 / 非 2xx / JSON 非法 | 日志 fallback，卡片仍是 BM25 顺序 |
 | 开关 SET 失败 | preload 回读磁盘，不假装已写入 |
@@ -58,6 +59,6 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 
 ## Related
 
-- 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-search.ts`、`doc2query-generate.ts`、`retrieval-index-store.ts`、`minimax-embed.ts`、`retrieval-embeddings-store.ts`
+- 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-announce.ts`、`product-search.ts`、`doc2query-generate.ts`、`retrieval-index-store.ts`、`minimax-embed.ts`、`retrieval-embeddings-store.ts`
 - 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`、`dense-retrieve.ts`
 - 冻结 HTTP 判定仍在 `apps/api/src/search-decision.ts`，本页不修改它

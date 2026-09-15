@@ -6,6 +6,11 @@ import {
   type ProductAnnouncement,
 } from '../shared/product-announce';
 import type { QueryIdentity } from '../shared/product-search';
+import {
+  persistHydrateFromEnv,
+  type HydrateSnapshotItem,
+  type SyncHydrateResult,
+} from './hydrate-catalog.ts';
 
 const LEASE = /^osl_[0-9a-f]{64}$/;
 type SnapshotState = { releaseId: string; cursor: string | null };
@@ -22,6 +27,10 @@ export class ProductAnnounce implements AnnounceGate {
     private readonly session: ProductSession,
     private readonly clientId: string,
     private readonly now: () => number = Date.now,
+    private readonly persistHydrate: (
+      releaseId: string,
+      items: readonly HydrateSnapshotItem[],
+    ) => SyncHydrateResult | null = persistHydrateFromEnv,
   ) {
     session.subscribe(state => {
       if (!state.ok || !state.signedIn) this.drop('signed_out');
@@ -86,13 +95,15 @@ export class ProductAnnounce implements AnnounceGate {
         ? { title: response.announcement.title, summary: response.announcement.summary, createdAt: response.announcement.created_at }
         : null;
       this.snapshot = { releaseId: response.current_release_id, cursor: null };
-      if (replaced) for (const listener of this.listeners) listener();
       const ack = await this.session.request(identity.sessionEpoch, '/v1/announce/ack', {
         body: { client_id: this.clientId, release_id: response.current_release_id, release_seq: response.release_seq, offline_lease_token: response.offline_lease.token },
       });
       parseContractSchema('OkResponse', ack.value);
       if (Date.parse(this.lease.expiresAt) !== priorExpiry) throw new ProductHttpError('VALIDATION');
-      await this.page(identity.sessionEpoch, null, 0);
+      const items: HydrateSnapshotItem[] = [];
+      await this.page(identity.sessionEpoch, null, 0, items);
+      const persisted = this.persistHydrate(response.current_release_id, items);
+      if (replaced || persisted?.wrote) for (const listener of this.listeners) listener();
       if (this.session.view().sessionEpoch !== identity.sessionEpoch || !this.session.view().signedIn) throw new ProductHttpError('STALE');
       this.arm();
       return this.projection(identity);
@@ -103,7 +114,7 @@ export class ProductAnnounce implements AnnounceGate {
       return announceFailure(code, identity);
     }
   }
-  private async page(epoch: number, cursor: string | null, depth: number) {
+  private async page(epoch: number, cursor: string | null, depth: number, items: HydrateSnapshotItem[]) {
     if (depth > 8) throw new ProductHttpError('UNAVAILABLE');
     if (!this.lease || !this.snapshot || this.snapshot.releaseId !== this.lease.releaseId) throw new ProductHttpError('STALE');
     if (cursor !== null && this.snapshot.cursor !== cursor) throw new ProductHttpError('VALIDATION');
@@ -114,6 +125,7 @@ export class ProductAnnounce implements AnnounceGate {
     const snapshot = parseContractSchema('SnapshotResponse', result.value);
     if (snapshot.release_id !== this.lease.releaseId || snapshot.release_seq !== this.lease.releaseSeq) throw new ProductHttpError('VALIDATION');
     this.snapshot = { releaseId: snapshot.release_id, cursor: snapshot.next_cursor };
-    if (snapshot.next_cursor) await this.page(epoch, snapshot.next_cursor, depth + 1);
+    for (const item of snapshot.items) items.push(item);
+    if (snapshot.next_cursor) await this.page(epoch, snapshot.next_cursor, depth + 1, items);
   }
 }

@@ -2,6 +2,8 @@
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { join } from 'node:path';
+import { loadHydrateCatalog } from '../../src/main/hydrate-catalog';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductAnnounce } from '../../src/main/product-announce';
 import { ProductSession } from '../../src/main/product-session';
@@ -21,11 +23,39 @@ function currentBody(expiry = expiresAt(), seq = 13) {
     announcement: { title: '合成公告', summary: '只读', created_at: '2026-09-09T00:00:00.000Z' },
   };
 }
-function snapshotBody(cursor: string | null = null, id = releaseId, seq = 13) {
+function snapshotItem(id = 'script-synthetic-001') {
+  return {
+    script_id: id,
+    script_version: 1,
+    content_hash: 'a'.repeat(64),
+    title: '合成发货',
+    category: 'presale',
+    answer_text: '合成订单 {订单号}',
+    platform_scope: ['qianniu'],
+    product_scope_type: 'storewide',
+    product_scope_refs: [],
+    effective_from: '2026-01-01T00:00:00.000Z',
+    effective_to: null,
+    intent_taxonomy_version: 'itax_synthetic_v1',
+    intent_id: 'intent_synthetic_shipping',
+    risk_level: 'low',
+    risk_categories: [],
+    has_conflict: false,
+    placeholder_keys: ['order_id'],
+    questions: [{
+      question_id: 'q_synthetic01',
+      question_version: 1,
+      question_text: '什么时候发货',
+      question_hash: 'b'.repeat(64),
+      semantic_family_id: 'sf_shipping',
+    }],
+  };
+}
+function snapshotBody(cursor: string | null = null, id = releaseId, seq = 13, items: unknown[] = []) {
   return {
     release_id: id, release_seq: seq, source_binding_hash: hash,
     offline_lease: { token: leaseToken, expires_at: expiresAt(), release_id: id, source_binding_hash: hash },
-    items: [], next_cursor: cursor,
+    items, next_cursor: cursor,
   };
 }
 async function setup(handler: (url: URL, init?: RequestInit) => Response | Promise<Response>) {
@@ -154,6 +184,32 @@ describe('product announce lease and snapshot', () => {
     await vi.advanceTimersByTimeAsync(1_200);
     expect(f.announce.allows(releaseId)).toBe(false);
     await f.session.logout();
+  });
+
+  it('writes the off-repo hydrate snapshot after paging the current release', async () => {
+    const previous = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    const hydratePath = join(mkdtempSync(join(tmpdir(), 'hydrate-announce-')), 'retrieval-hydrate.json');
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydratePath;
+    const f = await setup(() => new Response(null, { status: 404 }));
+    f.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') return Response.json(currentBody(), { headers: { etag: 'W/"13"' } });
+      if (url.pathname === '/v1/announce/ack') return Response.json({ ok: true });
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody(null, releaseId, 13, [snapshotItem()]));
+      return new Response(null, { status: 404 });
+    });
+    try {
+      expect(await f.announce.refresh(f.identity)).toMatchObject({ ok: true, releaseId });
+      const catalog = loadHydrateCatalog(hydratePath);
+      expect(catalog?.releaseId).toBe(releaseId);
+      expect(catalog?.candidate('script-synthetic-001')?.title).toBe('合成发货');
+      expect(JSON.parse(readFileSync(hydratePath, 'utf8')).scripts[0].questionText).toBe('什么时候发货');
+    } finally {
+      if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+      else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
+      await f.session.logout();
+    }
   });
 });
 

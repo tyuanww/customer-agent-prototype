@@ -11,7 +11,7 @@ import { SYNTHETIC_CATALOG } from '../shared/synthetic-catalog';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
-import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog';
+import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog.ts';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
 import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
@@ -59,13 +59,15 @@ function matchesJob(candidate: ProductCandidate, job: SearchJob): boolean {
 export class ProductSearch {
   private states = new Map<number, SearchState>();
   private last = new Map<number, SearchState>();
+  private readonly liveHydrate: boolean;
+  private hydrate: HydrateCatalog | null;
   constructor(
     private readonly session: ProductSession,
     private readonly writeClipboard: (text: string) => void,
     private readonly announce: AnnounceGate,
     private readonly help: SearchHelp = { openEntry: () => false },
     private readonly retrieve: SemanticRetriever = loadSemanticRetriever(),
-    private readonly hydrate: HydrateCatalog | null = loadHydrateCatalog(),
+    hydrate?: HydrateCatalog | null,
     private readonly rerank: Reranker | null = loadMinimaxReranker(),
     private readonly pipeline: RetrievalPipeline = loadRetrievalPipeline(),
     private readonly preference: RetrievalPreferenceStore = loadRetrievalPreferenceStore(
@@ -73,10 +75,13 @@ export class ProductSearch {
         ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-preference.json'),
     ),
   ) {
+    this.liveHydrate = hydrate === undefined;
+    this.hydrate = hydrate === undefined ? loadHydrateCatalog() : hydrate;
     const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
       this.states.clear();
       this.last.clear();
+      if (this.liveHydrate) this.hydrate = loadHydrateCatalog();
     };
     session.subscribe(forget);
     announce.subscribe(forget);
@@ -141,6 +146,9 @@ export class ProductSearch {
         ranked = smartEnabled && this.rerank && rewritten.length > 0
           ? await this.rerank.rerank(queryText, rewritten, state.controller.signal)
           : rewritten;
+      }
+      if (this.liveHydrate && (!this.hydrate || !this.announce.allows(this.hydrate.releaseId))) {
+        this.hydrate = loadHydrateCatalog();
       }
       if (this.hydrate) {
         const local = this.hydrate.hydrate(ranked)
