@@ -23,6 +23,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+- Recorded product PRs #80–#84 on the execution list and retrieval docs: off-repo `questions[]`, answer embeddings, hydrate alignment, query-route/non-activating palette, and 2026-09-15 M5 overlay observations. The #80 merge-commit PostgreSQL 15 job failed (announce 500 vs 403); #81–#84 merge-commit checks were green. This is not M5 acceptance, not BACKEND-CI-503 closed, not Windows start, and not a real SKU load.
+
 - Recorded 2026-09-15 macOS M5 human observations on the development overlay in `docs/how-to-verify-macos-m5.md`. STALE, session expiry, login-window cancel, and the M4 unsigned package remain unobserved. This is not M5 acceptance.
 
 - Added off-repo Doc2Query ingest (`pnpm retrieval:questions`) that writes customer-spoken `questions[]` into the local BM25 index from title and shortcut question only. Script bodies stay off MiniMax; the index file is refused if it sits inside the git worktree.

@@ -19,7 +19,7 @@
 顾客原句
   → 查询分析（域 / 实体槽）
   → 过滤器：平台 · 商品范围 · 有效期（发布门仍在 API）
-  → 并行召回：BM25(标题+问句)  ∥  BM25(正文)   〔后续把第二路换成 embedding〕
+  → 并行召回：BM25(标题+问句)  ∥  仓外 embedding(正文)（失败则 BM25 正文）
   → RRF(k=60) 融合
   → 仓外 hydrate 快照填原文 Top 3（有快照时不打 leftover `/v1/search`）
   → 现有卡片 + 复制
@@ -44,7 +44,7 @@
 | **C 接线** | Grok（本轮） | `semantic-retrieve.ts` 改为调用 A+B；`product-search.ts` 保持水合 | 无索引时行为与旧测试一致 |
 | **D 入库问句面** | 本切片 | 仓外索引 `questions[]` 由 `pnpm retrieval:questions` 写入 | 不提交飞书正文；MiniMax 只看标题和快捷问法 |
 | **E 稠密向量** | 本切片 | 第二路改为仓外 `embo-01` 向量 | 绑 `sha256(answerText)`；失败退回 BM25(正文) |
-| **F 真实商品槽** | 下一轮 | 目录换成 MENOKIN 品名/系列，仓外 | 不改冻结 HTTP |
+| **F 真实商品槽** | 未批准 | 目录换成 MENOKIN 品名/系列，仓外受控输入；替换后重跑 questions / embeddings / hydrate | 不改冻结 HTTP；无批准输入不实施 |
 
 禁止：改 `apps/api/src/search-decision.ts`、扩 FUNCTION_WORDS、把「什么时候」写死映射到某个 script_id。
 

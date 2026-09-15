@@ -1,7 +1,7 @@
 # 冻结点：`codex/macos-semantic-query`
 
-> 状态：**本轮收尾冻结**。检索主干已合入 `main`（#78）。后续检索债从新分支开提交，不要在 main 上直接改。
-> 冻结代码点：`27b8dab`（其后 #78 合入主干）。`questions[]` Doc2Query 入库见 `codex/macos-doc2query-questions`。
+> 状态：**本轮收尾冻结**。检索主干已合入 `main`（#78）。仓外 `questions[]` / 正文向量 / hydrate 对齐 / query-route 已分别由产品 PR #80 / #81 / #82 / #83 合入 `main@20fbe02`。后续检索债从新分支开提交，不要在 main 上直接改。
+> 冻结代码点：`27b8dab`（其后 #78 合入主干；#80–#83 是后续已合并切片，不是未合入 WIP）。
 > 相对当时 `origin/main` 的 merge-base：`c4f601e`（#75 之后）
 
 ## 不要做（防版本紊乱）
@@ -33,4 +33,4 @@
 
 ## 下次开发（不要和本冻结点混在一个 WIP 里）
 
-1. 真实 MENOKIN SKU 目录替换澄芽/雾屿
+1. 真实 MENOKIN SKU 目录替换澄芽/雾屿。只接受仓外受控输入；不读取或提交真实客户原文。替换后必须重跑 `pnpm retrieval:questions`、`pnpm retrieval:embeddings`，并合成登录或 `pnpm retrieval:hydrate` 对齐。没有批准的受控输入时不实施。

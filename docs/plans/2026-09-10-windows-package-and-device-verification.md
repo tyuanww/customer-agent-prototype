@@ -3,7 +3,7 @@
 > **状态：DRAFT · NOT APPROVED TO START。**
 > 本文是 Windows 安装包、启动配置与实机验证的计划入口，供用户审阅后决定是否开工。它不授权打包、安装、签名、公证、部署或真实数据。当前执行状态由[执行清单](2026-09-06-execution-goal.md#当前执行清单)拥有。
 > D0–D5 设计真源仍是 [2026-09-09 准备](2026-09-09-desktop-integration-preparation.md)；本机未签名打包事实仍由 [README 打包现状](../../README.md#windows-打包现状) 与 [如何验证 §3.3](../how-to-verify-desktop.md#33-pnpm-packagewin) 拥有。本文不复制那些真源，只引用并补安装/实机阶段缺口。
-> 核对日期：2026-09-10。产品基线 `main@5d6a8023d734e7ee3c83364944adada7751c0d93`。本文不是 Windows 产品实现、安装验收或部署完成记录。
+> 核对日期：2026-09-15。产品基线已前进到 `main@20fbe02777c213076b364fd9923d6ca6fddd416d`（含 #80–#84）；D0–D5 设计真源未变。本文仍是 **DRAFT**，不是 Windows 产品实现、安装验收或部署完成记录。开工前四项确认仍空：x64 测试机与 Windows 版本、首轮是否纯合成、是否接受未签名 NSIS、该机能否跑 API + PostgreSQL 15。
 
 ## 0. 目标与非目标
 
