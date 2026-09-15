@@ -10,6 +10,8 @@
 
 有 hydrate 快照时，不再把问句或命中标题转发给 leftover `/v1/search`。没有 hydrate 时，仍走 D1–D5 的合成 HTTP 搜索（测试与未接索引的 profile）。
 
+工程锚点（自动化，不是 M5、不是真实 SKU）：产品 PR [#80](https://github.com/weiweity/customer-agent-prototype/pull/80) `questions[]`、[#81](https://github.com/weiweity/customer-agent-prototype/pull/81) 正文向量、[#82](https://github.com/weiweity/customer-agent-prototype/pull/82) hydrate 对齐、[#83](https://github.com/weiweity/customer-agent-prototype/pull/83) `query-route` / 非激活 palette。真实 MENOKIN SKU 替换澄芽/雾屿仍未获批；若获批仓外受控输入，必须重跑 `pnpm retrieval:questions`、`pnpm retrieval:embeddings`，并合成登录或 `pnpm retrieval:hydrate`。不把真实客户原文写入 git。
+
 ## 管道
 
 ```
