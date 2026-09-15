@@ -9,6 +9,7 @@ import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index.ts';
 import { planQuery } from './minimax-plan';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat';
+import { createDenseQueryRanker, loadDenseCatalog, type DenseQueryRanker } from './retrieval-embeddings-store.ts';
 
 export type RetrievalPipeline = Readonly<{
   run(query: string, smartEnabled: boolean, signal?: AbortSignal): Promise<readonly RankedRetrieval[]>;
@@ -16,16 +17,18 @@ export type RetrievalPipeline = Readonly<{
 
 export function createRetrievalPipeline(
   scripts: readonly RetrievalScript[],
-  options: MinimaxChatOptions & { rerank?: Reranker | null } = {},
+  options: MinimaxChatOptions & { rerank?: Reranker | null; dense?: DenseQueryRanker | null } = {},
 ): RetrievalPipeline {
   const rerank = options.rerank ?? loadMinimaxReranker(options);
+  const dense = options.dense ?? null;
   return Object.freeze({
     async run(query: string, smartEnabled: boolean, signal?: AbortSignal) {
       const trimmed = query.trim();
       if (trimmed.length === 0 || scripts.length === 0) return Object.freeze([]);
       const useSmart = smartEnabled && minimaxConfigured();
       const queries = useSmart ? (await planQuery(trimmed, { ...options, signal })).queries : [trimmed];
-      const pooled = rankScriptsMulti(queries, scripts, RETRIEVAL_POOL);
+      const denseRanks = dense ? await dense.rank(trimmed, scripts, signal) : null;
+      const pooled = rankScriptsMulti(queries, scripts, RETRIEVAL_POOL, denseRanks);
       if (pooled.length === 0) return Object.freeze([]);
       if (!useSmart || !rerank) return pooled;
       return rerank.rerank(trimmed, pooled, signal);
@@ -35,7 +38,7 @@ export function createRetrievalPipeline(
 
 export function loadRetrievalPipeline(
   indexPath = process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX,
-  options: MinimaxChatOptions = {},
+  options: MinimaxChatOptions & { rerank?: Reranker | null; dense?: DenseQueryRanker | null } = {},
 ): RetrievalPipeline {
   const empty: RetrievalPipeline = Object.freeze({
     run: async () => Object.freeze([]),
@@ -45,7 +48,10 @@ export function loadRetrievalPipeline(
     const document = parseRetrievalIndex(readFileSync(indexPath, 'utf8'));
     const scripts = document ? scriptsOf(document) : [];
     if (scripts.length === 0) return empty;
-    return createRetrievalPipeline(scripts, options);
+    return createRetrievalPipeline(scripts, {
+      ...options,
+      dense: options.dense ?? createDenseQueryRanker(loadDenseCatalog(), options),
+    });
   } catch {
     return empty;
   }

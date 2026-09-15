@@ -15,7 +15,7 @@
 ```
 顾客问句
   → 可选 MiniMax 查询规划 JSON {intent, queries[1..3]}
-  → 每条 query：BM25(title×3, question/questions[]×2.5) ∥ BM25(answer×1)
+  → 每条 query：BM25(title×3, question/questions[]×2.5) ∥ 仓外 embedding(answer)（失败则 BM25(answer×1)）
   → RRF k=60，池 24
   → 可选 MiniMax 重排 Top 8（只返回已有 scriptId；只发 id + 标题）
   → hydrate 原文，过滤平台 / 商品范围 / 有效期 / 冲突
@@ -31,6 +31,8 @@
 | 智能检索开关 | 查询胶囊；IPC `product:retrieval-preference-get/set` | 默认 ON；无效 payload 不写入 |
 | `CUSTOMER_AGENT_RETRIEVAL_INDEX` | main `loadRetrievalPipeline` | 仓外 JSON；`scripts[]` 含 `scriptId` / `title` / `questionText` / `answerText` / 可选 `questions[]` |
 | `pnpm retrieval:questions` | `scripts/enrich-retrieval-questions.ts` | 只改仓外索引的 `questions[]`。输入是标题和快捷问法，不发送正文。缺 key / 生成失败不改该行。拒绝写进 git 工作树。`--dry-run` 只计数 |
+| `CUSTOMER_AGENT_EMBEDDING_INDEX` | main `loadDenseCatalog` | 仓外 JSON；`rows[]` 含 `scriptId` / `contentHash`=`sha256(answerText)` / `vector`。模型默认 `embo-01` |
+| `pnpm retrieval:embeddings` | `scripts/embed-retrieval-index.ts` | 把正文编成仓外向量（MiniMax `type=db`）。查询时 `type=query`。hash 对不上或查询失败则退回 BM25 正文 |
 | `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型 |
 | `CUSTOMER_AGENT_RETRIEVAL_PREFERENCE` | 偏好文件路径 | 默认 `~/.customer-agent-synthetic-stack/retrieval-preference.json` |
 | `MINIMAX_API_KEY` | main `minimax-chat.ts` | 未设置则智能检索等同 OFF |
@@ -56,6 +58,6 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 
 ## Related
 
-- 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-search.ts`、`doc2query-generate.ts`、`retrieval-index-store.ts`
-- 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`
+- 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-search.ts`、`doc2query-generate.ts`、`retrieval-index-store.ts`、`minimax-embed.ts`、`retrieval-embeddings-store.ts`
+- 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`、`dense-retrieve.ts`
 - 冻结 HTTP 判定仍在 `apps/api/src/search-decision.ts`，本页不修改它
