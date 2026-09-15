@@ -26,9 +26,9 @@
 | --- | --- |
 | 后端 T0–T6 | 已完成。产品 PR #51–#57 已合并；收尾 PR #58 为 `de0a92ca607412a99c3729becce9484635533008`。其后 PR #59 合并为 `bb7a14b565553dc689823e54b0218d1d24c47095`，合并后五项 CI 全部通过。不得重复实施后端 |
 | 合同 | 治理 PR #74/#75 已合并；来源 `0904a0aa11f2dc29ae7700871a943c41295cd329`，OpenAPI 1.13.0 / schema.v1.17；产品十四条 migration，旧十三条不得改写 |
-| Git | 两仓独立历史。治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。Windows 方案文档已随产品 PR #67 合并，状态仍是 DRAFT。桌面检索主干已随产品 PR #78 合入 `main`；其后 #80–#84 已在 `origin/main@20fbe02`。本地 main 已快进到该头。保留既有 worktree / 本地分支 / `node_modules`，不得清理 |
+| Git | 两仓独立历史。治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。Windows 方案文档已随产品 PR #67 合并，状态仍是 DRAFT。桌面检索主干已随产品 PR #78 合入 `main`；其后 #80–#85 已在 `origin/main@6385c67`。本地残留 worktree 对应已 squash 合入的切片，清理需单独授权 |
 | 桌面语义检索 | 本机冻结，见 [冻结点](2026-09-10-macos-semantic-query-freeze.md) 与 [检索参考](../reference-desktop-retrieval.md)。有 hydrate 时不打 leftover `/v1/search`。不要 `stack start`。仓外 `questions[]` / 正文向量 / hydrate 分别由产品 PR #80 / #81 / #82 合入：`pnpm retrieval:questions`、`pnpm retrieval:embeddings`、合成登录自动对齐（`pnpm retrieval:hydrate`）。#83 按 intent 路由，界面不再选手动平台 / 品类 / SKU。下一动作：仅在获批仓外受控输入后，用真实 MENOKIN SKU 替换澄芽/雾屿，并重跑 questions / embeddings / hydrate。无批准输入则不实施 |
-| 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。D0–D5 工程在 `5d6a802`。macOS 合成栈工程在 `main@f64765387c34374dadd42584b49f953b7c737cc8`。产品当前头 `main@20fbe02777c213076b364fd9923d6ca6fddd416d`。不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
+| 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。D0–D5 工程在 `5d6a802`。macOS 合成栈工程在 `main@f64765387c34374dadd42584b49f953b7c737cc8`。产品当前头 `main@6385c678b69d7b01146b649cca23e5a3c0547ba9`。不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
 | 人工观察 | 2026-09-15 开发态（非 M4 包）：登录成功非红、恢复会话、退出、全店发货、复制只进剪贴板、无命中辅导/联系卡/入口、收起后狐狸仍在。STALE、登录失效、关窗登录失败、M4 包记 **未观察**。见 [M5 清单](../how-to-verify-macos-m5.md) 第 7 节。清单进仓 **不等于** M5 通过 |
 | Windows 下一阶段 | [安装包与实机方案](2026-09-10-windows-package-and-device-verification.md) 状态 **DRAFT**，未批准开工。开工前须确认：x64 测试机与 Windows 版本、首轮是否纯合成、是否接受未签名 NSIS、该机能否跑 API + PostgreSQL 15。未确认前不执行 `package:win`、安装、签名、公证、部署或外发 |
 | macOS 合成栈（M1） | **已合并**（PR #70 → `75f100d`）。`scripts/synthetic-stack/stack.ts`：start/stop/restart/status/destroy/desktop/packaged-profile/anomaly。隔离 PG15（Unix socket only）+ 合成身份 + API + worker + 真实导入审核发布播种。开发态读 loopback 环境变量；打包态只读 userData `synthetic-stack.json`，缺文件 fail-closed。当前若已是 `rel_6` MENOKIN，只 `status`，不要 `start` |
@@ -71,7 +71,7 @@ M5 清单正文：[如何核验 macOS M5](../how-to-verify-macos-m5.md)。
 
 ### 桌面检索与 palette 工程证据（自动化 / 观察记录，不是 M5 通过）
 
-产品仓当前头：`main@20fbe02777c213076b364fd9923d6ca6fddd416d`。
+产品仓当前头：`main@6385c678b69d7b01146b649cca23e5a3c0547ba9`（#85 已合入）。
 
 | 切片 | PR | 合并 SHA | 合并后 CI | 不得写成 |
 | --- | --- | --- | --- | --- |

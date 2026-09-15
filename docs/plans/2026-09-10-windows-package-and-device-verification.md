@@ -3,7 +3,7 @@
 > **状态：DRAFT · NOT APPROVED TO START。**
 > 本文是 Windows 安装包、启动配置与实机验证的计划入口，供用户审阅后决定是否开工。它不授权打包、安装、签名、公证、部署或真实数据。当前执行状态由[执行清单](2026-09-06-execution-goal.md#当前执行清单)拥有。
 > D0–D5 设计真源仍是 [2026-09-09 准备](2026-09-09-desktop-integration-preparation.md)；本机未签名打包事实仍由 [README 打包现状](../../README.md#windows-打包现状) 与 [如何验证 §3.3](../how-to-verify-desktop.md#33-pnpm-packagewin) 拥有。本文不复制那些真源，只引用并补安装/实机阶段缺口。
-> 核对日期：2026-09-15。产品基线已前进到 `main@20fbe02777c213076b364fd9923d6ca6fddd416d`（含 #80–#84）；D0–D5 设计真源未变。本文仍是 **DRAFT**，不是 Windows 产品实现、安装验收或部署完成记录。开工前四项确认仍空：x64 测试机与 Windows 版本、首轮是否纯合成、是否接受未签名 NSIS、该机能否跑 API + PostgreSQL 15。
+> 核对日期：2026-09-15。产品基线已前进到 `main@6385c678b69d7b01146b649cca23e5a3c0547ba9`（含 #80–#85）；D0–D5 设计真源未变。本文仍是 **DRAFT**，不是 Windows 产品实现、安装验收或部署完成记录。开工前四项确认仍空：x64 测试机与 Windows 版本、首轮是否纯合成、是否接受未签名 NSIS、该机能否跑 API + PostgreSQL 15。
 
 ## 0. 目标与非目标
 
@@ -37,8 +37,8 @@
 
 - **首轮仍使用纯合成数据与合成身份。** 真实客户数据、真实飞书凭据与正式运行身份必须另行批准。
 - 现有 D1–D5 接入 profile 要求 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 均为精确 loopback `http://127.0.0.1:端口/`（pathname `/`）。缺一项、不成对、非 loopback 拒启。
-- **打包态当前拒启该 profile：** `apps/desktop/src/main/main.ts` 在 `app.isPackaged` 时只要设置了上述变量就抛错。因此**当前 `pnpm package:win` 产物不能携带 D1–D5 产品会话**；未签名包最多验证 S0 浮窗/安装路径，不能冒充客服主链试装。
-- 若用户测试或客服试装需要安装包内的合成登录/查询，必须先批准一项独立工程：在不把 token 交给 renderer、不放开任意 URL 的前提下，为打包态提供受控合成 origin 配置。该工程不在本文开工授权内。
+- **打包态读 userData `synthetic-stack.json`，忽略环境变量。** 文件必须是 `mode: synthetic-local`，且 `apiOrigin` / `identityOrigin` 都是裸 `http://127.0.0.1:<port>/`。缺文件或非法则启动失败，不会退回 S0 fixture。因此 Windows 未签名包要走查询主链，必须在**同一台机器**上跑 loopback API + 合成身份，并写入该文件；不能靠环境变量，也不能指向非 loopback。未准备该拓扑时，安装包只能验浮窗/安装路径，不能冒充客服主链试装。
+- 若试装机不能本机跑 API / PostgreSQL 15，或需要连非 loopback 主机，必须另批独立工程。本文不授权改 loopback 红线。
 - Dashboard 继续无 preload。复制成功只表示「已复制」。
 
 ## 3. 安装包、启动配置、后端连接、日志

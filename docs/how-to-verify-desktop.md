@@ -4,7 +4,7 @@
 
 相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [桌面语义检索](reference-desktop-retrieval.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) · [macOS M5 人工核验](how-to-verify-macos-m5.md)
 
-> 本 Demo 是合成数据、无后端、不代发。验证通过不等于可以正式发包，也不等于真实 OS 焦点 / 台前调度已被证明。
+> 本 Demo 是合成数据、不代发。默认狐狸路径可以不接 API；显式 loopback 合成栈才接通本机 API。验证通过不等于可以正式发包，也不等于真实 OS 焦点 / 台前调度已被证明。
 
 ---
 

@@ -24,7 +24,7 @@
 │ renderer                                                       │
 │  App.tsx 按 WindowRole 分发                                     │
 │   ├─ FoxApp       浮窗、拖拽、贴边、睡眠与交接                   │
-│   ├─ QueryApp     查询胶囊、BM25/hydrate Top 3、复制            │
+│   ├─ QueryApp     查询胶囊、BM25/embedding/hydrate Top 3、复制   │
 │   └─ DashboardApp 静态合成工作台、主题与导航                      │
 └────────────────────────────────────────────────────────────────┘
                 │

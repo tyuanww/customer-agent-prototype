@@ -1,6 +1,6 @@
 # 冻结点：`codex/macos-semantic-query`
 
-> 状态：**本轮收尾冻结**。检索主干已合入 `main`（#78）。仓外 `questions[]` / 正文向量 / hydrate 对齐 / query-route 已分别由产品 PR #80 / #81 / #82 / #83 合入 `main@20fbe02`。后续检索债从新分支开提交，不要在 main 上直接改。
+> 状态：**本轮收尾冻结**。检索主干已合入 `main`（#78）。仓外 `questions[]` / 正文向量 / hydrate 对齐 / query-route 已分别由产品 PR #80 / #81 / #82 / #83 合入；文档收口 #85 后头为 `main@6385c67`。后续检索债从新分支开提交，不要在 main 上直接改。
 > 冻结代码点：`27b8dab`（其后 #78 合入主干；#80–#83 是后续已合并切片，不是未合入 WIP）。
 > 相对当时 `origin/main` 的 merge-base：`c4f601e`（#75 之后）
 

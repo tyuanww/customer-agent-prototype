@@ -29,7 +29,7 @@
 | 恢复当前一期任务、核对证据与下一动作 | [当前执行清单](docs/plans/2026-09-06-execution-goal.md) |
 | 审阅 Windows 安装包与实机方案（DRAFT，未批准开工） | [docs/plans/2026-09-10-windows-package-and-device-verification.md](docs/plans/2026-09-10-windows-package-and-device-verification.md) |
 | 核对关键词与自然语言搜索的候选展示规则（规则仍有效；桌面检索见下行） | [候选展示规则](docs/plans/2026-09-07-natural-language-search.md) |
-| 查阅当前桌面 BM25 + 可选 MiniMax 检索、仓外索引与禁止 `stack start` | [桌面语义检索](docs/reference-desktop-retrieval.md) · [How to 启动检索浮窗](docs/how-to-run-macos-semantic-query.md) · [为什么检索在桌面](docs/explanation-desktop-retrieval.md) · [冻结点](docs/plans/2026-09-10-macos-semantic-query-freeze.md) |
+| 查阅当前桌面 BM25 + embedding + 可选 MiniMax 检索、仓外索引与禁止 `stack start` | [桌面语义检索](docs/reference-desktop-retrieval.md) · [How to 启动检索浮窗](docs/how-to-run-macos-semantic-query.md) · [为什么检索在桌面](docs/explanation-desktop-retrieval.md) · [冻结点](docs/plans/2026-09-10-macos-semantic-query-freeze.md) |
 | 运行合成搜索判定实验、完整 N 验收及报告证明 | [实验工具说明](apps/api/experiments/search-decision/README.md) |
 | 已暂停的探索备忘：教师辅助选句与合成材料（不是上线前置条件） | [docs/plans/2026-09-05-script-selection-preparation.md](docs/plans/2026-09-05-script-selection-preparation.md) |
 | 追溯 DEV-M0 历史切片与基线证据 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
@@ -51,9 +51,9 @@
 
 - 本目录应作为独立产品 Git 仓打开，不与项目进度记录仓混成同一工作树或 Git 历史。
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
-- `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是独立 Node 服务，当前只允许 loopback、mock auth 与合成 `search/adoption/escalate` 事务。显式 loopback profile 下 D1–D5 桌面 adapter 已接线；合成登录后的查询主链是本地 BM25 + RRF 与可选 MiniMax，有 hydrate 快照时不打 leftover `/v1/search`。`packages/database` 是 W4 的离线 migration 控制面，不创建连接、不读取环境变量，只有其显式 testkit 作为 API 集成测试的 devDependency，生产 API 不导入 migration 控制面。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
+- `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是独立 Node 服务，当前只允许 loopback、mock auth 与合成 `search/adoption/escalate` 事务。显式 loopback profile 下 D1–D5 桌面 adapter 已接线；合成登录后的查询主链是本地 BM25 + 仓外 embedding + RRF 与可选 MiniMax，有 hydrate 快照时不打 leftover `/v1/search`。`packages/database` 是 W4 的离线 migration 控制面，不创建连接、不读取环境变量，只有其显式 testkit 作为 API 集成测试的 devDependency，生产 API 不导入 migration 控制面。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
 - `packages/contracts` 是正式 OpenAPI 的唯一产品仓编译边界；它只从已验证快照生成 bundle、TypeScript 类型与 component runtime validator，不拥有 HTTP、DB、桌面接线或运行时激活状态。
-- `packages/database` 是正式 DDL 的唯一产品仓 migration 边界；它从同一受锁快照确定性生成 `0001..0012`、内嵌 catalogue 与私有账本，并封装 `status → plan → apply → verify`。当前只在一次性本机 PG15 cluster 中使用合成数据验证，不等于已有业务数据库或生产连接。
+- `packages/database` 是正式 DDL 的唯一产品仓 migration 边界；它从同一受锁快照确定性生成 `0001..0014`、内嵌 catalogue 与私有账本，并封装 `status → plan → apply → verify`。当前只在一次性本机 PG15 cluster 中使用合成数据验证，不等于已有业务数据库或生产连接。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `apps/desktop/assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `apps/desktop/fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `apps/desktop/assets/app-icon.png`（近白 squircle）、`apps/desktop/build/icon.png` 与 `apps/desktop/build/icon.ico`；在 macOS 上还会生成 `apps/desktop/build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Git 合成运行时；仓内话术与看板继续全部使用虚构合成内容。
 
