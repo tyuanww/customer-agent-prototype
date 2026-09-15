@@ -23,6 +23,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+- Added off-repo Doc2Query ingest (`pnpm retrieval:questions`) that writes customer-spoken `questions[]` into the local BM25 index from title and shortcut question only. Script bodies stay off MiniMax; the index file is refused if it sits inside the git worktree.
 - Recorded D0–D5 closeout status, user-reported synthetic observation boundaries, and a DRAFT Windows installer/device-verification plan. This is documentation only: not a Windows implementation, install acceptance, or deployment.
 - Recorded the backend identity and content closed-loop implementation plan, including T1–T6 order and remaining DRAFT contract boundaries. No DEV-M2 start, runtime activation, or contract freeze is implied.
 - Added an offline same-session keyword comparison with pinned historical ranking, independently bound report consumption, and synthetic PostgreSQL verification. No real admission or runtime activation is implied.

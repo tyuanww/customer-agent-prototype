@@ -1,8 +1,8 @@
 # 冻结点：`codex/macos-semantic-query`
 
-> 状态：**本轮收尾冻结**。后续开发从本提交起开新提交，不要在 main 上直接改检索。
-> 冻结代码点：`27b8dab`。其后允许文档钉扎与检索债修复，不以 main 为准。
-> 相对 `origin/main` 的 merge-base：`c4f601e`（#75 之后）
+> 状态：**本轮收尾冻结**。检索主干已合入 `main`（#78）。后续检索债从新分支开提交，不要在 main 上直接改。
+> 冻结代码点：`27b8dab`（其后 #78 合入主干）。`questions[]` Doc2Query 入库见 `codex/macos-doc2query-questions`。
+> 相对当时 `origin/main` 的 merge-base：`c4f601e`（#75 之后）
 
 ## 不要做（防版本紊乱）
 
@@ -10,7 +10,7 @@
 - 不要把 `~/.customer-agent-synthetic-stack/retrieval-*.json`、`minimax.env` 或飞书话术正文提交进 git。
 - 不要改冻结 `apps/api/src/search-decision.ts` / leftover `judgeSearch`。
 - 不要合并治理 PR #80，不要宣称 M5 完成，不要去掉合成登录 / MOCK AUTH。
-- 本分支先不 merge 进 main；需要续做时在本分支继续，或从本 HEAD 拉新 worktree。
+- 不要把 Doc2Query 产出写进 git；索引只留在仓外 `retrieval-index.json`。
 
 ## 本机受控栈（仓外）
 
@@ -27,12 +27,12 @@
 
 ## 已落地（桌面检索）
 
-顾客问句 → MiniMax 查询规划（可关）→ BM25+RRF 池 24 → MiniMax 重排 id（只发 id+标题，不发正文）→ hydrate 原文 Top 3。  
-智能检索默认 ON；失败 / 超时 fail-open 到 BM25。不生成话术。
+顾客问句 → MiniMax 查询规划（可关）→ BM25+RRF 池 24（`title` / `questionText` / `questions[]` / 正文）→ MiniMax 重排 id（只发 id+标题，不发正文）→ hydrate 原文 Top 3。  
+智能检索默认 ON；失败 / 超时 fail-open 到 BM25。不生成话术。  
+仓外 `questions[]` 由 `pnpm retrieval:questions` 按标题和快捷问法入库；MiniMax 看不到话术正文。缺 key 或生成失败则不改该行。
 
 ## 下次开发（不要和本冻结点混在一个 WIP 里）
 
-1. 入库 `questions[]`（Doc2Query，仓外索引）
-2. 第二路 BM25(正文) 换成 embedding
-3. 真实 MENOKIN SKU 目录替换澄芽/雾屿
-4. hydrate 的 `releaseId` 与 `content_current` 对齐的自动刷新
+1. 第二路 BM25(正文) 换成 embedding
+2. 真实 MENOKIN SKU 目录替换澄芽/雾屿
+3. hydrate 的 `releaseId` 与 `content_current` 对齐的自动刷新

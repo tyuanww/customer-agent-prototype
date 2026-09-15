@@ -42,7 +42,7 @@
 | **A 召回** | Grok（本轮） | `apps/desktop/src/shared/hybrid-retrieve.ts` 及单测 | 合成语料：口语句 Top1 正确；不引用客户原文 |
 | **B 查询分析** | Grok（本轮） | `apps/desktop/src/shared/query-analyze.ts` | 槽输出域+实体，只作为 BM25 查询扩展/过滤，不映射具体标题 |
 | **C 接线** | Grok（本轮） | `semantic-retrieve.ts` 改为调用 A+B；`product-search.ts` 保持水合 | 无索引时行为与旧测试一致 |
-| **D 入库问句面** | Codex / 下一轮 | 仓外索引 schema 增加 `questions[]`；发布时写入 | 不提交飞书正文；快捷短语降为别名 |
+| **D 入库问句面** | 本切片 | 仓外索引 `questions[]` 由 `pnpm retrieval:questions` 写入 | 不提交飞书正文；MiniMax 只看标题和快捷问法 |
 | **E 稠密向量** | 下一轮 | 第二路 BM25(正文) 换成 embedding | 模型版本绑 `content_hash`；失败显式降级到 A |
 | **F 真实商品槽** | 下一轮 | 目录换成 MENOKIN 品名/系列，仓外 | 不改冻结 HTTP |
 

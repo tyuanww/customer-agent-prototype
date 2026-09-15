@@ -20,7 +20,7 @@ Query renderer ──IPC──► ProductSearch
 ## Trade-offs
 
 - 索引和原文快照在仓外，git 里没有 MENOKIN 正文；换发布必须重导 hydrate，没有自动刷新。
-- 第二路仍是 BM25(正文)，还不是 embedding；`questions[]` 入库（Doc2Query）也还没做。
+- 第二路仍是 BM25(正文)，还不是 embedding。仓外 `questions[]` 可由 `pnpm retrieval:questions` 按标题和快捷问法写入；生成时不把话术正文发给 MiniMax。
 - 没有 hydrate 的 profile 仍会打 leftover HTTP，这是 D2 测试合同，不是演示主链。
 
 ## Alternatives considered
