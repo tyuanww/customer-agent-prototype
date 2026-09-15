@@ -43,7 +43,7 @@
 | **B 查询分析** | Grok（本轮） | `apps/desktop/src/shared/query-analyze.ts` | 槽输出域+实体，只作为 BM25 查询扩展/过滤，不映射具体标题 |
 | **C 接线** | Grok（本轮） | `semantic-retrieve.ts` 改为调用 A+B；`product-search.ts` 保持水合 | 无索引时行为与旧测试一致 |
 | **D 入库问句面** | 本切片 | 仓外索引 `questions[]` 由 `pnpm retrieval:questions` 写入 | 不提交飞书正文；MiniMax 只看标题和快捷问法 |
-| **E 稠密向量** | 下一轮 | 第二路 BM25(正文) 换成 embedding | 模型版本绑 `content_hash`；失败显式降级到 A |
+| **E 稠密向量** | 本切片 | 第二路改为仓外 `embo-01` 向量 | 绑 `sha256(answerText)`；失败退回 BM25(正文) |
 | **F 真实商品槽** | 下一轮 | 目录换成 MENOKIN 品名/系列，仓外 | 不改冻结 HTTP |
 
 禁止：改 `apps/api/src/search-decision.ts`、扩 FUNCTION_WORDS、把「什么时候」写死映射到某个 script_id。

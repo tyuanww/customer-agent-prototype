@@ -24,6 +24,7 @@
    | 文件 | 作用 |
    | --- | --- |
    | `~/.customer-agent-synthetic-stack/retrieval-index.json` | BM25 索引；`questions[]` 由 `pnpm retrieval:questions` 写入 |
+   | `~/.customer-agent-synthetic-stack/retrieval-embeddings.json` | 正文向量；由 `pnpm retrieval:embeddings` 写入 |
    | `~/.customer-agent-synthetic-stack/retrieval-hydrate.json` | 原文快照，`releaseId` 必须是当前发布 |
    | `~/.customer-agent-synthetic-stack/minimax.env` | MiniMax key，权限 600 |
 
@@ -35,6 +36,15 @@
    ```
 
    MiniMax 只看到标题和快捷问法。缺 key 或某行生成失败则跳过该行。`--rebuild` 会覆盖已有 `questions[]`。
+
+   正文第二路向量（失败则仍用 BM25 正文）：
+
+   ```bash
+   pnpm retrieval:embeddings -- --dry-run
+   pnpm retrieval:embeddings
+   ```
+
+   向量绑定 `sha256(answerText)`，不进 git。切发布后要重算。
 
 3. 用现有开发启动脚本或手动导出 origin 后 `pnpm --filter @customer-agent/desktop dev`。需要：
 

@@ -61,6 +61,7 @@
     "test:built": "pnpm --filter @customer-agent/contracts test:built && pnpm --filter @customer-agent/database test:built && pnpm --filter @customer-agent/api test:built && pnpm --filter @customer-agent/desktop test && pnpm test:artifact-boundary && pnpm test:workflow",
     "docs:check": "node scripts/check-documentation.mjs",
     "retrieval:questions": "node scripts/enrich-retrieval-questions.ts",
+    "retrieval:embeddings": "node scripts/embed-retrieval-index.ts",
     "verify:plan": "node scripts/verification-policy.mjs plan",
     "test:workflow": "node --test scripts/verification-policy.test.mjs scripts/synthetic-stack/stack.test.ts",
     "test:g1a:e0:ci": "node scripts/run-g1a-synthetic.mjs",

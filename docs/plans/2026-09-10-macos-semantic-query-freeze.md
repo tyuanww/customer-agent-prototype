@@ -27,12 +27,11 @@
 
 ## 已落地（桌面检索）
 
-顾客问句 → MiniMax 查询规划（可关）→ BM25+RRF 池 24（`title` / `questionText` / `questions[]` / 正文）→ MiniMax 重排 id（只发 id+标题，不发正文）→ hydrate 原文 Top 3。  
+顾客问句 → MiniMax 查询规划（可关）→ BM25(title/questions) ∥ 仓外 embo-01 正文向量（失败则 BM25 正文）→ RRF 池 24 → MiniMax 重排 id（只发 id+标题）→ hydrate 原文 Top 3。  
 智能检索默认 ON；失败 / 超时 fail-open 到 BM25。不生成话术。  
-仓外 `questions[]` 由 `pnpm retrieval:questions` 按标题和快捷问法入库；MiniMax 看不到话术正文。缺 key 或生成失败则不改该行。
+仓外 `questions[]` 由 `pnpm retrieval:questions` 入库。正文向量由 `pnpm retrieval:embeddings` 写入，绑定 `sha256(answerText)` + `embo-01`。
 
 ## 下次开发（不要和本冻结点混在一个 WIP 里）
 
-1. 第二路 BM25(正文) 换成 embedding
-2. 真实 MENOKIN SKU 目录替换澄芽/雾屿
-3. hydrate 的 `releaseId` 与 `content_current` 对齐的自动刷新
+1. 真实 MENOKIN SKU 目录替换澄芽/雾屿
+2. hydrate 的 `releaseId` 与 `content_current` 对齐的自动刷新

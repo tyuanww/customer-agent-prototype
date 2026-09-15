@@ -1,7 +1,7 @@
 /**
- * Field-weighted BM25 + RRF. Two sparse lists (title/question vs answer) are
- * fused by reciprocal rank; a later dense embedding list can replace the
- * answer list without changing callers.
+ * Field-weighted BM25 + RRF. Title/question BM25 is fused with either a dense
+ * embedding rank list or BM25(answer). Dense ranks are optional; missing or
+ * failed embeddings keep the answer BM25 lane.
  *
  * RRF: score = Σ 1 / (k + rank), k = 60. Azure and Elasticsearch both use
  * this fusion so BM25 and vector scores never have to be normalized together.
@@ -18,6 +18,8 @@ export type RetrievalScript = Readonly<{
 }>;
 
 export type RankedRetrieval = RetrievalScript & Readonly<{ score: number }>;
+
+export type RetrievalRank = Readonly<{ scriptId: string; rank: number }>;
 
 const K1 = 1.2;
 const B = 0.75;
@@ -177,13 +179,16 @@ export function rankScripts(
   scripts: readonly RetrievalScript[],
   limit = DEFAULT_LIMIT,
   slots: QuerySlots = analyzeQuery(query),
+  dense: readonly RetrievalRank[] | null = null,
 ): readonly RankedRetrieval[] {
   if (scripts.length === 0) return Object.freeze([]);
   const index = buildRetrievalIndex(scripts);
   const queryTerms = termsOf(expandQuery(query, slots));
   if (queryTerms.length === 0) return Object.freeze([]);
   const head = rankedList(queryTerms, index, { title: true, question: true, answer: false });
-  const body = rankedList(queryTerms, index, { title: false, question: false, answer: true });
+  const body = dense && dense.length > 0
+    ? dense
+    : rankedList(queryTerms, index, { title: false, question: false, answer: true });
   const fused = rrf([head, body]);
   const byId = new Map(index.docs.map((doc) => [doc.script.scriptId, doc.script]));
   const ordered = [...fused.entries()]
@@ -204,11 +209,12 @@ export function rankScriptsMulti(
   queries: readonly string[],
   scripts: readonly RetrievalScript[],
   limit = RETRIEVAL_POOL,
+  dense: readonly RetrievalRank[] | null = null,
 ): readonly RankedRetrieval[] {
   const uniqueQueries = [...new Set(queries.map((item) => item.trim()).filter((item) => item.length > 0))];
   if (uniqueQueries.length === 0) return Object.freeze([]);
-  if (uniqueQueries.length === 1) return rankScripts(uniqueQueries[0] ?? '', scripts, limit);
-  const rankedLists = uniqueQueries.map((query) => rankScripts(query, scripts, limit));
+  if (uniqueQueries.length === 1) return rankScripts(uniqueQueries[0] ?? '', scripts, limit, analyzeQuery(uniqueQueries[0] ?? ''), dense);
+  const rankedLists = uniqueQueries.map((query) => rankScripts(query, scripts, limit, analyzeQuery(query), dense));
   const lists = rankedLists.map((list) => list.map((row, index) => ({
     scriptId: row.scriptId,
     rank: index + 1,
