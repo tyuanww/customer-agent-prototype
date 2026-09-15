@@ -23,6 +23,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+- Recorded 2026-09-15 macOS M5 human observations on the development overlay in `docs/how-to-verify-macos-m5.md`. STALE, session expiry, login-window cancel, and the M4 unsigned package remain unobserved. This is not M5 acceptance.
+
 - Added off-repo Doc2Query ingest (`pnpm retrieval:questions`) that writes customer-spoken `questions[]` into the local BM25 index from title and shortcut question only. Script bodies stay off MiniMax; the index file is refused if it sits inside the git worktree.
 - Replaced the hybrid second lane with off-repo MiniMax `embo-01` answer embeddings (`pnpm retrieval:embeddings`). Vectors bind `sha256(answerText)`. Query embed failure or hash mismatch falls back to BM25(answer).
 - Auto-aligns the off-repo hydrate snapshot to the current announce release on synthetic login (`pnpm retrieval:hydrate` for a manual dump). Empty snapshots do not overwrite. Search reloads the file instead of staying STALE on a previous `releaseId`.

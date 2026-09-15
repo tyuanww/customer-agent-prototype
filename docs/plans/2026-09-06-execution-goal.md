@@ -20,7 +20,7 @@
 
 ## 当前执行清单
 
-> 核对日期：2026-09-10（macOS 合成栈合入后复核）。恢复工作先看本节；下面旧日期的执行记录不覆盖新状态。不得重做已完成的 D1–D5 或已合并的 macOS M1–M4 工程。
+> 核对日期：2026-09-15（M5 开发态观察记录后复核）。恢复工作先看本节；下面旧日期的执行记录不覆盖新状态。不得重做已完成的 D1–D5 或已合并的 macOS M1–M4 工程。本文件更新 **不是** M5 完成。
 
 | 项目 | 当前事实 / 下一动作 |
 | --- | --- |
@@ -29,11 +29,11 @@
 | Git | 两仓独立历史。治理仓同名分支仍承载 [PR #80](https://github.com/weiweity/tianyuan-ai-brief/pull/80)，不得删除。Windows 方案文档已随产品 PR #67 合并，状态仍是 DRAFT。桌面检索主干已随产品 PR #78 合入 `main` |
 | 桌面语义检索 | 本机冻结，见 [冻结点](2026-09-10-macos-semantic-query-freeze.md) 与 [检索参考](../reference-desktop-retrieval.md)。有 hydrate 时不打 leftover `/v1/search`。不要 `stack start`。仓外 `questions[]` / 正文向量 / hydrate 分别由 `pnpm retrieval:questions` / `pnpm retrieval:embeddings` / 合成登录自动对齐（`pnpm retrieval:hydrate`）入库。下一动作：真实 MENOKIN SKU 替换澄芽/雾屿 |
 | 桌面接入工程 | [准备文件](2026-09-09-desktop-integration-preparation.md) 仍是 D0–D5 设计真源（APPROVED）。D0–D5 工程在 `5d6a802`。macOS 合成栈工程在 `main@f64765387c34374dadd42584b49f953b7c737cc8`。不得把自动化、用户反馈、Windows hosted smoke 或 Windows 实机互相冒充 |
-| 人工观察 | 早先用户反馈覆盖开发态：登录、命中复制、无匹配联系卡、回退后仍能查询发货话术、退出后再查被拦。那次观察**没有**覆盖目录下拉点选、打包态 `synthetic-stack.json`，也**不能**把「回退后仍能查到同一句发货话术」写成 STALE 已人工验证。下一动作是按 [M5 清单](../how-to-verify-macos-m5.md) 做一次真人勾选；清单进仓不等于 M5 通过 |
+| 人工观察 | 2026-09-15 开发态（非 M4 包）：登录成功非红、恢复会话、退出、全店发货、复制只进剪贴板、无命中辅导/联系卡/入口、收起后狐狸仍在。STALE、登录失效、关窗登录失败、M4 包记 **未观察**。见 [M5 清单](../how-to-verify-macos-m5.md) 第 7 节。清单进仓 **不等于** M5 通过 |
 | Windows 下一阶段 | [安装包与实机方案](2026-09-10-windows-package-and-device-verification.md) 状态 **DRAFT**，未批准开工。本次不打包、不安装、不签名、不公证、不部署 |
 | macOS 合成栈（M1） | **已合并**（PR #70 → `75f100d`）。`scripts/synthetic-stack/stack.ts`：start/stop/restart/status/destroy/desktop/packaged-profile/anomaly。隔离 PG15（Unix socket only）+ 合成身份 + API + worker + 真实导入审核发布播种。开发态读 loopback 环境变量；打包态只读 userData `synthetic-stack.json`，缺文件 fail-closed |
 | macOS M2–M4 工程 | **已合并**：登录提示 #68、P3 四项测试 #69、目录选择 #72、业务异常自动化 #71、本机未签名包 #74。证据见下表。Query 不再手填商品标识。M3 自动化不是 Mac 人工 STALE |
-| macOS M5 | 清单已合并（PR #73）。**实机勾选未做**。不得把 unit/CI/Playwright 或本文件更新写成人工验收通过 |
+| macOS M5 | 清单已合并（PR #73）。2026-09-15 开发态部分人眼已记入清单第 7 节。STALE / 失效 / 关窗失败 / M4 包仍 **未观察**。**M5 仍为人工待验**。不得把 unit/CI/Playwright 或本文件更新写成人工验收通过 |
 | 登录残留提示 | **已修复**（PR #68 → `54fce22`）。成功提示不再占用红色 `invalidMessage`。TODOS 中该项为 DONE。不是 Windows 实机证据 |
 | BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。#71 同头曾先红后绿，仍不得用 CI 绿关闭 |
 | 治理 PR #80 | 保持 OPEN，不得合并，不得触发 GitHub Pages 发布 |
