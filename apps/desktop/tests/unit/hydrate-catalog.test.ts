@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadHydrateCatalog } from '../../src/main/hydrate-catalog';
+import { loadHydrateCatalog, persistHydrateFromEnv, syncHydrateCatalog } from '../../src/main/hydrate-catalog';
 
 const valid = {
   releaseId: 'rel-synthetic-001',
@@ -109,5 +109,80 @@ describe('hydrate catalog parser', () => {
     expect(catalog?.candidate('bad-hash')).toBeNull();
     expect(catalog?.candidate('empty-answer')).toBeNull();
     expect(catalog?.candidate('ok')?.script_id).toBe('ok');
+  });
+});
+
+const snapshotItem = {
+  script_id: 'script-synthetic-001',
+  script_version: 1,
+  content_hash: 'a'.repeat(64),
+  title: '合成发货',
+  category: 'presale',
+  answer_text: '合成订单 {订单号}',
+  platform_scope: ['qianniu'],
+  product_scope_type: 'storewide',
+  product_scope_refs: [],
+  effective_from: '2026-01-01T00:00:00Z',
+  effective_to: null,
+  intent_taxonomy_version: 'itax_synthetic_v1',
+  intent_id: 'intent_synthetic_shipping',
+  risk_level: 'low',
+  risk_categories: [],
+  has_conflict: false,
+  placeholder_keys: ['order_id'],
+  questions: [{ question_text: '什么时候发货' }],
+};
+
+describe('hydrate catalog auto-sync', () => {
+  it('writes a snapshot off-repo and skips a second write when already aligned', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hydrate-repo-'));
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const path = join(outside, 'retrieval-hydrate.json');
+    const first = syncHydrateCatalog({
+      path, repoRoot: repo, releaseId: 'rel-synthetic-002', items: [snapshotItem],
+    });
+    expect(first).toMatchObject({ wrote: true, reason: 'wrote', previousReleaseId: null, total: 1 });
+    const catalog = loadHydrateCatalog(path);
+    expect(catalog?.releaseId).toBe('rel-synthetic-002');
+    expect(catalog?.candidate('script-synthetic-001')?.answer_text).toBe('合成订单 {订单号}');
+    const second = syncHydrateCatalog({
+      path, repoRoot: repo, releaseId: 'rel-synthetic-002', items: [snapshotItem],
+    });
+    expect(second).toMatchObject({ wrote: false, skipped: true, reason: 'aligned' });
+  });
+
+  it('refuses to write inside the git worktree and does not wipe on empty snapshot', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hydrate-repo-'));
+    expect(() => syncHydrateCatalog({
+      path: join(repo, 'retrieval-hydrate.json'),
+      repoRoot: repo,
+      releaseId: 'rel-synthetic-002',
+      items: [snapshotItem],
+    })).toThrow(/outside the git worktree/);
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const path = join(outside, 'retrieval-hydrate.json');
+    syncHydrateCatalog({ path, repoRoot: repo, releaseId: 'rel-synthetic-001', items: [snapshotItem] });
+    const empty = syncHydrateCatalog({ path, repoRoot: repo, releaseId: 'rel-synthetic-099', items: [] });
+    expect(empty).toMatchObject({ wrote: false, skipped: true, reason: 'empty' });
+    expect(loadHydrateCatalog(path)?.releaseId).toBe('rel-synthetic-001');
+  });
+
+  it('dry-run counts without writing and persistHydrateFromEnv no-ops without env', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hydrate-repo-'));
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const path = join(outside, 'retrieval-hydrate.json');
+    const dry = syncHydrateCatalog({
+      path, repoRoot: repo, releaseId: 'rel-synthetic-002', items: [snapshotItem], dryRun: true,
+    });
+    expect(dry).toMatchObject({ wrote: false, reason: 'dry-run', total: 1 });
+    expect(loadHydrateCatalog(path)).toBeNull();
+    const previous = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    try {
+      expect(persistHydrateFromEnv('rel-synthetic-002', [snapshotItem])).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+      else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
+    }
   });
 });

@@ -6,7 +6,7 @@
 
 - Node.js 24.x 与 pnpm 11.19.0
 - 隔离合成栈已经在跑：PG15、身份 `:43101`、API `apps/api/dist/main.js` `:43100`
-- 仓外索引存在且 `releaseId` 与 `content_current` 同为当前发布（冻结时是 `rel_6`）
+- 仓外索引存在。hydrate 的 `releaseId` 由合成登录按当前 `content_current` 对齐（冻结时是 `rel_6`）
 - **不要** `node scripts/synthetic-stack/stack.ts start`。它会再种合成种子，把 `rel_6` 顶成 `rel_7`，hydrate 对不上就会「内容已变化，请重新查询」
 
 ## Steps
@@ -25,7 +25,7 @@
    | --- | --- |
    | `~/.customer-agent-synthetic-stack/retrieval-index.json` | BM25 索引；`questions[]` 由 `pnpm retrieval:questions` 写入 |
    | `~/.customer-agent-synthetic-stack/retrieval-embeddings.json` | 正文向量；由 `pnpm retrieval:embeddings` 写入 |
-   | `~/.customer-agent-synthetic-stack/retrieval-hydrate.json` | 原文快照，`releaseId` 必须是当前发布 |
+   | `~/.customer-agent-synthetic-stack/retrieval-hydrate.json` | 原文快照；合成登录时按当前发布自动对齐 |
    | `~/.customer-agent-synthetic-stack/minimax.env` | MiniMax key，权限 600 |
 
    若索引里还没有 `questions[]`，先入库顾客问法（只改仓外文件，不 `stack start`，不提交）：
@@ -46,6 +46,15 @@
 
    向量绑定 `sha256(answerText)`，不进 git。切发布后要重算。
 
+   hydrate 在合成登录时自动对齐当前发布。只想检查文件、或从 snapshot JSON 手工写入：
+
+   ```bash
+   pnpm retrieval:hydrate -- --dry-run
+   pnpm retrieval:hydrate -- --from snapshot.json
+   ```
+
+   空 snapshot 不会覆盖已有 hydrate。不要 `stack start`。
+
 3. 用现有开发启动脚本或手动导出 origin 后 `pnpm --filter @customer-agent/desktop dev`。需要：
 
    ```bash
@@ -65,13 +74,13 @@
 - 命中卡片是发布原文，不是模型新写的句子。
 - 卡片上没有 `DEMO · 合成数据`。胶囊仍有 `DEMO` / `MOCK AUTH`。
 - 关闭智能检索后再查，结果仍来自本地 BM25，不经过 MiniMax。
-- hydrate 的 `releaseId` 与公告不一致时出现「内容已变化，请重新查询」。处理：把当前发布改回 hydrate 对应的 release，或重导 hydrate，然后退出并重新合成登录。不要 `stack start`。
+- hydrate 的 `releaseId` 与公告不一致时出现「内容已变化，请重新查询」。处理：重新合成登录，让公告 snapshot 回写 hydrate。不要 `stack start`。
 
 ## Troubleshooting
 
 | 现象 | 处理 |
 | --- | --- |
-| 「内容已变化，请重新查询」 | `content_current` 与 hydrate `releaseId` 不一致。先查 PG 当前发布，再重导 hydrate 或把发布改回去 |
+| 「内容已变化，请重新查询」 | `content_current` 与 hydrate `releaseId` 不一致。重新合成登录以回写 hydrate；不要 `stack start` |
 | 查询很慢或 400 | 旧路径会打 leftover `/v1/search`。有 hydrate 时本分支不再走这条路；确认 `CUSTOMER_AGENT_HYDRATE_INDEX` 已导出 |
 | MiniMax 证书错误 | main 必须用 Electron `net.fetch`，不要让 Node 的 `fetch` 直连 |
-| `stack start` 已经跑过 | 种子发布可能已覆盖 `rel_6`。按冻结点把 `rel_7` superseded、`rel_6` published，并重导 hydrate |
+| `stack start` 已经跑过 | 种子发布可能已覆盖 `rel_6`。按冻结点把 `rel_7` superseded、`rel_6` published，再合成登录回写 hydrate |

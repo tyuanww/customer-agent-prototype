@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ProductSearch } from '../../src/main/product-search';
 import { ProductSession } from '../../src/main/product-session';
@@ -315,6 +318,53 @@ describe('product query and native copy provenance', () => {
     } finally {
       if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
+    }
+  });
+  it('reloads live hydrate from disk when announce starts allowing a new release', async () => {
+    const previous = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    const hydratePath = join(mkdtempSync(join(tmpdir(), 'hydrate-live-')), 'retrieval-hydrate.json');
+    const row = {
+      scriptId: candidate.script_id,
+      scriptVersion: candidate.script_version,
+      contentHash: candidate.content_hash,
+      title: candidate.title,
+      category: candidate.category,
+      answerText: candidate.answer_text,
+      platformScope: candidate.platform_scope,
+      productScopeType: candidate.product_scope_type,
+      productScopeRefs: candidate.product_scope_refs,
+      effectiveFrom: candidate.effective_from,
+      effectiveTo: candidate.effective_to,
+      intentTaxonomyVersion: candidate.intent_taxonomy_version,
+      intentId: candidate.intent_id,
+      riskLevel: candidate.risk_level,
+      riskCategories: candidate.risk_categories,
+      hasConflict: candidate.has_conflict,
+      placeholderKeys: candidate.placeholder_keys,
+    };
+    writeFileSync(hydratePath, `${JSON.stringify({ version: 1, releaseId: 'rel-old', scripts: [{ ...row, releaseId: 'rel-old' }] })}\n`);
+    const pipeline = {
+      run: async () => [{
+        scriptId: candidate.script_id, title: candidate.title, questionText: '', answerText: '', score: 1,
+      }],
+    };
+    const f = await fixture();
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydratePath;
+    f.announce.allows = (releaseId: string) => releaseId === 'rel-new';
+    try {
+      const search = new ProductSearch(
+        f.session, f.write, f.announce, f.help, { rank: () => [] }, undefined, null, pipeline,
+      );
+      const before = f.transport.mock.calls.length;
+      expect(await search.search(1, { ...f.request, generation: 2 })).toMatchObject({ code: 'STALE' });
+      writeFileSync(hydratePath, `${JSON.stringify({ version: 1, releaseId: 'rel-new', scripts: [{ ...row, releaseId: 'rel-new' }] })}\n`);
+      const result = await search.search(1, { ...f.request, generation: 3 });
+      expect(result).toMatchObject({ ok: true, hitStatus: 'hit', releaseId: 'rel-new' });
+      expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    } finally {
+      if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+      else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
+      await f.session.logout();
     }
   });
   it('returns local no-hit without leftover HTTP when hydrate misses ranked ids', async () => {

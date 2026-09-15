@@ -1,11 +1,49 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ProductCandidate } from '../shared/product-search';
 import type { RankedRetrieval } from '../shared/hybrid-retrieve';
+import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
 
 export type HydrateCatalog = Readonly<{
   releaseId: string;
   candidate(scriptId: string): ProductCandidate | null;
   hydrate(ranked: readonly RankedRetrieval[]): ProductCandidate[];
+}>;
+
+export const HYDRATE_CATALOG_VERSION = 1;
+export const DEFAULT_HYDRATE_PATH = join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-hydrate.json');
+
+export type HydrateSnapshotItem = Readonly<{
+  script_id: string;
+  script_version: number;
+  content_hash: string;
+  title: string;
+  category: string;
+  answer_text: string;
+  platform_scope: readonly string[];
+  product_scope_type: string;
+  product_scope_refs: readonly string[];
+  effective_from: string;
+  effective_to: string | null;
+  intent_taxonomy_version: string;
+  intent_id: string;
+  risk_level: string;
+  risk_categories: readonly string[];
+  has_conflict: boolean;
+  placeholder_keys: readonly string[];
+  questions?: readonly Readonly<{ question_text?: string }>[];
+}>;
+
+export type SyncHydrateResult = Readonly<{
+  path: string;
+  releaseId: string;
+  previousReleaseId: string | null;
+  total: number;
+  wrote: boolean;
+  skipped: boolean;
+  reason: 'aligned' | 'empty' | 'wrote' | 'dry-run' | 'invalid';
 }>;
 
 const CATEGORIES = ['presale', 'campaign', 'aftersale', 'product'] as const;
@@ -119,6 +157,180 @@ function parseSnapshotRow(item: object, releaseId: string): SnapshotRow | null {
     hasConflict,
     placeholderKeys: Object.freeze(placeholderKeys) as ProductCandidate['placeholder_keys'],
   });
+}
+
+function snapshotItemToObject(item: HydrateSnapshotItem): object {
+  return {
+    scriptId: item.script_id,
+    scriptVersion: item.script_version,
+    contentHash: item.content_hash,
+    title: item.title,
+    category: item.category,
+    answerText: item.answer_text,
+    platformScope: item.platform_scope,
+    productScopeType: item.product_scope_type,
+    productScopeRefs: item.product_scope_refs,
+    effectiveFrom: item.effective_from,
+    effectiveTo: item.effective_to,
+    intentTaxonomyVersion: item.intent_taxonomy_version,
+    intentId: item.intent_id,
+    riskLevel: item.risk_level,
+    riskCategories: item.risk_categories,
+    hasConflict: item.has_conflict,
+    placeholderKeys: item.placeholder_keys,
+  };
+}
+
+function fingerprint(releaseId: string, rows: readonly Readonly<{ scriptId: string; contentHash: string }>[]): string {
+  return `${releaseId}\n${[...rows].map((row) => `${row.scriptId}:${row.contentHash}`).sort().join('\n')}`;
+}
+
+function existingFingerprint(indexPath: string): { releaseId: string; fingerprint: string } | null {
+  if (!existsSync(indexPath)) return null;
+  try {
+    const raw: unknown = JSON.parse(readFileSync(indexPath, 'utf8'));
+    if (!raw || typeof raw !== 'object') return null;
+    const releaseId = Reflect.get(raw, 'releaseId');
+    const scripts = Reflect.get(raw, 'scripts');
+    if (typeof releaseId !== 'string' || releaseId.length < 1 || !Array.isArray(scripts)) return null;
+    const rows: Array<{ scriptId: string; contentHash: string }> = [];
+    for (const item of scripts) {
+      if (!item || typeof item !== 'object') continue;
+      const scriptId = Reflect.get(item, 'scriptId');
+      const contentHash = Reflect.get(item, 'contentHash');
+      if (typeof scriptId !== 'string' || typeof contentHash !== 'string') continue;
+      rows.push({ scriptId, contentHash });
+    }
+    return { releaseId, fingerprint: fingerprint(releaseId, rows) };
+  } catch {
+    return null;
+  }
+}
+
+function writeAtomic(indexPath: string, body: string): void {
+  mkdirSync(dirname(indexPath), { recursive: true });
+  const tempPath = `${indexPath}.${process.pid}.tmp`;
+  writeFileSync(tempPath, body);
+  renameSync(tempPath, indexPath);
+}
+
+function serializeHydrateDocument(
+  releaseId: string,
+  rows: readonly Readonly<{ row: SnapshotRow; questionText: string }>[],
+): string {
+  return `${JSON.stringify({
+    version: HYDRATE_CATALOG_VERSION,
+    releaseId,
+    scripts: rows.map(({ row, questionText }) => ({
+      releaseId: row.releaseId,
+      scriptId: row.scriptId,
+      scriptVersion: row.scriptVersion,
+      contentHash: row.contentHash,
+      title: row.title,
+      category: row.category,
+      answerText: row.answerText,
+      platformScope: [...row.platformScope],
+      productScopeType: row.productScopeType,
+      productScopeRefs: [...row.productScopeRefs],
+      effectiveFrom: row.effectiveFrom,
+      effectiveTo: row.effectiveTo,
+      intentTaxonomyVersion: row.intentTaxonomyVersion,
+      intentId: row.intentId,
+      riskLevel: row.riskLevel,
+      riskCategories: [...row.riskCategories],
+      hasConflict: row.hasConflict,
+      placeholderKeys: [...row.placeholderKeys],
+      questionText,
+    })),
+  })}\n`;
+}
+
+function desktopRepoRoot(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+}
+
+export function syncHydrateCatalog(options: Readonly<{
+  path: string;
+  repoRoot: string;
+  releaseId: string;
+  items: readonly HydrateSnapshotItem[];
+  dryRun?: boolean;
+  rebuild?: boolean;
+}>): SyncHydrateResult {
+  const indexPath = assertOffRepoIndexPath(options.path, options.repoRoot);
+  const previous = existingFingerprint(indexPath);
+  if (options.items.length === 0) {
+    return Object.freeze({
+      path: indexPath,
+      releaseId: options.releaseId,
+      previousReleaseId: previous?.releaseId ?? null,
+      total: 0,
+      wrote: false,
+      skipped: true,
+      reason: 'empty',
+    });
+  }
+  const parsed: Array<{ row: SnapshotRow; questionText: string }> = [];
+  for (const item of options.items) {
+    const row = parseSnapshotRow(snapshotItemToObject(item), options.releaseId);
+    if (!row) continue;
+    parsed.push({
+      row,
+      questionText: typeof item.questions?.[0]?.question_text === 'string' ? item.questions[0].question_text : '',
+    });
+  }
+  if (parsed.length === 0) {
+    return Object.freeze({
+      path: indexPath,
+      releaseId: options.releaseId,
+      previousReleaseId: previous?.releaseId ?? null,
+      total: 0,
+      wrote: false,
+      skipped: true,
+      reason: 'invalid',
+    });
+  }
+  const nextFingerprint = fingerprint(options.releaseId, parsed.map(({ row }) => row));
+  const aligned = !options.rebuild && previous?.fingerprint === nextFingerprint;
+  if (aligned || options.dryRun) {
+    return Object.freeze({
+      path: indexPath,
+      releaseId: options.releaseId,
+      previousReleaseId: previous?.releaseId ?? null,
+      total: parsed.length,
+      wrote: false,
+      skipped: aligned,
+      reason: aligned ? 'aligned' : 'dry-run',
+    });
+  }
+  writeAtomic(indexPath, serializeHydrateDocument(options.releaseId, parsed));
+  return Object.freeze({
+    path: indexPath,
+    releaseId: options.releaseId,
+    previousReleaseId: previous?.releaseId ?? null,
+    total: parsed.length,
+    wrote: true,
+    skipped: false,
+    reason: 'wrote',
+  });
+}
+
+export function persistHydrateFromEnv(
+  releaseId: string,
+  items: readonly HydrateSnapshotItem[],
+): SyncHydrateResult | null {
+  const indexPath = (process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
+  if (indexPath.length === 0) return null;
+  try {
+    return syncHydrateCatalog({
+      path: indexPath,
+      repoRoot: desktopRepoRoot(),
+      releaseId,
+      items,
+    });
+  } catch {
+    return null;
+  }
 }
 
 function asCandidate(row: SnapshotRow, rank: 1 | 2 | 3): ProductCandidate {
