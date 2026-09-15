@@ -172,7 +172,7 @@ describe('off-repo index enricher', () => {
     expect(saved.source).toBe('synthetic-fixture');
     expect(saved.scripts.find((row) => row.scriptId === 'ship')?.questions).toEqual(['包裹卡在中转几天了']);
     expect(saved.scripts.find((row) => row.scriptId === 'addr')?.questions).toEqual(['我写错收件信息了']);
-    expect((await loadRetrievalPipeline(indexPath).run('包裹卡在中转几天了', false))[0]?.scriptId).toBe('ship');
+    expect((await loadRetrievalPipeline(indexPath).run('包裹卡在中转几天了', false)).ranked[0]?.scriptId).toBe('ship');
     expect(loadSemanticRetriever(indexPath).rank('我写错收件信息了')[0]?.scriptId).toBe('addr');
   });
 

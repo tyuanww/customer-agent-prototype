@@ -7,7 +7,8 @@ import { queryFailure, type ProductCandidate, type ProductSearchRequest, type Pr
 import type { AnnounceGate } from '../shared/product-announce';
 import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
-import { SYNTHETIC_CATALOG } from '../shared/synthetic-catalog';
+import { routeQuery, type QueryRoute } from '../shared/query-route.ts';
+import { admitRetrieval } from '../shared/retrieval-quality.ts';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
@@ -15,6 +16,7 @@ import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog.ts';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
 import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
+import { loadRetrievalTelemetryStore, type RetrievalTelemetry } from './retrieval-telemetry-store.ts';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
@@ -26,20 +28,12 @@ type SearchJob = Readonly<{
 
 type SearchState = QueryIdentity & { controller: AbortController; result?: Extract<ProductSearchResult, { ok: true }>;
   copying: boolean; terminal: boolean; platform?: ProductSearchRequest['platform']; productType?: ProductSearchRequest['productContextType'];
-  productRef?: string | null; unscopedProducts?: boolean; origins?: Map<string, string> };
+  productRef?: string | null; unscopedProducts?: boolean; route?: QueryRoute; origins?: Map<string, string> };
 
-function searchJobs(request: ProductSearchRequest): SearchJob[] {
-  const platforms: Array<'qianniu' | 'douyin'> = request.platform === 'all' ? ['qianniu', 'douyin'] : [request.platform];
-  const scopes: Array<{ productContextType: SearchJob['productContextType']; productContextRef: string | null }> = request.productUnscoped
-    ? [
-      { productContextType: null, productContextRef: null },
-      ...SYNTHETIC_CATALOG.flatMap((category) => [
-        { productContextType: 'category' as const, productContextRef: category.id },
-        ...category.products.map((product) => ({ productContextType: 'sku' as const, productContextRef: product.id })),
-      ]),
-    ]
-    : [{ productContextType: request.productContextType, productContextRef: request.productContextRef }];
-  return platforms.flatMap((platform) => scopes.map((scope) => ({ platform, ...scope })));
+function searchJobs(route: QueryRoute): SearchJob[] {
+  const platforms: Array<'qianniu' | 'douyin'> = ['qianniu', 'douyin'];
+  const scope = { productContextType: route.productContextType, productContextRef: route.productContextRef };
+  return platforms.map((platform) => ({ platform, ...scope }));
 }
 
 function candidateLive(candidate: ProductCandidate): boolean {
@@ -74,6 +68,7 @@ export class ProductSearch {
       process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE
         ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-preference.json'),
     ),
+    private readonly telemetry: RetrievalTelemetry = loadRetrievalTelemetryStore(),
   ) {
     this.liveHydrate = hydrate === undefined;
     this.hydrate = hydrate === undefined ? loadHydrateCatalog() : hydrate;
@@ -122,30 +117,36 @@ export class ProductSearch {
     catch (error) { return this.failure(error, identity); }
   }
   private usable(candidate: ProductCandidate, state: SearchState) {
-    const platformOk = state.platform === 'all'
-      ? candidate.platform_scope.some((platform) => platform === 'qianniu' || platform === 'douyin')
-      : candidate.platform_scope.includes(state.platform as 'qianniu' | 'douyin');
-    const productOk = state.unscopedProducts
-      ? candidate.product_scope_type === 'storewide' || candidate.product_scope_type === 'category' || candidate.product_scope_type === 'sku'
-      : candidate.product_scope_type === 'storewide'
-        || (candidate.product_scope_type === state.productType && candidate.product_scope_refs.includes(state.productRef ?? ''));
+    const platformOk = candidate.platform_scope.some((platform) => platform === 'qianniu' || platform === 'douyin');
+    const route = state.route;
+    if (!route) return false;
+    const productOk = route.match === 'campaign'
+      ? candidate.category === 'campaign'
+      : route.productContextType === null
+        ? candidate.product_scope_type === 'storewide'
+        : candidate.product_scope_type === route.productContextType
+          && candidate.product_scope_refs.includes(route.productContextRef ?? '');
     return candidateLive(candidate) && platformOk && productOk;
   }
   async search(sender: number, request: ProductSearchRequest): Promise<ProductSearchResult> {
     try {
       const state = this.advance(sender, request);
-      state.platform = request.platform;
-      state.productType = request.productContextType;
-      state.productRef = request.productContextRef;
-      state.unscopedProducts = request.productUnscoped;
       const queryText = request.queryText.trim();
       const smartEnabled = this.preference.read().smartEnabled;
-      let ranked = await this.pipeline.run(queryText, smartEnabled, state.controller.signal);
+      const retrieved = await this.pipeline.run(queryText, smartEnabled, state.controller.signal);
+      const route = routeQuery(queryText, retrieved.intent);
+      state.route = route;
+      state.platform = 'all';
+      state.productType = route.productContextType;
+      state.productRef = route.productContextRef;
+      state.unscopedProducts = false;
+      let ranked = admitRetrieval(queryText, retrieved.ranked);
       if (ranked.length === 0) {
         const rewritten = this.retrieve.rank(queryText);
-        ranked = smartEnabled && this.rerank && rewritten.length > 0
+        const fallback = smartEnabled && this.rerank && rewritten.length > 0
           ? await this.rerank.rerank(queryText, rewritten, state.controller.signal)
           : rewritten;
+        ranked = admitRetrieval(queryText, fallback);
       }
       if (this.liveHydrate && (!this.hydrate || !this.announce.allows(this.hydrate.releaseId))) {
         this.hydrate = loadHydrateCatalog();
@@ -165,7 +166,7 @@ export class ProductSearch {
       if ((process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim().length > 0) {
         throw new ProductHttpError('UNAVAILABLE');
       }
-      const jobs = searchJobs(request);
+      const jobs = searchJobs(route);
       const pages = await Promise.all(jobs.map(async (job) => {
         const queryId = randomUUID();
         const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {
@@ -203,7 +204,24 @@ export class ProductSearch {
         candidates: merged,
       };
       state.origins = origins;
-      state.result = structuredClone(result); this.last.set(sender, state); return result;
+      state.result = structuredClone(result); this.last.set(sender, state);
+      try {
+        this.telemetry.recordQuery({
+          queryId: result.queryId,
+          at: new Date().toISOString(),
+          releaseId: result.releaseId,
+          hitStatus: result.hitStatus,
+          intent: state.route?.intent ?? 'other',
+          impressions: Object.freeze(merged.map((candidate) => Object.freeze({
+            scriptId: candidate.script_id,
+            rank: candidate.rank,
+            contentHash: candidate.content_hash,
+          }))),
+          adoptedScriptId: null,
+          outcome: null,
+        });
+      } catch { /* Local ledger must not fail leftover search. */ }
+      return result;
     } catch (error) { return this.failure(error, request); }
   }
   private finishLocal(
@@ -224,6 +242,22 @@ export class ProductSearch {
     state.origins = origins;
     state.result = structuredClone(result);
     this.last.set(sender, state);
+    try {
+      this.telemetry.recordQuery({
+        queryId,
+        at: new Date().toISOString(),
+        releaseId,
+        hitStatus: result.hitStatus,
+        intent: state.route?.intent ?? 'other',
+        impressions: Object.freeze(candidates.map((candidate) => Object.freeze({
+          scriptId: candidate.script_id,
+          rank: candidate.rank,
+          contentHash: candidate.content_hash,
+        }))),
+        adoptedScriptId: null,
+        outcome: null,
+      });
+    } catch { /* Local ledger must not fail the search. */ }
     return result;
   }
   async copy(sender: number, request: ProductCopyRequest): Promise<ProductCopyResult> {
@@ -248,6 +282,7 @@ export class ProductSearch {
       if (!this.usable(candidate, state) || !this.announce.allows(candidate.release_id)) throw new ProductHttpError('STALE');
       try { this.writeClipboard(text); } catch { throw new ProductHttpError('CLIPBOARD_FAILED'); }
       state.terminal = true;
+      try { this.telemetry.markAdopted(impressionQueryId, candidate.script_id); } catch { /* keep copy */ }
       let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';
       if (eventStatus !== 'disabled') {
         try {
@@ -281,6 +316,7 @@ export class ProductSearch {
       }
       let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';
       let escalateId = `esc_local_${request.queryId}`;
+      try { this.telemetry.markOutcome(request.queryId, 'escalate'); } catch { /* keep native help */ }
       if (eventStatus !== 'disabled') {
         try {
           const response = await this.session.request(request.sessionEpoch, '/v1/events/escalate', {
@@ -305,6 +341,7 @@ export class ProductSearch {
       if (request.outcome === 'dismissed' && result.hitStatus === 'no_hit') throw new ProductHttpError('VALIDATION');
       if (state.terminal) throw new ProductHttpError('CONFLICT');
       state.terminal = true;
+      try { this.telemetry.markOutcome(request.queryId, request.outcome); } catch { /* keep local close */ }
       if (result.telemetryStatus === 'collection_disabled') return { ok: true, ...request, recorded: false };
       try {
         const response = await this.session.request(request.sessionEpoch, '/v1/events/adoption', {

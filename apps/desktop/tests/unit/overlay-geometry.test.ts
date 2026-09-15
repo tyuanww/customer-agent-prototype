@@ -492,7 +492,9 @@ describe('overlay geometry', () => {
     expect(controller).toContain('finishOrClearQueryDrag');
     expect(controller).toContain('clearQueryDragGesture');
     expect(controller).toMatch(/if \(!delta\) \{\s*if \(finished\) \{\s*this\.finishOrClearQueryDrag\(\);/s);
-    expect(controller).toMatch(/dismiss\(restorePreviousApp = false\): void \{\s*if \(this\.isInactive\(\)\) \{\s*return;\s*\}\s*this\.restorePreviousAppOnIdle = restorePreviousApp === true;\s*this\.finishOrClearQueryDrag\(\);/s);
+    expect(controller).toMatch(/dismiss\(_restorePreviousApp = false\): void \{\s*if \(this\.isInactive\(\)\) \{\s*return;\s*\}\s*this\.finishOrClearQueryDrag\(\);/s);
+    expect(controller).toContain('resignPaletteActivation');
+    expect(controller).not.toContain('restorePreviousAppOnIdle');
     expect(controller).toMatch(/finishClosingHandoff[\s\S]*this\.clearQueryDragGesture\(\)/);
     expect(controller).toContain('foxDockDragSessionVisuallyUndocked');
     expect(controller).toContain('createFoxDockDragSession');

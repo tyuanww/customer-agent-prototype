@@ -1,7 +1,7 @@
+import { ROUTE_INTENTS, type RouteIntent } from '../shared/query-route.ts';
 import { minimaxChatContent, type MinimaxChatOptions } from './minimax-chat';
 
-const INTENTS = ['shipping', 'address', 'product', 'aftersale', 'campaign', 'other'] as const;
-export type PlannedIntent = (typeof INTENTS)[number];
+export type PlannedIntent = RouteIntent;
 
 export type QueryPlan = Readonly<{
   intent: PlannedIntent;
@@ -17,7 +17,7 @@ export function parseQueryPlan(raw: string, original: string): QueryPlan {
     const parsed: unknown = JSON.parse(raw.slice(start, end + 1));
     if (!parsed || typeof parsed !== 'object') return fallback;
     const intentRaw = Reflect.get(parsed, 'intent');
-    const intent = typeof intentRaw === 'string' && (INTENTS as readonly string[]).includes(intentRaw)
+    const intent = typeof intentRaw === 'string' && (ROUTE_INTENTS as readonly string[]).includes(intentRaw)
       ? intentRaw as PlannedIntent
       : 'other';
     const queriesRaw = Reflect.get(parsed, 'queries');

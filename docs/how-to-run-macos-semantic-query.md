@@ -65,15 +65,16 @@
    set -a && . "$HOME/.customer-agent-synthetic-stack/minimax.env" && set +a
    ```
 
-4. 合成登录。成功提示是「可以直接查询；需要时再筛选平台和商品」，不是红校验。
+4. 合成登录。成功提示是「可以直接查询」，不是红校验。
 
-5. 输入顾客问句并回车。默认「全部平台 / 全部商品」。胶囊「智能检索」默认 ON。
+5. 输入顾客问句并回车。不要选手动平台/品类/SKU；范围由问句 intent 路由（默认全店）。胶囊「智能检索」默认 ON。
 
 ## Verification
 
 - 命中卡片是发布原文，不是模型新写的句子。
 - 卡片上没有 `DEMO · 合成数据`。胶囊仍有 `DEMO` / `MOCK AUTH`。
 - 关闭智能检索后再查，结果仍来自本地 BM25，不经过 MiniMax。
+- `pnpm retrieval:never-hit` 列出 hydrate 里从未曝光或曝光未复制的话术（不打印正文）。
 - hydrate 的 `releaseId` 与公告不一致时出现「内容已变化，请重新查询」。处理：重新合成登录，让公告 snapshot 回写 hydrate。不要 `stack start`。
 
 ## Troubleshooting

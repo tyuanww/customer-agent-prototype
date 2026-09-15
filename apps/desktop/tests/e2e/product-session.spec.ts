@@ -73,8 +73,6 @@ test('product session native login, search, copy, logout and renderer isolation'
     expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(true);
     await query.getByTestId('question-input').fill('合成发货问题');
     await query.getByTestId('search-button').click();
-    await query.getByLabel('查询平台').selectOption('qianniu');
-    await query.getByTestId('search-button').click();
     await expect(query.getByTestId('answer-text-1')).toHaveText('这是合成订单 {订单号}。');
     await query.getByLabel('订单号').fill('SYNTHETIC-A');
     await query.getByTestId('question-input').fill('第二个合成订单发货问题');

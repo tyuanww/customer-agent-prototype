@@ -115,7 +115,7 @@ describe('off-repo embedding catalog', () => {
         },
         fetchImpl: (async () => new Response('{}', { status: 500 })) as typeof fetch,
       });
-      const ranked = await pipeline.run('什么时候发货', false);
+      const { ranked } = await pipeline.run('什么时候发货', false);
       expect(ranked[0]?.scriptId).toBe('ship');
     } finally {
       delete process.env.MINIMAX_API_KEY;

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ProductSearch } from '../../src/main/product-search';
+import { noopRetrievalTelemetry } from '../../src/main/retrieval-telemetry-store';
 import { ProductSession } from '../../src/main/product-session';
 import { ProductHttp } from '../../src/main/product-http';
 import { isProductSearchRequest, isProductCopyRequest, type ProductCandidate, type ProductSearchRequest } from '../../src/shared/product-search';
@@ -21,7 +22,7 @@ async function fixture(options: { disabled?: boolean; eventFail?: boolean; candi
     if (p === '/v1/search') {
       const row = options.candidate ?? candidate;
       let hit = !options.noHit;
-      if (options.respectJob && !options.noHit) {
+      if (!options.noHit) {
         const type = body.product_context_type ?? null;
         const ref = body.product_context_ref ?? null;
         hit = row.platform_scope.includes(body.platform)
@@ -82,10 +83,8 @@ describe('product query and native copy provenance', () => {
     const f = await fixture(); f.write.mockImplementation(() => { throw Error('synthetic clipboard failure'); });
     expect(await f.search.copy(1, f.copy)).toMatchObject({ code: 'CLIPBOARD_FAILED' }); expect(f.events).toHaveLength(0); await f.session.logout();
   });
-  it('rejects platform/SKU mismatch and exclusive expiry', async () => {
-    for (const change of [{ platform_scope: ['douyin'] }, { product_scope_type: 'sku', product_scope_refs: ['other'] }, { effective_to: new Date().toISOString() }]) {
-      await expect(fixture({ candidate: { ...candidate, ...change } as ProductCandidate })).rejects.toThrow('VALIDATION');
-    }
+  it('rejects leftover exclusive expiry', async () => {
+    await expect(fixture({ candidate: { ...candidate, effective_to: new Date().toISOString() } })).rejects.toThrow('VALIDATION');
   });
   it('keeps the copy lock after rejecting a concurrent duplicate', async () => {
     const f = await fixture(); let finish!: () => void;
@@ -153,19 +152,26 @@ describe('product query and native copy provenance', () => {
   it('uses the retrieval pipeline then hydrates locally without leftover HTTP', async () => {
     const retrieve = { rank: vi.fn(() => []) };
     const pipeline = {
-      run: vi.fn(async () => [{
-        scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
-        answerText: candidate.answer_text, score: 1,
-      }]),
+      run: vi.fn(async () => ({
+        intent: 'shipping' as const,
+        ranked: [{
+          scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
+          answerText: candidate.answer_text, score: 1,
+        }],
+      })),
     };
     const hydrate = {
       releaseId: candidate.release_id,
       candidate: () => candidate,
       hydrate: () => [candidate],
     };
+    const preference = {
+      read: () => ({ smartEnabled: true }),
+      write: (next: { smartEnabled: boolean }) => next,
+    };
     const f = await fixture();
     const search = new ProductSearch(
-      f.session, f.write, f.announce, f.help, retrieve, hydrate, null, pipeline,
+      f.session, f.write, f.announce, f.help, retrieve, hydrate, null, pipeline, preference,
     );
     const before = f.transport.mock.calls.length;
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
@@ -179,9 +185,12 @@ describe('product query and native copy provenance', () => {
   });
   it('returns STALE when hydrate is loaded but the announce gate rejects the release', async () => {
     const pipeline = {
-      run: async () => [{
-        scriptId: candidate.script_id, title: candidate.title, questionText: '', answerText: '', score: 1,
-      }],
+      run: async () => ({
+        intent: 'shipping' as const,
+        ranked: [{
+          scriptId: candidate.script_id, title: candidate.title, questionText: '', answerText: '', score: 1,
+        }],
+      }),
     };
     const hydrate = {
       releaseId: candidate.release_id,
@@ -210,7 +219,7 @@ describe('product query and native copy provenance', () => {
     }];
     const retrieve = { rank: vi.fn(() => ranked) };
     const rerank = { rerank: vi.fn(async (_query: string, rows: typeof ranked) => rows) };
-    const pipeline = { run: vi.fn(async () => []) };
+    const pipeline = { run: vi.fn(async () => ({ intent: 'shipping' as const, ranked: [] })) };
     const hydrate = {
       releaseId: candidate.release_id,
       candidate: () => candidate,
@@ -232,28 +241,31 @@ describe('product query and native copy provenance', () => {
     await f.session.logout();
   });
   it('walks past unusable hydrate hits and still returns a later usable card', async () => {
-    const blocked = { ...candidate, script_id: 'script-blocked', platform_scope: ['qianniu'] as ProductCandidate['platform_scope'] };
-    const usable = { ...candidate, script_id: 'script-usable', platform_scope: ['douyin'] as ProductCandidate['platform_scope'] };
+    const blocked = { ...candidate, script_id: 'script-blocked', product_scope_type: 'sku' as const, product_scope_refs: ['sku_chengyajiemian'] };
+    const usable = { ...candidate, script_id: 'script-usable' };
     const ranked = [
       { scriptId: blocked.script_id, title: blocked.title, questionText: '', answerText: '', score: 3 },
       { scriptId: 'script-missing', title: 'missing', questionText: '', answerText: '', score: 2 },
       { scriptId: usable.script_id, title: usable.title, questionText: '', answerText: '', score: 1 },
     ];
-    const pipeline = { run: async () => ranked };
+    const pipeline = { run: async () => ({ intent: 'shipping' as const, ranked }) };
     const hydrate = {
       releaseId: candidate.release_id,
       candidate: (id: string) => id === usable.script_id ? usable : id === blocked.script_id ? blocked : null,
-      hydrate: (rows: typeof ranked) => rows.flatMap((row) => {
-        if (row.scriptId === blocked.script_id) return [blocked];
-        if (row.scriptId === usable.script_id) return [usable];
-        return [];
-      }),
+      hydrate: (rows: typeof ranked): ProductCandidate[] => {
+        const out: ProductCandidate[] = [];
+        for (const row of rows) {
+          if (row.scriptId === blocked.script_id) out.push(blocked);
+          if (row.scriptId === usable.script_id) out.push(usable);
+        }
+        return out;
+      },
     };
     const f = await fixture();
     const search = new ProductSearch(
       f.session, f.write, f.announce, f.help, { rank: () => [] }, hydrate, null, pipeline,
     );
-    const result = await search.search(1, { ...f.request, generation: 2, platform: 'douyin' });
+    const result = await search.search(1, { ...f.request, generation: 2 });
     expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
     if (!result.ok) throw new Error('expected hit');
     expect(result.candidates.map((row) => row.script_id)).toEqual(['script-usable']);
@@ -263,8 +275,8 @@ describe('product query and native copy provenance', () => {
   it('does not commit a local hydrate result after cancel', async () => {
     let release: ((rows: { scriptId: string; title: string; questionText: string; answerText: string; score: number }[]) => void) | undefined;
     const pipeline = {
-      run: () => new Promise<{ scriptId: string; title: string; questionText: string; answerText: string; score: number }[]>((resolve) => {
-        release = resolve;
+      run: () => new Promise<{ intent: 'shipping'; ranked: { scriptId: string; title: string; questionText: string; answerText: string; score: number }[] }>((resolve) => {
+        release = (rows) => resolve({ intent: 'shipping', ranked: rows });
       }),
     };
     const hydrate = {
@@ -282,23 +294,30 @@ describe('product query and native copy provenance', () => {
     expect(await pending).toMatchObject({ code: 'STALE' });
     await f.session.logout();
   });
-  it('filters hydrated candidates by platform locally instead of calling leftover HTTP', async () => {
+  it('keeps shipping on storewide and drops SKU-scoped hydrate hits', async () => {
+    const skuOnly = {
+      ...candidate,
+      script_id: 'script-sku',
+      product_scope_type: 'sku' as const,
+      product_scope_refs: ['sku_chengyajiemian'],
+    };
     const pipeline = {
-      run: async () => [{
-        scriptId: candidate.script_id, title: candidate.title, questionText: '', answerText: '', score: 1,
-      }],
+      run: async () => ({
+        intent: 'shipping' as const,
+        ranked: [{ scriptId: skuOnly.script_id, title: skuOnly.title, questionText: '', answerText: '', score: 1 }],
+      }),
     };
     const hydrate = {
       releaseId: candidate.release_id,
-      candidate: () => candidate,
-      hydrate: () => [candidate],
+      candidate: () => skuOnly,
+      hydrate: () => [skuOnly],
     };
     const f = await fixture();
     const search = new ProductSearch(
       f.session, f.write, f.announce, f.help, { rank: () => [] }, hydrate, null, pipeline,
     );
     const before = f.transport.mock.calls.length;
-    const result = await search.search(1, { ...f.request, generation: 2, platform: 'douyin' });
+    const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
     expect(result).toMatchObject({ ok: true, hitStatus: 'no_hit', releaseId: candidate.release_id });
     expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
     await f.session.logout();
@@ -344,9 +363,12 @@ describe('product query and native copy provenance', () => {
     };
     writeFileSync(hydratePath, `${JSON.stringify({ version: 1, releaseId: 'rel-old', scripts: [{ ...row, releaseId: 'rel-old' }] })}\n`);
     const pipeline = {
-      run: async () => [{
-        scriptId: candidate.script_id, title: candidate.title, questionText: '', answerText: '', score: 1,
-      }],
+      run: async () => ({
+        intent: 'shipping' as const,
+        ranked: [{
+          scriptId: candidate.script_id, title: candidate.title, questionText: '', answerText: '', score: 1,
+        }],
+      }),
     };
     const f = await fixture();
     process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydratePath;
@@ -366,6 +388,67 @@ describe('product query and native copy provenance', () => {
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
       await f.session.logout();
     }
+  });
+  it('returns local no-hit when ranked scripts only match the answer body', async () => {
+    const pipeline = {
+      run: async () => ({
+        intent: 'other' as const,
+        ranked: [{
+          scriptId: candidate.script_id,
+          title: '改地址',
+          questionText: '地址填错了',
+          answerText: '仓库还有排骨汤配料清单一并发出',
+          score: 0.03,
+        }],
+      }),
+    };
+    const hydrate = {
+      releaseId: candidate.release_id,
+      candidate: () => candidate,
+      hydrate: (rows: readonly { scriptId: string }[]) => rows.length > 0 ? [candidate] : [],
+    };
+    const f = await fixture();
+    const search = new ProductSearch(
+      f.session, f.write, f.announce, f.help, { rank: () => [] }, hydrate, null, pipeline,
+    );
+    const before = f.transport.mock.calls.length;
+    const result = await search.search(1, { ...f.request, generation: 2, queryText: '排骨汤还有吗' });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'no_hit', releaseId: candidate.release_id });
+    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    await f.session.logout();
+  });
+  it('records hydrate impressions locally without leftover HTTP or query text', async () => {
+    const telemetry = noopRetrievalTelemetry();
+    const pipeline = {
+      run: async () => ({
+        intent: 'shipping' as const,
+        ranked: [{
+          scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
+          answerText: candidate.answer_text, score: 1,
+        }],
+      }),
+    };
+    const hydrate = {
+      releaseId: candidate.release_id,
+      candidate: () => candidate,
+      hydrate: () => [candidate],
+    };
+    const preference = { read: () => ({ smartEnabled: true }), write: (next: { smartEnabled: boolean }) => next };
+    const f = await fixture();
+    const search = new ProductSearch(
+      f.session, f.write, f.announce, f.help, { rank: () => [] }, hydrate, null, pipeline, preference, telemetry,
+    );
+    const before = f.transport.mock.calls.length;
+    const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit', telemetryStatus: 'collection_disabled' });
+    const event = telemetry.snapshot().events.at(-1);
+    expect(event).toMatchObject({
+      hitStatus: 'hit', intent: 'shipping', adoptedScriptId: null,
+      impressions: [{ scriptId: candidate.script_id, rank: 1, contentHash: candidate.content_hash }],
+    });
+    expect(JSON.stringify(telemetry.snapshot())).not.toContain('什么时候发货呀');
+    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    await f.session.logout();
   });
   it('returns local no-hit without leftover HTTP when hydrate misses ranked ids', async () => {
     const retrieve = {
@@ -390,10 +473,11 @@ describe('product query and native copy provenance', () => {
   });
   it('fans out all-platform unscoped search and copies through the originating query', async () => {
     const f = await fixture({ respectJob: true });
+    const before = f.transport.mock.calls.length;
     const result = await f.search.search(1, { ...f.request, generation: 2, platform: 'all', productUnscoped: true });
     expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
-    const searchCalls = f.transport.mock.calls.filter((call) => String(call[0]).includes('/v1/search'));
-    expect(searchCalls.length).toBeGreaterThan(2);
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls).toHaveLength(2);
     if (!result.ok || !result.candidates[0]) throw new Error('expected merged hit');
     expect(await f.search.copy(1, {
       sessionEpoch: f.request.sessionEpoch, generation: 2, queryId: result.queryId, rank: result.candidates[0].rank,
