@@ -1,7 +1,6 @@
 import type { ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
-import type { ProductCatalogEntry } from '@shared/product-catalog';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
@@ -55,13 +54,6 @@ import {
   type SessionNotice,
   type SessionNoticeSource,
 } from './features/search/query-view';
-import {
-  catalogCategories,
-  catalogIsConsistent,
-  catalogSkus,
-  catalogStatusMessage,
-  resolveCatalogScope,
-} from './features/search/catalog-scope';
 import { isImeComposing, shouldSubmitOnEnter } from './lib/ime';
 import { isInteractiveTarget } from './lib/is-interactive-target';
 import { useWindowDrag } from './lib/use-window-drag';
@@ -123,12 +115,6 @@ export function QueryApp() {
   const dashboardOpenFailedRef = useRef(false);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
-  const [searchPlatform, setSearchPlatform] = useState<'all' | 'qianniu' | 'douyin'>('all');
-  const [productType, setProductType] = useState<'all' | '' | 'category' | 'sku'>('all');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [selectedSkuId, setSelectedSkuId] = useState('');
-  const [catalogEntries, setCatalogEntries] = useState<ProductCatalogEntry[]>([]);
-  const [catalogStatus, setCatalogStatus] = useState<'loading' | 'ready' | 'missing' | 'failed' | 'inconsistent'>('loading');
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
   const [announce, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
   const announceGenerationRef = useRef(0);
@@ -824,48 +810,6 @@ export function QueryApp() {
     return () => { live = false; unsubscribe(); window.clearInterval(interval); };
   }, [acceptProductSession]);
 
-  useEffect(() => {
-    const api = window.customerAgent?.productCatalog;
-    if (!api) {
-      setCatalogEntries([]);
-      setCatalogStatus(window.customerAgent?.productSearch ? 'missing' : 'ready');
-      return;
-    }
-    let live = true;
-    void api.list().then((value) => {
-      if (!live) return;
-      if (!value.ok) {
-        setCatalogEntries([]);
-        setCatalogStatus('failed');
-        return;
-      }
-      if (value.entries.length === 0) {
-        setCatalogEntries([]);
-        setCatalogStatus('missing');
-        return;
-      }
-      if (!catalogIsConsistent(value.entries)) {
-        setCatalogEntries([]);
-        setCatalogStatus('inconsistent');
-        return;
-      }
-      setCatalogEntries(value.entries);
-      setCatalogStatus('ready');
-    }).catch(() => {
-      if (!live) return;
-      setCatalogEntries([]);
-      setCatalogStatus('failed');
-    });
-    return () => { live = false; };
-  }, []);
-
-  const invalidateScope = useCallback(() => {
-    cancelPendingSearch();
-    cancelPendingCopy();
-    setResults([]);
-    reportPhase('ERROR');
-  }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
-
   const sessionAction = async () => {
     const product = window.customerAgent?.product; if (!product || sessionBusy) return;
     setSessionBusy(true);
@@ -890,23 +834,8 @@ export function QueryApp() {
       }
       const api = window.customerAgent.productSearch;
       const queryText = (inputRef.current?.value ?? query).trim();
-      const scope = resolveCatalogScope({
-        entries: catalogStatus === 'ready' ? catalogEntries : [],
-        productType,
-        categoryId: selectedCategoryId,
-        skuId: selectedSkuId,
-      });
-      if ((productType === 'category' || productType === 'sku') && catalogStatus !== 'ready') {
-        setResults([]);
-        setErrorMessage(catalogStatusMessage(catalogStatus));
-        reportPhase('ERROR');
-        return;
-      }
-      if (!scope.ok) {
-        setResults([]); setErrorMessage(scope.message); reportPhase('ERROR'); return;
-      }
       if (!api || !queryText || [...queryText].length > 500) {
-        setResults([]); setErrorMessage('请确认客户的问题；问题最多 500 字。需要时再筛选平台和商品。'); reportPhase('ERROR'); return;
+        setResults([]); setErrorMessage('请确认客户的问题；问题最多 500 字。'); reportPhase('ERROR'); return;
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       if (sessionNoticeRef.current?.kind === 'success') {
@@ -916,9 +845,10 @@ export function QueryApp() {
       lastProductQueryRef.current = null; setHelpStatus('待核实');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
-      const search = () => preferenceWriteRef.current.then(() => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
-        productContextType: scope.productContextType, productContextRef: scope.productContextRef,
-        productUnscoped: productType === 'all', parentQueryId: null }));
+      const search = () => preferenceWriteRef.current.then(() => api.search({
+        sessionEpoch, generation, queryText, platform: 'all', platformSource: 'manual',
+        productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null,
+      }));
       const run = window.customerAgent.productAnnounce && !announce
         ? refreshAnnounce(sessionEpoch).then(result => { if (!result?.ok || generation !== searchGenerationRef.current) return null; return search(); })
         : search();
@@ -930,7 +860,7 @@ export function QueryApp() {
         const items: RankedScript[] = result.candidates.map(c => ({
           scriptId: c.script_id, domain: domains[c.category as keyof typeof domains] ?? '产品', questionVariants: [], answerText: c.answer_text,
           platform: c.platform_scope.includes('qianniu') && c.platform_scope.includes('douyin') ? '千牛 / 抖音'
-            : c.platform_scope.includes('douyin') && searchPlatform !== 'qianniu' ? '抖音' : '千牛', scopeLabel: c.title, riskLevel: c.risk_level,
+            : c.platform_scope.includes('douyin') ? '抖音' : '千牛', scopeLabel: c.title, riskLevel: c.risk_level,
           effectiveFrom: c.effective_from, effectiveTo: c.effective_to ?? '', rank: c.rank as 1 | 2 | 3, score: 0,
           matchKind: 'exact', matchLabel: result.telemetryStatus === 'collection_disabled' ? '后端候选 · 不记录事件' : '后端候选',
           productCopy: { sessionEpoch, generation, queryId: result.queryId, rank: c.rank, scriptId: c.script_id, scriptVersion: c.script_version, contentHash: c.content_hash },
@@ -1011,7 +941,7 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [announce, cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, searchPlatform, productType, selectedCategoryId, selectedSkuId, catalogEntries, catalogStatus, cancelPendingSearch, refreshAnnounce]);
+  }, [announce, cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
 
   const copyScript = useCallback(
     async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
@@ -1524,36 +1454,9 @@ export function QueryApp() {
 
         {expanded ? (
           <QueryResultsPane
-            contextControls={window.customerAgent?.productSearch && productState?.ok && productState.enabled ? (
+            contextControls={window.customerAgent?.productSearch && productState?.ok && productState.enabled && results.some((row) => (row.placeholderKeys ?? []).length > 0) ? (
               <fieldset aria-label="查询范围" className="product-query-context">
                 <legend>查询范围</legend>
-                <label>平台 <select aria-label="查询平台" value={searchPlatform} onChange={e => { setSearchPlatform(e.target.value as typeof searchPlatform); cancelPendingSearch(); cancelPendingCopy(); setResults([]); reportPhase('ERROR'); }}>
-                  <option value="all">全部平台</option><option value="qianniu">千牛</option><option value="douyin">抖音</option>
-                </select></label>
-                <label>商品范围 <select aria-label="商品范围" value={productType} onChange={e => {
-                  const next = e.target.value as typeof productType;
-                  setProductType(next);
-                  if (next === 'all' || next === '') setSelectedCategoryId('');
-                  setSelectedSkuId('');
-                  invalidateScope();
-                }}>
-                  <option value="all">全部商品</option><option value="">无具体商品（仅全店话术）</option><option value="category">品类</option><option value="sku">具体款</option>
-                </select></label>
-                {productType === 'category' || productType === 'sku' ? <label>品类 <select aria-label="查询品类" value={selectedCategoryId} onChange={e => {
-                  setSelectedCategoryId(e.target.value); setSelectedSkuId(''); invalidateScope();
-                }}>
-                  <option value="">请选择</option>
-                  {catalogCategories(catalogEntries).map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
-                </select></label> : null}
-                {productType === 'sku' ? <label>具体款 <select aria-label="查询具体款" value={selectedSkuId} onChange={e => {
-                  setSelectedSkuId(e.target.value); invalidateScope();
-                }}>
-                  <option value="">请选择</option>
-                  {catalogSkus(catalogEntries, selectedCategoryId).map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
-                </select></label> : null}
-                {catalogStatus !== 'ready' && catalogStatus !== 'loading' && (productType === 'category' || productType === 'sku') ? (
-                  <p className="catalog-scope-error" data-testid="catalog-error" role="status">{catalogStatusMessage(catalogStatus)}</p>
-                ) : null}
                 {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '订单号' : '日期'}
                   <input disabled={copying} aria-label={key === 'order_id' ? '订单号' : '日期'} value={placeholderValues[key] ?? ''} onChange={e => setPlaceholderValues(v => ({ ...v, [key]: e.target.value }))} />
                 </label>)}

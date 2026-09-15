@@ -1,4 +1,4 @@
-import { clipboard, ipcMain, type WebContents } from 'electron';
+import { ipcMain, type WebContents } from 'electron';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
@@ -13,6 +13,7 @@ import type { AnnounceGate } from '../shared/product-announce';
 import { isProductEscalateRequest, isProductTerminalRequest } from '../shared/product-help';
 import { loadRetrievalPreferenceStore } from './retrieval-preference-store';
 import { loadRetrievalPipeline } from './retrieval-pipeline';
+import { writeSystemClipboard } from './system-clipboard.ts';
 
 const preferenceStore = loadRetrievalPreferenceStore(
   process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE
@@ -21,7 +22,7 @@ const preferenceStore = loadRetrievalPreferenceStore(
 
 export function registerProductSearchIpc(session: ProductSession | null, announce: AnnounceGate | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined, help?: SearchHelp) {
   const search = session && announce
-    ? new ProductSearch(session, text => clipboard.writeText(text), announce, help, undefined, undefined, undefined, loadRetrievalPipeline(), preferenceStore)
+    ? new ProductSearch(session, writeSystemClipboard, announce, help, undefined, undefined, undefined, loadRetrievalPipeline(), preferenceStore)
     : null;
   const seen = new WeakSet<WebContents>();
   const guard = async (event: Parameters<Parameters<typeof ipcMain.handle>[1]>[0], args: unknown[], dispatch: (id: number, value: unknown) => unknown) => {

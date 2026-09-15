@@ -58,8 +58,6 @@ test('desktop client queries the running synthetic stack and copies a candidate'
 
     await query.getByTestId('question-input').fill('什么时候发货');
     await query.getByTestId('search-button').click();
-    await query.getByLabel('查询平台').selectOption('qianniu');
-    await query.getByTestId('search-button').click();
     await expect(query.getByTestId('answer-text-1')).toContainText('48 小时', { timeout: 20_000 });
 
     await query.getByTestId('copy-button-1').click();

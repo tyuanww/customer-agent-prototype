@@ -168,7 +168,7 @@ export class OverlayController {
   } | null = null;
   private queryLayoutFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private dashboardOpening: Promise<OpenDashboardResult> | null = null;
-  private restorePreviousAppOnIdle = false;
+
   private disposed = false;
   private readonly fence: ShutdownFence;
   private readonly scheduler = new GuardedScheduler();
@@ -231,11 +231,10 @@ export class OverlayController {
       height: QUERY_INPUT_HEIGHT,
       title: '客服话术查询 · Demo',
       backgroundThrottling: false,
-      macPanel: false,
     });
-    // Regular Dock / Cmd+Tab is the product requirement. Electron only allows
-    // skipTransformProcessType when the process is already a UIElementApplication,
-    // so this Demo keeps Query on the current Space instead of transforming type.
+    // Query is a macOS panel (NSWindowStyleMaskNonactivatingPanel). Keyboard
+    // can land on the palette without making this app the frontmost process.
+    // Dock / Cmd+Tab still belong to Dashboard via the regular activation path.
 
     this.bindWindowLifecycle(this.fox);
     this.bindWindowLifecycle(this.query);
@@ -307,11 +306,10 @@ export class OverlayController {
     this.applyEvent({ type: 'OPEN' });
   }
 
-  dismiss(restorePreviousApp = false): void {
+  dismiss(_restorePreviousApp = false): void {
     if (this.isInactive()) {
       return;
     }
-    this.restorePreviousAppOnIdle = restorePreviousApp === true;
     this.finishOrClearQueryDrag();
     this.applyEvent({ type: 'DISMISS' });
   }
@@ -1107,22 +1105,23 @@ export class OverlayController {
       query.invalidateShadow();
     }
     query.hide();
-    // After a successful copy the operator is about to paste. Yield macOS
-    // key-window status to the previously frontmost app (千牛 / editor)
-    // without quitting; keep the idle fox visible with showInactive.
-    if (this.restorePreviousAppOnIdle) {
-      this.restorePreviousAppOnIdle = false;
-      if (process.platform === 'darwin') {
-        try {
-          app.hide();
-        } catch {
-          // hide() can throw if the Dock policy is already accessory.
-        }
-        if (this.live(fox)) {
-          fox.showInactive();
-        }
+    this.resignPaletteActivation(fox);
+  }
+
+  private resignPaletteActivation(fox: BrowserWindow): void {
+    // Hide Query only. Hiding the whole app would hide the idle fox and help.
+    // A non-activating panel yields IME when it hides; fox stays on screen.
+    if (!this.live(fox)) {
+      return;
+    }
+    if (process.platform === 'darwin' && typeof app.isHidden === 'function' && app.isHidden()) {
+      try {
+        app.show();
+      } catch {
+        // show() can throw if the Dock policy is accessory.
       }
     }
+    fox.showInactive();
   }
 
   private focusQueryWindow(): void {
@@ -1130,10 +1129,15 @@ export class OverlayController {
     if (!this.live(query)) {
       return;
     }
-    try {
-      app.focus(process.platform === 'darwin' ? { steal: true } : undefined);
-    } catch {
-      // Some Linux window managers do not support explicit application focus.
+    // macOS Query is a non-activating panel: key focus without making this
+    // process frontmost. Windows/Linux Query is a normal always-on-top window
+    // and still needs app.focus() (without steal) so the palette can type.
+    if (process.platform !== 'darwin') {
+      try {
+        app.focus();
+      } catch {
+        // Some Linux window managers do not support explicit application focus.
+      }
     }
     query.focus();
     query.webContents.focus();
@@ -1532,6 +1536,11 @@ export class OverlayController {
 
   private handleQueryBlur(): void {
     if (this.isInactive() || this.phase === 'FOX_IDLE' || !this.isWindowVisible(this.query)) {
+      this.clearPendingQueryBlur();
+      return;
+    }
+    const focused = BrowserWindow.getFocusedWindow();
+    if (focused && focused !== this.query && focused !== this.fox) {
       this.clearPendingQueryBlur();
       return;
     }

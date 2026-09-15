@@ -22,7 +22,7 @@ describe('retrieval pipeline', () => {
         return new Response('{}', { status: 500 });
       }) as typeof fetch,
     });
-    const ranked = await pipeline.run('什么时候发货', false);
+    const { ranked } = await pipeline.run('什么时候发货', false);
     expect(planned).toBe(0);
     expect(ranked[0]?.title).toMatch(/发货|时效/);
   });
@@ -46,7 +46,7 @@ describe('retrieval pipeline', () => {
           }), { status: 200 });
         }) as typeof fetch,
       });
-      const ranked = await pipeline.run('什么时候发货', true);
+      const { ranked } = await pipeline.run('什么时候发货', true);
       expect(ranked.map((row) => row.scriptId)[0]).toBe('ship');
       expect(prompts.join('\n')).not.toContain('48小时内发出');
       expect(prompts.join('\n')).not.toContain('仓库正在处理');
@@ -57,14 +57,14 @@ describe('retrieval pipeline', () => {
 
   it('returns empty for missing index, invalid JSON, and blank queries', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'retrieval-pipeline-'));
-    expect((await loadRetrievalPipeline('').run('发货', true))).toEqual([]);
-    expect((await loadRetrievalPipeline(join(dir, 'missing.json')).run('发货', true))).toEqual([]);
+    expect((await loadRetrievalPipeline('').run('发货', true)).ranked).toEqual([]);
+    expect((await loadRetrievalPipeline(join(dir, 'missing.json')).run('发货', true)).ranked).toEqual([]);
     const invalid = join(dir, 'invalid.json');
     writeFileSync(invalid, '{not json');
-    expect((await loadRetrievalPipeline(invalid).run('发货', true))).toEqual([]);
+    expect((await loadRetrievalPipeline(invalid).run('发货', true)).ranked).toEqual([]);
     const empty = join(dir, 'empty.json');
     writeFileSync(empty, `${JSON.stringify({ scripts: [{ scriptId: '', title: '' }] })}\n`);
-    expect((await loadRetrievalPipeline(empty).run('发货', true))).toEqual([]);
+    expect((await loadRetrievalPipeline(empty).run('发货', true)).ranked).toEqual([]);
     const mixed = join(dir, 'mixed.json');
     writeFileSync(mixed, `${JSON.stringify({
       scripts: [
@@ -73,8 +73,8 @@ describe('retrieval pipeline', () => {
       ],
     })}\n`);
     const loaded = loadRetrievalPipeline(mixed);
-    expect((await loaded.run('   ', false))).toEqual([]);
-    expect((await loaded.run('什么时候发货', false))[0]?.scriptId).toBe('ship');
+    expect((await loaded.run('   ', false)).ranked).toEqual([]);
+    expect((await loaded.run('什么时候发货', false)).ranked[0]?.scriptId).toBe('ship');
   });
 
   it('uses planned queries to recover a script the original sentence would miss', async () => {
@@ -90,8 +90,8 @@ describe('retrieval pipeline', () => {
           choices: [{ message: { content: '{"intent":"shipping","queries":["发货时效","什么时候发货"]}' } }],
         }), { status: 200 })) as typeof fetch,
       });
-      expect((await pipeline.run('优惠券到期了', false))[0]?.scriptId).toBe('coupon');
-      expect((await pipeline.run('优惠券到期了', true))[0]?.scriptId).toBe('ship');
+      expect((await pipeline.run('优惠券到期了', false)).ranked[0]?.scriptId).toBe('coupon');
+      expect((await pipeline.run('优惠券到期了', true)).ranked[0]?.scriptId).toBe('ship');
     } finally {
       delete process.env.MINIMAX_API_KEY;
     }
@@ -113,7 +113,7 @@ describe('retrieval pipeline', () => {
           return new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] }), { status: 200 });
         }) as typeof fetch,
       });
-      const ranked = await pipeline.run('发货', true);
+      const { ranked } = await pipeline.run('发货', true);
       expect(ranked).toHaveLength(RETRIEVAL_POOL);
       const rerankBody = bodies.find((body) => body.includes('候选：')) ?? '';
       expect(rerankBody.match(/s\d+ \|/g)).toHaveLength(8);
@@ -134,14 +134,14 @@ describe('retrieval pipeline', () => {
           return new Response('{}', { status: 500 });
         }) as typeof fetch,
       });
-      expect((await offline.run('什么时候发货', true))[0]?.scriptId).toBe('ship');
+      expect((await offline.run('什么时候发货', true)).ranked[0]?.scriptId).toBe('ship');
       expect(planned).toBe(0);
 
       process.env.MINIMAX_API_KEY = 'test-key';
       const failing = createRetrievalPipeline(scripts, {
         fetchImpl: (async () => new Response('{}', { status: 500 })) as typeof fetch,
       });
-      expect((await failing.run('什么时候发货', true))[0]?.scriptId).toBe('ship');
+      expect((await failing.run('什么时候发货', true)).ranked[0]?.scriptId).toBe('ship');
     } finally {
       if (previous === undefined) delete process.env.MINIMAX_API_KEY;
       else process.env.MINIMAX_API_KEY = previous;

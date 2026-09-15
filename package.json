@@ -63,6 +63,7 @@
     "retrieval:questions": "node scripts/enrich-retrieval-questions.ts",
     "retrieval:embeddings": "node scripts/embed-retrieval-index.ts",
     "retrieval:hydrate": "node scripts/sync-retrieval-hydrate.ts",
+    "retrieval:never-hit": "node scripts/report-retrieval-never-hit.ts",
     "verify:plan": "node scripts/verification-policy.mjs plan",
     "test:workflow": "node --test scripts/verification-policy.test.mjs scripts/synthetic-stack/stack.test.ts",
     "test:g1a:e0:ci": "node scripts/run-g1a-synthetic.mjs",

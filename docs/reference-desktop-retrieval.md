@@ -18,7 +18,8 @@
   → 每条 query：BM25(title×3, question/questions[]×2.5) ∥ 仓外 embedding(answer)（失败则 BM25(answer×1)）
   → RRF k=60，池 24
   → 可选 MiniMax 重排 Top 8（只返回已有 scriptId；只发 id + 标题）
-  → hydrate 原文，过滤平台 / 商品范围 / 有效期 / 冲突
+  → 弱命中弃权：问句二元组必须打中标题/问法（不算正文），且 RRF ≥ 1/(60+20)；否则 no_hit
+  → hydrate 原文，按 intent 路由过滤全店 / 活动 / SKU
   → 卡片 Top 3
 ```
 
@@ -35,6 +36,8 @@
 | `pnpm retrieval:embeddings` | `scripts/embed-retrieval-index.ts` | 把正文编成仓外向量（MiniMax `type=db`）。查询时 `type=query`。hash 对不上或查询失败则退回 BM25 正文 |
 | `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型。合成登录分页公告 snapshot 后自动对齐；空 snapshot 不覆盖 |
 | `pnpm retrieval:hydrate` | `scripts/sync-retrieval-hydrate.ts` | 手工把 snapshot JSON 写入仓外 hydrate。`--dry-run` 不写。拒绝写进 git 工作树 |
+| `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` | main `loadRetrievalTelemetryStore` | 仓外 JSON。缺省写在 hydrate 同目录 `retrieval-telemetry.json`。只记 queryId / 命中 / 曝光 scriptId / 是否复制，**不记问句原文** |
+| `pnpm retrieval:never-hit` | `scripts/report-retrieval-never-hit.ts` | 对照 hydrate 目录，列出从未曝光、曝光未复制，以及 no_hit 率。不打 leftover `/v1/search` |
 | `CUSTOMER_AGENT_RETRIEVAL_PREFERENCE` | 偏好文件路径 | 默认 `~/.customer-agent-synthetic-stack/retrieval-preference.json` |
 | `MINIMAX_API_KEY` | main `minimax-chat.ts` | 未设置则智能检索等同 OFF |
 | `MINIMAX_BASE_URL` | 同上 | 默认 `https://api.minimaxi.com/v1` |
@@ -50,6 +53,8 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 | --- | --- |
 | hydrate 的 `releaseId` 不在当前公告允许集合，且磁盘上还没有对齐后的快照 | `STALE`：内容已变化，请重新查询。先合成登录让 snapshot 回写，不要 `stack start` |
 | 本地有排序但 hydrate 对不上 id，或过滤后为空 | `no_hit`，不打 leftover `/v1/search` |
+| 排序分过低，或问句二元组只打中正文、打不中标题/问法 | `no_hit`。不用余弦 0.7。不改 leftover `judgeSearch` |
+| hydrate 检索 | API 仍是 `collection_disabled`（合同里 query_events 只由 `/v1/search` 写入）。曝光记在仓外 telemetry，用 `pnpm retrieval:never-hit` 看从未命中 |
 | MiniMax 超时 / 非 2xx / JSON 非法 | 日志 fallback，卡片仍是 BM25 顺序 |
 | 开关 SET 失败 | preload 回读磁盘，不假装已写入 |
 
@@ -60,5 +65,5 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 ## Related
 
 - 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-announce.ts`、`product-search.ts`、`doc2query-generate.ts`、`retrieval-index-store.ts`、`minimax-embed.ts`、`retrieval-embeddings-store.ts`
-- 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`、`dense-retrieve.ts`
+- 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`、`dense-retrieve.ts`、`query-route.ts`、`retrieval-quality.ts`
 - 冻结 HTTP 判定仍在 `apps/api/src/search-decision.ts`，本页不修改它
