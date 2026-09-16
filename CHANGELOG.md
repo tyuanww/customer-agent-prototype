@@ -23,6 +23,10 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+- Prepared (not started) the Windows installer phase: pinned the Electron 43.4.0 platform floor to Windows 10 and up, and wrote down the current NSIS install/upgrade/uninstall boundaries, the fact that the desktop app has no file-logging facility (stack logs come from `stack.ts` stdio redirects, not the app), and the Chinese-named userData path as a device-verification risk. The plan stays DRAFT and unapproved; no `package:win`, install, signing, notarization, deploy, or external distribution was performed.
+- Added a preparation-only contract for the real MENOKIN SKU swap: input format restricted to `sku_id` / `sku_label` / `answer_text` with orders, employees, couriers, and customer utterances refused, plus validation and a rollback plan to `rel_17`. It records that the swap is not data-only — `query-route.ts` matches `SYNTHETIC_CATALOG` labels, so the in-repo catalog must change under separate code authorization. No real SKU input was approved or loaded.
+- Read-only diagnosis of BACKEND-CI-503: the failing assertion is `announce.integration.test.ts:396` (`/v1/announce/snapshot` with an unknown lease expecting 403, getting 500), the same assertion PR #79 already fixed once but which recurred on 2026-09-15 and 2026-09-16. Also recorded that docs-scope pushes skip the entire PostgreSQL 15 integration step, so recent five-job green runs are not regression evidence. The item stays OPEN; nothing was fixed or closed.
+
 - Packaged unsigned macOS app loads the known off-repo hydrate and BM25 index when those files exist, so synthetic login search does not depend on a developer shell. Leftover `/v1/search` is not the packaged main chain in that case. This is not a signed or distributable build.
 - Recorded 2026-09-16 macOS M5 human observations: session expiry copy passed (later flipped to unsigned), M4 UNSIGNED query and copy passed, STALE copy failed with「内容已变化，请重新查询」. Login-window cancel remains unobserved (Command+W hid Query; returning showed login success) and is deferred. This is not M5 acceptance.
 
