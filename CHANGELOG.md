@@ -24,7 +24,7 @@ All notable changes to this customer-agent product implementation repository are
 ## [Unreleased]
 
 - Packaged unsigned macOS app loads the known off-repo hydrate and BM25 index when those files exist, so synthetic login search does not depend on a developer shell. Leftover `/v1/search` is not the packaged main chain in that case. This is not a signed or distributable build.
-- Recorded 2026-09-16 macOS M5 human observations: session expiry copy passed (later flipped to unsigned), login-window cancel still unobserved, M4 UNSIGNED query and copy passed. STALE remains unobserved. This is not M5 acceptance.
+- Recorded 2026-09-16 macOS M5 human observations: session expiry copy passed (later flipped to unsigned), M4 UNSIGNED query and copy passed, STALE copy failed with「内容已变化，请重新查询」. Login-window cancel remains unobserved (Command+W hid Query; returning showed login success) and is deferred. This is not M5 acceptance.
 
 - Recorded product PRs #80–#85 on the execution list and retrieval docs: off-repo `questions[]`, answer embeddings, hydrate alignment, query-route/non-activating palette, and 2026-09-15 M5 overlay observations. The #80 merge-commit PostgreSQL 15 job failed (announce 500 vs 403); #81–#85 merge-commit checks were green. This is not M5 acceptance, not BACKEND-CI-503 closed, not Windows start, and not a real SKU load.
 
