@@ -4,6 +4,8 @@
 > 执行方法统一使用[工程工作流程](../reference-engineering-workflow.md)。本文件只维护完整目标、当前执行清单与历史事实，不新增真实运行、签发、合并或发布授权。
 > **当前分类（2026-09-15 复核）：后端 T0–T6 已完成。桌面 D0–D5 工程已合并到 `5d6a802`（D5 PR #66）。macOS 合成栈 M1–M4 工程与 M5 人工清单已合并到产品 `main@f64765387c34374dadd42584b49f953b7c737cc8`（#74；合并后 CI [`34433421332`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34433421332) 五项 SUCCESS）。其后产品 PR #80–#84 已合入 `main@20fbe02777c213076b364fd9923d6ca6fddd416d`：仓外 `questions[]`（#80）、正文向量（#81）、hydrate 对齐（#82）、query-route / 非激活 palette（#83）、M5 开发态观察记录（#84）。#80 的 PR 检查五项 SUCCESS；该 squash 合入后的 push run [`34943603129`](https://github.com/weiweity/customer-agent-prototype/actions/runs/34943603129) PostgreSQL 15 为 FAILURE（announce 期望 403、实得 500）。#81–#84 合并后五项 SUCCESS。D2 经 PR #63 修复后通过，不得把 #62 原始合并写成 Windows smoke 已绿。登录残留红字已由 PR #68 修复。2026-09-15 开发态观察仍有效。2026-09-16 开发态已见登录失效（`session-revoke` 后「登录已失效，请重新登录」，稍后变回「请先合成登录」）。同日 M4 UNSIGNED 打包态已走合成登录 + 全店发货复制。2026-09-16 STALE **通过**（旧候选复制见「内容已变化，请重新查询」；随后已接回 MENOKIN）。仍不覆盖关窗登录失败。M5 清单进仓或记录观察不等于人工验收通过。Windows 安装包见 [DRAFT](2026-09-10-windows-package-and-device-verification.md)，未批准开工。治理 PR #80 与 BACKEND-CI-503 保持 OPEN。旧记录保留历史语义。**
 
+> **2026-09-16 更新（不改写上段）：** 产品 PR #89–#91 已合入 `main@09a6f55`——#89 Windows/SKU 准备件与 503 定位、#90 503 根因复现、#91 **503 修复**。合并后 push run `35090745771` 五项 SUCCESS 且 `test:integration` **实际执行**。**BACKEND-CI-503 因此关闭**（上段写于关闭之前）。治理 PR #80 仍 OPEN。M5 仍为人工待验（关窗取消未观察，用户已延期）。
+
 ## 可粘贴到应用的目标
 
 持续推进客服 Agent 一期真实搜索版本，直到交付可供我测试及客服受控试装的安装包，再根据验收结果推进正式上线。
@@ -35,9 +37,9 @@
 | macOS M2–M4 工程 | **已合并**：登录提示 #68、P3 四项测试 #69、目录选择 #72、业务异常自动化 #71、本机未签名包 #74。证据见下表。Query 不再手填商品标识。其后 #83 去掉手动平台 / 品类 / SKU 下拉。M3 自动化不是 Mac 人工 STALE |
 | macOS M5 | 清单已合并（PR #73）。2026-09-15 / 2026-09-16 人眼已记入清单第 7 节。失效 **通过**；M4 UNSIGNED 查询复制 **通过**；STALE **通过**。关窗失败仍 **未观察**。**M5 仍为人工待验**。不得把 unit/CI/Playwright 或本文件更新写成人工验收通过 |
 | 登录残留提示 | **已修复**（PR #68 → `54fce22`）。成功提示不再占用红色 `invalidMessage`。TODOS 中该项为 DONE。不是 Windows 实机证据 |
-| BACKEND-CI-503 | 保持 OPEN。诊断缺口已随 PR #59 修复；原偶发 503 根因未确认。#71 同头曾先红后绿。#80 合入后 push 的 PG15 仍见 announce 500 vs 403。#81–#84 五项 SUCCESS **不得**关闭本项。2026-09-16 诊断见 [定位](2026-09-16-backend-ci-503-readonly-diagnosis.md)：失败断言是 `announce.integration.test.ts:396`（`/v1/announce/snapshot` 无效 lease 期望 403 实得 500），**PR #79 已修过同一断言但 09-15 / 09-16 各复发一次**。**根因已在本机一次性 PG15 上复现证明**（§3a）：node-pg 的 `query_timeout` 抛出无 `code`/`detail` 的普通 Error，令 403 的唯一判别分支失效而落入 `INTERNAL` 兜底；且 `mapDatabaseContractError` 对 ZA004 本身也返回 `INTERNAL`，故 403 只有一道防线。注意纯文档 push 的 PG15 job 是 docs 模式空跑（`integration=skipped`），`#88`/`#86` 的五项 SUCCESS 不构成回归证据。**仍未修** |
+| BACKEND-CI-503 | **已关闭（2026-09-16）**。失败断言是 `announce.integration.test.ts:396`（`/v1/announce/snapshot` 无效 lease 期望 403 实得 500），PR #79 修过同一断言但 09-15 / 09-16 各复发一次。根因：`pg` 的 `query_timeout` 抛裸 `Error('Query read timeout')`（无 `code`/`detail`），把在途的 `ZA004` 冲掉，落入 `INTERNAL` 兜底。修复 PR [#91](https://github.com/weiweity/customer-agent-prototype/pull/91) `09a6f55`：超时后复核 `validate_snapshot_offline_lease`，无效→403 / 有效→503 / 复核也盲→503。回归证据见 merge 后 push run `35090745771`（full 模式，`test:integration` 实际执行）。定位与复现见 [诊断](2026-09-16-backend-ci-503-readonly-diagnosis.md)，关闭勘误见 [后端计划](2026-09-08-backend-runtime-plan.md)。**遗留**：CI 上该测试 6026ms vs 本机全量 8.75s，慢的成因未查明，属独立问题 |
 | 治理 PR #80 | 保持 OPEN，不得合并，不得触发 GitHub Pages 发布 |
-| 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实现/打包/安装/签名/公证/部署、自动外发、治理 #80 合并、Pages 发布、BACKEND-CI-503 修复、删除其他分支/worktree/桌面材料 |
+| 不在本轮 | 冻结合同变更、旧 migration、真实飞书/客户数据、Windows 实现/打包/安装/签名/公证/部署、自动外发、治理 #80 合并、Pages 发布、删除其他分支/worktree/桌面材料。**BACKEND-CI-503 已于 2026-09-16 修复并关闭**，不再属于本轮禁项 |
 
 ### D0–D5 工程证据（自动化，不是人工观察或 Windows 实机）
 

@@ -420,3 +420,26 @@ T1–T6 已合并至产品 main `8814ce8ddaff5c74a02c3ed4b817c04d0aadf864`，但
 已确认诊断缺口：公告服务默认空诊断 sink，且请求/审计 pool.connect 失败被吞掉。当前修复默认接入安全诊断、区分请求连接、审计连接/BEGIN/SQL/COMMIT/ROLLBACK故障，并在PG集成断言中附带安全诊断。仅输出稳定代码与SQLSTATE，不输出凭据、SQL或原文；审计失败仍503，不放宽断言或超时。故障注入证明诊断缺口，不能证明历史503根因。
 
 关闭条件：在实际PG/CI场景捕获原始故障的安全诊断，确认根因，完成针对性修复、回归、审查与CI。若不能复现则保留OPEN，不以新增日志或通过测试代替修复。
+
+---
+
+### 2026-09-16 勘误：`BACKEND-CI-503` 已关闭
+
+上段是 2026-09-09 的记录，保留不改写。以下为后续进展。
+
+**结论：四项关闭条件均已满足，本项关闭。**
+
+上段把根因指向「PR #58 的 503/OVERLOADED」。后续证实那是**更早、不同形态**的失败；真正反复失败的是另一条断言，形态是 **500 `INTERNAL`** 而非 503。两者不应混为一谈。
+
+| 条件 | 证据 |
+| --- | --- |
+| 在实际场景捕获原始故障 | [只读定位](2026-09-16-backend-ci-503-readonly-diagnosis.md) §3a：本机一次性 PG15 集群复现，与合成栈隔离 |
+| 确认根因 | `pg` 的 `query_timeout` 是**客户端**计时器；计时器赢时 `pg/client.js` 抛裸 `Error('Query read timeout')`，**无 `code`、无 `detail`、无 `fields`**。在途的 SQLSTATE `ZA004` / `DETAIL OFFLINE_LEASE_INVALID` 被替换，`announceFailure` 失去唯一判别依据，落入 `mapDatabaseContractError` 兜底——该函数**对 `ZA004` 本身也返回 `INTERNAL`** |
+| 针对性修复 | 产品 PR [#91](https://github.com/weiweity/customer-agent-prototype/pull/91) `09a6f55`：超时后用独立 pooled client 复核 `validate_snapshot_offline_lease`（主键查找，不带分页 join）。判定无效 → 403；确认有效 → 503；复核也盲 → 503。不猜、不违约 |
+| 回归 + CI | PR #91 与本仓 merge 后 push run `35090745771` 五项 SUCCESS，且 `test:integration` **实际执行**（非 docs 空跑），`announce.integration.test.ts` 通过 |
+
+**失败断言的确切位置**：`apps/api/tests/announce.integration.test.ts:396`——向 `/v1/announce/snapshot` 传格式合法但不存在的 lease（`osl_` + 64 个 `ab`），期望 403 `OFFLINE_LEASE_INVALID`。它由 PR #79 修过一次（`9e6e044`，2026-09-11）但未根治，2026-09-15 与 09-16 各复发一次。
+
+**为什么此前多次「五项 SUCCESS」不能关闭本项**：`verification-policy.mjs` 把纯文档变更判为 `mode: 'docs'`，此时 PG15 job 的 9 个步骤里只有一句 echo 会跑，`test:integration` 等 8 步全部 `skipped`。`#88`、`#86` 等运行均属此类，绿灯只证明文档范围判定生效。关闭依据必须来自 `mode: 'full'` 的运行——即 `#91` 这次。
+
+**遗留（不阻塞关闭）**：CI 上该测试耗时 6026ms，而本机全量集成套件（9 文件 / 90 测试）仅 8.75s。本次修复让「慢」不再产生错误状态码，但**未消除慢本身**，也**未查明 CI 为何慢**。若后续再见到 503，说明复核也超时，属另一个问题，需单独立项（CI 侧插桩）。

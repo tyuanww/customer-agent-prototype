@@ -17,6 +17,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Fixed
 
+- **BACKEND-CI-503 closed.** The invalid-lease snapshot assertion (`announce.integration.test.ts:396`) failed twice in CI with 500 instead of the contract's 403. Root cause: `pg` enforces `query_timeout` on the client and, when the timer wins, raises a bare `Error('Query read timeout')` with no `code`, `detail` or `fields` — discarding the `ZA004` / `OFFLINE_LEASE_INVALID` already in flight so `announceFailure` lost its only discriminator and fell through to the `INTERNAL` mapping. Fix (PR #91): after an undetermined read, re-ask `validate_snapshot_offline_lease` on its own pooled client — invalid lease still returns the contract's 403, a confirmed-good lease returns a retryable 503, and a blind revalidation stays 503 rather than guessing. Verified by merge push run `35090745771`, whose PostgreSQL 15 job actually executed the integration lane.
 - MiniMax calls go through Electron `net.fetch` so corporate TLS no longer fail-opens every smart search.
 - Hydrate rows must match the copy contract (`content_hash` 64 hex, non-empty answer). Cancelled searches no longer commit. Long customer sentences stay in the MiniMax plan.
 - The retrieval toggle is visually separate from 合成登录, cancels an in-flight search when flipped, and keeps the last good OFF value if the preference file is corrupt.
