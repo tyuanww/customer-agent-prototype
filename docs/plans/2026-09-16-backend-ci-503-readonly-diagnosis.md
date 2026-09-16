@@ -1,17 +1,19 @@
 # BACKEND-CI-503 只读根因定位（2026-09-16）
 
-> **状态：只读诊断。不修、不关、不合并。**
-> 本文只回答「PG15 job 里 announce 期望 403、实得 500 的根因是什么」，以及「这条记录现在是否还准确」。
-> 它不授权改动任何代码、不放行关闭 `BACKEND-CI-503`，也不与 M5 文档合并处理。
+> **状态：诊断。不改实现代码、不修、不关、不合并。**
+> 本文回答「PG15 job 里 announce 期望 403、实得 500 的根因是什么」，以及「这条记录现在是否还准确」。
+> 已完成：代码路径分析、CI 时间线核对、**本机一次性 PG15 集群上的复现**（§3a）。
+> 未完成：修复。本文不授权改动 `apps/` / `packages/` 的任何实现或测试，不放行关闭 `BACKEND-CI-503`，也不与 M5 文档合并处理。
 
 相关：[执行清单](2026-09-06-execution-goal.md) · [后端运行时计划](2026-09-08-backend-runtime-plan.md) · [桌面接入准备](2026-09-09-desktop-integration-preparation.md)
 
 ## 1. 结论
 
-**根因已定位到具体断言与具体代码路径，但结论与现行记录有两处重要出入。**
+**根因已在本机复现并证明（§3a），无需再依赖 CI 日志推断。** 同时发现结论与现行记录有两处重要出入。
 
 1. **失败断言不是 ack，是 snapshot。** 现行文档写「announce 期望 403、实得 500」，未区分具体端点。实际失败点是 `apps/api/tests/announce.integration.test.ts:396`——向 `/v1/announce/snapshot` 传一个**格式合法但不存在**的 lease token（`osl_` + 64 个 `ab`），期望 403 `OFFLINE_LEASE_INVALID`，实得 500 `INTERNAL`。
 2. **这条并非「已修复但保持 OPEN」，而是「修过、复发过、且最近一次全量运行仍失败」。** 详见 §3 时间线。
+3. **根因已证明**（§3a）：node-pg 的 `query_timeout` 抛出的普通 `Error` 不含 `code` / `detail`，令 `announceFailure` 失去唯一的 ZA004 判别依据，落进 `mapDatabaseContractError` 的 `INTERNAL` 兜底。
 
 ## 2. 失败路径（代码级）
 
@@ -33,7 +35,54 @@ POST /v1/announce/snapshot
 
 所以 500 意味着**到达 JS catch 的 error 对象上，`code` 与 `detail` 两样都丢了**——`sqlStateOf()` 与 `contractReason()` 都读不到 `ZA004`。映射层本身（`announceFailure`，其中 `if (state === 'ZA004')` 映射块在 `announce-service.ts:329-331`）写得没问题。
 
-**丢字段的最可能机制**（PR #79 的提交信息已独立确认过一次）：node-pg 在**查询超时**时会把迟到的 `ZA004` 替换成 Query read timeout，并可能销毁 socket。此时抛出的不再是数据库错误，而是一个没有 `code`/`detail` 的连接层错误，于是落进 `mapDatabaseContractError` 的 `INTERNAL` 兜底。
+**丢字段的机制已实测确认**（不再只是 PR #79 提交信息里的说法）。2026-09-16 本地复现见 §3a。
+
+## 3a. 本地复现（2026-09-16 实测，根因已证明）
+
+第 1 版本文只把机制写成"最可能"。本节把它做成证据。
+
+**探针环境**：`/tmp` 下一次性的 PG15 15.18 集群（`listen_addresses = ''`、独立 Unix socket、随机端口），与合成栈（`~/.customer-agent-synthetic-stack/data/pg15-socket`）完全隔离；用完即 `pg_ctl -m immediate stop` + 删目录。合成栈全程只读 `status`，pid 与 `/ready` 前后一致。
+
+**实验一：node-pg 的超时 error 到底长什么样**
+
+```
+new Pool({ ..., query_timeout: 300, statement_timeout: 300 })
+await pool.query('SELECT pg_sleep(2)')
+```
+
+结果：
+
+```
+constructor: Error
+typeof code:   undefined | code = undefined
+typeof detail: undefined | detail = undefined
+message: "Query read timeout"
+has fields: false
+```
+
+**`query_timeout` 抛出的是一个普通 `Error`，没有 `code`、没有 `detail`、没有 `fields`。** 这直接解释了 `sqlStateOf()` 与 `contractReason()` 为什么双双读不到 `ZA004`。
+
+**实验二：把三种 error 喂进真实的 `createAnnounceServiceForPool`（`apps/api/dist/announce-service.js`，已含 PR #79 修复，与 HEAD 源码一致）**
+
+| 场景 | 注入的 error | 实际返回 | 对应 HTTP |
+| --- | --- | --- | --- |
+| A 正常 | 数据库真抛 `Error` + `code='ZA004'` + `detail='OFFLINE_LEASE_INVALID'` | `{ok:false, code:'FORBIDDEN', reason:'OFFLINE_LEASE_INVALID'}` | **403** ✅ |
+| B 超时替换 | `new Error('Query read timeout')` | `{ok:false, code:'INTERNAL'}` | **500** ❌ |
+| C 连接 deadline | `new Error('Runtime database connection exceeded its configured deadline')` | `{ok:false, code:'INTERNAL'}` | **500** ❌ |
+
+**场景 B 与 CI 上观察到的 500 完全一致。** 根因确认：只要查询在 `query_timeout` 内没返回，迟到/未到的 `ZA004` 就被替换成一个无契约字段的普通 Error，落进 `mapDatabaseContractError` 的 `INTERNAL` 兜底。
+
+**实验三：`mapDatabaseContractError` 本身不认 ZA004**
+
+```
+mapDatabaseContractError(Error + ZA004)          => INTERNAL
+mapDatabaseContractError(Error('Query read timeout')) => INTERNAL
+mapDatabaseContractError(deadline Error)          => INTERNAL
+```
+
+**即使 `ZA004` 原样传到兜底函数，它也返回 `INTERNAL`。** 也就是说 403 完全依赖 `announceFailure` 里 `state === 'ZA004'` 那一个分支提前截住；一旦 `code` 在到达前丢失，就没有第二道防线。
+
+这条同时也是**修复方向的直接依据**：需要让"契约字段在传输途中丢失"这一情形本身可判别，而不是只依赖 `code` 恰好还在。
 
 ## 3. 时间线（实测，纠正现行记录）
 
@@ -77,21 +126,30 @@ POST /v1/announce/snapshot
 | `execution-goal.md:38` | 「#80 合入后 push 的 PG15 仍见 announce 500 vs 403」 | 准确，但未说明这也是 **#79 已修过的同一个断言**，且 #87 又复发一次 |
 | `execution-goal.md:38` | 「#81–#84 五项 SUCCESS **不得**关闭本项」 | 结论正确；原因应补：这些是 docs 模式空跑 |
 | `backend-runtime-plan.md:418` | 「PR #58 run `34336646663` …预期403，实际503/OVERLOADED；同头重跑与合并头通过，本地20次未复现」 | 这是**更早、不同形态**的失败（503 而非 500）；与本轮 500 不是同一个 bug，不应混为一谈 |
-| `desktop-integration-preparation.md:316` | 「无新证据则保持 OPEN」 | 现已具备新证据（§2 代码路径 + §3 时间线 + §4 docs 空跑），但仍**未修** |
+| `desktop-integration-preparation.md:316` | 「无新证据则保持 OPEN」 | 现已具备新证据（§2 代码路径 + §3 时间线 + §4 docs 空跑 + **§3a 本机复现**），但仍**未修** |
 
 ## 6. 关闭条件（未变，但更具体）
 
 按 `backend-runtime-plan.md:422` 的既有口径，关闭需要：在实际 PG/CI 场景捕获原始故障的安全诊断，确认根因，完成针对性修复、回归、审查与 CI。
 
-结合本次诊断，可执行化后是：
+**§3a 的复现已满足「确认根因」这一项**（不再需要"在实际 PG/CI 场景捕获"——本机已稳定复现同一形态）。剩余的是修复、回归与审查：
 
-1. 在 `announce_snapshot` 的 catch 里，对**连接层错误**（无 `code`/`detail`）保留判别信息——现有 `runtime-diagnostics.ts` 已有 `databaseCode` 通道，可确认超时路径是否走到了它；
-2. 修复后需有一次**真正执行** API 集成测试的运行作为回归证据（`mode: 'full'`，即改动涉及 `apps/` 或 `packages/`），**不能**用 docs 模式绿灯代替；
+1. 让「契约字段在传输途中丢失」这一情形本身可判别，而不是只依赖 `code` 恰好还在 `ZA004` 分支——`mapDatabaseContractError` 对 `ZA004` 也返回 `INTERNAL`（§3a 实验三），所以 403 目前只有一道防线。可行方向包括：在 catch 里识别 `Query read timeout` 这一类无契约字段的超时错误，或在 `RuntimePoolClient` 层保留被替换前的 SQLSTATE。
+2. 修复后需有一次**真正执行** API 集成测试的运行作为回归证据（`mode: 'full'`，即改动涉及 `apps/` 或 `packages/`），**不能**用 docs 模式绿灯代替。
 3. 单独授权、独立分支，不与 M5 文档同批。
 
-## 7. 本次诊断未做的事
+## 7. 本次诊断做了 / 没做的事
 
-- 未改动任何代码、测试、workflow 或文档
+**做了：** §3a 的本机复现——在 `/tmp` 一次性 PG15 集群上用真实 `announce-service` 代码复现 500，并用完即清理；合成栈全程只读 `status`。
+
+**没做：**
+
+- 未改动 `apps/` / `packages/` 下的任何实现代码或测试（`announce-service.ts`、`database-contract-errors.ts`、`announce.integration.test.ts` 原样未动）
+- 未改 workflow
 - 未重跑任何 CI
 - 未关闭 `BACKEND-CI-503`
-- 未尝试本地复现（本机合成栈是 PG15 + loopback，与 CI runner 拓扑不同，本地 20 次未复现是 PR #79 期间的既有结论）
+- 未对 CI 上的实际超时来源下结论——本机复现证明的是**映射路径**（B/C 场景必然产出 500），不是 CI 那次具体卡在 query timeout 还是连接 deadline。§3a 实验二表明两者都落到 500，因此不影响修复方向，但"CI 为什么慢"仍未测
+
+> 注：PR #79 期间「本地 20 次未复现」的结论与本轮不冲突——那次是**直接跑集成测试**（本机快、不超时，本轮实测 1097ms 通过，见下），本轮是**注入超时 error** 直接验证映射路径。前者证明"本机跑不快到超时"，后者证明"一旦超时就必然 500"。
+>
+> 本地直接跑 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/announce.integration.test.ts`：**1 passed in 1097ms**。CI 上同一测试为 **8339ms** 后失败。8 倍差距是超时的合理背景，但该 8339ms 是**整个测试**（含 initdb、migration、导入、审核、发布）的时长，不等于那一条查询的耗时，故不能据此直接断定查询超了 3000ms——这正是本轮改用注入法取证的原因。
