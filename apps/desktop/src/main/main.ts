@@ -10,6 +10,7 @@ import { registerProductAnnounceIpc } from './product-announce-ipc';
 import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { resolveProductProfile } from './product-runtime-config';
+import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { app, Menu, session } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
@@ -157,13 +158,16 @@ if (!gotLock) {
     // Development reads loopback origins from the environment; a packaged build
     // reads the same values from its own userData file so an installed client
     // can run the synthetic chain without any environment setup. Both paths are
-    // validated to bare loopback origins. A packaged build ignores the
-    // environment entirely and fail-closes if the file is missing or invalid,
+    // validated to bare loopback origins. A packaged build ignores origin
+    // environment variables and fail-closes if the file is missing or invalid,
     // so it cannot be repointed off-host or silently dropped to the S0 fixture.
+    // Retrieval hydrate / BM25 use the known off-repo stack files, not leftover
+    // `/v1/search`, and also must not require a developer shell.
     const userDataDirectory = app.getPath('userData');
     const productProfile = resolveProductProfile(app.isPackaged, userDataDirectory, process.env);
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
+      if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
         createSessionStore(userDataDirectory), createLoginWindow(productProfile.identityOrigin, productProfile.apiOrigin));
       productAnnounce = new ProductAnnounce(productSession, readProductClientId(userDataDirectory));
