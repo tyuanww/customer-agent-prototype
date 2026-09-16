@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | 安装包格式 | electron-builder **NSIS**，`oneClick: true`，`perMachine: false`，不可改安装目录，关闭 differential package | 试装是否改成可改目录 / 按机安装，需阶段批准 |
 | 架构 | 仅声明 **x64**（`apps/desktop/package.json` `build.win.target`） | 是否需要 Windows ARM64 / 32 位；当前产物不能冒充已支持 |
-| 最低 OS | Windows 目标**未**声明 `minimumSystemVersion`（macOS 声明了 12.0） | 对照 Electron 43 官方支持矩阵后选定；在选定前不写“已支持 Windows 10/11” |
+| 最低 OS | Windows 目标**未**声明 `minimumSystemVersion`（macOS 声明了 12.0）。Electron 43.4.0 随包 README 的官方口径是 **Windows 10 and up**；Windows 7/8/8.1 已在 Electron 23 移除。**仓库当前未就此声明任何 Windows 最低版本** | 是否要在 `build.win` 显式声明最低版本，以及声明成什么；在选定前不写“已支持 Windows 10/11” |
 | 应用身份 | `appId` 仍为 `local.demo.customer-agent`；`productName` 为「客服话术浮窗 Demo」 | 试装是否继续 Demo appId，或另批长期 ID |
 | 目标设备 | 未指定 | 用户测试机台账、客服受控试装机台账、是否允许远程协助 |
 | 本机环境 | 当前开发与人工观察在 macOS 合成栈 | Windows 测试机是否可安装 Node 24 / pnpm / PostgreSQL 15，或只收安装包 |
@@ -55,7 +55,7 @@
 | --- | --- | --- |
 | 启动配置 | 未批准打包态产品 profile 前，安装包按 S0 合成 fixture 启动，不读真实 URL | 合成 API 是同机 loopback，还是另批测试主机；当前代码只允许 127.0.0.1 |
 | 后端连接 | 首轮若要跑 D1–D5 主链，API / 合成身份 / PostgreSQL 15 必须出现在获批拓扑里，且仍是 synthetic-only | Windows 测试机是否安装 PG15；端口、防火墙、开机自启均未定 |
-| 日志与脱敏 | 诊断不得写入真实客户原文、token、内部 URL；失败码与哈希化标识可保留 | 安装后日志目录、保留天数、如何从试装机取回；现无现成 Windows 采集手册 |
+| 日志与脱敏 | 诊断不得写入真实客户原文、token、内部 URL；失败码与哈希化标识可保留。**桌面应用当前没有文件日志设施**：`apps/desktop/src` 里有 16 处 `console.warn` / `console.error`（启动失败、Tray 降级、Dashboard 打开失败、MiniMax 回退等），全部只写 stdout/stderr，**不落盘**；renderer 无任何写文件能力。`~/.customer-agent-synthetic-stack/logs/` 下的 `api.log` / `identity.log` / `worker.log` / `postgres.log` 由 `scripts/synthetic-stack/stack.ts` 的 `spawnLogged()` 用 `openSync` 重定向子进程 stdio 生成，属于**栈侧**而非应用侧。打包态应用双击启动时没有这些重定向，stdout 去向取决于启动方式 | 安装后日志目录、保留天数、如何从试装机取回；现无现成 Windows 采集手册，且取回前需先决定要不要为此新增应用侧日志设施 |
 | 交付位置 | 未签名包只放本机 `release/local-unsigned/windows/`，被 Git 忽略 | 用户测试包的传递方式（当面拷贝 / 受控网盘）；禁止公开 Release 当正式分发 |
 
 ## 4. 功能验收项（实机，合成数据）
@@ -77,10 +77,12 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 
 | 检查 | 当前实现能支持什么 | 实机仍要看什么 |
 | --- | --- | --- |
-| 安装 | NSIS one-click 写入当前用户目录 | SmartScreen / 未签名警告文案；是否要管理员；任务栏/开始菜单快捷方式；图标 |
-| 升级 | 无自动更新元数据；再次安装同一 NSIS 的覆盖行为未在实机验证 | 覆盖后用户数据目录是否保留；是否出现双图标；版本号是否可见 |
+| 安装 | NSIS `oneClick: true` + `perMachine: false` + `allowToChangeInstallationDirectory: false`：无安装向导、装进当前用户目录、安装路径不可改。产物名强制 `-UNSIGNED.exe`（`build.win.artifactName`） | SmartScreen / 未签名警告文案；是否要管理员；任务栏/开始菜单快捷方式；图标 |
+| 升级 | 无自动更新元数据；`differentialPackage: false` 且后验显式拒绝 `.blockmap` / `latest*.yml` / `app-update.yml`，因此不存在增量包路径。再次安装同一 NSIS 的覆盖行为未在实机验证 | 覆盖后用户数据目录是否保留；是否出现双图标；版本号是否可见 |
 | 卸载 | 依赖 NSIS 默认卸载器 | 「应用和功能」能卸干净；开始菜单与安装目录是否残留；userData 是否按约定保留或删除 |
-| 异常恢复 | 开发态缺配置/非 loopback/打包态产品 profile 均 fail-closed | 安装中断、杀软拦截、缺 VC++ 运行库、杀进程后重启、卸载失败后的手工清理步骤 |
+| 异常恢复 | 开发态缺配置 / 非 loopback / 打包态产品 profile 均 fail-closed：`product-runtime-config.ts` 缺 `synthetic-stack.json` 或缺任一 origin 直接抛错，不退 S0 fixture | 安装中断、杀软拦截、缺 VC++ 运行库、杀进程后重启、卸载失败后的手工清理步骤 |
+
+**userData 路径是本阶段的一个 Windows 待验点。** `apps/desktop/src/main/main.ts` 在 `requestSingleInstanceLock()` 之前执行 `app.setName('客服话术浮窗 Demo')`；代码注释说明这个顺序不可调换，因为 `requestSingleInstanceLock()` 是第一个会把该路径落地的 API，晚设置会让 packaged 构建去找 `@customer-agent/desktop` 并 fail-closed。packaged 构建的 userData 必须落在该名字下，否则合成栈写入的 `synthetic-stack.json` 找不到。该名字含中文与空格，在 Windows 上对应 `%APPDATA%` 下的同名目录。**纯 ASCII 路径假设不适用；中文路径在部分企业镜像 / 漫游配置下的行为未验证**——实机第一次启动若报 `Packaged desktop requires a valid synthetic-stack.json under userData`，应先确认该目录名与写入位置是否一致，而不是改代码。
 
 回退方式：保留上一份已知安装包；卸载当前版本后改装上一份。没有在线回滚通道。
 
@@ -124,6 +126,13 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 
 ## 9. 可并行 vs 必须先取得设备或阶段批准
 
+**已被本仓消化、不再是 TBD 的（2026-09-16 准备，仍不构成开工）：**
+
+- 最低 OS 口径：Electron 43.4.0 官方为 **Windows 10 and up**（见第 1 节）。是否在 `build.win` 显式声明、声明成什么，仍待用户拍板
+- 安装 / 升级 / 卸载 / 异常恢复的**当前实现边界**已逐条落在第 5 节，含 NSIS `oneClick` / `perMachine` / 不可改目录、无自动更新元数据、后验拒绝 `.blockmap` 与 `latest*.yml`
+- 日志口径已澄清：应用侧**无文件日志设施**（16 处 `console.*` 只写 stdout/stderr），栈侧日志由 `stack.ts` 重定向产生（见第 3 节）。这条从"待确认日志目录"变成了"待决定是否新增应用侧设施"
+- Windows 上的 userData 目录名风险已登记（见第 5 节）：`app.setName` 含中文，实机首启失败先查目录名再查代码
+
 **现在可并行、且不构成本文开工：**
 
 - 继续引用 D0–D5 已合并自动化证据
@@ -153,8 +162,9 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 4. 是否批准打包态产品 profile 的独立工程
 5. 代码签名证书主体、类型（OV/EV）、费用、保管人
 6. 未签名包的传递与回收方式
-7. 试装日志如何脱敏取回
-8. 登录残留是否必须在试装前修复（建议：独立、可并行，不阻塞 P0/P1）
+7. 试装日志如何脱敏取回（先定：应用侧当前没有文件日志设施，见第 3 节；是否为此新增需单独决定）
+8. 登录残留是否必须在试装前修复 —— **已不适用**：该项已由产品 PR #68 修复，`TODOS.md` 记为 DONE。原「独立、可并行，不阻塞 P0/P1」的建议保留为历史语义
+9. Windows 上 userData 目录名含中文（`客服话术浮窗 Demo`）是否需要在企业镜像 / 漫游配置下预先验证（见第 5 节）
 
 ## 11. 与已有文档的关系
 
@@ -164,3 +174,5 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 | [D0–D5 准备](2026-09-09-desktop-integration-preparation.md) | 合成桌面设计 SSOT；不授权 Windows 开工 |
 | [如何验证](../how-to-verify-desktop.md) | 命令与 hosted smoke 边界 |
 | [README 打包现状](../../README.md#windows-打包现状) | 未签名包路径与禁止事项 |
+| [BACKEND-CI-503 只读定位](2026-09-16-backend-ci-503-readonly-diagnosis.md) | 独立缺陷线，保持 OPEN；与本阶段的签名字段无关，不要混批 |
+| [真实 SKU 替换输入契约](2026-09-16-real-sku-replacement-input-contract.md) | 首轮仍纯合成，与本阶段并行但不交叉 |
