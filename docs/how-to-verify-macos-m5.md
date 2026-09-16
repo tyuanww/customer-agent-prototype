@@ -208,7 +208,7 @@ STALE 要看的是：**已经拿到的那条旧候选** 在回退后不得再被
 ## 8. 明确不在本门禁
 
 - Windows 实现、Windows 包、Windows 实机
-- 治理 PR #80、GitHub Pages、BACKEND-CI-503（保持 OPEN）
+- 治理 PR #80（保持 OPEN）、GitHub Pages
 - 冻结合同、旧 migration、真实飞书 / 客户数据
 - 付费签名、公证、部署、自动外发、代发
 - Dock / Cmd+Tab / 台前调度 / 真实全局快捷键（仍是设备门，但不是本页 M5 五项）

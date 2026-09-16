@@ -136,9 +136,10 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 **现在可并行、且不构成本文开工：**
 
 - 继续引用 D0–D5 已合并自动化证据
-- 登记登录残留与 BACKEND-CI-503（保持 OPEN）
 - 用户填写第 1 节 TBD（设备、OS、是否本机 API）
 - 查询证书采购周期与大致费用（只收集，不购买）
+
+> 登记项状态更新（2026-09-16）：登录残留已由 PR #68 修复（`TODOS.md` 记 DONE）；BACKEND-CI-503 已由 PR #91 修复并关闭。两项都不再是待登记项。
 
 **必须先取得阶段批准才能做：**
 
@@ -174,5 +175,5 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 | [D0–D5 准备](2026-09-09-desktop-integration-preparation.md) | 合成桌面设计 SSOT；不授权 Windows 开工 |
 | [如何验证](../how-to-verify-desktop.md) | 命令与 hosted smoke 边界 |
 | [README 打包现状](../../README.md#windows-打包现状) | 未签名包路径与禁止事项 |
-| [BACKEND-CI-503 只读定位](2026-09-16-backend-ci-503-readonly-diagnosis.md) | 独立缺陷线，保持 OPEN；与本阶段的签名字段无关，不要混批 |
+| [BACKEND-CI-503 定位与修复](2026-09-16-backend-ci-503-readonly-diagnosis.md) | **已关闭**（PR #91）；与本阶段的签名字段无关 |
 | [真实 SKU 替换输入契约](2026-09-16-real-sku-replacement-input-contract.md) | 首轮仍纯合成，与本阶段并行但不交叉 |

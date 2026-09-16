@@ -29,7 +29,7 @@
 | 恢复当前一期任务、核对证据与下一动作 | [当前执行清单](docs/plans/2026-09-06-execution-goal.md) |
 | 审阅 Windows 安装包与实机方案（DRAFT，未批准开工） | [docs/plans/2026-09-10-windows-package-and-device-verification.md](docs/plans/2026-09-10-windows-package-and-device-verification.md) |
 | 准备真实 MENOKIN SKU 替换的输入格式与回退（准备件，未实施） | [docs/plans/2026-09-16-real-sku-replacement-input-contract.md](docs/plans/2026-09-16-real-sku-replacement-input-contract.md) |
-| 查看 BACKEND-CI-503 的只读根因定位（未修复、保持 OPEN） | [docs/plans/2026-09-16-backend-ci-503-readonly-diagnosis.md](docs/plans/2026-09-16-backend-ci-503-readonly-diagnosis.md) |
+| 查看 BACKEND-CI-503 的根因定位与修复（已关闭） | [docs/plans/2026-09-16-backend-ci-503-readonly-diagnosis.md](docs/plans/2026-09-16-backend-ci-503-readonly-diagnosis.md) |
 | 核对关键词与自然语言搜索的候选展示规则（规则仍有效；桌面检索见下行） | [候选展示规则](docs/plans/2026-09-07-natural-language-search.md) |
 | 查阅当前桌面 BM25 + embedding + 可选 MiniMax 检索、仓外索引与禁止 `stack start` | [桌面语义检索](docs/reference-desktop-retrieval.md) · [How to 启动检索浮窗](docs/how-to-run-macos-semantic-query.md) · [为什么检索在桌面](docs/explanation-desktop-retrieval.md) · [冻结点](docs/plans/2026-09-10-macos-semantic-query-freeze.md) |
 | 运行合成搜索判定实验、完整 N 验收及报告证明 | [实验工具说明](apps/api/experiments/search-decision/README.md) |
