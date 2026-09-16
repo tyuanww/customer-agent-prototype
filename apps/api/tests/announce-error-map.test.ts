@@ -292,3 +292,120 @@ describe('announce denial diagnostics', () => {
     }
   });
 });
+
+/**
+ * `pg` discards the server's SQLSTATE when `query_timeout` wins the race
+ * (pg/client.js builds `new Error('Query read timeout')` with no code/detail).
+ * The paging read then carries no verdict about the lease. These cases pin the
+ * recovery: ask `validate_snapshot_offline_lease` again on a fresh client, and
+ * only fall back to a retryable status when that second look is also blind.
+ */
+describe('announce snapshot lease revalidation after a timeout', () => {
+  const snapshotRequest = {
+    actor: { user_id: 'usr_t5_owner', role: 'owner' as const, auth_mode: 'mock' as const },
+    clientId: 'mac-cs-t5-001',
+    leaseToken: `osl_${'ab'.repeat(32)}`,
+    releaseId: 'rel-1',
+    cursor: null,
+    limit: 200,
+  };
+
+  function poolWhere(
+    page: () => never | { rows: unknown[] },
+    revalidate: () => never | { rows: unknown[] },
+  ) {
+    return {
+      connect: async () => ({
+        query: async (sql: string) => {
+          if (String(sql).includes('read_snapshot_page')) return page();
+          if (String(sql).includes('validate_snapshot_offline_lease')) return revalidate();
+          // Denial-audit writes answer with an empty row set.
+          return { rows: [] };
+        },
+        release: () => undefined,
+      }),
+      query: async () => ({ rows: [] }),
+      end: async () => undefined,
+    };
+  }
+
+  it('returns the contract 403 when revalidation proves the lease invalid', async () => {
+    const service = createAnnounceServiceForPool(poolWhere(
+      () => { throw new Error('Query read timeout'); },
+      () => {
+        throw Object.assign(new Error('offline lease token is invalid'), {
+          code: 'ZA004',
+          detail: 'OFFLINE_LEASE_INVALID',
+        });
+      },
+    ) as unknown as Pool, LOG_HASH, false);
+
+    await expect(service.snapshot(snapshotRequest)).resolves.toEqual({
+      ok: false,
+      code: 'FORBIDDEN',
+      reason: 'OFFLINE_LEASE_INVALID',
+    });
+  });
+
+  it('stays retryable when revalidation confirms the lease is good', async () => {
+    const service = createAnnounceServiceForPool(poolWhere(
+      () => { throw new Error('Query read timeout'); },
+      () => ({ rows: [{}] }),
+    ) as unknown as Pool, LOG_HASH, false);
+
+    await expect(service.snapshot(snapshotRequest)).resolves.toEqual({
+      ok: false,
+      code: 'OVERLOADED',
+    });
+  });
+
+  it('stays retryable when revalidation is itself undetermined', async () => {
+    const service = createAnnounceServiceForPool(poolWhere(
+      () => { throw new Error('Query read timeout'); },
+      () => { throw new Error('Query read timeout'); },
+    ) as unknown as Pool, LOG_HASH, false);
+
+    await expect(service.snapshot(snapshotRequest)).resolves.toEqual({
+      ok: false,
+      code: 'OVERLOADED',
+    });
+  });
+
+  it('does not revalidate a connection error that never reached a verdict', async () => {
+    let snapshotQueries = 0;
+    let revalidations = 0;
+    const pool = {
+      connect: async () => ({
+        query: async (sql: string) => {
+          if (String(sql).includes('read_snapshot_page')) {
+            snapshotQueries += 1;
+            throw new Error('socket hang up');
+          }
+          if (String(sql).includes('validate_snapshot_offline_lease')) {
+            revalidations += 1;
+            return { rows: [{}] };
+          }
+          return { rows: [] };
+        },
+        release: () => undefined,
+      }),
+      query: async () => ({ rows: [] }),
+      end: async () => undefined,
+    };
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const service = createAnnounceServiceForPool(pool as unknown as Pool, LOG_HASH, false);
+      await expect(service.snapshot(snapshotRequest)).resolves.toEqual({
+        ok: false,
+        code: 'INTERNAL',
+      });
+      // A torn-down socket is already a definite "no answer from this client";
+      // it keeps the pre-existing INTERNAL path and must not be reclassified.
+      expect(revalidations).toBe(0);
+      expect(snapshotQueries).toBe(2);
+    } finally {
+      log.mockRestore();
+    }
+  });
+});
+
