@@ -180,6 +180,39 @@ function isBrokenClient(error: unknown): boolean {
     || message.includes('hang up');
 }
 
+/**
+ * True when a read failed without the database giving a verdict.
+ *
+ * `pg` enforces `query_timeout` / `statement_timeout` from the client side. When
+ * the timer wins, it discards whatever the server was about to send and raises a
+ * bare `Error` — `pg/client.js` builds `new Error('Query read timeout')` with no
+ * `code`, no `detail` and no `fields`. A lease denial that was already travelling
+ * (SQLSTATE `ZA004`, DETAIL `OFFLINE_LEASE_*`) is replaced by that shapeless
+ * error, so `announceFailure` loses its only discriminator and any statement
+ * still in flight becomes indistinguishable from a genuine internal fault.
+ *
+ * Such a read is *undetermined*, not forbidden and not broken: the same request
+ * may succeed once the database is responsive again. Callers must therefore
+ * retry it and, once retries are exhausted, report a retryable status — never
+ * `FORBIDDEN` (which would tell an agent their lease is void, and would audit a
+ * denial that the database never issued) and never `INTERNAL` (which hides a
+ * transient overload behind a server-fault status).
+ *
+ * This deliberately does NOT consult `isBrokenClient`: a client whose socket was
+ * torn down still reports a retryable condition, but the two decisions are
+ * separate — one picks the pooled connection to discard, this one picks the
+ * status. Keeping them apart is what stops a connection error from being
+ * rewritten as an invalid lease (see the `socket hang up` case).
+ */
+function isUndeterminedRead(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : fieldOf(error, 'message')).toLowerCase();
+  // `query read timeout` is pg's client-side timer. Server-side
+  // `statement_timeout` also reports SQLSTATE 57014, which mapDatabaseContractError
+  // already folds into OVERLOADED; matching the message keeps that true even when
+  // the SQLSTATE is lost the same way.
+  return message.includes('query read timeout') || message.includes('statement timeout');
+}
+
 function contractReason(error: unknown): string {
   const detail = fieldOf(error, 'detail');
   if (LEASE_REASONS.has(detail)
@@ -332,7 +365,63 @@ function announceFailure(
   if (reason === 'FORBIDDEN') return failure('FORBIDDEN');
   if (reason === 'VALIDATION') return failure('VALIDATION');
   if (reason === 'NOT_FOUND') return failure('NOT_FOUND');
+  // A read the database never answered carries no verdict. Report it as
+  // retryable rather than internal, so a timeout is never surfaced as a server
+  // fault. Checked after every contract reason so a real ZA005/ZA001 denial that
+  // happens to travel with a slow statement still wins.
+  if (isUndeterminedRead(unwrapped) || isUndeterminedRead(error)) return failure('OVERLOADED');
   return failure(mapDatabaseContractError(unwrapped));
+}
+
+/**
+ * Recover the verdict a timed-out snapshot read never delivered.
+ *
+ * The frozen contract for `/v1/announce/snapshot` is explicit: an invalid,
+ * mismatched or expired lease returns 403 with `OFFLINE_LEASE_INVALID` and never
+ * a partial snapshot. A `query_timeout` makes the server unable to tell *which*
+ * of those it is — the SQLSTATE that would have said so was discarded by `pg`
+ * before it reached this process (see `isUndeterminedRead`).
+ *
+ * Answering 503 there would be honest about the uncertainty but would break the
+ * contract for the common case, and guessing 403 would fabricate a denial the
+ * database never issued — including a bogus `source_denial_audits` row. So ask
+ * again, cheaply: `validate_snapshot_offline_lease` is a `SECURITY DEFINER`
+ * function that resolves the lease by primary key on `lease_token_hash` plus the
+ * client/user/release binding, without the paging join that made the original
+ * statement slow. It gives a definite verdict on a fresh round trip.
+ *
+ * Runs on its own pooled client so it is never queued behind the statement that
+ * already timed out. Any failure here (including another timeout) stays
+ * undetermined and yields `undefined`, leaving the caller on the retryable path.
+ */
+async function revalidateLeaseAfterTimeout(
+  pool: Pick<Pool, 'connect' | 'query' | 'end'>,
+  request: Readonly<{
+    leaseToken: string;
+    clientId: string;
+    userId: string;
+    releaseId: string;
+  }>,
+): Promise<AnnounceFailure | undefined> {
+  const client = await pool.connect().catch(() => null);
+  if (client === null) return undefined;
+  let broken = false;
+  try {
+    await client.query(
+      'SELECT * FROM public.validate_snapshot_offline_lease($1,$2,$3,$4)',
+      [request.leaseToken, request.clientId, request.userId, request.releaseId],
+    );
+    // The lease validated: the timeout was environmental, not a denial. Leave it
+    // to the caller to report a retryable status.
+    return undefined;
+  } catch (error) {
+    const mapped = announceFailure(error, 'announce_snapshot');
+    broken = isBrokenClient(error);
+    if (mapped.reason !== undefined && SNAPSHOT_AUDITED.has(mapped.reason)) return mapped;
+    return undefined;
+  } finally {
+    client.release(broken);
+  }
 }
 
 export function createAnnounceServiceForPool(
@@ -478,12 +567,12 @@ export function createAnnounceServiceForPool(
           return Object.freeze({ ok: true as const, status: 200 as const, response, etag });
         }
       } catch (error) {
-        broken = isBrokenClient(error);
+        broken = isBrokenClient(error) || isUndeterminedRead(error);
         const mapped = announceFailure(error, 'announce_current');
         if (mapped.reason !== undefined && CURRENT_AUDITED.has(mapped.reason)) {
           denied = mapped;
         } else {
-          if (mapped.code === 'INTERNAL') report(error);
+          if (mapped.code === 'INTERNAL' || mapped.code === 'OVERLOADED') report(error);
           return mapped;
         }
       } finally {
@@ -542,15 +631,29 @@ export function createAnnounceServiceForPool(
         } catch (error) {
           const mapped = announceFailure(error, 'announce_snapshot');
           broken = isBrokenClient(error) || mapped.code === 'INTERNAL' || mapped.code === 'OVERLOADED';
+          // A genuine fault and an undetermined read both deserve a diagnostic:
+          // the transient one is exactly what an operator needs to see when this
+          // endpoint starts returning 503 under load.
+          if (mapped.code === 'INTERNAL' || mapped.code === 'OVERLOADED') report(error);
           if (mapped.reason !== undefined && SNAPSHOT_AUDITED.has(mapped.reason)) {
             denied = mapped;
+          } else if (mapped.code === 'OVERLOADED' && isUndeterminedRead(error)) {
+            // The paging read timed out before the database could rule on the
+            // lease. Ask again on a separate client so the endpoint can still
+            // honour the contract's 403 for a lease that really is invalid,
+            // instead of reporting the uncertainty as a retryable 503.
+            const revalidated = await revalidateLeaseAfterTimeout(pool, {
+              leaseToken: request.leaseToken,
+              clientId: request.clientId,
+              userId: request.actor.user_id,
+              releaseId: request.releaseId,
+            });
+            if (revalidated !== undefined) denied = revalidated;
+            else lastInfra = mapped;
+          } else if (mapped.code === 'INTERNAL' || mapped.code === 'OVERLOADED') {
+            lastInfra = mapped;
           } else {
-            if (mapped.code === 'INTERNAL') report(error);
-            if (mapped.code === 'INTERNAL' || mapped.code === 'OVERLOADED') {
-              lastInfra = mapped;
-            } else {
-              return mapped;
-            }
+            return mapped;
           }
         } finally {
           client.release(broken);
@@ -599,7 +702,7 @@ export function createAnnounceServiceForPool(
           if (!rolledBack) return failure('OVERLOADED');
           denied = mapped;
         } else {
-          if (mapped.code === 'INTERNAL') report(error);
+          if (mapped.code === 'INTERNAL' || mapped.code === 'OVERLOADED') report(error);
           return mapped;
         }
       } finally {
