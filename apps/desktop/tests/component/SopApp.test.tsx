@@ -63,6 +63,7 @@ describe('SopApp injected projection', () => {
     const { rerender } = render(<SopApp projection={projectionFor([])} />);
     expect(screen.getByTestId('sop-high-risk')).toHaveTextContent(SOP_HIGH_RISK_BANNER);
     expect(screen.getByTestId('script-card-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('report-inaccuracy-button-1')).not.toBeInTheDocument();
     expect(screen.getByTestId('sop-edge-no-photo')).toHaveTextContent('未给照片');
     expect(screen.getByTestId('sop-edge-has-photo')).toHaveTextContent('已给照片');
     expect(screen.getByTestId('sop-step')).toHaveTextContent('步骤 1');

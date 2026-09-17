@@ -1673,6 +1673,30 @@
   margin-bottom: 5px;
 }
 
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: start;
+  justify-content: flex-end;
+}
+
+.script-card .retry-btn {
+  margin-top: 0;
+}
+
+.script-card .retry-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.report-status {
+  display: block;
+  margin: 0 0 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .meta-row {
   display: flex;
   flex-wrap: wrap;

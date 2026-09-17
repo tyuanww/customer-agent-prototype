@@ -9,6 +9,11 @@ import {
   MAX_QUERY_CHARS,
   QUERY_TOO_LONG_MESSAGE,
 } from '../../src/shared/contracts';
+import {
+  FORBIDDEN_INACCURACY_STATUS_PHRASES,
+  SCRIPT_INACCURACY_ACTION_LABEL,
+  SCRIPT_INACCURACY_RECORDED_STATUS,
+} from '../../src/renderer/features/search/query-view';
 import { productCatalogEntries } from '../../src/shared/product-catalog';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
@@ -253,6 +258,7 @@ describe('QueryApp', () => {
     fireEvent.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('no-hit')).toHaveTextContent('没找到可用话术');
     expect(screen.getByTestId('help-status')).toHaveTextContent('待核实');
+    expect(screen.queryByTestId('report-inaccuracy-button-1')).not.toBeInTheDocument();
     expect(screen.queryByText('已转交成功')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('copy-contact-button'));
     await waitFor(() => expect(screen.getByTestId('help-status')).toHaveTextContent('已复制联系方式'));
@@ -1088,6 +1094,80 @@ describe('QueryApp', () => {
     expect(screen.queryByText('已发送')).not.toBeInTheDocument();
     expect(screen.queryByText('已采纳')).not.toBeInTheDocument();
     expect(reportUiPhase).toHaveBeenCalledWith('COPIED', 3);
+  });
+
+  it('shows a hairline 话术不准 control on query results', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+
+    const report = screen.getByTestId('report-inaccuracy-button-1');
+    expect(report).toHaveTextContent(SCRIPT_INACCURACY_ACTION_LABEL);
+    expect(report).toHaveClass('retry-btn');
+    expect(report).not.toHaveClass('copy-btn');
+    expect(screen.getByTestId('report-inaccuracy-button-2')).toHaveClass('retry-btn');
+    expect(screen.getByTestId('report-inaccuracy-button-3')).toHaveClass('retry-btn');
+    expect(screen.getByTestId('copy-button-1')).toHaveTextContent('复制话术');
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
+  });
+
+  it('records a local inaccuracy report for high-risk scripts without claiming it was processed', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '面膜过敏怎么办');
+    await user.click(screen.getByTestId('search-button'));
+
+    const lead = await screen.findByTestId('script-card-1');
+    expect(within(lead).getByTestId('risk-1')).toHaveTextContent('高风险');
+    await user.click(within(lead).getByTestId('report-inaccuracy-button-1'));
+
+    expect(within(lead).getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    expect(within(lead).getByTestId('report-inaccuracy-button-1')).toBeDisabled();
+    expect(screen.getByTestId('capsule-fox')).toHaveAttribute('data-fox-state', 'RESULTS');
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+    expect(copyText).not.toHaveBeenCalled();
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(reportUiPhase).not.toHaveBeenCalledWith('COPIED', expect.anything());
+    for (const phrase of FORBIDDEN_INACCURACY_STATUS_PHRASES) {
+      expect(lead.textContent).not.toContain(phrase);
+    }
+  });
+
+  it('keeps the copy path as 已复制 after a local inaccuracy report', async () => {
+    const user = userEvent.setup();
+    const cleanser = SYNTHETIC_SCRIPTS.find((item) => item.scriptId === 'syn-prod-001');
+    expect(cleanser).toBeDefined();
+
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('report-inaccuracy-button-1'));
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+
+    await user.click(screen.getByTestId('copy-button-1'));
+    await waitFor(() => {
+      expect(copyText).toHaveBeenCalledWith(cleanser?.answerText);
+    });
+    expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+    expect(screen.getByTestId('copy-button-1')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    expect(screen.queryByText('已发送')).not.toBeInTheDocument();
+    expect(screen.queryByText('已采纳')).not.toBeInTheDocument();
+    expect(screen.queryByText('已处理')).not.toBeInTheDocument();
+    expect(reportUiPhase).toHaveBeenCalledWith('COPIED', 3);
+  });
+
+  it('does not call copyAdopt when recording a local inaccuracy report', async () => {
+    const f = connectProduct();
+    await prepareProductQuery();
+    await screen.findByTestId('copy-button-1');
+
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    expect(f.copyAdopt).not.toHaveBeenCalled();
+    expect(f.escalate).not.toHaveBeenCalled();
+    expect(f.recordTerminal).not.toHaveBeenCalled();
+    expect(copyText).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
   });
 
   it('dismisses with Esc after copy without implying the reply was sent', async () => {
