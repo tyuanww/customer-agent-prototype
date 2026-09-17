@@ -93,6 +93,9 @@ describe('dashboard layout contract', () => {
     expect(css).not.toMatch(/border-left:\s*3px\s+solid\s+var\(--dash-purple\)/);
     expect(css).toContain('.wording-list > button.is-selected');
     expect(css).toContain('.iteration-list > button.is-selected');
+    expect(css).toContain('.iteration-reminder');
+    expect(css).toContain('.iteration-reminder-list > li > button.is-selected');
+    expect(css).toContain('border-color: var(--dash-danger-line)');
     expect(css).toContain('.dash-release-card.is-selected');
     expect(css).toContain('.dash-segmented button.is-active');
     expect(css).toContain('.dash-action-primary');

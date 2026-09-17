@@ -2710,6 +2710,103 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .wording-domain-panel { min-width: 0; }
 
+.iteration-reminder {
+  margin: 0 0 16px;
+  border-color: var(--dash-danger-line);
+}
+
+.iteration-reminder .dash-card-row {
+  margin-bottom: 8px;
+}
+
+.iteration-reminder-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.iteration-reminder-list > li > button {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface);
+  color: var(--dash-ink);
+  text-align: left;
+}
+
+.iteration-reminder-list > li > button:hover:not(.is-selected) {
+  background: var(--dash-chrome-hover);
+}
+
+.iteration-reminder-list > li > button.is-selected {
+  border-color: var(--dash-line-strong);
+  background: var(--dash-chrome-selected);
+}
+
+.iteration-role-note {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.iteration-drill {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dash-line);
+}
+
+.iteration-drill h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.iteration-drill-note {
+  display: grid;
+  gap: 4px;
+  color: var(--dash-ink-soft);
+  font-size: 11px;
+}
+
+.iteration-drill-note textarea {
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface);
+  color: var(--dash-ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.iteration-drill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.iteration-drill-terminal {
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 12px;
+}
+
+.iteration-drill-conflict {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dash-danger-line);
+  border-radius: var(--dash-radius);
+  background: var(--dash-danger-bg);
+  color: var(--dash-danger);
+  font-size: 12px;
+}
+
 .iteration-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
@@ -2942,6 +3039,7 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   .dash-structure-legend button,
   .dash-pareto-row,
   .iteration-list > button,
+  .iteration-reminder-list > li > button,
   .dash-release-card
 ):active:not(:disabled) {
   background: var(--dash-chrome-pressed);

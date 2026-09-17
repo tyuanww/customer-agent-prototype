@@ -7,6 +7,7 @@ import {
   DASHBOARD_DEFERRED_NAV,
   DASHBOARD_MODULE_IDS,
   DASHBOARD_NAV,
+  listOpenP0IterationTasks,
   nextDashboardNavId,
 } from '../../src/renderer/data/dashboard-manifest';
 
@@ -266,11 +267,53 @@ describe('dashboard manifest', () => {
 
   it('keeps optimization tasks actionable without enabling automatic mutation', () => {
     for (const task of DASHBOARD_MANIFEST.iteration.tasks) {
-      expect(['content_gap', 'ranking', 'policy']).toContain(task.cause);
+      expect(['content_gap', 'ranking', 'stale', 'mixed']).toContain(task.cause);
+      expect(['no_hit', 'top1_skipped']).toContain(task.kind);
       expect(task.owner.length).toBeGreaterThan(0);
       expect(task.evidenceCount).toBeGreaterThan(0);
       expect(task.nextStep.length).toBeGreaterThan(0);
     }
     expect(DASHBOARD_MANIFEST.iteration.domainNote).toContain('不自动改写');
+  });
+
+  it('keeps the iteration DTO aligned with the frozen IterationTask schema', () => {
+    const ids = new Set<string>();
+    for (const task of DASHBOARD_MANIFEST.iteration.tasks) {
+      expect(task.taskId).toMatch(/^it-/);
+      expect(task.signalId.length).toBeGreaterThan(0);
+      expect(task.clusterKey.length).toBeGreaterThan(0);
+      expect(task.version).toBeGreaterThanOrEqual(1);
+      if (task.status === 'open') expect(task.version).toBe(1);
+      if (task.status === 'in_progress') expect(task.version).toBe(2);
+      if (task.status === 'resolved' || task.status === 'wont_fix') {
+        expect(task.version).toBe(3);
+        expect(task.resolution).toBe(task.status);
+        expect(task.resolutionNote && task.resolutionNote.length).toBeGreaterThan(0);
+      } else {
+        expect(task.resolution).toBeNull();
+        expect(task.resolutionNote).toBeNull();
+      }
+      expect(task.suggestedScriptIds.every((id) => id.startsWith('syn-'))).toBe(true);
+      expect(task.sampleQueryIds.every((id) => id.startsWith('q-syn-'))).toBe(true);
+      ids.add(task.taskId);
+    }
+    expect(ids.size).toBe(DASHBOARD_MANIFEST.iteration.tasks.length);
+    // 风险升级属于 escalate 域；本模块只保留 no_hit / top1_skipped。
+    expect(JSON.stringify(DASHBOARD_MANIFEST.iteration)).not.toContain('risk_escalated');
+    expect(JSON.stringify(DASHBOARD_MANIFEST.iteration)).not.toContain('policy');
+    expect(DASHBOARD_MANIFEST.iteration.footnote).toContain('不是正式 SLA');
+  });
+
+  it('lists only open P0 iteration tasks for the coach reminder', () => {
+    const openP0 = listOpenP0IterationTasks(DASHBOARD_MANIFEST.iteration.tasks);
+    expect(openP0.map((task) => task.taskId)).toEqual(['it-2041', 'it-2055']);
+    expect(openP0.every((task) => task.status === 'open' && task.priority === 'P0')).toBe(true);
+    expect(listOpenP0IterationTasks([])).toEqual([]);
+    expect(
+      listOpenP0IterationTasks([
+        { ...DASHBOARD_MANIFEST.iteration.tasks[0], status: 'in_progress' },
+        { ...DASHBOARD_MANIFEST.iteration.tasks[2], priority: 'P1' },
+      ]),
+    ).toEqual([]);
   });
 });
