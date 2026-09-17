@@ -36,6 +36,7 @@ function sopLayoutSignature(projection: SopProjection): string {
     projection.internalTask ? '1' : '0',
     projection.failCode ?? '',
     projection.copied ? '1' : '0',
+    projection.prompt,
   ].join('|');
 }
 
@@ -200,7 +201,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
         <div className="glass-surface" aria-hidden="true" />
         <header className="sop-chrome" data-testid="sop-chrome" {...drag}>
           <div className="sop-chrome-title">
-            <strong>{projection.sceneTitle} · {projection.stageLabel}</strong>
+            <strong>{projection.sceneTitle}</strong>
             <span data-testid="sop-step">步骤 {projection.stepIndex}</span>
           </div>
           <div className="sop-chrome-tools">
@@ -245,6 +246,9 @@ export function SopApp({ projection: injected }: SopAppProps) {
                 <div className="status-banner" data-testid="sop-high-risk">
                   {projection.highRiskBanner}
                 </div>
+              ) : null}
+              {projection.prompt ? (
+                <p className="sop-prompt" data-testid="sop-prompt">{projection.prompt}</p>
               ) : null}
               {projection.internalNote ? (
                 <div className="sop-internal-banner" data-testid="sop-internal-note">

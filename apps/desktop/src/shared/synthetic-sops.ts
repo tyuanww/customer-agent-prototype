@@ -30,6 +30,7 @@ export const ALLERGY_SOP_TREE: SopTree = defineAllergyTree({
     {
       id: 'severity',
       kind: 'decision',
+      prompt: '先判断不适程度，再选路径。',
       edges: [
         { id: 'mild', label: '轻微', targetId: 'mild-copyable' },
         { id: 'severe', label: '严重', targetId: 'severe-internal' },
@@ -58,6 +59,7 @@ export const ALLERGY_SOP_TREE: SopTree = defineAllergyTree({
     {
       id: 'severe-internal',
       kind: 'internal',
+      prompt: '严重路径需要话术师复核。先不要对客户承诺补偿。',
       internalNote: '按升级路径交给话术师复核，不要把内部口径发给客户。',
       internalTask: '通知话术师复核（合成待办，不建单）',
       nextId: 'severe-done',
@@ -66,6 +68,7 @@ export const ALLERGY_SOP_TREE: SopTree = defineAllergyTree({
     {
       id: 'severe-done',
       kind: 'internal',
+      prompt: '升级说明已走完，可以结束本流程。',
       internalNote: '升级说明已走完，坐席可结束本流程。',
       edges: [],
     },

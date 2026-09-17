@@ -51,6 +51,7 @@ export type SopProjection = Readonly<{
   shellState: SopShellState;
   nodeKind: SopNodeKind | 'opening';
   highRiskBanner: string;
+  prompt: string;
   internalNote: string | null;
   internalTask: string | null;
   script: SopProjectedScript | null;
@@ -105,6 +106,7 @@ const SOP_PROJECTION_KEYS = [
   'shellState',
   'nodeKind',
   'highRiskBanner',
+  'prompt',
   'internalNote',
   'internalTask',
   'script',
@@ -250,6 +252,7 @@ export function isSopProjection(value: unknown): value is SopProjection {
     && shellOk
     && nodeKindOk
     && typeof record.highRiskBanner === 'string'
+    && typeof record.prompt === 'string'
     && (record.internalNote === null || typeof record.internalNote === 'string')
     && (record.internalTask === null || typeof record.internalTask === 'string')
     && (record.script === null || isProjectedScript(record.script))
