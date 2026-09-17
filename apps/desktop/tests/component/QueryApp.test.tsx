@@ -1177,6 +1177,29 @@ describe('QueryApp', () => {
     expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
   });
 
+  it('keeps a local inaccuracy record across a second search until the overlay collapses', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('report-inaccuracy-button-1'));
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+
+    await searchCleanser(user);
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    expect(screen.getByTestId('report-inaccuracy-button-1')).toBeDisabled();
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+      }
+    });
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
+
+    await searchCleanser(user);
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-inaccuracy-button-1')).not.toBeDisabled();
+  });
+
   it('dismisses with Esc after copy without implying the reply was sent', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);

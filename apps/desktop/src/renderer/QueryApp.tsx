@@ -127,6 +127,7 @@ export function QueryApp() {
   const [sopEntryBusy, setSopEntryBusy] = useState(false);
   const [sopEntryError, setSopEntryError] = useState<string | null>(null);
   const [sopEntryResume, setSopEntryResume] = useState(false);
+  const [reportedScriptIds, setReportedScriptIds] = useState<ReadonlySet<string>>(() => new Set());
   const lastProductQueryRef = useRef<{
     sessionEpoch: number;
     generation: number;
@@ -171,6 +172,7 @@ export function QueryApp() {
   const finishCollapseContent = useCallback(() => {
     setPhase('SEARCH_INPUT');
     setResults([]);
+    setReportedScriptIds(new Set());
     setCopying(false);
     setSearching(false);
     setCopiedRank(null);
@@ -1560,6 +1562,17 @@ export function QueryApp() {
             sopEntryError={sopEntryError}
             sopEntryResume={sopEntryResume}
             onOpenSop={openAllergySop}
+            reportedScriptIds={reportedScriptIds}
+            onReportInaccuracy={(script) => {
+              setReportedScriptIds((current) => {
+                if (current.has(script.scriptId)) {
+                  return current;
+                }
+                const next = new Set(current);
+                next.add(script.scriptId);
+                return next;
+              });
+            }}
             onRetry={retry}
             onCopy={(item, trigger) => {
               void copyScript(item, trigger);

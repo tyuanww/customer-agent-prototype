@@ -12,6 +12,8 @@ type ScriptCardProps = {
   copied: boolean;
   onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
   allowInaccuracyReport?: boolean;
+  reported?: boolean;
+  onReport?: (script: RankedScript) => void;
 };
 
 const RISK_COPY: Record<RiskLevel, { label: string; className: string }> = {
@@ -20,13 +22,21 @@ const RISK_COPY: Record<RiskLevel, { label: string; className: string }> = {
   high: { label: '高风险 · 需复核', className: 'risk-chip is-high' },
 };
 
-export function ScriptCard({ script, copying, copied, onCopy, allowInaccuracyReport = true }: ScriptCardProps) {
+export function ScriptCard({
+  script,
+  copying,
+  copied,
+  onCopy,
+  allowInaccuracyReport = true,
+  reported,
+  onReport,
+}: ScriptCardProps) {
   const validNow = Date.parse(script.effectiveFrom) <= Date.now() && (!script.effectiveTo || Date.now() < Date.parse(script.effectiveTo));
   const validity = script.productCopy ? { kind: validNow ? 'active' : 'expired', text: validNow ? '当前有效' : '已失效，请重新查询' } : getValidityInfo(script.effectiveFrom, script.effectiveTo);
   const risk = RISK_COPY[script.riskLevel];
   const lead = script.rank === 1;
-  const [inaccuracyReport, setInaccuracyReport] = useState<'recorded' | null>(null);
-  const reported = inaccuracyReport === 'recorded';
+  const [localReported, setLocalReported] = useState(false);
+  const isReported = reported ?? localReported;
 
   return (
     <article
@@ -68,11 +78,15 @@ export function ScriptCard({ script, copying, copied, onCopy, allowInaccuracyRep
               type="button"
               className="retry-btn"
               data-testid={`report-inaccuracy-button-${script.rank}`}
-              disabled={reported}
-              aria-pressed={reported}
+              disabled={isReported}
+              aria-pressed={isReported}
               onClick={() => {
                 // Local UI record only; not copyAdopt, help escalate, or backend persistence.
-                setInaccuracyReport('recorded');
+                if (onReport) {
+                  onReport(script);
+                  return;
+                }
+                setLocalReported(true);
               }}
             >
               {SCRIPT_INACCURACY_ACTION_LABEL}
@@ -80,7 +94,7 @@ export function ScriptCard({ script, copying, copied, onCopy, allowInaccuracyRep
           ) : null}
         </div>
       </div>
-      {reported ? (
+      {isReported ? (
         <span className="report-status" role="status" data-testid={`report-status-${script.rank}`}>
           {SCRIPT_INACCURACY_RECORDED_STATUS}
         </span>
