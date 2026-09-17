@@ -125,3 +125,4 @@
 - typecheck: pnpm typecheck
 - lint: pnpm lint
 - test: pnpm test
+- shell: shellcheck apps/desktop/scripts/generate-mac-icon.sh
