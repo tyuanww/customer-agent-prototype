@@ -1675,6 +1675,8 @@ describe('DashboardApp', () => {
     expect(reminder).not.toHaveTextContent('洁面泡沫少的首条场景过宽');
     expect(reminder).not.toHaveTextContent('班牛');
     expect(reminder).not.toHaveTextContent('工单');
+    expect(screen.getByTestId('iteration-reset-drill')).toBeDisabled();
+    expect(screen.queryByTestId('iteration-reminder-empty')).not.toBeInTheDocument();
     expect(screen.getByTestId('iteration-it-2041')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('iteration-reminder-it-2041')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('module-iteration')).toHaveTextContent(
@@ -1709,6 +1711,9 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
     expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
     expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
+    expect(screen.getByTestId('iteration-reset-drill')).toBeEnabled();
+    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('有 1 条待处理 P0 需要跟进');
+    expect(screen.queryByTestId('iteration-reminder-it-2041')).not.toBeInTheDocument();
 
     // 缺少结论时不能关闭。
     expect(screen.getByTestId('iteration-close-resolved')).toBeDisabled();
@@ -1733,6 +1738,25 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
     expect(screen.queryByTestId('iteration-drill-state')).not.toBeInTheDocument();
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
+    expect(screen.getByTestId('iteration-reset-drill')).toBeDisabled();
+    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('有 2 条待处理 P0 需要跟进');
+  });
+
+  it('keeps a P0 empty reminder after the last open P0 leaves the strip', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-iteration'));
+
+    await user.click(screen.getByTestId('iteration-start'));
+    await user.click(screen.getByTestId('iteration-reminder-it-2055'));
+    await user.click(screen.getByTestId('iteration-start'));
+
+    expect(screen.getByTestId('iteration-reminder')).toHaveClass('is-empty');
+    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('当前没有待处理 P0');
+    expect(screen.getByTestId('iteration-reminder-empty')).toHaveTextContent('处理中或已关闭的不出现在这里');
+    expect(screen.queryByTestId('iteration-reminder-it-2041')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('iteration-reminder-it-2055')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-reset-drill')).toBeEnabled();
   });
 
   it('reports a refresh prompt when the server version moves ahead of the client snapshot', async () => {
