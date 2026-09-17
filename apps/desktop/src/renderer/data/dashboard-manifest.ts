@@ -230,6 +230,17 @@ export type ContentRelease = {
   blockReason?: string;
 };
 
+export type ContentCoachUpload = {
+  title: string;
+  roleNote: string;
+  draftOnlyCopy: string;
+  boundaryCopy: string;
+  aftersaleNote: string;
+  accept: string;
+  demoFileName: string;
+  demoCsv: string;
+};
+
 export type AnnounceRow = {
   itemId: string;
   title: string;
@@ -314,7 +325,7 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'review', label: '离线抽样复核', blurb: '修改 / 发送 / 适用性分账', group: '服务洞察' },
   { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
   { id: 'iteration', label: '话术优化待办', blurb: '缺库 / 排序 / 风险分域', group: '话术运营' },
-  { id: 'content', label: '内容与发布', blurb: '四域绑定与缺域阻断', group: '治理与架构' },
+  { id: 'content', label: '内容与发布', blurb: '话术师草稿与缺域阻断', group: '治理与架构' },
   { id: 'announce', label: '公告与同步', blurb: 'published / ACK / lease 分面', group: '治理与架构' },
   { id: 'architecture', label: '架构能力图', blurb: '双表面与九端口故事', group: '治理与架构' },
 ]);
@@ -772,7 +783,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         label: '售后流程',
         readiness: 'upstream_authoring',
         readinessLabel: '合成过敏树样例 · DEMO',
-        sourceSummary: '合成过敏树样例 · DEMO。切片 1 不提供树编辑或上传。',
+        sourceSummary: '合成过敏树样例 · DEMO。切片 1 不提供树编辑；话术师 CSV 上传在「内容与发布」。',
       },
     ] as const,
     entries: [
@@ -1159,6 +1170,22 @@ export const DASHBOARD_MANIFEST = deepFreeze({
     kicker: 'Import → Validate → Staged → Publish → Announce → ACK/Lease',
     pipeline: ['Import', 'Validate', 'Staged', 'Publish', 'Announce', 'ACK/Lease'],
     publishDisabledReason: '演示禁用 · 正式需 owner + G0/Ddev',
+    upload: {
+      title: '话术师上传',
+      roleNote:
+        '话术师（coach）只写入待审核草稿；发布与回滚仅 owner（管理员）。坐席（agent）不能上传。角色仅为 agent / coach / owner，没有第四角色。',
+      draftOnlyCopy: '上传只进入待审核草稿，不是已发布。',
+      boundaryCopy: '本地合成预览：不连接飞书或 Wiki，也不写入任何已发布内容库。',
+      aftersaleNote: '售后流程仍为合成样例，本页不展开 SOP 树。',
+      accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      demoFileName: 'synthetic-coach-draft.csv',
+      demoCsv: [
+        'scene,script',
+        '洁面用量确认,先确认产品版本，再说明用量与不可承诺边界',
+        '满赠规则说明,展示门槛与结算条件，不承诺库存',
+        '售后质量升级,记录必要证据，禁止原因承诺',
+      ].join('\n'),
+    } satisfies ContentCoachUpload,
     domains: [
       { id: 'presale', label: '售前' },
       { id: 'campaign', label: '活动' },
@@ -1341,7 +1368,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
             {
               code: 'B6',
               title: '内容导入 / 发布 / 回滚',
-              detail: '展示四域治理流水线；正式 Publish 保持禁用。',
+              detail: '话术师可本地导入 CSV/XLSX 进入待审核草稿预览；正式 Publish 保持禁用。',
               ...architectureEvidence('visual-only'),
             },
             {

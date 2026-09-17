@@ -25,6 +25,10 @@ const announce = readFileSync(
   path.join(root, 'src/renderer/features/dashboard/AnnounceModule.tsx'),
   'utf8',
 );
+const content = [
+  readFileSync(path.join(root, 'src/renderer/features/dashboard/ContentModule.tsx'), 'utf8'),
+  readFileSync(path.join(root, 'src/renderer/features/dashboard/coach-content-upload.ts'), 'utf8'),
+].join('\n');
 const charts = readFileSync(
   path.join(root, 'src/renderer/features/dashboard/DashboardCharts.tsx'),
   'utf8',
@@ -495,6 +499,16 @@ describe('dashboard layout contract', () => {
     expect(announce).toContain('window.setTimeout');
     expect(announce).toContain('window.clearTimeout');
     expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
+  });
+
+  it('keeps coach content upload in the renderer without IPC or persistence', () => {
+    expect(content).toContain('待审核草稿');
+    expect(content).toContain('标准话术');
+    expect(content).toContain('readCoachUploadFile');
+    expect(content).not.toContain('synthetic-sops');
+    expect(content).not.toMatch(
+      /fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|customerAgent|ipcRenderer|preload/,
+    );
   });
 
   it('fail-closes transition-all via direct values, var fallbacks, and earlier scoped custom properties', () => {
