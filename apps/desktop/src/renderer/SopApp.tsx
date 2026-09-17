@@ -3,7 +3,6 @@ import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import { useWindowDrag } from './lib/use-window-drag';
 import {
   SOP_END_FLOW_LABEL,
-  SOP_HIGH_RISK_BANNER,
   SOP_INTERNAL_NOTE_PREFIX,
   SOP_OPENING_MESSAGE,
   SOP_TERMINAL_MESSAGE,
@@ -242,9 +241,11 @@ export function SopApp({ projection: injected }: SopAppProps) {
           ) : null}
           {!opening && !failed ? (
             <>
-              <div className="status-banner is-error" data-testid="sop-high-risk">
-                {SOP_HIGH_RISK_BANNER}
-              </div>
+              {projection.highRiskBanner ? (
+                <div className="status-banner" data-testid="sop-high-risk">
+                  {projection.highRiskBanner}
+                </div>
+              ) : null}
               {projection.internalNote ? (
                 <div className="sop-internal-banner" data-testid="sop-internal-note">
                   <strong>{SOP_INTERNAL_NOTE_PREFIX}</strong>
