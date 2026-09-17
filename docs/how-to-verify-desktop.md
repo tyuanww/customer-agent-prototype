@@ -287,11 +287,11 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 | --- | --- |
 | SOP 树 / 几何 / 合同 / 入口 / 三屏渲染 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/sop-model.test.ts tests/unit/sop-geometry.test.ts tests/unit/contracts.test.ts tests/unit/window-role.test.ts tests/unit/sop-window-ipc.test.ts tests/component/SopApp.test.tsx tests/component/QueryApp.test.tsx tests/unit/search-service.test.ts` |
 
-黄金路径（人工）：`pnpm dev` → 狐狸头 → `过敏了怎么办` → 结果标题和卡片之间的 banner +「打开过敏售后流程」→ 凭证话术屏。SOP 窗 600×240 起壳，ACK 后 hug，高度上限 620。Windows feasibility 允许过敏 hug 比旧 Query 更高，不把 620 当成失败。不要跑 `pnpm test:float` 来证明 SOP。SOP 卡片没有「话术不准」。
+黄金路径（人工）：`pnpm dev` → 狐狸头 → `过敏了怎么办` → 结果标题和卡片之间的 banner +「打开过敏售后流程」→ 凭证话术屏。SOP 窗 600×240 起壳，ACK 后 hug，高度上限 620。Esc / × 收起后，同一 Query 结果应改成「继续过敏售后流程」。选严重程度时有「先判断不适程度，再选路径。」；凭证步才有「本步只给话术，不建单、不指令仓配」。复制卡没有排名「1」。Windows feasibility 允许过敏 hug 比旧 Query 更高，不把 620 当成失败。不要跑 `pnpm test:float` 来证明 SOP。SOP 卡片没有「话术不准」。
 
 ## 话术不准（Query 切片 1）
 
-结果卡发丝按钮「话术不准」只写本卡 React 状态，文案「已记录，待话术师核实」。不走 IPC / API / Dashboard / `copyAdopt`。数字键 1/2/3 仍只复制。EMPTY 无命中继续 escalate。
+结果卡发丝按钮「话术不准」按 `scriptId` 记在本次 Query 浮窗会话里，文案「已记录，待话术师核实」。同一浮窗再搜同一条仍在。收起查询后丢弃。不走 IPC / API / Dashboard / `copyAdopt`。数字键 1/2/3 仍只复制。EMPTY 无命中继续 escalate。
 
 | 你想证明 | 命令 |
 | --- | --- |
@@ -299,7 +299,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 内容与发布草稿（Dashboard 切片 1）
 
-「内容与发布」本地解析 CSV 成待审核草稿。Publish 仍 disabled。无 Dashboard preload、不 POST `/v1/content/import`。二进制 xlsx fail-close；本地预览 64KiB / 50 行（后端 10MiB / 5000 行不要对齐）。售后过敏树是 DEMO 样例，不接本页上传。
+「内容与发布」本地解析 CSV 成待审核草稿。Publish 仍 disabled。无 Dashboard preload、不 POST `/v1/content/import`。选文件先显示「正在读取」。二进制 xlsx fail-close；失败文案指出第几行以及 50 行 / 64KiB 上限（后端 10MiB / 5000 行不要对齐）。售后过敏树是 DEMO 样例，不接本页上传。
 
 | 你想证明 | 命令 |
 | --- | --- |
@@ -307,7 +307,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 话术优化待办提醒（Dashboard 切片 1）
 
-现有「话术优化待办」模块顶部一条 P0 横幅 + 队列，不是新窗口。会话内 CAS 演练：窗口里把模拟服务端 version +1、客户端快照不动，随后 start/close 可打出页内「待办已更新，请刷新后再处理」。无 HTTP start/close、无飞书推送、无 Dashboard preload。
+现有「话术优化待办」模块顶部一条 P0 横幅 + 队列，不是新窗口。待处理 P0 被开始处理后离开横幅；全部离开后横幅仍在，文案「当前没有待处理 P0」。没有演练改动时「重置演练」禁用。会话内 CAS 演练：窗口里把模拟服务端 version +1、客户端快照不动，随后 start/close 可打出页内「待办已更新，请刷新后再处理」。无 HTTP start/close、无飞书推送、无 Dashboard preload。
 
 | 你想证明 | 命令 |
 | --- | --- |
