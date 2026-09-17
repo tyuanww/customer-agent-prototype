@@ -101,6 +101,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(verifyWindowsPackage).toContain("endsWith('.blockmap')");
     expect(verifyWindowsPackage).toContain('Electron-LICENSE.txt');
     expect(verifyWindowsPackage).toContain('Chromium-LICENSES.html');
+    expect(verifyWindowsPackage).toContain('assertPackagedOfflineProfile');
     expect(verifyWindowsPackage).toContain('does not inspect the PE executable icon resource');
   });
 
@@ -378,6 +379,17 @@ describe('Windows local-unsigned packaging contract', () => {
       rmSync(chromiumLicense);
       expect(() => verify()).toThrow(/Missing or empty packaged license notice/);
       writeFileSync(chromiumLicense, 'fixture-Chromium-LICENSES.html');
+
+      expect(() => verify()).toThrow(/Missing packaged offline profile/);
+      writeFileSync(
+        path.join(resourcesDirectory, 'synthetic-offline.json'),
+        JSON.stringify({ mode: 'synthetic-offline', extra: true }),
+      );
+      expect(() => verify()).toThrow(/exact synthetic-offline document/);
+      writeFileSync(
+        path.join(resourcesDirectory, 'synthetic-offline.json'),
+        '{"mode":"synthetic-offline"}',
+      );
 
       expect(verify()).toMatchObject({
         installers: [path.basename(installer)],

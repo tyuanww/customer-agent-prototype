@@ -7,6 +7,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertPackagedOfflineProfile } from './verify-packaged-offline-profile.mjs';
 
 export const WINDOWS_LOCAL_UNSIGNED_OUTPUT = path.join(
   'release',
@@ -123,6 +124,8 @@ export function verifyWindowsPackage(options = {}) {
       `packaged license notice ${relativePath}`,
     );
   }
+
+  assertPackagedOfflineProfile(resourcesDirectory);
 
   return {
     outputDirectory,

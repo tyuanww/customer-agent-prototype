@@ -3,6 +3,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyMacPackageBrandGate } from './mac-package-brand-gate.mjs';
+import { assertPackagedOfflineProfile } from './verify-packaged-offline-profile.mjs';
 
 const mode = process.argv[2];
 if (mode !== 'local' && mode !== 'distribution') {
@@ -52,6 +53,7 @@ for (const relativePath of [
   }
 }
 
+assertPackagedOfflineProfile(resources);
 const expectedBrandIcon = path.join(desktopRoot, 'build', 'icon.icns');
 verifyMacPackageBrandGate({ infoPlist, resourcesDirectory: resources, expectedBrandIcon });
 
