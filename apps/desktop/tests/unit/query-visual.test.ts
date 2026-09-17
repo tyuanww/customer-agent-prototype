@@ -12,6 +12,7 @@ const queryApp = [
   readFileSync(path.join(root, 'src/renderer/QueryApp.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/search/QueryCapsule.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/search/QueryResultsPane.tsx'), 'utf8'),
+  readFileSync(path.join(root, 'src/renderer/features/search/ScriptCard.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/search/query-view.ts'), 'utf8'),
 ].join('\n');
 const overlayPreload = readFileSync(path.join(root, 'src/preload/index.ts'), 'utf8');
@@ -93,6 +94,17 @@ describe('query capsule visual contract', () => {
     expect(css).not.toContain('color: #6543aa');
     expect(css).toContain('color: var(--query-success-ink)');
     expect(css).toContain(".deep-thinking-entry[aria-pressed='true'] span {\n  color: var(--query-rank-ink)");
+  });
+
+  it('keeps inaccuracy report as a hairline retry control, not the lavender copy CTA', () => {
+    expect(queryApp).toContain('className="retry-btn"');
+    expect(queryApp).toContain('data-testid={`report-inaccuracy-button-${script.rank}`}');
+    expect(queryApp).toContain('allowInaccuracyReport = true');
+    expect(queryApp).toContain('SCRIPT_INACCURACY_ACTION_LABEL');
+    expect(queryApp).toContain('SCRIPT_INACCURACY_RECORDED_STATUS');
+    expect(css).toMatch(/\.retry-btn\s*\{[\s\S]*?background: transparent/);
+    expect(css).toContain('.script-card .retry-btn');
+    expect(css).toMatch(/\.copy-btn\s*\{[\s\S]*?background: var\(--query-accent-control\)/);
   });
 
   it('provides glass fallbacks without changing the reduced-motion handoff snap', () => {

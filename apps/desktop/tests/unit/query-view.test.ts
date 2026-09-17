@@ -4,6 +4,9 @@ import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
 import { PRODUCT_ERRORS } from '../../src/shared/product-session';
 import {
   COPY_FEEDBACK_MS,
+  FORBIDDEN_INACCURACY_STATUS_PHRASES,
+  SCRIPT_INACCURACY_ACTION_LABEL,
+  SCRIPT_INACCURACY_RECORDED_STATUS,
   SEARCH_FEEDBACK_MS,
   SESSION_NOTICE_TEXT,
   maxContentBottom,
@@ -18,6 +21,14 @@ describe('query view leaves', () => {
   it('keeps the search and copy feedback timings', () => {
     expect(SEARCH_FEEDBACK_MS).toBe(280);
     expect(COPY_FEEDBACK_MS).toBe(900);
+  });
+
+  it('records inaccuracy as pending verification, not processed or sent', () => {
+    expect(SCRIPT_INACCURACY_ACTION_LABEL).toBe('话术不准');
+    expect(SCRIPT_INACCURACY_RECORDED_STATUS).toBe('已记录，待话术师核实');
+    for (const phrase of FORBIDDEN_INACCURACY_STATUS_PHRASES) {
+      expect(SCRIPT_INACCURACY_RECORDED_STATUS).not.toContain(phrase);
+    }
   });
 
   it('maps fox visual state without changing business priority', () => {

@@ -18,6 +18,16 @@ export const SEARCH_FEEDBACK_MS = 280;
 export const COPY_FEEDBACK_MS = 900;
 export const DEEP_THINKING_DESCRIPTION =
   '智能检索默认开启：MiniMax 只规划检索式并重排已有话术，不生成、不改写正文。关闭后仅用本地 BM25。';
+export const SCRIPT_INACCURACY_ACTION_LABEL = '话术不准';
+export const SCRIPT_INACCURACY_RECORDED_STATUS = '已记录，待话术师核实';
+export const FORBIDDEN_INACCURACY_STATUS_PHRASES = [
+  '已处理',
+  '已发送',
+  '已采纳',
+  '已转交成功',
+  '已上报',
+  '已建单',
+] as const;
 
 export function queryFoxVisualState(
   searching: boolean,
