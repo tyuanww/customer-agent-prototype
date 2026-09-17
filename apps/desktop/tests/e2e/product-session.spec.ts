@@ -98,7 +98,7 @@ test('product session native Feishu login, logout and renderer isolation', async
     app = launched.app;
     directory = launched.directory;
     const { query } = launched;
-    await query.getByRole('button', { name: '合成登录' }).click();
+    await query.getByRole('button', { name: '登录' }).click();
     await expect.poll(() => app!.windows().some((window) => window.url().includes('role=login'))).toBe(true);
     const login = app.windows().find((window) => window.url().includes('role=login'))!;
     await login.getByRole('button', { name: '飞书登录' }).click();
@@ -111,7 +111,7 @@ test('product session native Feishu login, logout and renderer isolation', async
     expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(true);
     expect(await query.evaluate(() => window.customerAgent!.copyText('绕过候选'))).toMatchObject({ ok: false });
     await query.evaluate(() => window.customerAgent!.product!.logout());
-    await expect(query.getByRole('button', { name: '合成登录' })).toBeVisible();
+    await expect(query.getByRole('button', { name: '登录' })).toBeVisible();
     expect(wire.state.revoked).toBe(true); expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(false);
   } finally {
     await app?.close();
@@ -130,7 +130,7 @@ test('product session account login exchanges a synthetic password for the same 
     app = launched.app;
     directory = launched.directory;
     const { query } = launched;
-    await query.getByRole('button', { name: '合成登录' }).click();
+    await query.getByRole('button', { name: '登录' }).click();
     await expect.poll(() => app!.windows().some((window) => window.url().includes('role=login'))).toBe(true);
     const login = app.windows().find((window) => window.url().includes('role=login'))!;
     await login.getByRole('button', { name: '账号' }).click();
@@ -142,7 +142,7 @@ test('product session account login exchanges a synthetic password for the same 
     expect(JSON.stringify(view)).not.toContain(wire.token);
     expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(true);
     await query.evaluate(() => window.customerAgent!.product!.logout());
-    await expect(query.getByRole('button', { name: '合成登录' })).toBeVisible();
+    await expect(query.getByRole('button', { name: '登录' })).toBeVisible();
   } finally {
     await app?.close();
     await wire.close();

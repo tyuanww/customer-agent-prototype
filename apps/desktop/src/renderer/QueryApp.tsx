@@ -8,7 +8,6 @@ import {
   MAX_QUERY_CHARS,
   QUERY_TOO_LONG_MESSAGE,
 } from '@shared/contracts';
-import { formatAcceleratorLabel } from '@shared/shortcut';
 import {
   QUERY_CLOSE_DURATION_MS,
   QUERY_CONTENT_EXIT_DURATION_MS,
@@ -44,7 +43,7 @@ import {
   COPY_FEEDBACK_MS,
   DEEP_THINKING_DESCRIPTION,
   SEARCH_FEEDBACK_MS,
-  SESSION_NOTICE_TEXT,
+  SESSION_ENTRY_UNSIGNED_LABEL,
   maxContentBottom,
   queryFoxVisualState,
   queryHandoffCssVars,
@@ -76,7 +75,6 @@ export function QueryApp() {
   const [copying, setCopying] = useState(false);
   const [searching, setSearching] = useState(false);
   const [copiedRank, setCopiedRank] = useState<1 | 2 | 3 | null>(null);
-  const [platform, setPlatform] = useState('win32');
   const [shortcutHint, setShortcutHint] = useState('');
   const [shortcutFailed, setShortcutFailed] = useState(false);
   const [anchor, setAnchor] = useState<QueryAnchor>('left');
@@ -116,6 +114,8 @@ export function QueryApp() {
   const searchInFlightRef = useRef(false);
   const preferenceWriteRef = useRef(Promise.resolve());
   const dashboardOpenFailedRef = useRef(false);
+  const pendingDashboardOpenRef = useRef(false);
+  const openDashboardWindowRef = useRef<() => void>(() => undefined);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
@@ -374,9 +374,6 @@ export function QueryApp() {
     void api
       .getWindowContext()
       .then((context) => {
-        if (context.platform) {
-          setPlatform(context.platform);
-        }
         if (!context.shortcut.registered) {
           setShortcutFailed(true);
           setShortcutHint(context.shortcut.message);
@@ -819,26 +816,38 @@ export function QueryApp() {
     return () => { live = false; unsubscribe(); window.clearInterval(interval); };
   }, [acceptProductSession]);
 
-  const sessionAction = async () => {
-    const product = window.customerAgent?.product; if (!product || sessionBusy) return;
+  const sessionAction = useCallback(async (): Promise<ProductSessionResult | null> => {
+    const product = window.customerAgent?.product;
+    if (!product || sessionBusy) {
+      return null;
+    }
     setSessionBusy(true);
     const signingOut = Boolean(productState?.ok && productState.signedIn);
     try {
       const result = await (signingOut ? product.logout() : product.login());
-      if (result.sessionEpoch < productEpochRef.current) return;
+      if (result.sessionEpoch < productEpochRef.current) {
+        pendingDashboardOpenRef.current = false;
+        return null;
+      }
       acceptProductSession(result, signingOut ? 'logout' : 'login');
-    } finally { setSessionBusy(false); }
-  };
+      if (result.ok && result.signedIn && pendingDashboardOpenRef.current) {
+        pendingDashboardOpenRef.current = false;
+        openDashboardWindowRef.current();
+      } else {
+        pendingDashboardOpenRef.current = false;
+      }
+      return result;
+    } catch {
+      pendingDashboardOpenRef.current = false;
+      return null;
+    } finally {
+      setSessionBusy(false);
+    }
+  }, [acceptProductSession, productState, sessionBusy]);
 
   const runSearch = useCallback(() => {
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
       if (!(productState?.ok && productState.signedIn)) {
-        const current = sessionNoticeRef.current;
-        if (current?.kind !== 'expired' && current?.kind !== 'failed') {
-          const unsigned = { kind: 'unsigned' as const, text: SESSION_NOTICE_TEXT.unsigned };
-          sessionNoticeRef.current = unsigned;
-          setSessionNotice(unsigned);
-        }
         return;
       }
       const api = window.customerAgent.productSearch;
@@ -1016,7 +1025,7 @@ export function QueryApp() {
     [phase, reportPhase, results.length, placeholderValues, productState],
   );
 
-  const openDashboard = useCallback(() => {
+  const openDashboardWindow = useCallback(() => {
     dashboardOpenFailedRef.current = false;
     const request = window.customerAgent?.openDashboard();
     const failOpen = (): void => {
@@ -1043,6 +1052,21 @@ export function QueryApp() {
       failOpen();
     });
   }, [reportPhase, results.length]);
+  openDashboardWindowRef.current = openDashboardWindow;
+
+  const openDashboard = useCallback(() => {
+    const product = window.customerAgent?.product;
+    const productReady = Boolean(product && !(productState?.ok && !productState.enabled));
+    if (productReady && !(productState?.ok && productState.signedIn)) {
+      pendingDashboardOpenRef.current = true;
+      void sessionAction().catch(() => {
+        pendingDashboardOpenRef.current = false;
+      });
+      return;
+    }
+    pendingDashboardOpenRef.current = false;
+    openDashboardWindow();
+  }, [openDashboardWindow, productState, sessionAction]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1134,7 +1158,7 @@ export function QueryApp() {
   }, [copyScript, errorMessage, openDashboard, runSearch]);
 
   const dismiss = useCallback(() => {
-    void window.customerAgent?.dismiss();
+    void window.customerAgent?.dismiss(true);
   }, []);
 
   const runHelp = useCallback(async (action: HelpAction, openedStatus: HelpStatus, failedMessage: string) => {
@@ -1178,6 +1202,9 @@ export function QueryApp() {
 
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
+      if (parked || closing || !queryInteractiveRef.current) {
+        return;
+      }
       if (event.key === 'Escape') {
         event.preventDefault();
         dismiss();
@@ -1211,9 +1238,13 @@ export function QueryApp() {
     };
     window.addEventListener('keydown', onWindowKeyDown);
     return () => window.removeEventListener('keydown', onWindowKeyDown);
-  }, [copyScript, copying, dismiss, phase, results, searching]);
+  }, [closing, copyScript, copying, dismiss, parked, phase, results, searching]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (parked || closing || !queryInteractiveRef.current) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       dismiss();
@@ -1421,7 +1452,6 @@ export function QueryApp() {
     finishQueryResize('cancel');
   }, [finishQueryResize]);
 
-  const shortcutLabel = formatAcceleratorLabel('CommandOrControl+Shift+Space', platform);
   const foxVisualState = queryFoxVisualState(searching, phase);
 
   return (
@@ -1486,7 +1516,7 @@ export function QueryApp() {
           productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
             <button type="button" className="capsule-session-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
               title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '仅使用合成身份'}>
-              {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : '合成登录'}
+              {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : SESSION_ENTRY_UNSIGNED_LABEL}
             </button>
           ) : null}
           foxVisualState={foxVisualState}
@@ -1497,9 +1527,9 @@ export function QueryApp() {
           inputRef={inputRef}
           invalidMessage={invalidMessage}
           sessionNotice={sessionNotice}
-          shortcutFailed={shortcutFailed}
-          shortcutLabel={shortcutLabel}
           searching={searching}
+          signedIn={Boolean(productState?.ok && productState.signedIn)}
+          inputIdle={parked || closing}
           onCancelScheduledResultFocus={cancelScheduledResultFocus}
           onCancelScheduledInputFocus={cancelScheduledInputFocus}
           onChangeQuery={changeQuery}

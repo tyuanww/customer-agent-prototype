@@ -43,7 +43,7 @@ test('desktop client queries the running synthetic stack and copies a candidate'
     const query = app.windows().find((window) => window.url().includes('role=query'))!;
     await query.evaluate(() => window.customerAgent!.openSearch());
 
-    await query.getByRole('button', { name: '合成登录' }).click();
+    await query.getByRole('button', { name: '登录' }).click();
     await expect.poll(() => app!.windows().some((window) => window.url().includes('role=login'))).toBe(true);
     const login = app.windows().find((window) => window.url().includes('role=login'))!;
     await login.getByRole('button', { name: '飞书登录' }).click();
@@ -70,7 +70,7 @@ test('desktop client queries the running synthetic stack and copies a candidate'
     expect(copied).not.toContain('{订单号}');
 
     await query.evaluate(() => window.customerAgent!.product!.logout());
-    await expect(query.getByRole('button', { name: '合成登录' })).toBeVisible();
+    await expect(query.getByRole('button', { name: '登录' })).toBeVisible();
     expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(false);
   } finally {
     await app?.close();

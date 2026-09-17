@@ -2,6 +2,26 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.1] - 2026-09-18
+
+### Added
+
+- After collapsing the query overlay, macOS returns keyboard focus to the previous app (Qianniu, Grok Build, or any other) so the agent can keep typing without clicking that window.
+- The query capsule login control is labeled 登录. Unsigned placeholder is 登录后查询话术; signed-in placeholder is 输入或粘贴客户问题，回车查询.
+- Smart retrieval is a compact right-side switch with a sliding thumb, not ON/OFF text.
+- Clicking the dashboard icon while unsigned starts login first, then opens the dashboard on success.
+
+### Changed
+
+- Capsule tools (登录, dashboard, smart retrieval) share a 28px row; the switch itself is 34×20.
+- Unsigned search no longer writes a separate 请先合成登录 notice; the placeholder carries that state.
+
+### Fixed
+
+- Closing the overlay no longer leaves keystrokes in a hidden query field.
+- Yielding focus ignores Electron DevTools windows, so `pnpm dev` with DevTools open still returns the previous app.
+- `app.hide()` is skipped when Dashboard, login, or SOP is visible, so those windows are not hidden with the overlay.
+
 ## [0.3.0] - 2026-09-11
 
 ### Added
