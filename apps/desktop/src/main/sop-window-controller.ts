@@ -12,6 +12,7 @@ import {
   applySopDrag,
   applySopHeight,
   placeSopNearQuery,
+  sopLayoutNeedsProjection,
   sopOpeningSize,
 } from '../shared/sop-geometry';
 import {
@@ -230,12 +231,18 @@ export class SopWindowController {
     }
     this.lastLayoutSequence = request.sequence;
     this.clearLayoutTimer();
-    const next = applySopHeight(win.getBounds(), request.desiredHeight, this.workArea());
-    win.setBounds(next);
+    const current = win.getBounds();
+    const next = applySopHeight(current, request.desiredHeight, this.workArea());
+    const shouldProject = sopLayoutNeedsProjection(this.shellState, current, next);
+    if (sopLayoutNeedsProjection('ready', current, next)) {
+      win.setBounds(next);
+    }
     this.shellState = 'ready';
     this.failCode = null;
     this.failMessage = null;
-    this.pushProjection();
+    if (shouldProject) {
+      this.pushProjection();
+    }
     return {
       ok: true,
       sessionId: request.sessionId,
@@ -249,7 +256,10 @@ export class SopWindowController {
       return { ok: false, message: '没有可复制的话术内容' };
     }
     const node = currentSopNode(this.tree, this.progress);
-    const resolved = resolveClipboardWrite(node?.answerText);
+    if (node?.kind !== 'copyable') {
+      return { ok: false, message: '没有可复制的话术内容' };
+    }
+    const resolved = resolveClipboardWrite(node.answerText);
     if (!resolved.ok) {
       return resolved;
     }

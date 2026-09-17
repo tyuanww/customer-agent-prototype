@@ -94,6 +94,9 @@ describe('query capsule visual contract', () => {
     expect(css).not.toContain('color: #6543aa');
     expect(css).toContain('color: var(--query-success-ink)');
     expect(css).toContain(".deep-thinking-entry[aria-pressed='true'] span {\n  color: var(--query-rank-ink)");
+    expect(css).toMatch(/\.sop-entry-banner\s*\{[\s\S]*?border: 1px solid var\(--hairline\)/);
+    expect(css).toMatch(/\.sop-entry-banner\s*\{[\s\S]*?background: var\(--glass-inner\)/);
+    expect(css).not.toMatch(/\.sop-entry-banner\s*\{[^}]*--fox-soft/);
   });
 
   it('keeps inaccuracy report as a hairline retry control, not the lavender copy CTA', () => {

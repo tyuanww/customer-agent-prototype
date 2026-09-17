@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ScriptCard } from './features/search/ScriptCard';
+import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import { useWindowDrag } from './lib/use-window-drag';
-import type { RankedScript } from './features/search/types';
 import {
   SOP_END_FLOW_LABEL,
   SOP_HIGH_RISK_BANNER,
@@ -9,6 +8,7 @@ import {
   SOP_OPENING_MESSAGE,
   SOP_TERMINAL_MESSAGE,
   SOP_UNPUBLISHED_MESSAGE,
+  type SopProjectedScript,
   type SopProjection,
 } from '@shared/sop-window';
 import './styles/sop.css';
@@ -17,22 +17,79 @@ type SopAppProps = {
   projection?: SopProjection;
 };
 
-function asRankedScript(script: NonNullable<SopProjection['script']>): RankedScript {
-  return {
-    scriptId: script.scriptId,
-    domain: script.domain,
-    questionVariants: script.questionVariants,
-    answerText: script.answerText,
-    platform: script.platform,
-    scopeLabel: script.scopeLabel,
-    riskLevel: script.riskLevel,
-    effectiveFrom: script.effectiveFrom,
-    effectiveTo: script.effectiveTo,
-    rank: 1,
-    score: 0,
-    matchKind: script.matchKind,
-    matchLabel: script.matchLabel,
-  };
+const RISK_COPY = {
+  low: { label: '低风险', className: 'risk-chip' },
+  medium: { label: '需人工核对', className: 'risk-chip is-medium' },
+  high: { label: '高风险 · 需复核', className: 'risk-chip is-high' },
+} as const;
+
+function sopLayoutSignature(projection: SopProjection): string {
+  return [
+    projection.sessionId,
+    projection.stepIndex,
+    projection.shellState,
+    projection.nodeKind,
+    projection.script?.scriptId ?? '',
+    projection.edges.map((edge) => edge.id).join(','),
+    projection.canNext ? '1' : '0',
+    projection.terminal ? '1' : '0',
+    projection.internalNote ? '1' : '0',
+    projection.internalTask ? '1' : '0',
+    projection.failCode ?? '',
+    projection.copied ? '1' : '0',
+  ].join('|');
+}
+
+function SopCopyCard({
+  script,
+  copying,
+  copied,
+  onCopy,
+}: {
+  script: SopProjectedScript;
+  copying: boolean;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const risk = RISK_COPY[script.riskLevel];
+  return (
+    <article
+      className={['script-card', 'is-lead', script.riskLevel === 'high' ? 'is-high' : '']
+        .filter(Boolean)
+        .join(' ')}
+      data-testid="script-card-1"
+    >
+      <div className="card-top">
+        <div className="card-kicker">
+          <kbd className="rank" aria-label="按数字 1 快速复制">1</kbd>
+          <span className="scene-label">{script.scopeLabel}</span>
+        </div>
+        <div className="card-top-tags">
+          <span className={risk.className} data-testid="risk-1">{risk.label}</span>
+        </div>
+      </div>
+      <div className="card-answer-row">
+        <p className="answer-text" data-testid="answer-text-1">{script.answerText}</p>
+        <button
+          type="button"
+          className={copied ? 'copy-btn is-copied' : 'copy-btn'}
+          data-testid="copy-button-1"
+          disabled={copying}
+          aria-keyshortcuts="1"
+          onClick={onCopy}
+        >
+          {copied ? COPY_SUCCESS_MESSAGE : '复制话术'}
+        </button>
+      </div>
+      <div className="meta-row">
+        <span className={`match-chip is-${script.matchKind}`} data-testid="match-reason-1">
+          {script.matchLabel}
+        </span>
+        <span className="meta-chip">{script.domain}</span>
+        <span className="meta-chip">{script.platform}</span>
+      </div>
+    </article>
+  );
 }
 
 export function SopApp({ projection: injected }: SopAppProps) {
@@ -52,6 +109,8 @@ export function SopApp({ projection: injected }: SopAppProps) {
     });
   }, [injected]);
 
+  const layoutSignature = projection ? sopLayoutSignature(projection) : '';
+
   const reportLayout = useCallback((desiredHeight: number) => {
     const api = window.sopWindow?.reportLayout;
     if (!api || injected) {
@@ -70,7 +129,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
   }, [injected, projection?.sessionId]);
 
   useLayoutEffect(() => {
-    if (!projection || injected) {
+    if (injected || !layoutSignature) {
       return undefined;
     }
     const shell = shellRef.current;
@@ -85,7 +144,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
       reportLayout(desired);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [injected, projection, reportLayout]);
+  }, [injected, layoutSignature, reportLayout]);
 
   const drag = useWindowDrag(
     (dx, dy, finished) => {
@@ -135,7 +194,6 @@ export function SopApp({ projection: injected }: SopAppProps) {
 
   const opening = projection.shellState === 'opening';
   const failed = projection.shellState === 'failed';
-  const ranked = projection.script ? asRankedScript(projection.script) : null;
 
   return (
     <div className="sop-shell query-shell" data-testid="sop-shell" data-window-role="sop" ref={shellRef}>
@@ -193,12 +251,11 @@ export function SopApp({ projection: injected }: SopAppProps) {
                   <span>{projection.internalNote}</span>
                 </div>
               ) : null}
-              {ranked ? (
-                <ScriptCard
-                  script={ranked}
+              {projection.script ? (
+                <SopCopyCard
+                  script={projection.script}
                   copying={copying || projection.copied}
                   copied={projection.copied}
-                  allowInaccuracyReport={false}
                   onCopy={() => {
                     void copyCurrent();
                   }}

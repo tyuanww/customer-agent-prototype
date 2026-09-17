@@ -80,6 +80,41 @@ async function readRetrievalPreference() {
     return DEFAULT_RETRIEVAL_PREFERENCE;
   }
 }
+const SOP_OPEN_ERROR_CODES = [
+  'INVALID',
+  'UNAVAILABLE',
+  'FAILED',
+  'SOP_LOAD_FAILED',
+  'SOP_LAYOUT_TIMEOUT',
+  'SOP_FIXTURE_MISSING',
+] as const;
+
+function parseSopWindowOpenResult(value: unknown):
+  | { ok: true }
+  | { ok: false; code: (typeof SOP_OPEN_ERROR_CODES)[number]; message: string }
+  | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.ok === true) {
+    return exactKeys(record, ['ok']) ? { ok: true } : null;
+  }
+  if (
+    record.ok === false
+    && exactKeys(record, ['ok', 'code', 'message'])
+    && typeof record.code === 'string'
+    && (SOP_OPEN_ERROR_CODES as readonly string[]).includes(record.code)
+    && typeof record.message === 'string'
+  ) {
+    return {
+      ok: false,
+      code: record.code as (typeof SOP_OPEN_ERROR_CODES)[number],
+      message: record.message,
+    };
+  }
+  return null;
+}
 const api: CustomerAgentApi = {
   productSearch: {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
@@ -227,25 +262,8 @@ const api: CustomerAgentApi = {
       }
       try {
         const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.SOP_WINDOW_OPEN, sceneId);
-        if (!value || typeof value !== 'object' || Array.isArray(value)) {
-          return { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
-        }
-        const record = value as { ok?: unknown; code?: unknown; message?: unknown };
-        if (record.ok === true) {
-          return { ok: true as const };
-        }
-        if (
-          record.ok === false
-          && typeof record.code === 'string'
-          && typeof record.message === 'string'
-        ) {
-          return {
-            ok: false as const,
-            code: record.code as 'INVALID' | 'UNAVAILABLE' | 'FAILED' | 'SOP_LOAD_FAILED' | 'SOP_LAYOUT_TIMEOUT' | 'SOP_FIXTURE_MISSING',
-            message: record.message,
-          };
-        }
-        return { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
+        const parsed = parseSopWindowOpenResult(value);
+        return parsed ?? { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
       } catch {
         return { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
       }
