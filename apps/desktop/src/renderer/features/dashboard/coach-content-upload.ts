@@ -106,18 +106,20 @@ export function parseCoachUploadCsv(text: string, sourceName: string): CoachUplo
   }
   const domainIndex = header.findIndex((cell) => DOMAIN_HEADERS.has(cell));
   const rows: CoachUploadRow[] = [];
-  for (const record of table.slice(1)) {
+  for (let index = 1; index < table.length; index += 1) {
+    const record = table[index];
     const scene = (record[sceneIndex] ?? '').trim();
     const script = (record[scriptIndex] ?? '').trim();
     const rawDomain = domainIndex >= 0 ? (record[domainIndex] ?? '').trim() : '';
     if (!scene && !script && !rawDomain) continue;
+    const sheetRow = index + 1;
     if (!scene || !script) {
-      return fail('invalid-table', '每一行都必须有场景与标准话术。');
+      return fail('invalid-table', `第 ${sheetRow} 行必须有场景与标准话术。`);
     }
     let domain: DomainId | undefined;
     if (rawDomain !== '') {
       if (!DOMAINS.has(rawDomain)) {
-        return fail('invalid-table', '域只能是 presale、campaign、aftersale 或 product。');
+        return fail('invalid-table', `第 ${sheetRow} 行的域只能是 presale、campaign、aftersale 或 product。`);
       }
       domain = rawDomain as DomainId;
     }
@@ -127,7 +129,7 @@ export function parseCoachUploadCsv(text: string, sourceName: string): CoachUplo
     return fail('empty', '没有可预览的数据行。');
   }
   if (rows.length > COACH_UPLOAD_MAX_ROWS) {
-    return fail('invalid-table', '行数超过当前切片的本地预览上限。');
+    return fail('invalid-table', `行数超过 ${COACH_UPLOAD_MAX_ROWS} 行本地预览上限。`);
   }
   return Object.freeze({
     ok: true,
@@ -158,7 +160,7 @@ export async function readCoachUploadFile(file: File): Promise<CoachUploadResult
     return fail('unsupported-type', '仅接受 .csv 或 .xlsx。');
   }
   if (file.size > COACH_UPLOAD_MAX_BYTES) {
-    return fail('too-large', '文件过大，当前切片只做本地草稿预览。');
+    return fail('too-large', `文件超过 ${COACH_UPLOAD_MAX_BYTES / 1024}KiB。当前切片只做本地草稿预览。`);
   }
   const bytes = await readFileBytes(file);
   // Renderer cannot unzip workbooks. ZIP/OLE files fail closed instead of

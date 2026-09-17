@@ -1567,7 +1567,7 @@ describe('DashboardApp', () => {
       { file: new File(['scene,step,domain\n用量,说明,legal\n'], 'bad-domain.csv', { type: 'text/csv' }), copy: '域只能是' },
       {
         file: new File(['x'.repeat(COACH_UPLOAD_MAX_BYTES + 1)], 'huge.csv', { type: 'text/csv' }),
-        copy: '文件过大',
+        copy: '64KiB',
       },
     ] as const;
 

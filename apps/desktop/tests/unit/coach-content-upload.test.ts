@@ -52,10 +52,13 @@ describe('coach content upload parser', () => {
       ok: false,
       code: 'empty',
     });
-    expect(parseCoachUploadCsv('scene,step,domain\n用量,说明,legal\n', 'domain.csv')).toMatchObject({
+    const badDomain = parseCoachUploadCsv('scene,step,domain\n用量,说明,legal\n', 'domain.csv');
+    expect(badDomain).toMatchObject({
       ok: false,
       code: 'invalid-table',
     });
+    if (badDomain.ok) return;
+    expect(badDomain.message).toContain('第 2 行');
   });
 
   it('fail-closes rows above the local row cap and rows missing a scene or script cell', () => {
@@ -66,6 +69,7 @@ describe('coach content upload parser', () => {
     const overCapResult = parseCoachUploadCsv(overCap, 'over-cap.csv');
     expect(overCapResult).toMatchObject({ ok: false, code: 'invalid-table' });
     if (overCapResult.ok) return;
+    expect(overCapResult.message).toContain(`${COACH_UPLOAD_MAX_ROWS} 行`);
     expect(overCapResult.message).toContain('上限');
 
     const atCap = [
@@ -77,14 +81,14 @@ describe('coach content upload parser', () => {
     if (!atCapResult.ok) return;
     expect(atCapResult.rows).toHaveLength(COACH_UPLOAD_MAX_ROWS);
 
-    expect(parseCoachUploadCsv('scene,script\n,先确认版本\n', 'no-scene.csv')).toMatchObject({
-      ok: false,
-      code: 'invalid-table',
-    });
-    expect(parseCoachUploadCsv('scene,script\n洁面用量确认,\n', 'no-script.csv')).toMatchObject({
-      ok: false,
-      code: 'invalid-table',
-    });
+    const noScene = parseCoachUploadCsv('scene,script\n,先确认版本\n', 'no-scene.csv');
+    expect(noScene).toMatchObject({ ok: false, code: 'invalid-table' });
+    if (noScene.ok) return;
+    expect(noScene.message).toContain('第 2 行');
+    const noScript = parseCoachUploadCsv('scene,script\n洁面用量确认,\n', 'no-script.csv');
+    expect(noScript).toMatchObject({ ok: false, code: 'invalid-table' });
+    if (noScript.ok) return;
+    expect(noScript.message).toContain('第 2 行');
     expect(parseCoachUploadCsv('﻿scene,script\r\n洁面,先确认版本\r\n', 'bom.csv')).toMatchObject({
       ok: true,
       rows: [{ scene: '洁面', script: '先确认版本' }],
@@ -129,6 +133,8 @@ describe('coach content upload parser', () => {
       { type: 'text/csv' },
     ));
     expect(huge).toMatchObject({ ok: false, code: 'too-large' });
+    if (huge.ok) return;
+    expect(huge.message).toContain(`${COACH_UPLOAD_MAX_BYTES / 1024}KiB`);
 
     const other = await readCoachUploadFile(new File(['scene,step\nA,B\n'], 'notes.txt'));
     expect(other).toMatchObject({ ok: false, code: 'unsupported-type' });
