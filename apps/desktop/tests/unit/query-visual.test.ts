@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const css = readFileSync(path.join(root, 'src/renderer/styles/app.css'), 'utf8');
+const loginCss = readFileSync(path.join(root, 'src/renderer/styles/login.css'), 'utf8');
+const loginApp = readFileSync(path.join(root, 'src/renderer/LoginApp.tsx'), 'utf8');
 const tokens = readFileSync(path.join(root, 'src/renderer/styles/tokens.css'), 'utf8');
 const queryApp = [
   readFileSync(path.join(root, 'src/renderer/QueryApp.tsx'), 'utf8'),
@@ -165,5 +167,26 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('.capsule-fox:focus-visible');
     expect(css).toContain('.capsule-fox:focus-visible .fox-focus-ring');
     expect(queryApp).toContain('query-fox-focus-ring');
+  });
+});
+
+describe('login window visual contract', () => {
+  it('keeps capsule copy as 合成登录 and chooser copy as 飞书 / 账号', () => {
+    expect(queryApp).toContain('合成登录');
+    expect(loginApp).toContain('飞书');
+    expect(loginApp).toContain('账号');
+    expect(loginApp).not.toMatch(/内部|外包/);
+    expect(loginCss).not.toMatch(/内部|外包/);
+  });
+
+  it('reuses query capsule tokens instead of a second palette', () => {
+    expect(loginCss).toContain('background: var(--query-glass-solid)');
+    expect(loginCss).toContain('color: var(--ink)');
+    expect(loginCss).toContain('color: var(--muted)');
+    expect(loginCss).toContain('background: var(--query-accent-control)');
+    expect(loginCss).toContain('border-radius: 14px');
+    expect(loginCss).toContain('font-size: 16px');
+    expect(loginCss).toContain('font-size: 11px');
+    expect(loginCss).not.toMatch(/linear-gradient|#6543aa|#7c3aed/);
   });
 });

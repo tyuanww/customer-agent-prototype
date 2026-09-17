@@ -6,6 +6,7 @@
  * deliberately tiny:
  *
  *   GET  /authorize?state=...&redirect_uri=...  -> 302 to the API callback
+ *   POST /password {username, password}          -> {code: bindingId} (seeded subjects only)
  *   POST /exchange {code}                        -> {provider:'synthetic', binding_id}
  *   GET  /health                                 -> liveness
  *

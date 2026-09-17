@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { createIdentityProvider } from './identity-provider.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
   DESKTOP_PACKAGED_PROFILE_PATH, PID_DIRECTORY, apiEnvironment, readProfile,
@@ -190,5 +192,57 @@ describe('anomaly checks', () => {
     const source = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
     assert.match(source, /sourceVersionId = process\.argv\[4\]/);
     assert.match(source, /case 'anomaly': await commandAnomaly\(process\.argv\[3\]\)/);
+  });
+});
+
+async function freeLoopbackPort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close((error) => { if (error) reject(error); else resolve(port); });
+    });
+    server.on('error', reject);
+  });
+}
+
+describe('synthetic identity password', () => {
+  it('grants a seeded binding and rejects unknown credentials without enumerating', async () => {
+    const port = await freeLoopbackPort();
+    const provider = createIdentityProvider({ port });
+    const origin = await provider.listen();
+    try {
+      const ok = await fetch(`${origin}/password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'synthetic_agent', password: 'synthetic-password' }),
+      });
+      assert.equal(ok.status, 200);
+      assert.deepEqual(await ok.json(), { code: 'synthetic_agent' });
+      const owner = await fetch(`${origin}/password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'synthetic_owner', password: 'synthetic-password' }),
+      });
+      assert.equal(owner.status, 200);
+      assert.deepEqual(await owner.json(), { code: 'synthetic_owner' });
+      const bad = await fetch(`${origin}/password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'synthetic_agent', password: 'wrong' }),
+      });
+      assert.equal(bad.status, 401);
+      assert.deepEqual(await bad.json(), { error: 'invalid_credentials' });
+      const unknown = await fetch(`${origin}/password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'not_a_subject', password: 'synthetic-password' }),
+      });
+      assert.equal(unknown.status, 401);
+      assert.deepEqual(await unknown.json(), { error: 'invalid_credentials' });
+    } finally {
+      await provider.close();
+    }
   });
 });
