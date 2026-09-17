@@ -45,6 +45,7 @@ describe('SOP window IPC sender matrix', () => {
   const sop = sender(11, 'sop');
   const open = vi.fn(async () => ({ ok: true as const }));
   const entryAvailable = vi.fn(() => true);
+  const resumeAvailable = vi.fn(() => false);
   const chooseEdge = vi.fn(() => ({ ok: true as const }));
   const copyCurrent = vi.fn(() => ({ ok: true as const }));
 
@@ -65,6 +66,7 @@ describe('SOP window IPC sender matrix', () => {
       isSopContents: (contents: WebContents) => contents.id === sop.webContents.id,
       open,
       entryAvailable,
+      resumeAvailable,
       chooseEdge,
       copyCurrent,
     } as unknown as SopWindowController;
@@ -84,11 +86,13 @@ describe('SOP window IPC sender matrix', () => {
     await expect(handler(IPC_CHANNELS.SOP_WINDOW_OPEN)(query.event, 'allergy-aftersale-demo')).resolves.toEqual({ ok: true });
     expect(open).toHaveBeenCalledWith('allergy-aftersale-demo');
     expect(handler(IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE)(query.event)).toBe(true);
+    expect(handler(IPC_CHANNELS.SOP_WINDOW_RESUME_AVAILABLE)(query.event)).toBe(false);
 
     await expect(handler(IPC_CHANNELS.SOP_WINDOW_OPEN)(fox.event, 'allergy-aftersale-demo')).resolves.toMatchObject({ ok: false, code: 'UNAVAILABLE' });
     await expect(handler(IPC_CHANNELS.SOP_WINDOW_OPEN)(dashboard.event, 'allergy-aftersale-demo')).resolves.toMatchObject({ ok: false });
     expect(handler(IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE)(fox.event)).toBe(false);
     expect(handler(IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE)(sop.event)).toBe(false);
+    expect(handler(IPC_CHANNELS.SOP_WINDOW_RESUME_AVAILABLE)(fox.event)).toBe(false);
   });
 
   it('lets only the SOP window choose edges or copy', () => {

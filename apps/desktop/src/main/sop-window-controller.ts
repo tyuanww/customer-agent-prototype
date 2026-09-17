@@ -113,6 +113,10 @@ export class SopWindowController {
     }
   }
 
+  resumeAvailable(): boolean {
+    return this.liveWindow() !== null && this.progress !== null;
+  }
+
   async open(sceneId: string): Promise<SopWindowResult> {
     if (this.disposed) {
       return sopWindowFailure('UNAVAILABLE', SOP_OPEN_FAILURE_MESSAGE);
@@ -160,9 +164,20 @@ export class SopWindowController {
   }
 
   endFlow(): void {
-    this.resetProgress();
-    this.hideRememberingProgress();
-    this.pushProjection();
+    this.clearLayoutTimer();
+    this.scheduler.clear(this.copyTimer);
+    this.copyTimer = null;
+    this.copied = false;
+    this.progress = null;
+    this.tree = null;
+    this.shellState = 'opening';
+    this.failCode = null;
+    this.failMessage = null;
+    const win = this.window;
+    this.window = null;
+    if (win && !win.isDestroyed()) {
+      win.destroy();
+    }
   }
 
   async restart(): Promise<SopWindowResult> {

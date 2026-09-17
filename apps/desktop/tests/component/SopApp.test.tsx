@@ -75,6 +75,7 @@ describe('SopApp injected projection', () => {
     expect(screen.getByTestId('sop-step').textContent).not.toMatch(/\//);
     expect(screen.getByTestId('sop-chrome')).toHaveTextContent('过敏流程');
     expect(screen.getByTestId('sop-chrome')).not.toHaveTextContent('环节');
+    expect(screen.getByTestId('sop-close')).toHaveAttribute('aria-label', '收起过敏流程，保留进度');
     expect(screen.queryByTestId('sop-prompt')).not.toBeInTheDocument();
 
     rerender(<SopApp projection={projectionFor(['has-photo'])} />);

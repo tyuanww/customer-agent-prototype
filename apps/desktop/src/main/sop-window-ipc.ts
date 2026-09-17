@@ -81,6 +81,16 @@ export function registerSopWindowIpc(host: SopWindowIpcHost): void {
     return host.getSop()?.entryAvailable() === true;
   });
 
+  ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_RESUME_AVAILABLE, (event): boolean => {
+    if (!queryGuard(event, host) || !canQueryReadSopEntry({
+      trusted: true,
+      role: host.getOverlay()?.overlayRoleOf(event.sender) ?? null,
+    })) {
+      return false;
+    }
+    return host.getSop()?.resumeAvailable() === true;
+  });
+
   ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_CLOSE, (event): void => {
     sopGuard(event, host)?.close();
   });

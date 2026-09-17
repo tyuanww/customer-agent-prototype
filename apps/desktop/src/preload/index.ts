@@ -275,6 +275,13 @@ const api: CustomerAgentApi = {
         return false;
       }
     },
+    async resumeAvailable() {
+      try {
+        return (await ipcRenderer.invoke(IPC_CHANNELS.SOP_WINDOW_RESUME_AVAILABLE)) === true;
+      } catch {
+        return false;
+      }
+    },
   },
 };
 

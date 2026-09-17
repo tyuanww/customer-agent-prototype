@@ -92,6 +92,7 @@ export type SopWindowApi = {
 export type QuerySopWindowApi = {
   open(sceneId: string): Promise<SopWindowResult>;
   entryAvailable(): Promise<boolean>;
+  resumeAvailable(): Promise<boolean>;
 };
 
 const SOP_LAYOUT_KEYS = ['sessionId', 'sequence', 'desiredHeight'] as const;
@@ -274,6 +275,7 @@ export const SOP_OPENING_MESSAGE = '正在打开过敏流程';
 export const SOP_OPEN_FAILURE_MESSAGE = '过敏流程没打开';
 export const SOP_ENTRY_HINT = '过敏可走售后流程 · 建议先要凭证';
 export const SOP_ENTRY_BUTTON = '打开过敏售后流程';
+export const SOP_RESUME_BUTTON = '继续过敏售后流程';
 export const SOP_TERMINAL_MESSAGE = '本流程没有下一步';
 export const SOP_UNPUBLISHED_MESSAGE = '该话术尚未发布';
 export const SOP_END_FLOW_LABEL = '结束并清除进度';
