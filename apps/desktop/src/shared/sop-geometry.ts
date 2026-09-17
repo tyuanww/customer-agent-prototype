@@ -120,11 +120,12 @@ export function placeSopNearQuery(
     height,
   };
 
-  const candidate = fitsInWorkArea(right, workArea)
-    ? right
-    : fitsInWorkArea(left, workArea)
-      ? left
-      : below;
+  let candidate = below;
+  if (fitsInWorkArea(right, workArea)) {
+    candidate = right;
+  } else if (fitsInWorkArea(left, workArea)) {
+    candidate = left;
+  }
   const clamped = clampRectToWorkArea(candidate, workArea);
   return avoidQueryCapsule(nudgeOffQueryOrigin(clamped, query, workArea), query, workArea);
 }
@@ -146,4 +147,26 @@ export function applySopHeight(current: Rect, nextHeight: number, workArea: Rect
   const maxY = workArea.y + workArea.height - height;
   const y = Math.min(Math.max(current.y, workArea.y), maxY);
   return clampRectToWorkArea({ ...current, y, height, width: SOP_WIDTH }, workArea);
+}
+
+export function sopLayoutNeedsProjection(
+  shellState: 'opening' | 'ready' | 'failed',
+  current: Rect,
+  next: Rect,
+): boolean {
+  if (shellState !== 'ready') {
+    return true;
+  }
+  return current.x !== next.x || current.y !== next.y || current.height !== next.height;
+}
+
+export function sopWorkAreaForQuery(
+  query: Rect | null,
+  primaryWorkArea: Rect,
+  matchingWorkArea: (query: Rect) => Rect,
+): Rect {
+  if (!query) {
+    return primaryWorkArea;
+  }
+  return matchingWorkArea(query);
 }

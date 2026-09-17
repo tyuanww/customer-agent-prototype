@@ -1497,9 +1497,9 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--fox) 22%, var(--hairline));
+  border: 1px solid var(--hairline);
   border-radius: 12px;
-  background: var(--fox-soft);
+  background: var(--glass-inner);
   color: var(--ink);
   font-size: 12px;
 }

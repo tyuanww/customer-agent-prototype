@@ -8,6 +8,8 @@ import {
   SOP_WIDTH,
   clampSopHeight,
   placeSopNearQuery,
+  sopLayoutNeedsProjection,
+  sopWorkAreaForQuery,
 } from '../../src/shared/sop-geometry';
 
 const workArea = { x: 0, y: 25, width: 1440, height: 875 };
@@ -41,6 +43,24 @@ describe('SOP geometry cascade', () => {
     const placed = placeSopNearQuery(wideQuery, narrow);
     expect(placed.y).toBeGreaterThanOrEqual(wideQuery.y + SOP_OFFSET_Y);
     expect(placed.x === wideQuery.x && placed.y === wideQuery.y).toBe(false);
+  });
+
+  it('uses the matching display work area when Query is present', () => {
+    const primary = { x: 0, y: 25, width: 1440, height: 875 };
+    const secondary = { x: 1440, y: 0, width: 1920, height: 1080 };
+    const queryOnSecondary = { x: 1600, y: 80, width: 600, height: 340 };
+    expect(sopWorkAreaForQuery(null, primary, () => secondary)).toEqual(primary);
+    expect(sopWorkAreaForQuery(queryOnSecondary, primary, (rect) => {
+      expect(rect).toEqual(queryOnSecondary);
+      return secondary;
+    })).toEqual(secondary);
+  });
+
+  it('only projects layout when the shell is not ready or the bounds change', () => {
+    const current = { x: 10, y: 20, width: 600, height: 320 };
+    expect(sopLayoutNeedsProjection('opening', current, current)).toBe(true);
+    expect(sopLayoutNeedsProjection('ready', current, current)).toBe(false);
+    expect(sopLayoutNeedsProjection('ready', current, { ...current, height: 400 })).toBe(true);
   });
 
   it('prefers not covering the Query capsule band', () => {

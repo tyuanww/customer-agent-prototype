@@ -18,6 +18,7 @@ import { registerClipboardIpc } from './clipboard-ipc';
 import { registerOverlayIpc } from './overlay-ipc';
 import { SopWindowController } from './sop-window-controller';
 import { registerSopWindowIpc } from './sop-window-ipc';
+import { sopWorkAreaForQuery } from '../shared/sop-geometry';
 import { applySessionSecurity } from './window-security';
 import { installDesktopShell, type DesktopShell } from './desktop-shell';
 import { applyApplicationIdentity } from './app-identity';
@@ -150,7 +151,11 @@ if (!gotLock) {
     sopController = new SopWindowController({
       rendererDevServerUrl: () => controller?.rendererDevServerUrl,
       queryBounds: () => controller?.queryWindowBounds() ?? null,
-      workArea: () => screen.getPrimaryDisplay().workArea,
+      workArea: () => sopWorkAreaForQuery(
+        controller?.queryWindowBounds() ?? null,
+        screen.getPrimaryDisplay().workArea,
+        (query) => screen.getDisplayMatching(query).workArea,
+      ),
       sessionRole: () => {
         const view = productSession?.view();
         return view?.ok && view.signedIn ? view.role : null;

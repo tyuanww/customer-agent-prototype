@@ -12,6 +12,10 @@ const sopPreload = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/sop.ts'),
   'utf8',
 );
+const overlayPreload = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/index.ts'),
+  'utf8',
+);
 import { ALLOWED_HELP_STATUS, FORBIDDEN_HELP_PHRASES } from '../../src/shared/product-help';
 
 describe('IPC whitelist', () => {
@@ -67,6 +71,16 @@ describe('IPC whitelist', () => {
     expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU}'`);
     expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT}'`);
     expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_CANCEL}'`);
+  });
+
+  it('parses SOP open results in the overlay preload without importing sop-window', () => {
+    expect(overlayPreload).not.toContain("from '../shared/sop-window'");
+    expect(overlayPreload).toContain('parseSopWindowOpenResult');
+    expect(overlayPreload).toContain("exactKeys(record, ['ok'])");
+    expect(overlayPreload).toContain("exactKeys(record, ['ok', 'code', 'message'])");
+    expect(overlayPreload).toContain('SOP_LOAD_FAILED');
+    expect(overlayPreload).toContain('SOP_LAYOUT_TIMEOUT');
+    expect(overlayPreload).toContain('SOP_FIXTURE_MISSING');
   });
 
   it('keeps the SOP preload free of shared overlay modules', () => {
