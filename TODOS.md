@@ -40,7 +40,7 @@
 **Effort:** — （决定项）
 **Priority:** P1
 **Depends on:** None
-**Status:** OPEN · 待用户
+**Status:** 已拍板（2026-09-17）。首轮只验安装 / 启动 / 浮窗 / 快捷键 / 卸载；办公机只禁单独安装开发工具，不禁 Electron 自带运行时；首轮必须断网可用。路径锁 **P3 显式离线 profile**，不走 P4 / P10。
 
 ### P3 · 显式离线 synthetic profile
 
@@ -53,7 +53,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** OPEN · 未授权 · **决策材料已就绪**（`docs/plans/2026-09-17-office-machine-delivery-path-decision.md`）。实证结论：S0 链路与 fixture 今天已存在，且已被打进包（`apps/desktop/package.json:59-62` 的 `files` 只收 `out/**/*`，fixture 由 Vite 编进 `out/renderer`）；唯一阻塞点是 `main.ts:168` 的 `resolveProductProfile` 在 packaged 时无条件 fail-close。**但它不是「加一个开关」**：要反转 `product-runtime-config.ts:22-24` 明写的不变量、过 `docs/plans/2026-09-10-windows-package-and-device-verification.md:147` 的授权门、并同步改打包脚本、后验 gate 与 `apps/desktop/tests/unit/product-runtime-config.test.ts:178-194` 的断言。**纠正一处旧说法**：不是 12 条 fixture 全部有效到 2099——`syn-camp-002` 已于 2026-06-30 过期（`synthetic-scripts.ts:196`）。**覆盖 S0 全链的那条 E2E 不在默认 CI 门禁**（`.github/workflows/ci.yml:139` 只跑 `@windows-feasibility`），纳入按需门禁前这条路径没有回归保护。
+**Status:** 已授权第一刀（P2 拍板后）。缺文件仍 fail-closed `missing`；显式 `{ "mode": "synthetic-offline" }` 才进打包 S0。不得用删文件冒充离线。安装包写入该文件、办公机实机勾选仍属后续刀。
 
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 
@@ -121,7 +121,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Context:** `docs/plans/2026-09-10-windows-package-and-device-verification.md` 的 §2 数据与身份、§3 启动配置行、§4 末尾、§9 日志口径共四处；对照 `apps/desktop/src/main/product-runtime-config.ts`。
 
-**Status:** 已在工作区修正（未提交）。四处冲突表述已改为与代码一致的「配置缺失即退出，不退回 S0」。
+**Status:** 已在工作区修正。缺文件仍退出、不退回 S0；显式 `{ "mode": "synthetic-offline" }` 才进离线浮窗。
 
 ### P10 · 办公机免装依赖的交付问题（尚未解决）
 

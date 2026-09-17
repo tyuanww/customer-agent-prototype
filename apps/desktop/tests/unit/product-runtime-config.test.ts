@@ -78,6 +78,26 @@ describe('packaged synthetic product profile', () => {
     expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
   });
 
+  it('starts packaged S0 only from an explicit synthetic-offline file, not from a missing file', () => {
+    const directory = userDataDirectory();
+    expect(() => resolveProductProfile(true, directory, LOOPBACK_ENV)).toThrow(
+      expect.objectContaining({ kind: 'missing' }),
+    );
+
+    write(directory, { mode: 'synthetic-offline' });
+    expect(readPackagedProductProfile(directory)).toBeUndefined();
+    expect(resolveProductProfile(true, directory, LOOPBACK_ENV)).toBeUndefined();
+
+    write(directory, { mode: 'synthetic-offline', apiOrigin: 'http://127.0.0.1:43100' });
+    expect(() => readPackagedProductProfile(directory)).toThrow(
+      expect.objectContaining({ kind: 'invalid' }),
+    );
+    write(directory, { mode: 'synthetic-offline', extra: true });
+    expect(() => readPackagedProductProfile(directory)).toThrow(
+      expect.objectContaining({ kind: 'invalid' }),
+    );
+  });
+
   it('distinguishes a missing profile from a rejected one so the notice can differ', () => {
     const directory = userDataDirectory();
     // Absent file: the operator is told to install/start the stack.

@@ -313,6 +313,14 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 | --- | --- |
 | P0 横幅与 CAS 演练 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts tests/unit/dashboard-manifest.test.ts` |
 
+## 打包态显式离线（P3 第一刀）
+
+缺 `synthetic-stack.json` 仍是 fail-closed 启动失败（`missing`），**不会**变成 S0。只有 userData 里放精确文件 `{ "mode": "synthetic-offline" }`（不得夹带 origin 或其它字段）才走离线浮窗。macOS 路径：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`。Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`。本刀不把该文件打进安装包。
+
+| 你想证明 | 命令 |
+| --- | --- |
+| 缺文件仍 missing；显式 offline 返回 undefined | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-runtime-config.test.ts` |
+
 ## 打包 file:// 登录窗
 
 打包态 chooser 必须能加载 `out/renderer/assets/` 下嵌套 hashed JS/CSS。`isChooserUrl` 放行 `file:` 的 `index.html` 与 renderer 资源，拒绝 `..` / 凭据 / 非 file（开发态 Vite origin 除外）。

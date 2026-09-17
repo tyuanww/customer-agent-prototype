@@ -184,8 +184,8 @@ if (!gotLock) {
     // reads the same values from its own userData file so an installed client
     // can run the synthetic chain without any environment setup. Both paths are
     // validated to bare loopback origins. A packaged build ignores origin
-    // environment variables and fail-closes if the file is missing or invalid,
-    // so it cannot be repointed off-host or silently dropped to the S0 fixture.
+    // environment variables and fail-closes if the file is missing or invalid.
+    // Absence is not S0. Explicit `{ "mode": "synthetic-offline" }` starts S0.
     // Retrieval hydrate / BM25 use the known off-repo stack files, not leftover
     // `/v1/search`, and also must not require a developer shell.
     const userDataDirectory = app.getPath('userData');

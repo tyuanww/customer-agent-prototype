@@ -20,11 +20,13 @@ import path from 'node:path';
  * credentials — the same restrictions the development profile enforced.
  *
  * A missing or invalid file is a startup error: the packaged client must not
- * fall back to the offline S0 fixture, and it must not consult the environment
- * as a substitute. Unpackaged development without both origins still stays S0.
+ * treat absence as offline S0, and it must not consult the environment as a
+ * substitute. Offline S0 is an explicit file `{ "mode": "synthetic-offline" }`
+ * with no origins. Unpackaged development without both origins still stays S0.
  */
 export const SYNTHETIC_STACK_PROFILE_FILE = 'synthetic-stack.json';
 const MODE = 'synthetic-local';
+const OFFLINE_MODE = 'synthetic-offline';
 const MAX_BYTES = 4_096;
 const MISSING_PROFILE_ERROR =
   'Packaged desktop requires synthetic-stack.json under userData';
@@ -73,7 +75,7 @@ function loopbackOrigin(value: unknown): string | undefined {
 }
 
 type PackagedProfileParse =
-  | { readonly ok: true; readonly profile: PackagedProductProfile }
+  | { readonly ok: true; readonly profile: PackagedProductProfile | undefined }
   | { readonly ok: false; readonly kind: PackagedProfileErrorKind };
 
 function parsePackagedProductProfile(userDataDirectory: string): PackagedProfileParse {
@@ -114,6 +116,11 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, kind: 'invalid' };
   const record = parsed as Record<string, unknown>;
+  if (record.mode === OFFLINE_MODE) {
+    const keys = Object.keys(record);
+    if (keys.length !== 1 || keys[0] !== 'mode') return { ok: false, kind: 'invalid' };
+    return { ok: true, profile: undefined };
+  }
   if (record.mode !== MODE) return { ok: false, kind: 'invalid' };
   const apiOrigin = loopbackOrigin(record.apiOrigin);
   const identityOrigin = loopbackOrigin(record.identityOrigin);
@@ -123,8 +130,8 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin }) };
 }
 
-/** Read and validate the packaged synthetic profile. Missing or invalid files fail closed. */
-export function readPackagedProductProfile(userDataDirectory: string): PackagedProductProfile {
+/** Read and validate the packaged synthetic profile. Missing or invalid files fail closed. Explicit offline mode returns undefined (S0), it is not a missing file. */
+export function readPackagedProductProfile(userDataDirectory: string): PackagedProductProfile | undefined {
   const result = parsePackagedProductProfile(userDataDirectory);
   if (!result.ok) throw new PackagedProfileError(result.kind);
   return result.profile;
