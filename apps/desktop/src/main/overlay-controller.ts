@@ -170,6 +170,9 @@ export class OverlayController {
   } | null = null;
   private queryLayoutFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private dashboardOpening: Promise<OpenDashboardResult> | null = null;
+  private restorePreviousAppOnIdle = false;
+  private foxYieldShowTimer: ReturnType<typeof setTimeout> | null = null;
+  private foxYieldGeneration = 0;
 
   private disposed = false;
   private readonly fence: ShutdownFence;
@@ -252,13 +255,19 @@ export class OverlayController {
     this.bindWindowLifecycle(this.fox);
     this.bindWindowLifecycle(this.query);
     this.bindFoxNativeBoundsReadback(this.fox);
+    this.bindQueryKeyboardGuard(this.query);
+    this.setQueryFocusable(false);
     this.query.on('blur', () => this.handleQueryBlur());
     this.query.on('focus', () => {
       this.clearPendingQueryBlur();
       this.clearQueryFocusRetry();
-      if (isOpenPhase(this.phase) && this.live(this.query)) {
-        this.query.webContents.focus();
+      if (!this.queryAcceptsKeyboard() || !this.live(this.query)) {
+        this.resignQueryKeyboard({
+          hide: this.phase === 'FOX_IDLE' && this.chromeHandoffMode !== 'closing',
+        });
+        return;
       }
+      this.query.webContents.focus();
     });
 
     const loadStates = await Promise.all([
@@ -280,6 +289,7 @@ export class OverlayController {
     this.fox.setBounds(placed);
     this.resetFoxPeekLifecycle('none');
     this.fox.showInactive();
+    this.setFoxFocusable(false);
     this.bindDisplayLifecycle();
 
     this.registerShortcut();
@@ -294,6 +304,7 @@ export class OverlayController {
     if (this.isInactive()) {
       return;
     }
+    this.clearFoxYieldShow();
     if (isOpenPhase(this.phase)) {
       this.activateExisting();
       return;
@@ -316,13 +327,15 @@ export class OverlayController {
       this.syncFoxOriginFromNativeBounds(idleFox);
     }
     this.pendingFoxVisualTransform = visualTransform;
+    this.restorePreviousAppOnIdle = false;
     this.applyEvent({ type: 'OPEN' });
   }
 
-  dismiss(_restorePreviousApp = false): void {
+  dismiss(restorePreviousApp = false): void {
     if (this.isInactive()) {
       return;
     }
+    this.restorePreviousAppOnIdle = restorePreviousApp === true;
     this.finishOrClearQueryDrag();
     this.applyEvent({ type: 'DISMISS' });
   }
@@ -332,7 +345,7 @@ export class OverlayController {
       return;
     }
     if (isOpenPhase(this.phase)) {
-      this.dismiss();
+      this.dismiss(true);
       return;
     }
     this.openSearch();
@@ -887,6 +900,7 @@ export class OverlayController {
     this.unbindDisplayLifecycle();
     this.clearPendingQueryBlur();
     this.clearQueryFocusRetry();
+    this.clearFoxYieldShow();
     this.cancelChromeHandoff();
     this.clearQueryLayoutFallback();
     this.displayReconcilePending = false;
@@ -1040,6 +1054,7 @@ export class OverlayController {
     // the native fox share one screen-space center during the handoff.
     const preparedBounds = query.getBounds();
     query.webContents.invalidate();
+    this.setQueryFocusable(true);
     query.show();
     query.setBounds(preparedBounds);
     fox.hide();
@@ -1119,8 +1134,128 @@ export class OverlayController {
     if (process.platform === 'darwin') {
       query.invalidateShadow();
     }
-    query.hide();
-    this.resignPaletteActivation(fox);
+    this.resignQueryKeyboard({ hide: true });
+    this.yieldOrKeepPalette(fox);
+  }
+
+  private yieldOrKeepPalette(fox: BrowserWindow): void {
+    const yieldFocus = this.restorePreviousAppOnIdle;
+    this.restorePreviousAppOnIdle = false;
+    this.setFoxFocusable(false);
+    // Idle fox must not become the key window, or Grok Build / 千牛 keep
+    // looking focused while keystrokes go nowhere until the user clicks.
+    if (
+      !yieldFocus
+      || process.platform !== 'darwin'
+      || this.otherChromeWindowsVisible()
+    ) {
+      this.resignPaletteActivation(fox);
+      return;
+    }
+    const generation = ++this.foxYieldGeneration;
+    try {
+      app.hide();
+    } catch {
+      // hide() can throw if the Dock policy is already accessory.
+    }
+    this.clearFoxYieldShowTimer();
+    this.foxYieldShowTimer = this.scheduler.schedule(() => {
+      this.foxYieldShowTimer = null;
+      if (
+        generation !== this.foxYieldGeneration
+        || this.phase !== 'FOX_IDLE'
+        || this.chromeHandoffMode !== null
+        || !this.live(fox)
+      ) {
+        return;
+      }
+      fox.showInactive();
+      this.syncFoxOriginFromNativeBounds(fox);
+    }, 34);
+  }
+
+  private otherChromeWindowsVisible(): boolean {
+    return BrowserWindow.getAllWindows().some((win) => {
+      if (win.isDestroyed() || !win.isVisible()) {
+        return false;
+      }
+      if (win === this.fox || win === this.query) {
+        return false;
+      }
+      return !this.isDevToolsWindow(win);
+    });
+  }
+
+  private isDevToolsWindow(win: BrowserWindow): boolean {
+    const contents = win.webContents;
+    if (!contents || contents.isDestroyed()) {
+      return false;
+    }
+    const type = typeof contents.getType === 'function' ? contents.getType() : '';
+    if (type === 'remote') {
+      return true;
+    }
+    const url = typeof contents.getURL === 'function' ? contents.getURL() : '';
+    return url.startsWith('devtools:');
+  }
+
+  private setFoxFocusable(focusable: boolean): void {
+    const fox = this.fox;
+    if (!this.live(fox) || typeof fox.setFocusable !== 'function') {
+      return;
+    }
+    fox.setFocusable(focusable);
+  }
+
+  private clearFoxYieldShow(): void {
+    this.foxYieldGeneration += 1;
+    this.clearFoxYieldShowTimer();
+  }
+
+  private clearFoxYieldShowTimer(): void {
+    this.scheduler.clear(this.foxYieldShowTimer);
+    this.foxYieldShowTimer = null;
+  }
+
+  private queryAcceptsKeyboard(): boolean {
+    return (
+      isOpenPhase(this.phase)
+      && this.chromeHandoffMode !== 'closing'
+      && this.isWindowVisible(this.query)
+    );
+  }
+
+  private setQueryFocusable(focusable: boolean): void {
+    const query = this.query;
+    if (!this.live(query) || typeof query.setFocusable !== 'function') {
+      return;
+    }
+    query.setFocusable(focusable);
+  }
+
+  private bindQueryKeyboardGuard(query: BrowserWindow): void {
+    if (typeof query.webContents.on !== 'function') {
+      return;
+    }
+    query.webContents.on('before-input-event', (event) => {
+      if (!this.queryAcceptsKeyboard()) {
+        event.preventDefault();
+      }
+    });
+  }
+
+  private resignQueryKeyboard(options: { hide: boolean }): void {
+    const query = this.query;
+    if (!this.live(query)) {
+      return;
+    }
+    if (typeof query.blur === 'function') {
+      query.blur();
+    }
+    if (options.hide && query.isVisible()) {
+      query.hide();
+    }
+    this.setQueryFocusable(false);
   }
 
   private resignPaletteActivation(fox: BrowserWindow): void {
@@ -1582,7 +1717,7 @@ export class OverlayController {
     }
     this.pendingQueryBlur = false;
     if (this.phase !== 'FOX_IDLE' && this.isWindowVisible(this.query)) {
-      this.dismiss();
+      this.dismiss(true);
     }
   }
 
@@ -1687,7 +1822,7 @@ export class OverlayController {
       }
       event.preventDefault();
       if (win === this.query) {
-        this.dismiss();
+        this.dismiss(true);
       }
     });
   }

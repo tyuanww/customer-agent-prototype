@@ -80,6 +80,10 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('.dashboard-entry');
     expect(css).toContain('.deep-thinking-entry');
     expect(css).toContain('.capsule-session-entry');
+    expect(css).toContain('.capsule-tools-end');
+    expect(css).toContain('.smart-retrieval-label');
+    expect(css).toContain('.smart-toggle-thumb');
+    expect(css).toContain('margin-left: auto');
     expect(css).toContain('background: var(--fox-soft)');
     expect(tokens).toContain('--ink: #f5f5f7');
     expect(tokens).toContain('--muted: #b9b5c0');
@@ -93,7 +97,9 @@ describe('query capsule visual contract', () => {
     expect(css).not.toContain('background: rgba(255, 255, 255, 0.72)');
     expect(css).not.toContain('color: #6543aa');
     expect(css).toContain('color: var(--query-success-ink)');
-    expect(css).toContain(".deep-thinking-entry[aria-pressed='true'] span {\n  color: var(--query-rank-ink)");
+    expect(css).toContain('color-mix(in srgb, var(--muted) 32%, var(--glass-inner-solid))');
+    expect(css).toContain(".deep-thinking-entry[aria-checked='true'] .smart-toggle-thumb {\n  transform: translateX(16px)");
+    expect(css).toContain(".deep-thinking-entry[aria-checked='true'] .smart-toggle-thumb {\n  transform: translateX(16px);\n  border-color: color-mix(in srgb, var(--fox) 28%, #fff);\n  background: #fff;");
     expect(css).toMatch(/\.sop-entry-banner\s*\{[\s\S]*?border: 1px solid var\(--hairline\)/);
     expect(css).toMatch(/\.sop-entry-banner\s*\{[\s\S]*?background: var\(--glass-inner\)/);
     expect(css).not.toMatch(/\.sop-entry-banner\s*\{[^}]*--fox-soft/);
@@ -121,7 +127,7 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('--glass: var(--glass-solid)');
     expect(css).toContain('.capsule-field:focus-within,');
     expect(css).toContain('.dashboard-entry:hover,');
-    expect(css).toContain(".deep-thinking-entry[aria-pressed='true'],");
+    expect(css).toContain(".deep-thinking-entry[aria-checked='true'],");
     expect(css).toContain('.search-btn:hover,');
     expect(css).toContain('.copy-btn:hover:not(:disabled)');
     expect(css).toContain('.query-shell.is-opening .glass-shell {');
@@ -197,8 +203,16 @@ describe('query capsule visual contract', () => {
 });
 
 describe('login window visual contract', () => {
-  it('keeps capsule copy as 合成登录 and chooser copy as 飞书 / 账号', () => {
-    expect(queryApp).toContain('合成登录');
+  it('keeps capsule copy as 登录 and chooser copy as 飞书 / 账号', () => {
+    const capsule = readFileSync(path.join(root, 'src/renderer/features/search/QueryCapsule.tsx'), 'utf8');
+    const app = readFileSync(path.join(root, 'src/renderer/QueryApp.tsx'), 'utf8');
+    expect(app).toContain('SESSION_ENTRY_UNSIGNED_LABEL');
+    expect(app).not.toContain('合成登录');
+    expect(queryApp).toContain("SESSION_ENTRY_UNSIGNED_LABEL = '登录'");
+    expect(capsule).toContain('QUERY_PLACEHOLDER_UNSIGNED');
+    expect(capsule).not.toContain('合成登录');
+    expect(queryApp).toContain('登录后查询话术');
+    expect(queryApp).not.toContain('合成登录');
     expect(loginApp).toContain('飞书');
     expect(loginApp).toContain('账号');
     expect(loginApp).not.toMatch(/内部|外包/);

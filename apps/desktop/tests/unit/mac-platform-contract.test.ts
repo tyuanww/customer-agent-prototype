@@ -271,11 +271,15 @@ describe('macOS runtime contract', () => {
       expect(controller).toContain(`screen.removeListener('${eventName}'`);
     }
     expect(controller).toContain('DISPLAY_RECONCILE_DELAY_MS = 100');
-    expect(controller).toContain('dismiss(_restorePreviousApp = false)');
+    expect(controller).toContain('dismiss(restorePreviousApp = false)');
     expect(controller).toContain('resignPaletteActivation');
     expect(controller).toContain('fox.showInactive()');
-    expect(controller).not.toMatch(/app\.hide\(\)/);
-    expect(controller).not.toContain('restorePreviousAppOnIdle');
+    expect(controller).toContain('restorePreviousAppOnIdle');
+    expect(controller).toContain('otherChromeWindowsVisible');
+    expect(controller).toContain('isDevToolsWindow');
+    expect(controller).toContain('setFoxFocusable(false)');
+    expect(controller).toMatch(/app\.hide\(\)/);
+    expect(controller).toMatch(/generation !== this\.foxYieldGeneration/);
     expect(controller).not.toContain('macPanel: false');
     expect(controller).not.toMatch(/app\.focus\([^)]*steal/);
     expect(controller).toMatch(/if \(process\.platform !== 'darwin'\) \{\s*try \{\s*app\.focus\(\);/);

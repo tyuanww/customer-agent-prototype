@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BrowserWindow } from 'electron';
 
 const mocks = vi.hoisted(() => ({
   attachTestHarness: vi.fn(),
@@ -11,10 +10,12 @@ vi.mock('electron', () => ({
   app: {
     focus: vi.fn(),
     hide: vi.fn(),
+    show: vi.fn(),
+    isHidden: vi.fn(() => false),
     isReady: () => true,
   },
   BrowserWindow: {
-    getAllWindows: () => [],
+    getAllWindows: vi.fn(() => []),
   },
   globalShortcut: {
     register: vi.fn(),
@@ -51,11 +52,14 @@ vi.mock('../../src/main/overlay-test-harness', () => ({
 }));
 
 import { OverlayController } from '../../src/main/overlay-controller';
+import { app, BrowserWindow } from 'electron';
 import { IPC_CHANNELS } from '../../src/shared/contracts';
 import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-events';
 
 type FoxWindowFixture = BrowserWindow & {
   sent: OverlayCommand[];
+  showInactive: ReturnType<typeof vi.fn>;
+  setFocusable: ReturnType<typeof vi.fn>;
   acceptNativeBounds(
     bounds: { x: number; y: number; width: number; height: number },
     event: 'move' | 'moved',
@@ -78,6 +82,8 @@ function createFoxWindow(): FoxWindowFixture {
     setBounds: vi.fn((next: typeof bounds) => {
       bounds = { ...next };
     }),
+    showInactive: vi.fn(),
+    setFocusable: vi.fn(),
     webContents: {
       isDestroyed: () => false,
       send: vi.fn((channel: string, command: OverlayCommand) => {
@@ -216,5 +222,111 @@ describe('OverlayController fox drag settle transaction', () => {
     expect(settle.generation).toBe(7);
     controller.commitFoxDragSettle(settle.settleId);
     expect(controller.phase).toBe('SEARCH_INPUT');
+  });
+});
+
+describe('OverlayController yield previous-app focus', () => {
+  const controllers: OverlayController[] = [];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    for (const controller of controllers.splice(0)) {
+      controller.dispose();
+    }
+  });
+
+  function yieldPalette(controller: OverlayController, fox: FoxWindowFixture) {
+    const yieldOrKeepPalette = Reflect.get(controller, 'yieldOrKeepPalette') as (
+      win: BrowserWindow,
+    ) => void;
+    yieldOrKeepPalette.call(controller, fox);
+  }
+
+  it('on darwin hides then shows the fox on the next scheduler tick, not synchronously', () => {
+    vi.useFakeTimers();
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+    const { controller, fox } = controllerWithDockedFox();
+    controllers.push(controller);
+    Object.assign(controller as object, {
+      restorePreviousAppOnIdle: true,
+      chromeHandoffMode: null,
+      phase: 'FOX_IDLE',
+    });
+    fox.showInactive.mockClear();
+
+    yieldPalette(controller, fox);
+
+    expect(fox.setFocusable).toHaveBeenCalledWith(false);
+    expect(app.hide).toHaveBeenCalledOnce();
+    expect(fox.showInactive).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(34);
+    expect(fox.showInactive).toHaveBeenCalledOnce();
+  });
+
+  it('cancels the delayed fox show when search opens', () => {
+    vi.useFakeTimers();
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+    const { controller, fox } = controllerWithDockedFox();
+    controllers.push(controller);
+    Object.assign(controller as object, {
+      restorePreviousAppOnIdle: true,
+      chromeHandoffMode: null,
+      phase: 'FOX_IDLE',
+    });
+    fox.showInactive.mockClear();
+    yieldPalette(controller, fox);
+    const clearFoxYieldShow = Reflect.get(controller, 'clearFoxYieldShow') as () => void;
+    clearFoxYieldShow.call(controller);
+    vi.advanceTimersByTime(34);
+    expect(fox.showInactive).not.toHaveBeenCalled();
+  });
+
+  it('does not app.hide when another chrome window is visible', () => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+    const { controller, fox } = controllerWithDockedFox();
+    controllers.push(controller);
+    const extra = { isDestroyed: () => false, isVisible: () => true } as unknown as BrowserWindow;
+    vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([fox, extra]);
+    Object.assign(controller as object, {
+      restorePreviousAppOnIdle: true,
+      chromeHandoffMode: null,
+      phase: 'FOX_IDLE',
+    });
+    fox.showInactive.mockClear();
+    yieldPalette(controller, fox);
+    expect(app.hide).not.toHaveBeenCalled();
+    expect(fox.showInactive).toHaveBeenCalled();
+  });
+
+  it('still yields when the extra window is DevTools', () => {
+    vi.useFakeTimers();
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+    const { controller, fox } = controllerWithDockedFox();
+    controllers.push(controller);
+    const devtools = {
+      isDestroyed: () => false,
+      isVisible: () => true,
+      webContents: {
+        isDestroyed: () => false,
+        getType: () => 'remote',
+        getURL: () => 'devtools://devtools/bundled/devtools_app.html',
+      },
+    } as unknown as BrowserWindow;
+    vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([fox, devtools]);
+    Object.assign(controller as object, {
+      restorePreviousAppOnIdle: true,
+      chromeHandoffMode: null,
+      phase: 'FOX_IDLE',
+    });
+    fox.showInactive.mockClear();
+    yieldPalette(controller, fox);
+    expect(app.hide).toHaveBeenCalledOnce();
+    expect(fox.showInactive).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(34);
+    expect(fox.showInactive).toHaveBeenCalledOnce();
   });
 });

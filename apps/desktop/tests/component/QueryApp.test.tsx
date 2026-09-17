@@ -50,7 +50,22 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function activateQuery(anchor: 'left' | 'right' = 'left') {
+  act(() => {
+    for (const listener of commandListeners) {
+      listener({ type: 'activate-search', anchor, animate: false });
+    }
+  });
+}
+
+function activateQueryIfParked() {
+  if (screen.getByTestId('query-shell').getAttribute('data-parked') === 'true') {
+    activateQuery();
+  }
+}
+
 async function searchCleanser(user: ReturnType<typeof userEvent.setup>) {
+  activateQueryIfParked();
   await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
   await user.click(screen.getByTestId('search-button'));
   await screen.findByTestId('copy-button-1');
@@ -311,23 +326,26 @@ describe('QueryApp', () => {
       onSessionChanged: () => () => {},
     };
     render(<QueryApp />);
-    expect(await screen.findByTestId('session-notice-unsigned')).toHaveTextContent('请先合成登录');
+    expect(screen.getByTestId('question-input')).toHaveAttribute('placeholder', '登录后查询话术');
+    expect(screen.queryByTestId('session-notice-unsigned')).not.toBeInTheDocument();
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '澄芽氨基酸洁面怎么用' } });
     fireEvent.click(screen.getByTestId('search-button'));
     expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
     await screen.findByRole('button', { name: 'agent · 退出' });
-    expect(screen.getByTestId('session-notice-success')).toHaveTextContent('合成登录成功，可以直接查询');
-    expect(screen.getByTestId('session-notice-success')).toHaveClass('is-success');
+    expect(screen.getByTestId('question-input')).toHaveAttribute('placeholder', '输入或粘贴客户问题，回车查询');
+    expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
     expect(document.body.textContent).not.toContain('access_token');
     fireEvent.click(screen.getByRole('button', { name: 'agent · 退出' }));
-    expect(await screen.findByTestId('session-notice-unsigned')).toHaveTextContent('已退出，请先登录');
+    expect(await screen.findByRole('button', { name: '登录' })).toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).toHaveAttribute('placeholder', '登录后查询话术');
     expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
-    expect(await screen.findByTestId('session-notice-success')).toHaveTextContent('合成登录成功，可以直接查询');
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+    expect(await screen.findByRole('button', { name: 'agent · 退出' })).toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).toHaveAttribute('placeholder', '输入或粘贴客户问题，回车查询');
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
   });
 
@@ -362,8 +380,8 @@ describe('QueryApp', () => {
     act(() => listener({ ...signedOut, sessionEpoch: 9 }));
     expect(await screen.findByTestId('session-notice-expired')).toHaveTextContent('登录已失效，请重新登录');
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '合成登录' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
+    expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
     expect(await screen.findByTestId('session-notice-failed')).toHaveTextContent('服务暂不可用，请重试');
     expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
@@ -394,12 +412,12 @@ describe('QueryApp', () => {
     let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
     window.customerAgent!.product = { sessionStatus: () => pending.promise, login: vi.fn().mockResolvedValue(signedIn), logout: vi.fn().mockResolvedValue(signedOut), onSessionChanged: handler => { listener = handler; return () => {}; } };
     render(<QueryApp />);
-    fireEvent.click(screen.getByRole('button', { name: '合成登录' }));
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
     await screen.findByRole('button', { name: 'agent · 退出' });
     await act(async () => { pending.resolve(signedOut); });
     act(() => listener(signedOut));
     expect(screen.getByRole('button', { name: 'agent · 退出' })).toBeInTheDocument();
-    expect(screen.queryByText('请先合成登录')).not.toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).not.toHaveAttribute('placeholder', '登录后查询话术');
   });
 
   afterEach(() => {
@@ -601,6 +619,7 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('query-fox-focus-ring')).toBeInTheDocument();
     await user.click(fox);
     expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(dismiss).toHaveBeenCalledWith(true);
 
     dismiss.mockClear();
     fireEvent.pointerDown(fox, {
@@ -666,13 +685,18 @@ describe('QueryApp', () => {
     const toggle = await screen.findByTestId('deep-thinking-toggle');
     reportUiPhase.mockClear();
 
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(toggle).toHaveTextContent('ON');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(toggle).not.toHaveAttribute('aria-pressed');
+    expect(toggle).toHaveAttribute('role', 'switch');
+    expect(toggle).not.toHaveTextContent('ON');
+    expect(toggle).not.toHaveTextContent('OFF');
+    expect(toggle.querySelector('.smart-toggle-thumb')).not.toBeNull();
+    expect(screen.getByText('智能检索')).toBeInTheDocument();
     expect(screen.getByTestId('question-input')).toBeInTheDocument();
 
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(toggle).toHaveTextContent('OFF');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(toggle).not.toHaveTextContent('OFF');
     expect(screen.getByTestId('question-input')).toBeInTheDocument();
     expect(window.customerAgent?.productSearch?.setRetrievalPreference).toHaveBeenCalledWith({ smartEnabled: false });
     expect(reportUiPhase).not.toHaveBeenCalled();
@@ -686,7 +710,7 @@ describe('QueryApp', () => {
     fireEvent.click(screen.getByTestId('search-button'));
     await screen.findByTestId('copy-button-1');
     expect(screen.queryByText('DEMO · 合成数据')).not.toBeInTheDocument();
-    expect(screen.getByTestId('env-badges')).toHaveTextContent('DEMO');
+    expect(screen.queryByTestId('env-badges')).not.toBeInTheDocument();
     expect(f.search).toHaveBeenCalled();
   });
 
@@ -698,11 +722,11 @@ describe('QueryApp', () => {
     });
     render(<QueryApp />);
     const toggle = await screen.findByTestId('deep-thinking-toggle');
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
-    expect(toggle).toHaveTextContent('OFF');
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'));
+    expect(toggle).not.toHaveTextContent('OFF');
     fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'));
   });
 
   it('cancels an in-flight search when smart retrieval is toggled', async () => {
@@ -743,6 +767,7 @@ describe('QueryApp', () => {
   it('keeps the same fixture ranking after toggling smart retrieval', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
     await user.click(screen.getByTestId('deep-thinking-toggle'));
     await user.click(screen.getByTestId('deep-thinking-toggle'));
@@ -762,6 +787,7 @@ describe('QueryApp', () => {
     render(<QueryApp />);
     const fox = screen.getByTestId('capsule-fox');
 
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
     await user.click(screen.getByTestId('search-button'));
     expect(fox).toHaveAttribute('data-fox-state', 'SEARCHING');
@@ -777,6 +803,7 @@ describe('QueryApp', () => {
         listener({ type: 'activate-search', anchor: 'left', animate: true });
       }
     });
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '今天中午虚构星球食堂有没有排骨汤');
     await user.click(screen.getByTestId('search-button'));
     await screen.findByTestId('no-hit');
@@ -785,6 +812,7 @@ describe('QueryApp', () => {
 
   it('does not submit while a Chinese IME composition is active', async () => {
     render(<QueryApp />);
+    activateQueryIfParked();
     const input = screen.getByTestId('question-input');
     fireEvent.change(input, { target: { value: '澄' } });
     fireEvent.compositionStart(input);
@@ -857,6 +885,7 @@ describe('QueryApp', () => {
   it('shows the allergy SOP banner between the heading and cards for the gold query', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-1')).toBeVisible();
@@ -875,6 +904,7 @@ describe('QueryApp', () => {
   it('does not show the SOP button for usage-plus-allergy or empty results', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '怎么用过敏');
     await user.click(screen.getByTestId('search-button'));
     await waitFor(() => {
@@ -890,6 +920,7 @@ describe('QueryApp', () => {
   it('keeps 少发/长痘 on aftersale Top 3 without a SOP button', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '月白防晒长痘了');
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-1')).toBeVisible();
@@ -899,6 +930,7 @@ describe('QueryApp', () => {
   it('renders the original synthetic aftersales wording for a natural category question', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '面膜过敏怎么办');
     await user.click(screen.getByTestId('search-button'));
 
@@ -932,6 +964,7 @@ describe('QueryApp', () => {
   it('shows searching feedback before revealing results', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
     await user.click(screen.getByTestId('search-button'));
 
@@ -1042,6 +1075,7 @@ describe('QueryApp', () => {
   it('ignores a number shortcut when that result rank does not exist', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '月白防晒闷痘吗');
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-2')).toBeVisible();
@@ -1077,6 +1111,7 @@ describe('QueryApp', () => {
   it('never surfaces expired campaign copy in the result list', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '青禾会员日积分怎么兑');
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('no-hit')).toHaveTextContent('没找到可用话术');
@@ -1121,6 +1156,7 @@ describe('QueryApp', () => {
   it('records a local inaccuracy report for high-risk scripts without claiming it was processed', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '面膜过敏怎么办');
     await user.click(screen.getByTestId('search-button'));
 
@@ -1207,8 +1243,39 @@ describe('QueryApp', () => {
     await user.click(screen.getByTestId('copy-button-1'));
     await screen.findByTestId('toast');
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(dismiss).toHaveBeenCalled();
+    expect(dismiss).toHaveBeenCalledWith(true);
     expect(screen.queryByText('已发送')).not.toBeInTheDocument();
+  });
+
+  it('does not accept typed digits after collapse until search is activated again', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    activateQuery();
+    await user.type(screen.getByTestId('question-input'), '123');
+    expect(screen.getByTestId('question-input')).toHaveValue('123');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'collapse',
+          anchor: 'left',
+          dockEdge: 'none',
+          animate: false,
+          handoffCenterX: 44,
+          handoffCenterY: 44,
+        });
+      }
+    });
+
+    const input = screen.getByTestId('question-input');
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    expect(input).toHaveValue('');
+    expect(input).toHaveAttribute('readonly');
+    fireEvent.keyDown(window, { key: '4', code: 'Digit4' });
+    fireEvent.keyDown(input, { key: '5', code: 'Digit5' });
+    fireEvent.keyDown(input, { key: '6', code: 'Digit6' });
+    expect(input).toHaveValue('');
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
   });
 
   it('clears customer text and transient results when the overlay collapses', async () => {
@@ -1363,9 +1430,8 @@ describe('QueryApp', () => {
       render(<QueryApp />);
 
       await waitFor(() => expect(getWindowContext).toHaveBeenCalledTimes(1));
-      await waitFor(() => {
-        expect(document.getElementById('query-guidance')).toHaveTextContent(shortcutLabel);
-      });
+      expect(document.getElementById('query-guidance')).toBeNull();
+      expect(screen.queryByText(shortcutLabel)).not.toBeInTheDocument();
     },
   );
 
@@ -1413,6 +1479,7 @@ describe('QueryApp', () => {
       const user = userEvent.setup();
       render(<QueryApp />);
       expect(await screen.findByTestId('shortcut-fallback')).toBeVisible();
+      activateQueryIfParked();
       await user.type(screen.getByTestId('question-input'), '今天中午虚构星球食堂有没有排骨汤');
       await user.click(screen.getByTestId('search-button'));
       expect(await screen.findByTestId('no-hit')).toBeVisible();
@@ -1505,6 +1572,127 @@ describe('QueryApp', () => {
     }
   });
 
+  it('starts login from the dashboard entry when unsigned, then opens the dashboard', async () => {
+    const user = userEvent.setup();
+    const signedOut = {
+      ok: true as const,
+      enabled: true,
+      signedIn: false,
+      sessionEpoch: 1,
+      userId: null,
+      role: null,
+      authMode: null,
+      expiresAt: null,
+    };
+    const signedIn = {
+      ...signedOut,
+      signedIn: true,
+      sessionEpoch: 2,
+      userId: 'usr_synthetic_agent',
+      role: 'agent' as const,
+      authMode: 'mock' as const,
+      expiresAt: new Date(Date.now() + 900_000).toISOString(),
+    };
+    const pending = deferred<typeof signedIn>();
+    const login = vi.fn().mockReturnValue(pending.promise);
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedOut),
+      login,
+      logout: vi.fn(),
+      onSessionChanged: () => () => {},
+    };
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: '登录' });
+
+    await user.click(screen.getByTestId('open-dashboard'));
+    expect(login).toHaveBeenCalledOnce();
+    expect(openDashboard).not.toHaveBeenCalled();
+    await act(async () => pending.resolve(signedIn));
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    await waitFor(() => expect(openDashboard).toHaveBeenCalledTimes(1));
+  });
+
+  it('opens the dashboard after an in-flight login when the dashboard entry is clicked second', async () => {
+    const user = userEvent.setup();
+    const signedOut = {
+      ok: true as const,
+      enabled: true,
+      signedIn: false,
+      sessionEpoch: 1,
+      userId: null,
+      role: null,
+      authMode: null,
+      expiresAt: null,
+    };
+    const signedIn = {
+      ...signedOut,
+      signedIn: true,
+      sessionEpoch: 2,
+      userId: 'usr_synthetic_agent',
+      role: 'agent' as const,
+      authMode: 'mock' as const,
+      expiresAt: new Date(Date.now() + 900_000).toISOString(),
+    };
+    const pending = deferred<typeof signedIn>();
+    const login = vi.fn().mockReturnValue(pending.promise);
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedOut),
+      login,
+      logout: vi.fn(),
+      onSessionChanged: () => () => {},
+    };
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: '登录' });
+
+    await user.click(screen.getByRole('button', { name: '登录' }));
+    expect(login).toHaveBeenCalledOnce();
+    await user.click(screen.getByTestId('open-dashboard'));
+    expect(login).toHaveBeenCalledOnce();
+    expect(openDashboard).not.toHaveBeenCalled();
+    await act(async () => pending.resolve(signedIn));
+    await waitFor(() => expect(openDashboard).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not open the dashboard when login from the dashboard entry fails', async () => {
+    const user = userEvent.setup();
+    const signedOut = {
+      ok: true as const,
+      enabled: true,
+      signedIn: false,
+      sessionEpoch: 1,
+      userId: null,
+      role: null,
+      authMode: null,
+      expiresAt: null,
+    };
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedOut),
+      login: vi.fn().mockRejectedValue(new Error('login window failed')),
+      logout: vi.fn(),
+      onSessionChanged: () => () => {},
+    };
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: '登录' });
+
+    await user.click(screen.getByTestId('open-dashboard'));
+    await waitFor(() => expect(window.customerAgent?.product?.login).toHaveBeenCalledOnce());
+    expect(openDashboard).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
+  });
+
+  it('opens the dashboard without logging in again when already signed in', async () => {
+    const user = userEvent.setup();
+    connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    const login = window.customerAgent?.product?.login as ReturnType<typeof vi.fn>;
+    login.mockClear();
+
+    await user.click(screen.getByTestId('open-dashboard'));
+    expect(login).not.toHaveBeenCalled();
+    expect(openDashboard).toHaveBeenCalledTimes(1);
+  });
+
   it('offers a secondary dashboard entry that does not search', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
@@ -1583,6 +1771,7 @@ describe('QueryApp', () => {
     const user = userEvent.setup();
     render(<QueryApp />);
     openQuerySession(4);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
     await user.click(screen.getByTestId('search-button'));
     await screen.findByTestId('script-card-1');
@@ -1607,6 +1796,7 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('query-resize-grip')).not.toHaveAttribute('aria-valuenow', '620');
 
     openQuerySession(9);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
     await user.click(screen.getByTestId('search-button'));
     await screen.findByTestId('script-card-1');
@@ -1735,6 +1925,7 @@ describe('QueryApp', () => {
     const user = userEvent.setup();
     render(<QueryApp />);
     openQuerySession(4);
+    activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
     await user.click(screen.getByTestId('search-button'));
     await screen.findByTestId('script-card-3');

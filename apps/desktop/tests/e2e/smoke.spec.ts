@@ -365,9 +365,8 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       );
     }).toBe(true);
 
-    await expect(query.getByTestId('env-badges')).toContainText('DEMO');
-    await expect(query.getByTestId('env-badges')).toContainText('MOCK AUTH');
-    await expect(query.getByTestId('env-badges')).not.toContainText('SYNTHETIC DATA');
+    await expect(query.getByTestId('env-badges')).toHaveCount(0);
+    await expect(query.getByTestId('question-input')).toHaveAttribute('placeholder', '登录后查询话术');
     await expect(query.getByTestId('question-input')).toBeFocused();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
 

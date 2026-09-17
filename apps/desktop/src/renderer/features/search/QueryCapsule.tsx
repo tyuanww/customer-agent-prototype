@@ -2,7 +2,12 @@ import type { Ref } from 'react';
 import { MAX_QUERY_CHARS } from '@shared/contracts';
 import { FoxHead } from '../../components/FoxHead';
 import { useWindowDrag } from '../../lib/use-window-drag';
-import type { QueryFoxVisualState, SessionNotice } from './query-view';
+import {
+  QUERY_PLACEHOLDER_SIGNED_IN,
+  QUERY_PLACEHOLDER_UNSIGNED,
+  type QueryFoxVisualState,
+  type SessionNotice,
+} from './query-view';
 
 type QueryCapsuleProps = {
   productControl?: React.ReactNode;
@@ -14,9 +19,9 @@ type QueryCapsuleProps = {
   inputRef: Ref<HTMLInputElement>;
   invalidMessage: string;
   sessionNotice: SessionNotice | null;
-  shortcutFailed: boolean;
-  shortcutLabel: string;
   searching: boolean;
+  signedIn: boolean;
+  inputIdle: boolean;
   onCancelScheduledResultFocus: () => void;
   onCancelScheduledInputFocus: () => void;
   onChangeQuery: (value: string) => void;
@@ -38,9 +43,9 @@ export function QueryCapsule({
   inputRef,
   invalidMessage,
   sessionNotice,
-  shortcutFailed,
-  shortcutLabel,
   searching,
+  signedIn,
+  inputIdle,
   onCancelScheduledResultFocus,
   onCancelScheduledInputFocus,
   onChangeQuery,
@@ -77,10 +82,12 @@ export function QueryCapsule({
                 value={query}
                 maxLength={MAX_QUERY_CHARS}
                 autoComplete="off"
-                aria-describedby="query-guidance"
+                aria-describedby={invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired')) ? 'query-guidance' : undefined}
                 aria-invalid={invalidMessage ? true : undefined}
                 spellCheck={false}
-                placeholder="输入或粘贴客户问题，回车查询"
+                readOnly={inputIdle}
+                tabIndex={inputIdle ? -1 : 0}
+                placeholder={signedIn ? QUERY_PLACEHOLDER_SIGNED_IN : QUERY_PLACEHOLDER_UNSIGNED}
                 onPointerDown={onCancelScheduledResultFocus}
                 onFocus={onCancelScheduledResultFocus}
                 onBeforeInput={onCancelScheduledInputFocus}
@@ -100,30 +107,27 @@ export function QueryCapsule({
               {deepThinkingDescription}
             </span>
             <div className="capsule-meta">
+              {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired')) ? (
               <p
                 id="query-guidance"
                 className="capsule-hint"
-                aria-live={invalidMessage || sessionNotice ? 'polite' : undefined}
+                aria-live="polite"
               >
                 {invalidMessage ? (
                   <span className="validation-error" data-testid="validation-error">
                     {invalidMessage}
                   </span>
-                ) : sessionNotice ? (
+                ) : (
                   <span
-                    className={`session-notice is-${sessionNotice.kind}`}
-                    data-testid={`session-notice-${sessionNotice.kind}`}
+                    className={`session-notice is-${sessionNotice!.kind}`}
+                    data-testid={`session-notice-${sessionNotice!.kind}`}
                     role="status"
                   >
-                    {sessionNotice.text}
-                  </span>
-                ) : (
-                  <span>
-                    Enter 查询 · Esc 收起 · 只复制不代发
-                    {shortcutFailed ? '' : ` · ${shortcutLabel}`}
+                    {sessionNotice!.text}
                   </span>
                 )}
               </p>
+              ) : null}
               <div className="capsule-tools">
                 {productControl}
                 <button
@@ -145,21 +149,21 @@ export function QueryCapsule({
                     <path d="M10 10.25h4.5M10 13.25h3" />
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  className="deep-thinking-entry"
-                  data-testid="deep-thinking-toggle"
-                  aria-label={`智能检索当前${smartEnabled ? '开启' : '关闭'}，点击切换。默认开启。`}
-                  aria-pressed={smartEnabled}
-                  aria-describedby="deep-thinking-description"
-                  title="智能检索：MiniMax 规划检索式并重排已有话术，不生成正文"
-                  onClick={onToggleSmartRetrieval}
-                >
-                  智能检索 <span>{smartEnabled ? 'ON' : 'OFF'}</span>
-                </button>
-                <div className="env-badges" data-testid="env-badges">
-                  <span className="env-badge">DEMO</span>
-                  <span className="env-badge">MOCK AUTH</span>
+                <div className="capsule-tools-end">
+                  <span className="smart-retrieval-label" aria-hidden="true">智能检索</span>
+                  <button
+                    type="button"
+                    className="deep-thinking-entry"
+                    data-testid="deep-thinking-toggle"
+                    role="switch"
+                    aria-label={`智能检索当前${smartEnabled ? '开启' : '关闭'}，点击切换。默认开启。`}
+                    aria-checked={smartEnabled}
+                    aria-describedby="deep-thinking-description"
+                    title="智能检索：MiniMax 规划检索式并重排已有话术，不生成正文"
+                    onClick={onToggleSmartRetrieval}
+                  >
+                    <span className="smart-toggle-thumb" aria-hidden="true" />
+                  </button>
                 </div>
               </div>
             </div>

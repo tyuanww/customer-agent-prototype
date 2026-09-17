@@ -149,6 +149,32 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Depends on:** P3 或 P4
 **Status:** OPEN
 
+### Overlay · Windows 收起后交还前台输入框
+
+**What:** Windows 上收起查询胶囊后，把键盘交回前一个应用的输入框（千牛 / 编辑器），不必再点窗口。
+
+**Why:** 当前 `app.hide()` 只在 darwin。Windows Query 是普通置顶窗，收起后前台应用通常不会自动拿回光标。办公机 Windows 验收会踩同一坑。
+
+**Context:** `apps/desktop/src/main/overlay-controller.ts` 的 `yieldOrKeepPalette`。macOS 路径是有条件 `app.hide()` + 闲置狐狸 `setFocusable(false)`。Windows 可参考：先 `query.hide()` / `minimize`，再 `hide`，让上一窗口提前。不要 `app.focus({ steal: true })`。先等 macOS 交还落地。
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** macOS 收起交还焦点先在 `feat/overlay-window` 落地
+**Status:** OPEN
+
+### Overlay · NSPanel 隐身属性（becomesKeyOnlyIfNeeded）
+
+**What:** 在 Electron `type: 'panel'` 之上补 AppKit 面板属性（`becomesKeyOnlyIfNeeded`、必要时 `_setPreventsActivation`），让点击浮窗按钮也不把本 App 推到前台。
+
+**Why:** Electron 的 panel 只加了 NonactivatingPanel 掩码，点搜索框仍会成为 key window；收起后闲置狐狸头也可能抢走键盘。真正 Spotlight/Alfred 级「前台应用一直保持 key」需要原生属性。
+
+**Context:** 不要在本轮 overlay 交还焦点里做。本轮只用 `setFocusable(false)` + 有条件 `app.hide()`。原生模块会牵动公证、打包和 Electron 版本。参考：philz.blog NSPanel notes；不要为这一条引入新 native addon，除非产品明确要 IME 级隐身。
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** 本轮 macOS 交还先用 Electron 公共 API 验证是否够用
+**Status:** OPEN
+
 ## Completed
 
 ### Login residual invalid banner

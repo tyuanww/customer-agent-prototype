@@ -124,11 +124,15 @@ export type SessionNotice = { kind: SessionNoticeKind; text: string };
 export type SessionNoticeSource = 'status' | 'login' | 'logout';
 
 export const SESSION_NOTICE_TEXT = {
-  unsigned: '请先合成登录',
+  unsigned: '请先登录',
   loggedOut: '已退出，请先登录',
-  success: '合成登录成功，可以直接查询',
+  success: '登录成功，可以直接查询',
   expired: '登录已失效，请重新登录',
 } as const;
+
+export const QUERY_PLACEHOLDER_UNSIGNED = '登录后查询话术';
+export const QUERY_PLACEHOLDER_SIGNED_IN = '输入或粘贴客户问题，回车查询';
+export const SESSION_ENTRY_UNSIGNED_LABEL = '登录';
 
 export function sessionNoticeForResult(input: {
   value: ProductSessionResult;
