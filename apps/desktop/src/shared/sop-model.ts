@@ -23,6 +23,7 @@ export type SopNode = Readonly<{
   scriptId?: string;
   answerText?: string;
   scopeLabel?: string;
+  prompt?: string;
   riskLevel?: 'low' | 'medium' | 'high';
   internalNote?: string;
   internalTask?: string;
@@ -142,6 +143,12 @@ export function validateSopTree(tree: SopTree): void {
       if (!isNonEmptyString(node.scriptId) || !isNonEmptyString(node.answerText)) {
         throw new SopTreeValidationError('COPYABLE_SCRIPT', `copyable node ${node.id} requires scriptId`);
       }
+    }
+    if (node.kind === 'decision' && !isNonEmptyString(node.prompt)) {
+      throw new SopTreeValidationError('INVALID', `decision node ${node.id} requires prompt`);
+    }
+    if (node.prompt !== undefined && !isNonEmptyString(node.prompt)) {
+      throw new SopTreeValidationError('INVALID', `SOP node ${node.id} prompt is invalid`);
     }
     if (node.voucher) {
       if (node.kind !== 'copyable') {
@@ -264,6 +271,7 @@ export function projectSop(input: {
     shellState,
     nodeKind: shellState === 'opening' ? 'opening' : (node?.kind ?? 'internal'),
     highRiskBanner: highRiskBannerFor(node, shellState),
+    prompt: shellState === 'ready' && node?.prompt ? node.prompt : '',
     internalNote: privileged ? (node?.internalNote ?? null) : null,
     internalTask: privileged ? (node?.internalTask ?? null) : null,
     script: shellState === 'ready' ? script : null,

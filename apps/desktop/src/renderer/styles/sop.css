@@ -109,6 +109,13 @@ html[data-role='sop'] #root {
   font-size: 12px;
 }
 
+.sop-prompt {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .sop-todo {
   margin: 0;
   color: var(--muted);

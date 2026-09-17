@@ -70,12 +70,20 @@ describe('SopApp injected projection', () => {
     expect(screen.getByTestId('sop-edge-has-photo')).toHaveTextContent('已给照片');
     expect(screen.getByTestId('sop-step')).toHaveTextContent('步骤 1');
     expect(screen.getByTestId('sop-step').textContent).not.toMatch(/\//);
+    expect(screen.getByTestId('sop-chrome')).toHaveTextContent('过敏流程');
+    expect(screen.getByTestId('sop-chrome')).not.toHaveTextContent('环节');
+    expect(screen.queryByTestId('sop-prompt')).not.toBeInTheDocument();
 
     rerender(<SopApp projection={projectionFor(['has-photo'])} />);
     expect(screen.queryByTestId('script-card-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sop-high-risk')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sop-prompt')).toHaveTextContent('先判断不适程度，再选路径。');
     expect(screen.getByTestId('sop-edge-mild')).toHaveTextContent('轻微');
     expect(screen.getByTestId('sop-edge-severe')).toHaveTextContent('严重');
+
+    rerender(<SopApp projection={projectionFor(['has-photo', 'severe'])} />);
+    expect(screen.getByTestId('sop-prompt')).toHaveTextContent('严重路径需要话术师复核');
+    expect(screen.queryByTestId('sop-internal-note')).not.toBeInTheDocument();
 
     rerender(<SopApp projection={projectionFor(['has-photo', 'severe'], 'coach')} />);
     expect(screen.queryByTestId('script-card-1')).not.toBeInTheDocument();

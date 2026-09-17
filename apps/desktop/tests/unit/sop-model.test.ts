@@ -43,8 +43,8 @@ describe('SOP tree validator', () => {
     expect(() => validateSopTree(tree({
       startNodeId: 'a',
       nodes: [
-        { id: 'a', kind: 'decision', edges: [{ id: 'to-b', label: '去B', targetId: 'b' }] },
-        { id: 'b', kind: 'decision', edges: [{ id: 'to-a', label: '去A', targetId: 'a' }] },
+        { id: 'a', kind: 'decision', prompt: '去B？', edges: [{ id: 'to-b', label: '去B', targetId: 'b' }] },
+        { id: 'b', kind: 'decision', prompt: '去A？', edges: [{ id: 'to-a', label: '去A', targetId: 'a' }] },
       ],
     }))).toThrow(SopTreeValidationError);
   });
@@ -54,6 +54,13 @@ describe('SOP tree validator', () => {
       startNodeId: 'a',
       nodes: [{ id: 'a', kind: 'copyable', answerText: '正文', edges: [] }],
     }))).toThrow(/scriptId/);
+  });
+
+  it('rejects decision nodes without a prompt', () => {
+    expect(() => validateSopTree(tree({
+      startNodeId: 'a',
+      nodes: [{ id: 'a', kind: 'decision', edges: [{ id: 'to-b', label: '去B', targetId: 'b' }] }, { id: 'b', kind: 'internal', edges: [] }],
+    }))).toThrow(/prompt/);
   });
 
   it('rejects voucher nodes with payout extras', () => {
@@ -77,6 +84,7 @@ describe('SOP tree validator', () => {
         {
           id: 'a',
           kind: 'decision',
+          prompt: '选一条',
           edges: [
             { id: 'e1', label: '1', targetId: 'b' },
             { id: 'e2', label: '2', targetId: 'b' },
@@ -107,6 +115,7 @@ describe('SOP projection', () => {
     expect(projection.internalTask).toBeNull();
     expect(projection.unpublished).toBe(false);
     expect(projection.highRiskBanner).toBe(SOP_HIGH_RISK_BANNER);
+    expect(projection.prompt).toBe('');
   });
 
   it('keeps the voucher constraint banner off decision, mild, and internal steps', () => {
@@ -121,6 +130,12 @@ describe('SOP projection', () => {
       role: 'agent',
       sessionId: 1,
     }).highRiskBanner).toBe('');
+    expect(projectSop({
+      tree: ALLERGY_SOP_TREE,
+      progress: severity,
+      role: 'agent',
+      sessionId: 1,
+    }).prompt).toBe('先判断不适程度，再选路径。');
     expect(projectSop({
       tree: ALLERGY_SOP_TREE,
       progress: mild,
