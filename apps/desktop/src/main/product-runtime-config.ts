@@ -1,4 +1,4 @@
-import { readFileSync, lstatSync, type Stats } from 'node:fs';
+import { readFileSync, lstatSync, writeFileSync, type Stats } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -21,12 +21,19 @@ import path from 'node:path';
  *
  * A missing or invalid file is a startup error: the packaged client must not
  * treat absence as offline S0, and it must not consult the environment as a
- * substitute. Offline S0 is an explicit file `{ "mode": "synthetic-offline" }`
- * with no origins. Unpackaged development without both origins still stays S0.
+ * substitute. Offline S0 is an explicit `{ "mode": "synthetic-offline" }` file.
+ * Packaged builds may copy that exact document from extraResources into
+ * userData when userData has no profile yet. That copy is the package opting
+ * into offline; it is not "missing file means S0". A package without the
+ * bundled document still fail-closes on a missing userData file. Existing
+ * synthetic-local files are never overwritten. Unpackaged development without
+ * both origins still stays S0.
  */
 export const SYNTHETIC_STACK_PROFILE_FILE = 'synthetic-stack.json';
+export const BUNDLED_OFFLINE_PROFILE_FILE = 'synthetic-offline.json';
 const MODE = 'synthetic-local';
 const OFFLINE_MODE = 'synthetic-offline';
+export const SYNTHETIC_OFFLINE_PROFILE_JSON = '{"mode":"synthetic-offline"}';
 const MAX_BYTES = 4_096;
 const MISSING_PROFILE_ERROR =
   'Packaged desktop requires synthetic-stack.json under userData';
@@ -137,6 +144,57 @@ export function readPackagedProductProfile(userDataDirectory: string): PackagedP
   return result.profile;
 }
 
+export function bundledOfflineProfilePath(resourcesPath: string): string {
+  return path.join(resourcesPath, BUNDLED_OFFLINE_PROFILE_FILE);
+}
+
+export function isExactOfflineProfileContents(contents: string): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(contents);
+  } catch {
+    return false;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  const record = parsed as Record<string, unknown>;
+  return Object.keys(record).length === 1 && record.mode === OFFLINE_MODE;
+}
+
+export type OfflineSeedResult = 'seeded' | 'present' | 'skipped';
+
+/**
+ * Copy the bundled offline document into userData only when no profile exists.
+ * Never overwrites synthetic-local or an invalid file the operator already has.
+ */
+export function seedPackagedOfflineProfile(options: {
+  userDataDirectory: string;
+  bundledOfflinePath: string | undefined;
+}): OfflineSeedResult {
+  const destination = path.join(options.userDataDirectory, SYNTHETIC_STACK_PROFILE_FILE);
+  try {
+    lstatSync(destination);
+    return 'present';
+  } catch (error: unknown) {
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    if (code !== 'ENOENT') return 'skipped';
+  }
+  if (!options.bundledOfflinePath) return 'skipped';
+  let bundled: string;
+  try {
+    bundled = readFileSync(options.bundledOfflinePath, 'utf8');
+  } catch {
+    return 'skipped';
+  }
+  if (!isExactOfflineProfileContents(bundled)) return 'skipped';
+  try {
+    writeFileSync(destination, SYNTHETIC_OFFLINE_PROFILE_JSON, { flag: 'wx' });
+    return 'seeded';
+  } catch (error: unknown) {
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    return code === 'EEXIST' ? 'present' : 'skipped';
+  }
+}
+
 /**
  * Choose the product origin source. Packaged builds read only the userData
  * file and ignore `environment`; unpackaged builds read loopback env vars.
@@ -145,8 +203,12 @@ export function resolveProductProfile(
   packaged: boolean,
   userDataDirectory: string,
   environment: NodeJS.ProcessEnv,
+  bundledOfflinePath?: string,
 ): PackagedProductProfile | undefined {
-  if (packaged) return readPackagedProductProfile(userDataDirectory);
+  if (packaged) {
+    seedPackagedOfflineProfile({ userDataDirectory, bundledOfflinePath });
+    return readPackagedProductProfile(userDataDirectory);
+  }
   return developmentProductProfile(environment);
 }
 

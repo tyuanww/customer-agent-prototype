@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   PackagedProfileError,
+  SYNTHETIC_OFFLINE_PROFILE_JSON,
   SYNTHETIC_STACK_PROFILE_FILE,
   developmentProductProfile,
   readPackagedProductProfile,
   resolveProductProfile,
+  seedPackagedOfflineProfile,
 } from '../../src/main/product-runtime-config';
 
 const directories: string[] = [];
@@ -95,6 +97,46 @@ describe('packaged synthetic product profile', () => {
     write(directory, { mode: 'synthetic-offline', extra: true });
     expect(() => readPackagedProductProfile(directory)).toThrow(
       expect.objectContaining({ kind: 'invalid' }),
+    );
+  });
+
+  it('seeds userData from an exact bundled offline document and never overwrites an existing profile', () => {
+    const directory = userDataDirectory();
+    const bundle = path.join(directory, 'bundle');
+    mkdirSync(bundle);
+    const bundled = path.join(bundle, 'synthetic-offline.json');
+    writeFileSync(bundled, '{\n  "mode": "synthetic-offline"\n}\n');
+
+    expect(seedPackagedOfflineProfile({
+      userDataDirectory: directory,
+      bundledOfflinePath: bundled,
+    })).toBe('seeded');
+    expect(readFileSync(path.join(directory, SYNTHETIC_STACK_PROFILE_FILE), 'utf8')).toBe(
+      SYNTHETIC_OFFLINE_PROFILE_JSON,
+    );
+    expect(resolveProductProfile(true, directory, LOOPBACK_ENV, bundled)).toBeUndefined();
+
+    write(directory, STACK_PROFILE);
+    expect(seedPackagedOfflineProfile({
+      userDataDirectory: directory,
+      bundledOfflinePath: bundled,
+    })).toBe('present');
+    expect(JSON.parse(readFileSync(path.join(directory, SYNTHETIC_STACK_PROFILE_FILE), 'utf8'))).toEqual(
+      STACK_PROFILE,
+    );
+
+    const empty = userDataDirectory();
+    expect(() => resolveProductProfile(true, empty, LOOPBACK_ENV)).toThrow(
+      expect.objectContaining({ kind: 'missing' }),
+    );
+    writeFileSync(bundled, JSON.stringify({ mode: 'synthetic-offline', extra: true }));
+    const poisoned = userDataDirectory();
+    expect(seedPackagedOfflineProfile({
+      userDataDirectory: poisoned,
+      bundledOfflinePath: bundled,
+    })).toBe('skipped');
+    expect(() => readPackagedProductProfile(poisoned)).toThrow(
+      expect.objectContaining({ kind: 'missing' }),
     );
   });
 
@@ -206,7 +248,8 @@ describe('packaged synthetic product profile', () => {
     expect(main.indexOf("app.setName('客服话术浮窗 Demo')")).toBeLessThan(
       main.indexOf('app.requestSingleInstanceLock()'),
     );
-    expect(main).toContain('resolveProductProfile(app.isPackaged, userDataDirectory, process.env)');
+    expect(main).toContain('resolveProductProfile(');
+    expect(main).toContain('bundledOfflineProfilePath(process.resourcesPath)');
     expect(main).not.toContain('developmentProductProfile(process.env)');
     expect(main).not.toContain('readPackagedProductProfile(userDataDirectory)');
     expect(stackProfile).toContain("'Library', 'Application Support', '客服话术浮窗 Demo'");

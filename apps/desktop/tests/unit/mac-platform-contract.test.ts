@@ -208,6 +208,10 @@ describe('macOS distribution contract', () => {
     expect(packageJson.build.extraResources).toEqual(
       expect.arrayContaining([
         {
+          from: 'resources/synthetic-offline.json',
+          to: 'synthetic-offline.json',
+        },
+        {
           from: 'THIRD_PARTY_NOTICES.md',
           to: 'THIRD_PARTY_NOTICES.md',
         },

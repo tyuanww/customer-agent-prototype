@@ -9,7 +9,7 @@ import { ProductAnnounce } from './product-announce';
 import { registerProductAnnounceIpc } from './product-announce-ipc';
 import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
-import { resolveProductProfile } from './product-runtime-config';
+import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { app, Menu, screen, session } from 'electron';
 import { OverlayController } from './overlay-controller';
@@ -189,7 +189,12 @@ if (!gotLock) {
     // Retrieval hydrate / BM25 use the known off-repo stack files, not leftover
     // `/v1/search`, and also must not require a developer shell.
     const userDataDirectory = app.getPath('userData');
-    const productProfile = resolveProductProfile(app.isPackaged, userDataDirectory, process.env);
+    const productProfile = resolveProductProfile(
+      app.isPackaged,
+      userDataDirectory,
+      process.env,
+      app.isPackaged ? bundledOfflineProfilePath(process.resourcesPath) : undefined,
+    );
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
       if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);
