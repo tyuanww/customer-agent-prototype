@@ -64,6 +64,9 @@ test('product session native login, search, copy, logout and renderer isolation'
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.evaluate(() => window.customerAgent!.openSearch());
     await query.getByRole('button', { name: '合成登录' }).click();
+    await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
+    const login = app.windows().find(w => w.url().includes('role=login'))!;
+    await login.getByRole('button', { name: '飞书登录' }).click();
     await expect(query.getByRole('button', { name: 'agent · 退出' })).toBeVisible();
     await expect(query.getByTestId('announce-banner')).toContainText('ACK 不是已读');
     const view = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());

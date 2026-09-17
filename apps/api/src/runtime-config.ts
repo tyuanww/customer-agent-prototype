@@ -19,7 +19,7 @@ export type ApiRuntimeEnvironment = Readonly<Record<string, string | undefined>>
 
 export type ApiRuntimeConfig = Readonly<{
   profile: ApiProfile;
-  authMode: 'mock';
+  authMode: AuthMode;
   sessionMode?: 'product';
   host: '127.0.0.1';
   port: number;
@@ -41,9 +41,22 @@ export type ApiHmacKeyRing = Readonly<{
   keys: Readonly<Record<string, string>>;
 }>;
 
+export type FeishuProviderBootstrap = Readonly<{
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}>;
+
+export type ProductIdentityBootstrap = Readonly<{
+  database: ApiDatabaseBootstrapConfig;
+} & (
+  | { kind: 'synthetic'; providerOrigin: string }
+  | { kind: 'feishu'; feishu: FeishuProviderBootstrap }
+)>;
+
 /** Private, process-local capability configuration. It must never cross the composition root. */
 export type ApiPrivateBootstrapConfig = Readonly<{
-  productIdentity?: Readonly<{ database: ApiDatabaseBootstrapConfig; providerOrigin: string }>;
+  productIdentity?: ProductIdentityBootstrap;
   runtimeDatabase: ApiDatabaseBootstrapConfig;
   policyAdminDatabase: ApiDatabaseBootstrapConfig;
   idempotencyHmac: ApiHmacKeyRing;
@@ -66,6 +79,8 @@ export type ApiConfigIssue = Readonly<{
 
 const PROFILE_SET = new Set<string>(CUSTOMER_AGENT_PROFILES);
 const AUTH_MODE_SET = new Set<string>(['mock', 'feishu']);
+const FEISHU_APP_ID_PATTERN = /^cli_[a-z0-9]{8,32}$/;
+const FEISHU_APP_SECRET_PATTERN = /^[\x21-\x7E]{16,128}$/;
 const BUILD_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 const HMAC_KEY_VERSION_PATTERN = /^hmac-[a-z0-9][a-z0-9._-]{0,31}$/;
 const DIAGNOSTIC_ID_PATTERN = /^diag_[0-9a-f]{32}$/;
@@ -139,6 +154,43 @@ function parseAuthMode(
     return undefined;
   }
   return value as AuthMode;
+}
+
+function validFeishuRedirectUri(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname.length > 0 && !url.username && !url.password
+      && url.pathname === '/v1/auth/callback' && url.search === '' && url.hash === '';
+  } catch {
+    return false;
+  }
+}
+
+function parseFeishuProviderConfig(
+  environment: ApiRuntimeEnvironment,
+  issues: ApiConfigIssue[],
+): FeishuProviderBootstrap | undefined {
+  if (environment.FEISHU_APP_ID === undefined
+    || environment.FEISHU_APP_SECRET === undefined
+    || environment.FEISHU_REDIRECT_URI === undefined) return undefined;
+  const clientId = exactEnvironmentValue(environment, 'FEISHU_APP_ID', issues);
+  const clientSecret = exactEnvironmentValue(environment, 'FEISHU_APP_SECRET', issues);
+  const redirectUri = exactEnvironmentValue(environment, 'FEISHU_REDIRECT_URI', issues);
+  let ok = true;
+  if (clientId !== undefined && !FEISHU_APP_ID_PATTERN.test(clientId)) {
+    issues.push(issue('FEISHU_APP_ID', 'invalid'));
+    ok = false;
+  }
+  if (clientSecret !== undefined && !FEISHU_APP_SECRET_PATTERN.test(clientSecret)) {
+    issues.push(issue('FEISHU_APP_SECRET', 'invalid'));
+    ok = false;
+  }
+  if (redirectUri !== undefined && !validFeishuRedirectUri(redirectUri)) {
+    issues.push(issue('FEISHU_REDIRECT_URI', 'invalid'));
+    ok = false;
+  }
+  if (!ok || clientId === undefined || clientSecret === undefined || redirectUri === undefined) return undefined;
+  return Object.freeze({ clientId, clientSecret, redirectUri });
 }
 
 function parsePort(
@@ -428,14 +480,20 @@ export function parseApiRuntimeConfig(
     issues.push(issue('CUSTOMER_AGENT_PROFILE', 'profile_not_available'));
   }
 
-  if (authMode && authMode !== 'mock') {
+  if (authMode === 'feishu') {
+    const feishuIssues: ApiConfigIssue[] = [];
+    const feishu = parseFeishuProviderConfig(environment, feishuIssues);
+    if (feishuIssues.length > 0) issues.push(...feishuIssues);
+    else if (!feishu) issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
+  } else if (authMode && authMode !== 'mock') {
     issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
   }
   if (requestedHost !== LOOPBACK_HOST) {
     issues.push(issue('CUSTOMER_AGENT_API_HOST', 'external_bind_not_allowed'));
   }
 
-  if (issues.length > 0 || (profile !== 'formal-dev' && profile !== 'test') || authMode !== 'mock') {
+  if (issues.length > 0 || (profile !== 'formal-dev' && profile !== 'test')
+    || (authMode !== 'mock' && authMode !== 'feishu')) {
     throw new ApiConfigError(issues);
   }
 
@@ -490,17 +548,29 @@ export function parseApiPrivateBootstrapConfig(
     const database = parseDatabaseConfig(environment, {
       connectionString: 'AUTH_DATABASE_URL', poolMax: 'AUTH_DB_POOL_MAX', defaultPoolMax: 2,
     }, issues);
-    let providerOrigin: string | undefined;
-    try {
-      const raw = environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN;
-      if (!raw) throw new Error('missing');
-      const url = new URL(raw);
-      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port
-        || Number(url.port) < 1024 || url.username || url.password || url.pathname !== '/'
-        || url.search || url.hash) throw new Error('invalid');
-      providerOrigin = url.origin;
-    } catch { issues.push(issue('SYNTHETIC_IDENTITY_PROVIDER_ORIGIN', 'invalid')); }
-    if (database && providerOrigin) productIdentity = Object.freeze({ database, providerOrigin });
+    if (environment.AUTH_MODE === 'feishu') {
+      const feishuIssues: ApiConfigIssue[] = [];
+      const feishu = parseFeishuProviderConfig(environment, feishuIssues);
+      if (feishuIssues.length > 0) issues.push(...feishuIssues);
+      else if (!feishu) issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
+      if (database && feishu && feishuIssues.length === 0) {
+        productIdentity = Object.freeze({ kind: 'feishu', database, feishu });
+      }
+    } else {
+      let providerOrigin: string | undefined;
+      try {
+        const raw = environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN;
+        if (!raw) throw new Error('missing');
+        const url = new URL(raw);
+        if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port
+          || Number(url.port) < 1024 || url.username || url.password || url.pathname !== '/'
+          || url.search || url.hash) throw new Error('invalid');
+        providerOrigin = url.origin;
+      } catch { issues.push(issue('SYNTHETIC_IDENTITY_PROVIDER_ORIGIN', 'invalid')); }
+      if (database && providerOrigin) {
+        productIdentity = Object.freeze({ kind: 'synthetic', database, providerOrigin });
+      }
+    }
   }
   const idempotencyHmac = parseHmacKeyRing(environment, issues);
   const logHash = parseLogHashConfig(environment, issues);

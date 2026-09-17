@@ -2,7 +2,7 @@ import { isOverlayPhase, type OverlayPhase } from './overlay-machine';
 import { isQueryLayoutAckCommand, type QueryLayoutAckCommand } from './query-layout';
 
 export type OverlayRole = 'fox' | 'query';
-export type RendererRole = OverlayRole | 'dashboard';
+export type RendererRole = OverlayRole | 'dashboard' | 'login';
 
 export type FoxVisualTransform = {
   a: number;
@@ -116,7 +116,7 @@ export type ReportablePhase = (typeof REPORTABLE_PHASES)[number];
 export type ResultCount = 0 | 1 | 2 | 3;
 
 export function isRendererRole(value: unknown): value is RendererRole {
-  return value === 'fox' || value === 'query' || value === 'dashboard';
+  return value === 'fox' || value === 'query' || value === 'dashboard' || value === 'login';
 }
 
 export function isReportablePhase(value: unknown): value is ReportablePhase {

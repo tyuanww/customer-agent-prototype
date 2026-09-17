@@ -63,7 +63,7 @@ describe('API runtime configuration', () => {
     }
   });
 
-  it('does not allow an unimplemented auth provider to look configured', () => {
+  it('does not allow feishu to look configured without provider credentials', () => {
     expectConfigIssue(
       { CUSTOMER_AGENT_PROFILE: 'formal-dev', AUTH_MODE: 'feishu' },
       'AUTH_MODE',
@@ -94,6 +94,30 @@ describe('API runtime configuration', () => {
     expect(Object.isFrozen(config)).toBe(true);
     expect(config).not.toHaveProperty('FEISHU_APP_SECRET');
     expect(config).not.toHaveProperty('DATABASE_URL');
+  });
+
+  it('accepts feishu when provider credentials are complete and keeps secrets out of public config', () => {
+    const config = parseApiRuntimeConfig({
+      CUSTOMER_AGENT_PROFILE: 'formal-dev',
+      AUTH_MODE: 'feishu',
+      FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
+      FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
+      FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
+    });
+    expect(config.authMode).toBe('feishu');
+    expect(config).not.toHaveProperty('FEISHU_APP_SECRET');
+    expect(JSON.stringify(config)).not.toContain('test-feishu-secret-material-0001');
+    expectConfigIssue(
+      {
+        CUSTOMER_AGENT_PROFILE: 'formal-dev',
+        AUTH_MODE: 'feishu',
+        FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
+        FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
+        FEISHU_REDIRECT_URI: 'http://127.0.0.1:3100/v1/auth/callback',
+      },
+      'FEISHU_REDIRECT_URI',
+      'invalid',
+    );
   });
 
   it('allows an ephemeral loopback port only for tests', () => {
@@ -213,6 +237,27 @@ describe('synthetic product identity bootstrap', () => {
     expect(() => parseApiRuntimeConfig({ ...environment, AUTH_SESSION_MODE: undefined })).toThrow(ApiConfigError);
     expect(() => parseApiRuntimeConfig({ ...environment, AUTH_SESSION_MODE: 'typo' })).toThrow(ApiConfigError);
     expect(() => parseApiRuntimeConfig({ ...environment, AUTH_MODE: 'feishu' })).toThrow(ApiConfigError);
+  });
+
+  it('bootstraps a feishu product identity without a synthetic provider origin', () => {
+    const config = parseApiPrivateBootstrapConfig({
+      ...environment,
+      AUTH_MODE: 'feishu',
+      SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: undefined,
+      FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
+      FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
+      FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
+    });
+    expect(config.productIdentity).toMatchObject({
+      kind: 'feishu',
+      feishu: { clientId: 'cli_aaaaaaaaaaaaaaaa', redirectUri: 'https://oauth.test.invalid/v1/auth/callback' },
+    });
+    expect(parseApiRuntimeConfig({
+      CUSTOMER_AGENT_PROFILE: 'formal-dev', AUTH_MODE: 'feishu', AUTH_SESSION_MODE: 'product',
+      FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
+      FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
+      FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
+    }).authMode).toBe('feishu');
   });
 
   it('shrinks the runtime pool when a review capability is configured and keeps worker login distinct', () => {

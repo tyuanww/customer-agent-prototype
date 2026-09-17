@@ -15,24 +15,27 @@
 | Profile | 当前结果 | 原因 |
 | --- | --- | --- |
 | `demo` | 拒启 | Demo 由 `apps/desktop` 独立运行，禁止因为新增 API 骨架而暗接后端 |
-| `formal-dev` | 允许 | 仅 `AUTH_MODE=mock`、loopback、`/health`、`/ready`、mock auth/policy 与 synthetic-only Search + Events；使用私有 runtime/admin pool |
+| `formal-dev` | 允许 | `AUTH_MODE=mock`，或 `AUTH_MODE=feishu` 且飞书凭据齐全；仍只绑 loopback。缺凭据的 `feishu` 继续拒启 |
 | `test` | 允许 | 同上；允许端口 `0` 做 ephemeral 测试 |
 | `single-host` | 拒启 | DB、storage、auth、readiness 与部署门尚未闭合 |
 | `multi-instance` | 拒启 | 共享存储、并发、worker 与 readiness 尚未闭合 |
 | `production` | 拒启 | Feishu auth、DB、storage、runtime activation 与部署均未放行 |
 
-`AUTH_MODE=feishu` 当前同样拒启。服务不通过“接受配置但不注册鉴权”的方式伪造正式能力。
+`AUTH_MODE=feishu` 仅在 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_REDIRECT_URI` 全部合法时启动，并由组合根安装飞书 provider；缺任一项仍 `auth_mode_not_available`。不通过“接受配置但不注册鉴权”的方式伪造正式能力。监听地址与 PG DSN 仍只接受 loopback。
 
 ## 2. 当前变量
 
 | 变量 | 规则 | 是否进入公开响应/错误 |
 | --- | --- | --- |
 | `CUSTOMER_AGENT_PROFILE` | 必填；必须是上表精确值 | 只输出字段名和稳定拒绝原因 |
-| `AUTH_MODE` | 必填；当前只接受 `mock`，表示合成身份来源 | 只输出字段名和稳定拒绝原因 |
+| `AUTH_MODE` | 必填；`mock` 或 `feishu`。`feishu` 必须同时提供合法飞书凭据，否则 `auth_mode_not_available` | 只输出字段名和稳定拒绝原因 |
+| `FEISHU_APP_ID` | `AUTH_MODE=feishu` 必填；`cli_` 前缀的应用 ID | 不回显原值 |
+| `FEISHU_APP_SECRET` | `AUTH_MODE=feishu` 必填；只进私有 bootstrap | 不回显、不记录 |
+| `FEISHU_REDIRECT_URI` | `AUTH_MODE=feishu` 必填；精确 `https://…/v1/auth/callback`，无 userinfo / query / fragment | 不回显原值 |
 | `AUTH_SESSION_MODE` | 可省略或 `mock` 保留进程内合成登录；`product` 显式启用持久产品会话。其它值、未选择 product 却提供产品身份配置均拒启 | 合法 product 模式可进入公开 config |
 | `AUTH_DATABASE_URL` | product 必填；独立无特权登录账号仅属于 app_backend_auth，与 runtime/admin 同库且登录名不同 | 仅私有 bootstrap |
 | `AUTH_DB_POOL_MAX` | product 默认 2；runtime 此时默认 16（配置审核池时改为 12），admin 默认 2；API 进程启用的池合计最多 20，并给独立 worker 进程预留 2 | 不进入公开 config |
-| `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN` | product 必填；精确 http://127.0.0.1:port，无凭据、路径、query 或 fragment；只允许本机合成提供方 | 不回显原值 |
+| `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN` | `AUTH_MODE=mock` 的 product 必填；精确 http://127.0.0.1:port，无凭据、路径、query 或 fragment。`AUTH_MODE=feishu` 时不使用 | 不回显原值 |
 | `CUSTOMER_AGENT_API_HOST` | 可省略，固定默认 `127.0.0.1`；其它值拒启 | 不回显原值 |
 | `CUSTOMER_AGENT_API_PORT` | formal-dev 默认 `3100`；两者范围均为 `1024..65535`，test 另可用 `0` 做 ephemeral 监听 | 不回显非法原值 |
 | `CUSTOMER_AGENT_BUILD_VERSION` | 可省略，默认 `dev-m0`；1–64 位安全版本字符 | 仅合法值进入 `/health.version` |

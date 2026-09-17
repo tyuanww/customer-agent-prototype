@@ -28,6 +28,8 @@ const ALLOWED_BINDINGS = new Set(SYNTHETIC_IDENTITIES.map((identity) => identity
 
 /** The authorize endpoint always grants the agent subject; /exchange picks the subject. */
 const DEFAULT_BINDING = 'synthetic_agent';
+/** Non-secret local password for the synthetic account form. Never a production credential. */
+const SYNTHETIC_PASSWORD = 'synthetic-password';
 
 function send(response: ServerResponse, status: number, body: string, contentType = 'application/json'): void {
   response.writeHead(status, { 'content-type': contentType, 'cache-control': 'no-store' });
@@ -73,6 +75,21 @@ export function createIdentityProvider({ port }: Readonly<{ port: number }>) {
       target.searchParams.set('code', DEFAULT_BINDING);
       response.writeHead(302, { location: target.href, 'cache-control': 'no-store' });
       response.end();
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/password') {
+      void readBody(request).then((body) => {
+        let parsed: unknown;
+        try { parsed = body ? JSON.parse(body) : null; } catch { send(response, 400, '{"error":"invalid_json"}'); return; }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) { send(response, 400, '{"error":"invalid_request"}'); return; }
+        const username = Reflect.get(parsed, 'username');
+        const password = Reflect.get(parsed, 'password');
+        if (typeof username !== 'string' || typeof password !== 'string') { send(response, 400, '{"error":"invalid_request"}'); return; }
+        const identity = SYNTHETIC_IDENTITIES.find((item) => item.bindingId === username);
+        if (!identity || password !== SYNTHETIC_PASSWORD) { send(response, 401, '{"error":"invalid_credentials"}'); return; }
+        send(response, 200, JSON.stringify({ code: identity.bindingId }));
+      });
       return;
     }
 

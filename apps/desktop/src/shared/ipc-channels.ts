@@ -26,6 +26,9 @@ export const IPC_CHANNELS = {
   COMMIT_FOX_DRAG_SETTLE: 'overlay:commit-fox-drag-settle',
   SET_FOX_PEEK: 'overlay:set-fox-peek',
   OVERLAY_COMMAND: 'overlay:command',
+  LOGIN_WINDOW_CHOOSE_FEISHU: 'login-window:choose-feishu',
+  LOGIN_WINDOW_SUBMIT_ACCOUNT: 'login-window:submit-account',
+  LOGIN_WINDOW_CANCEL: 'login-window:cancel',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
