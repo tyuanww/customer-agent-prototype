@@ -53,7 +53,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 三刀代码已合入。本机 UNSIGNED mac `.app` 已 seed；本机 `pnpm package:win` 后验通过且 `win-unpacked/resources/synthetic-offline.json` 精确。办公机 Windows 实机勾选仍属后续。
+**Status:** 三刀代码已合入。本机 UNSIGNED mac seed 与 `pnpm package:win` 后验已记录。办公机实机勾选清单：`docs/how-to-office-machine-first-round.md`（人填，开发机不代填）。
 
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 

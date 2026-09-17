@@ -17,6 +17,7 @@
 | 按统一流程开发、审查、提交 PR、合并、验收和发布，处理授权与证据复用 | [工程工作流程](docs/reference-engineering-workflow.md) |
 | 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP、话术不准、内容草稿、P0 待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
+| 在办公机 Windows 上勾首轮离线安装 / 浮窗 / 快捷键 / 卸载（人填，开发机不代填） | [docs/how-to-office-machine-first-round.md](docs/how-to-office-machine-first-round.md) |
 | 查阅 Fox / Query / Dashboard / 登录 / SOP 窗口、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
 | 了解 main / preload / renderer / shared 的职责和清理边界 | [docs/reference-project-architecture.md](docs/reference-project-architecture.md) |
 | 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
