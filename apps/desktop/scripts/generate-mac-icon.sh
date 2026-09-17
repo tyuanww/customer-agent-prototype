@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+PROJECT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 MASTER_ICON="${CUSTOMER_AGENT_ICON_MASTER:-$PROJECT_DIR/assets/app-icon.png}"
 OUTPUT_ICON="$PROJECT_DIR/build/icon.icns"
 ICONSET_DIR=$(mktemp -d "${TMPDIR:-/tmp}/customer-agent-icon.XXXXXX")
