@@ -321,7 +321,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 | 你想证明 | 命令 |
 | --- | --- |
-| 缺文件仍 missing；显式 offline；bundle seed 不覆盖 local | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-runtime-config.test.ts tests/unit/mac-platform-contract.test.ts` |
+| 缺文件仍 missing；显式 offline；bundle seed 不覆盖 local | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-runtime-config.test.ts tests/unit/mac-platform-contract.test.ts tests/unit/windows-platform-contract.test.ts` |
 
 ## 打包 file:// 登录窗
 

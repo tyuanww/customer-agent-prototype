@@ -53,7 +53,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 第一刀已合入。第二刀：包内 extraResources `synthetic-offline.json`，userData 无 profile 时才 seed 精确 `{ "mode": "synthetic-offline" }`，不覆盖已有 synthetic-local。办公机实机勾选仍属后续。
+**Status:** 第一、二刀已合入。第三刀：Windows/mac 打包校验必须看到精确 `synthetic-offline.json`。办公机实机勾选仍属后续。
 
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 
