@@ -12,7 +12,7 @@
 
    `release/local-unsigned/windows/客服话术浮窗 Demo-0.3.0-win-x64-UNSIGNED.exe`
 
-   不要从 Git 拉安装包（产物不入库）。
+   不要从 Git 拉安装包（产物不入库）。开发机上也可能只留桌面副本 `~/Desktop/客服话术浮窗 Demo-0.3.0-win-x64-UNSIGNED.exe`；`release/` 是本地构建缓存，可删后重打。
 2. 办公机**断开网络**。
 3. 不安装 Node / pnpm / Git。Electron 自带运行时即可。
 4. 记下日期、机器名、操作人。

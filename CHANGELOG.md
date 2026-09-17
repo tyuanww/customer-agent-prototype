@@ -33,6 +33,9 @@ All notable changes to this customer-agent product implementation repository are
 - Coach upload polish (PRs #106, #108): fail-close names the sheet row and the 50-row / 64KiB caps; picking a file shows「正在读取」; the picker copy says binary xlsx fail-closes.
 - Query「话术不准」stays for the overlay session (PR #107) until collapse. Still no IPC or tickets.
 - Dashboard P0 reminder stays visible when no open P0 remain (PR #109), and「重置演练」is disabled until the in-memory drill changes.
+- Packaged S0 is explicit: `{ "mode": "synthetic-offline" }` only (PR #111). extraResources can seed an empty userData file and never overwrite `synthetic-local` (PR #112). Windows/mac package gates require that exact document (PR #113).
+- `package:mac:local` extracts Electron dist before copying license extraResources (PR #114). Local unsigned Windows extraResources proof is recorded (PR #115). Office-machine first-round checklist is in `docs/how-to-office-machine-first-round.md` (PR #116).
+- Health Stack includes `shellcheck apps/desktop/scripts/generate-mac-icon.sh` (PR #117). The script quotes empty `CDPATH` (PR #118).
 
 - Logged the 2026-09-16 desktop delivery-shape review at `docs/plans/2026-09-16-desktop-delivery-shape-review.md`: a read-only re-check of whether a packaged Windows build is usable on the office machine, which reverses several earlier assumptions. This is a review record, not a Windows implementation, install acceptance, or approval to start the phase, and it does not move the loopback red line.
 - Added an Open section (P1–P10) to `TODOS.md` for that review's follow-ups, without re-opening any Completed entry. Each Open item carries its own status and needs its own authorization. P10 records the still-unsolved part: the installer ships only the desktop output and assets, so the API, worker, synthetic identity, PostgreSQL 15, and the off-repo index still have to be prepared on the target machine — this is not "no external dependencies".

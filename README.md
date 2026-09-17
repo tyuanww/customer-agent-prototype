@@ -6,6 +6,8 @@
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
+Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.command)（或 `pnpm dev`）。要测最新已合入切片，用跟踪 `main` 的工作树，不要在正在跑 API 的登录目录里切分支。Windows 办公机首轮用未签名 `UNSIGNED.exe`，不要在 Mac 上安装 `.exe`。
+
 **仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。当前任务、证据及下一动作只维护在[执行清单](docs/plans/2026-09-06-execution-goal.md)；模块实现查[架构参考](docs/reference-project-architecture.md)。桌面仍使用合成模式，复制只表示“已复制”，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
