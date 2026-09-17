@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { DASHBOARD_NAV } from '../../src/renderer/data/dashboard-manifest';
+import { COACH_UPLOAD_MAX_BYTES } from '../../src/renderer/features/dashboard/coach-content-upload';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 
 type ColorSchemeListener = (event: MediaQueryListEvent) => void;
@@ -1441,6 +1442,148 @@ describe('DashboardApp', () => {
     );
     await user.click(screen.getByTestId('release-rel-demo-2026-08-blocked'));
     expect(screen.getByTestId('missing-domain-block')).toHaveTextContent('缺域即阻断');
+  });
+
+  it('lets a coach import a synthetic csv/xlsx or demo file into staged preview without enabling publish', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    expect(window.customerAgent).toBeUndefined();
+    await user.click(screen.getByTestId('nav-content'));
+
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('content-upload-draft-copy')).toHaveTextContent(
+      '上传只进入待审核草稿，不是已发布',
+    );
+    expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('owner（管理员）');
+    expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('售前仍为');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('NOT_CREATED');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('合成过敏树样例');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('不接本页上传');
+    expect(screen.getByTestId('formal-source-warning')).not.toHaveTextContent('售前、售后仍为');
+    expect(screen.getByTestId('content-aftersale-note')).toHaveTextContent('售后流程仍为合成样例');
+    expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
+    // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
+    expect(screen.getByTestId('content-upload-input')).toHaveAttribute('accept', '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(screen.getByTestId('content-upload-input')).toHaveAttribute('type', 'file');
+
+    await user.click(screen.getByTestId('content-upload-demo'));
+    const demoPreview = screen.getByTestId('content-staged-preview');
+    expect(demoPreview).toHaveTextContent('场景');
+    expect(demoPreview).toHaveTextContent('标准话术');
+    expect(demoPreview).not.toHaveTextContent('步骤');
+    expect(demoPreview).toHaveTextContent('洁面用量确认');
+    expect(demoPreview).toHaveTextContent('售后质量升级');
+    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Staged"]'))
+      .toHaveClass('is-current');
+    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Publish"]'))
+      .not.toHaveClass('is-current');
+    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Publish"]'))
+      .not.toHaveClass('is-done');
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(window.customerAgent).toBeUndefined();
+
+    const csv = new File(
+      ['scene,step\n洁面用量确认,先确认产品版本\n'],
+      'coach-draft.csv',
+      { type: 'text/csv' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), csv);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('先确认产品版本');
+    });
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('coach-draft.csv');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+
+    const xlsx = new File(
+      ['scene,step\n满赠规则说明,不承诺库存\n'],
+      'coach-draft.xlsx',
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('满赠规则说明');
+    });
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('不承诺库存');
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
+      '演示禁用 · 正式需 owner + G0/Ddev',
+    );
+    expect(window.customerAgent).toBeUndefined();
+
+    const binary = new File(
+      [new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00])],
+      'workbook.xlsx',
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), binary);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
+    });
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('二进制 Excel 未解析');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('未连接飞书或 Wiki');
+    expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(window.customerAgent).toBeUndefined();
+  });
+
+  it('clears the coach preview back to idle without leaving released state behind', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-content'));
+
+    const clear = screen.getByTestId('content-upload-clear');
+    expect(clear).toBeDisabled();
+
+    await user.click(screen.getByTestId('content-upload-demo'));
+    expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
+    expect(clear).toBeEnabled();
+
+    await user.click(clear);
+    expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
+    expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'idle');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('等待导入');
+    expect(screen.getByTestId('content-upload-status')).not.toHaveTextContent('不是已发布');
+    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Staged"]'))
+      .not.toHaveClass('is-current');
+    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Import"]'))
+      .not.toHaveClass('is-done');
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(window.customerAgent).toBeUndefined();
+  });
+
+  it('fail-closes bad coach tables without leaking a staged preview or enabling publish', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('content-upload-demo'));
+    expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
+
+    const cases = [
+      { file: new File(['title,body\nA,B\n'], 'bad-headers.csv', { type: 'text/csv' }), copy: '表头必须包含' },
+      { file: new File([''], 'empty.csv', { type: 'text/csv' }), copy: '没有可预览的数据行' },
+      { file: new File(['scene,step,domain\n用量,说明,legal\n'], 'bad-domain.csv', { type: 'text/csv' }), copy: '域只能是' },
+      {
+        file: new File(['x'.repeat(COACH_UPLOAD_MAX_BYTES + 1)], 'huge.csv', { type: 'text/csv' }),
+        copy: '文件过大',
+      },
+    ] as const;
+
+    for (const item of cases) {
+      await user.upload(screen.getByTestId('content-upload-input'), item.file);
+      await waitFor(() => {
+        expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
+      });
+      expect(screen.getByTestId('content-upload-status')).toHaveTextContent('未进入草稿');
+      expect(screen.getByTestId('content-upload-status')).toHaveTextContent(item.copy);
+      expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
+      expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Staged"]'))
+        .not.toHaveClass('is-current');
+      expect(screen.getByTestId('publish-action')).toBeDisabled();
+      expect(window.customerAgent).toBeUndefined();
+    }
   });
 
   it('keeps modified, sent, and applicable offline review dimensions separate', async () => {

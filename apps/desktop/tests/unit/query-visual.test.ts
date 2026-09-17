@@ -14,6 +14,8 @@ const queryApp = [
   readFileSync(path.join(root, 'src/renderer/features/search/QueryResultsPane.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/search/query-view.ts'), 'utf8'),
 ].join('\n');
+const overlayPreload = readFileSync(path.join(root, 'src/preload/index.ts'), 'utf8');
+const contracts = readFileSync(path.join(root, 'src/shared/contracts.ts'), 'utf8');
 
 type Rgb = readonly [number, number, number];
 
@@ -167,6 +169,15 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('.capsule-fox:focus-visible');
     expect(css).toContain('.capsule-fox:focus-visible .fox-focus-ring');
     expect(queryApp).toContain('query-fox-focus-ring');
+  });
+
+  it('keeps the query overlay free of coach upload controls and parameterized dashboard entry', () => {
+    expect(queryApp).not.toMatch(/type=["']file["']|coach-content-upload|content-upload|accept=/);
+    expect(overlayPreload).not.toMatch(/coach-content-upload|content-upload|contentImport|FileReader/);
+    // 打开工作台只开门：不带文件、不带角色。
+    expect(contracts).toContain('openDashboard: () => Promise<OpenDashboardResult>');
+    expect(overlayPreload).toContain('.invoke(IPC_CHANNELS.OPEN_DASHBOARD)');
+    expect(overlayPreload).not.toMatch(/OPEN_DASHBOARD,\s*[^)]/);
   });
 });
 

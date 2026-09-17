@@ -121,6 +121,24 @@ describe('dashboard manifest', () => {
     expect(blocked?.blockReason).toContain('缺域即阻断');
   });
 
+  it('keeps coach upload as staged drafts without implying Feishu, Wiki, or published content', () => {
+    const upload = DASHBOARD_MANIFEST.content.upload;
+    expect(upload.draftOnlyCopy).toBe('上传只进入待审核草稿，不是已发布。');
+    expect(upload.roleNote).toContain('coach');
+    expect(upload.roleNote).toContain('owner（管理员）');
+    expect(upload.roleNote).toContain('agent');
+    expect(upload.roleNote).toContain('没有第四角色');
+    expect(upload.boundaryCopy).toContain('不连接飞书或 Wiki');
+    expect(upload.aftersaleNote).toContain('售后流程仍为合成样例');
+    expect(upload.aftersaleNote).toContain('不展开 SOP 树');
+    expect(upload.accept).toContain('.csv');
+    expect(upload.accept).toContain('.xlsx');
+    expect(upload.demoCsv).toMatch(/^scene,script\n/u);
+    expect(upload.demoCsv).toContain('售后质量升级');
+    expect(DASHBOARD_MANIFEST.content.publishDisabledReason).toBe('演示禁用 · 正式需 owner + G0/Ddev');
+    expect(JSON.stringify(upload)).not.toMatch(/已连接飞书|Wiki 已接入|已写入已发布/);
+  });
+
   it('keeps the four formal domains, source readiness, and synthetic wording separate', () => {
     expect(DASHBOARD_MANIFEST.wording.domains.map((item) => item.id)).toEqual([
       'product',
@@ -133,6 +151,11 @@ describe('dashboard manifest', () => {
         .filter((item) => item.readiness === 'upstream_authoring')
         .map((item) => item.id),
     ).toEqual(['presale', 'aftersale']);
+    const aftersale = DASHBOARD_MANIFEST.wording.domains.find((item) => item.id === 'aftersale');
+    expect(aftersale?.readinessLabel).toBe('合成过敏树样例 · DEMO');
+    expect(aftersale?.sourceSummary).toContain('不提供树编辑');
+    expect(aftersale?.sourceSummary).toContain('内容与发布');
+    expect(aftersale?.sourceSummary).not.toMatch(/不提供树编辑或上传/u);
     expect(DASHBOARD_MANIFEST.wording.entries.every((entry) => entry.dataClass === 'synthetic')).toBe(true);
     expect(JSON.stringify(DASHBOARD_MANIFEST.wording)).not.toMatch(/customerText|order_id|image_url/i);
   });

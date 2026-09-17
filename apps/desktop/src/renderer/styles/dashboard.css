@@ -2866,6 +2866,65 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .dash-release-detail { margin-top: 12px; }
 .dash-release-detail h2 { margin-top: 3px; }
+
+.content-upload {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.content-upload-copy h2 { margin-top: 3px; }
+
+.content-upload-copy p {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: var(--dash-muted);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.content-upload-controls {
+  margin: 0;
+}
+
+.content-upload-controls input[type='file'] {
+  min-width: min(220px, 50vw);
+  padding: 6px 8px;
+}
+
+.content-upload-status {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  gap: 8px 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface-subtle);
+  color: var(--dash-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.content-upload-status strong { color: var(--dash-ink); }
+.content-upload-status[data-state='ready'] {
+  border-color: var(--dash-line-strong);
+  background: var(--dash-surface-subtle);
+}
+.content-upload-status[data-state='error'] {
+  border-color: var(--dash-danger-line);
+  background: var(--dash-danger-bg);
+  color: var(--dash-danger);
+}
+
+.content-staged-preview { margin: 0; }
+.content-staged-preview .dash-table { min-width: 420px; }
+.content-staged-preview caption {
+  caption-side: top;
+  padding: 8px 12px 0;
+  color: var(--dash-muted);
+  font-size: 12px;
+  text-align: left;
+}
 .release-gate-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
 .release-gate-grid article { display: grid; gap: 3px; padding: 9px; border: 1px solid var(--dash-line); border-radius: 8px; background: var(--dash-surface-subtle); }
 .release-gate-grid article > span,
@@ -2932,6 +2991,7 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   .iteration-detail { min-height: 0; }
   .announce-simulation { grid-template-columns: 1fr; }
   .announce-simulation-controls { align-items: stretch; }
+  .content-upload-status { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 1040px) {
