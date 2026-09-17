@@ -53,7 +53,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 第一、二刀已合入。第三刀：Windows/mac 打包校验必须看到精确 `synthetic-offline.json`。办公机实机勾选仍属后续。
+**Status:** 三刀代码已合入。本机 UNSIGNED mac `.app` 已观察到 extraResources + 空 userData seed；办公机 Windows 实机勾选仍属后续。`package:mac:local` 须先跑 `electron/install.js`，否则 extraResources 许可文件缺失、后验失败。
 
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 
