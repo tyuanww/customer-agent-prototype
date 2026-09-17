@@ -1491,6 +1491,24 @@
   font-size: 11px;
 }
 
+.sop-entry-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--fox) 22%, var(--hairline));
+  border-radius: 12px;
+  background: var(--fox-soft);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.sop-entry-banner .retry-btn {
+  margin-top: 0;
+  min-height: 32px;
+}
+
 .status-banner {
   padding: 12px;
   border-radius: 12px;

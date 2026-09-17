@@ -37,7 +37,7 @@
 以下细则描述桌面模块；`apps/api/`、`packages/contracts/`、`packages/database/`、根脚本与合同快照的所有权以 `docs/reference-project-architecture.md` 和对应获批合同为准，不把桌面无后端 / 无 preload 等局部约束外推到整个 workspace。
 
 - `apps/desktop/src/main/`：唯一拥有 Electron / OS、BrowserWindow、原生 bounds、应用生命周期、Electron sender 身份判定和原生副作用；可复用 `shared` 中的纯授权谓词。
-- `apps/desktop/src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。
+- `apps/desktop/src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。独立入口（`login.ts`、`sop.ts`）必须内联 IPC 通道字符串，禁止 `import` `ipc-channels.ts`：否则 electron-vite 会拆出 overlay preload 在 Windows sandbox 中加载不了的 shared chunk，Query 会停在 parked。
 - `apps/desktop/src/shared/`：只放跨边界类型、validator、状态模型、几何和纯函数；不得依赖 React、DOM、Electron 或产生 I/O。
 - `apps/desktop/src/renderer/`：只拥有 React / DOM、局部交互和 ViewModel；当前基线读取合成数据，未来正式数据也必须经过受控 adapter。不得导入 `main`、`preload` 或 Electron，也不得直连数据库或持有凭证。
 - `apps/desktop/assets/` 中的 canonical 资产是 SSOT；`apps/desktop/scripts/` 负责确定性派生。不得手改派生产物制造第二真源。

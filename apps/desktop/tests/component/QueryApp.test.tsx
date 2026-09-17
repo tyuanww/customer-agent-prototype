@@ -26,6 +26,8 @@ const reportQueryLayout = vi.fn();
 const resizeQueryHeight = vi.fn();
 const moveFoxBy = vi.fn();
 const setFoxPeek = vi.fn();
+const sopOpen = vi.fn();
+const sopEntryAvailable = vi.fn();
 const commandListeners = new Set<(command: OverlayCommand) => void>();
 
 function dispatchAnimationEnd(target: Element, animationName: string): void {
@@ -61,6 +63,10 @@ describe('QueryApp', () => {
     resizeQueryHeight.mockReset();
     moveFoxBy.mockReset();
     setFoxPeek.mockReset();
+    sopOpen.mockReset();
+    sopEntryAvailable.mockReset();
+    sopOpen.mockResolvedValue({ ok: true });
+    sopEntryAvailable.mockResolvedValue(true);
     reportHandoffMilestone.mockResolvedValue(undefined);
     reportQueryLayout.mockImplementation(async (request: {
       sessionId: number;
@@ -112,6 +118,10 @@ describe('QueryApp', () => {
       moveFoxBy,
       commitFoxDragSettle: vi.fn(),
       setFoxPeek,
+      sopWindow: {
+        open: sopOpen,
+        entryAvailable: sopEntryAvailable,
+      },
       onOverlayCommand(handler) {
         commandListeners.add(handler);
         return () => {
@@ -832,6 +842,45 @@ describe('QueryApp', () => {
     expect(list.textContent).not.toContain('匹配分');
     expect(list.textContent).not.toMatch(/匹配分\s*\d+/);
     expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it('shows the allergy SOP banner between the heading and cards for the gold query', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('script-card-1')).toBeVisible();
+    const heading = screen.getByText('候选话术');
+    const banner = await screen.findByTestId('sop-entry-banner');
+    const firstCard = screen.getByTestId('script-card-1');
+    expect(heading.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(banner.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(banner).toHaveTextContent('过敏可走售后流程 · 建议先要凭证');
+    expect(screen.getByTestId('open-allergy-sop')).toHaveTextContent('打开过敏售后流程');
+  });
+
+  it('does not show the SOP button for usage-plus-allergy or empty results', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '怎么用过敏');
+    await user.click(screen.getByTestId('search-button'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('open-allergy-sop')).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '今天中午虚构星球食堂有没有排骨汤' } });
+    await user.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('no-hit');
+    expect(screen.queryByTestId('open-allergy-sop')).not.toBeInTheDocument();
+  });
+
+  it('keeps 少发/长痘 on aftersale Top 3 without a SOP button', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await user.type(screen.getByTestId('question-input'), '月白防晒长痘了');
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('script-card-1')).toBeVisible();
+    expect(screen.queryByTestId('open-allergy-sop')).not.toBeInTheDocument();
   });
 
   it('renders the original synthetic aftersales wording for a natural category question', async () => {

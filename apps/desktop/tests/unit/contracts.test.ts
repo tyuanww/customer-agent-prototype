@@ -8,6 +8,10 @@ const loginPreload = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/login.ts'),
   'utf8',
 );
+const sopPreload = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/sop.ts'),
+  'utf8',
+);
 import { ALLOWED_HELP_STATUS, FORBIDDEN_HELP_PHRASES } from '../../src/shared/product-help';
 
 describe('IPC whitelist', () => {
@@ -43,6 +47,17 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU,
       IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT,
       IPC_CHANNELS.LOGIN_WINDOW_CANCEL,
+      IPC_CHANNELS.SOP_WINDOW_OPEN,
+      IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE,
+      IPC_CHANNELS.SOP_WINDOW_CLOSE,
+      IPC_CHANNELS.SOP_WINDOW_END_FLOW,
+      IPC_CHANNELS.SOP_WINDOW_RESTART,
+      IPC_CHANNELS.SOP_WINDOW_CHOOSE_EDGE,
+      IPC_CHANNELS.SOP_WINDOW_NEXT_STEP,
+      IPC_CHANNELS.SOP_WINDOW_MOVE_BY,
+      IPC_CHANNELS.SOP_WINDOW_REPORT_LAYOUT,
+      IPC_CHANNELS.SOP_WINDOW_COPY_CURRENT,
+      IPC_CHANNELS.SOP_WINDOW_PROJECTION,
     ]);
     expect(new Set(IPC_CHANNEL_WHITELIST).size).toBe(IPC_CHANNEL_WHITELIST.length);
   });
@@ -52,6 +67,19 @@ describe('IPC whitelist', () => {
     expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU}'`);
     expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT}'`);
     expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_CANCEL}'`);
+  });
+
+  it('keeps the SOP preload free of shared overlay modules', () => {
+    expect(sopPreload).not.toContain("from '../shared/ipc-channels'");
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_CLOSE}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_END_FLOW}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_RESTART}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_CHOOSE_EDGE}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_NEXT_STEP}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_MOVE_BY}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_REPORT_LAYOUT}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_COPY_CURRENT}'`);
+    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_PROJECTION}'`);
   });
 
   it('uses 已复制 as the only success copy label', () => {

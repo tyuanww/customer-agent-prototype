@@ -57,6 +57,9 @@ import {
 import { isImeComposing, shouldSubmitOnEnter } from './lib/ime';
 import { isInteractiveTarget } from './lib/is-interactive-target';
 import { useWindowDrag } from './lib/use-window-drag';
+import { ALLERGY_SOP_SCENE_ID, isAllergySopEntry } from '@shared/sop-entry';
+import { compactQueryText } from '@shared/query-analyze';
+import { SOP_OPEN_FAILURE_MESSAGE } from '@shared/sop-window';
 
 export function QueryApp() {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
@@ -120,6 +123,9 @@ export function QueryApp() {
   const announceGenerationRef = useRef(0);
   const announceReleaseRef = useRef<string | null>(null);
   const [helpStatus, setHelpStatus] = useState<HelpStatus>('待核实');
+  const [sopEntryVisible, setSopEntryVisible] = useState(false);
+  const [sopEntryBusy, setSopEntryBusy] = useState(false);
+  const [sopEntryError, setSopEntryError] = useState<string | null>(null);
   const lastProductQueryRef = useRef<{
     sessionEpoch: number;
     generation: number;
@@ -1035,6 +1041,54 @@ export function QueryApp() {
     });
   }, [reportPhase, results.length]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const allergyHit = (phase === 'RESULTS' || phase === 'COPIED')
+      && results.length > 0
+      && isAllergySopEntry(compactQueryText(query));
+    if (!allergyHit) {
+      setSopEntryVisible(false);
+      setSopEntryError(null);
+      return undefined;
+    }
+    const available = window.customerAgent?.sopWindow?.entryAvailable;
+    if (!available) {
+      setSopEntryVisible(false);
+      return undefined;
+    }
+    void available().then((ok) => {
+      if (!cancelled) {
+        setSopEntryVisible(ok === true);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setSopEntryVisible(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, query, results.length]);
+
+  const openAllergySop = useCallback(() => {
+    const api = window.customerAgent?.sopWindow;
+    if (!api || sopEntryBusy) {
+      setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
+      return;
+    }
+    setSopEntryBusy(true);
+    setSopEntryError(null);
+    void api.open(ALLERGY_SOP_SCENE_ID).then((result) => {
+      if (!result.ok) {
+        setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
+      }
+    }).catch(() => {
+      setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
+    }).finally(() => {
+      setSopEntryBusy(false);
+    });
+  }, [sopEntryBusy]);
+
   const retry = useCallback(() => {
     if (dashboardOpenFailedRef.current) {
       openDashboard();
@@ -1471,6 +1525,10 @@ export function QueryApp() {
             copying={copying}
             copiedRank={copiedRank}
             helpStatus={helpStatus}
+            sopEntryVisible={sopEntryVisible}
+            sopEntryBusy={sopEntryBusy}
+            sopEntryError={sopEntryError}
+            onOpenSop={openAllergySop}
             onRetry={retry}
             onCopy={(item, trigger) => {
               void copyScript(item, trigger);

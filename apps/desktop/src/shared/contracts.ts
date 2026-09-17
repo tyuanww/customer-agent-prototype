@@ -15,6 +15,7 @@ import type {
   QueryLayoutRequest,
   QueryResizeRequest,
 } from './query-layout';
+import type { QuerySopWindowApi } from './sop-window';
 
 export type CopyTextResult =
   | { ok: true }
@@ -53,6 +54,7 @@ export type CustomerAgentApi = {
   commitFoxDragSettle: (settleId: number) => Promise<void>;
   setFoxPeek: (intent: FoxPeekIntent, epoch: number) => Promise<void>;
   onOverlayCommand: (handler: (command: OverlayCommand) => void) => () => void;
+  sopWindow?: QuerySopWindowApi;
 };
 
 export const COPY_SUCCESS_MESSAGE = '已复制';

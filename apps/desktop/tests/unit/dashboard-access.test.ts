@@ -14,6 +14,7 @@ describe('canOpenDashboard', () => {
   it('fails closed for fox, dashboard, unknown, or untrusted senders', () => {
     expect(canOpenDashboard({ trusted: true, role: 'fox' })).toBe(false);
     expect(canOpenDashboard({ trusted: true, role: 'dashboard' })).toBe(false);
+    expect(canOpenDashboard({ trusted: true, role: 'sop' })).toBe(false);
     expect(canOpenDashboard({ trusted: true, role: null })).toBe(false);
     expect(canOpenDashboard({ trusted: false, role: 'query' })).toBe(false);
   });

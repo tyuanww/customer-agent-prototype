@@ -320,6 +320,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
     scriptId: 'syn-after-002',
     domain: '售后',
     questionVariants: [
+      '过敏了怎么办',
       '用了露芷面膜过敏了怎么办',
       '面膜过敏了怎么处理',
       '敷完面膜红肿',

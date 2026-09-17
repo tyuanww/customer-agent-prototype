@@ -220,6 +220,44 @@ const api: CustomerAgentApi = {
       overlayListeners.delete(handler);
     };
   },
+  sopWindow: {
+    async open(sceneId) {
+      if (typeof sceneId !== 'string' || sceneId.length === 0 || sceneId.length > 64) {
+        return { ok: false as const, code: 'INVALID' as const, message: '流程参数无效' };
+      }
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.SOP_WINDOW_OPEN, sceneId);
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+          return { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
+        }
+        const record = value as { ok?: unknown; code?: unknown; message?: unknown };
+        if (record.ok === true) {
+          return { ok: true as const };
+        }
+        if (
+          record.ok === false
+          && typeof record.code === 'string'
+          && typeof record.message === 'string'
+        ) {
+          return {
+            ok: false as const,
+            code: record.code as 'INVALID' | 'UNAVAILABLE' | 'FAILED' | 'SOP_LOAD_FAILED' | 'SOP_LAYOUT_TIMEOUT' | 'SOP_FIXTURE_MISSING',
+            message: record.message,
+          };
+        }
+        return { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
+      } catch {
+        return { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
+      }
+    },
+    async entryAvailable() {
+      try {
+        return (await ipcRenderer.invoke(IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE)) === true;
+      } catch {
+        return false;
+      }
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('customerAgent', api);

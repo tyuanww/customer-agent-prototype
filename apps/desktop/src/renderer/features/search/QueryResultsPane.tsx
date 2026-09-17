@@ -1,6 +1,7 @@
 import type { Ref, ReactNode } from 'react';
 import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import type { OverlayPhase } from '@shared/overlay-machine';
+import { SOP_ENTRY_BUTTON, SOP_ENTRY_HINT } from '@shared/sop-window';
 import { ScriptCard } from './ScriptCard';
 import type { HelpStatus } from '@shared/product-help';
 import type { RankedScript } from './types';
@@ -16,6 +17,10 @@ type QueryResultsPaneProps = {
   copying: boolean;
   copiedRank: 1 | 2 | 3 | null;
   helpStatus?: HelpStatus;
+  sopEntryVisible?: boolean;
+  sopEntryBusy?: boolean;
+  sopEntryError?: string | null;
+  onOpenSop?: () => void;
   onRetry: () => void;
   onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
   onCopyContact?: () => void;
@@ -34,6 +39,10 @@ export function QueryResultsPane({
   copying,
   copiedRank,
   helpStatus,
+  sopEntryVisible = false,
+  sopEntryBusy = false,
+  sopEntryError = null,
+  onOpenSop,
   onRetry,
   onCopy,
   onCopyContact,
@@ -91,6 +100,23 @@ export function QueryResultsPane({
                       <span>{results.length} 条 · 按 1 / 2 / 3 复制</span>
                     )}
                   </div>
+                  {sopEntryVisible ? (
+                    <div className="sop-entry-banner" data-testid="sop-entry-banner">
+                      <span>{SOP_ENTRY_HINT}</span>
+                      <button
+                        type="button"
+                        className="retry-btn"
+                        data-testid="open-allergy-sop"
+                        disabled={sopEntryBusy}
+                        onClick={onOpenSop}
+                      >
+                        {SOP_ENTRY_BUTTON}
+                      </button>
+                      {sopEntryError ? (
+                        <span className="validation-error" data-testid="sop-open-error">{sopEntryError}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {results.map((script) => (
                     <ScriptCard
                       key={script.scriptId}

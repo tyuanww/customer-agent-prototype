@@ -771,8 +771,8 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         id: 'aftersale',
         label: '售后流程',
         readiness: 'upstream_authoring',
-        readinessLabel: 'NOT_CREATED · UPSTREAM_AUTHORING',
-        sourceSummary: '上游文档尚未创建，不存在 canonical / current。',
+        readinessLabel: '合成过敏树样例 · DEMO',
+        sourceSummary: '合成过敏树样例 · DEMO。切片 1 不提供树编辑或上传。',
       },
     ] as const,
     entries: [
