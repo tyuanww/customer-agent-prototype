@@ -122,6 +122,7 @@ describe('macOS distribution contract', () => {
     expect(packageRunner).toContain('-UNSIGNED.${ext}');
     expect(packageRunner).toContain("'scripts/finalize-mac-package.mjs', mode");
     expect(packageRunner).toContain("'scripts/verify-mac-package.mjs', mode");
+    expect(packageRunner).toContain("node_modules/electron/install.js");
     expect(packageVerifier).toContain('assertPackagedOfflineProfile');
     expect(packageJson.build.publish).toBeNull();
     expect(packageJson.build.afterPack).toBe('./scripts/after-pack-macos.mjs');

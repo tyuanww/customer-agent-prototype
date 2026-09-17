@@ -158,7 +158,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 | 包内 `THIRD_PARTY_NOTICES.md` 与 Electron / Chromium 许可非空 | 本 Demo 自身已被授权分发给外包或客户 |
 | 品牌 ICNS 门禁通过；无 `app-update.yml` / `latest*.yml` / `.blockmap` | 真实机器上的 Dock 观感、第一次打开的系统对话框 |
 | 每个本地产物文件名带 `UNSIGNED`；`codesign --verify` **必须失败**（未签名） | 「可以发给别人试」；Mac 人工验收 |
-| 打包应用只读 userData 下 `synthetic-stack.json` 的精确 loopback origin；文件缺失或非法则启动 fail-closed，不退回离线 S0，也不改读环境变量 | 环境变量可改打包客户端指向；未先跑合成栈也能当离线 Demo 启动 |
+| 打包应用只读 userData 下 `synthetic-stack.json`；缺文件且包内无精确 extraResources `synthetic-offline.json` 则 fail-closed `missing`。当前包会带该文件，空 userData 首次启动才 seed 离线 S0，不覆盖已有 `synthetic-local`，也不改读环境变量 | 环境变量可改打包客户端指向；删掉 userData 配置就能冒充离线 |
 
 该包禁止外发。经外部渠道下载后通常会被 Gatekeeper 拦截。自动化后验和本机构建图**不能**写成 Mac 人工验收。
 
@@ -318,6 +318,8 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 缺 `synthetic-stack.json` 且包内没有精确 `synthetic-offline.json` 时仍是 fail-closed `missing`，**不会**变成 S0。当前安装包把 `resources/synthetic-offline.json` 打进 extraResources；userData 还没有 profile 时才拷成 `{ "mode": "synthetic-offline" }`。已有 `synthetic-local` 不覆盖。macOS userData：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`。Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`。
 
 办公机首轮勾选（未在本仓代填实机结果）：安装 → 启动出现狐狸头 → 快捷键唤起查询 → 卸载。卸载可能留下 userData，需手工删除上述目录。本勾选不是 M5 验收。
+
+本机未签名 mac 包（2026-09-17，`package:mac:local` 产物 `release/local-unsigned/mac-universal/客服话术浮窗 Demo.app`）：`Contents/Resources/synthetic-offline.json` 为精确 `{"mode":"synthetic-offline"}`。用 `--user-data-dir` 指向空目录启动后写出同样内容的 `synthetic-stack.json`，进程保持运行。**这不是办公机 Windows 安装/卸载验收**，也不代替 Gatekeeper / 公证。
 
 | 你想证明 | 命令 |
 | --- | --- |
