@@ -6,9 +6,9 @@
 
 ---
 
-## 1. 三个窗口的职责与安全配置
+## 1. 窗口职责与安全配置
 
-三个业务 `BrowserWindow` 使用同一份 renderer 入口 `apps/desktop/src/renderer/index.html`，用 `?role=` 分流（`apps/desktop/src/renderer/lib/window-role.ts`）。切片 1 另有独立 SOP 窗，`role=sop`，不进入 `OverlayRole` / `overlayRoleOf` / `trustedContents()`。
+Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/desktop/src/renderer/index.html`，用 `?role=` 分流（`apps/desktop/src/renderer/lib/window-role.ts`）。`OverlayRole` 仍只有 `fox | query`。登录 `role=login`、SOP `role=sop` 不进入 `overlayRoleOf` / `trustedContents()`。
 
 | | Fox | Query | Dashboard |
 | --- | --- | --- | --- |
@@ -22,7 +22,20 @@
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
 | webPreferences | `contextIsolation: true` `sandbox: true` `nodeIntegration: false` `spellcheck: false` | 同左；Query 另设 `backgroundThrottling: false` | `DASHBOARD_WINDOW_SECURITY`：同样三项 + `spellcheck: false`，**不设 preload** |
 
-D1 另有临时独立登录窗，由 `product-login-window.ts` 持有非持久 partition，无 preload/Node，sandbox 与 contextIsolation 开启；仅允许配置的合成 `/authorize` 和 API `/v1/auth/callback`，拒绝子窗和权限。
+| | Login | SOP |
+| --- | --- | --- |
+| 职责 | 飞书 / 账号 chooser | 过敏售后流程投影 |
+| 工厂 | `product-login-window.ts` | `sop-window-controller.ts`（`createOverlayChromeWindow`） |
+| 典型尺寸 | 520×420 | 宽 600；起壳 240，hug 240–620；chrome 40px |
+| frame / 透明 / 置顶 | 标准原生标题栏，不透明 | overlay chrome，可拖动 |
+| preload | `login.ts` → `login.cjs`（内联通道） | `sop.ts` → `sop.cjs`（内联通道） |
+| `trustedContents()` | **否** | **否** |
+| session | 非持久 isolated partition | 与 overlay 同会话，不是登录 partition |
+| 打开时 | Query「合成登录」 | Query 过敏 banner；Dashboard 打开则隐藏 SOP |
+
+登录窗由 `product-login-window.ts` 持有非持久 isolated session，sandbox 与 contextIsolation 开启，专用 preload `apps/desktop/src/preload/login.ts` → `out/preload/login.cjs`（通道字符串内联，禁止 import `ipc-channels.ts`）。Query IPC 不挂到登录窗。打包 `file://` 下 chooser 必须放行 renderer `assets/` 嵌套 hashed 资源并剥掉 Vite `crossorigin`，否则窗是空白。仅允许配置的合成 `/authorize`、账号 `POST /password` 和 API `/v1/auth/callback`，拒绝子窗和权限。
+
+SOP 窗由 `sop-window-controller.ts` 持有，专用 preload `apps/desktop/src/preload/sop.ts` → `out/preload/sop.cjs`（同样内联通道）。Query 只能 `sop-window:open` / `entry-available`；其它 `sop-window:*` 仅 SOP 主框。Dashboard 打开时 SOP 隐藏。
 
 共同锁定（`lockRendererWindow`）：拒绝 `window.open`、拦截 `will-navigate`、拦截 `will-attach-webview`。会话级（`applySessionSecurity`）：权限请求 / 权限检查一律 false。
 
@@ -226,7 +239,9 @@ macOS 台前调度可能把后台透明窗限制在 Electron `screen.workArea` �
 
 ```text
 apps/desktop/src/main/main.ts                 单实例、CSP、identity、IPC、fence、shell
-apps/desktop/src/main/overlay-controller.ts   三窗、handoff、layout、drag、Dashboard
+apps/desktop/src/main/overlay-controller.ts   Fox/Query overlay、handoff、layout、drag、Dashboard
+apps/desktop/src/main/product-login-window.ts 飞书/账号登录窗、isolated session、file:// chooser
+apps/desktop/src/main/sop-window-controller.ts 售后 SOP 窗生命周期与进度
 apps/desktop/src/main/overlay-ipc.ts          overlay / dashboard invoke 门禁
 apps/desktop/src/main/clipboard-ipc.ts        复制门禁
 apps/desktop/src/main/sender-guard.ts         trusted + main-frame
@@ -238,11 +253,15 @@ apps/desktop/src/main/desktop-lifecycle.ts    Dock activate / 二次启动
 apps/desktop/src/main/app-identity.ts         Dock / 品牌图
 apps/desktop/src/main/shutdown-fence.ts
 apps/desktop/src/main/guarded-scheduler.ts
-apps/desktop/src/preload/index.ts             customerAgent 白名单
+apps/desktop/src/preload/index.ts             overlay customerAgent 白名单
+apps/desktop/src/preload/login.ts             登录窗独立 preload（内联通道）
+apps/desktop/src/preload/sop.ts               SOP 窗独立 preload（内联通道）
 apps/desktop/src/shared/                      合同、几何、状态机、IPC 名
 apps/desktop/src/renderer/FoxApp.tsx
 apps/desktop/src/renderer/QueryApp.tsx
 apps/desktop/src/renderer/DashboardApp.tsx
+apps/desktop/src/renderer/LoginApp.tsx
+apps/desktop/src/renderer/SopApp.tsx
 apps/desktop/src/renderer/data/               合成 fixture / manifest
 apps/desktop/scripts/verify-*-package.mjs     打包后验
 apps/desktop/scripts/verify-mac-release-env.mjs 正式外发前置（当前会因 local.demo appId 失败）
@@ -254,6 +273,8 @@ apps/desktop/scripts/verify-mac-release-env.mjs 正式外发前置（当前会�
 | --- | --- |
 | `apps/desktop/src/main/main.ts` | `apps/desktop/out/main/index.js` |
 | `apps/desktop/src/preload/index.ts` | `apps/desktop/out/preload/index.cjs` |
+| `apps/desktop/src/preload/login.ts` | `apps/desktop/out/preload/login.cjs` |
+| `apps/desktop/src/preload/sop.ts` | `apps/desktop/out/preload/sop.cjs` |
 | `apps/desktop/src/renderer/index.html` | `apps/desktop/out/renderer/` |
 
 renderer 无 Node 权限。`apps/desktop/package.json` 的打包 `files` 只含 package-local `out/**/*` 与 `package.json`；狐狸 PNG 与第三方许可走 `extraResources`。产物在仓库中的实际路径是 `apps/desktop/out/`。

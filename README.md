@@ -15,9 +15,9 @@
 | 你现在要做什么 | 打开 |
 | --- | --- |
 | 按统一流程开发、审查、提交 PR、合并、验收和发布，处理授权与证据复用 | [工程工作流程](docs/reference-engineering-workflow.md) |
-| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
+| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP、话术不准、内容草稿、P0 待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
-| 查阅三窗安全、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
+| 查阅 Fox / Query / Dashboard / 登录 / SOP 窗口、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
 | 了解 main / preload / renderer / shared 的职责和清理边界 | [docs/reference-project-architecture.md](docs/reference-project-architecture.md) |
 | 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
@@ -41,6 +41,7 @@
 | 查看 W5 runtime pool / service readiness 的实施边界与证据 | [docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md](docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md) |
 | 查看 W6 CI、Windows smoke 与正式服务候选产物的退出收口 | [docs/plans/2026-09-03-dev-m0-w6-exit-closure.md](docs/plans/2026-09-03-dev-m0-w6-exit-closure.md) |
 | 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
+| 核对合成飞书 / 账号登录窗与打包 file:// 收口（已合入，不含真实飞书凭据） | [docs/plans/2026-09-17-synthetic-dual-login.md](docs/plans/2026-09-17-synthetic-dual-login.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
 | 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |

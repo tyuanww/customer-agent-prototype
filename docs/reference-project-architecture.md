@@ -8,7 +8,7 @@
 ┌──────────────────────────────────────────────────────────────┐
 │ Electron main                                                  │
 │  apps/desktop/src/main/main.ts                                  │
-│   ├─ overlay-controller       三个 BrowserWindow 的生命周期     │
+│   ├─ overlay-controller       Fox / Query overlay 生命周期      │
 │   ├─ desktop-shell             Tray / 菜单 / Dock 入口           │
 │   ├─ desktop-lifecycle         activate / shutdown fence        │
 │   └─ window factories           安全偏好与 renderer loader       │
@@ -26,7 +26,8 @@
 │   ├─ FoxApp       浮窗、拖拽、贴边、睡眠与交接                   │
 │   ├─ QueryApp     查询胶囊、BM25/embedding/hydrate Top 3、复制   │
 │   ├─ DashboardApp 静态合成工作台、主题与导航                      │
-│   └─ LoginApp     飞书 / 账号 chooser（独立原生窗，非 overlay）   │
+│   ├─ LoginApp     飞书 / 账号 chooser（独立原生窗，非 overlay）   │
+│   └─ SopApp       过敏售后流程切片 1（独立 SOP 窗，非 overlay）   │
 └────────────────────────────────────────────────────────────────┘
                 │
 ┌───────────────▼───────────────────────────────────────────────┐
@@ -61,8 +62,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | 目录 | 只负责什么 | 不应该放什么 |
 | --- | --- | --- |
 | `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页、D4 合成求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排 | React 视图、业务 fixture、通用 HTTP 客户端 |
-| `apps/desktop/src/preload/` | 把 `CustomerAgentApi` 的白名单能力暴露给 renderer | `ipcRenderer` 通用转发、Node 文件系统、token |
-| `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard 和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
+| `apps/desktop/src/preload/` | overlay `index.ts` 把 `CustomerAgentApi` 白名单暴露给 Fox/Query；`login.ts` / `sop.ts` 是独立入口，通道字符串必须内联 | `ipcRenderer` 通用转发、Node 文件系统、token、独立 preload 去 import `ipc-channels.ts` |
+| `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard、登录 chooser、SOP 投影和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
 | `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何、状态纯函数，以及 BM25+RRF `hybrid-retrieve` | 依赖 DOM、Electron、React 的实现 |
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
@@ -102,13 +103,17 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 `负责人承接 B3` 仅扩展测试支持链：闭合 v3 第五文件和独立外部记录/主体锚点；内容身份模块统一 canonical JSON、审核前投影与最终摘要。loader 使用实际来源确定 tenant，在同一事务以登记角色写入，再由数据库独立校验实际内容和完整 scope，失败整批回滚。owner 评测采用 `READ COMMITTED READ ONLY` 保持来源/撤销 fence，v2 行为不变；未新增生产 API、runtime 权限或桌面接入。验证见 [B3 记录](plans/2026-09-06-owner-acceptance-loader.md)。
 
-## 3. 三个窗口和安全边界
+## 3. 窗口和安全边界
 
-| WindowRole | Renderer | preload | 主要能力 |
+`OverlayRole` 只有 `fox | query`。`RendererRole` 是 `fox | query | dashboard | login | sop`（`apps/desktop/src/shared/overlay-events.ts`，由 `window-role.ts` 从 `?role=` 读取）。
+
+| RendererRole | Renderer | preload | 主要能力 |
 | --- | --- | --- | --- |
-| `fox` | `FoxApp` | 有 | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
-| `query` | `QueryApp` | 有 | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard |
-| `dashboard` | `DashboardApp` | 无 | 静态合成 Dashboard、主题和导航 |
+| `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
+| `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
+| `dashboard` | `DashboardApp` | 无 | 合成工作台、主题和导航；本窗还有 CSV 草稿解析与 P0 迭代提醒（会话内状态，不写盘） |
+| `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
+| `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 

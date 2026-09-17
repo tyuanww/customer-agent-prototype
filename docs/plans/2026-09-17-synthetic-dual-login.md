@@ -1,9 +1,9 @@
 # 合成双身份登录收口（飞书 / 账号）
 
-> **状态：** 本切片实施清单。不批准真实飞书凭据、不打开无凭据的 `AUTH_MODE=feishu`、不放宽 loopback、不加契约 `AuthMode` 第三值。
+> **状态：** 已合入 `main`（PR #99 squash `48ec546`）。历史实施清单，不再当待办。不批准真实飞书凭据、不打开无凭据的 `AUTH_MODE=feishu`、不放宽 loopback、不加契约 `AuthMode` 第三值。
 > **日期：** 2026-09-17
-> **基线：** `origin/main` @ `dda273c`（PR #94 已合入登录窗）。
-> **工作区：** `/Users/hutou/Desktop/wt-synthetic-login` · 分支 `feat/synthetic-dual-login`。不切换 SOP 工作区，不改另外四项。
+> **基线：** 合入前 `origin/main` @ `dda273c`（PR #94 登录窗）+ PR #95 SOP。
+> **工作区（历史）：** `/Users/hutou/Desktop/wt-synthetic-login` · 分支 `feat/synthetic-dual-login`。
 
 ## 已在 main
 
