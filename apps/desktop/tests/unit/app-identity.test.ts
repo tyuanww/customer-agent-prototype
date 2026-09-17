@@ -213,6 +213,7 @@ describe('brand icon assets', () => {
     expect(generator).toContain('assets/app-icon.png');
     expect(generator).not.toMatch(/https?:\/\//);
     expect(macIcon).toContain('assets/app-icon.png');
+    expect(macIcon).toContain("CDPATH=''");
     expect(macIcon).not.toContain('fox-head.png');
     expect(gitignore).toContain('build/icon.icns');
     expect(gitignore).toContain('build/icon.png');
