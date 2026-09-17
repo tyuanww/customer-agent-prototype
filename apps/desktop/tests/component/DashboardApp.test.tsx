@@ -1466,6 +1466,8 @@ describe('DashboardApp', () => {
     // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
     expect(screen.getByTestId('content-upload-input')).toHaveAttribute('accept', '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     expect(screen.getByTestId('content-upload-input')).toHaveAttribute('type', 'file');
+    expect(screen.getByLabelText('选择 CSV；二进制 xlsx 会失败关闭')).toBeInTheDocument();
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('二进制 xlsx 会失败关闭');
 
     await user.click(screen.getByTestId('content-upload-demo'));
     const demoPreview = screen.getByTestId('content-staged-preview');
@@ -1490,8 +1492,9 @@ describe('DashboardApp', () => {
     );
     await user.upload(screen.getByTestId('content-upload-input'), csv);
     await waitFor(() => {
-      expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('先确认产品版本');
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('先确认产品版本');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('coach-draft.csv');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');

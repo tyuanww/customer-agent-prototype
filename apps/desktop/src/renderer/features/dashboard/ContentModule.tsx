@@ -12,10 +12,12 @@ const data = DASHBOARD_MANIFEST.content;
 
 type UploadView =
   | { status: 'idle' }
+  | { status: 'reading'; sourceName: string }
   | { status: 'ready'; sourceName: string; rows: readonly CoachUploadRow[] }
   | { status: 'error'; message: string };
 
 function pipelineItemClass(step: string, upload: UploadView): string {
+  if (upload.status === 'reading' && step === 'Import') return 'is-current';
   if (upload.status !== 'ready') return '';
   if (step === 'Import' || step === 'Validate') return 'is-done';
   if (step === 'Staged') return 'is-current';
@@ -42,9 +44,11 @@ export function ContentModule() {
   const hasDomain = upload.status === 'ready' && upload.rows.some((row) => row.domain);
   const statusMessage = upload.status === 'ready'
     ? `已进入待审核草稿 · ${upload.rows.length} 行 · ${upload.sourceName} · 不是已发布`
+    : upload.status === 'reading'
+      ? `正在读取 ${upload.sourceName} · 只在本页预览，不会发布`
     : upload.status === 'error'
       ? upload.message
-      : '尚未导入。选择 CSV / XLSX 或载入合成样例后，只在本页显示待审核草稿预览。';
+      : '尚未导入。选择 CSV 或载入合成样例后，只在本页显示待审核草稿预览。二进制 xlsx 会失败关闭。';
 
   const loadDemo = () => {
     ingestGeneration.current += 1;
@@ -63,6 +67,7 @@ export function ContentModule() {
     if (!file) return;
     const generation = ingestGeneration.current + 1;
     ingestGeneration.current = generation;
+    setUpload({ status: 'reading', sourceName: file.name.trim() || 'untitled.csv' });
     void readCoachUploadFile(file).then(
       (result) => {
         if (generation !== ingestGeneration.current) return;
@@ -117,12 +122,13 @@ export function ContentModule() {
 
         <div className="dash-filter-toolbar compact content-upload-controls" aria-label="话术师上传">
           <label className="is-grow" htmlFor="content-upload-file">
-            <span>选择 CSV / XLSX</span>
+            <span>选择 CSV；二进制 xlsx 会失败关闭</span>
             <input
               id="content-upload-file"
               type="file"
               accept={data.upload.accept}
               data-testid="content-upload-input"
+              disabled={upload.status === 'reading'}
               onChange={onFileChange}
             />
           </label>
@@ -130,6 +136,7 @@ export function ContentModule() {
             type="button"
             className="dash-action-primary"
             data-testid="content-upload-demo"
+            disabled={upload.status === 'reading'}
             onClick={loadDemo}
           >
             载入合成样例
@@ -138,7 +145,7 @@ export function ContentModule() {
             type="button"
             className="dash-reset"
             data-testid="content-upload-clear"
-            disabled={upload.status === 'idle'}
+            disabled={upload.status === 'idle' || upload.status === 'reading'}
             onClick={clearUpload}
           >
             清除预览
@@ -152,7 +159,15 @@ export function ContentModule() {
           data-state={upload.status}
           data-testid="content-upload-status"
         >
-          <strong>{upload.status === 'ready' ? '待审核草稿' : upload.status === 'error' ? '未进入草稿' : '等待导入'}</strong>
+          <strong>{
+            upload.status === 'ready'
+              ? '待审核草稿'
+              : upload.status === 'reading'
+                ? '正在读取'
+                : upload.status === 'error'
+                  ? '未进入草稿'
+                  : '等待导入'
+          }</strong>
           <span>{statusMessage}</span>
         </div>
 
