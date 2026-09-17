@@ -44,6 +44,9 @@ test('desktop client queries the running synthetic stack and copies a candidate'
     await query.evaluate(() => window.customerAgent!.openSearch());
 
     await query.getByRole('button', { name: '合成登录' }).click();
+    await expect.poll(() => app!.windows().some((window) => window.url().includes('role=login'))).toBe(true);
+    const login = app.windows().find((window) => window.url().includes('role=login'))!;
+    await login.getByRole('button', { name: '飞书登录' }).click();
     await expect(query.getByRole('button', { name: /agent/ })).toBeVisible({ timeout: 30_000 });
     expect(JSON.stringify(await query.evaluate(() => window.customerAgent!.product!.sessionStatus())))
       .not.toContain('access_token');

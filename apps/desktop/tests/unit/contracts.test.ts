@@ -1,5 +1,13 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { COPY_SUCCESS_MESSAGE, IPC_CHANNEL_WHITELIST, IPC_CHANNELS } from '../../src/shared/contracts';
+
+const loginPreload = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/login.ts'),
+  'utf8',
+);
 import { ALLOWED_HELP_STATUS, FORBIDDEN_HELP_PHRASES } from '../../src/shared/product-help';
 
 describe('IPC whitelist', () => {
@@ -32,8 +40,18 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.COMMIT_FOX_DRAG_SETTLE,
       IPC_CHANNELS.SET_FOX_PEEK,
       IPC_CHANNELS.OVERLAY_COMMAND,
+      IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU,
+      IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT,
+      IPC_CHANNELS.LOGIN_WINDOW_CANCEL,
     ]);
     expect(new Set(IPC_CHANNEL_WHITELIST).size).toBe(IPC_CHANNEL_WHITELIST.length);
+  });
+
+  it('keeps the login preload free of shared overlay modules', () => {
+    expect(loginPreload).not.toContain("from '../shared/ipc-channels'");
+    expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU}'`);
+    expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT}'`);
+    expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_CANCEL}'`);
   });
 
   it('uses 已复制 as the only success copy label', () => {
