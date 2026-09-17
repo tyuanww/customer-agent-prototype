@@ -24,6 +24,12 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [Unreleased]
 
+- After-sale allergy SOP is a dedicated draggable window (PR #95). Query search stays Top 3; agents open「打开过敏售后流程」from the gold query. SOP copy is local feedback only, not Query `COPIED`. Slice 1 is the synthetic allergy tree.
+- Coach「内容与发布」parses a local CSV into unpublished drafts (PR #96). Publish stays disabled. After-sale remains a DEMO sample and does not take this page's upload.
+- Query script cards can mark「话术不准」locally (PR #97) without IPC, tickets, or copy-adopt. SOP cards do not show that control.
+- Dashboard「话术优化待办」shows open P0 reminders and a session-local CAS drill (PR #98). No HTTP start/close and no Feishu push.
+- Packaged `file://` login can mount the Feishu / account chooser (PR #99) by allowing nested renderer assets and stripping Vite `crossorigin`. Login and SOP use independent preloads and stay out of `trustedContents()`. Real Feishu credentials and `AUTH_MODE=feishu` without creds stay closed.
+
 - Logged the 2026-09-16 desktop delivery-shape review at `docs/plans/2026-09-16-desktop-delivery-shape-review.md`: a read-only re-check of whether a packaged Windows build is usable on the office machine, which reverses several earlier assumptions. This is a review record, not a Windows implementation, install acceptance, or approval to start the phase, and it does not move the loopback red line.
 - Added an Open section (P1–P10) to `TODOS.md` for that review's follow-ups, without re-opening any Completed entry. Each Open item carries its own status and needs its own authorization. P10 records the still-unsolved part: the installer ships only the desktop output and assets, so the API, worker, synthetic identity, PostgreSQL 15, and the off-repo index still have to be prepared on the target machine — this is not "no external dependencies".
 - Corrected the Windows DRAFT plan where it contradicted the startup code: the plan said a packaged build without a topology starts on the S0 synthetic fixture and can still verify the overlay, but `product-runtime-config.ts` throws on a missing, invalid, or unreadable `synthetic-stack.json` and `main.ts` quits — there is no S0 middle state. The plan now states the app does not start. Documentation only: the plan stays DRAFT and no `package:win`, install, signing, notarization, or deploy was performed.

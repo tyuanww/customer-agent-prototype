@@ -287,7 +287,39 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 | --- | --- |
 | SOP 树 / 几何 / 合同 / 入口 / 三屏渲染 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/sop-model.test.ts tests/unit/sop-geometry.test.ts tests/unit/contracts.test.ts tests/unit/window-role.test.ts tests/unit/sop-window-ipc.test.ts tests/component/SopApp.test.tsx tests/component/QueryApp.test.tsx tests/unit/search-service.test.ts` |
 
-黄金路径（人工）：`pnpm dev` → 狐狸头 → `过敏了怎么办` → 结果标题和卡片之间的 banner +「打开过敏售后流程」→ 凭证话术屏。SOP 窗 600×240 起壳，ACK 后 hug，高度上限 620。Windows feasibility 允许过敏 hug 比旧 Query 更高，不把 620 当成失败。不要跑 `pnpm test:float` 来证明 SOP。
+黄金路径（人工）：`pnpm dev` → 狐狸头 → `过敏了怎么办` → 结果标题和卡片之间的 banner +「打开过敏售后流程」→ 凭证话术屏。SOP 窗 600×240 起壳，ACK 后 hug，高度上限 620。Windows feasibility 允许过敏 hug 比旧 Query 更高，不把 620 当成失败。不要跑 `pnpm test:float` 来证明 SOP。SOP 卡片没有「话术不准」。
+
+## 话术不准（Query 切片 1）
+
+结果卡发丝按钮「话术不准」只写本卡 React 状态，文案「已记录，待话术师核实」。不走 IPC / API / Dashboard / `copyAdopt`。数字键 1/2/3 仍只复制。EMPTY 无命中继续 escalate。
+
+| 你想证明 | 命令 |
+| --- | --- |
+| 话术不准入口与复制路径隔离 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx tests/component/SopApp.test.tsx tests/unit/query-view.test.ts tests/unit/query-visual.test.ts` |
+
+## 内容与发布草稿（Dashboard 切片 1）
+
+「内容与发布」本地解析 CSV 成待审核草稿。Publish 仍 disabled。无 Dashboard preload、不 POST `/v1/content/import`。二进制 xlsx fail-close；本地预览 64KiB / 50 行（后端 10MiB / 5000 行不要对齐）。售后过敏树是 DEMO 样例，不接本页上传。
+
+| 你想证明 | 命令 |
+| --- | --- |
+| 草稿解析与正式来源文案 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/coach-content-upload.test.ts tests/component/DashboardApp.test.tsx tests/unit/query-visual.test.ts` |
+
+## 话术优化待办提醒（Dashboard 切片 1）
+
+现有「话术优化待办」模块顶部一条 P0 横幅 + 队列，不是新窗口。会话内 CAS 演练：窗口里把模拟服务端 version +1、客户端快照不动，随后 start/close 可打出页内「待办已更新，请刷新后再处理」。无 HTTP start/close、无飞书推送、无 Dashboard preload。
+
+| 你想证明 | 命令 |
+| --- | --- |
+| P0 横幅与 CAS 演练 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts tests/unit/dashboard-manifest.test.ts` |
+
+## 打包 file:// 登录窗
+
+打包态 chooser 必须能加载 `out/renderer/assets/` 下嵌套 hashed JS/CSS。`isChooserUrl` 放行 `file:` 的 `index.html` 与 renderer 资源，拒绝 `..` / 凭据 / 非 file（开发态 Vite origin 除外）。
+
+| 你想证明 | 命令 |
+| --- | --- |
+| chooser 白名单与飞书/账号文案 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-login-window.test.ts tests/component/LoginApp.test.tsx tests/e2e/product-session.spec.ts` |
 
 ## 合成产品会话接入（D1）
 
