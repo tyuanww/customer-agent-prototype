@@ -24,6 +24,8 @@ type QueryResultsPaneProps = {
   onOpenSop?: () => void;
   onRetry: () => void;
   onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
+  reportedScriptIds?: ReadonlySet<string>;
+  onReportInaccuracy?: (script: RankedScript) => void;
   onCopyContact?: () => void;
   onOpenHelp?: () => void;
   onLeaveNoHit?: () => void;
@@ -47,6 +49,8 @@ export function QueryResultsPane({
   onOpenSop,
   onRetry,
   onCopy,
+  reportedScriptIds,
+  onReportInaccuracy,
   onCopyContact,
   onOpenHelp,
   onLeaveNoHit,
@@ -125,6 +129,8 @@ export function QueryResultsPane({
                       script={script}
                       copying={copying || phase === 'COPIED'}
                       copied={copiedRank === script.rank}
+                      reported={reportedScriptIds?.has(script.scriptId)}
+                      onReport={onReportInaccuracy}
                       onCopy={(item, trigger) => {
                         onCopy(item, trigger);
                       }}
