@@ -205,6 +205,16 @@ function scriptPublished(scriptId: string | undefined, published: SopPublishSet)
   return published.has(scriptId);
 }
 
+function highRiskBannerFor(node: SopNode | null | undefined, shellState: SopShellState): string {
+  if (shellState !== 'ready' || node?.kind !== 'copyable') {
+    return '';
+  }
+  if (node.voucher === true || node.riskLevel === 'high') {
+    return SOP_HIGH_RISK_BANNER;
+  }
+  return '';
+}
+
 function projectScript(node: SopNode): SopProjectedScript | null {
   if (node.kind !== 'copyable' || !node.scriptId || !node.answerText) {
     return null;
@@ -253,7 +263,7 @@ export function projectSop(input: {
     demo: true,
     shellState,
     nodeKind: shellState === 'opening' ? 'opening' : (node?.kind ?? 'internal'),
-    highRiskBanner: SOP_HIGH_RISK_BANNER,
+    highRiskBanner: highRiskBannerFor(node, shellState),
     internalNote: privileged ? (node?.internalNote ?? null) : null,
     internalTask: privileged ? (node?.internalTask ?? null) : null,
     script: shellState === 'ready' ? script : null,

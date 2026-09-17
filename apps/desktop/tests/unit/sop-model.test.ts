@@ -9,6 +9,7 @@ import {
   type SopTree,
 } from '../../src/shared/sop-model';
 import { ALLERGY_SOP_TREE } from '../../src/shared/synthetic-sops';
+import { SOP_HIGH_RISK_BANNER } from '../../src/shared/sop-window';
 import { compactQueryText } from '../../src/shared/query-analyze';
 
 function tree(partial: Partial<SopTree> & Pick<SopTree, 'nodes' | 'startNodeId'>): SopTree {
@@ -105,6 +106,39 @@ describe('SOP projection', () => {
     expect(projection.internalNote).toBeNull();
     expect(projection.internalTask).toBeNull();
     expect(projection.unpublished).toBe(false);
+    expect(projection.highRiskBanner).toBe(SOP_HIGH_RISK_BANNER);
+  });
+
+  it('keeps the voucher constraint banner off decision, mild, and internal steps', () => {
+    const start = startSopProgress(ALLERGY_SOP_TREE);
+    const severity = chooseSopEdge(ALLERGY_SOP_TREE, start, 'has-photo')!;
+    const mild = chooseSopEdge(ALLERGY_SOP_TREE, severity, 'mild')!;
+    const insist = chooseSopEdge(ALLERGY_SOP_TREE, start, 'no-photo')!;
+    const severe = chooseSopEdge(ALLERGY_SOP_TREE, severity, 'severe')!;
+    expect(projectSop({
+      tree: ALLERGY_SOP_TREE,
+      progress: severity,
+      role: 'agent',
+      sessionId: 1,
+    }).highRiskBanner).toBe('');
+    expect(projectSop({
+      tree: ALLERGY_SOP_TREE,
+      progress: mild,
+      role: 'agent',
+      sessionId: 1,
+    }).highRiskBanner).toBe('');
+    expect(projectSop({
+      tree: ALLERGY_SOP_TREE,
+      progress: insist,
+      role: 'agent',
+      sessionId: 1,
+    }).highRiskBanner).toBe(SOP_HIGH_RISK_BANNER);
+    expect(projectSop({
+      tree: ALLERGY_SOP_TREE,
+      progress: severe,
+      role: 'agent',
+      sessionId: 1,
+    }).highRiskBanner).toBe('');
   });
 
   it('omits unpublished as an open failure and keeps it as a projection field', () => {
