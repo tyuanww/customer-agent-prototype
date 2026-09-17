@@ -6,7 +6,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Added
 
-- After collapsing the query overlay, macOS returns keyboard focus to the previous app (Qianniu, Grok Build, or any other) so the agent can keep typing without clicking that window.
+- After collapsing the query overlay, macOS returns keyboard focus to the previous app (Qianniu, Grok Build, or any other) so the agent can keep typing without clicking that window. See `docs/how-to-verify-desktop.md` D2.
 - The query capsule login control is labeled 登录. Unsigned placeholder is 登录后查询话术; signed-in placeholder is 输入或粘贴客户问题，回车查询.
 - Smart retrieval is a compact right-side switch with a sliding thumb, not ON/OFF text.
 - Clicking the dashboard icon while unsigned starts login first, then opens the dashboard on success.

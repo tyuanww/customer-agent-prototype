@@ -16,7 +16,7 @@ Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/
 | 工厂 | `createOverlayChromeWindow` | 同左 | `createDashboardBrowserWindow` |
 | 典型尺寸 | 88×88（`FOX_SIZE`） | 宽 600；高见第 4 节 | 1180×760，最小 980×680 |
 | frame / 透明 / 置顶 | frameless、透明、`alwaysOnTop`、`skipTaskbar` | 同左；`resizable: false` | 标准 frame、不透明、非置顶、显示任务栏 |
-| macOS 形态 | `panel` + `hiddenInMissionControl` | 同左（命令面板：非激活 NSPanel）。收起时 `app.hide()` 让出前台，不 `app.focus({ steal })`。Dock 仍走 Dashboard 的 regular 激活 | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
+| macOS 形态 | `panel` + `hiddenInMissionControl` | 同左（命令面板：非激活 NSPanel）。收起要把键盘还给上一个 App：闲置狐狸 `setFocusable(false)`；仅当 Dashboard / 登录 / SOP 都不可见时才 `app.hide()`，再延迟 `showInactive` 狐狸。DevTools 窗不算「别 hide」。不 `app.focus({ steal })`。Dock 仍走 Dashboard 的 regular 激活 | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
 | preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | **无 preload** |
 | `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无** |
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
@@ -31,7 +31,7 @@ Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/
 | preload | `login.ts` → `login.cjs`（内联通道） | `sop.ts` → `sop.cjs`（内联通道） |
 | `trustedContents()` | **否** | **否** |
 | session | 非持久 isolated partition | 与 overlay 同会话，不是登录 partition |
-| 打开时 | Query「合成登录」 | Query 过敏 banner；Dashboard 打开则隐藏 SOP |
+| 打开时 | Query「登录」 | Query 过敏 banner；Dashboard 打开则隐藏 SOP |
 
 登录窗由 `product-login-window.ts` 持有非持久 isolated session，sandbox 与 contextIsolation 开启，专用 preload `apps/desktop/src/preload/login.ts` → `out/preload/login.cjs`（通道字符串内联，禁止 import `ipc-channels.ts`）。Query IPC 不挂到登录窗。打包 `file://` 下 chooser 必须放行 renderer `assets/` 嵌套 hashed 资源并剥掉 Vite `crossorigin`，否则窗是空白。仅允许配置的合成 `/authorize`、账号 `POST /password` 和 API `/v1/auth/callback`，拒绝子窗和权限。
 
@@ -138,7 +138,7 @@ SOP 几何（`apps/desktop/src/shared/sop-geometry.ts`）：宽 600，起壳高 
 3. Main `startPreparedOpen`：`show` Query、立刻 `setBounds` 回准备好的 frame、`hide` Fox、聚焦 App / BrowserWindow / WebContents，再发 `activate-search`。
 4. 外壳 `clip-path` 约 260ms；Query 回执 `open-finished`。定时器 `180ms`（准备）/ `260+100ms`（打开）只作异常兜底。
 
-关闭反向：`collapse` → Query 末帧 `close-finished` → Main `showInactive` Fox、`hide` Query。贴边 Query 与物理工作区边缘齐平，保持 32px 半露轮廓。每阶段最终 bounds 只提交一次。禁止双狐狸错位、先闪完整面板、两窗同时不可见。
+关闭反向：`collapse` → Query 末帧 `close-finished` → Main 先 remap 并 `showInactive` Fox、再 `hide` Query，然后 `yieldOrKeepPalette`（见上表 macOS 收起焦点）。贴边 Query 与物理工作区边缘齐平，保持 32px 半露轮廓。每阶段最终 bounds 只提交一次。禁止双狐狸错位、先闪完整面板、两窗同时不可见。
 
 ---
 

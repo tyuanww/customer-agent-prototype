@@ -29,7 +29,7 @@
 - 锚定在狐狸位置附近，并钳制到当前屏 `workArea`。
 - 狐狸拖到当前屏左右边缘 18px 内时自动吸附：88px 原生窗始终完整留在工作区，renderer 在稳定窗口内平移裁切，令 64px 狐狸视觉左右都恰好露 32px；打开查询后仍从原侧向屏幕内展开。禁止把透明原生窗反复推到屏外与 WindowServer 争抢位置。
 - macOS 台前调度的最近 App 条带可能把后台透明窗限制在一个未由 Electron `screen.workArea` 暴露的“有效舞台边界”。此时以 WindowServer 实际接受的 `BrowserWindow.getBounds()` 为该 dock epoch 的位置真值；hover peek / retract 只改 renderer 裁切，不得再次 `setBounds(workArea.x)`。打开 Query、共享元素中心与关闭恢复都从实际 frame 采样。目标是在系统接受边界稳定半露且不横跳；Electron 公共 API 下不承诺后台窗口一定占据物理屏 x=0。
-- 查询胶囊持续显示环境徽标：`DEMO`、`MOCK AUTH`。话术卡片不再贴 `DEMO · 合成数据`；身份与目录仍是合成。Dashboard 顶栏在 macOS integrated chrome 下就是 48px 单行标题栏：左侧模块名与紧凑刷新信息与标题栏同中心线；右侧只保留一个主题图标按钮、一个「演示数据」标识及极短边界文本「无后端 · 不保存」。完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 与安全免责声明收进侧栏「演示环境」，避免把管理端做成 Demo 徽标墙。
+- 查询胶囊不再贴 `DEMO`、`MOCK AUTH` 徽标。话术卡片不再贴 `DEMO · 合成数据`；身份与目录仍是合成。Dashboard 顶栏在 macOS integrated chrome 下就是 48px 单行标题栏：左侧模块名与紧凑刷新信息与标题栏同中心线；右侧只保留一个主题图标按钮、一个「演示数据」标识及极短边界文本「无后端 · 不保存」。完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 与安全免责声明收进侧栏「演示环境」，避免把管理端做成 Demo 徽标墙。
 - macOS 查询窗保留可激活的普通窗口类型以保障 IME / 物理键盘焦点。应用必须保持 regular Dock / Cmd+Tab；Electron 只允许已是 `UIElementApplication` 时使用 `skipTransformProcessType: true`，因此本 Demo 不再把 Query 加入所有 Space 或覆盖全屏应用。当前 Space 内正常唤起仍成立。显示器新增、拔除、分辨率或 Dock 工作区变化后，Float 以防抖方式重新钳制到可用 `workArea`，不抢焦点、不重播动效、不打断共享元素交接。
 - `FOX_IDLE` 按“只显示狐狸头”的目标例外。
 
@@ -82,12 +82,13 @@
 - 打开时自动聚焦并全选已有内容；应用或窗口恢复焦点时只恢复键盘路由，不再次全选，避免下一键覆盖已输入问题。
 - 中文 IME 组合输入期间按 Enter 不得误提交。
 - 空查询给出明确提示，不检索。
-- Dashboard 图标是清晰但不抢主 CTA 的次入口，具有 `aria-label` 与 tooltip。打开后 Float 收起为狐狸。
+- Dashboard 图标是清晰但不抢主 CTA 的次入口，具有 `aria-label` 与 tooltip。未登录点它先走「登录」，成功后再打开工作台；打开后 Float 收起为狐狸。
 - 查询胶囊的玻璃外壳、输入井、次入口、查询按钮与结果卡沿用白主紫锚的克制材质，观感接近专业桌面输入工具；不得新增装饰文案，也不得改变共享元素交接几何、打开关闭 ACK、焦点 / IME、检索、Top 3、复制、窗口尺寸或 IPC。
 - 接入模式可显示只读版本横幅（当前 release / 公告标题）。ACK 只表示客户端核验动作，不得写成已读、已同步或已生效。
 - 狐狸右键使用主进程固定生成的原生菜单；系统 Tray / 菜单栏与应用菜单提供「打开话术查询」「打开运营工作台」。这些可信入口直接调用主进程窗口动作，不允许 renderer 传任意菜单或 command，也不放宽 `dashboard:open` 的 query-only IPC 门禁。
 - macOS 程序坞图标代表完整应用表面：应用已就绪后点击程序坞打开 / 恢复单例 Dashboard，不展开查询；首次启动仍只显示狐狸。
-- 「智能检索」是查询胶囊开关，默认 ON。它只允许 MiniMax 规划检索式并重排已有话术 id；不得生成或改写 Answer，也不得出现「AI 正在生成答案」。关闭、缺 key 或超时则只走本地 BM25。
+- 「智能检索」是查询胶囊右侧小开关，默认开。它只允许 MiniMax 规划检索式并重排已有话术 id；不得生成或改写 Answer，也不得出现「AI 正在生成答案」。关闭、缺 key 或超时则只走本地 BM25。
+- macOS 收起查询（Esc、点狐狸头、再按快捷键、复制后自动收起）必须把键盘还给上一个应用的输入框，坐席不必再点那个窗口。工作台 / 登录 / SOP 可见时不得用 `app.hide()` 把它们一起藏掉。
 
 ### Top 3 话术卡
 
