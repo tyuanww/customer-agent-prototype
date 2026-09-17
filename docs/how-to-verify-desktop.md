@@ -315,11 +315,13 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 打包态显式离线（P3 第一刀）
 
-缺 `synthetic-stack.json` 仍是 fail-closed 启动失败（`missing`），**不会**变成 S0。只有 userData 里放精确文件 `{ "mode": "synthetic-offline" }`（不得夹带 origin 或其它字段）才走离线浮窗。macOS 路径：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`。Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`。本刀不把该文件打进安装包。
+缺 `synthetic-stack.json` 且包内没有精确 `synthetic-offline.json` 时仍是 fail-closed `missing`，**不会**变成 S0。当前安装包把 `resources/synthetic-offline.json` 打进 extraResources；userData 还没有 profile 时才拷成 `{ "mode": "synthetic-offline" }`。已有 `synthetic-local` 不覆盖。macOS userData：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`。Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`。
+
+办公机首轮勾选（未在本仓代填实机结果）：安装 → 启动出现狐狸头 → 快捷键唤起查询 → 卸载。卸载可能留下 userData，需手工删除上述目录。本勾选不是 M5 验收。
 
 | 你想证明 | 命令 |
 | --- | --- |
-| 缺文件仍 missing；显式 offline 返回 undefined | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-runtime-config.test.ts` |
+| 缺文件仍 missing；显式 offline；bundle seed 不覆盖 local | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-runtime-config.test.ts tests/unit/mac-platform-contract.test.ts` |
 
 ## 打包 file:// 登录窗
 

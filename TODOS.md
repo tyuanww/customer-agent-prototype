@@ -53,7 +53,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 已授权第一刀（P2 拍板后）。缺文件仍 fail-closed `missing`；显式 `{ "mode": "synthetic-offline" }` 才进打包 S0。不得用删文件冒充离线。安装包写入该文件、办公机实机勾选仍属后续刀。
+**Status:** 第一刀已合入。第二刀：包内 extraResources `synthetic-offline.json`，userData 无 profile 时才 seed 精确 `{ "mode": "synthetic-offline" }`，不覆盖已有 synthetic-local。办公机实机勾选仍属后续。
 
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 

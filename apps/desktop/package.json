@@ -62,6 +62,10 @@
     ],
     "extraResources": [
       {
+        "from": "resources/synthetic-offline.json",
+        "to": "synthetic-offline.json"
+      },
+      {
         "from": "fox-head.png",
         "to": "fox-head.png"
       },
