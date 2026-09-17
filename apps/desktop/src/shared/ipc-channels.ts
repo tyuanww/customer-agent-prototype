@@ -31,6 +31,7 @@ export const IPC_CHANNELS = {
   LOGIN_WINDOW_CANCEL: 'login-window:cancel',
   SOP_WINDOW_OPEN: 'sop-window:open',
   SOP_WINDOW_ENTRY_AVAILABLE: 'sop-window:entry-available',
+  SOP_WINDOW_RESUME_AVAILABLE: 'sop-window:resume-available',
   SOP_WINDOW_CLOSE: 'sop-window:close',
   SOP_WINDOW_END_FLOW: 'sop-window:end-flow',
   SOP_WINDOW_RESTART: 'sop-window:restart',

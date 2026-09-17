@@ -126,6 +126,7 @@ export function QueryApp() {
   const [sopEntryVisible, setSopEntryVisible] = useState(false);
   const [sopEntryBusy, setSopEntryBusy] = useState(false);
   const [sopEntryError, setSopEntryError] = useState<string | null>(null);
+  const [sopEntryResume, setSopEntryResume] = useState(false);
   const lastProductQueryRef = useRef<{
     sessionEpoch: number;
     generation: number;
@@ -1048,15 +1049,17 @@ export function QueryApp() {
       && isAllergySopEntry(compactQueryText(query));
     if (!allergyHit) {
       setSopEntryVisible(false);
+      setSopEntryResume(false);
       setSopEntryError(null);
       return undefined;
     }
-    const available = window.customerAgent?.sopWindow?.entryAvailable;
-    if (!available) {
+    const api = window.customerAgent?.sopWindow;
+    if (!api?.entryAvailable) {
       setSopEntryVisible(false);
+      setSopEntryResume(false);
       return undefined;
     }
-    void available().then((ok) => {
+    void api.entryAvailable().then((ok) => {
       if (!cancelled) {
         setSopEntryVisible(ok === true);
       }
@@ -1065,10 +1068,35 @@ export function QueryApp() {
         setSopEntryVisible(false);
       }
     });
+    void api.resumeAvailable?.().then((ok) => {
+      if (!cancelled) {
+        setSopEntryResume(ok === true);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setSopEntryResume(false);
+      }
+    });
     return () => {
       cancelled = true;
     };
   }, [phase, query, results.length]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      const resume = window.customerAgent?.sopWindow?.resumeAvailable;
+      if (!resume) {
+        return;
+      }
+      void resume().then((ok) => {
+        setSopEntryResume(ok === true);
+      }).catch(() => {
+        setSopEntryResume(false);
+      });
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   const openAllergySop = useCallback(() => {
     const api = window.customerAgent?.sopWindow;
@@ -1081,7 +1109,9 @@ export function QueryApp() {
     void api.open(ALLERGY_SOP_SCENE_ID).then((result) => {
       if (!result.ok) {
         setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
+        return;
       }
+      setSopEntryResume(true);
     }).catch(() => {
       setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
     }).finally(() => {
@@ -1528,6 +1558,7 @@ export function QueryApp() {
             sopEntryVisible={sopEntryVisible}
             sopEntryBusy={sopEntryBusy}
             sopEntryError={sopEntryError}
+            sopEntryResume={sopEntryResume}
             onOpenSop={openAllergySop}
             onRetry={retry}
             onCopy={(item, trigger) => {

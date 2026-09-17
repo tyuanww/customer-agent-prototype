@@ -33,6 +33,7 @@ const moveFoxBy = vi.fn();
 const setFoxPeek = vi.fn();
 const sopOpen = vi.fn();
 const sopEntryAvailable = vi.fn();
+const sopResumeAvailable = vi.fn();
 const commandListeners = new Set<(command: OverlayCommand) => void>();
 
 function dispatchAnimationEnd(target: Element, animationName: string): void {
@@ -70,8 +71,10 @@ describe('QueryApp', () => {
     setFoxPeek.mockReset();
     sopOpen.mockReset();
     sopEntryAvailable.mockReset();
+    sopResumeAvailable.mockReset();
     sopOpen.mockResolvedValue({ ok: true });
     sopEntryAvailable.mockResolvedValue(true);
+    sopResumeAvailable.mockResolvedValue(false);
     reportHandoffMilestone.mockResolvedValue(undefined);
     reportQueryLayout.mockImplementation(async (request: {
       sessionId: number;
@@ -126,6 +129,7 @@ describe('QueryApp', () => {
       sopWindow: {
         open: sopOpen,
         entryAvailable: sopEntryAvailable,
+        resumeAvailable: sopResumeAvailable,
       },
       onOverlayCommand(handler) {
         commandListeners.add(handler);
@@ -863,6 +867,9 @@ describe('QueryApp', () => {
     expect(banner.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(banner).toHaveTextContent('过敏可走售后流程 · 建议先要凭证');
     expect(screen.getByTestId('open-allergy-sop')).toHaveTextContent('打开过敏售后流程');
+    await user.click(screen.getByTestId('open-allergy-sop'));
+    expect(sopOpen).toHaveBeenCalledWith('allergy-aftersale-demo');
+    expect(await screen.findByTestId('open-allergy-sop')).toHaveTextContent('继续过敏售后流程');
   });
 
   it('does not show the SOP button for usage-plus-allergy or empty results', async () => {

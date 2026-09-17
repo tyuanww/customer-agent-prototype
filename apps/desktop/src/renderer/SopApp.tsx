@@ -205,7 +205,8 @@ export function SopApp({ projection: injected }: SopAppProps) {
               type="button"
               className="sop-close"
               data-testid="sop-close"
-              aria-label="关闭过敏流程"
+              aria-label="收起过敏流程，保留进度"
+              title="收起，保留进度"
               onClick={() => {
                 void window.sopWindow?.close();
               }}

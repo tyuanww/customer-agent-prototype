@@ -1,7 +1,7 @@
 import type { Ref, ReactNode } from 'react';
 import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import type { OverlayPhase } from '@shared/overlay-machine';
-import { SOP_ENTRY_BUTTON, SOP_ENTRY_HINT } from '@shared/sop-window';
+import { SOP_ENTRY_BUTTON, SOP_ENTRY_HINT, SOP_RESUME_BUTTON } from '@shared/sop-window';
 import { ScriptCard } from './ScriptCard';
 import type { HelpStatus } from '@shared/product-help';
 import type { RankedScript } from './types';
@@ -20,6 +20,7 @@ type QueryResultsPaneProps = {
   sopEntryVisible?: boolean;
   sopEntryBusy?: boolean;
   sopEntryError?: string | null;
+  sopEntryResume?: boolean;
   onOpenSop?: () => void;
   onRetry: () => void;
   onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
@@ -42,6 +43,7 @@ export function QueryResultsPane({
   sopEntryVisible = false,
   sopEntryBusy = false,
   sopEntryError = null,
+  sopEntryResume = false,
   onOpenSop,
   onRetry,
   onCopy,
@@ -110,7 +112,7 @@ export function QueryResultsPane({
                         disabled={sopEntryBusy}
                         onClick={onOpenSop}
                       >
-                        {SOP_ENTRY_BUTTON}
+                        {sopEntryResume ? SOP_RESUME_BUTTON : SOP_ENTRY_BUTTON}
                       </button>
                       {sopEntryError ? (
                         <span className="validation-error" data-testid="sop-open-error">{sopEntryError}</span>
