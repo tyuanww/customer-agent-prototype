@@ -36,6 +36,7 @@ export function LoginApp() {
   const submitAccount = async () => {
     setInvalid(false);
     setAccountUnavailable(false);
+    setState('loading');
     const result = await window.loginWindow!.submitAccount(username, password);
     if (result.ok) return;
     if (result.code === 'INVALID') { setInvalid(true); setState('entry'); return; }
@@ -56,7 +57,7 @@ export function LoginApp() {
 
       {state === 'loading' ? (
         <>
-          <p className="login-copy">正在打开飞书登录…</p>
+          <p className="login-copy">{audience === 'account' ? '正在验证账号…' : '正在打开飞书登录…'}</p>
           <div className="login-actions">
             <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
           </div>

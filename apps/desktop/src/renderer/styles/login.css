@@ -69,6 +69,13 @@ html[data-role='login'] #root {
   line-height: 20px;
 }
 
+.login-form {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .login-audience {
   display: flex;
   gap: 8px;

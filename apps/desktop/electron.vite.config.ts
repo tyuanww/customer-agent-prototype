@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import { stripCrossOriginAttributes } from './src/shared/file-renderer-html';
 
 export default defineConfig({
   main: {
@@ -52,6 +53,14 @@ export default defineConfig({
         '@renderer': resolve(__dirname, 'src/renderer'),
       },
     },
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        name: 'strip-crossorigin-for-file-renderer',
+        transformIndexHtml(html: string) {
+          return stripCrossOriginAttributes(html);
+        },
+      },
+    ],
   },
 });

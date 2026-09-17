@@ -43,6 +43,8 @@ export function createLoginWindow(
       ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT);
       ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_CANCEL);
       return new Promise<void>((resolve, reject) => {
+        // Isolated cookies/storage. Renderer HTML must not emit `crossorigin`
+        // (see stripCrossOriginAttributes) or this partition cannot load file:// modules.
         const isolated = session.fromPartition(`synthetic-login-${randomUUID()}`);
         isolated.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
         isolated.setPermissionCheckHandler(() => false);
@@ -136,7 +138,7 @@ export function createLoginWindow(
   };
 }
 
-function isChooserUrl(value: string, devServerUrl?: string): boolean {
+export function isChooserUrl(value: string, devServerUrl?: string): boolean {
   try {
     const url = new URL(value);
     if (url.username || url.password || url.hash) return false;
@@ -145,9 +147,11 @@ function isChooserUrl(value: string, devServerUrl?: string): boolean {
       return (url.protocol === 'http:' || url.protocol === 'https:')
         && url.host === dev.host && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
     }
+    if (url.protocol !== 'file:') return false;
     const path = decodeURIComponent(url.pathname).replace(/\\/g, '/');
-    return url.protocol === 'file:'
-      && (path.endsWith('/out/renderer/index.html') || /(?:^|\/)[^/]+\.asar\/(?:out\/)?renderer\/index\.html$/.test(path));
+    if (path.includes('/..') || path.includes('//')) return false;
+    return /(?:^|\/)out\/renderer\/(?:index\.html|assets\/(?:[^/]+\/)*[^/]+)$/.test(path)
+      || /(?:^|\/)[^/]+\.asar\/(?:out\/)?renderer\/(?:index\.html|assets\/(?:[^/]+\/)*[^/]+)$/.test(path);
   } catch { return false; }
 }
 
