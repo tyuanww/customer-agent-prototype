@@ -209,7 +209,7 @@ node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/script
 
 它**不能**证明：PE 可执行文件内部图标资源、Authenticode / EV 签名、真实 Windows 安装、任务栏图标、办公机快捷键。对应验收必须在 Windows 设备上做。禁止把未签名产物写成已签名。
 
-本机（macOS 交叉打包，2026-09-17）`pnpm package:win` 通过后验：产物 `客服话术浮窗 Demo-0.3.0-win-x64-UNSIGNED.exe`，`win-unpacked/resources/synthetic-offline.json` 为精确 offline 文档。**这不是办公机安装/启动/卸载验收。**
+本机（macOS 交叉打包，2026-09-17）`pnpm package:win` 通过后验：产物 `客服话术浮窗 Demo-0.3.0-win-x64-UNSIGNED.exe`，`win-unpacked/resources/synthetic-offline.json` 为精确 offline 文档。**这不是办公机安装/启动/卸载验收。** 办公机勾选见 [how-to-office-machine-first-round.md](how-to-office-machine-first-round.md)。
 
 W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上执行 `pnpm test:e2e:windows-feasibility` 与 `pnpm package:win`。定向 E2E 会实际启动 `apps/desktop/out/main/index.js`，不经过 `apps/desktop/node_modules/@customer-agent/*` 的嵌套解析；`package:win` 先构建 `packages/contracts` runtime `dist`，再让 electron-vite 把该包内联进 main，并在打包前检查产物不含 workspace 裸导入。该路径确认 Fox / Query 两个 overlay 使用透明背景、快捷键注册成功、查询窗可打开并能干净退出；它比“脚本存在”多证明一次 clean-checkout 的 Windows 运行路径与未签名产物后验，但仍不是企业坐席真机、IME/DPI/读屏、真实 OS 按键投递、GPU 合成观感、签名、更新、Pilot 或 D1–D5 产品会话验收。安装包与实机方案见 [DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工，本页命令不得当作已授权打包。
 
