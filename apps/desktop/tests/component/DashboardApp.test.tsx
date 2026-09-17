@@ -1623,10 +1623,11 @@ describe('DashboardApp', () => {
     expect(screen.queryByTestId('upload-input')).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId('nav-iteration'));
-    expect(screen.getByTestId('iteration-it-2041')).toHaveTextContent('open');
-    expect(screen.getByTestId('iteration-it-2048')).toHaveTextContent('in_progress');
-    expect(screen.getByTestId('iteration-it-2017')).toHaveTextContent('resolved');
-    expect(screen.getByTestId('iteration-it-1992')).toHaveTextContent('wont_fix');
+    expect(screen.getByTestId('iteration-it-2041')).toHaveTextContent('待处理');
+    expect(screen.getByTestId('iteration-it-2048')).toHaveTextContent('处理中');
+    expect(screen.getByTestId('iteration-it-2017')).toHaveTextContent('已处理');
+    expect(screen.getByTestId('iteration-it-1992')).toHaveTextContent('暂不处理');
+    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('有 2 条待处理 P0 需要跟进');
 
     await user.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('announce-table')).toHaveTextContent('已 ACK');
@@ -1654,5 +1655,138 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('arch-step-B6')).toHaveTextContent('交互形状模拟');
     expect(screen.getByTestId('arch-guardrail-no-auto-send')).toHaveTextContent('禁代发');
     expect(screen.getByTestId('arch-guardrail-no-new-port')).toHaveTextContent('不新增第十端口');
+  });
+
+  it('reminds coach/owner of open P0 iteration tasks and selects the matching queue row', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+
+    await user.click(screen.getByTestId('nav-iteration'));
+
+    const reminder = screen.getByTestId('iteration-reminder');
+    expect(reminder).toHaveClass('dash-card');
+    expect(reminder).toHaveTextContent('有 2 条待处理 P0 需要跟进');
+    expect(reminder).toHaveTextContent('DEMO · 合成数据');
+    expect(reminder).toHaveTextContent('会员积分过期补发缺少有效稿');
+    expect(reminder).toHaveTextContent('退货检测旧稿已过有效期仍被召回');
+    expect(reminder).not.toHaveTextContent('洁面泡沫少的首条场景过宽');
+    expect(reminder).not.toHaveTextContent('班牛');
+    expect(reminder).not.toHaveTextContent('工单');
+    expect(screen.getByTestId('iteration-it-2041')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('iteration-reminder-it-2041')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('module-iteration')).toHaveTextContent(
+      '正式仅 coach / owner · agent 403 · 本页 MOCK AUTH',
+    );
+
+    await user.selectOptions(screen.getByTestId('iteration-status-filter'), 'closed');
+    expect(screen.queryByTestId('iteration-it-2055')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-it-2017')).toBeInTheDocument();
+    expect(screen.getByTestId('iteration-it-1992')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('iteration-reminder-it-2055'));
+    expect(screen.getByTestId('iteration-status-filter')).toHaveValue('all');
+    expect(screen.getByTestId('iteration-cause-filter')).toHaveValue('all');
+    expect(screen.getByTestId('iteration-it-2055')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('iteration-reminder-it-2055')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('退货检测旧稿已过有效期仍被召回');
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('it-2055');
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('过期仍召回');
+  });
+
+  it('drills start and close on the in-memory iteration queue without persisting anything', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+
+    await user.click(screen.getByTestId('nav-iteration'));
+
+    // 开始处理：open @ v1 → in_progress @ v2，按钮换成结论表单。
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
+    expect(screen.queryByTestId('iteration-drill-state')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('iteration-start'));
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
+    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
+
+    // 缺少结论时不能关闭。
+    expect(screen.getByTestId('iteration-close-resolved')).toBeDisabled();
+    expect(screen.getByTestId('iteration-close-wont-fix')).toBeDisabled();
+    await user.type(screen.getByTestId('iteration-note'), '已确认有效期过滤口径，待排期修复');
+    expect(screen.getByTestId('iteration-close-resolved')).toBeEnabled();
+
+    await user.click(screen.getByTestId('iteration-close-resolved'));
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('已处理');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v3');
+    expect(screen.getByTestId('iteration-terminal')).toHaveTextContent('终态不可再变更');
+    expect(screen.getByTestId('iteration-terminal')).toHaveTextContent('已确认有效期过滤口径');
+    expect(screen.queryByTestId('iteration-start')).not.toBeInTheDocument();
+
+    // 关闭待办不等于已发布。
+    expect(screen.getByTestId('iteration-detail-footnote')).toHaveTextContent(
+      '不自动改写 Answer。关闭待办不等于已发布。演练不保存、不联网。',
+    );
+
+    // 重置演练恢复合成清单。
+    await user.click(screen.getByTestId('iteration-reset-drill'));
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
+    expect(screen.queryByTestId('iteration-drill-state')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
+  });
+
+  it('reports a refresh prompt when the server version moves ahead of the client snapshot', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+
+    await user.click(screen.getByTestId('nav-iteration'));
+    expect(screen.queryByTestId('iteration-conflict')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-stale-attempt')).toHaveTextContent('演示版本冲突');
+
+    await user.click(screen.getByTestId('iteration-stale-attempt'));
+    await user.click(screen.getByTestId('iteration-start'));
+
+    expect(screen.getByTestId('iteration-conflict')).toHaveTextContent('待办已更新，请刷新后再处理');
+    // 冲突不落地：客户端快照仍是 open @ v1。
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
+    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
+
+    await user.click(screen.getByTestId('iteration-reset-drill'));
+    expect(screen.queryByTestId('iteration-conflict')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
+  });
+
+  it('rejects close when the server version moved ahead during in_progress', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+
+    await user.click(screen.getByTestId('nav-iteration'));
+    await user.click(screen.getByTestId('iteration-start'));
+    await user.type(screen.getByTestId('iteration-note'), '已核对有效期过滤');
+    await user.click(screen.getByTestId('iteration-stale-attempt'));
+    await user.click(screen.getByTestId('iteration-close-resolved'));
+
+    expect(screen.getByTestId('iteration-conflict')).toHaveTextContent('待办已更新，请刷新后再处理');
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
+    expect(screen.queryByTestId('iteration-terminal')).not.toBeInTheDocument();
+  });
+
+  it('resets filters without wiping an in-memory drill', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+
+    await user.click(screen.getByTestId('nav-iteration'));
+    await user.click(screen.getByTestId('iteration-start'));
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+
+    await user.selectOptions(screen.getByTestId('iteration-status-filter'), 'closed');
+    expect(screen.queryByTestId('iteration-it-2041')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+
+    await user.click(screen.getByTestId('iteration-reset-filters'));
+    expect(screen.getByTestId('iteration-status-filter')).toHaveValue('all');
+    expect(screen.getByTestId('iteration-it-2041')).toBeInTheDocument();
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
+    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
   });
 });

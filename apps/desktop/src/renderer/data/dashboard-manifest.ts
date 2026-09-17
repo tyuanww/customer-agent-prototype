@@ -31,8 +31,9 @@ export type ArchitecturePrototypeStatus =
 export type ArchitectureFormalRuntimeStatus = 'not-started' | 'in-progress' | 'verified';
 export type LedgerTerminal = 'copied' | 'no_hit' | 'abandoned' | 'risk_escalated';
 export type IterationStatus = 'open' | 'in_progress' | 'resolved' | 'wont_fix';
-export type IterationKind = 'no_hit' | 'top1_skipped' | 'risk_escalated';
-export type IterationCause = 'content_gap' | 'ranking' | 'policy';
+export type IterationKind = 'no_hit' | 'top1_skipped';
+// 与 OpenAPI `IterationTaskCause` 一一对应；风险升级属于 escalate，不属于本域。
+export type IterationCause = 'content_gap' | 'ranking' | 'stale' | 'mixed';
 export type DomainId = 'presale' | 'campaign' | 'aftersale' | 'product';
 export type SyncFacet = 'published' | 'announced' | 'client_ack' | 'offline_lease';
 export type VocTimeGrain = 'year' | 'month' | 'day';
@@ -204,13 +205,19 @@ export type WorkorderBatch = {
 
 export type IterationTask = {
   taskId: string;
+  /** 与 OpenAPI `signal_id` 同形；本刀不进 HTTP，只作展示。 */
+  signalId: string;
+  clusterKey: string;
   kind: IterationKind;
-  kindLabel: string;
   status: IterationStatus;
-  statusLabel: string;
-  cause: IterationCause;
-  causeLabel: string;
   priority: 'P0' | 'P1' | 'P2';
+  cause: IterationCause;
+  suggestedScriptIds: readonly string[];
+  sampleQueryIds: readonly string[];
+  /** CAS 期望版本；演练的 start / close 用它判定并发冲突。 */
+  version: number;
+  resolution: 'resolved' | 'wont_fix' | null;
+  resolutionNote: string | null;
   owner: string;
   evidenceCount: number;
   title: string;
@@ -324,7 +331,7 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'ledger', label: '检索效果', blurb: '根问题 / 检索操作双账', group: '服务洞察' },
   { id: 'review', label: '离线抽样复核', blurb: '修改 / 发送 / 适用性分账', group: '服务洞察' },
   { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
-  { id: 'iteration', label: '话术优化待办', blurb: '缺库 / 排序 / 风险分域', group: '话术运营' },
+  { id: 'iteration', label: '话术优化待办', blurb: '内容缺口 / 排序 / 过期召回', group: '话术运营' },
   { id: 'content', label: '内容与发布', blurb: '话术师草稿与缺域阻断', group: '治理与架构' },
   { id: 'announce', label: '公告与同步', blurb: 'published / ACK / lease 分面', group: '治理与架构' },
   { id: 'architecture', label: '架构能力图', blurb: '双表面与九端口故事', group: '治理与架构' },
@@ -379,7 +386,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         id: 'decision-no-hit',
         priority: 'P1',
         title: '无命中与风险升级需要分开处理',
-        evidence: '无命中可能是话术缺口或检索排序；风险升级属于 policy 边界，不能自动改 Answer。',
+        evidence: '无命中可能是内容缺口、检索排序或过期召回；风险升级走人工升级，不建话术优化待办。',
         impact: '58 次合成操作需分流处理',
         owner: '话术 Owner + Coach',
         nextStep: '查看检索效果并进入对应优化待办。',
@@ -1087,15 +1094,22 @@ export const DASHBOARD_MANIFEST = deepFreeze({
     kicker: 'iteration_task · 与工单分析分域',
     domainNote:
       '工单分析看业务咨询分布；本页只收录话术库迭代任务。不自动改写 Answer，不回写 fixture。',
+    // 形状对齐 OpenAPI `IterationTask`：task_id / signal_id / cluster_key / sample_query_ids /
+    // suspected_cause / suggested_script_ids / status / version。priority 合同无此列，只作本页 UI 分层。
+    footnote: 'priority 是本页 UI 分层用的合成标注，不是正式 SLA，也不属于合同字段。',
     tasks: [
       {
         taskId: 'it-2041',
+        signalId: 'sig-no-hit-rq-points-expire',
+        clusterKey: 'no_hit:rq-points-expire',
         kind: 'no_hit',
-        kindLabel: '无命中',
         status: 'open',
-        statusLabel: 'open',
         cause: 'content_gap',
-        causeLabel: '内容缺口',
+        suggestedScriptIds: ['syn-after-004'],
+        sampleQueryIds: ['q-syn-2041-01', 'q-syn-2041-02', 'q-syn-2041-03'],
+        version: 1,
+        resolution: null,
+        resolutionNote: null,
         priority: 'P0',
         owner: '售后流程 Owner',
         evidenceCount: 18,
@@ -1105,12 +1119,16 @@ export const DASHBOARD_MANIFEST = deepFreeze({
       },
       {
         taskId: 'it-2048',
+        signalId: 'sig-top1-skipped-rq-cleanser-usage',
+        clusterKey: 'top1_skipped:rq-cleanser-usage',
         kind: 'top1_skipped',
-        kindLabel: 'Top1 跳过',
         status: 'in_progress',
-        statusLabel: 'in_progress',
         cause: 'ranking',
-        causeLabel: '排序问题',
+        suggestedScriptIds: ['syn-prod-001-quick', 'syn-prod-001-care'],
+        sampleQueryIds: ['q-syn-2048-01', 'q-syn-2048-02'],
+        version: 2,
+        resolution: null,
+        resolutionNote: null,
         priority: 'P1',
         owner: 'Search Owner + Coach',
         evidenceCount: 12,
@@ -1120,27 +1138,35 @@ export const DASHBOARD_MANIFEST = deepFreeze({
       },
       {
         taskId: 'it-2055',
-        kind: 'risk_escalated',
-        kindLabel: '风险升级',
+        signalId: 'sig-no-hit-rq-refund-report',
+        clusterKey: 'no_hit:rq-refund-report',
+        kind: 'no_hit',
         status: 'open',
-        statusLabel: 'open',
-        cause: 'policy',
-        causeLabel: '策略边界',
+        cause: 'stale',
+        suggestedScriptIds: ['syn-after-021'],
+        sampleQueryIds: ['q-syn-2055-01', 'q-syn-2055-02', 'q-syn-2055-03', 'q-syn-2055-04'],
+        version: 1,
+        resolution: null,
+        resolutionNote: null,
         priority: 'P0',
-        owner: '客服经理 + 法务口径 Owner',
+        owner: '售后口径 Owner',
         evidenceCount: 7,
-        title: '退货检测承诺越权',
-        detail: '售后稿触及检测报告是否必须，策略要求升级。待法务口径确认后再入库。',
-        nextStep: '保持人工升级，确认承诺边界后再决定是否新增正式话术。',
+        title: '退货检测旧稿已过有效期仍被召回',
+        detail: '根问题 rq-refund-report 命中的售后稿有效窗口已过，仍出现在候选里。',
+        nextStep: '核对有效期硬过滤与召回口径；过期内容不得进入结果。',
       },
       {
         taskId: 'it-2017',
+        signalId: 'sig-no-hit-rq-sunscreen-acne',
+        clusterKey: 'no_hit:rq-sunscreen-acne',
         kind: 'no_hit',
-        kindLabel: '无命中',
         status: 'resolved',
-        statusLabel: 'resolved',
         cause: 'content_gap',
-        causeLabel: '内容缺口',
+        suggestedScriptIds: ['syn-prod-003'],
+        sampleQueryIds: ['q-syn-2017-01'],
+        version: 3,
+        resolution: 'resolved',
+        resolutionNote: '上一发布已纳入 syn-prod-003，本条保留合成闭环记录。',
         priority: 'P2',
         owner: '产品话术 Owner',
         evidenceCount: 9,
@@ -1150,12 +1176,16 @@ export const DASHBOARD_MANIFEST = deepFreeze({
       },
       {
         taskId: 'it-1992',
+        signalId: 'sig-top1-skipped-rq-live-streaming',
+        clusterKey: 'top1_skipped:rq-live-streaming',
         kind: 'top1_skipped',
-        kindLabel: 'Top1 跳过',
         status: 'wont_fix',
-        statusLabel: 'wont_fix',
-        cause: 'ranking',
-        causeLabel: '排序问题',
+        cause: 'mixed',
+        suggestedScriptIds: ['syn-pre-007'],
+        sampleQueryIds: ['q-syn-1992-01'],
+        version: 3,
+        resolution: 'wont_fix',
+        resolutionNote: '样本过少且与现有简洁稿重复，维持观察。',
         priority: 'P2',
         owner: 'Search Owner',
         evidenceCount: 3,
@@ -1362,7 +1392,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
             {
               code: 'B5',
               title: '话术优化待办',
-              detail: '按内容缺口、排序和策略分域跟进，不自动改写 Answer。',
+              detail: '按内容缺口、排序与过期召回归因跟进，不自动改写 Answer。',
               ...architectureEvidence('static-interactive'),
             },
             {
@@ -1522,4 +1552,10 @@ export function nextDashboardNavId(
 
 export function findLedgerRow(operationId: string): LedgerRow | undefined {
   return DASHBOARD_MANIFEST.ledger.rows.find((row) => row.operationId === operationId);
+}
+
+export function listOpenP0IterationTasks(
+  tasks: readonly IterationTask[],
+): readonly IterationTask[] {
+  return tasks.filter((task) => task.status === 'open' && task.priority === 'P0');
 }
