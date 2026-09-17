@@ -39,7 +39,7 @@ describe.skipIf(!enabled)('synthetic persistent product identity', () => {
   async function build(identityProvider = provider()) {
     return createApiApp({ profile: 'test', authMode: 'mock', sessionMode: 'product', host: '127.0.0.1',
       port: 0, buildVersion: 'synthetic-t1', contractSetId: 'synthetic', runtimeActivated: false },
-    repository, undefined, await createProductAuthService(config, identityProvider));
+    repository, undefined, await createProductAuthService(config, identityProvider, 'mock'));
   }
   beforeEach(async () => {
     harness = new Pg15Harness(); harness.start();
@@ -86,7 +86,7 @@ describe.skipIf(!enabled)('synthetic persistent product identity', () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ login_id: expect.stringMatching(/^login_/) });
     await admin.query('ALTER ROLE synthetic_auth_login SUPERUSER');
-    await expect(createProductAuthService(config, provider())).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
+    await expect(createProductAuthService(config, provider(), 'mock')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
   });
 
   it('starts the actual composition root with separate synthetic capability credentials', async () => {
@@ -201,5 +201,15 @@ describe.skipIf(!enabled)('synthetic persistent product identity', () => {
     expect((await app.inject({ method: 'POST', url: '/v1/auth/login-requests', payload: { client_challenge: challenge, challenge_method: 'plain' } })).statusCode).toBe(400);
     for (let n = 0; n < 18; n++) await loginRequest();
     expect((await app.inject({ method: 'POST', url: '/v1/auth/login-requests', payload: { client_challenge: challenge, challenge_method: 'S256' } })).statusCode).toBe(429);
+  });
+
+  it('reports an injected feishu auth_mode without opening the AUTH_MODE startup gate', async () => {
+    await app.close();
+    app = await createApiApp({ profile: 'test', authMode: 'mock', sessionMode: 'product', host: '127.0.0.1',
+      port: 0, buildVersion: 'synthetic-t1', contractSetId: 'synthetic', runtimeActivated: false },
+    repository, undefined, await createProductAuthService(config, provider(), 'feishu'));
+    const { token } = await session();
+    expect((await app.inject({ url: '/v1/auth/me', headers: { authorization: `Bearer ${token}` } })).json())
+      .toEqual({ user_id: 'synthetic-user', role: 'agent', auth_mode: 'feishu' });
   });
 });

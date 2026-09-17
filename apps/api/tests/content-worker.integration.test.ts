@@ -121,6 +121,7 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
         exchange: async (code) => code,
         close: () => undefined,
       },
+      'mock',
     );
     app = createApiApp(
       parseApiRuntimeConfig({

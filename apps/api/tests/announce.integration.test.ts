@@ -124,6 +124,7 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         exchange: async (code) => code,
         close: () => undefined,
       },
+      'mock',
     );
     app = createApiApp(
       parseApiRuntimeConfig({

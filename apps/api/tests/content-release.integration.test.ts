@@ -117,6 +117,7 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
         exchange: async (code) => code,
         close: () => undefined,
       },
+      'mock',
     );
     app = createApiApp(
       parseApiRuntimeConfig({

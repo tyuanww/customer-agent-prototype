@@ -37,7 +37,7 @@
 
 - **首轮仍使用纯合成数据与合成身份。** 真实客户数据、真实飞书凭据与正式运行身份必须另行批准。
 - 现有 D1–D5 接入 profile 要求 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 均为精确 loopback `http://127.0.0.1:端口/`（pathname `/`）。缺一项、不成对、非 loopback 拒启。
-- **打包态读 userData `synthetic-stack.json`，忽略环境变量。** 文件必须是 `mode: synthetic-local`，且 `apiOrigin` / `identityOrigin` 都是裸 `http://127.0.0.1:<port>/`。缺文件或非法则启动失败，不会退回 S0 fixture。因此 Windows 未签名包要走查询主链，必须在**同一台机器**上跑 loopback API + 合成身份，并写入该文件；不能靠环境变量，也不能指向非 loopback。未准备该拓扑时，安装包只能验浮窗/安装路径，不能冒充客服主链试装。
+- **打包态读 userData `synthetic-stack.json`，忽略环境变量。** 文件必须是 `mode: synthetic-local`，且 `apiOrigin` / `identityOrigin` 都是裸 `http://127.0.0.1:<port>/`。缺文件或非法则启动失败，不会退回 S0 fixture。因此 Windows 未签名包要走查询主链，必须在**同一台机器**上跑 loopback API + 合成身份，并写入该文件；不能靠环境变量，也不能指向非 loopback。未准备该拓扑时，安装包**连启动都过不去**：主进程在 `resolveProductProfile` 处抛错，被 catch 后调用 `app.quit()`，既不会退回 S0 fixture，也不会进入浮窗。此时实机只能在安装/卸载与启动失败提示上取证，不能冒充客服主链试装。（S0 回退只存在于**未打包**的开发运行，且要求两个 origin 环境变量都未设。）
 - 若试装机不能本机跑 API / PostgreSQL 15，或需要连非 loopback 主机，必须另批独立工程。本文不授权改 loopback 红线。
 - Dashboard 继续无 preload。复制成功只表示「已复制」。
 
@@ -53,9 +53,9 @@
 
 | 主题 | DRAFT 约定 | 待确认 |
 | --- | --- | --- |
-| 启动配置 | 未批准打包态产品 profile 前，安装包按 S0 合成 fixture 启动，不读真实 URL | 合成 API 是同机 loopback，还是另批测试主机；当前代码只允许 127.0.0.1 |
+| 启动配置 | 未批准打包态产品 profile 前，安装包启动即失败：`readPackagedProductProfile` 缺文件/非法直接抛错，主进程 catch 后 `app.quit()`，不读环境变量、也不退 S0 fixture | 合成 API 是同机 loopback，还是另批测试主机；当前代码只允许 127.0.0.1 |
 | 后端连接 | 首轮若要跑 D1–D5 主链，API / 合成身份 / PostgreSQL 15 必须出现在获批拓扑里，且仍是 synthetic-only | Windows 测试机是否安装 PG15；端口、防火墙、开机自启均未定 |
-| 日志与脱敏 | 诊断不得写入真实客户原文、token、内部 URL；失败码与哈希化标识可保留。**桌面应用当前没有文件日志设施**：`apps/desktop/src` 里有 16 处 `console.warn` / `console.error`（启动失败、Tray 降级、Dashboard 打开失败、MiniMax 回退等），全部只写 stdout/stderr，**不落盘**；renderer 无任何写文件能力。`~/.customer-agent-synthetic-stack/logs/` 下的 `api.log` / `identity.log` / `worker.log` / `postgres.log` 由 `scripts/synthetic-stack/stack.ts` 的 `spawnLogged()` 用 `openSync` 重定向子进程 stdio 生成，属于**栈侧**而非应用侧。打包态应用双击启动时没有这些重定向，stdout 去向取决于启动方式 | 安装后日志目录、保留天数、如何从试装机取回；现无现成 Windows 采集手册，且取回前需先决定要不要为此新增应用侧日志设施 |
+| 日志与脱敏 | 诊断不得写入真实客户原文、token、内部 URL；失败码与哈希化标识可保留。**桌面应用当前没有文件日志设施**：`apps/desktop/src` 里有 18 处 `console.warn` / `console.error`（启动失败与启动失败提示、Tray 降级、Dashboard 打开失败、MiniMax 回退等），全部只写 stdout/stderr，**不落盘**；renderer 无任何写文件能力。`~/.customer-agent-synthetic-stack/logs/` 下的 `identity.log` / `api.log` / `worker.log` 由 `scripts/synthetic-stack/stack.ts` 的 `spawnLogged()`（`:144` / `:162` / `:171`）用 `openSync` 重定向子进程 stdio 生成；`postgres.log` 走另一条路径，由 `scripts/synthetic-stack/postgres.ts:76` 定义并由 `pg_ctl` 写出。四者都属于**栈侧**而非应用侧。打包态应用双击启动时没有这些重定向，stdout 去向取决于启动方式 | 安装后日志目录、保留天数、如何从试装机取回；现无现成 Windows 采集手册，且取回前需先决定要不要为此新增应用侧日志设施 |
 | 交付位置 | 未签名包只放本机 `release/local-unsigned/windows/`，被 Git 忽略 | 用户测试包的传递方式（当面拷贝 / 受控网盘）；禁止公开 Release 当正式分发 |
 
 ## 4. 功能验收项（实机，合成数据）
@@ -71,7 +71,7 @@
 | 内容失效 | 获批拓扑下发布/回退后，旧候选不可继续当有效答案使用 | 只凭「回退后仍能查到同一句话术」勾选 STALE。该现象只证明回退后查询可用 |
 | 登录残留 | 不作为本阶段通过门禁 | 已见残留红色「合成登录…」，见 [TODOS](../../TODOS.md#login-residual-invalid-banner)，独立修复 |
 
-S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；只能验收安装、启动、浮窗与卸载，并在报告中写明未测产品主链。
+打包态若未接通产品 profile（缺 `synthetic-stack.json` 或其中 origin 非法），上表登录/查询/失效**无法验收，因为应用不会启动**：`resolveProductProfile` 抛错后主进程 catch 并 `app.quit()`，不存在「退回 S0 只显示浮窗」的中间态。此时只能验收安装、卸载与启动失败提示，并在报告中写明未进入产品主链。**提示文案见 `product-runtime-config.ts` 的两个常量**：缺文件为 `Packaged desktop requires synthetic-stack.json under userData`，present-but-rejected 为 `Packaged desktop requires a valid synthetic-stack.json under userData`。这两个字符串只用于内部错误对象，不再假定操作者能读到——实机看到的是应用侧的可见提示（见 TODOS.md P1）。
 
 ## 5. 安装、升级、卸载、异常恢复
 
@@ -82,7 +82,7 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 | 卸载 | 依赖 NSIS 默认卸载器 | 「应用和功能」能卸干净；开始菜单与安装目录是否残留；userData 是否按约定保留或删除 |
 | 异常恢复 | 开发态缺配置 / 非 loopback / 打包态产品 profile 均 fail-closed：`product-runtime-config.ts` 缺 `synthetic-stack.json` 或缺任一 origin 直接抛错，不退 S0 fixture | 安装中断、杀软拦截、缺 VC++ 运行库、杀进程后重启、卸载失败后的手工清理步骤 |
 
-**userData 路径是本阶段的一个 Windows 待验点。** `apps/desktop/src/main/main.ts` 在 `requestSingleInstanceLock()` 之前执行 `app.setName('客服话术浮窗 Demo')`；代码注释说明这个顺序不可调换，因为 `requestSingleInstanceLock()` 是第一个会把该路径落地的 API，晚设置会让 packaged 构建去找 `@customer-agent/desktop` 并 fail-closed。packaged 构建的 userData 必须落在该名字下，否则合成栈写入的 `synthetic-stack.json` 找不到。该名字含中文与空格，在 Windows 上对应 `%APPDATA%` 下的同名目录。**纯 ASCII 路径假设不适用；中文路径在部分企业镜像 / 漫游配置下的行为未验证**——实机第一次启动若报 `Packaged desktop requires a valid synthetic-stack.json under userData`，应先确认该目录名与写入位置是否一致，而不是改代码。
+**userData 路径是本阶段的一个 Windows 待验点。** `apps/desktop/src/main/main.ts` 在 `requestSingleInstanceLock()` 之前执行 `app.setName('客服话术浮窗 Demo')`；代码注释说明这个顺序不可调换，因为 `requestSingleInstanceLock()` 是第一个会把该路径落地的 API，晚设置会让 packaged 构建去找 `@customer-agent/desktop` 并 fail-closed。packaged 构建的 userData 必须落在该名字下，否则合成栈写入的 `synthetic-stack.json` 找不到。该名字含中文与空格，在 Windows 上对应 `%APPDATA%` 下的同名目录。**纯 ASCII 路径假设不适用；中文路径在部分企业镜像 / 漫游配置下的行为未验证**——实机第一次启动若起不来，应先确认该目录名与写入位置是否一致，而不是改代码。**另见 TODOS.md 的 P1**：配置失败时应用会给出可见的启动失败提示（区分「缺文件」与「文件非法」两种），不再只是写一条看不到的 `console.error`。
 
 回退方式：保留上一份已知安装包；卸载当前版本后改装上一份。没有在线回滚通道。
 
@@ -118,7 +118,7 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 | P1 采集 TBD | OS 版本、架构、测试机、是否本机 API/PG15、证书意向与费用 | P0 | 台账列出设备与缺口，不编造 | 缺项保持 TBD，不进入 P2 |
 | P2 打包态合成配置（若需要客服主链） | 设计打包态 loopback/受控 origin，renderer 仍无 token | P0 + 独立工程批准 | 获批计划 + 实现 PR + CI；打包态不再误拒合成 profile，也不接受任意 URL | 还原「打包态拒启产品 profile」 |
 | P3 未签名安装包 | 在获批 SHA 上 `pnpm package:win`，产物后验 | P0；主链试装还依赖 P2 | 存在 `UNSIGNED.exe`、后验通过、SHA 绑定 | 丢弃该份 `release/` 产物，不入库 |
-| P4 用户测试机 | 安装、启动、卸载；若 P2 已合并则加第 4 节功能表 | P3 + 实际设备 | 实机记录（机型/OS/包 SHA/现象）；失败原样保留 | 卸载，改回上一份包或卸干净 |
+| P4 用户测试机 | 安装、卸载与启动失败取证；若 P2 已合并则加第 4 节功能表 | P3 + 实际设备 | 实机记录（机型/OS/包 SHA/现象）；P2 未合并且未准备拓扑时应用启动即退出，记录启动失败提示并标注「未进入产品主链」 | 卸载，改回上一份包或卸干净 |
 | P5 签名策略 | 仅在 P4 未签名路径可重复之后 | 证书、费用、法律批准 | 独立 `release/distribution/` 方案，不复用 UNSIGNED 当已签名 | 继续 UNSIGNED，不外发 |
 | P6 客服受控试装 | 仍合成，除非另批真实数据 | P4 或 P5 + 试装机 + 负责人 | 试装名单、回退包、脱敏日志回收 | 卸载并回收安装包 |
 
@@ -130,7 +130,7 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 
 - 最低 OS 口径：Electron 43.4.0 官方为 **Windows 10 and up**（见第 1 节）。是否在 `build.win` 显式声明、声明成什么，仍待用户拍板
 - 安装 / 升级 / 卸载 / 异常恢复的**当前实现边界**已逐条落在第 5 节，含 NSIS `oneClick` / `perMachine` / 不可改目录、无自动更新元数据、后验拒绝 `.blockmap` 与 `latest*.yml`
-- 日志口径已澄清：应用侧**无文件日志设施**（16 处 `console.*` 只写 stdout/stderr），栈侧日志由 `stack.ts` 重定向产生（见第 3 节）。这条从"待确认日志目录"变成了"待决定是否新增应用侧设施"
+- 日志口径已澄清：应用侧**无文件日志设施**（18 处 `console.*` 只写 stdout/stderr），栈侧日志由 `stack.ts` 的 `spawnLogged()`（identity/api/worker）与 `postgres.ts`（postgres）分别产生（见第 3 节）。这条从"待确认日志目录"变成了"待决定是否新增应用侧设施"
 - Windows 上的 userData 目录名风险已登记（见第 5 节）：`app.setName` 含中文，实机首启失败先查目录名再查代码
 
 **现在可并行、且不构成本文开工：**

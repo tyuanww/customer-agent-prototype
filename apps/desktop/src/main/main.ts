@@ -21,6 +21,7 @@ import { installDesktopShell, type DesktopShell } from './desktop-shell';
 import { applyApplicationIdentity } from './app-identity';
 import { handleDesktopActivate, handleSecondInstance } from './desktop-lifecycle';
 import { notifyDashboardOpenFailure } from './dashboard-open-failure';
+import { notifyStartupFailure } from './startup-failure-notice';
 import { createShutdownFence } from './shutdown-fence';
 import { resolveRendererDevServerUrl } from '../shared/renderer-url';
 
@@ -228,6 +229,15 @@ if (!gotLock) {
   }).catch((error: unknown) => {
     console.error('[bootstrap] 主进程启动失败，已安全退出。', error);
     if (!shuttingDown.isShuttingDown()) {
+      // A packaged build that fails before any window exists has no other
+      // visible surface, so the operator would only see the window flash and
+      // disappear. The notice uses a native message box, which works without a
+      // window and before ready, and offers 重试 where the operator can act.
+      // The notice text depends only on the failure class; it never includes
+      // the error message, the userData path or any configuration value. This
+      // runs before beginShutdown() so it is not skipped by the fence, and the
+      // fail-closed quit below is unchanged.
+      void notifyStartupFailure(error);
       beginShutdown();
       app.quit();
     }

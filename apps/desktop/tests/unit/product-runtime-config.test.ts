@@ -1,9 +1,10 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  PackagedProfileError,
   SYNTHETIC_STACK_PROFILE_FILE,
   developmentProductProfile,
   readPackagedProductProfile,
@@ -75,6 +76,77 @@ describe('packaged synthetic product profile', () => {
     expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
     writeFileSync(path.join(directory, SYNTHETIC_STACK_PROFILE_FILE), '');
     expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
+  });
+
+  it('distinguishes a missing profile from a rejected one so the notice can differ', () => {
+    const directory = userDataDirectory();
+    // Absent file: the operator is told to install/start the stack.
+    try {
+      readPackagedProductProfile(directory);
+      expect.unreachable('missing profile must fail closed');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(PackagedProfileError);
+      expect((error as PackagedProfileError).kind).toBe('missing');
+    }
+
+    // Present but rejected (bad mode here): a different explanation, same fail-closed exit.
+    write(directory, { ...STACK_PROFILE, mode: 'production' });
+    try {
+      readPackagedProductProfile(directory);
+      expect.unreachable('invalid profile must fail closed');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(PackagedProfileError);
+      expect((error as PackagedProfileError).kind).toBe('invalid');
+    }
+
+    // Non-JSON content and a symlinked file are rejected files, not missing ones.
+    writeFileSync(path.join(directory, SYNTHETIC_STACK_PROFILE_FILE), 'not json');
+    expect(() => readPackagedProductProfile(directory)).toThrow(
+      expect.objectContaining({ kind: 'invalid' }),
+    );
+  });
+
+  it('reports an unreadable profile as unreadable, not as missing', () => {
+    const directory = userDataDirectory();
+    const nested = path.join(directory, 'locked');
+    mkdirSync(nested);
+    write(nested, STACK_PROFILE);
+
+    // A directory the process cannot traverse makes lstatSync throw EACCES even
+    // though the file is present. Telling the operator to install the stack
+    // there would send them after the wrong problem.
+    chmodSync(nested, 0o000);
+    try {
+      readPackagedProductProfile(nested);
+      expect.unreachable('unreadable profile must fail closed');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(PackagedProfileError);
+      expect((error as PackagedProfileError).kind).toBe('unreadable');
+    } finally {
+      chmodSync(nested, 0o700);
+    }
+  });
+
+  it('reports a present but unreadable profile file as unreadable, not as rejected', () => {
+    const directory = userDataDirectory();
+    const profile = path.join(directory, SYNTHETIC_STACK_PROFILE_FILE);
+    write(directory, STACK_PROFILE);
+
+    // The directory stays traversable, so lstatSync succeeds and this looks like
+    // a well-formed file of the right size; only opening it fails. A read
+    // failure is an access problem the operator can fix and retry, so it must
+    // not be reported as a rejected file — that would claim a validation ran
+    // and would withhold the retry the unreadable explanation offers.
+    chmodSync(profile, 0o000);
+    try {
+      readPackagedProductProfile(directory);
+      expect.unreachable('unreadable profile must fail closed');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(PackagedProfileError);
+      expect((error as PackagedProfileError).kind).toBe('unreadable');
+    } finally {
+      chmodSync(profile, 0o600);
+    }
   });
 
   it('refuses a symlinked profile file', () => {
