@@ -38,8 +38,9 @@ export class ProductSession {
     const { value } = await this.http.request('/v1/auth/me', { token: token.access_token, signal });
     if (!exactKeys(value, ['user_id', 'role', 'auth_mode']) || typeof value.user_id !== 'string'
       || value.user_id.length < 1 || value.user_id.length > 128
-      || !['agent', 'coach', 'owner'].includes(value.role as string) || value.auth_mode !== 'mock') throw new ProductHttpError('UNAUTHORIZED');
-    return { userId: value.user_id, role: value.role as 'agent' | 'coach' | 'owner', authMode: value.auth_mode as 'mock' };
+      || !['agent', 'coach', 'owner'].includes(value.role as string)
+      || !['mock', 'feishu'].includes(value.auth_mode as string)) throw new ProductHttpError('UNAUTHORIZED');
+    return { userId: value.user_id, role: value.role as 'agent' | 'coach' | 'owner', authMode: value.auth_mode as 'mock' | 'feishu' };
   }
   private install(token: StoredSession, user: NonNullable<ProductSession['user']>, epoch: number, signal: AbortSignal) {
     if (signal.aborted || epoch !== this.epoch) throw new ProductHttpError('STALE');

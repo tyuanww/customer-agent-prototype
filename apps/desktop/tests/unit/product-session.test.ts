@@ -6,7 +6,7 @@ import { isProductSessionResult } from '../../src/shared/product-session';
 
 const token = 't'.repeat(43);
 const user = { user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' };
-function fixture(options: { store?: Partial<SessionStore>; respond?: (path: string) => Response | Promise<Response> } = {}) {
+function fixture(options: { store?: Partial<SessionStore>; respond?: (path: string) => Response | Promise<Response>; identity?: { user_id: string; role: string; auth_mode: string } } = {}) {
   const stored = { access_token: token, expires_at: new Date(Date.now() + 899_000).toISOString() };
   const store = { read: vi.fn(() => null as unknown), write: vi.fn(), clear: vi.fn(), ...options.store };
   const requests: { path: string; init: RequestInit }[] = [];
@@ -16,7 +16,7 @@ function fixture(options: { store?: Partial<SessionStore>; respond?: (path: stri
     if (path === '/v1/auth/login-requests') return Response.json({ login_id: `login_${'i'.repeat(43)}`, authorize_url: 'http://127.0.0.1:4101/authorize?state=s', expires_at: new Date(Date.now() + 300_000).toISOString() }, { status: 201 });
     if (path.endsWith('/exchange')) return Response.json({ ...stored, token_type: 'Bearer' });
     if (path.endsWith('/logout')) return new Response(null, { status: 204 });
-    return Response.json(user);
+    return Response.json(options.identity ?? user);
   }) as unknown as typeof fetch;
   const window = { open: vi.fn(async () => {}) };
   const session = new ProductSession(new ProductHttp('http://127.0.0.1:4100', transport), store, window);
@@ -84,6 +84,20 @@ describe('product session lifetime', () => {
   });
   it('rejects secret fields in public payloads', () => {
     expect(isProductSessionResult({ ...fixture().session.view(), access_token: token })).toBe(false);
+  });
+  it('accepts contracted feishu auth_mode on login and restore', async () => {
+    const identity = { user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'feishu' };
+    const loggedIn = fixture({ identity });
+    expect(await loggedIn.session.login()).toMatchObject({ ok: true, signedIn: true, authMode: 'feishu' });
+    expect(loggedIn.session.view().authMode).toBe('feishu');
+    const restored = fixture({ identity, store: { read: () => loggedIn.stored } });
+    expect(await restored.session.restore()).toMatchObject({ ok: true, signedIn: true, authMode: 'feishu' });
+    expect(restored.session.view().authMode).toBe('feishu');
+  });
+  it('rejects unknown auth_mode from /v1/auth/me', async () => {
+    const f = fixture({ identity: { user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'saml' } });
+    expect(await f.session.login()).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    expect(f.session.view().signedIn).toBe(false);
   });
 });
 describe('loopback transport', () => {

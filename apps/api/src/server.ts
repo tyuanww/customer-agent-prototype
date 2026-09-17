@@ -59,7 +59,7 @@ export async function startApi(
         if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
         auth = await createProductAuthService(bootstrap.productIdentity.database,
           createSyntheticIdentityProvider(bootstrap.productIdentity.providerOrigin,
-            `http://${config.host}:${config.port}/v1/auth/callback`));
+            `http://${config.host}:${config.port}/v1/auth/callback`), config.authMode);
       }
       try {
         const contentImport = bootstrap.objectStoreDir === undefined ? undefined : {

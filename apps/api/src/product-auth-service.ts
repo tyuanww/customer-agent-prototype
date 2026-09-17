@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Pool, type QueryResultRow } from 'pg';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { bearerToken, type ProductAuthService, type MockCredentials } from './auth-service.js';
-import type { ApiDatabaseBootstrapConfig } from './runtime-config.js';
+import type { ApiDatabaseBootstrapConfig, AuthMode } from './runtime-config.js';
 
 export class IdentityFailure extends Error {
   constructor(readonly reason: 'LOGIN_INVALID' | 'LOGIN_EXPIRED' | 'LOGIN_CONSUMED' | 'SESSION_INVALID' | 'CAPABILITY_DENIED' | 'DEPENDENCY_UNAVAILABLE' | 'RATE_LIMITED' | 'REQUEST_INVALID') {
@@ -40,6 +40,7 @@ interface ExpiryRow extends QueryResultRow { expires_at: Date | null }
 export async function createProductAuthService(
   config: ApiDatabaseBootstrapConfig,
   provider: SyntheticIdentityProvider,
+  authMode: AuthMode,
 ): Promise<ProductAuthService> {
   const pool = new Pool({
     connectionString: config.connectionString,
@@ -148,9 +149,9 @@ export async function createProductAuthService(
         const rows = await query<IdentityRow>('SELECT * FROM backend_identity.actor($1)', [token]);
         const actor = rows[0];
         if (!actor) return null;
-        // auth_mode describes the synthetic identity source, not permission to
+        // auth_mode is the deployment identity source, not permission to
         // accept mock headers. Product-session routing is a separate boundary.
-        return parseContractSchema('CurrentUserResponse', { user_id: actor.user_id, role: actor.role, auth_mode: 'mock' });
+        return parseContractSchema('CurrentUserResponse', { user_id: actor.user_id, role: actor.role, auth_mode: authMode });
       } catch (error) {
         if (error instanceof IdentityFailure && error.reason === 'SESSION_INVALID') return null;
         throw error;
