@@ -54,14 +54,13 @@ function SopCopyCard({
   const risk = RISK_COPY[script.riskLevel];
   return (
     <article
-      className={['script-card', 'is-lead', script.riskLevel === 'high' ? 'is-high' : '']
+      className={['script-card', script.riskLevel === 'high' ? 'is-high' : '']
         .filter(Boolean)
         .join(' ')}
       data-testid="script-card-1"
     >
       <div className="card-top">
         <div className="card-kicker">
-          <kbd className="rank" aria-label="按数字 1 快速复制">1</kbd>
           <span className="scene-label">{script.scopeLabel}</span>
         </div>
         <div className="card-top-tags">
@@ -82,10 +81,6 @@ function SopCopyCard({
         </button>
       </div>
       <div className="meta-row">
-        <span className={`match-chip is-${script.matchKind}`} data-testid="match-reason-1">
-          {script.matchLabel}
-        </span>
-        <span className="meta-chip">{script.domain}</span>
         <span className="meta-chip">{script.platform}</span>
       </div>
     </article>
