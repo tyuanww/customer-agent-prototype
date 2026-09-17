@@ -175,16 +175,18 @@ export function IterationModule() {
       </header>
       <p className="dash-scope">{data.domainNote}</p>
 
-      {p0Open.length > 0 ? (
-        <section
-          className="dash-card iteration-reminder"
-          aria-labelledby="iteration-reminder-title"
-          data-testid="iteration-reminder"
-        >
-          <div className="dash-card-row">
-            <h2 id="iteration-reminder-title">有 {p0Open.length} 条待处理 P0 需要跟进</h2>
-            <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />
-          </div>
+      <section
+        className={`dash-card iteration-reminder${p0Open.length === 0 ? ' is-empty' : ''}`}
+        aria-labelledby="iteration-reminder-title"
+        data-testid="iteration-reminder"
+      >
+        <div className="dash-card-row">
+          <h2 id="iteration-reminder-title">
+            {p0Open.length > 0 ? `有 ${p0Open.length} 条待处理 P0 需要跟进` : '当前没有待处理 P0'}
+          </h2>
+          <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />
+        </div>
+        {p0Open.length > 0 ? (
           <ul className="iteration-reminder-list">
             {p0Open.map((task) => (
               <li key={task.taskId}>
@@ -200,8 +202,12 @@ export function IterationModule() {
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        ) : (
+          <p className="dash-footnote" data-testid="iteration-reminder-empty">
+            处理中或已关闭的不出现在这里。重置演练可恢复合成清单。
+          </p>
+        )}
+      </section>
 
       <div className="dash-filter-toolbar compact" aria-label="优化待办筛选">
         <label>
@@ -237,7 +243,13 @@ export function IterationModule() {
         <button type="button" className="dash-reset" data-testid="iteration-reset-filters" onClick={resetFilters}>
           重置筛选
         </button>
-        <button type="button" className="dash-reset" data-testid="iteration-reset-drill" onClick={resetDrill}>
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="iteration-reset-drill"
+          disabled={!edited}
+          onClick={resetDrill}
+        >
           重置演练
         </button>
       </div>

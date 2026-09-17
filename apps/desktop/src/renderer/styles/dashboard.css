@@ -2715,6 +2715,10 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   border-color: var(--dash-danger-line);
 }
 
+.iteration-reminder.is-empty {
+  border-color: var(--dash-line);
+}
+
 .iteration-reminder .dash-card-row {
   margin-bottom: 8px;
 }
