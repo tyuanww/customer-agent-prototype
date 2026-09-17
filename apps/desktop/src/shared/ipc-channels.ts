@@ -29,6 +29,17 @@ export const IPC_CHANNELS = {
   LOGIN_WINDOW_CHOOSE_FEISHU: 'login-window:choose-feishu',
   LOGIN_WINDOW_SUBMIT_ACCOUNT: 'login-window:submit-account',
   LOGIN_WINDOW_CANCEL: 'login-window:cancel',
+  SOP_WINDOW_OPEN: 'sop-window:open',
+  SOP_WINDOW_ENTRY_AVAILABLE: 'sop-window:entry-available',
+  SOP_WINDOW_CLOSE: 'sop-window:close',
+  SOP_WINDOW_END_FLOW: 'sop-window:end-flow',
+  SOP_WINDOW_RESTART: 'sop-window:restart',
+  SOP_WINDOW_CHOOSE_EDGE: 'sop-window:choose-edge',
+  SOP_WINDOW_NEXT_STEP: 'sop-window:next-step',
+  SOP_WINDOW_MOVE_BY: 'sop-window:move-by',
+  SOP_WINDOW_REPORT_LAYOUT: 'sop-window:report-layout',
+  SOP_WINDOW_COPY_CURRENT: 'sop-window:copy-current',
+  SOP_WINDOW_PROJECTION: 'sop-window:projection',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

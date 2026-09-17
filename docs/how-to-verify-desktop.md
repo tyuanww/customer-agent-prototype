@@ -279,6 +279,16 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 未运行的 Electron、打包或设备验证不得写成通过。
 
+## SOP
+
+过敏售后流程切片 1 是独立 SOP 窗，不是 Query 的第三种 overlay 角色。`OverlayRole` 仍只有 `fox | query`；`RendererRole` 增加 `sop`。
+
+| 你想证明 | 命令 |
+| --- | --- |
+| SOP 树 / 几何 / 合同 / 入口 / 三屏渲染 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/sop-model.test.ts tests/unit/sop-geometry.test.ts tests/unit/contracts.test.ts tests/unit/window-role.test.ts tests/unit/sop-window-ipc.test.ts tests/component/SopApp.test.tsx tests/component/QueryApp.test.tsx tests/unit/search-service.test.ts` |
+
+黄金路径（人工）：`pnpm dev` → 狐狸头 → `过敏了怎么办` → 结果标题和卡片之间的 banner +「打开过敏售后流程」→ 凭证话术屏。SOP 窗 600×240 起壳，ACK 后 hug，高度上限 620。Windows feasibility 允许过敏 hug 比旧 Query 更高，不把 620 当成失败。不要跑 `pnpm test:float` 来证明 SOP。
+
 ## 合成产品会话接入（D1）
 
 仅开发态显式设置 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 后运行 `pnpm dev`。两者必须是含端口的 `http://127.0.0.1:端口` origin，分别对应已经启动的 formal-dev API 与合成身份提供方；不能使用真实飞书地址或凭据。缺一项、非 loopback 或打包态拒启。无配置继续显式 S0 开发模式；接入模式故障不回退 S0。

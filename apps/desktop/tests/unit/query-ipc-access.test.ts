@@ -27,6 +27,7 @@ describe('trusted query IPC access', () => {
     for (const denied of [
       { trusted: true, role: 'fox' as const },
       { trusted: true, role: 'dashboard' as const },
+      { trusted: true, role: 'sop' as const },
       { trusted: true, role: null },
       { trusted: false, role: 'query' as const },
     ]) {

@@ -1,4 +1,6 @@
 import { MAX_QUERY_CHARS } from '@shared/contracts';
+import { compactQueryText } from '@shared/query-analyze';
+import { isAllergySopEntry } from '@shared/sop-entry';
 import { SYNTHETIC_SCRIPTS } from '../../data/synthetic-scripts';
 import type {
   MatchKind,
@@ -384,7 +386,7 @@ export function scoreScript(query: string, script: ScriptFixture): number {
     return 0;
   }
   const features = buildQueryFeatures(normalizedQuery);
-  if (features.understanding.genericOnly) {
+  if (features.understanding.genericOnly && !isAllergySopEntry(compactQueryText(query))) {
     return 0;
   }
   return scoreScriptWithFeatures(features, script).score;
@@ -426,7 +428,7 @@ export function searchScripts(
   }
 
   const features = buildQueryFeatures(normalizedQuery);
-  if (features.understanding.genericOnly) {
+  if (features.understanding.genericOnly && !isAllergySopEntry(compactQueryText(query))) {
     return { status: 'no-hit' };
   }
 

@@ -98,6 +98,14 @@ describe('searchScripts', () => {
     }
   });
 
+  it('keeps 过敏了怎么办 as an aftersale hit so the SOP banner can appear', () => {
+    const outcome = searchScripts('过敏了怎么办', SYNTHETIC_SCRIPTS, DEMO_NOW);
+    expect(outcome.status).toBe('hit');
+    if (outcome.status === 'hit') {
+      expect(outcome.results[0]?.scriptId).toBe('syn-after-002');
+    }
+  });
+
   it.each([
     ['面膜过敏怎么办', 'syn-after-002'],
     ['防晒闷痘怎么办', 'syn-after-001'],

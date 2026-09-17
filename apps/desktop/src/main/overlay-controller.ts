@@ -116,6 +116,8 @@ export type OverlayControllerOptions = {
   testHarness?: boolean;
   fence?: ShutdownFence;
   rendererDevServerUrl?: string;
+  onDispose?: () => void;
+  onDashboardShown?: () => void;
 };
 
 export class OverlayController {
@@ -173,6 +175,8 @@ export class OverlayController {
   private readonly fence: ShutdownFence;
   private readonly scheduler = new GuardedScheduler();
   private readonly preloadPath: string;
+  private readonly onDispose?: () => void;
+  private readonly onDashboardShown?: () => void;
   readonly rendererDevServerUrl: string | undefined;
 
   constructor(options: OverlayControllerOptions = {}) {
@@ -181,6 +185,8 @@ export class OverlayController {
     this.testHarness = options.testHarness ?? isTestHarnessEnabled();
     this.fence = options.fence ?? createShutdownFence();
     this.rendererDevServerUrl = options.rendererDevServerUrl;
+    this.onDispose = options.onDispose;
+    this.onDashboardShown = options.onDashboardShown;
   }
 
   isDisposed(): boolean {
@@ -215,6 +221,13 @@ export class OverlayController {
       return 'query';
     }
     return null;
+  }
+
+  queryWindowBounds(): Rect | null {
+    if (!this.query || this.query.isDestroyed()) {
+      return null;
+    }
+    return this.query.getBounds();
   }
 
   async start(): Promise<void> {
@@ -420,6 +433,7 @@ export class OverlayController {
       this.abandonDashboardWindow(win);
       return openDashboardUnavailable();
     }
+    this.onDashboardShown?.();
     this.dismiss();
     return { ok: true };
   }
@@ -885,6 +899,7 @@ export class OverlayController {
     this.queryResizeSession = null;
     this.scheduler.dispose();
     globalShortcut.unregisterAll();
+    this.onDispose?.();
   }
 
   private applyEvent(event: OverlayEvent): void {

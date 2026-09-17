@@ -1,0 +1,171 @@
+html[data-role='sop'],
+html[data-role='sop'] body,
+html[data-role='sop'] #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.sop-shell {
+  height: 100%;
+  padding: 0;
+  background: transparent;
+}
+
+.sop-shell .glass-shell {
+  height: 100%;
+}
+
+.sop-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  flex: 0 0 40px;
+  padding: 0 10px 0 14px;
+  z-index: 1;
+  color: var(--ink);
+  user-select: none;
+}
+
+.sop-chrome-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.sop-chrome-title strong {
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.sop-chrome-title span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sop-chrome-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.sop-chrome-tools button,
+.sop-chrome-tools .env-badge {
+  -webkit-app-region: no-drag;
+}
+
+.sop-close {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: var(--query-control);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.sop-close:hover {
+  background: var(--query-control-hover);
+  color: var(--ink);
+}
+
+.sop-body {
+  z-index: 1;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+  overflow: auto;
+}
+
+.sop-body .status-banner {
+  margin: 0;
+}
+
+.sop-internal-banner {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--hairline));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warning) 8%, var(--glass-inner));
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.sop-internal-banner strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.sop-todo {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sop-branches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sop-branches .retry-btn {
+  margin-top: 0;
+}
+
+.sop-end {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sop-end:hover {
+  color: var(--ink);
+}
+
+.sop-terminal {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sop-opening,
+.sop-failed {
+  display: flex;
+  min-height: 140px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+}
+
+.env-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}

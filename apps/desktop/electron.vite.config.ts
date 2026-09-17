@@ -23,6 +23,7 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
           login: resolve(__dirname, 'src/preload/login.ts'),
+          sop: resolve(__dirname, 'src/preload/sop.ts'),
         },
         output: {
           format: 'cjs',

@@ -49,6 +49,12 @@ describe('App role switch', () => {
     expect(screen.getByTestId('question-input')).toBeInTheDocument();
   });
 
+  it('does not fall through an identified sop role to QueryApp', () => {
+    render(<App role="sop" />);
+    expect(screen.queryByTestId('question-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('fox-button')).not.toBeInTheDocument();
+  });
+
   it('renders the dashboard workbench when role=dashboard and does not require customerAgent', () => {
     delete window.customerAgent;
     render(<App role="dashboard" />);

@@ -11,11 +11,13 @@ import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { resolveProductProfile } from './product-runtime-config';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
-import { app, Menu, session } from 'electron';
+import { app, Menu, screen, session } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
 import { registerClipboardIpc } from './clipboard-ipc';
 import { registerOverlayIpc } from './overlay-ipc';
+import { SopWindowController } from './sop-window-controller';
+import { registerSopWindowIpc } from './sop-window-ipc';
 import { applySessionSecurity } from './window-security';
 import { installDesktopShell, type DesktopShell } from './desktop-shell';
 import { applyApplicationIdentity } from './app-identity';
@@ -67,6 +69,7 @@ if (!gotLock) {
 } else {
   const shuttingDown = createShutdownFence();
   let controller: OverlayController | null = null;
+  let sopController: SopWindowController | null = null;
   let desktopShell: DesktopShell | null = null;
   let controllerReady = false;
   let productSession: ProductSession | null = null;
@@ -111,6 +114,7 @@ if (!gotLock) {
     desktopShell?.destroy();
     desktopShell = null;
     outgoing?.dispose();
+    sopController = null;
   };
 
   app.on('second-instance', () => {
@@ -143,10 +147,21 @@ if (!gotLock) {
     const testAccelerator = isTestHarnessEnabled()
       ? process.env.DEMO_E2E_ACCELERATOR
       : undefined;
+    sopController = new SopWindowController({
+      rendererDevServerUrl: () => controller?.rendererDevServerUrl,
+      queryBounds: () => controller?.queryWindowBounds() ?? null,
+      workArea: () => screen.getPrimaryDisplay().workArea,
+      sessionRole: () => {
+        const view = productSession?.view();
+        return view?.ok && view.signedIn ? view.role : null;
+      },
+    });
     const next = new OverlayController({
       fence: shuttingDown,
       rendererDevServerUrl,
       ...(testAccelerator ? { accelerator: testAccelerator } : {}),
+      onDispose: () => sopController?.destroy(),
+      onDashboardShown: () => sopController?.hideRememberingProgress(),
     });
     controller = next;
     registerClipboardIpc(
@@ -156,6 +171,10 @@ if (!gotLock) {
       () => productSession !== null,
     );
     registerOverlayIpc(() => controller);
+    registerSopWindowIpc({
+      getOverlay: () => controller,
+      getSop: () => sopController,
+    });
     // Development reads loopback origins from the environment; a packaged build
     // reads the same values from its own userData file so an installed client
     // can run the synthetic chain without any environment setup. Both paths are

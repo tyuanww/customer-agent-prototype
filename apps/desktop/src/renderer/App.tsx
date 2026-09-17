@@ -10,6 +10,11 @@ const LoginApp = lazy(async () => {
   return { default: module.LoginApp };
 });
 
+const SopApp = lazy(async () => {
+  const module = await import('./SopApp');
+  return { default: module.SopApp };
+});
+
 type AppProps = {
   role?: RendererRole;
 };
@@ -26,6 +31,13 @@ export function App({ role }: AppProps) {
     return (
       <Suspense fallback={null}>
         <LoginApp />
+      </Suspense>
+    );
+  }
+  if (resolved === 'sop') {
+    return (
+      <Suspense fallback={null}>
+        <SopApp />
       </Suspense>
     );
   }

@@ -8,7 +8,7 @@
 
 ## 1. 三个窗口的职责与安全配置
 
-三个业务 `BrowserWindow` 使用同一份 renderer 入口 `apps/desktop/src/renderer/index.html`，用 `?role=` 分流（`apps/desktop/src/renderer/lib/window-role.ts`）。
+三个业务 `BrowserWindow` 使用同一份 renderer 入口 `apps/desktop/src/renderer/index.html`，用 `?role=` 分流（`apps/desktop/src/renderer/lib/window-role.ts`）。切片 1 另有独立 SOP 窗，`role=sop`，不进入 `OverlayRole` / `overlayRoleOf` / `trustedContents()`。
 
 | | Fox | Query | Dashboard |
 | --- | --- | --- | --- |
@@ -76,12 +76,17 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `overlay:commit-fox-drag-settle` | invoke | **main-frame** + `role === 'fox'` + 正整数 `settleId` |
 | `overlay:set-fox-peek` | invoke | `role === 'fox'`；`peek \| retract`；`epoch >= 0` |
 | `overlay:command` | Main → renderer | preload 丢弃非 `isOverlayCommand` 的载荷 |
+| `sop-window:open` / `sop-window:entry-available` | invoke | 仅受信 Query；Fox / Dashboard / SOP 拒绝。Query 不得调用其它 `sop-window:*` |
+| `sop-window:close` / `end-flow` / `restart` / `choose-edge` / `next-step` / `move-by` / `report-layout` / `copy-current` | invoke | 仅 SOP 窗主框。`copy-current` 不接受任意字符串，Main 用当前投影 `answerText` + `resolveClipboardWrite` |
+| `sop-window:projection` | Main → SOP | preload 丢弃非 `isSopProjection` 的载荷 |
 
 `isTrustedSender`：sender 未销毁、属于 `trustedContents()`（仅 Fox / Query）、`senderFrame` 无 parent、URL 为允许的本机 dev server 或打包 `index.html`。
 
 `isTrustedMainFrameSender`：上述全部成立，且 `senderFrame === sender.mainFrame`。缺 frame 则拒绝。
 
 Payload 共性：精确 key 集合、安全整数、枚举。不开放 width / x / y / bounds IPC，不暴露文件系统。
+
+SOP 几何（`apps/desktop/src/shared/sop-geometry.ts`）：宽 600，起壳高 240，hug 240–620，默认放在 Query 右侧 +16，否则左侧，否则下方 +12，并 clamp 到 workArea。左上角不得与 Query origin 重合。优先避开 Query 胶囊 88px 带；若仍重叠，Query 输入框仍可点。布局超时 `SOP_LAYOUT_TIMEOUT_MS = 180`，不要命名为 HANDOFF。复制反馈 `SOP_COPY_FEEDBACK_MS = 1200`。Main 拥有树与进度；renderer 只渲染投影。`copyCurrent()` 不得走 `clipboard:copy-text`、`copyAdopt` 或 `/v1/events/adoption`。
 
 ---
 
