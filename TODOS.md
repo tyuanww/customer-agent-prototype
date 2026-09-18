@@ -106,12 +106,12 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Why:** 新机器上的索引初始化、发布版本对齐、缓存失效必须纳入交付设计，不能只迁移 API + PG。打包态目前按文件存在与否决定是否启用（`packaged-retrieval-paths.ts:25`），文件不在就没有主链。
 
-**Context:** `docs/reference-desktop-retrieval.md`、`apps/desktop/src/main/packaged-retrieval-paths.ts:18`。
+**Context:** `docs/reference-desktop-retrieval.md`、`apps/desktop/src/main/packaged-retrieval-paths.ts:18`。Mac 开发机路径已拍板：仓外 `~/.customer-agent-synthetic-stack/` 文件 + `existsSync` 才挂 env；不打进包；离线 S0 无主链。见 `docs/plans/2026-09-18-mac-dev-remainder.md`。远端拉索引仍跟 P4。
 
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** OPEN
+**Status:** 本机路径已冻结 · 远端仍 OPEN（跟 P4）
 
 ### P8 · Windows DRAFT 与启动代码冲突
 
@@ -142,12 +142,12 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Why:** 历史观察仍然有效，但**不能自动覆盖新模式**。
 
-**Context:** `docs/how-to-verify-macos-m5.md` 第 7 节。关窗取消项**保持未观察**；Mac 浮窗等未受影响行为可按变更范围复用原证据，但不能替代 Windows 实机证据。
+**Context:** `docs/how-to-verify-macos-m5.md` 第 7 节。关窗取消已于 2026-09-18 在开发态观察到（#127）。`synthetic-offline` 是 S0，没有登录/查询/复制主链，**不能**用来重验 M5 这三项。P3 段记不适用；P4 远端落地后再验。见 `docs/plans/2026-09-18-mac-dev-remainder.md`。不能替代 Windows 实机证据。
 
 **Effort:** M
 **Priority:** P2
 **Depends on:** P3 或 P4
-**Status:** OPEN
+**Status:** P3 段不适用主链 · P4 段仍 OPEN
 
 ### Overlay · Windows 收起后交还前台输入框
 
@@ -168,12 +168,12 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Why:** Electron 的 panel 只加了 NonactivatingPanel 掩码，点搜索框仍会成为 key window；收起后闲置狐狸头也可能抢走键盘。真正 Spotlight/Alfred 级「前台应用一直保持 key」需要原生属性。
 
-**Context:** 不要在本轮 overlay 交还焦点里做。本轮只用 `setFocusable(false)` + 有条件 `app.hide()`。原生模块会牵动公证、打包和 Electron 版本。参考：philz.blog NSPanel notes；不要为这一条引入新 native addon，除非产品明确要 IME 级隐身。
+**Context:** 不要在本轮 overlay 交还焦点里做。本轮只用 `setFocusable(false)` + 有条件 `app.hide()`。原生模块会牵动公证、打包和 Electron 版本。参考：philz.blog NSPanel notes。2026-09-18 拍板：本轮 **不** 引入 native addon；IME 级隐身等产品明确要求再开。见 `docs/plans/2026-09-18-mac-dev-remainder.md`。
 
 **Effort:** L
 **Priority:** P3
 **Depends on:** 本轮 macOS 交还先用 Electron 公共 API 验证是否够用
-**Status:** OPEN
+**Status:** 本轮不做 native · IME 级隐身仍待产品明确
 
 ## Completed
 

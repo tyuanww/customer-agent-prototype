@@ -16,7 +16,7 @@ Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/
 | 工厂 | `createOverlayChromeWindow` | 同左 | `createDashboardBrowserWindow` |
 | 典型尺寸 | 88×88（`FOX_SIZE`） | 宽 600；高见第 4 节 | 1180×760，最小 980×680 |
 | frame / 透明 / 置顶 | frameless、透明、`alwaysOnTop`、`skipTaskbar` | 同左；`resizable: false` | 标准 frame、不透明、非置顶、显示任务栏 |
-| macOS 形态 | `panel` + `hiddenInMissionControl` | 同左（命令面板：非激活 NSPanel）。收起要把键盘还给上一个 App：闲置狐狸 `setFocusable(false)`；仅当 Dashboard / 登录 / SOP 都不可见时才 `app.hide()`，再延迟 `showInactive` 狐狸。DevTools 窗不算「别 hide」。不 `app.focus({ steal })`。Dock 仍走 Dashboard 的 regular 激活 | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
+| macOS 形态 | `panel` + `hiddenInMissionControl` | 同左（命令面板：非激活 NSPanel）。收起要把键盘还给上一个 App：闲置狐狸 `setFocusable(false)`；仅当 Dashboard / 登录 / SOP 都不可见时才 `app.hide()`，再延迟 `showInactive` 狐狸。DevTools 窗不算「别 hide」。不 `app.focus({ steal })`。Dock 仍走 Dashboard 的 regular 激活。IME 级 NSPanel native 本轮不引入 | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
 | preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | `dashboard.ts` → `dashboard.cjs`（内联 `dashboard:wording-list`） |
 | `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无**；只有 `window.dashboardWording.list()` |
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
