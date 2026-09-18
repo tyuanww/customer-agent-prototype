@@ -65,7 +65,7 @@ export function createFeishuIdentityProvider(
       if (closed) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
       const controller = new AbortController();
       pending.add(controller);
-      const timeout = setTimeout(() => controller.abort(), 5_000);
+      const timeout = setTimeout(() => controller.abort(), 15_000);
       try {
         const tokenResponse = await fetchImpl(FEISHU_TOKEN_URL, {
           method: 'POST',
@@ -115,7 +115,7 @@ function readAccessToken(value: unknown): string | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
   if (record.code !== undefined && record.code !== 0) return undefined;
-  if (record.token_type !== undefined && record.token_type !== 'Bearer') return undefined;
+  if (record.token_type !== undefined && String(record.token_type).toLowerCase() !== 'bearer') return undefined;
   return typeof record.access_token === 'string' && record.access_token.length > 0
     ? record.access_token
     : undefined;

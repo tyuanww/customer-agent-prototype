@@ -51,7 +51,7 @@ export type ProductIdentityBootstrap = Readonly<{
   database: ApiDatabaseBootstrapConfig;
 } & (
   | { kind: 'synthetic'; providerOrigin: string }
-  | { kind: 'feishu'; feishu: FeishuProviderBootstrap }
+  | { kind: 'feishu'; feishu: FeishuProviderBootstrap; providerOrigin?: string }
 )>;
 
 /** Private, process-local capability configuration. It must never cross the composition root. */
@@ -163,6 +163,19 @@ function validFeishuRedirectUri(value: string): boolean {
       && url.pathname === '/v1/auth/callback' && url.search === '' && url.hash === '';
   } catch {
     return false;
+  }
+}
+
+function parseLoopbackIdentityOrigin(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port
+      || Number(url.port) < 1024 || url.username || url.password || url.pathname !== '/'
+      || url.search || url.hash) return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
   }
 }
 
@@ -553,20 +566,20 @@ export function parseApiPrivateBootstrapConfig(
       const feishu = parseFeishuProviderConfig(environment, feishuIssues);
       if (feishuIssues.length > 0) issues.push(...feishuIssues);
       else if (!feishu) issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
-      if (database && feishu && feishuIssues.length === 0) {
-        productIdentity = Object.freeze({ kind: 'feishu', database, feishu });
+      let providerOrigin: string | undefined;
+      if (environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN !== undefined) {
+        providerOrigin = parseLoopbackIdentityOrigin(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN);
+        if (!providerOrigin) issues.push(issue('SYNTHETIC_IDENTITY_PROVIDER_ORIGIN', 'invalid'));
+      }
+      if (database && feishu && feishuIssues.length === 0
+        && (environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN === undefined || providerOrigin)) {
+        productIdentity = Object.freeze(providerOrigin
+          ? { kind: 'feishu' as const, database, feishu, providerOrigin }
+          : { kind: 'feishu' as const, database, feishu });
       }
     } else {
-      let providerOrigin: string | undefined;
-      try {
-        const raw = environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN;
-        if (!raw) throw new Error('missing');
-        const url = new URL(raw);
-        if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port
-          || Number(url.port) < 1024 || url.username || url.password || url.pathname !== '/'
-          || url.search || url.hash) throw new Error('invalid');
-        providerOrigin = url.origin;
-      } catch { issues.push(issue('SYNTHETIC_IDENTITY_PROVIDER_ORIGIN', 'invalid')); }
+      const providerOrigin = parseLoopbackIdentityOrigin(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN);
+      if (!providerOrigin) issues.push(issue('SYNTHETIC_IDENTITY_PROVIDER_ORIGIN', 'invalid'));
       if (database && providerOrigin) {
         productIdentity = Object.freeze({ kind: 'synthetic', database, providerOrigin });
       }

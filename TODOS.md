@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 未授权 · **决策材料已就绪**（`docs/plans/2026-09-17-office-machine-delivery-path-decision.md`）。该路径评估经对抗性复核**未被反驳**。漏列必改点的落地情况：(1) `auth_mode` 硬编码 **第一刀已落地**（`7d0e93c`：服务端从部署配置注入，桌面端接受 `mock|feishu`，未知值 fail-closed；`AUTH_MODE=feishu` 启动门未开）；(2) **服务端 loopback 硬编码仍在**——`apps/api/src/synthetic-identity-provider.ts:4-11`、`apps/api/src/runtime-config.ts:498-502`。桌面飞书 CTA 已改系统浏览器（v0.3.4 / #125），会话仍是 mock。真实飞书 provider、打开启动门、放宽 loopback 均未授权。
+**Status:** OPEN · 方案 C 开工（`feat/identity-c`）。飞书 OAuth + 产品自管口令；不用 Logto。见 `docs/plans/2026-09-18-identity-c-password-and-feishu.md`。#129 / #130 不作为正路。API 仍只绑 127.0.0.1。未知飞书 `open_id` 不自动建号。放宽 loopback / 办公机远端部署仍未授权。
 
 ### P5 · 会话未绑定后端身份
 

@@ -127,7 +127,15 @@ export async function createProductAuthService(
       if (code !== undefined) {
         try { binding = await provider.exchange(code); } catch (error) { providerFailure = identityFailure(error); }
       }
-      await query('SELECT backend_identity.complete_callback($1,$2)', [loginId, binding]);
+      try {
+        await query('SELECT backend_identity.complete_callback($1,$2)', [loginId, binding]);
+      } catch (error) {
+        const failure = identityFailure(error);
+        if (failure.reason === 'CAPABILITY_DENIED' && binding) {
+          console.info(`[api] identity binding not allowlisted: ${binding}`);
+        }
+        throw failure;
+      }
       if (providerFailure) throw providerFailure;
       if (binding === null) throw new IdentityFailure('LOGIN_INVALID');
     },
