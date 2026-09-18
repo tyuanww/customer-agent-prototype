@@ -5,7 +5,7 @@ import { ProductHttp, ProductHttpError } from './product-http';
 
 type StoredSession = { access_token: string; expires_at: string };
 export type SessionStore = { read(): unknown; write(value: StoredSession): void; clear(): void };
-export type LoginWindow = { open(url: string, signal: AbortSignal): Promise<void> };
+export type LoginWindow = { open(url: string, operation: AbortController): Promise<void> };
 function validSession(v: unknown): v is StoredSession {
   return exactKeys(v, ['access_token', 'expires_at']) && typeof v.access_token === 'string'
     && /^[A-Za-z0-9_-]{43}$/.test(v.access_token) && typeof v.expires_at === 'string' && Number.isFinite(Date.parse(v.expires_at));
@@ -106,7 +106,7 @@ export class ProductSession {
       const { value: created } = await this.http.request('/v1/auth/login-requests', { body: { client_challenge: challenge, challenge_method: 'S256' }, signal: operation.signal });
       if (!exactKeys(created, ['login_id', 'authorize_url', 'expires_at']) || typeof created.login_id !== 'string'
         || !/^login_[A-Za-z0-9_-]{43}$/.test(created.login_id) || typeof created.authorize_url !== 'string') throw new ProductHttpError('VALIDATION');
-      await this.window.open(created.authorize_url, operation.signal);
+      await this.window.open(created.authorize_url, operation);
       for (;;) {
         const result = await this.http.request(`/v1/auth/login-requests/${created.login_id}/exchange`, { body: { client_verifier: verifier }, signal: operation.signal });
         if (result.status === 202) { await delay(2_000, undefined, { signal: operation.signal }); continue; }

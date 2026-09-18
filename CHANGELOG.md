@@ -2,6 +2,13 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.4] - 2026-09-18
+
+### Changed
+
+- Feishu login opens in the system browser. The 520×420 window stays a 飞书 / 账号 chooser and account form; it no longer loads the identity-provider page.
+- Cancelling the chooser after the browser opens stops the desktop login instead of still exchanging a session.
+
 ## [0.3.3] - 2026-09-18
 
 ### Added

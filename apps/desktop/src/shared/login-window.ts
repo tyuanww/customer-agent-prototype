@@ -1,10 +1,10 @@
 export type LoginAudience = 'feishu' | 'account';
 
-export type LoginChooserState = 'entry' | 'loading' | 'failed' | 'cancelled';
+export type LoginChooserState = 'entry' | 'loading' | 'waiting' | 'failed' | 'cancelled';
 
 export type LoginWindowCommandResult =
   | { ok: true }
-  | { ok: false; code: 'INVALID' | 'UNAVAILABLE' | 'FAILED' | 'CANCELLED' };
+  | { ok: false; code: 'INVALID' | 'UNAVAILABLE' | 'FAILED' | 'CANCELLED' | 'VALIDATION' };
 
 export type LoginWindowApi = {
   chooseFeishu(): Promise<LoginWindowCommandResult>;
@@ -17,6 +17,6 @@ export function isLoginWindowCommandResult(value: unknown): value is LoginWindow
   const record = value as Record<string, unknown>;
   if (record.ok === true) return Object.keys(record).length === 1;
   return record.ok === false && typeof record.code === 'string'
-    && ['INVALID', 'UNAVAILABLE', 'FAILED', 'CANCELLED'].includes(record.code)
+    && ['INVALID', 'UNAVAILABLE', 'FAILED', 'CANCELLED', 'VALIDATION'].includes(record.code)
     && Object.keys(record).length === 2;
 }

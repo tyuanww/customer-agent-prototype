@@ -5,7 +5,7 @@ import './styles/login.css';
 
 function readChooserState(search = window.location.search): LoginChooserState {
   const value = new URLSearchParams(search).get('loginState');
-  return value === 'loading' || value === 'failed' || value === 'cancelled' ? value : 'entry';
+  return value === 'loading' || value === 'waiting' || value === 'failed' || value === 'cancelled' ? value : 'entry';
 }
 
 export function LoginApp() {
@@ -15,7 +15,8 @@ export function LoginApp() {
   const [password, setPassword] = useState('');
   const [invalid, setInvalid] = useState(false);
   const [accountUnavailable, setAccountUnavailable] = useState(false);
-  const busy = state === 'loading';
+  const [failKind, setFailKind] = useState<'start' | 'open' | null>(null);
+  const busy = state === 'loading' || state === 'waiting';
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -28,9 +29,13 @@ export function LoginApp() {
   const chooseFeishu = async () => {
     setState('loading');
     setInvalid(false);
+    setFailKind(null);
     const result = await window.loginWindow!.chooseFeishu();
-    if (!result.ok && result.code === 'FAILED') setState('failed');
-    if (!result.ok && result.code === 'CANCELLED') setState('cancelled');
+    if (result.ok) { setState('waiting'); return; }
+    if (result.code === 'CANCELLED') { setState('cancelled'); return; }
+    if (result.code === 'UNAVAILABLE') { setFailKind('open'); setState('failed'); return; }
+    setFailKind('start');
+    setState('failed');
   };
 
   const submitAccount = async () => {
@@ -41,9 +46,11 @@ export function LoginApp() {
     if (result.ok) return;
     if (result.code === 'INVALID') { setInvalid(true); setState('entry'); return; }
     if (result.code === 'UNAVAILABLE') { setAccountUnavailable(true); setState('entry'); return; }
-    if (result.code === 'FAILED') setState('failed');
+    if (result.code === 'FAILED' || result.code === 'VALIDATION') { setFailKind('start'); setState('failed'); return; }
     if (result.code === 'CANCELLED') setState('cancelled');
   };
+
+  const failedCopy = failKind === 'start' ? '无法开始登录。' : '无法打开浏览器，请重试。';
 
   return (
     <div className="login-window">
@@ -57,14 +64,21 @@ export function LoginApp() {
 
       {state === 'loading' ? (
         <>
-          <p className="login-copy">{audience === 'account' ? '正在验证账号…' : '正在打开飞书登录…'}</p>
+          <p className="login-copy">{audience === 'account' ? '正在验证账号…' : '正在打开浏览器…'}</p>
+          <div className="login-actions">
+            <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
+          </div>
+        </>
+      ) : state === 'waiting' ? (
+        <>
+          <p className="login-copy">正在等待登录完成。可关闭浏览器页，回到此窗等待。</p>
           <div className="login-actions">
             <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
           </div>
         </>
       ) : state === 'failed' ? (
         <>
-          <p className="login-copy" style={{ color: 'var(--danger)' }}>飞书登录页未能加载，请重试。</p>
+          <p className="login-copy" style={{ color: 'var(--danger)' }}>{failedCopy}</p>
           <div className="login-actions">
             <button type="button" className="login-primary" onClick={() => void chooseFeishu()}>重试</button>
             <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
@@ -74,7 +88,7 @@ export function LoginApp() {
         <>
           <p className="login-copy">已取消登录。</p>
           <div className="login-actions">
-            <button type="button" className="login-primary" autoFocus onClick={() => { setState('entry'); setAudience('feishu'); }}>重新登录</button>
+            <button type="button" className="login-primary" autoFocus onClick={() => { setState('entry'); setAudience('feishu'); setFailKind(null); }}>重新登录</button>
           </div>
         </>
       ) : (
@@ -87,7 +101,7 @@ export function LoginApp() {
           </div>
           {audience === 'feishu' ? (
             <>
-              <p className="login-copy">将在此窗口打开飞书官方登录页。</p>
+              <p className="login-copy">将用浏览器打开飞书登录。</p>
               <div className="login-actions">
                 <button type="button" className="login-primary" autoFocus disabled={busy} onClick={() => void chooseFeishu()}>飞书登录</button>
                 <button type="button" className="login-cancel" disabled={busy} onClick={() => void window.loginWindow?.cancel()}>取消</button>
