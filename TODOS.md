@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 方案 C 开工（`feat/identity-c`）。飞书 OAuth + 产品自管口令；不用 Logto。见 `docs/plans/2026-09-18-identity-c-password-and-feishu.md`。#129 / #130 不作为正路。API 仍只绑 127.0.0.1。未知飞书 `open_id` 不自动建号。放宽 loopback / 办公机远端部署仍未授权。
+**Status:** OPEN · 本机方案 C 已合入（#131 / `ddd4b4a`）：飞书 OAuth + 产品自管口令，不用 Logto。本机已验证飞书 `owner` 与账号 `agent`。见 `docs/plans/2026-09-18-identity-c-password-and-feishu.md`、`docs/how-to-feishu-and-password-mac.md`。API 仍只绑 127.0.0.1。未知 `open_id` 不自动建号。放宽 loopback / 办公机远端部署仍未授权。
 
 ### P5 · 会话未绑定后端身份
 

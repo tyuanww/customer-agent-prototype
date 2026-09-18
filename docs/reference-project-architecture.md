@@ -240,7 +240,7 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 ### T1 身份所有权
 
-`runtime-config.ts` 唯一解析显式产品会话配置和三池总预算；`server.ts` 组合受控提供方与身份服务，失败时不建 mock。`product-auth-service.ts` 封装持久登录、会话、最小数据库角色和关闭；`synthetic-identity-provider.ts` 仅拥有本机合成 wire 的 URL、响应和取消预算。`product-auth-routes.ts` 拥有封闭 HTTP 输入、静态完成页、错误响应和固定限流窗口。现有 auth/search/event/policy 路由统一等待异步认证；renderer 不直连；D1 Query 已通过窄 IPC 使用合成身份，其他产品接线按后续切片实施。
+`runtime-config.ts` 唯一解析显式产品会话配置和三池总预算；`server.ts` 组合受控提供方与身份服务，失败时不建 mock。`AUTH_MODE=feishu` 且配了 loopback 口令 origin 时，`workforce-identity-provider.ts` 组合飞书 OAuth 与口令一次性 code；`feishu-identity-provider.ts` 只拥有飞书 authorize/token/user_info。`product-auth-service.ts` 封装持久登录、会话、最小数据库角色和关闭；`synthetic-identity-provider.ts` 仅拥有 mock 合成 wire。口令 HTTP 在 `scripts/synthetic-stack/password-identity-server.ts`。`product-auth-routes.ts` 拥有封闭 HTTP 输入、静态完成页、错误响应和固定限流窗口。现有 auth/search/event/policy 路由统一等待异步认证；renderer 不直连；D1 Query 已通过窄 IPC 使用产品会话。
 
 ### D1 桌面产品会话所有权
 
