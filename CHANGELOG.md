@@ -2,6 +2,17 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.2] - 2026-09-18
+
+### Added
+
+- Dashboard 话术库 reads the same off-repo hydrate / retrieval index as Query (prefers the larger file). Dedicated `dashboard.cjs` preload exposes only `dashboardWording.list()`.
+
+### Changed
+
+- Wording library no longer shows DEMO · SYNTHETIC fixture samples or NOT_CREATED for empty domains.
+- Dashboard chrome disclaimer: VOC stays synthetic; the wording library is the local catalog.
+
 ## [0.3.1] - 2026-09-18
 
 ### Added

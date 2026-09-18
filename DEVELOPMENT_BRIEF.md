@@ -50,7 +50,7 @@ Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Gi
 ### 2.2 演示级 Dashboard
 
 - 第三个懒创建的标准系统窗：约 1180×760，最小约 980×680；正常 frame、可缩放、非透明、非置顶、显示在任务栏。macOS 使用 `hiddenInset` 隐藏原生标题文字并保留交通灯，`trafficLightPosition` 为 x14 y16。共享 SSOT：标题栏高度 48px、traffic-light safe zone 0..72、titlebar control island 右缘 120px（仅命中 / no-drag overlay，不是第二条视觉列），macOS integrated collapsed surface / 结构边界 / divider 统一 120px，toggle 占 72..112 且右侧距 divider 8px；Windows / Linux native collapsed surface 仍为 72px。结构列边界由 `--dash-rendered-nav-width` 驱动的 `--dash-structure-boundary`（mac 折叠 120 / native 折叠 72 / 展开为当前合法 nav width / 拖宽预览共用），renderer 经 CSS vars 消费，不开放 preload / IPC。一体 chrome 下 48px 单行标题栏，品牌 / 导航 block offset 48，同一个 PanelLeft 钮固定约 x72 y4 40×40，由侧栏自有透明 island 持有。macOS 四阶段 icon / brand 中心固定 nav.left+60，native 固定 nav.left+36。左侧玻璃与右侧实色 main 顶底连续，分界线单一；macOS 折叠稳态必须是 120，不得再让 72 同时承担 safe zone / toggle / rail / divider 四种职责。Windows / Linux 保持原生标题栏与系统窗控，按钮放在稳定 48px 侧栏 chrome 槽。窗口 title 保持「客服运营工作台 · 演示数据」，侧栏业务标题不得删除。应用菜单顺序：mac `appMenu,fileMenu,agent,edit,window`；Win/Linux `fileMenu,agent,edit,window`。`role:close` 关闭当前表面，无新 renderer IPC，无重复 quit，不加 view/reload/devtools。Page 截图不含原生红绿灯，最终原生外观需真实 macOS 人工或 OS 截图验证。
-- 最好无 preload；不得进入 overlay `trustedContents()`；renderer 无 Node / Electron / clipboard。
+- 仅允许独立 `dashboard.ts` 话术库只读 preload；不得进入 overlay `trustedContents()`；renderer 无 Node / Electron / clipboard。
 - 只新增一个无参数 `dashboard:open` 白名单 IPC。main 必须验证 trusted sender 且 role 为 `query`。Fox 或非受信 sender fail-closed。
 - 重复打开只 focus；关闭后可重建；关闭不得退出狐狸。
 - 九个可浏览模块：管理概览、VOC / 工单洞察、检索效果、离线三维抽样复核、四域话术库、话术优化待办、内容与发布、公告与同步、架构能力图。

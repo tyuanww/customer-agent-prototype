@@ -113,6 +113,7 @@ describe('dashboard window contract', () => {
     expect(mainWindow).toContain("win.on('page-title-updated'");
     expect(mainWindow).toContain('event.preventDefault()');
     expect(mainWindow).toContain('DASHBOARD_WINDOW_TITLE');
+    expect(mainWindow).toContain('../preload/dashboard.cjs');
     expect(mainWindow).not.toContain('titleBarOverlay');
     expect(mainWindow).not.toContain('vibrancy');
     expect(mainWindow).not.toContain('setVibrancy');
@@ -140,7 +141,7 @@ describe('dashboard window contract', () => {
   it('uses one visible demo marker while keeping the non-Dafuyan boundary explicit', () => {
     expect(DASHBOARD_ENV_BADGES).toEqual(['演示数据']);
     expect(DASHBOARD_STRUCTURE_DISCLAIMER).toBe(
-      '无后端 · 不保存 · 话术正文与 VOC 明细均为合成镜像',
+      '无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读本机目录',
     );
   });
 });

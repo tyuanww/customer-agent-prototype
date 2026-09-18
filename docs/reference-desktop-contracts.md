@@ -1,6 +1,6 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated`、`product:escalate/record-terminal`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 无 preload。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated`、`product:escalate/record-terminal`、`dashboard:wording-list`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 只有话术库只读 preload，没有 `customerAgent`。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 
@@ -17,10 +17,10 @@ Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/
 | 典型尺寸 | 88×88（`FOX_SIZE`） | 宽 600；高见第 4 节 | 1180×760，最小 980×680 |
 | frame / 透明 / 置顶 | frameless、透明、`alwaysOnTop`、`skipTaskbar` | 同左；`resizable: false` | 标准 frame、不透明、非置顶、显示任务栏 |
 | macOS 形态 | `panel` + `hiddenInMissionControl` | 同左（命令面板：非激活 NSPanel）。收起要把键盘还给上一个 App：闲置狐狸 `setFocusable(false)`；仅当 Dashboard / 登录 / SOP 都不可见时才 `app.hide()`，再延迟 `showInactive` 狐狸。DevTools 窗不算「别 hide」。不 `app.focus({ steal })`。Dock 仍走 Dashboard 的 regular 激活 | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
-| preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | **无 preload** |
-| `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无** |
+| preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | `dashboard.ts` → `dashboard.cjs`（内联 `dashboard:wording-list`） |
+| `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无**；只有 `window.dashboardWording.list()` |
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
-| webPreferences | `contextIsolation: true` `sandbox: true` `nodeIntegration: false` `spellcheck: false` | 同左；Query 另设 `backgroundThrottling: false` | `DASHBOARD_WINDOW_SECURITY`：同样三项 + `spellcheck: false`，**不设 preload** |
+| webPreferences | `contextIsolation: true` `sandbox: true` `nodeIntegration: false` `spellcheck: false` | 同左；Query 另设 `backgroundThrottling: false` | `DASHBOARD_WINDOW_SECURITY` + 专用 preload；sandbox 三项不变 |
 
 | | Login | SOP |
 | --- | --- | --- |
@@ -43,11 +43,12 @@ CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态�
 
 ---
 
-## 2. Dashboard：无 preload、无 `customerAgent`
+## 2. Dashboard：话术库只读 preload、无 `customerAgent`
 
-- `createDashboardBrowserWindow` 使用 `DASHBOARD_WINDOW_SECURITY`，不传入 `preload`。
-- `readDashboardWindowSnapshot().hasPreload` 因此为 false。
-- Dashboard renderer 不得进入 `trustedContents()`，也拿不到 `window.customerAgent`。
+- `createDashboardBrowserWindow` 使用 `DASHBOARD_WINDOW_SECURITY` 加专用 `dashboard.cjs`。
+- `readDashboardWindowSnapshot().hasPreload` 为 true。preload 只暴露 `dashboardWording.list()`，通道 `dashboard:wording-list`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
+- 话术库读仓外 hydrate / 检索索引（仓内路径拒绝），只读、不复制、不发布。VOC / 工单仍是架构模拟。
+- Dashboard renderer 拿不到 `window.customerAgent`，也调不了 search / login / copy。
 - 打开通道只有无参数 `dashboard:open`。Main 要求 `isTrustedSender` 且 `role === 'query'`（`canOpenDashboard`）。Fox / 未受信 sender fail-closed，返回 `OpenDashboardResult` `{ ok: false, message }`。
 - 原生菜单 / Tray / Dock **不走**该 IPC：它们直接调 `OverlayController.openDashboard()`，失败用 `runDashboardOpenAttempt` + `notifyDashboardOpenFailure`（原生对话框），查询窗保持可用。
 
@@ -246,7 +247,9 @@ apps/desktop/src/main/overlay-ipc.ts          overlay / dashboard invoke 门禁
 apps/desktop/src/main/clipboard-ipc.ts        复制门禁
 apps/desktop/src/main/sender-guard.ts         trusted + main-frame
 apps/desktop/src/main/window-security.ts      导航 / 权限锁
-apps/desktop/src/main/dashboard-window.ts     无 preload 的标准窗
+apps/desktop/src/main/dashboard-window.ts     标准窗 + 话术库只读 preload
+apps/desktop/src/main/dashboard-wording.ts    仓外 hydrate/index 投影
+apps/desktop/src/preload/dashboard.ts         工作台独立 preload（内联通道）
 apps/desktop/src/main/dashboard-open-failure.ts 原生失败对话框
 apps/desktop/src/main/desktop-shell.ts        菜单 / Tray
 apps/desktop/src/main/desktop-lifecycle.ts    Dock activate / 二次启动

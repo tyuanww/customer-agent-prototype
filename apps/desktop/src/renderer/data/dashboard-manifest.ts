@@ -52,8 +52,8 @@ export type DashboardDeferredNavItem = {
   group: '服务洞察';
 };
 
-export type WordingLifecycle = 'demo_effective' | 'demo_expiring' | 'structure_sample';
-export type SourceReadiness = 'structure_confirmed' | 'upstream_authoring';
+export type WordingLifecycle = 'demo_effective' | 'demo_expiring' | 'structure_sample' | 'published';
+export type SourceReadiness = 'structure_confirmed' | 'upstream_authoring' | 'local_catalog';
 
 export type WordingEntry = {
   scriptId: string;
@@ -68,7 +68,7 @@ export type WordingEntry = {
   lifecycle: WordingLifecycle;
   lifecycleLabel: string;
   ownerRole: string;
-  dataClass: 'synthetic';
+  dataClass: 'synthetic' | 'local-catalog';
 };
 
 export type ManagerDecision = {

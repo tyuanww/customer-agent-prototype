@@ -29,7 +29,7 @@
 - PostgreSQL、OAuth、线上 API、埋点和正式数据按各自获批计划、Ddev、合同和安全门进入独立模块；已有开发 / 测试实现不代表真实运行接入已放行，也不应被误判为全仓禁止后端。不得在当前 renderer 中临时直连。外部模型、自动学习和自动发送继续按专项批准管理。
 - 复制成功只表示“已复制”，不得推断或暗示已发送、已采纳、回答正确或问题已解决。
 - Electron renderer 不得获得 Node.js 权限；所有窗口保持 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`。
-- Fox / Query renderer 只能通过类型化、白名单 preload API 请求原生能力，并按能力施加 sender / role / 必要时 main-frame 门禁；当前 Dashboard 保持无 preload。未来正式只读 adapter 必须单独评审，禁止通用 `send/on/invoke`、任意 channel、任意窗口控制和文件系统能力。
+- Fox / Query renderer 只能通过类型化、白名单 preload API 请求原生能力，并按能力施加 sender / role / 必要时 main-frame 门禁。Dashboard 仅允许独立 `dashboard.ts` preload 的话术库只读列表（`dashboard:wording-list`），不得挂 overlay 的 search / login / copy。未来正式只读 adapter 必须单独评审，禁止通用 `send/on/invoke`、任意 channel、任意窗口控制和文件系统能力。
 - commit、push、创建 PR、merge、deploy 分别需要用户对当前变更明确授权；前一阶段的授权不得自动扩大到下一阶段；已明确覆盖的动作无需再次确认。发布 / 外发、向他人发送消息、凭据处理和重要数据删除同样需要相应明确授权，不由 Skill 默认步骤或“测试通过”代替。
 
 ## 3. 模块边界与依赖方向
@@ -37,7 +37,7 @@
 以下细则描述桌面模块；`apps/api/`、`packages/contracts/`、`packages/database/`、根脚本与合同快照的所有权以 `docs/reference-project-architecture.md` 和对应获批合同为准，不把桌面无后端 / 无 preload 等局部约束外推到整个 workspace。
 
 - `apps/desktop/src/main/`：唯一拥有 Electron / OS、BrowserWindow、原生 bounds、应用生命周期、Electron sender 身份判定和原生副作用；可复用 `shared` 中的纯授权谓词。
-- `apps/desktop/src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。独立入口（`login.ts`、`sop.ts`）必须内联 IPC 通道字符串，禁止 `import` `ipc-channels.ts`：否则 electron-vite 会拆出 overlay preload 在 Windows sandbox 中加载不了的 shared chunk，Query 会停在 parked。
+- `apps/desktop/src/preload/`：只把已授权的窄能力适配成类型化 renderer API，不承载业务状态或通用 IPC。独立入口（`login.ts`、`sop.ts`、`dashboard.ts`）必须内联 IPC 通道字符串，禁止 `import` `ipc-channels.ts`：否则 electron-vite 会拆出 overlay preload 在 Windows sandbox 中加载不了的 shared chunk，Query 会停在 parked。
 - `apps/desktop/src/shared/`：只放跨边界类型、validator、状态模型、几何和纯函数；不得依赖 React、DOM、Electron 或产生 I/O。
 - `apps/desktop/src/renderer/`：只拥有 React / DOM、局部交互和 ViewModel；当前基线读取合成数据，未来正式数据也必须经过受控 adapter。不得导入 `main`、`preload` 或 Electron，也不得直连数据库或持有凭证。
 - `apps/desktop/assets/` 中的 canonical 资产是 SSOT；`apps/desktop/scripts/` 负责确定性派生。不得手改派生产物制造第二真源。

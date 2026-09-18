@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   GET_WINDOW_CONTEXT: 'overlay:get-window-context',
   OPEN_SEARCH: 'overlay:open-search',
   OPEN_DASHBOARD: 'dashboard:open',
+  DASHBOARD_WORDING_LIST: 'dashboard:wording-list',
   DISMISS: 'overlay:dismiss',
   REPORT_UI_PHASE: 'overlay:report-ui-phase',
   REPORT_HANDOFF_MILESTONE: 'overlay:report-handoff-milestone',

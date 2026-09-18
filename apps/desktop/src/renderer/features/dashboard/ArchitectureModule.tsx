@@ -135,7 +135,7 @@ export function ArchitectureModule() {
           </div>
         </section>
         <div className="arch-connector" aria-hidden="true">
-          Fox / Query：白名单 IPC · Dashboard：当前无 preload / IPC
+          Fox / Query：白名单 IPC · Dashboard：话术库只读 list，无 customerAgent
         </div>
         <section>
           <h2>九端口</h2>

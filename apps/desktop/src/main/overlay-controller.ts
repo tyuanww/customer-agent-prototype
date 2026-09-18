@@ -476,6 +476,13 @@ export class OverlayController {
     return readDashboardWindowSnapshot(this.dashboard);
   }
 
+  dashboardWebContents(): WebContents | null {
+    if (!this.dashboard || this.dashboard.isDestroyed()) {
+      return null;
+    }
+    return this.dashboard.webContents;
+  }
+
   isDashboardTrusted(): boolean {
     if (!this.dashboard || this.dashboard.isDestroyed()) {
       return false;

@@ -79,6 +79,7 @@ describe('DashboardApp', () => {
     originalMatchMedia = window.matchMedia;
     originalPointerEvent = window.PointerEvent;
     delete window.customerAgent;
+    delete window.dashboardWording;
     Object.defineProperty(window, 'PointerEvent', {
       configurable: true,
       writable: true,
@@ -94,6 +95,7 @@ describe('DashboardApp', () => {
     } else {
       delete window.customerAgent;
     }
+    delete window.dashboardWording;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -120,7 +122,7 @@ describe('DashboardApp', () => {
     expect(envBadges).toHaveTextContent('演示数据');
     expect(screen.getByTestId('dashboard-disclaimer')).toHaveTextContent('无后端 · 不保存');
     expect(screen.getByTestId('dashboard-boundary-disclaimer')).toHaveTextContent(
-      '话术正文与 VOC 明细均为合成镜像',
+      'VOC 明细为合成镜像 · 话术库读本机目录',
     );
     expect(screen.getByTestId('dashboard-refresh')).toHaveTextContent('固定快照');
 
@@ -131,7 +133,7 @@ describe('DashboardApp', () => {
     expect(boundary).toHaveTextContent('SYNTHETIC DATA');
     expect(boundary).toHaveTextContent('NO BACKEND');
     expect(boundary).toHaveTextContent('不保存');
-    expect(boundary).toHaveTextContent('话术正文与 VOC 明细均为合成镜像');
+    expect(boundary).toHaveTextContent('VOC 明细为合成镜像 · 话术库读本机目录');
 
     await user.click(screen.getByText('查看 Demo 技术指标与数据边界'));
     expect(screen.getByTestId('adopted-disclaimer')).toBeVisible();
@@ -1342,12 +1344,53 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('voc-period-ticket-count')).toHaveTextContent('2,400');
   });
 
-  it('filters the four-domain wording library and keeps missing sources visible', async () => {
+  it('filters the four-domain wording library from the local catalog', async () => {
     const user = userEvent.setup();
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_18',
+        total: 2,
+        entries: [
+          {
+            scriptId: 'mn-1',
+            domain: 'product',
+            title: '洁面用法',
+            scene: '怎么用',
+            answerPreview: '先打湿再打圈',
+            platform: '千牛 / 抖音',
+            version: 'rel_18',
+            effectiveWindow: '本机目录',
+            risk: 'low',
+            lifecycle: 'published',
+            lifecycleLabel: '已发布',
+            ownerRole: '本机话术库',
+            dataClass: 'local-catalog',
+          },
+          {
+            scriptId: 'mn-2',
+            domain: 'campaign',
+            title: '满赠规则',
+            scene: '活动',
+            answerPreview: '满赠不叠加',
+            platform: '千牛 / 抖音',
+            version: 'rel_18',
+            effectiveWindow: '本机目录',
+            risk: 'medium',
+            lifecycle: 'published',
+            lifecycleLabel: '已发布',
+            ownerRole: '本机话术库',
+            dataClass: 'local-catalog',
+          },
+        ],
+      }),
+    };
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-wording'));
-    expect(screen.getByTestId('module-wording')).toHaveTextContent('产品话术');
-    expect(screen.getByTestId('wording-detail')).toHaveTextContent('DEMO · SYNTHETIC');
+    expect(await screen.findByTestId('module-wording')).toHaveTextContent('产品话术');
+    expect(await screen.findByTestId('wording-detail')).toHaveTextContent('本机话术库');
+    expect(screen.getByTestId('wording-detail')).not.toHaveTextContent('DEMO · SYNTHETIC');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('洁面用法');
 
     const productTab = screen.getByTestId('wording-domain-product');
     productTab.focus();
@@ -1357,14 +1400,12 @@ describe('DashboardApp', () => {
     expect(productTab).toHaveAttribute('tabindex', '-1');
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
     expect(screen.getByTestId('wording-domain-campaign')).toHaveFocus();
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('满赠规则');
 
     await user.click(screen.getByTestId('wording-domain-presale'));
-    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('NOT_CREATED');
-    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('UPSTREAM_AUTHORING');
-    await user.selectOptions(screen.getByTestId('wording-lifecycle'), 'demo_effective');
-    expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配');
-    await user.selectOptions(screen.getByTestId('wording-lifecycle'), 'structure_sample');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('结构样例 · 未发布');
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机无此域');
+    expect(screen.getByTestId('wording-source-readiness')).not.toHaveTextContent('NOT_CREATED');
+    expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配的话术');
   });
 
   it('supports roving keyboard navigation between modules', async () => {
