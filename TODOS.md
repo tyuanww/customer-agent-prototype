@@ -159,7 +159,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Effort:** M
 **Priority:** P3
-**Depends on:** macOS 收起交还焦点先在 `feat/overlay-window` 落地
+**Depends on:** macOS 收起交还焦点已在 v0.3.1 / PR #120 落地
 **Status:** OPEN
 
 ### Overlay · NSPanel 隐身属性（becomesKeyOnlyIfNeeded）

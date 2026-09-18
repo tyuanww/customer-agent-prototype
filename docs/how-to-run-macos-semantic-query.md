@@ -6,7 +6,7 @@
 
 - Node.js 24.x 与 pnpm 11.19.0
 - 隔离合成栈已经在跑：PG15、身份 `:43101`、API `apps/api/dist/main.js` `:43100`
-- 仓外索引存在。hydrate 的 `releaseId` 由合成登录按当前 `content_current` 对齐（冻结时是 `rel_6`）
+- 仓外索引存在。hydrate 的 `releaseId` 由胶囊「登录」按当前 `content_current` 对齐（冻结时是 `rel_6`）
 - **不要** `node scripts/synthetic-stack/stack.ts start`。它会再种合成种子，把 `rel_6` 顶成 `rel_7`，hydrate 对不上就会「内容已变化，请重新查询」
 
 ## Steps
@@ -25,7 +25,7 @@
    | --- | --- |
    | `~/.customer-agent-synthetic-stack/retrieval-index.json` | BM25 索引；`questions[]` 由 `pnpm retrieval:questions` 写入 |
    | `~/.customer-agent-synthetic-stack/retrieval-embeddings.json` | 正文向量；由 `pnpm retrieval:embeddings` 写入 |
-   | `~/.customer-agent-synthetic-stack/retrieval-hydrate.json` | 原文快照；合成登录时按当前发布自动对齐 |
+   | `~/.customer-agent-synthetic-stack/retrieval-hydrate.json` | 原文快照；登录后按当前发布自动对齐。更小的种子 snapshot 不会盖掉更大的已有文件 |
    | `~/.customer-agent-synthetic-stack/minimax.env` | MiniMax key，权限 600 |
 
    若索引里还没有 `questions[]`，先入库顾客问法（只改仓外文件，不 `stack start`，不提交）：
@@ -46,7 +46,7 @@
 
    向量绑定 `sha256(answerText)`，不进 git。切发布后要重算。
 
-   hydrate 在合成登录时自动对齐当前发布。只想检查文件、或从 snapshot JSON 手工写入：
+   hydrate 在点胶囊「登录」后自动对齐当前发布。只想检查文件、或从 snapshot JSON 手工写入：
 
    ```bash
    pnpm retrieval:hydrate -- --dry-run
@@ -55,15 +55,15 @@
 
    空 snapshot 不会覆盖已有 hydrate。不要 `stack start`。
 
-3. 用现有开发启动脚本或手动导出 origin 后 `pnpm --filter @customer-agent/desktop dev`。需要：
+3. 用现有开发启动脚本或手动导出 origin 后 `pnpm --filter @customer-agent/desktop dev`。产品态至少需要：
 
    ```bash
    export CUSTOMER_AGENT_DESKTOP_API_ORIGIN=http://127.0.0.1:43100
    export CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN=http://127.0.0.1:43101
-   export CUSTOMER_AGENT_RETRIEVAL_INDEX="$HOME/.customer-agent-synthetic-stack/retrieval-index.json"
-   export CUSTOMER_AGENT_HYDRATE_INDEX="$HOME/.customer-agent-synthetic-stack/retrieval-hydrate.json"
    set -a && . "$HOME/.customer-agent-synthetic-stack/minimax.env" && set +a
    ```
+
+   仓外 hydrate / BM25 文件若已在默认路径，开发态会自动挂上，不必再 export `CUSTOMER_AGENT_RETRIEVAL_INDEX` / `CUSTOMER_AGENT_HYDRATE_INDEX`。需要覆盖时再 export。
 
 4. 点胶囊「登录」。成功后按钮变成 `{角色} · 退出`，占位变成「输入或粘贴客户问题，回车查询」，不是红校验。
 
@@ -81,7 +81,7 @@
 
 | 现象 | 处理 |
 | --- | --- |
-| 「内容已变化，请重新查询」 | `content_current` 与 hydrate `releaseId` 不一致。重新合成登录以回写 hydrate；不要 `stack start` |
+| 「内容已变化，请重新查询」 | `content_current` 与 hydrate `releaseId` 不一致。再点胶囊「登录」回写 hydrate；不要 `stack start` |
 | 查询很慢或 400 | 旧路径会打 leftover `/v1/search`。有 hydrate 时本分支不再走这条路；确认 `CUSTOMER_AGENT_HYDRATE_INDEX` 已导出 |
 | MiniMax 证书错误 | main 必须用 Electron `net.fetch`，不要让 Node 的 `fetch` 直连 |
-| `stack start` 已经跑过 | 种子发布可能已覆盖 `rel_6`。按冻结点把 `rel_7` superseded、`rel_6` published，再合成登录回写 hydrate |
+| `stack start` 已经跑过 | 种子发布可能已覆盖 `rel_6`。按冻结点把 `rel_7` superseded、`rel_6` published，再点胶囊「登录」回写 hydrate。检索会优先更大的仓外索引，不会用 11 条种子盖掉已有大库 |

@@ -10,7 +10,7 @@
 
 有 hydrate 快照时，不再把问句或命中标题转发给 leftover `/v1/search`。没有 hydrate 时，仍走 D1–D5 的合成 HTTP 搜索（测试与未接索引的 profile）。
 
-工程锚点（自动化，不是 M5、不是真实 SKU）：产品 PR [#80](https://github.com/weiweity/customer-agent-prototype/pull/80) `questions[]`、[#81](https://github.com/weiweity/customer-agent-prototype/pull/81) 正文向量、[#82](https://github.com/weiweity/customer-agent-prototype/pull/82) hydrate 对齐、[#83](https://github.com/weiweity/customer-agent-prototype/pull/83) `query-route` / 非激活 palette。真实 MENOKIN SKU 替换澄芽/雾屿仍未获批；若获批仓外受控输入，必须重跑 `pnpm retrieval:questions`、`pnpm retrieval:embeddings`，并合成登录或 `pnpm retrieval:hydrate`。不把真实客户原文写入 git。
+工程锚点（自动化，不是 M5、不是真实 SKU）：产品 PR [#80](https://github.com/weiweity/customer-agent-prototype/pull/80) `questions[]`、[#81](https://github.com/weiweity/customer-agent-prototype/pull/81) 正文向量、[#82](https://github.com/weiweity/customer-agent-prototype/pull/82) hydrate 对齐、[#83](https://github.com/weiweity/customer-agent-prototype/pull/83) `query-route` / 非激活 palette。真实 MENOKIN SKU 替换澄芽/雾屿仍未获批；若获批仓外受控输入，必须重跑 `pnpm retrieval:questions`、`pnpm retrieval:embeddings`，并点胶囊「登录」或 `pnpm retrieval:hydrate`。不把真实客户原文写入 git。
 
 ## 管道
 
@@ -36,7 +36,7 @@
 | `pnpm retrieval:questions` | `scripts/enrich-retrieval-questions.ts` | 只改仓外索引的 `questions[]`。输入是标题和快捷问法，不发送正文。缺 key / 生成失败不改该行。拒绝写进 git 工作树。`--dry-run` 只计数 |
 | `CUSTOMER_AGENT_EMBEDDING_INDEX` | main `loadDenseCatalog` | 仓外 JSON；`rows[]` 含 `scriptId` / `contentHash`=`sha256(answerText)` / `vector`。模型默认 `embo-01` |
 | `pnpm retrieval:embeddings` | `scripts/embed-retrieval-index.ts` | 把正文编成仓外向量（MiniMax `type=db`）。查询时 `type=query`。hash 对不上或查询失败则退回 BM25 正文 |
-| `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型。合成登录分页公告 snapshot 后自动对齐；空 snapshot 不覆盖 |
+| `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型。登录分页公告 snapshot 后自动对齐；空 snapshot 和更小的种子 snapshot 不覆盖。开发态文件存在则自动挂路径 |
 | `pnpm retrieval:hydrate` | `scripts/sync-retrieval-hydrate.ts` | 手工把 snapshot JSON 写入仓外 hydrate。`--dry-run` 不写。拒绝写进 git 工作树 |
 | `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` | main `loadRetrievalTelemetryStore` | 仓外 JSON。缺省写在 hydrate 同目录 `retrieval-telemetry.json`。只记 queryId / 命中 / 曝光 scriptId / 是否复制，**不记问句原文** |
 | `pnpm retrieval:never-hit` | `scripts/report-retrieval-never-hit.ts` | 对照 hydrate 目录，列出从未曝光、曝光未复制，以及 no_hit 率。不打 leftover `/v1/search` |
@@ -53,7 +53,7 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 
 | 情况 | 坐席看到 |
 | --- | --- |
-| hydrate 的 `releaseId` 不在当前公告允许集合，且磁盘上还没有对齐后的快照 | `STALE`：内容已变化，请重新查询。先合成登录让 snapshot 回写，不要 `stack start` |
+| hydrate 的 `releaseId` 不在当前公告允许集合，且磁盘上还没有对齐后的快照 | `STALE`：内容已变化，请重新查询。再点胶囊「登录」让 snapshot 回写，不要 `stack start` |
 | 本地有排序但 hydrate 对不上 id，或过滤后为空 | `no_hit`，不打 leftover `/v1/search` |
 | 排序分过低，或问句二元组只打中正文、打不中标题/问法 | `no_hit`。不用余弦 0.7。不改 leftover `judgeSearch` |
 | hydrate 检索 | API 仍是 `collection_disabled`（合同里 query_events 只由 `/v1/search` 写入）。曝光记在仓外 telemetry，用 `pnpm retrieval:never-hit` 看从未命中 |
