@@ -103,7 +103,7 @@ test('product session native Feishu login, logout and renderer isolation', async
     const login = app.windows().find((window) => window.url().includes('role=login'))!;
     await login.getByRole('button', { name: '飞书登录' }).click();
     await expect(query.getByRole('button', { name: 'agent · 退出' })).toBeVisible();
-    await expect(query.getByTestId('announce-banner')).toContainText('ACK 不是已读');
+    await expect(query.getByTestId('announce-banner')).toHaveCount(0);
     const view = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());
     expect(JSON.stringify(view)).not.toContain(wire.token);
     const loginWindows = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((window) => window.webContents.getURL().includes('/authorize')).length);

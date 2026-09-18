@@ -21,7 +21,7 @@ export function openSyntheticHelp(identityOrigin: string): Promise<boolean> {
       isolated.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
       isolated.setPermissionCheckHandler(() => false);
       const window = new BrowserWindow({
-        width: 420, height: 360, title: '合成求助入口', show: false, alwaysOnTop: true,
+        width: 420, height: 360, title: '求助入口', show: false, alwaysOnTop: true,
         webPreferences: { session: isolated, contextIsolation: true, sandbox: true, nodeIntegration: false },
       });
       if (process.platform === 'darwin') window.setAlwaysOnTop(true, 'floating');

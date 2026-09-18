@@ -1,11 +1,11 @@
 import { exactKeys, productFailure, type ProductFailure } from './product-session';
 import { isQueryIdentity, queryFailure, type QueryIdentity } from './product-search';
 
-export const SYNTHETIC_HELP_CONTACT = '合成话术师（演示）\n请先让客户稍等，再联系话术师或运营核实。必要时升级客服经理。\n此卡片只表示联系方式已准备，不是转交回执。';
+export const SYNTHETIC_HELP_CONTACT = '话术师\n请先让客户稍等，再联系话术师或运营核实。必要时升级客服经理。\n此卡片只表示联系方式已准备，不是转交回执。';
 export const FORBIDDEN_HELP_PHRASES = ['已转交成功', '转交成功', '已转交', '转交完成'] as const;
 export const ALLOWED_HELP_STATUS = ['待核实', '已打开入口', '已复制联系方式'] as const;
 export type HelpStatus = (typeof ALLOWED_HELP_STATUS)[number];
-export const SYNTHETIC_HELP_HTML = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>合成求助入口</title></head><body><h1>合成求助入口</h1><p>请先让客户稍等，再联系话术师或运营核实。必要时升级客服经理。</p><p>此窗口只表示入口已打开，不是转交回执。</p></body></html>`;
+export const SYNTHETIC_HELP_HTML = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>求助入口</title></head><body><h1>求助入口</h1><p>请先让客户稍等，再联系话术师或运营核实。必要时升级客服经理。</p><p>此窗口只表示入口已打开，不是转交回执。</p></body></html>`;
 export type HelpAction = 'open_feishu' | 'copy_contact';
 export type TerminalOutcome = 'dismissed' | 'no_hit_exit' | 'timeout';
 export type ProductEscalateRequest = QueryIdentity & { queryId: string; action: HelpAction };

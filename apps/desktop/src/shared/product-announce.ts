@@ -12,6 +12,7 @@ export type ProductAnnounceInvalidation = {
 };
 export type AnnounceGate = {
   allows(releaseId: string): boolean;
+  currentReleaseId?(): string | null;
   subscribe(listener: () => void): () => void;
 };
 export const announceFailure = (code: ProductFailure['code'], identity: QueryIdentity): ProductAnnounceFailure =>

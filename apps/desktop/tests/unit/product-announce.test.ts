@@ -110,7 +110,19 @@ describe('product announce lease and snapshot', () => {
     expect(f.announce.allows(releaseId)).toBe(true);
     await f.session.status();
     expect(f.announce.allows(releaseId)).toBe(true);
+    const replacedEvents: unknown[] = [];
+    f.announce.onInvalidated(value => replacedEvents.push(value));
     await f.session.logout();
+    expect(f.announce.allows(releaseId)).toBe(false);
+    expect(replacedEvents).toEqual([{ sessionEpoch: f.session.view().sessionEpoch, reason: 'signed_out' }]);
+  });
+
+  it('does not invalidate Query when signing out with no current lease', async () => {
+    const events: unknown[] = [];
+    const f = await setup(() => new Response(null, { status: 404 }));
+    f.announce.onInvalidated(value => events.push(value));
+    await f.session.logout();
+    expect(events).toEqual([]);
     expect(f.announce.allows(releaseId)).toBe(false);
   });
 

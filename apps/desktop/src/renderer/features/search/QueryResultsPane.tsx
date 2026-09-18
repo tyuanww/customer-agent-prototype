@@ -72,12 +72,12 @@ export function QueryResultsPane({
                 {errorMessage ? <span>{errorMessage}</span> : null}
                 {onCopyContact || onOpenHelp ? (
                   <div className="no-hit-help" data-testid="no-hit-help">
-                    {onCopyContact ? <button type="button" className="retry-btn" data-testid="copy-contact-button" onClick={onCopyContact}>复制合成联系方式</button> : null}
-                    {onOpenHelp ? <button type="button" className="retry-btn" data-testid="open-help-button" onClick={onOpenHelp}>打开合成入口</button> : null}
+                    {onCopyContact ? <button type="button" className="retry-btn" data-testid="copy-contact-button" onClick={onCopyContact}>复制联系方式</button> : null}
+                    {onOpenHelp ? <button type="button" className="retry-btn" data-testid="open-help-button" onClick={onOpenHelp}>打开求助入口</button> : null}
                     {onLeaveNoHit ? <button type="button" className="retry-btn" data-testid="no-hit-exit-button" onClick={onLeaveNoHit}>离开</button> : null}
                     <span className="help-status" data-testid="help-status">{helpStatus || '待核实'}</span>
                   </div>
-                ) : <span>当前 Demo 未接通真实话术库。</span>}
+                ) : <span>当前没有可用的升级入口。</span>}
               </div>
             ) : null}
 

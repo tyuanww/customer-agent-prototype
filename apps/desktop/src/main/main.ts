@@ -198,7 +198,7 @@ if (!gotLock) {
     );
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
-      if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);
+      applyPackagedRetrievalDefaults(process.env);
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
         createSessionStore(userDataDirectory), createLoginWindow(productProfile.identityOrigin, productProfile.apiOrigin, () => controller?.rendererDevServerUrl));
       productAnnounce = new ProductAnnounce(productSession, readProductClientId(userDataDirectory));

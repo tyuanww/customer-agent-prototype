@@ -58,7 +58,7 @@ export function createLoginWindow(
           } catch { callback({ cancel: true }); }
         });
         const window = new BrowserWindow({
-          width: 520, height: 420, title: '合成身份登录', show: false,
+          width: 520, height: 420, title: '登录', show: false,
           webPreferences: {
             session: isolated, contextIsolation: true, sandbox: true, nodeIntegration: false,
             preload: join(__dirname, '../preload/login.cjs'),

@@ -153,7 +153,7 @@ export function registerSopWindowIpc(host: SopWindowIpcHost): void {
   ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_COPY_CURRENT, (event): SopCopyResult => {
     const sop = sopGuard(event, host);
     if (!sop) {
-      return { ok: false, message: '复制通道不可用，请在桌面 Demo 中重试' };
+      return { ok: false, message: '复制通道不可用，请重试' };
     }
     return sop.copyCurrent();
   });

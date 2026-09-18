@@ -128,6 +128,40 @@ describe('product query and native copy provenance', () => {
     expect(searchCalls).toHaveLength(0);
     await f.session.logout();
   });
+  it('ranks the current hydrate snapshot instead of leftover index ids', async () => {
+    const retrieve = {
+      rank: () => [{
+        scriptId: 'from-index-400', title: '旧索引', questionText: '旧问法', answerText: '旧正文', score: 1,
+      }],
+    };
+    const pipeline = {
+      run: async () => ({
+        intent: 'other' as const,
+        ranked: [{
+          scriptId: 'from-index-400', title: '旧索引', questionText: '旧问法', answerText: '旧正文', score: 1,
+        }],
+      }),
+    };
+    const hydrate = {
+      releaseId: candidate.release_id,
+      candidate: (scriptId: string) => (scriptId === candidate.script_id ? candidate : null),
+      hydrate: (ranked: readonly { scriptId: string }[]) => ranked.flatMap((row) => (
+        row.scriptId === candidate.script_id ? [candidate] : []
+      )),
+      retrievalScripts: () => [{
+        scriptId: candidate.script_id,
+        title: candidate.title,
+        questionText: '什么时候发货',
+        answerText: candidate.answer_text,
+      }],
+    };
+    const f = await fixture();
+    const search = new ProductSearch(f.session, f.write, f.announce, f.help, retrieve, hydrate, null, pipeline);
+    const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
+    if (result.ok) expect(result.candidates[0]?.script_id).toBe(candidate.script_id);
+    await f.session.logout();
+  });
   it('does not send a ranked title to leftover /v1/search when hydrate is missing', async () => {
     const retrieve = {
       rank: (query: string) => query.includes('什么时候')
@@ -450,7 +484,7 @@ describe('product query and native copy provenance', () => {
     expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
     await f.session.logout();
   });
-  it('returns local no-hit without leftover HTTP when hydrate misses ranked ids', async () => {
+  it('fills hydrate misses from ranked answer text without leftover HTTP', async () => {
     const retrieve = {
       rank: () => [{
         scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
@@ -466,7 +500,8 @@ describe('product query and native copy provenance', () => {
     const search = new ProductSearch(f.session, f.write, f.announce, f.help, retrieve, hydrate);
     const before = f.transport.mock.calls.length;
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
-    expect(result).toMatchObject({ ok: true, hitStatus: 'no_hit', releaseId: candidate.release_id });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit', releaseId: candidate.release_id });
+    if (result.ok) expect(result.candidates[0]?.script_id).toBe(candidate.script_id);
     const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
     expect(searchCalls).toHaveLength(0);
     await f.session.logout();
@@ -500,7 +535,7 @@ describe('product no-hit escalate and terminal', () => {
     expect(await f.search.escalate(1, { ...identity, action: 'copy_contact' })).toMatchObject({
       ok: true, opened: true, action: 'copy_contact', eventStatus: 'recorded',
     });
-    expect(f.write).toHaveBeenCalledWith(expect.stringContaining('合成话术师'));
+    expect(f.write).toHaveBeenCalledWith(expect.stringContaining('话术师'));
     expect(f.events).toEqual([expect.objectContaining({ query_id: f.queryId, action: 'copy_contact' })]);
     expect(JSON.stringify(f.events)).not.toMatch(/已转交成功|转交完成/);
     const headers = new Headers(f.transport.mock.calls.find(call => String(call[0]).includes('/v1/events/escalate'))?.[1]?.headers);

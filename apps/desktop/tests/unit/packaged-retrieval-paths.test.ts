@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyPackagedRetrievalDefaults, defaultSyntheticStackFile } from '../../src/main/packaged-retrieval-paths';
+import { applyPackagedRetrievalDefaults, defaultSyntheticStackFile, resolveStackFile } from '../../src/main/packaged-retrieval-paths';
 
 const directories: string[] = [];
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -50,12 +50,23 @@ describe('packaged retrieval defaults', () => {
     );
   });
 
-  it('applies defaults after the packaged profile and before search IPC', () => {
+  it('falls back to an existing stack file only when the env path is unset', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'stack-file-fallback-'));
+    directories.push(root);
+    const fallback = path.join(root, 'retrieval-hydrate.json');
+    writeFileSync(fallback, '{}\n');
+    expect(resolveStackFile(undefined, fallback)).toBe(fallback);
+    expect(resolveStackFile('', fallback)).toBeUndefined();
+    expect(resolveStackFile('/tmp/explicit.json', fallback)).toBe('/tmp/explicit.json');
+  });
+
+  it('applies defaults after the product profile and before search IPC', () => {
     const main = readFileSync(path.join(desktopRoot, 'src/main/main.ts'), 'utf8');
-    expect(main).toContain('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);');
-    expect(main.indexOf('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);'))
+    expect(main).toContain('applyPackagedRetrievalDefaults(process.env);');
+    expect(main).not.toContain('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);');
+    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env);'))
       .toBeGreaterThan(main.indexOf('resolveProductProfile(app.isPackaged, userDataDirectory, process.env)'));
-    expect(main.indexOf('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);'))
+    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env);'))
       .toBeLessThan(main.indexOf('registerProductSearchIpc('));
   });
 });

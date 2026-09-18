@@ -25,7 +25,7 @@ export function registerClipboardIpc(
       const trusted = guard(event);
       const role = getRole(event.sender);
       if (!canCopyText({ trusted, role })) {
-        return { ok: false, message: '复制通道不可用，请在桌面 Demo 中重试' };
+        return { ok: false, message: '复制通道不可用，请重试' };
       }
 
       const resolved = resolveClipboardWrite(text);
