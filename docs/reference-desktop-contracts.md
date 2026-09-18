@@ -33,7 +33,7 @@ Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/
 | session | 非持久 isolated partition | 与 overlay 同会话，不是登录 partition |
 | 打开时 | Query「登录」 | Query 过敏 banner；Dashboard 打开则隐藏 SOP |
 
-登录窗由 `product-login-window.ts` 持有非持久 isolated session，sandbox 与 contextIsolation 开启，专用 preload `apps/desktop/src/preload/login.ts` → `out/preload/login.cjs`（通道字符串内联，禁止 import `ipc-channels.ts`）。Query IPC 不挂到登录窗。打包 `file://` 下 chooser 必须放行 renderer `assets/` 嵌套 hashed 资源并剥掉 Vite `crossorigin`，否则窗是空白。本窗只加载 chooser：飞书授权 URL 经 `allowedLoginUrl` 后再 `shell.openExternal`，账号在本窗 `POST /password` 后由 main GET API `/v1/auth/callback`。窗内不得导航到 IdP。拒绝子窗和权限。
+登录窗由 `product-login-window.ts` 持有非持久 isolated session，sandbox 与 contextIsolation 开启，专用 preload `apps/desktop/src/preload/login.ts` → `out/preload/login.cjs`（通道字符串内联，禁止 import `ipc-channels.ts`）。Query IPC 不挂到登录窗。打包 `file://` 下 chooser 必须放行 renderer `assets/` 嵌套 hashed 资源并剥掉 Vite `crossorigin`，否则窗是空白。本窗只加载 chooser：飞书授权 URL 经 `allowedLoginUrl` 后再 `shell.openExternal`，账号在本窗 `POST /password` 后由 main GET API `/v1/auth/callback`。`allowedLoginUrl` 只放行配置的合成 `/authorize`、API `/v1/auth/callback`，以及 `https://accounts.feishu.cn/open-apis/authen/v1/authorize`；拒绝凭据、hash 与其它路径。窗内不得导航到 IdP。拒绝子窗和权限。
 
 SOP 窗由 `sop-window-controller.ts` 持有，专用 preload `apps/desktop/src/preload/sop.ts` → `out/preload/sop.cjs`（同样内联通道）。Query 只能 `sop-window:open` / `entry-available`；其它 `sop-window:*` 仅 SOP 主框。Dashboard 打开时 SOP 隐藏。
 

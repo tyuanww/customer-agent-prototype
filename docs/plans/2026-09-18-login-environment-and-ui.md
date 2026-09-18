@@ -1,6 +1,6 @@
 # 登录环境与登录窗 UI（2026-09-18）
 
-> **状态：** 规格已拍板；本切片已在 `feat/login-system-browser` 落地（仍 `AUTH_MODE=mock`），走 `/ship` PR。  
+> **状态：** 规格已拍板；mock 选择器已合入 `main`（v0.3.4 / PR #125）。仍 `AUTH_MODE=mock`，未开 feishu 启动门。  
 > **拍板：** 环境先定规格、不开 `AUTH_MODE=feishu` 启动门；UI 保留 520×420 选择器，飞书改系统浏览器。  
 > **相关：** [登录与身份设计](2026-09-17-login-identity-design.md)、`DESIGN.md` 窗口 4、`TODOS.md` P4。
 
