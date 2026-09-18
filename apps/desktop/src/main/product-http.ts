@@ -13,6 +13,28 @@ export function loopbackOrigin(value: string): string {
   }
   return url.origin;
 }
+
+function isPublicHostname(hostname: string): boolean {
+  if (hostname.length < 4 || hostname.length > 253) return false;
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return false;
+  if (hostname.includes(':') || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+  if (!hostname.includes('.')) return false;
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(hostname);
+}
+
+/** Loopback http://127.0.0.1:<port> or https://hostname (no userinfo, path, or non-443 port). */
+export function productOrigin(value: string): string {
+  try { return loopbackOrigin(value); } catch { /* try https */ }
+  let url: URL;
+  try { url = new URL(value); } catch { throw new ProductHttpError('VALIDATION'); }
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    throw new ProductHttpError('VALIDATION');
+  }
+  if (url.pathname !== '/' && url.pathname !== '') throw new ProductHttpError('VALIDATION');
+  if (url.port && url.port !== '443') throw new ProductHttpError('VALIDATION');
+  if (!isPublicHostname(url.hostname)) throw new ProductHttpError('VALIDATION');
+  return url.origin;
+}
 const EXTRA_HEADERS = ['x-client-id', 'x-snapshot-lease', 'if-none-match', 'idempotency-key'] as const;
 export type ProductHttpResult = {
   status: number; value: unknown;
@@ -21,7 +43,7 @@ export type ProductHttpResult = {
 export class ProductHttp {
   readonly origin: string;
   constructor(origin: string, private readonly transport: typeof fetch = fetch) {
-    this.origin = loopbackOrigin(origin);
+    this.origin = productOrigin(origin);
   }
   /** Bounded response and deadline. No retries: mutations may have committed. */
   async request(path: string, options: {

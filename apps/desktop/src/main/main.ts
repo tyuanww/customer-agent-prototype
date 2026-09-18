@@ -200,7 +200,7 @@ if (!gotLock) {
     if (productProfile) {
       applyPackagedRetrievalDefaults(process.env);
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
-        createSessionStore(userDataDirectory), createLoginWindow(
+        createSessionStore(userDataDirectory, productProfile.apiOrigin), createLoginWindow(
           productProfile.identityOrigin,
           productProfile.apiOrigin,
           () => controller?.rendererDevServerUrl,

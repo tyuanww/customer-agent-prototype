@@ -1,12 +1,18 @@
 import { safeStorage } from 'electron';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, renameSync, unlinkSync, lstatSync } from 'node:fs';
 import path from 'node:path';
 import type { SessionStore } from './product-session';
 import { ProductHttpError } from './product-http';
 
-/** Dedicated encrypted blob. Linux basic_text is explicitly not an encryption backend. */
-export function createSessionStore(directory: string): SessionStore {
-  const target = path.join(directory, 'product-session.enc'); const temporary = `${target}.tmp`;
+export function sessionStoreFileName(apiOrigin: string): string {
+  const id = createHash('sha256').update(apiOrigin).digest('hex').slice(0, 16);
+  return `product-session.${id}.enc`;
+}
+
+/** Dedicated encrypted blob, keyed by API origin so local and remote tokens never mix. */
+export function createSessionStore(directory: string, apiOrigin = 'http://127.0.0.1:43100'): SessionStore {
+  const target = path.join(directory, sessionStoreFileName(apiOrigin)); const temporary = `${target}.tmp`;
   const secure = () => {
     if (!safeStorage.isEncryptionAvailable() || (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')) {
       throw new ProductHttpError('UNAVAILABLE');

@@ -12,12 +12,11 @@ import path from 'node:path';
  *   { "mode": "synthetic-local", "apiOrigin": "http://127.0.0.1:43100",
  *     "identityOrigin": "http://127.0.0.1:43101" }
  *
- * Every field is re-validated here, so the file cannot widen the client's reach:
- * the mode must be exact, both origins must be bare `http://127.0.0.1:<port>/`
- * with a non-privileged port, and the file must be a regular file under
- * userData (no symlink, no traversal). There is still no way to point the
- * packaged client at a non-loopback host, at a path or at a URL with
- * credentials — the same restrictions the development profile enforced.
+ * Every field is re-validated here. `synthetic-local` still only accepts
+ * `http://127.0.0.1:<port>`. `product-remote` accepts `https://hostname` with
+ * no userinfo, path, or non-443 port. The file must be a regular file under
+ * userData (no symlink, no traversal). HTTP public hosts and IP literals stay
+ * rejected.
  *
  * A missing or invalid file is a startup error: the packaged client must not
  * treat absence as offline S0, and it must not consult the environment as a
@@ -32,6 +31,7 @@ import path from 'node:path';
 export const SYNTHETIC_STACK_PROFILE_FILE = 'synthetic-stack.json';
 export const BUNDLED_OFFLINE_PROFILE_FILE = 'synthetic-offline.json';
 const MODE = 'synthetic-local';
+const REMOTE_MODE = 'product-remote';
 const OFFLINE_MODE = 'synthetic-offline';
 export const SYNTHETIC_OFFLINE_PROFILE_JSON = '{"mode":"synthetic-offline"}';
 const MAX_BYTES = 4_096;
@@ -81,6 +81,29 @@ function loopbackOrigin(value: unknown): string | undefined {
   return url.origin;
 }
 
+function isPublicHostname(hostname: string): boolean {
+  if (hostname.length < 4 || hostname.length > 253) return false;
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return false;
+  if (hostname.includes(':') || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+  if (!hostname.includes('.')) return false;
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(hostname);
+}
+
+function httpsOrigin(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  let url: URL;
+  try { url = new URL(value); } catch { return undefined; }
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return undefined;
+  if (url.pathname !== '/' && url.pathname !== '') return undefined;
+  if (url.port && url.port !== '443') return undefined;
+  if (!isPublicHostname(url.hostname)) return undefined;
+  return url.origin;
+}
+
+function productOrigin(value: unknown): string | undefined {
+  return loopbackOrigin(value) ?? httpsOrigin(value);
+}
+
 type PackagedProfileParse =
   | { readonly ok: true; readonly profile: PackagedProductProfile | undefined }
   | { readonly ok: false; readonly kind: PackagedProfileErrorKind };
@@ -127,6 +150,14 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
     const keys = Object.keys(record);
     if (keys.length !== 1 || keys[0] !== 'mode') return { ok: false, kind: 'invalid' };
     return { ok: true, profile: undefined };
+  }
+  if (record.mode === REMOTE_MODE) {
+    const apiOrigin = httpsOrigin(record.apiOrigin);
+    const identityOrigin = httpsOrigin(record.identityOrigin);
+    if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
+      return { ok: false, kind: 'invalid' };
+    }
+    return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin }) };
   }
   if (record.mode !== MODE) return { ok: false, kind: 'invalid' };
   const apiOrigin = loopbackOrigin(record.apiOrigin);
@@ -225,10 +256,10 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   const apiOrigin = environment.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
   const identityOrigin = environment.CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN;
   if (apiOrigin === undefined && identityOrigin === undefined) return undefined;
-  const api = loopbackOrigin(apiOrigin);
-  const identity = loopbackOrigin(identityOrigin);
-  if (api === undefined || identity === undefined) {
-    throw new Error('Synthetic desktop requires both exact loopback origins in development');
+  const api = productOrigin(apiOrigin);
+  const identity = productOrigin(identityOrigin);
+  if (api === undefined || identity === undefined || api === identity) {
+    throw new Error('Synthetic desktop requires both exact loopback or https origins in development');
   }
   return Object.freeze({ apiOrigin: api, identityOrigin: identity });
 }

@@ -112,8 +112,11 @@ describe('product session lifetime', () => {
   });
 });
 describe('loopback transport', () => {
-  it.each(['https://example.com', 'http://localhost:4100', 'http://127.0.0.1:4100/path'])('rejects %s', origin => {
+  it.each(['http://example.com', 'http://localhost:4100', 'http://127.0.0.1:4100/path', 'https://127.0.0.1'])('rejects %s', origin => {
     expect(() => new ProductHttp(origin)).toThrow();
+  });
+  it('accepts an https public hostname', () => {
+    expect(new ProductHttp('https://example.com').origin).toBe('https://example.com');
   });
   it('rejects userinfo in the configured origin', () => {
     const url = new URL('http://127.0.0.1:4100'); url.username = 'synthetic';
