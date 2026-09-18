@@ -244,7 +244,7 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 ### D1 桌面产品会话所有权
 
-`main/product-session.ts` 拥有 token、epoch、PKCE 与退出/过期；`product-http.ts` 拥有有界 loopback HTTP；`product-session-store.ts` 拥有 safeStorage 密文文件；`product-login-window.ts` 拥有独立登录选择器、`allowedLoginUrl` 外开白名单与账号 callback GET；`product-ipc.ts` 绑定 sender/main-frame 与能力。shared 只提供脱敏状态/失败合同，preload 校验投影，Query 不获得 token。无环境变量的 S0 搜索保持本地；显式接入 profile 经 D2 的受控 adapter 搜索，绝不因 API 失败回退 fixture。
+`main/product-session.ts` 拥有 token、epoch、PKCE 与退出/过期；`product-http.ts` 拥有有界 HTTP（loopback 或 https 公网主机名）；`product-session-store.ts` 拥有按 `apiOrigin` 分文件的 safeStorage 密文；`product-login-window.ts` 拥有独立登录选择器、`allowedLoginUrl` 外开白名单与账号 callback GET；`product-ipc.ts` 绑定 sender/main-frame 与能力。shared 只提供脱敏状态/失败合同，preload 校验投影，Query 不获得 token。无环境变量的 S0 搜索保持本地；显式接入 profile 经 D2 的受控 adapter 搜索，绝不因 API 失败回退 fixture。
 
 ### D2 桌面候选与复制所有权
 
