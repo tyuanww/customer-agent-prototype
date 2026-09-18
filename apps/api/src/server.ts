@@ -1,5 +1,6 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
+import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
 import { createContentImportService } from './content-import-service.js';
@@ -61,10 +62,12 @@ export async function startApi(
         if ((config.authMode === 'feishu') !== (bootstrap.productIdentity.kind === 'feishu')) {
           throw new Error('Product identity bootstrap is incomplete');
         }
+        const callback = `http://${config.host}:${config.port}/v1/auth/callback`;
         const provider = bootstrap.productIdentity.kind === 'feishu'
-          ? createFeishuIdentityProvider(bootstrap.productIdentity.feishu)
-          : createSyntheticIdentityProvider(bootstrap.productIdentity.providerOrigin,
-            `http://${config.host}:${config.port}/v1/auth/callback`);
+          ? (bootstrap.productIdentity.providerOrigin
+            ? createWorkforceIdentityProvider(bootstrap.productIdentity.feishu, bootstrap.productIdentity.providerOrigin, callback)
+            : createFeishuIdentityProvider(bootstrap.productIdentity.feishu))
+          : createSyntheticIdentityProvider(bootstrap.productIdentity.providerOrigin, callback);
         auth = await createProductAuthService(bootstrap.productIdentity.database, provider, config.authMode);
       }
       try {

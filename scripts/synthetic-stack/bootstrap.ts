@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 // `pnpm build:services`.
 import { applyDatabaseMigrations } from '../../packages/database/dist/index.js';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SOURCES } from './content.ts';
-import { SYNTHETIC_IDENTITIES } from './profile.ts';
+import { SYNTHETIC_IDENTITIES, type FeishuStackBinding } from './profile.ts';
 import { SEED_INTENT } from './seed.ts';
 
 const CAPABILITIES: readonly (readonly [string, string])[] = Object.freeze([
@@ -90,6 +90,19 @@ export async function seedReferenceData(client): Promise<string> {
   }
 
   return `reference data: ${String(SYNTHETIC_SOURCES.length)} sources, ${String(SYNTHETIC_IDENTITIES.length)} identities`;
+}
+
+export async function seedFeishuBindings(client, bindings: readonly FeishuStackBinding[]): Promise<string> {
+  for (const binding of bindings) {
+    const userId = `usr_${binding.openId}`.slice(0, 128);
+    await client.query(`
+      INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+      VALUES ($1,'feishu','feishu-tenant',$1,$2,$3,true,$4)
+      ON CONFLICT (binding_id) DO UPDATE SET provider='feishu', tenant='feishu-tenant', subject=EXCLUDED.subject,
+        user_id=EXCLUDED.user_id, subject_hash=EXCLUDED.subject_hash, enabled=true, role=EXCLUDED.role
+    `, [binding.openId, userId, sha256(binding.openId), binding.role]);
+  }
+  return `feishu bindings: ${bindings.length === 0 ? 'none' : bindings.map((binding) => binding.openId).join(', ')}`;
 }
 
 export async function bootstrapDatabase(client): Promise<readonly string[]> {

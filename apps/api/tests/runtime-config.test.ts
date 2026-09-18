@@ -260,6 +260,21 @@ describe('synthetic product identity bootstrap', () => {
     }).authMode).toBe('feishu');
   });
 
+  it('keeps the loopback password identity beside Feishu', () => {
+    const config = parseApiPrivateBootstrapConfig({
+      ...environment,
+      AUTH_MODE: 'feishu',
+      FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
+      FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
+      FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
+    });
+    expect(config.productIdentity).toMatchObject({
+      kind: 'feishu',
+      providerOrigin: 'http://127.0.0.1:44002',
+      feishu: { clientId: 'cli_aaaaaaaaaaaaaaaa' },
+    });
+  });
+
   it('shrinks the runtime pool when a review capability is configured and keeps worker login distinct', () => {
     const withReview = parseApiPrivateBootstrapConfig({
       ...environment,
