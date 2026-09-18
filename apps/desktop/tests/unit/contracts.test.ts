@@ -12,6 +12,10 @@ const sopPreload = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/sop.ts'),
   'utf8',
 );
+const dashboardPreload = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/dashboard.ts'),
+  'utf8',
+);
 const overlayPreload = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/index.ts'),
   'utf8',
@@ -39,6 +43,7 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.GET_WINDOW_CONTEXT,
       IPC_CHANNELS.OPEN_SEARCH,
       IPC_CHANNELS.OPEN_DASHBOARD,
+      IPC_CHANNELS.DASHBOARD_WORDING_LIST,
       IPC_CHANNELS.DISMISS,
       IPC_CHANNELS.REPORT_UI_PHASE,
       IPC_CHANNELS.REPORT_HANDOFF_MILESTONE,
@@ -82,6 +87,14 @@ describe('IPC whitelist', () => {
     expect(overlayPreload).toContain('SOP_LOAD_FAILED');
     expect(overlayPreload).toContain('SOP_LAYOUT_TIMEOUT');
     expect(overlayPreload).toContain('SOP_FIXTURE_MISSING');
+  });
+
+  it('keeps the dashboard wording preload free of shared overlay modules', () => {
+    expect(dashboardPreload).not.toContain("from '../shared/");
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_WORDING_LIST}'`);
+    expect(dashboardPreload).not.toContain('product:search');
+    expect(dashboardPreload).not.toContain('product:login');
+    expect(dashboardPreload).not.toContain("from '../shared/product-session'");
   });
 
   it('keeps the SOP preload free of shared overlay modules', () => {

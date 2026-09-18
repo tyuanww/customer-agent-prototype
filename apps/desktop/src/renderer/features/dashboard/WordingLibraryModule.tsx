@@ -1,10 +1,11 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import {
   DASHBOARD_MANIFEST,
   type DomainId,
   type WordingEntry,
   type WordingLifecycle,
 } from '../../data/dashboard-manifest';
+import type { DashboardWordingView } from '@shared/dashboard-wording';
 import { StatusBadge } from './StatusBadge';
 
 const data = DASHBOARD_MANIFEST.wording;
@@ -13,28 +14,68 @@ function riskTone(risk: WordingEntry['risk']): 'ok' | 'warn' | 'danger' {
   return risk === 'low' ? 'ok' : risk === 'medium' ? 'warn' : 'danger';
 }
 
+function asWordingEntry(entry: DashboardWordingView['entries'][number]): WordingEntry {
+  return {
+    scriptId: entry.scriptId,
+    domain: entry.domain,
+    title: entry.title,
+    scene: entry.scene,
+    answerPreview: entry.answerPreview,
+    platform: entry.platform,
+    version: entry.version,
+    effectiveWindow: entry.effectiveWindow,
+    risk: entry.risk,
+    lifecycle: entry.lifecycle,
+    lifecycleLabel: entry.lifecycleLabel,
+    ownerRole: entry.ownerRole,
+    dataClass: entry.dataClass,
+  };
+}
+
 export function WordingLibraryModule() {
-  const [domain, setDomain] = useState<DomainId>('product');
+  const [catalog, setCatalog] = useState<DashboardWordingView | null>(null);
   const [query, setQuery] = useState('');
   const [lifecycle, setLifecycle] = useState<WordingLifecycle | 'all'>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(data.entries[0]?.scriptId ?? null);
+  const [domain, setDomain] = useState<DomainId>('product');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const api = window.dashboardWording;
+    if (!api) return undefined;
+    void api.list().then((result) => {
+      if (!live || !result.ok) return;
+      setCatalog(result);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const entries = useMemo(
+    () => (catalog?.entries ?? []).map(asWordingEntry),
+    [catalog],
+  );
+  const live = catalog !== null;
+
   const source = data.domains.find((item) => item.id === domain) ?? data.domains[0];
+  const domainCount = entries.filter((entry) => entry.domain === domain).length;
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('zh-CN');
-    return data.entries.filter((entry) => {
+    return entries.filter((entry) => {
       if (entry.domain !== domain || (lifecycle !== 'all' && entry.lifecycle !== lifecycle)) {
         return false;
       }
       return !needle || `${entry.title} ${entry.scene} ${entry.answerPreview}`.toLocaleLowerCase('zh-CN').includes(needle);
     });
-  }, [domain, lifecycle, query]);
-  const selected = visible.find((item) => item.scriptId === selectedId) ?? visible[0];
+  }, [domain, entries, lifecycle, query]);
+  const selected = visible.find((entry) => entry.scriptId === selectedId) ?? visible[0];
 
   const chooseDomain = (next: DomainId) => {
     setDomain(next);
     setQuery('');
     setLifecycle('all');
-    setSelectedId(data.entries.find((item) => item.domain === next)?.scriptId ?? null);
+    setSelectedId(entries.find((entry) => entry.domain === next)?.scriptId ?? null);
   };
 
   const handleDomainKeyDown = (event: KeyboardEvent<HTMLButtonElement>, current: DomainId) => {
@@ -53,15 +94,28 @@ export function WordingLibraryModule() {
     });
   };
 
+  const readinessLabel = !live
+    ? '本机话术库未挂载'
+    : domainCount > 0
+      ? '本机已挂载'
+      : '本机无此域';
+  const sourceSummary = !live
+    ? '工作台只读通道未接通。VOC / 工单仍是架构模拟。'
+    : domainCount > 0
+      ? `${domainCount} 条 · 与查询胶囊同一份本机目录`
+      : '当前域在本机目录中没有条目。';
+
   return (
     <div className="dash-module" data-testid="module-wording">
       <header className="dash-module-head">
         <div>
           <h1>{data.title}</h1>
-          <p className="dash-kicker">{data.kicker}</p>
+          <p className="dash-kicker">本机话术库只读 · 与查询胶囊同一份目录</p>
         </div>
       </header>
-      <p className="dash-scope dash-scope-important">{data.disclaimer}</p>
+      <p className="dash-scope dash-scope-important">
+        只读浏览本机话术库。不复制、不编辑、不发布、不发送。VOC / 工单仍是架构模拟。
+      </p>
 
       <div className="wording-domain-tabs" role="tablist" aria-label="话术域">
         {data.domains.map((item) => (
@@ -79,7 +133,7 @@ export function WordingLibraryModule() {
             onKeyDown={(event) => handleDomainKeyDown(event, item.id)}
           >
             <strong>{item.label}</strong>
-            <span>{item.readiness === 'upstream_authoring' ? '待上游建设' : '结构已确认'}</span>
+            <span>{live ? `${entries.filter((entry) => entry.domain === item.id).length} 条` : '未挂载'}</span>
           </button>
         ))}
       </div>
@@ -92,14 +146,14 @@ export function WordingLibraryModule() {
       >
         <div className="source-readiness" data-testid="wording-source-readiness">
           <div>
-            <span className="dash-card-label">正式来源就绪度</span>
+            <span className="dash-card-label">本机目录</span>
             <strong>{source.label}</strong>
           </div>
           <StatusBadge
-            label={source.readinessLabel}
-            tone={source.readiness === 'upstream_authoring' ? 'danger' : 'warn'}
+            label={readinessLabel}
+            tone={!live || domainCount === 0 ? 'warn' : 'ok'}
           />
-          <p>{source.sourceSummary}</p>
+          <p>{sourceSummary}</p>
         </div>
 
         <div className="dash-filterbar" aria-label="话术筛选">
@@ -108,7 +162,7 @@ export function WordingLibraryModule() {
           <input
             data-testid="wording-search"
             value={query}
-            placeholder="搜索标题 / 场景 / 合成正文"
+            placeholder="搜索标题 / 场景 / 正文"
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
@@ -120,9 +174,7 @@ export function WordingLibraryModule() {
             onChange={(event) => setLifecycle(event.target.value as WordingLifecycle | 'all')}
           >
             <option value="all">全部</option>
-            <option value="demo_effective">合成有效</option>
-            <option value="demo_expiring">合成临期</option>
-            <option value="structure_sample">结构样例 · 未发布</option>
+            <option value="published">已发布</option>
           </select>
         </label>
         <button
@@ -131,7 +183,7 @@ export function WordingLibraryModule() {
           onClick={() => {
             setQuery('');
             setLifecycle('all');
-            setSelectedId(data.entries.find((item) => item.domain === domain)?.scriptId ?? null);
+            setSelectedId(entries.find((entry) => entry.domain === domain)?.scriptId ?? null);
           }}
         >
           重置
@@ -139,7 +191,7 @@ export function WordingLibraryModule() {
         </div>
 
         <div className="dash-selection-status" aria-live="polite" data-testid="wording-filter-status">
-          <span>当前域</span><strong>{source.label} · {visible.length} 条合成样例</strong><em>{source.readinessLabel}</em>
+          <span>当前域</span><strong>{source.label} · {visible.length} 条</strong><em>{readinessLabel}</em>
         </div>
 
         <div className="wording-layout">
@@ -156,12 +208,12 @@ export function WordingLibraryModule() {
                 <strong>{entry.title}</strong>
                 <small>{entry.scene} · {entry.version}</small>
               </span>
-              <StatusBadge label={entry.lifecycleLabel} tone={entry.lifecycle === 'structure_sample' ? 'danger' : 'warn'} />
+              <StatusBadge label={entry.lifecycleLabel} tone="ok" />
             </button>
           )) : (
             <div className="dash-empty-state" data-testid="wording-empty">
-              <strong>没有匹配的合成样例</strong>
-              <span>这不代表正式话术库无内容；当前 Dashboard 未连接正式源。</span>
+              <strong>{live ? '没有匹配的话术' : '本机话术库未挂载'}</strong>
+              <span>{live ? '换一个域或清空筛选后再看。' : '工作台只读通道未接通，不会回退到合成样例。'}</span>
             </div>
           )}
         </div>
@@ -170,7 +222,7 @@ export function WordingLibraryModule() {
           {selected ? (
             <>
               <div className="dash-card-row">
-                <span className="dash-card-label">DEMO · SYNTHETIC</span>
+                <span className="dash-card-label">本机话术库</span>
                 <StatusBadge label={`风险 ${selected.risk}`} tone={riskTone(selected.risk)} />
               </div>
               <h2>{selected.title}</h2>
@@ -179,12 +231,12 @@ export function WordingLibraryModule() {
                 <div><dt>script_id</dt><dd>{selected.scriptId}</dd></div>
                 <div><dt>适用平台</dt><dd>{selected.platform}</dd></div>
                 <div><dt>有效窗</dt><dd>{selected.effectiveWindow}</dd></div>
-                <div><dt>Owner</dt><dd>{selected.ownerRole}</dd></div>
+                <div><dt>来源</dt><dd>{selected.ownerRole}</dd></div>
               </dl>
               <p className="dash-footnote">只读浏览 · 不复制、不编辑、不发布、不发送</p>
             </>
           ) : (
-            <p className="dash-empty">选择一条合成样例查看结构</p>
+            <p className="dash-empty">选择一条话术查看正文</p>
           )}
         </aside>
         </div>

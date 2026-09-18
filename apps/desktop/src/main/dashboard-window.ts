@@ -1,4 +1,5 @@
 import { BrowserWindow, nativeTheme, type WebPreferences } from 'electron';
+import { join } from 'node:path';
 import {
   DASHBOARD_WINDOW_CHROME,
   DASHBOARD_WINDOW_SECURITY,
@@ -31,6 +32,7 @@ export type DashboardWindowSnapshot = {
 
 const DASHBOARD_WEB_PREFERENCES: WebPreferences = {
   ...DASHBOARD_WINDOW_SECURITY,
+  preload: join(__dirname, '../preload/dashboard.cjs'),
 };
 
 export function createDashboardBrowserWindow(): BrowserWindow {

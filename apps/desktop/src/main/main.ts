@@ -9,6 +9,7 @@ import { ProductAnnounce } from './product-announce';
 import { registerProductAnnounceIpc } from './product-announce-ipc';
 import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
+import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { app, Menu, screen, session } from 'electron';
@@ -212,6 +213,10 @@ if (!gotLock) {
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+    registerDashboardWordingIpc(
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+    );
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {
       if (controller === next) {

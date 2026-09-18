@@ -159,7 +159,7 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 - 不使用 Menokin 名义、真实产品事实或真实客户原文；正式 Menokin 数据只可在 G0 / Ddev 与数据门通过后由受控 adapter 接入。
 - 不复制或迁移旧 `dafuyan-wording` 项目的代码、词典、权重、数据或配置；查询能力是在本仓按合成合同独立实现。
 - 过期与未生效话术永不返回；卡片不展示匹配分。
-- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 无 preload，也没有 `customerAgent`。
+- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 只有话术库只读 preload，没有 `customerAgent`。
 - 复制成功只显示「已复制」，不表示已发送、已采纳或回答正确。
 - Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。API host 已有合成范围的 `search/adoption/escalate` 事务端口；默认 S0 不连接，显式 loopback 已接线 D1–D5，hydrate 检索不打 leftover `/v1/search`。合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
 - 「智能检索」默认 ON：MiniMax 只规划检索式并重排已有 `scriptId`，不生成、不改写、不发送。失败 fail-open 到 BM25。未登录的 S0 fixture 路径仍不调用模型。

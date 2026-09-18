@@ -152,7 +152,7 @@ test('opens one isolated Dashboard from trusted desktop entries', async () => {
     await expect(dashboard.getByTestId('dashboard-env-badges')).toHaveText('演示数据');
     await expect(dashboard.getByTestId('dashboard-disclaimer')).toHaveText('无后端 · 不保存');
     await expect(dashboard.getByTestId('dashboard-boundary-disclaimer')).toContainText(
-      '话术正文与 VOC 明细均为合成镜像',
+      'VOC 明细为合成镜像 · 话术库读本机目录',
     );
     for (const [width, height] of [[980, 680], [1180, 760], [1440, 820]] as const) {
       await expectDashboardWithoutHorizontalOverflow(app, dashboard, width, height);
@@ -198,7 +198,7 @@ test('opens one isolated Dashboard from trusted desktop entries', async () => {
       alwaysOnTop: false,
       skipTaskbar: false,
       transparent: false,
-      hasPreload: false,
+      hasPreload: true,
       closable: true,
       title: '客服运营工作台 · 演示数据',
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',

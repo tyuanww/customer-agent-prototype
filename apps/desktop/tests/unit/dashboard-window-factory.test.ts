@@ -42,7 +42,9 @@ describe('dashboard BrowserWindow factory', () => {
 
     expect(created).toBeDefined();
     expect(mocks.BrowserWindow).toHaveBeenCalledOnce();
-    const options = mocks.BrowserWindow.mock.calls[0]?.[0];
+    const options = mocks.BrowserWindow.mock.calls[0]?.[0] as {
+      webPreferences?: { preload?: string };
+    } | undefined;
     expect(options).toMatchObject({
       frame: true,
       transparent: false,
@@ -58,7 +60,7 @@ describe('dashboard BrowserWindow factory', () => {
         spellcheck: false,
       },
     });
-    expect(options?.webPreferences).not.toHaveProperty('preload');
+    expect(options?.webPreferences?.preload).toMatch(/preload\/dashboard\.cjs$/);
     expect(mocks.setMenuBarVisibility).toHaveBeenCalledWith(false);
     expect(mocks.on).toHaveBeenCalledWith('page-title-updated', expect.any(Function));
   });
