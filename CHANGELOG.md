@@ -6,7 +6,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Changed
 
-- Feishu login opens in the system browser. The 520×420 window stays a 飞书 / 账号 chooser and account form; it no longer loads the identity-provider page.
+- Feishu login opens in the system browser (still `AUTH_MODE=mock`; the Feishu start gate is closed). The 520×420 window stays a 飞书 / 账号 chooser and account form; it no longer loads the identity-provider page. See `docs/how-to-verify-desktop.md` D1.
 - Cancelling the chooser after the browser opens stops the desktop login instead of still exchanging a session.
 
 ## [0.3.3] - 2026-09-18

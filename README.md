@@ -45,6 +45,7 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 查看 W6 CI、Windows smoke 与正式服务候选产物的退出收口 | [docs/plans/2026-09-03-dev-m0-w6-exit-closure.md](docs/plans/2026-09-03-dev-m0-w6-exit-closure.md) |
 | 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
 | 核对合成飞书 / 账号登录窗与打包 file:// 收口（已合入，不含真实飞书凭据） | [docs/plans/2026-09-17-synthetic-dual-login.md](docs/plans/2026-09-17-synthetic-dual-login.md) |
+| 核对登录窗飞书改系统浏览器、账号仍本窗（how-to D1；已合入 v0.3.4，仍 mock） | [如何验证 · D1](docs/how-to-verify-desktop.md#合成产品会话接入d1) · [2026-09-18 规格](docs/plans/2026-09-18-login-environment-and-ui.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
 | 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |
