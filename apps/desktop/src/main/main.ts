@@ -2,7 +2,7 @@ import { registerProductSearchIpc } from './product-search-ipc';
 import { ProductHttp } from './product-http';
 import { ProductSession } from './product-session';
 import { createSessionStore } from './product-session-store';
-import { createLoginWindow } from './product-login-window';
+import { createLoginWindow, followAllowedLoginRedirects } from './product-login-window';
 import { registerProductIpc } from './product-ipc';
 import { readProductClientId } from './product-client-id';
 import { ProductAnnounce } from './product-announce';
@@ -12,7 +12,7 @@ import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
-import { app, Menu, screen, session } from 'electron';
+import { app, Menu, screen, session, shell } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
 import { registerClipboardIpc } from './clipboard-ipc';
@@ -200,7 +200,16 @@ if (!gotLock) {
     if (productProfile) {
       applyPackagedRetrievalDefaults(process.env);
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
-        createSessionStore(userDataDirectory), createLoginWindow(productProfile.identityOrigin, productProfile.apiOrigin, () => controller?.rendererDevServerUrl));
+        createSessionStore(userDataDirectory), createLoginWindow(
+          productProfile.identityOrigin,
+          productProfile.apiOrigin,
+          () => controller?.rendererDevServerUrl,
+          {
+            openExternal: isTestHarnessEnabled()
+              ? followAllowedLoginRedirects(productProfile.identityOrigin, productProfile.apiOrigin)
+              : (url) => shell.openExternal(url),
+          },
+        ));
       productAnnounce = new ProductAnnounce(productSession, readProductClientId(userDataDirectory));
       await productSession.restore();
     }

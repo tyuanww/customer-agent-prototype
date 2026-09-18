@@ -11,6 +11,11 @@ function fixture(options: { store?: Partial<SessionStore>; respond?: (path: stri
   const store = { read: vi.fn(() => null as unknown), write: vi.fn(), clear: vi.fn(), ...options.store };
   const requests: { path: string; init: RequestInit }[] = [];
   const transport = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    if (init?.signal?.aborted) {
+      const error = new Error('aborted');
+      error.name = 'AbortError';
+      throw error;
+    }
     const path = new URL(String(url)).pathname; requests.push({ path, init: init ?? {} });
     if (options.respond) return options.respond(path);
     if (path === '/v1/auth/login-requests') return Response.json({ login_id: `login_${'i'.repeat(43)}`, authorize_url: 'http://127.0.0.1:4101/authorize?state=s', expires_at: new Date(Date.now() + 300_000).toISOString() }, { status: 201 });
@@ -18,7 +23,7 @@ function fixture(options: { store?: Partial<SessionStore>; respond?: (path: stri
     if (path.endsWith('/logout')) return new Response(null, { status: 204 });
     return Response.json(options.identity ?? user);
   }) as unknown as typeof fetch;
-  const window = { open: vi.fn(async () => {}) };
+  const window = { open: vi.fn(async (_url?: string, _operation?: AbortController) => {}) };
   const session = new ProductSession(new ProductHttp('http://127.0.0.1:4100', transport), store, window);
   return { session, store, requests, stored, window };
 }
@@ -45,6 +50,12 @@ describe('product session lifetime', () => {
     const pending = f.session.login(); await vi.waitFor(() => expect(f.window.open).toHaveBeenCalled());
     await f.session.logout(); finish(); await pending;
     expect(f.session.view().signedIn).toBe(false); expect(f.store.write).not.toHaveBeenCalled();
+  });
+  it('cancels exchange when the login window aborts after opening the browser', async () => {
+    const f = fixture();
+    f.window.open.mockImplementation(async (_url, operation) => { operation?.abort(); });
+    expect(await f.session.login()).toMatchObject({ ok: false, code: 'CANCELLED' });
+    expect(f.session.view().signedIn).toBe(false);
   });
   it('keeps a delayed old status below the newly logged-in epoch', async () => {
     const f = fixture(); await f.session.login();

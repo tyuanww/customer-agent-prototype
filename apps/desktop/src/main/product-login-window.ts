@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, session, type Event } from 'electron';
+import { BrowserWindow, ipcMain, session, shell, type Event } from 'electron';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { loopbackOrigin, ProductHttpError } from './product-http';
@@ -8,6 +8,11 @@ import type { LoginWindow } from './product-session';
 import type { LoginWindowCommandResult } from '../shared/login-window';
 
 const FEISHU_AUTHORIZE_HOST = 'accounts.feishu.cn';
+
+export type LoginWindowHost = {
+  openExternal(url: string): Promise<void>;
+  fetch: typeof fetch;
+};
 
 export function allowedLoginUrl(value: string, provider: string, api: string): boolean {
   try {
@@ -24,20 +29,40 @@ export function isFeishuAuthorize(url: URL): boolean {
     && url.pathname === '/open-apis/authen/v1/authorize';
 }
 
-function isFeishuPage(url: URL): boolean {
-  return url.protocol === 'https:' && !url.username && !url.password && !url.hash
-    && (url.hostname === FEISHU_AUTHORIZE_HOST || url.hostname === 'open.feishu.cn'
-      || url.hostname.endsWith('.feishu.cn'));
+/** One allowlisted hop only. Used by DEMO_E2E instead of unrestricted redirect:follow. */
+export function followAllowedLoginRedirects(
+  providerOrigin: string,
+  apiOrigin: string,
+  transport: typeof fetch = fetch,
+): (url: string) => Promise<void> {
+  const provider = loopbackOrigin(providerOrigin);
+  const api = loopbackOrigin(apiOrigin);
+  return async (url: string) => {
+    if (!allowedLoginUrl(url, provider, api)) throw new Error('unavailable');
+    const first = await transport(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(5_000) });
+    const location = first.headers.get('location');
+    await first.body?.cancel().catch(() => undefined);
+    if (first.status < 300 || first.status >= 400 || !location) throw new Error('unavailable');
+    let next: string;
+    try { next = new URL(location, url).href; } catch { throw new Error('unavailable'); }
+    if (!allowedLoginUrl(next, provider, api)) throw new Error('unavailable');
+    const second = await transport(next, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(5_000) });
+    if (!second.ok) throw new Error('unavailable');
+  };
 }
 
 export function createLoginWindow(
   providerOrigin: string,
   apiOrigin: string,
   devServerUrl?: () => string | undefined,
+  host: Partial<LoginWindowHost> = {},
 ): LoginWindow {
   const provider = loopbackOrigin(providerOrigin); const api = loopbackOrigin(apiOrigin);
+  const openExternal = host.openExternal ?? ((url: string) => shell.openExternal(url));
+  const transport = host.fetch ?? fetch;
   return {
-    open(url, signal) {
+    open(url, operation) {
+      const signal = operation.signal;
       if (signal.aborted || !allowedLoginUrl(url, provider, api)) return Promise.reject(new ProductHttpError('VALIDATION'));
       ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU);
       ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT);
@@ -48,14 +73,9 @@ export function createLoginWindow(
         const isolated = session.fromPartition(`synthetic-login-${randomUUID()}`);
         isolated.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
         isolated.setPermissionCheckHandler(() => false);
-        let phase: 'chooser' | 'provider' = 'chooser';
         isolated.webRequest.onBeforeRequest((details, callback) => {
-          try {
-            const allow = phase === 'chooser'
-              ? isChooserUrl(details.url, devServerUrl?.())
-              : allowedProviderNavigation(details.url, provider, api);
-            callback({ cancel: !allow });
-          } catch { callback({ cancel: true }); }
+          try { callback({ cancel: !isChooserUrl(details.url, devServerUrl?.()) }); }
+          catch { callback({ cancel: true }); }
         });
         const window = new BrowserWindow({
           width: 520, height: 420, title: '登录', show: false,
@@ -64,66 +84,59 @@ export function createLoginWindow(
             preload: join(__dirname, '../preload/login.cjs'),
           },
         });
-        let settled = false;
+        let closed = false;
+        let handedOff = false;
         const finish = (error?: ProductHttpError) => {
-          if (settled) return; settled = true; signal.removeEventListener('abort', cancel);
+          if (closed) return; closed = true; signal.removeEventListener('abort', cancel);
           ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU);
           ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT);
           ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_CANCEL);
           if (!window.isDestroyed()) window.destroy();
+          if (error?.code === 'CANCELLED' && !signal.aborted) operation.abort();
+          if (handedOff) return;
+          handedOff = true;
           if (error) reject(error); else resolve();
+        };
+        const handoff = () => {
+          if (handedOff) return;
+          handedOff = true;
+          resolve();
         };
         const cancel = () => finish(new ProductHttpError('CANCELLED'));
         signal.addEventListener('abort', cancel, { once: true });
         window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
         const guardNavigation = (e: Event, target: string) => {
-          if (phase === 'chooser') {
-            if (!isChooserUrl(target, devServerUrl?.())) { e.preventDefault(); finish(new ProductHttpError('FORBIDDEN')); }
-            return;
-          }
-          if (!allowedProviderNavigation(target, provider, api)) { e.preventDefault(); finish(new ProductHttpError('FORBIDDEN')); }
+          if (!isChooserUrl(target, devServerUrl?.())) { e.preventDefault(); finish(new ProductHttpError('FORBIDDEN')); }
         };
         window.webContents.on('will-navigate', guardNavigation);
         window.webContents.on('will-redirect', guardNavigation);
         window.on('closed', cancel);
-        window.webContents.on('did-navigate', (_event, target, responseCode) => {
-          if (phase !== 'provider') return;
-          try {
-            const location = new URL(target);
-            if (location.origin === api && location.pathname === '/v1/auth/callback') {
-              finish(responseCode >= 200 && responseCode < 300 && location.searchParams.has('code')
-                ? undefined : new ProductHttpError('VALIDATION'));
-            }
-          } catch { finish(new ProductHttpError('VALIDATION')); }
-        });
-        const senderOk = () => !window.isDestroyed() && window.webContents === window.webContents;
         ipcMain.handle(IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU, async (event) => {
-          if (event.sender !== window.webContents) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
-          phase = 'provider';
+          if (event.sender !== window.webContents || window.isDestroyed()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
+          if (!allowedLoginUrl(url, provider, api)) return { ok: false, code: 'VALIDATION' } satisfies LoginWindowCommandResult;
           try {
-            await window.loadURL(url);
+            await openExternal(url);
+            handoff();
             return { ok: true } satisfies LoginWindowCommandResult;
           } catch {
-            phase = 'chooser';
-            await loadChooser(window, 'failed', devServerUrl?.());
-            return { ok: false, code: 'FAILED' } satisfies LoginWindowCommandResult;
+            return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           }
         });
         ipcMain.handle(IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT, async (event, payload: unknown) => {
-          if (event.sender !== window.webContents || !senderOk()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
+          if (event.sender !== window.webContents || window.isDestroyed()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
           const credentials = readCredentials(payload);
           if (!credentials) return { ok: false, code: 'INVALID' } satisfies LoginWindowCommandResult;
-          const code = await verifySyntheticPassword(provider, credentials.username, credentials.password);
+          const code = await verifySyntheticPassword(provider, credentials.username, credentials.password, transport);
           if (code === 'invalid') return { ok: false, code: 'INVALID' } satisfies LoginWindowCommandResult;
           if (code === 'unavailable') return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           const callback = callbackUrl(url, api, code);
-          if (!callback) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
-          phase = 'provider';
+          if (!callback || !allowedLoginUrl(callback, provider, api)) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           try {
-            await window.loadURL(callback);
+            const response = await transport(callback, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(5_000) });
+            if (!response.ok) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
+            finish();
             return { ok: true } satisfies LoginWindowCommandResult;
           } catch {
-            phase = 'chooser';
             return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           }
         });
@@ -131,7 +144,7 @@ export function createLoginWindow(
           if (event.sender !== window.webContents) return;
           cancel();
         });
-        void loadChooser(window, 'entry', devServerUrl?.()).then(() => { if (!settled && !window.isDestroyed()) window.show(); })
+        void loadChooser(window, 'entry', devServerUrl?.()).then(() => { if (!closed && !window.isDestroyed()) window.show(); })
           .catch(() => finish(new ProductHttpError('UNAVAILABLE')));
       });
     },
@@ -152,13 +165,6 @@ export function isChooserUrl(value: string, devServerUrl?: string): boolean {
     if (path.includes('/..') || path.includes('//')) return false;
     return /(?:^|\/)out\/renderer\/(?:index\.html|assets\/(?:[^/]+\/)*[^/]+)$/.test(path)
       || /(?:^|\/)[^/]+\.asar\/(?:out\/)?renderer\/(?:index\.html|assets\/(?:[^/]+\/)*[^/]+)$/.test(path);
-  } catch { return false; }
-}
-
-function allowedProviderNavigation(value: string, provider: string, api: string): boolean {
-  try {
-    const url = new URL(value);
-    return allowedLoginUrl(value, provider, api) || isFeishuPage(url);
   } catch { return false; }
 }
 
@@ -184,9 +190,14 @@ function callbackUrl(authorizeUrl: string, api: string, code: string): string | 
   } catch { return undefined; }
 }
 
-async function verifySyntheticPassword(origin: string, username: string, password: string): Promise<string | 'invalid' | 'unavailable'> {
+async function verifySyntheticPassword(
+  origin: string,
+  username: string,
+  password: string,
+  transport: typeof fetch,
+): Promise<string | 'invalid' | 'unavailable'> {
   try {
-    const response = await fetch(new URL('/password', origin), {
+    const response = await transport(new URL('/password', origin), {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5_000),
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username, password }),

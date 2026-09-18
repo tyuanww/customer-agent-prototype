@@ -34,6 +34,7 @@ test('desktop client queries the running synthetic stack and copies a candidate'
       args: [`--user-data-dir=${directory}`, path.join(root, 'out/main/index.js')],
       env: {
         ...process.env,
+        DEMO_E2E: '1',
         CUSTOMER_AGENT_DESKTOP_API_ORIGIN: profile!.apiOrigin,
         CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: profile!.identityOrigin,
       },

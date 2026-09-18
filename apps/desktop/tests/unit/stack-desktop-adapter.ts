@@ -22,13 +22,13 @@ export async function connectDesktopAdapter(apiOrigin: string, bindingId: string
     write: (value: { access_token: string; expires_at: string }) => { stored = value; },
     clear: () => { stored = null; },
   }, {
-    async open(url: string, signal: AbortSignal) {
-      if (signal.aborted) throw new Error('synthetic login aborted');
+    async open(url: string, operation: AbortController) {
+      if (operation.signal.aborted) throw new Error('synthetic login aborted');
       const authorize = new URL(url);
       const redirect = authorize.searchParams.get('redirect_uri');
       const state = authorize.searchParams.get('state');
       if (!redirect || !state) throw new Error('synthetic login window missing callback');
-      const callback = await fetch(`${redirect}?state=${encodeURIComponent(state)}&code=${encodeURIComponent(bindingId)}`, { signal });
+      const callback = await fetch(`${redirect}?state=${encodeURIComponent(state)}&code=${encodeURIComponent(bindingId)}`, { signal: operation.signal });
       if (!callback.ok) throw new Error(`synthetic callback ${String(callback.status)}`);
     },
   });

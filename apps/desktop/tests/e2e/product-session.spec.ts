@@ -102,6 +102,7 @@ test('product session native Feishu login, logout and renderer isolation', async
     await expect.poll(() => app!.windows().some((window) => window.url().includes('role=login'))).toBe(true);
     const login = app.windows().find((window) => window.url().includes('role=login'))!;
     await login.getByRole('button', { name: '飞书登录' }).click();
+    expect(login.url()).toMatch(/role=login/);
     await expect(query.getByRole('button', { name: 'agent · 退出' })).toBeVisible();
     await expect(query.getByTestId('announce-banner')).toHaveCount(0);
     const view = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());
