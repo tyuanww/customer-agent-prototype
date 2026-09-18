@@ -425,7 +425,7 @@ export function FoxApp() {
     const api = window.customerAgent;
     if (!api) {
       setShortcutFailed(true);
-      setHint('复制通道不可用，请在桌面 Demo 中打开');
+      setHint('复制通道不可用，请重试');
       return;
     }
 

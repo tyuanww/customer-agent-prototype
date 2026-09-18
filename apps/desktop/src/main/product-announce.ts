@@ -23,6 +23,7 @@ export class ProductAnnounce implements AnnounceGate {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
   private invalidationListeners = new Set<(value: ProductAnnounceInvalidation) => void>();
+  private refreshTail: Promise<void> = Promise.resolve();
   constructor(
     private readonly session: ProductSession,
     private readonly clientId: string,
@@ -45,6 +46,9 @@ export class ProductAnnounce implements AnnounceGate {
     return !!this.lease && view.signedIn && view.sessionEpoch === this.lease.epoch
       && this.lease.releaseId === releaseId && this.now() < Date.parse(this.lease.expiresAt);
   }
+  currentReleaseId() {
+    return this.lease?.releaseId ?? null;
+  }
   private projection(identity: QueryIdentity): ProductAnnounceResult {
     if (!this.lease) return announceFailure('SOURCE_GATE_NOT_READY', identity);
     return { ok: true, ...identity, releaseId: this.lease.releaseId, releaseSeq: this.lease.releaseSeq,
@@ -52,9 +56,11 @@ export class ProductAnnounce implements AnnounceGate {
   }
   private drop(reason: ProductAnnounceInvalidation['reason']) {
     const epoch = this.session.view().sessionEpoch;
+    const hadLease = this.lease !== null;
     this.lease = null; this.announcement = null; this.snapshot = null;
     if (this.timer) clearTimeout(this.timer); this.timer = null;
     for (const listener of this.listeners) listener();
+    if (reason === 'signed_out' && !hadLease) return;
     for (const listener of this.invalidationListeners) listener({ sessionEpoch: epoch, reason });
   }
   private arm() {
@@ -71,6 +77,12 @@ export class ProductAnnounce implements AnnounceGate {
     };
   }
   async refresh(identity: QueryIdentity): Promise<ProductAnnounceResult> {
+    const run = this.refreshTail.then(() => this.refreshNow(identity));
+    this.refreshTail = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
+  private async refreshNow(identity: QueryIdentity): Promise<ProductAnnounceResult> {
     try {
       const view = this.session.view();
       if (!view.signedIn) throw new ProductHttpError('UNAUTHORIZED');

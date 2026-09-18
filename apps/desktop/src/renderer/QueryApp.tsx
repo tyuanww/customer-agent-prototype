@@ -114,12 +114,14 @@ export function QueryApp() {
   const searchInFlightRef = useRef(false);
   const preferenceWriteRef = useRef(Promise.resolve());
   const dashboardOpenFailedRef = useRef(false);
+  const sessionBusyRef = useRef(false);
   const pendingDashboardOpenRef = useRef(false);
   const openDashboardWindowRef = useRef<() => void>(() => undefined);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
   const [announce, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
+  const [announceInvalid, setAnnounceInvalid] = useState(false);
   const announceGenerationRef = useRef(0);
   const announceReleaseRef = useRef<string | null>(null);
   const [helpStatus, setHelpStatus] = useState<HelpStatus>('待核实');
@@ -756,13 +758,21 @@ export function QueryApp() {
     if (generation !== announceGenerationRef.current || sessionEpoch !== productEpochRef.current) return null;
     if (!result.ok) {
       announceReleaseRef.current = null;
-      setAnnounce(null); setErrorMessage(result.message); reportPhase('ERROR'); return result;
+      setAnnounce(null);
+      if (!searchInFlightRef.current) {
+        setErrorMessage('');
+        setAnnounceInvalid(!sessionBusyRef.current);
+        reportPhase('SEARCH_INPUT');
+        return result;
+      }
+      setAnnounceInvalid(false);
+      setErrorMessage(result.message); reportPhase('ERROR'); return result;
     }
     if (announceReleaseRef.current && announceReleaseRef.current !== result.releaseId) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
     }
     announceReleaseRef.current = result.releaseId;
-    setAnnounce(result); setErrorMessage(''); return result;
+    setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
   }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
 
   const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
@@ -787,9 +797,12 @@ export function QueryApp() {
     }
     if (!value.ok || (value.enabled && !value.signedIn)) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
+      setAnnounceInvalid(false);
       reportPhase('SEARCH_INPUT');
     } else if (value.ok && value.signedIn) {
-      void refreshAnnounce(value.sessionEpoch);
+      if (!(sessionBusyRef.current && source === 'status')) {
+        void refreshAnnounce(value.sessionEpoch);
+      }
     }
   }, [cancelPendingSearch, cancelPendingCopy, reportPhase, refreshAnnounce]);
 
@@ -799,8 +812,24 @@ export function QueryApp() {
     return api.onInvalidated(value => {
       if (value.sessionEpoch !== productEpochRef.current) return;
       announceGenerationRef.current += 1; announceReleaseRef.current = null;
+      const showingQueryContent = searchInFlightRef.current
+        || isQueryContentLayoutPhase(phaseRef.current)
+        || phaseRef.current === 'COPIED';
       setAnnounce(null); cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
       lastProductQueryRef.current = null; setHelpStatus('待核实');
+      if (value.reason === 'signed_out' || sessionBusyRef.current) {
+        setAnnounceInvalid(false);
+        setErrorMessage('');
+        reportPhase('SEARCH_INPUT');
+        return;
+      }
+      if (!showingQueryContent) {
+        setAnnounceInvalid(true);
+        setErrorMessage('');
+        reportPhase('SEARCH_INPUT');
+        return;
+      }
+      setAnnounceInvalid(false);
       setErrorMessage('当前版本已失效，请重新核验'); reportPhase('ERROR');
     });
   }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
@@ -821,6 +850,7 @@ export function QueryApp() {
     if (!product || sessionBusy) {
       return null;
     }
+    sessionBusyRef.current = true;
     setSessionBusy(true);
     const signingOut = Boolean(productState?.ok && productState.signedIn);
     try {
@@ -841,6 +871,7 @@ export function QueryApp() {
       pendingDashboardOpenRef.current = false;
       return null;
     } finally {
+      sessionBusyRef.current = false;
       setSessionBusy(false);
     }
   }, [acceptProductSession, productState, sessionBusy]);
@@ -950,7 +981,7 @@ export function QueryApp() {
         reportPhase('RESULTS', outcome.results.length as ResultCount);
       } catch {
         setResults([]);
-        setErrorMessage('本地检索失败，请重试。当前 Demo 未连接外部服务。');
+        setErrorMessage('本地检索失败，请重试。');
         reportPhase('ERROR');
       } finally {
         if (generation === searchGenerationRef.current) {
@@ -980,7 +1011,7 @@ export function QueryApp() {
       const api = window.customerAgent;
       const resultCount = results.length as ResultCount;
       if (!api) {
-        setErrorMessage('复制通道不可用，请在桌面 Demo 中重试');
+        setErrorMessage('复制通道不可用，请重试');
         reportPhase('ERROR', resultCount);
         copyInFlightRef.current = false;
         return;
@@ -1515,7 +1546,7 @@ export function QueryApp() {
         <QueryCapsule
           productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
             <button type="button" className="capsule-session-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
-              title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '仅使用合成身份'}>
+              title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '登录后查询话术'}>
               {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : SESSION_ENTRY_UNSIGNED_LABEL}
             </button>
           ) : null}
@@ -1562,9 +1593,9 @@ export function QueryApp() {
             {shortcutHint || '全局快捷键注册失败，请点击狐狸头打开。'}
           </p>
         ) : null}
-        {announce ? (
-          <p className="product-announce-banner" data-testid="announce-banner" role="status">
-            版本 {announce.releaseSeq} · {announce.announcement?.title ?? '当前发布'} · 只读核验，ACK 不是已读
+        {announceInvalid ? (
+          <p className="product-announce-banner is-invalid" data-testid="announce-banner" role="status">
+            当前版本已失效，请重新核验
           </p>
         ) : null}
 

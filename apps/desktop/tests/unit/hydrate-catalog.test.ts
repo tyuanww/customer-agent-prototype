@@ -25,6 +25,8 @@ const valid = {
     riskCategories: [],
     hasConflict: false,
     placeholderKeys: ['order_id'],
+    questionText: '什么时候发货',
+    questions: ['我下单后多久能到啊'],
   }],
 };
 
@@ -49,6 +51,14 @@ describe('hydrate catalog parser', () => {
       risk_categories: [],
       placeholder_keys: ['order_id'],
     });
+    expect(catalog?.retrievalScripts?.()).toEqual([
+      expect.objectContaining({
+        scriptId: 'script-synthetic-001',
+        title: '合成发货',
+        questionText: '什么时候发货',
+        questions: ['我下单后多久能到啊'],
+      }),
+    ]);
   });
 
   it('keeps an empty catalog when the snapshot parses but no row is valid', () => {
@@ -165,6 +175,23 @@ describe('hydrate catalog auto-sync', () => {
     const empty = syncHydrateCatalog({ path, repoRoot: repo, releaseId: 'rel-synthetic-099', items: [] });
     expect(empty).toMatchObject({ wrote: false, skipped: true, reason: 'empty' });
     expect(loadHydrateCatalog(path)?.releaseId).toBe('rel-synthetic-001');
+  });
+
+  it('does not let a smaller snapshot wipe a larger off-repo catalog', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hydrate-repo-'));
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const path = join(outside, 'retrieval-hydrate.json');
+    const larger = [
+      snapshotItem,
+      { ...snapshotItem, script_id: 'script-synthetic-002', content_hash: 'b'.repeat(64) },
+    ];
+    syncHydrateCatalog({ path, repoRoot: repo, releaseId: 'rel-synthetic-001', items: larger });
+    const kept = syncHydrateCatalog({
+      path, repoRoot: repo, releaseId: 'rel-synthetic-099', items: [snapshotItem],
+    });
+    expect(kept).toMatchObject({ wrote: false, skipped: true, reason: 'kept-larger', total: 2 });
+    expect(loadHydrateCatalog(path)?.releaseId).toBe('rel-synthetic-001');
+    expect(loadHydrateCatalog(path)?.candidate('script-synthetic-002')?.script_id).toBe('script-synthetic-002');
   });
 
   it('dry-run counts without writing and persistHydrateFromEnv no-ops without env', () => {

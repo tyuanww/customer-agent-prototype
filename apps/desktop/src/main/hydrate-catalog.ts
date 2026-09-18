@@ -3,13 +3,14 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProductCandidate } from '../shared/product-search';
-import type { RankedRetrieval } from '../shared/hybrid-retrieve';
+import type { RankedRetrieval, RetrievalScript } from '../shared/hybrid-retrieve';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
 
 export type HydrateCatalog = Readonly<{
   releaseId: string;
   candidate(scriptId: string): ProductCandidate | null;
   hydrate(ranked: readonly RankedRetrieval[]): ProductCandidate[];
+  retrievalScripts?(): readonly RetrievalScript[];
 }>;
 
 export const HYDRATE_CATALOG_VERSION = 1;
@@ -43,7 +44,7 @@ export type SyncHydrateResult = Readonly<{
   total: number;
   wrote: boolean;
   skipped: boolean;
-  reason: 'aligned' | 'empty' | 'wrote' | 'dry-run' | 'invalid';
+  reason: 'aligned' | 'empty' | 'wrote' | 'dry-run' | 'invalid' | 'kept-larger';
 }>;
 
 const CATEGORIES = ['presale', 'campaign', 'aftersale', 'product'] as const;
@@ -75,6 +76,8 @@ type SnapshotRow = Readonly<{
   riskCategories: ProductCandidate['risk_categories'];
   hasConflict: boolean;
   placeholderKeys: ProductCandidate['placeholder_keys'];
+  questionText: string;
+  questions: readonly string[];
 }>;
 
 function isMember<T extends string>(value: unknown, allowed: readonly T[]): value is T {
@@ -137,6 +140,10 @@ function parseSnapshotRow(item: object, releaseId: string): SnapshotRow | null {
   if (!riskCategories) return null;
   if (typeof hasConflict !== 'boolean') return null;
   if (!placeholderKeys) return null;
+  const questionTextRaw = Reflect.get(item, 'questionText');
+  const questionText = typeof questionTextRaw === 'string' ? questionTextRaw : '';
+  const questionsRaw = Reflect.get(item, 'questions');
+  const questions = parseStringList(questionsRaw) ?? [];
   return Object.freeze({
     releaseId,
     scriptId,
@@ -156,6 +163,8 @@ function parseSnapshotRow(item: object, releaseId: string): SnapshotRow | null {
     riskCategories: Object.freeze(riskCategories) as ProductCandidate['risk_categories'],
     hasConflict,
     placeholderKeys: Object.freeze(placeholderKeys) as ProductCandidate['placeholder_keys'],
+    questionText,
+    questions: Object.freeze(questions),
   });
 }
 
@@ -185,7 +194,7 @@ function fingerprint(releaseId: string, rows: readonly Readonly<{ scriptId: stri
   return `${releaseId}\n${[...rows].map((row) => `${row.scriptId}:${row.contentHash}`).sort().join('\n')}`;
 }
 
-function existingFingerprint(indexPath: string): { releaseId: string; fingerprint: string } | null {
+function existingFingerprint(indexPath: string): { releaseId: string; fingerprint: string; total: number } | null {
   if (!existsSync(indexPath)) return null;
   try {
     const raw: unknown = JSON.parse(readFileSync(indexPath, 'utf8'));
@@ -201,7 +210,7 @@ function existingFingerprint(indexPath: string): { releaseId: string; fingerprin
       if (typeof scriptId !== 'string' || typeof contentHash !== 'string') continue;
       rows.push({ scriptId, contentHash });
     }
-    return { releaseId, fingerprint: fingerprint(releaseId, rows) };
+    return { releaseId, fingerprint: fingerprint(releaseId, rows), total: rows.length };
   } catch {
     return null;
   }
@@ -288,6 +297,17 @@ export function syncHydrateCatalog(options: Readonly<{
       wrote: false,
       skipped: true,
       reason: 'invalid',
+    });
+  }
+  if (!options.rebuild && previous && previous.total > parsed.length) {
+    return Object.freeze({
+      path: indexPath,
+      releaseId: previous.releaseId,
+      previousReleaseId: previous.releaseId,
+      total: previous.total,
+      wrote: false,
+      skipped: true,
+      reason: 'kept-larger',
     });
   }
   const nextFingerprint = fingerprint(options.releaseId, parsed.map(({ row }) => row));
@@ -386,6 +406,16 @@ export function loadHydrateCatalog(indexPath = process.env.CUSTOMER_AGENT_HYDRAT
           out.push(asCandidate(found, 1));
         }
         return out;
+      },
+      retrievalScripts() {
+        return Object.freeze([...byId.values()].map((row) => Object.freeze({
+          scriptId: row.scriptId,
+          title: row.title,
+          questionText: row.questionText,
+          answerText: row.answerText,
+          category: row.category,
+          questions: row.questions,
+        })));
       },
     });
   } catch {

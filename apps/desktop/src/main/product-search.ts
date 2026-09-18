@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
@@ -9,12 +10,14 @@ import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscala
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
 import { routeQuery, type QueryRoute } from '../shared/query-route.ts';
 import { admitRetrieval } from '../shared/retrieval-quality.ts';
+import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index.ts';
+import type { RetrievalScript } from '../shared/hybrid-retrieve.ts';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
 import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog.ts';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
-import { loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
+import { createRetrievalPipeline, loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
 import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
 import { loadRetrievalTelemetryStore, type RetrievalTelemetry } from './retrieval-telemetry-store.ts';
 
@@ -42,6 +45,48 @@ function candidateLive(candidate: ProductCandidate): boolean {
     && !candidate.has_conflict;
 }
 
+function loadIndexScripts(): RetrievalScript[] {
+  const indexPath = (process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX ?? '').trim();
+  if (indexPath.length === 0 || !existsSync(indexPath)) return [];
+  try {
+    const document = parseRetrievalIndex(readFileSync(indexPath, 'utf8'));
+    return document ? [...scriptsOf(document)] : [];
+  } catch {
+    return [];
+  }
+}
+
+function candidateFromScript(script: RetrievalScript, releaseId: string): ProductCandidate {
+  const placeholders: Array<'order_id' | 'date'> = [];
+  if (script.answerText.includes('{订单号}')) placeholders.push('order_id');
+  if (script.answerText.includes('{日期}')) placeholders.push('date');
+  const category = script.category === 'campaign' || script.category === 'aftersale'
+    || script.category === 'product' || script.category === 'presale'
+    ? script.category
+    : 'presale';
+  return {
+    rank: 1,
+    release_id: releaseId,
+    script_id: script.scriptId,
+    script_version: 1,
+    content_hash: createHash('sha256').update(script.answerText).digest('hex'),
+    title: script.title,
+    category,
+    answer_text: script.answerText,
+    platform_scope: ['qianniu', 'douyin'],
+    product_scope_type: 'storewide',
+    product_scope_refs: [],
+    effective_from: '2020-01-01T00:00:00.000Z',
+    effective_to: null,
+    intent_taxonomy_version: 'itax_local',
+    intent_id: 'intent_local',
+    risk_level: 'low',
+    risk_categories: [],
+    has_conflict: false,
+    placeholder_keys: placeholders,
+  };
+}
+
 function matchesJob(candidate: ProductCandidate, job: SearchJob): boolean {
   return candidateLive(candidate)
     && candidate.platform_scope.includes(job.platform)
@@ -55,6 +100,7 @@ export class ProductSearch {
   private last = new Map<number, SearchState>();
   private readonly liveHydrate: boolean;
   private hydrate: HydrateCatalog | null;
+  private activePipeline: RetrievalPipeline;
   constructor(
     private readonly session: ProductSession,
     private readonly writeClipboard: (text: string) => void,
@@ -72,14 +118,25 @@ export class ProductSearch {
   ) {
     this.liveHydrate = hydrate === undefined;
     this.hydrate = hydrate === undefined ? loadHydrateCatalog() : hydrate;
+    this.activePipeline = pipeline;
+    this.bindHydrateCorpus();
     const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
       this.states.clear();
       this.last.clear();
       if (this.liveHydrate) this.hydrate = loadHydrateCatalog();
+      this.bindHydrateCorpus();
     };
     session.subscribe(forget);
     announce.subscribe(forget);
+  }
+  private bindHydrateCorpus(): void {
+    const hydrateScripts = this.hydrate?.retrievalScripts?.() ?? [];
+    const indexScripts = loadIndexScripts();
+    const scripts = indexScripts.length >= hydrateScripts.length && indexScripts.length > 0
+      ? indexScripts
+      : hydrateScripts;
+    this.activePipeline = scripts.length > 0 ? createRetrievalPipeline(scripts) : this.pipeline;
   }
   forget(sender: number) {
     this.states.get(sender)?.controller.abort();
@@ -133,7 +190,11 @@ export class ProductSearch {
       const state = this.advance(sender, request);
       const queryText = request.queryText.trim();
       const smartEnabled = this.preference.read().smartEnabled;
-      const retrieved = await this.pipeline.run(queryText, smartEnabled, state.controller.signal);
+      if (this.liveHydrate && (!this.hydrate || !this.announce.allows(this.hydrate.releaseId))) {
+        this.hydrate = loadHydrateCatalog();
+        this.bindHydrateCorpus();
+      }
+      const retrieved = await this.activePipeline.run(queryText, smartEnabled, state.controller.signal);
       const route = routeQuery(queryText, retrieved.intent);
       state.route = route;
       state.platform = 'all';
@@ -148,11 +209,19 @@ export class ProductSearch {
           : rewritten;
         ranked = admitRetrieval(queryText, fallback);
       }
-      if (this.liveHydrate && (!this.hydrate || !this.announce.allows(this.hydrate.releaseId))) {
-        this.hydrate = loadHydrateCatalog();
-      }
-      if (this.hydrate) {
-        const local = this.hydrate.hydrate(ranked)
+      const gateId = this.announce.currentReleaseId?.() ?? this.hydrate?.releaseId ?? null;
+      if (this.hydrate || ranked.length > 0) {
+        const fromHydrate = this.hydrate ? this.hydrate.hydrate(ranked) : [];
+        const seen = new Set(fromHydrate.map((candidate) => candidate.script_id));
+        const filled = [
+          ...fromHydrate,
+          ...ranked.flatMap((row) => (
+            seen.has(row.scriptId) || row.answerText.trim().length === 0 || !gateId
+              ? []
+              : [candidateFromScript(row, gateId)]
+          )),
+        ].map((candidate) => (gateId && candidate.release_id !== gateId ? { ...candidate, release_id: gateId } : candidate));
+        const local = filled
           .filter((candidate) => this.usable(candidate, state))
           .slice(0, 3)
           .map((candidate, index) => ({ ...candidate, rank: (index + 1) as 1 | 2 | 3 }));
@@ -160,8 +229,13 @@ export class ProductSearch {
           if (!this.announce.allows(local[0]!.release_id)) throw new ProductHttpError('STALE');
           return this.finishLocal(sender, state, request, local[0]!.release_id, local);
         }
-        if (!this.announce.allows(this.hydrate.releaseId)) throw new ProductHttpError('STALE');
-        return this.finishLocal(sender, state, request, this.hydrate.releaseId, []);
+        if (this.hydrate && this.announce.allows(this.hydrate.releaseId)) {
+          return this.finishLocal(sender, state, request, this.hydrate.releaseId, []);
+        }
+        if (gateId && this.announce.allows(gateId)) {
+          return this.finishLocal(sender, state, request, gateId, []);
+        }
+        if (this.hydrate) throw new ProductHttpError('STALE');
       }
       if ((process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim().length > 0) {
         throw new ProductHttpError('UNAVAILABLE');

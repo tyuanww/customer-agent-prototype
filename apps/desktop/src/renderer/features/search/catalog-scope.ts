@@ -1,12 +1,12 @@
 import type { ProductCatalogEntry } from '@shared/product-catalog';
 
 export const CATALOG_SCOPE_MESSAGES = {
-  loading: '合成商品目录加载中，请稍候。未猜测商品，未扩大为全店。',
-  missing: '合成商品目录不可用，无法按品类或具体款查询。未猜测商品，未扩大为全店。',
-  inconsistent: '合成商品目录配置不一致，无法按品类或具体款查询。未猜测商品，未扩大为全店。',
+  loading: '商品目录加载中，请稍候。未猜测商品，未扩大为全店。',
+  missing: '商品目录不可用，无法按品类或具体款查询。未猜测商品，未扩大为全店。',
+  inconsistent: '商品目录配置不一致，无法按品类或具体款查询。未猜测商品，未扩大为全店。',
   pickCategory: '请选择品类后再查询。未猜测商品，未扩大为全店。',
   pickSku: '请选择具体款后再查询。未猜测商品，未扩大为全店。',
-  unknown: '所选商品不在当前合成目录中，请重新选择。未猜测商品，未扩大为全店。',
+  unknown: '所选商品不在当前目录中，请重新选择。未猜测商品，未扩大为全店。',
 } as const;
 
 export function catalogCategories(entries: readonly ProductCatalogEntry[]): ProductCatalogEntry[] {

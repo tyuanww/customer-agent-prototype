@@ -2,6 +2,22 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.3] - 2026-09-18
+
+### Added
+
+- Unpackaged product mode loads the off-repo hydrate and BM25 indexes without extra shell env.
+
+### Changed
+
+- Query ranks the current hydrate snapshot, or the larger local index when a seed snapshot is smaller. Login persist will not shrink a bigger hydrate.
+- Login window title is 登录. Help actions are 复制联系方式 / 打开求助入口. The version ACK banner is hidden under the search box.
+- Idle lease expiry stays on the announce slot instead of 查询未完成.
+
+### Fixed
+
+- Logging in no longer treats session teardown as a failed query.
+
 ## [0.3.2] - 2026-09-18
 
 ### Added
