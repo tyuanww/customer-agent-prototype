@@ -1,6 +1,6 @@
 import { BrowserWindow, session } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { loopbackOrigin } from './product-http';
+import { productOrigin } from './product-http';
 import { SYNTHETIC_HELP_HTML } from '../shared/product-help';
 
 export function allowedHelpUrl(value: string, origin: string): boolean {
@@ -15,7 +15,7 @@ export function allowedHelpUrl(value: string, origin: string): boolean {
 export function openSyntheticHelp(identityOrigin: string): Promise<boolean> {
   return new Promise(resolve => {
     try {
-      const origin = loopbackOrigin(identityOrigin);
+      const origin = productOrigin(identityOrigin);
       if (!allowedHelpUrl(`${origin}/synthetic-help`, origin)) { resolve(false); return; }
       const isolated = session.fromPartition(`synthetic-help-${randomUUID()}`);
       isolated.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));

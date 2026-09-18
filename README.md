@@ -48,6 +48,7 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 核对登录窗飞书改系统浏览器、账号仍本窗（how-to D1；已合入 v0.3.4） | [如何验证 · D1](docs/how-to-verify-desktop.md#合成产品会话接入d1) · [2026-09-18 规格](docs/plans/2026-09-18-login-environment-and-ui.md) |
 | 核对 Mac 开发机 NSPanel / P7 / P9 收口（不引入 native、索引不进包、离线 S0 不验 M5 主链） | [docs/plans/2026-09-18-mac-dev-remainder.md](docs/plans/2026-09-18-mac-dev-remainder.md) |
 | 方案 C：飞书 OAuth + 产品自管账号口令（不用 Logto） | [docs/plans/2026-09-18-identity-c-password-and-feishu.md](docs/plans/2026-09-18-identity-c-password-and-feishu.md) · [how-to](docs/how-to-feishu-and-password-mac.md) |
+| P4 远端：桌面连受控 HTTPS，API 仍 loopback | [docs/plans/2026-09-19-p4-remote-https-profile.md](docs/plans/2026-09-19-p4-remote-https-profile.md) · [how-to](docs/how-to-p4-remote-mac.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
 | 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |

@@ -42,6 +42,31 @@ afterEach(() => {
 });
 
 describe('packaged synthetic product profile', () => {
+  it('accepts a product-remote https profile', () => {
+    const directory = userDataDirectory();
+    write(directory, {
+      mode: 'product-remote',
+      apiOrigin: 'https://agent-auth.jianghua.site',
+      identityOrigin: 'https://agent-id.jianghua.site',
+    });
+    expect(readPackagedProductProfile(directory)).toEqual({
+      apiOrigin: 'https://agent-auth.jianghua.site',
+      identityOrigin: 'https://agent-id.jianghua.site',
+    });
+    write(directory, {
+      mode: 'product-remote',
+      apiOrigin: 'https://10.0.0.5',
+      identityOrigin: 'https://agent-id.jianghua.site',
+    });
+    expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
+    write(directory, {
+      mode: 'synthetic-local',
+      apiOrigin: 'https://agent-auth.jianghua.site',
+      identityOrigin: 'https://agent-id.jianghua.site',
+    });
+    expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
+  });
+
   it('accepts the exact loopback profile the stack writes', () => {
     const directory = userDataDirectory();
     write(directory, STACK_PROFILE);
@@ -234,6 +259,13 @@ describe('packaged synthetic product profile', () => {
     expect(resolveProductProfile(false, directory, LOOPBACK_ENV)).toEqual({
       apiOrigin: 'http://127.0.0.1:43110',
       identityOrigin: 'http://127.0.0.1:43111',
+    });
+    expect(resolveProductProfile(false, directory, {
+      CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'https://agent-auth.jianghua.site',
+      CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: 'https://agent-id.jianghua.site',
+    })).toEqual({
+      apiOrigin: 'https://agent-auth.jianghua.site',
+      identityOrigin: 'https://agent-id.jianghua.site',
     });
   });
 

@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain, session, shell, type Event } from 'electron';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { loopbackOrigin, ProductHttpError } from './product-http';
+import { productOrigin, ProductHttpError } from './product-http';
 import { loadRenderer } from './overlay-renderer-loader';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import type { LoginWindow } from './product-session';
@@ -35,8 +35,8 @@ export function followAllowedLoginRedirects(
   apiOrigin: string,
   transport: typeof fetch = fetch,
 ): (url: string) => Promise<void> {
-  const provider = loopbackOrigin(providerOrigin);
-  const api = loopbackOrigin(apiOrigin);
+  const provider = productOrigin(providerOrigin);
+  const api = productOrigin(apiOrigin);
   return async (url: string) => {
     if (!allowedLoginUrl(url, provider, api)) throw new Error('unavailable');
     const first = await transport(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(5_000) });
@@ -57,7 +57,7 @@ export function createLoginWindow(
   devServerUrl?: () => string | undefined,
   host: Partial<LoginWindowHost> = {},
 ): LoginWindow {
-  const provider = loopbackOrigin(providerOrigin); const api = loopbackOrigin(apiOrigin);
+  const provider = productOrigin(providerOrigin); const api = productOrigin(apiOrigin);
   const openExternal = host.openExternal ?? ((url: string) => shell.openExternal(url));
   const transport = host.fetch ?? fetch;
   return {

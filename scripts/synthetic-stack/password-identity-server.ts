@@ -81,7 +81,9 @@ export function createPasswordIdentityServer({ port }: Readonly<{ port: number }
   const failures = new Map<string, { count: number; lockedUntil: number }>();
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://127.0.0.1:${String(port)}`);
-    if (url.hostname !== '127.0.0.1' || request.socket.remoteAddress !== '127.0.0.1') {
+    const remote = request.socket.remoteAddress;
+    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+    if (!loopback) {
       send(response, 403, '{"error":"loopback_only"}'); return;
     }
     if (request.method === 'GET' && url.pathname === '/health') {

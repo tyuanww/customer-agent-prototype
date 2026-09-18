@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 本机方案 C 已合入（#131 / `ddd4b4a`）：飞书 OAuth + 产品自管口令，不用 Logto。本机已验证飞书 `owner` 与账号 `agent`。见 `docs/plans/2026-09-18-identity-c-password-and-feishu.md`、`docs/how-to-feishu-and-password-mac.md`。API 仍只绑 127.0.0.1。未知 `open_id` 不自动建号。放宽 loopback / 办公机远端部署仍未授权。
+**Status:** OPEN · 第一刀开工（`feat/p4-remote`）：桌面可连受控 HTTPS，API 仍绑 127.0.0.1。见 `docs/plans/2026-09-19-p4-remote-https-profile.md`。本机方案 C 已合入。未知 `open_id` 不自动建号。API 绑 `0.0.0.0` / 办公机实装仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -85,7 +85,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P4（若走远端才成为阻塞）
-**Status:** OPEN
+**Status:** OPEN · P4 第一刀按 `apiOrigin` 哈希分文件（`product-session.<id>.enc`）。本机与远端 token 不再共用一个文件。
 
 ### P6 · 两条网络栈的证书/代理覆盖
 
