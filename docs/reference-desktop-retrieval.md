@@ -10,7 +10,7 @@
 
 有 hydrate 快照时，不再把问句或命中标题转发给 leftover `/v1/search`。没有 hydrate 时，仍走 D1–D5 的合成 HTTP 搜索（测试与未接索引的 profile）。
 
-本机交付：索引与 hydrate **不进 git、不打进安装包**。默认在 `~/.customer-agent-synthetic-stack/`。`packaged-retrieval-paths.ts` 只在文件已存在时挂路径。新机器要拷仓外文件或再跑 `retrieval:*` 并点「登录」。`synthetic-offline` 没有这条主链。远端拉取跟 P4，未授权。详见 [Mac 开发机剩余项收口](plans/2026-09-18-mac-dev-remainder.md)。
+本机交付：索引与 hydrate **不进 git、不打进安装包**。默认在 `~/.customer-agent-synthetic-stack/`。`packaged-retrieval-paths.ts` 只在文件已存在时挂路径。新机器要拷仓外文件或再跑 `retrieval:*` 并点「登录」。`synthetic-offline` 没有这条主链。P4 第一刀只让桌面连 HTTPS API，**不**把检索索引拉到远端。检索远端交付仍是 P7。详见 [Mac 开发机剩余项收口](plans/2026-09-18-mac-dev-remainder.md)、[P4](plans/2026-09-19-p4-remote-https-profile.md)。
 
 工程锚点（自动化，不是 M5、不是真实 SKU）：产品 PR [#80](https://github.com/weiweity/customer-agent-prototype/pull/80) `questions[]`、[#81](https://github.com/weiweity/customer-agent-prototype/pull/81) 正文向量、[#82](https://github.com/weiweity/customer-agent-prototype/pull/82) hydrate 对齐、[#83](https://github.com/weiweity/customer-agent-prototype/pull/83) `query-route` / 非激活 palette。真实 MENOKIN SKU 替换澄芽/雾屿仍未获批；若获批仓外受控输入，必须重跑 `pnpm retrieval:questions`、`pnpm retrieval:embeddings`，并点胶囊「登录」或 `pnpm retrieval:hydrate`。不把真实客户原文写入 git。
 
