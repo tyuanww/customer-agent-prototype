@@ -60,6 +60,8 @@ type FoxWindowFixture = BrowserWindow & {
   sent: OverlayCommand[];
   showInactive: ReturnType<typeof vi.fn>;
   setFocusable: ReturnType<typeof vi.fn>;
+  hide: ReturnType<typeof vi.fn>;
+  blur: ReturnType<typeof vi.fn>;
   acceptNativeBounds(
     bounds: { x: number; y: number; width: number; height: number },
     event: 'move' | 'moved',
@@ -84,6 +86,8 @@ function createFoxWindow(): FoxWindowFixture {
     }),
     showInactive: vi.fn(),
     setFocusable: vi.fn(),
+    hide: vi.fn(),
+    blur: vi.fn(),
     webContents: {
       isDestroyed: () => false,
       send: vi.fn((channel: string, command: OverlayCommand) => {
@@ -328,5 +332,32 @@ describe('OverlayController yield previous-app focus', () => {
     expect(fox.showInactive).not.toHaveBeenCalled();
     vi.advanceTimersByTime(34);
     expect(fox.showInactive).toHaveBeenCalledOnce();
+  });
+
+  it('on win32 hides the fox one tick then showInactive, without app.hide or steal', () => {
+    vi.useFakeTimers();
+    const previous = process.platform;
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
+    try {
+      const { controller, fox } = controllerWithDockedFox();
+      controllers.push(controller);
+      Object.assign(controller as object, {
+        restorePreviousAppOnIdle: true,
+        chromeHandoffMode: null,
+        phase: 'FOX_IDLE',
+      });
+      fox.showInactive.mockClear();
+      yieldPalette(controller, fox);
+      expect(fox.setFocusable).toHaveBeenCalledWith(false);
+      expect(fox.blur).toHaveBeenCalledOnce();
+      expect(fox.hide).toHaveBeenCalledOnce();
+      expect(app.hide).not.toHaveBeenCalled();
+      expect(app.focus).not.toHaveBeenCalled();
+      expect(fox.showInactive).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(34);
+      expect(fox.showInactive).toHaveBeenCalledOnce();
+    } finally {
+      Object.defineProperty(process, 'platform', { configurable: true, value: previous });
+    }
   });
 });

@@ -1151,20 +1151,44 @@ export class OverlayController {
     this.setFoxFocusable(false);
     // Idle fox must not become the key window, or Grok Build / 千牛 keep
     // looking focused while keystrokes go nowhere until the user clicks.
-    if (
-      !yieldFocus
-      || process.platform !== 'darwin'
-      || this.otherChromeWindowsVisible()
-    ) {
+    if (!yieldFocus || this.otherChromeWindowsVisible()) {
       this.resignPaletteActivation(fox);
       return;
     }
+    if (process.platform === 'darwin') {
+      this.yieldDarwinPalette(fox);
+      return;
+    }
+    if (process.platform === 'win32') {
+      this.yieldWindowsForeground(fox);
+      return;
+    }
+    this.resignPaletteActivation(fox);
+  }
+
+  private yieldDarwinPalette(fox: BrowserWindow): void {
     const generation = ++this.foxYieldGeneration;
     try {
       app.hide();
     } catch {
       // hide() can throw if the Dock policy is already accessory.
     }
+    this.scheduleIdleFoxShow(fox, generation);
+  }
+
+  /** Hide fox one frame so Windows can activate 千牛, then show without stealing. */
+  private yieldWindowsForeground(fox: BrowserWindow): void {
+    const generation = ++this.foxYieldGeneration;
+    if (typeof fox.blur === 'function') {
+      fox.blur();
+    }
+    if (fox.isVisible()) {
+      fox.hide();
+    }
+    this.scheduleIdleFoxShow(fox, generation);
+  }
+
+  private scheduleIdleFoxShow(fox: BrowserWindow, generation: number): void {
     this.clearFoxYieldShowTimer();
     this.foxYieldShowTimer = this.scheduler.schedule(() => {
       this.foxYieldShowTimer = null;

@@ -10,8 +10,9 @@ All notable changes to this customer-agent product implementation repository are
 - Cancelling the chooser after the browser opens stops the desktop login instead of still exchanging a session.
 - Desktop ProductHttp, account `/password`, and MiniMax share Electron `net.fetch` (system trust store). The login isolated session uses the same permission policy as the default session. Certificate pinning is not default. See `docs/plans/2026-09-19-p6-cert-proxy-paths.md`.
 - Account login POSTs `/password` to the HTTPS identity origin and callbacks the API origin. Identity timeout is 15s. The password server still binds loopback; a second named-tunnel hostname is documented. See `docs/plans/2026-09-19-p4-account-https-tunnel.md`.
-- Packaged and unpackaged desktop can use a `product-remote` HTTPS origin (no IP, no public HTTP, no userinfo). The API still binds `127.0.0.1`. Session files are keyed by API origin. See `docs/how-to-p4-remote-mac.md`.
+- On Windows, collapsing Query yields the previous app by hiding the idle fox for one frame, then `showInactive`. It does not call `app.hide()` or `app.focus({ steal: true })`. Not a Windows device pass. See `docs/plans/2026-09-19-windows-yield-focus.md`.
 - M5 lists `product-remote` as a separate re-verify table, all **未观察**. `synthetic-offline` cannot tick login / search / copy. See `docs/how-to-verify-macos-m5.md` §7.1.
+- Packaged and unpackaged desktop can use a `product-remote` HTTPS origin (no IP, no public HTTP, no userinfo). The API still binds `127.0.0.1`. Session files are keyed by API origin. See `docs/how-to-p4-remote-mac.md`.
 
 ## [0.3.3] - 2026-09-18
 
