@@ -1,4 +1,5 @@
 import { IdentityFailure, type SyntheticIdentityProvider } from './product-auth-service.js';
+import { persistOperatorDisplayName } from './operator-display-names.js';
 
 /** Official Feishu OAuth endpoints. Not configurable: arbitrary URLs would be an SSRF seam. */
 export const FEISHU_AUTHORIZE_URL = 'https://accounts.feishu.cn/open-apis/authen/v1/authorize';
@@ -92,8 +93,11 @@ export function createFeishuIdentityProvider(
           headers: { authorization: `Bearer ${accessToken}` },
         });
         if (!userResponse.ok) throw identityFromHttp(userResponse.status);
-        const openId = readOpenId(await readJson(userResponse));
+        const userBody = await readJson(userResponse);
+        const openId = readOpenId(userBody);
         if (!openId) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
+        const name = readDisplayName(userBody);
+        if (name) persistOperatorDisplayName(`usr_${openId}`.slice(0, 128), name);
         return openId;
       } catch (error) {
         if (error instanceof IdentityFailure) throw error;
@@ -132,4 +136,17 @@ function readOpenId(value: unknown): string | undefined {
     : record;
   const openId = nested.open_id;
   return typeof openId === 'string' && OPEN_ID_PATTERN.test(openId) ? openId : undefined;
+}
+
+function readDisplayName(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const nested = record.data !== undefined && record.data !== null && typeof record.data === 'object'
+    && !Array.isArray(record.data)
+    ? record.data as Record<string, unknown>
+    : record;
+  const name = nested.name;
+  if (typeof name !== 'string') return undefined;
+  const trimmed = name.trim().slice(0, 64);
+  return trimmed.length > 0 ? trimmed : undefined;
 }

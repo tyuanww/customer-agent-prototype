@@ -10,7 +10,15 @@ import {
 import { QUERY_WIDTH } from '@shared/overlay-geometry';
 import type { FoxVisualTransform, QueryAnchor } from '@shared/overlay-events';
 import type { OverlayPhase } from '@shared/overlay-machine';
-import type { ProductSessionResult } from '@shared/product-session';
+import type { ProductSessionResult, ProductSessionView } from '@shared/product-session';
+
+export function sessionEntryLabel(state: ProductSessionView): string {
+  if (state.displayName && state.displayName.trim().length > 0) return state.displayName.trim();
+  const userId = state.userId;
+  if (userId && userId.startsWith('usr_') && userId.length > 4) return userId.slice(4);
+  if (userId && userId.length > 0) return userId;
+  return state.role ?? '';
+}
 
 export type QueryFoxVisualState = 'SEARCHING' | 'RESULTS' | 'EMPTY' | 'COPIED' | 'IDLE';
 

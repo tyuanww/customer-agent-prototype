@@ -50,6 +50,7 @@ import {
   queryShellClassName,
   resultCopyRankFromKey,
   sessionNoticeForResult,
+  sessionEntryLabel,
   type SessionNotice,
   type SessionNoticeSource,
 } from './features/search/query-view';
@@ -817,7 +818,7 @@ export function QueryApp() {
         || phaseRef.current === 'COPIED';
       setAnnounce(null); cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
       lastProductQueryRef.current = null; setHelpStatus('待核实');
-      if (value.reason === 'signed_out' || sessionBusyRef.current) {
+      if (value.reason === 'signed_out' || value.reason === 'replaced' || sessionBusyRef.current) {
         setAnnounceInvalid(false);
         setErrorMessage('');
         reportPhase('SEARCH_INPUT');
@@ -1546,8 +1547,8 @@ export function QueryApp() {
         <QueryCapsule
           productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
             <button type="button" className="capsule-session-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
-              title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '登录后查询话术'}>
-              {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : SESSION_ENTRY_UNSIGNED_LABEL}
+              title={productState?.ok && productState.signedIn ? `${sessionEntryLabel(productState)} · 到期 ${productState.expiresAt}` : '登录后查询话术'}>
+              {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${sessionEntryLabel(productState)} · 退出` : SESSION_ENTRY_UNSIGNED_LABEL}
             </button>
           ) : null}
           foxVisualState={foxVisualState}

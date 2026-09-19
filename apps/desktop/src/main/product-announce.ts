@@ -39,6 +39,7 @@ export class ProductAnnounce implements AnnounceGate {
   ) {
     session.subscribe(state => {
       if (!state.ok || !state.signedIn) this.drop('signed_out');
+      else if (this.lease && this.lease.epoch !== state.sessionEpoch) this.drop('replaced');
     });
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }

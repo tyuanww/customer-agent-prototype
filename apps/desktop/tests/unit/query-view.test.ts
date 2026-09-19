@@ -14,6 +14,7 @@ import {
   queryHandoffCssVars,
   queryShellClassName,
   resultCopyRankFromKey,
+  sessionEntryLabel,
   sessionNoticeForResult,
 } from '../../src/renderer/features/search/query-view';
 
@@ -111,6 +112,7 @@ describe('session notice projection', () => {
     role: null,
     authMode: null,
     expiresAt: null,
+    displayName: null,
   };
   const signedIn = {
     ...unsigned,
@@ -120,7 +122,13 @@ describe('session notice projection', () => {
     role: 'agent' as const,
     authMode: 'mock' as const,
     expiresAt: '2026-09-10T12:00:00.000Z',
+    displayName: '合成客服',
   };
+
+  it('labels the session chip with the operator name, not the role', () => {
+    expect(sessionEntryLabel(signedIn)).toBe('合成客服');
+    expect(sessionEntryLabel({ ...signedIn, displayName: null })).toBe('synthetic_agent');
+  });
 
   it('keeps restored signed-in sessions free of residual banners', () => {
     expect(sessionNoticeForResult({

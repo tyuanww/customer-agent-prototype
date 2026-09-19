@@ -31,7 +31,7 @@ afterEach(() => vi.useRealTimers());
 describe('product session lifetime', () => {
   it('uses PKCE without projecting credentials and revokes repeat logout safely', async () => {
     const f = fixture(); const login = await f.session.login();
-    expect(login).toMatchObject({ ok: true, signedIn: true, role: 'agent', authMode: 'mock' });
+    expect(login).toMatchObject({ ok: true, signedIn: true, role: 'agent', authMode: 'mock', displayName: 'synthetic_agent' });
     expect(isProductSessionResult(login)).toBe(true);
     expect(JSON.stringify(login)).not.toContain(token);
     const created = JSON.parse(f.requests[0].init.body as string);
