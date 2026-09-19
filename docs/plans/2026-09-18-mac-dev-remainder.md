@@ -40,6 +40,8 @@
 | 打包空 userData → seed `synthetic-offline` | **不适用** 主链 | 只证明 S0 浮窗能起来 |
 | `AUTH_MODE=feishu` / P4 远端 | 以后才适用 | 未授权，P9 对 P4 仍 OPEN |
 
+> **2026-09-19 注：** `product-remote` 的 M5 主链重验表已写在 [how-to M5 §7.1](../how-to-verify-macos-m5.md) 与 [P9](2026-09-19-p9-remote-m5.md)。行全部是 **未观察**，不是通过。本页仍不授权再打 `package:mac:local`。
+
 **拍板：** P3 引入后，P9 对离线 profile 记 **不适用**，不要拿 S0 勾 M5。P4 若落地，P9 再开。本页不授权再打 `package:mac:local`。
 
 ## 本机卫生（同日已做）

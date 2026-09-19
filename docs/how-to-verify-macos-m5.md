@@ -203,6 +203,28 @@ STALE 要看的是：**已经拿到的那条旧候选** 在回退后不得再被
 - 不得在执行清单、CHANGELOG、PR 标题或提交说明里把 M5 写成 done / 已接受。
 - 本页存在于仓库里，只表示门禁标准已写明，不表示门禁已通过。
 
+### 7.1 新 profile：不适用与待重验
+
+第 7 节的勾选只覆盖当时的 **dev `synthetic-local` + 本机栈** 和 **M4 UNSIGNED + `synthetic-local`**。换 profile 不能自动继承。本小节不授权再打 `package:mac:local`，也不把 unit / CI / Playwright 写成通过。
+
+| 模式 | 登录 / 查询 / 复制 / STALE | 本页记录 |
+| --- | --- | --- |
+| 开发态 `synthetic-local` + 本机栈 | 适用 | 第 7 节已记；不是完成戳 |
+| M4 UNSIGNED + `synthetic-local` | 适用 | 第 7 节已记；不是完成戳 |
+| 打包空 userData → `{ "mode": "synthetic-offline" }` | **不适用** 主链 | 只能证明 S0 浮窗；不得勾第 7 节 |
+| `product-remote` HTTPS（飞书 / 账号、远端发布、断网） | 适用，须重验 | **未观察**。网络错误不得记成身份失效。断网、远端回退 STALE、干净 userData 打包态登录/查询/复制都还没有本页人工行 |
+
+`product-remote` 待人填（全部保持未观察，直到真人在该模式下看过窗口）：
+
+| 项 | 通过 / 未通过 / 未观察 | 观察人 | 日期 | 客户端 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| 远端登录成功非红；关窗取消；断网不是「登录已失效」 | **未观察** | | | product-remote | 须与第 7 节 dev 行分开填 |
+| 远端查询 / 复制（hydrate 由登录交付，不是 leftover `/v1/search`） | **未观察** | | | product-remote | |
+| 远端 STALE（发布回退或租约过期，旧卡片复制） | **未观察** | | | product-remote | |
+| 干净 userData 的 M4 UNSIGNED + `mode: product-remote` | **未观察** | | | M4 UNSIGNED | 本页不授权现在去打新包 |
+
+规格：[P9](plans/2026-09-19-p9-remote-m5.md)。不能替代 Windows 实机证据。
+
 ---
 
 ## 8. 明确不在本门禁
