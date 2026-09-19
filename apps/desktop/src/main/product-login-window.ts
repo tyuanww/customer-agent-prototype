@@ -8,6 +8,8 @@ import type { LoginWindow } from './product-session';
 import type { LoginWindowCommandResult } from '../shared/login-window';
 
 const FEISHU_AUTHORIZE_HOST = 'accounts.feishu.cn';
+/** Password POST and callback GET go through the named tunnel on product-remote. */
+export const LOGIN_IDENTITY_TIMEOUT_MS = 15_000;
 
 export type LoginWindowHost = {
   openExternal(url: string): Promise<void>;
@@ -132,7 +134,9 @@ export function createLoginWindow(
           const callback = callbackUrl(url, api, code);
           if (!callback || !allowedLoginUrl(callback, provider, api)) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           try {
-            const response = await transport(callback, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(5_000) });
+            const response = await transport(callback, {
+              method: 'GET', redirect: 'error', signal: AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS),
+            });
             if (!response.ok) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
             finish();
             return { ok: true } satisfies LoginWindowCommandResult;
@@ -198,7 +202,7 @@ async function verifySyntheticPassword(
 ): Promise<string | 'invalid' | 'unavailable'> {
   try {
     const response = await transport(new URL('/password', origin), {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5_000),
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS),
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });

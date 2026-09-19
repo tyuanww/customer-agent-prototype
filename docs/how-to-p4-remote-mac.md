@@ -10,7 +10,28 @@ export CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN=https://agent-id.jianghua.site
 pnpm --filter @customer-agent/desktop dev
 ```
 
-两个 origin 必须不同、必须是 `https://` 主机名（不要 IP、不要路径、不要 userinfo）。账号口令若走第二个主机，cloudflared 再加一条到 `127.0.0.1:43101`。只测飞书时，identity origin 也必须是合法 https 主机，即使暂时不点账号。
+两个 origin 必须不同、必须是 `https://` 主机名（不要 IP、不要路径、不要 userinfo）。
+
+账号口令 POST `/password` 打 **identity** origin，callback 打 **API** origin。飞书只走 API 隧道也能完成；要点「账号」，必须有第二条隧道。口令服务仍只听 `127.0.0.1:43101`。
+
+同一条 named tunnel 的 ingress 示例（`~/.cloudflared/customer-agent-local.yml`）：
+
+```yaml
+ingress:
+  - hostname: agent-auth.jianghua.site
+    service: http://127.0.0.1:43100
+  - hostname: agent-id.jianghua.site
+    service: http://127.0.0.1:43101
+  - service: http_status:404
+```
+
+DNS 只加一次：
+
+```bash
+cloudflared tunnel route dns customer-agent-local agent-id.jianghua.site
+```
+
+改完 yml 后重启 `cloudflared tunnel run`。不要把 API 或口令服务绑到 `0.0.0.0`。只测飞书时，identity origin 也必须是合法 https 主机，即使暂时不点账号。
 
 ## 打包态
 
