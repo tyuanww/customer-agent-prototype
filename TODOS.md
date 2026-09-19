@@ -160,7 +160,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P3
 **Depends on:** macOS 收起交还焦点已在 v0.3.1 / PR #120 落地
-**Status:** OPEN
+**Status:** OPEN · 第一刀：Windows 收起闲置狐狸时 `blur` + `hide` 一帧再 `showInactive`，不用 `app.hide()`、不用 `app.focus({ steal: true })`。未做 Windows 实机勾选。见 `docs/plans/2026-09-19-windows-yield-focus.md`。
 
 ### Overlay · NSPanel 隐身属性（becomesKeyOnlyIfNeeded）
 
