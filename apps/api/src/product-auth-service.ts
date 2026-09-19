@@ -136,7 +136,10 @@ export async function createProductAuthService(
         }
         throw failure;
       }
-      if (providerFailure) throw providerFailure;
+      if (providerFailure) {
+        console.info(`[api] identity provider exchange failed: ${providerFailure.reason}`);
+        throw providerFailure;
+      }
       if (binding === null) throw new IdentityFailure('LOGIN_INVALID');
     },
     async exchange(loginId: string, verifier: string) {

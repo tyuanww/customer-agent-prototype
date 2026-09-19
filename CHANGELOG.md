@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.5] - 2026-09-19
+
+### Fixed
+
+- Feishu login completes after Feishu’s user_info hop instead of failing as OVERLOADED. Token POST still refuses redirects so a 307 cannot forward the client secret. Empty or non-HTTPS final URLs fail closed. A display-name write failure cannot fail login. The request timer no longer aborts the response body after fetch returns (`AbortError 20`).
+
 ## [0.3.4] - 2026-09-18
 
 ### Changed
