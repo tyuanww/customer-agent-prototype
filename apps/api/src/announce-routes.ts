@@ -89,7 +89,10 @@ export function registerAnnounceRoutes(
       ...(ifNoneMatch === undefined ? {} : { ifNoneMatch }),
       ...(leaseToken === undefined ? {} : { leaseToken }),
     });
-    if (!result.ok) return sendAnnounceFailure(reply, result);
+    if (!result.ok) {
+      console.info(`[api] announce current failed ${result.code}${result.reason ? ` ${result.reason}` : ''}`);
+      return sendAnnounceFailure(reply, result);
+    }
     reply.header('cache-control', 'max-age=10');
     reply.header('etag', result.etag);
     if (result.status === 304) {
@@ -127,7 +130,10 @@ export function registerAnnounceRoutes(
       cursor,
       limit: limitValue,
     });
-    if (!result.ok) return sendAnnounceFailure(reply, result);
+    if (!result.ok) {
+      console.info(`[api] announce snapshot failed ${result.code}${result.reason ? ` ${result.reason}` : ''}`);
+      return sendAnnounceFailure(reply, result);
+    }
     return result.response;
   });
 
@@ -146,7 +152,10 @@ export function registerAnnounceRoutes(
       releaseSeq: body.value.release_seq,
       leaseToken: body.value.offline_lease_token,
     });
-    if (!result.ok) return sendAnnounceFailure(reply, result);
+    if (!result.ok) {
+      console.info(`[api] announce ack failed ${result.code}${result.reason ? ` ${result.reason}` : ''}`);
+      return sendAnnounceFailure(reply, result);
+    }
     return parseContractSchema('OkResponse', { ok: true });
   });
 }

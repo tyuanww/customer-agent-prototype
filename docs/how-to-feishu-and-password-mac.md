@@ -27,3 +27,11 @@ FEISHU_BINDINGS=ou_你的open_id:agent
 ## 启动
 
 有 `feishu.env` 时 `stack.ts start` 会：API `AUTH_MODE=feishu`、口令服务替换原来的自动放行 `/authorize`、预置飞书 `open_id`。先停当前 mock 栈再 start。
+
+## 登录
+
+选择器文案仍是「飞书」和「账号」。飞书 `code` / `state` 一次性：失败后重新点「飞书」，不要刷新 callback URL。
+
+API 跟随 `user_info` GET 的 HTTPS 跳转，最终地址只接受 `open.feishu.cn` 与 `accounts.feishu.cn`（https、默认 443）。token POST 不跟随跳转。空地址或非 HTTPS 失败关闭。写仓外 `operator-display-names.json` 失败不会让登录失败。
+
+规格：[飞书 user_info 跳转](plans/2026-09-19-fix-feishu-userinfo-redirect.md)。
