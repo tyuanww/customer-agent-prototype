@@ -8,11 +8,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductAnnounce } from '../../src/main/product-announce';
 import { ProductSession } from '../../src/main/product-session';
 import { ProductHttp } from '../../src/main/product-http';
-import { readProductClientId } from '../../src/main/product-client-id';
+import { announceClientId, readProductClientId } from '../../src/main/product-client-id';
 import { isProductAnnounceResult, isProductAnnounceInvalidation } from '../../src/shared/product-announce';
 
 const token = 't'.repeat(43);
 const leaseToken = `osl_${'c'.repeat(64)}`;
+const installId = 'desk_' + 'a'.repeat(32);
+const boundClientId = announceClientId(installId, 'usr_synthetic_agent');
 const releaseId = 'rel-synthetic-001';
 const hash = 'b'.repeat(64);
 const expiresAt = () => new Date(Date.now() + 600_000).toISOString();
@@ -75,7 +77,7 @@ async function setup(
   await session.restore();
   const announce = new ProductAnnounce(
     session,
-    'desk_' + 'a'.repeat(32),
+    installId,
     Date.now,
     persistHydrate,
     afterSnapshotPersist,
@@ -107,6 +109,7 @@ describe('product announce lease and snapshot', () => {
       if (url.pathname === '/v1/announce/snapshot') {
         expect(url.searchParams.get('release_id')).toBe(releaseId);
         expect(init?.headers && new Headers(init.headers).get('x-snapshot-lease')).toBe(leaseToken);
+        expect(init?.headers && new Headers(init.headers).get('x-client-id')).toBe(boundClientId);
         return Response.json(snapshotBody());
       }
       return new Response(null, { status: 404 });
@@ -115,7 +118,7 @@ describe('product announce lease and snapshot', () => {
     expect(result).toMatchObject({ ok: true, releaseId, releaseSeq: 13, leaseExpiresAt: expiry, announcement: { title: '合成公告' } });
     expect(JSON.stringify(result)).not.toContain(leaseToken);
     expect(isProductAnnounceResult(result)).toBe(true);
-    expect(acks[0]).toMatchObject({ client_id: 'desk_' + 'a'.repeat(32), release_id: releaseId, release_seq: 13, offline_lease_token: leaseToken });
+    expect(acks[0]).toMatchObject({ client_id: boundClientId, release_id: releaseId, release_seq: 13, offline_lease_token: leaseToken });
     expect(result.ok && result.leaseExpiresAt).toBe(expiry);
     expect(f.announce.allows(releaseId)).toBe(true);
     await f.session.status();
@@ -176,6 +179,52 @@ describe('product announce lease and snapshot', () => {
     expect(await ok.announce.refresh({ ...ok.identity, generation: 2 })).toMatchObject({ ok: true, leaseExpiresAt: expiry });
     expect(seen).toBe(2);
     await f.session.logout(); await ok.session.logout();
+  });
+
+  it('still hydrates when ack is forbidden for a client bound to another user', async () => {
+    const expiry = expiresAt();
+    const f = await setup(async _url => new Response(null, { status: 404 }));
+    let snap = 0;
+    f.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') return Response.json(currentBody(expiry), { headers: { etag: 'W/"13"' } });
+      if (url.pathname === '/v1/announce/ack') {
+        return Response.json({ error: { code: 'FORBIDDEN', message: 'forbidden' } }, { status: 403 });
+      }
+      if (url.pathname === '/v1/announce/snapshot') {
+        snap += 1;
+        return Response.json(snapshotBody());
+      }
+      return new Response(null, { status: 404 });
+    });
+    expect(await f.announce.refresh(f.identity)).toMatchObject({ ok: true, releaseId, leaseExpiresAt: expiry });
+    expect(f.announce.allows(releaseId)).toBe(true);
+    expect(snap).toBe(1);
+    await f.session.logout();
+  });
+
+  it('keeps the local lease when a 304 omits snapshot-lease headers', async () => {
+    const expiry = expiresAt();
+    const f = await setup(async _url => new Response(null, { status: 404 }));
+    let seen = 0;
+    f.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') {
+        seen += 1;
+        if (seen === 1) return Response.json(currentBody(expiry), { headers: { etag: 'W/"13"' } });
+        return new Response(null, { status: 304, headers: { etag: 'W/"13"' } });
+      }
+      if (url.pathname === '/v1/announce/ack') return Response.json({ ok: true });
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody());
+      return new Response(null, { status: 404 });
+    });
+    expect(await f.announce.refresh(f.identity)).toMatchObject({ ok: true, releaseId, leaseExpiresAt: expiry });
+    expect(await f.announce.refresh({ ...f.identity, generation: 2 })).toMatchObject({ ok: true, releaseId, leaseExpiresAt: expiry });
+    expect(f.announce.allows(releaseId)).toBe(true);
+    expect(seen).toBe(2);
+    await f.session.logout();
   });
 
   it('maps source-gate 503 and expires the local lease without claiming a read', async () => {
@@ -289,6 +338,14 @@ describe('product announce lease and snapshot', () => {
 });
 
 describe('install-stable client id', () => {
+  it('binds a distinct announce client id per signed-in user', () => {
+    const feishu = announceClientId(installId, 'usr_ou_5a6b7c7a3ae19edc72676dbfff328f75');
+    expect(boundClientId).toMatch(/^desk_[0-9a-f]{32}$/);
+    expect(feishu).toMatch(/^desk_[0-9a-f]{32}$/);
+    expect(feishu).not.toBe(boundClientId);
+    expect(feishu).not.toBe(installId);
+  });
+
   it('reuses a generated plaintext identifier and rejects renderer-shaped values', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'desktop-client-id-'));
     const first = readProductClientId(directory);

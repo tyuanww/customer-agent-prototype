@@ -56,6 +56,7 @@ export class ProductHttp {
     if (Object.keys(extra).some(name => !(EXTRA_HEADERS as readonly string[]).includes(name))) throw new ProductHttpError('VALIDATION');
     const deadline = AbortSignal.timeout(5_000);
     const signal = options.signal ? AbortSignal.any([deadline, options.signal]) : deadline;
+    const started = Date.now();
     try {
       const response = await this.transport(new URL(path, this.origin), {
         method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
@@ -71,11 +72,23 @@ export class ProductHttp {
         ...(response.headers.get('x-snapshot-lease-expires') ? { leaseExpiresAt: response.headers.get('x-snapshot-lease-expires')! } : {}),
       };
       if (response.status === 304) { await response.body?.cancel(); return { status: 304, value: null, ...meta }; }
-      if (!response.ok) throw new ProductHttpError(await mapFailure(response));
+      if (!response.ok) {
+        const code = await mapFailure(response);
+        console.info(`[desktop] product-http ${options.method ?? (options.body === undefined ? 'GET' : 'POST')} ${path} ${response.status} ${code} ${String(Date.now() - started)}ms`);
+        throw new ProductHttpError(code);
+      }
       if (response.status === 204) return { status: 204, value: null, ...meta };
       return { status: response.status, value: JSON.parse(await readBounded(response)), ...meta };
     } catch (error) {
       if (error instanceof ProductHttpError) throw error;
+      const name = error instanceof Error ? error.name : 'unknown';
+      const cause = error !== null && typeof error === 'object' && 'cause' in error
+        ? (error as { cause?: { code?: unknown; message?: unknown } }).cause
+        : undefined;
+      const causeBit = cause && typeof cause === 'object'
+        ? ` ${String(cause.code ?? '')} ${String(cause.message ?? '').replace(/https?:\/\/\S+/gi, '[url]').slice(0, 80)}`
+        : '';
+      console.info(`[desktop] product-http ${path} transport ${name}${causeBit} ${String(Date.now() - started)}ms`);
       throw new ProductHttpError(options.signal?.aborted ? 'CANCELLED' : 'UNAVAILABLE');
     }
   }

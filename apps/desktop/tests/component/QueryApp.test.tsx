@@ -248,6 +248,18 @@ describe('QueryApp', () => {
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
     await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'source_gate' })); });
     expect(screen.queryByText('当前版本已失效，请重新核验')).not.toBeInTheDocument();
+    expect(screen.getByText('内容暂不可用，请联系话术师核实')).toBeInTheDocument();
+  });
+
+  it('shows unavailable copy instead of a blank overlay when announce drops during search', async () => {
+    const f = connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '什么时候发货' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'unavailable' })); });
+    expect(screen.queryByText('当前版本已失效，请重新核验')).not.toBeInTheDocument();
+    expect(screen.getByText('服务暂不可用，请重试')).toBeInTheDocument();
   });
 
   it('does not treat a replaced session epoch as an expired announcement', async () => {

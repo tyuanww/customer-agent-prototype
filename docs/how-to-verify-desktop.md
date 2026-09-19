@@ -360,7 +360,9 @@ Query 的「登录」打开独立受控登录窗（窗标题「登录」）。�
 
 沿用 D1 的两个 loopback 配置。登录后即可查询：不要选手动平台/品类/SKU。问句由 MiniMax 规划 intent 路由——发货/地址/售后走全店，活动走活动类，问句点到款名才绑 SKU。有占位符的候选须填写合成订单号或日期后复制。复制成功只表示剪贴板写入，不表示发送。macOS 上收起 Query（复制后、Esc、点狐狸头或再按快捷键）应把键盘还给刚才的应用输入框，不必再点那个窗口。工作台 / 登录窗 / SOP 正开着时不整应用 `app.hide()`。Windows 交还焦点尚未做。
 
-`pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-search.test.ts` 检查候选归属、隔离、半开有效期、并发复制、取消及事件失败。`pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts` 在 build 后运行真实 Electron 登录/搜索/复制/退出，HTTP 为合成 double；不是 PG 整链、人工观察或 Windows 实机证据。
+登录后第一次查询会 `refreshAnnounce`。lease 未就绪会 `drop('source_gate')`。查询进行中或已有结果时，overlay 必须显示「内容暂不可用，请联系话术师核实」（`source_gate`）或「服务暂不可用，请重试」（`unavailable`），不得空白，也不得画「当前版本已失效」。空闲已登录输入态这两类原因仍静默。只有 `expired` 才画「当前版本已失效，请重新核验」。
+
+`pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-search.test.ts` 检查候选归属、隔离、半开有效期、并发复制、取消及事件失败。`pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx` 检查查询中 `source_gate` / `unavailable` 掉租约时的 overlay 文案，且不得出现「当前版本已失效」。`pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts` 在 build 后运行真实 Electron 登录/搜索/复制/退出，HTTP 为合成 double；不是 PG 整链、人工观察或 Windows 实机证据。
 
 ### D5 合成整链验证
 
@@ -418,7 +420,7 @@ node scripts/synthetic-stack/anomaly-check.ts
 | --- | --- |
 | 会话撤销后 `/auth/me` 与 `/v1/search` 401，重新登录恢复 | 真实飞书过期、人工点退出 |
 | 停 API 后不可达，`stack start` 后 `/ready` 200 | 真实网络分区、生产拓扑 |
-| 暂停权威来源后搜索 503 fail-closed；恢复只能 `destroy` + `start` | 人工在 Query 里看到的红字文案 |
+| 暂停权威来源后搜索 503 fail-closed；恢复只能 `destroy` + `start` | 人工在 Query 里看到的红字文案。查询中 announce `source_gate` / `unavailable` 的 overlay 文案由 `tests/component/QueryApp.test.tsx` 覆盖，不是本命令 |
 | 回退后桌面 `ProductSearch.copy` 对旧候选返回 `STALE`（`announce.allows()`） | 裸 `POST /v1/events/adoption` 拒绝旧 release；Mac 人工复制手感 |
 
 人工注入命令：`stack.ts anomaly status|session-revoke|source-suspend <id>`。`source-suspend` 的 id 是 argv[4]。暂停后不得靠 `start` 重新播种恢复。

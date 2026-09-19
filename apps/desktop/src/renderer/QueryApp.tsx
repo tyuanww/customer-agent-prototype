@@ -1,4 +1,4 @@
-import type { ProductSessionResult } from '@shared/product-session';
+import { PRODUCT_ERRORS, type ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -820,6 +820,19 @@ export function QueryApp() {
       lastProductQueryRef.current = null; setHelpStatus('待核实');
       if (value.reason === 'signed_out' || value.reason === 'replaced' || sessionBusyRef.current) {
         setAnnounceInvalid(false);
+        setErrorMessage('');
+        reportPhase('SEARCH_INPUT');
+        return;
+      }
+      if (value.reason === 'source_gate' || value.reason === 'unavailable') {
+        setAnnounceInvalid(false);
+        if (searchInFlightRef.current || showingQueryContent) {
+          setErrorMessage(value.reason === 'source_gate'
+            ? PRODUCT_ERRORS.SOURCE_GATE_NOT_READY
+            : PRODUCT_ERRORS.UNAVAILABLE);
+          reportPhase('ERROR');
+          return;
+        }
         setErrorMessage('');
         reportPhase('SEARCH_INPUT');
         return;

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { lstatSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { ProductHttpError } from './product-http';
@@ -25,4 +25,12 @@ export function readProductClientId(directory: string): string {
   const value = `desk_${randomBytes(16).toString('hex')}`;
   writeFileSync(target, `${value}\n`, { mode: 0o644, flag: 'wx' });
   return value;
+}
+
+/** Per-user announce client. Same install must ACK as Feishu and as 账号 without sharing client_sync_state. */
+export function announceClientId(installId: string, userId: string): string {
+  if (!PATTERN.test(installId) || userId.length < 1 || userId.length > 128) {
+    throw new ProductHttpError('VALIDATION');
+  }
+  return `desk_${createHash('sha256').update(`announce-client\0${installId}\0${userId}`, 'utf8').digest('hex').slice(0, 32)}`;
 }
