@@ -93,12 +93,12 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Why:** 不能假设给默认 session 加一个证书钩子就覆盖所有请求。代理、证书策略与 pinning 都必须验证**实际传输路径**。
 
-**Context:** `apps/desktop/src/main/product-http.ts:23`、`apps/desktop/src/main/product-login-window.ts:21`。
+**Context:** `apps/desktop/src/main/desktop-fetch.ts`、`product-http.ts`、`product-login-window.ts`。规格：`docs/plans/2026-09-19-p6-cert-proxy-paths.md`。
 
 **Effort:** M
 **Priority:** P3
 **Depends on:** P4
-**Status:** OPEN
+**Status:** OPEN · 第一刀：ProductHttp / 登录 identity / MiniMax 共用 `electron.net.fetch`；登录隔离 session 走 `applySessionSecurity`。不做默认 pinning。
 
 ### P7 · 检索资产的交付路径
 

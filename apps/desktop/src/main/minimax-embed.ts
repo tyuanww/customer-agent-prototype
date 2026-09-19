@@ -1,20 +1,11 @@
-import { createRequire } from 'node:module';
 import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat.ts';
+import { electronNetFetch } from './desktop-fetch.ts';
 import { DENSE_MODEL_EMBO } from '../shared/dense-retrieve.ts';
 
 export const EMBED_BATCH = 16;
 export const EMBED_MAX_CHARS = 2000;
 
 export type EmbedKind = 'db' | 'query';
-
-function electronFetch(): typeof fetch | null {
-  try {
-    const electron = createRequire(import.meta.url)('electron') as { net?: { fetch?: typeof fetch } };
-    return typeof electron.net?.fetch === 'function' ? electron.net.fetch.bind(electron.net) : null;
-  } catch {
-    return null;
-  }
-}
 
 function clip(text: string): string {
   return [...text].slice(0, EMBED_MAX_CHARS).join('');
@@ -52,7 +43,7 @@ export async function minimaxEmbed(
   const base = (process.env.MINIMAX_BASE_URL?.trim() || 'https://api.minimaxi.com/v1').replace(/\/$/, '');
   if (!base.startsWith('https://')) return null;
   const model = options.model?.trim() || process.env.MINIMAX_EMBED_MODEL?.trim() || DENSE_MODEL_EMBO;
-  const netFetch = electronFetch();
+  const netFetch = electronNetFetch();
   const fetchImpl = options.fetchImpl ?? netFetch ?? fetch;
   if (!options.fetchImpl && !netFetch) console.warn('[minimax-embed] fallback Node fetch');
   const controller = new AbortController();
