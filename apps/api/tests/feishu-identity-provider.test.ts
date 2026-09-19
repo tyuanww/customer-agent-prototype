@@ -95,6 +95,27 @@ describe('feishu identity provider', () => {
     finally { provider.close(); }
   });
 
+  it('accepts a Feishu token receipt larger than 4KB', async () => {
+    const accessToken = `u-${'a'.repeat(5000)}`;
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === FEISHU_TOKEN_URL) {
+        return jsonResponse({
+          code: 0,
+          token_type: 'Bearer',
+          access_token: accessToken,
+          refresh_token: `r-${'b'.repeat(2000)}`,
+        });
+      }
+      return jsonResponse({ code: 0, data: { open_id: openId } });
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      expect(await provider.exchange('one-time-code')).toBe(openId);
+    } finally {
+      provider.close();
+    }
+  });
+
   it('does not follow redirects from Feishu endpoints', async () => {
     const fetchImpl = vi.fn(async () => new Response('', { status: 302, headers: { location: 'https://example.com' } })) as unknown as typeof fetch;
     const provider = createFeishuIdentityProvider(config, fetchImpl);

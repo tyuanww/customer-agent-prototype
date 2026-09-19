@@ -6,7 +6,7 @@ API 仍只绑 `127.0.0.1`。桌面可以把 origin 设成隧道 HTTPS。规格�
 
 ```bash
 export CUSTOMER_AGENT_DESKTOP_API_ORIGIN=https://agent-auth.jianghua.site
-export CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN=https://agent-id.jianghua.site
+export CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN=https://agent-pass.jianghua.site
 pnpm --filter @customer-agent/desktop dev
 ```
 
@@ -20,15 +20,15 @@ pnpm --filter @customer-agent/desktop dev
 ingress:
   - hostname: agent-auth.jianghua.site
     service: http://127.0.0.1:43100
-  - hostname: agent-id.jianghua.site
+  - hostname: agent-pass.jianghua.site
     service: http://127.0.0.1:43101
   - service: http_status:404
 ```
 
-DNS 只加一次：
+DNS 只给 **空闲** 主机名加 CNAME，不要覆盖别的隧道已经占用的名字：
 
 ```bash
-cloudflared tunnel route dns customer-agent-local agent-id.jianghua.site
+cloudflared tunnel route dns customer-agent-local agent-pass.jianghua.site
 ```
 
 改完 yml 后重启 `cloudflared tunnel run`。不要把 API 或口令服务绑到 `0.0.0.0`。只测飞书时，identity origin 也必须是合法 https 主机，即使暂时不点账号。
@@ -41,7 +41,7 @@ cloudflared tunnel route dns customer-agent-local agent-id.jianghua.site
 {
   "mode": "product-remote",
   "apiOrigin": "https://agent-auth.jianghua.site",
-  "identityOrigin": "https://agent-id.jianghua.site"
+  "identityOrigin": "https://agent-pass.jianghua.site"
 }
 ```
 

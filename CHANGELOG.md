@@ -6,6 +6,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Changed
 
+- Feishu token exchange accepts receipts up to 32KB. A 4KB cap treated a real user_access_token JSON as `DEPENDENCY_UNAVAILABLE`.
+- Account HTTPS identity origin in how-tos is `https://agent-pass.jianghua.site`. Do not overwrite hostnames already used by another tunnel.
 - Feishu login opens in the system browser. The 520×420 window stays a 飞书 / 账号 chooser. With off-repo `feishu.env`, you can complete official Feishu OAuth as `owner` (or another allowlisted role); account login uses the hashed loopback password server. See `docs/how-to-feishu-and-password-mac.md`.
 - Cancelling the chooser after the browser opens stops the desktop login instead of still exchanging a session.
 - Desktop ProductHttp, account `/password`, and MiniMax share Electron `net.fetch` (system trust store). The login isolated session uses the same permission policy as the default session. Certificate pinning is not default. See `docs/plans/2026-09-19-p6-cert-proxy-paths.md`.
@@ -54,6 +56,7 @@ All notable changes to this customer-agent product implementation repository are
 - Linux AppImage uses ASCII `executableName` `customer-agent-desktop`. Electron-builder rejects the scoped package name.
 - Linux overlay feasibility smoke does not call `capturePage` (Xvfb raises UnknownVizError). Windows still checks corner alpha.
 - Merge-order note records the landed PRs on `origin/main` `58dfac4`. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- Feishu token exchange accepts receipts up to 32KB. A 4KB cap treated a real user_access_token JSON as DEPENDENCY_UNAVAILABLE.
 - Retrieval how-tos name origin-keyed catalog files when the desktop API origin is set. See `docs/how-to-run-macos-semantic-query.md`.
 - Desktop retrieval explanation states product-mode catalogs are keyed by API origin. See `docs/explanation-desktop-retrieval.md`.
 
