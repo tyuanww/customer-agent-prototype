@@ -10,6 +10,24 @@ All notable changes to this customer-agent product implementation repository are
 - Cancelling the chooser after the browser opens stops the desktop login instead of still exchanging a session.
 - Desktop ProductHttp, account `/password`, and MiniMax share Electron `net.fetch` (system trust store). The login isolated session uses the same permission policy as the default session. Certificate pinning is not default. See `docs/plans/2026-09-19-p6-cert-proxy-paths.md`.
 - Account login POSTs `/password` to the HTTPS identity origin and callbacks the API origin. Identity timeout is 15s. The password server still binds loopback; a second named-tunnel hostname is documented. See `docs/plans/2026-09-19-p4-account-https-tunnel.md`.
+- Off-repo hydrate and BM25 files are keyed by API origin, same hash as the session file. A leftover unkeyed catalog is still used until the keyed file exists. See `docs/plans/2026-09-19-p7-origin-keyed-retrieval.md`.
+- Answer embeddings use the same origin-keyed path. See `docs/plans/2026-09-19-p7-origin-keyed-embeddings.md`.
+- The smart-retrieval preference file is origin-keyed and loaded after packaged retrieval defaults, not at import time. See `docs/plans/2026-09-19-p7-origin-keyed-preference.md`.
+- Product mode copies a leftover unkeyed catalog into the origin-keyed path once, then writes only the keyed file. See `docs/plans/2026-09-19-p7-seed-keyed-catalog.md`.
+- Retrieval CLIs write origin-keyed files when `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` is set. See `docs/plans/2026-09-19-p7-cli-origin-keyed.md`.
+- Dashboard wording and dense catalog reads follow origin-keyed files when env is unset. See `docs/plans/2026-09-19-p7-dashboard-origin-keyed.md`.
+- Retrieval telemetry is origin-keyed (`retrieval-telemetry.<id>.json`) so two API targets do not share impression logs. See `docs/plans/2026-09-19-p7-origin-keyed-telemetry.md`.
+- Hydrate, BM25, and the smart-retrieval preference load origin-keyed files at query time when the desktop API origin is set. See `docs/plans/2026-09-19-p7-runtime-origin-reads.md`.
+- Login snapshot persist also writes the BM25 index from the same announce page. See `docs/plans/2026-09-19-p7-login-bm25-index.md`.
+- Login fills missing answer embeddings in the background when MiniMax is configured; query uses the dense lane without blocking login. See `docs/plans/2026-09-19-p7-login-embeddings.md`.
+- Query corpus loading (`loadIndexScripts`) follows origin-keyed BM25 files when env is unset. See `docs/plans/2026-09-19-p7-index-scripts-origin.md`.
+- Product-remote search does not fall back to leftover `/v1/search` when a desktop API origin is set. See `docs/plans/2026-09-19-p7-origin-no-leftover-search.md`.
+- Product mode publishes `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` from the runtime profile when unset. See `docs/plans/2026-09-19-p7-publish-desktop-origin.md`.
+- Seeding an origin-keyed catalog from a leftover unkeyed file is best-effort; a copy failure does not abort packaged startup. See `docs/plans/2026-09-19-p7-seed-copy-best-effort.md`.
+- Dashboard, dense catalog, and telemetry reads do not fall back to leftover unkeyed files when the desktop API origin is set. See `docs/plans/2026-09-19-p7-runtime-no-unkeyed.md`.
+- Login schedules background embeddings only after hydrate writes or already matches the snapshot, not when a smaller seed is kept out. See `docs/plans/2026-09-19-p7-embed-after-persist.md`.
+- Login persist does not write a smaller BM25 index or report `wrote` when hydrate keeps a larger local catalog. See `docs/plans/2026-09-19-p7-persist-no-shrink.md`.
+- Query BM25 fallback loads origin-keyed retrieval-index files instead of only `CUSTOMER_AGENT_RETRIEVAL_INDEX`. See `docs/plans/2026-09-19-p7-semantic-origin-path.md`.
 - The install package still does not ship PostgreSQL or the API. A missing profile notice no longer tells the operator to install a local database. See `docs/plans/2026-09-19-p10-no-bundled-stack.md`.
 - On Windows, collapsing Query yields the previous app by hiding the idle fox for one frame, then `showInactive`. It does not call `app.hide()` or `app.focus({ steal: true })`. Not a Windows device pass. See `docs/plans/2026-09-19-windows-yield-focus.md`.
 - M5 lists `product-remote` as a separate re-verify table, all **未观察**. `synthetic-offline` cannot tick login / search / copy. See `docs/how-to-verify-macos-m5.md` §7.1.

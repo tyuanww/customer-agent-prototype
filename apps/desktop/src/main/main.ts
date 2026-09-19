@@ -11,7 +11,9 @@ import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
+import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
+import { scheduleRetrievalEmbeddingsFromEnv } from './retrieval-embeddings-store.ts';
 import { app, Menu, screen, session, shell } from 'electron';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
@@ -198,7 +200,7 @@ if (!gotLock) {
     );
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
-      applyPackagedRetrievalDefaults(process.env);
+      applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin });
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
         createSessionStore(userDataDirectory, productProfile.apiOrigin), createLoginWindow(
           productProfile.identityOrigin,
@@ -210,7 +212,13 @@ if (!gotLock) {
               : (url) => shell.openExternal(url),
           },
         ));
-      productAnnounce = new ProductAnnounce(productSession, readProductClientId(userDataDirectory));
+      productAnnounce = new ProductAnnounce(
+        productSession,
+        readProductClientId(userDataDirectory),
+        Date.now,
+        persistHydrateFromEnv,
+        (_releaseId, items) => { scheduleRetrievalEmbeddingsFromEnv(items); },
+      );
       await productSession.restore();
     }
     registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],

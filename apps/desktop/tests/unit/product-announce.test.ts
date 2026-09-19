@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { join } from 'node:path';
-import { loadHydrateCatalog } from '../../src/main/hydrate-catalog';
+import { loadHydrateCatalog, type SyncHydrateResult } from '../../src/main/hydrate-catalog';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductAnnounce } from '../../src/main/product-announce';
 import { ProductSession } from '../../src/main/product-session';
@@ -58,7 +58,11 @@ function snapshotBody(cursor: string | null = null, id = releaseId, seq = 13, it
     items, next_cursor: cursor,
   };
 }
-async function setup(handler: (url: URL, init?: RequestInit) => Response | Promise<Response>) {
+async function setup(
+  handler: (url: URL, init?: RequestInit) => Response | Promise<Response>,
+  persistHydrate?: ConstructorParameters<typeof ProductAnnounce>[3],
+  afterSnapshotPersist?: ConstructorParameters<typeof ProductAnnounce>[4],
+) {
   const transport = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
     if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
@@ -69,7 +73,13 @@ async function setup(handler: (url: URL, init?: RequestInit) => Response | Promi
     read: () => ({ access_token: token, expires_at: new Date(Date.now() + 899_000).toISOString() }), write: () => {}, clear: () => {},
   }, { open: async () => {} });
   await session.restore();
-  const announce = new ProductAnnounce(session, 'desk_' + 'a'.repeat(32));
+  const announce = new ProductAnnounce(
+    session,
+    'desk_' + 'a'.repeat(32),
+    Date.now,
+    persistHydrate,
+    afterSnapshotPersist,
+  );
   const identity = { sessionEpoch: session.view().sessionEpoch, generation: 1 };
   return { session, announce, identity, transport };
 }
@@ -222,6 +232,59 @@ describe('product announce lease and snapshot', () => {
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
       await f.session.logout();
     }
+  });
+
+  it('schedules embeddings after hydrate writes or aligns, not when keeping a larger catalog', async () => {
+    const persistResult = (reason: SyncHydrateResult['reason']): SyncHydrateResult => ({
+      path: '/tmp/hydrate.json',
+      releaseId,
+      previousReleaseId: null,
+      total: reason === 'kept-larger' ? 2 : 1,
+      wrote: reason === 'wrote',
+      skipped: reason !== 'wrote',
+      reason,
+    });
+    const afterWrite = vi.fn();
+    const wrote = await setup(() => new Response(null, { status: 404 }), () => persistResult('wrote'), afterWrite);
+    wrote.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') return Response.json(currentBody(), { headers: { etag: 'W/"13"' } });
+      if (url.pathname === '/v1/announce/ack') return Response.json({ ok: true });
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody(null, releaseId, 13, [snapshotItem()]));
+      return new Response(null, { status: 404 });
+    });
+    expect(await wrote.announce.refresh(wrote.identity)).toMatchObject({ ok: true });
+    expect(afterWrite).toHaveBeenCalledOnce();
+    await wrote.session.logout();
+
+    const afterKept = vi.fn();
+    const kept = await setup(() => new Response(null, { status: 404 }), () => persistResult('kept-larger'), afterKept);
+    kept.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') return Response.json(currentBody(), { headers: { etag: 'W/"13"' } });
+      if (url.pathname === '/v1/announce/ack') return Response.json({ ok: true });
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody(null, releaseId, 13, [snapshotItem()]));
+      return new Response(null, { status: 404 });
+    });
+    expect(await kept.announce.refresh(kept.identity)).toMatchObject({ ok: true });
+    expect(afterKept).not.toHaveBeenCalled();
+    await kept.session.logout();
+
+    const afterAligned = vi.fn();
+    const aligned = await setup(() => new Response(null, { status: 404 }), () => persistResult('aligned'), afterAligned);
+    aligned.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') return Response.json(currentBody(), { headers: { etag: 'W/"13"' } });
+      if (url.pathname === '/v1/announce/ack') return Response.json({ ok: true });
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody(null, releaseId, 13, [snapshotItem()]));
+      return new Response(null, { status: 404 });
+    });
+    expect(await aligned.announce.refresh(aligned.identity)).toMatchObject({ ok: true });
+    expect(afterAligned).toHaveBeenCalledOnce();
+    await aligned.session.logout();
   });
 });
 

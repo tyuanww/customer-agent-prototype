@@ -12,11 +12,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  DEFAULT_HYDRATE_PATH,
   loadHydrateCatalog,
   syncHydrateCatalog,
   type HydrateSnapshotItem,
 } from '../apps/desktop/src/main/hydrate-catalog.ts';
+import { defaultStackWritePath } from '../apps/desktop/src/main/packaged-retrieval-paths.ts';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -37,7 +37,9 @@ function asItems(raw: unknown): { releaseId: string; items: HydrateSnapshotItem[
 const dryRun = process.argv.includes('--dry-run');
 const rebuild = process.argv.includes('--rebuild');
 const fromPath = argValue('--from');
-const outPath = argValue('--out') || process.env.CUSTOMER_AGENT_HYDRATE_INDEX?.trim() || DEFAULT_HYDRATE_PATH;
+const outPath = argValue('--out')
+  || process.env.CUSTOMER_AGENT_HYDRATE_INDEX?.trim()
+  || defaultStackWritePath('retrieval-hydrate.json');
 
 if (!fromPath) {
   const catalog = existsSync(outPath) ? loadHydrateCatalog(outPath) : null;

@@ -12,11 +12,11 @@ import { routeQuery, type QueryRoute } from '../shared/query-route.ts';
 import { admitRetrieval } from '../shared/retrieval-quality.ts';
 import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index.ts';
 import type { RetrievalScript } from '../shared/hybrid-retrieve.ts';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
+import { DEFAULT_RETRIEVAL_PREFERENCE_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog.ts';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
+import { liveDenseQueryRanker } from './retrieval-embeddings-store.ts';
 import { createRetrievalPipeline, loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
 import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
 import { loadRetrievalTelemetryStore, type RetrievalTelemetry } from './retrieval-telemetry-store.ts';
@@ -46,7 +46,7 @@ function candidateLive(candidate: ProductCandidate): boolean {
 }
 
 function loadIndexScripts(): RetrievalScript[] {
-  const indexPath = (process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX ?? '').trim();
+  const indexPath = productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json');
   if (indexPath.length === 0 || !existsSync(indexPath)) return [];
   try {
     const document = parseRetrievalIndex(readFileSync(indexPath, 'utf8'));
@@ -111,8 +111,8 @@ export class ProductSearch {
     private readonly rerank: Reranker | null = loadMinimaxReranker(),
     private readonly pipeline: RetrievalPipeline = loadRetrievalPipeline(),
     private readonly preference: RetrievalPreferenceStore = loadRetrievalPreferenceStore(
-      process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE
-        ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-preference.json'),
+      productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_PREFERENCE', 'retrieval-preference.json')
+        || DEFAULT_RETRIEVAL_PREFERENCE_PATH,
     ),
     private readonly telemetry: RetrievalTelemetry = loadRetrievalTelemetryStore(),
   ) {
@@ -136,7 +136,9 @@ export class ProductSearch {
     const scripts = indexScripts.length >= hydrateScripts.length && indexScripts.length > 0
       ? indexScripts
       : hydrateScripts;
-    this.activePipeline = scripts.length > 0 ? createRetrievalPipeline(scripts) : this.pipeline;
+    this.activePipeline = scripts.length > 0
+      ? createRetrievalPipeline(scripts, { dense: liveDenseQueryRanker() })
+      : this.pipeline;
   }
   forget(sender: number) {
     this.states.get(sender)?.controller.abort();
@@ -237,7 +239,7 @@ export class ProductSearch {
         }
         if (this.hydrate) throw new ProductHttpError('STALE');
       }
-      if ((process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim().length > 0) {
+      if (productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json').length > 0) {
         throw new ProductHttpError('UNAVAILABLE');
       }
       const jobs = searchJobs(route);

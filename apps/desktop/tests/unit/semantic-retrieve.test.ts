@@ -1,9 +1,13 @@
 // @vitest-environment node
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadSemanticRetriever } from '../../src/main/semantic-retrieve';
+import {
+  defaultSyntheticStackFile,
+  originKeyedStackFile,
+} from '../../src/main/packaged-retrieval-paths';
 import { rankScripts, rankScriptsMulti, type RetrievalScript } from '../../src/shared/hybrid-retrieve';
 import { analyzeQuery, compactQueryText } from '../../src/shared/query-analyze';
 
@@ -111,5 +115,31 @@ describe('semantic retriever loader', () => {
       }],
     })}\n`);
     expect(loadSemanticRetriever(ok).rank('什么时候发货')[0]?.scriptId).toBe('ship-express');
+  });
+
+  it('loads origin-keyed BM25 and ignores leftover unkeyed files', () => {
+    const home = mkdtempSync(join(tmpdir(), 'semantic-origin-'));
+    mkdirSync(join(home, '.customer-agent-synthetic-stack'));
+    const origin = 'https://agent-auth.jianghua.site';
+    const body = `${JSON.stringify({
+      version: 1,
+      scripts: [{
+        scriptId: 'ship-keyed', title: '发货快递', questionText: '发货快递',
+        answerText: '订单付款后四十八小时内发出，物流单号同步到订单页。',
+      }],
+    })}\n`;
+    const leftover = `${JSON.stringify({
+      version: 1,
+      scripts: [{
+        scriptId: 'ship-leftover', title: '发货快递', questionText: '发货快递',
+        answerText: '订单付款后四十八小时内发出，物流单号同步到订单页。',
+      }],
+    })}\n`;
+    writeFileSync(defaultSyntheticStackFile('retrieval-index.json', home), leftover);
+    expect(loadSemanticRetriever(undefined, { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin }, home).rank('什么时候发货'))
+      .toEqual([]);
+    writeFileSync(originKeyedStackFile('retrieval-index.json', origin, home), body);
+    expect(loadSemanticRetriever(undefined, { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin }, home).rank('什么时候发货')[0]?.scriptId)
+      .toBe('ship-keyed');
   });
 });

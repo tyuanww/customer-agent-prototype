@@ -32,6 +32,10 @@ export class ProductAnnounce implements AnnounceGate {
       releaseId: string,
       items: readonly HydrateSnapshotItem[],
     ) => SyncHydrateResult | null = persistHydrateFromEnv,
+    private readonly afterSnapshotPersist: (
+      releaseId: string,
+      items: readonly HydrateSnapshotItem[],
+    ) => void = () => {},
   ) {
     session.subscribe(state => {
       if (!state.ok || !state.signedIn) this.drop('signed_out');
@@ -116,6 +120,13 @@ export class ProductAnnounce implements AnnounceGate {
       await this.page(identity.sessionEpoch, null, 0, items);
       const persisted = this.persistHydrate(response.current_release_id, items);
       if (replaced || persisted?.wrote) for (const listener of this.listeners) listener();
+      try {
+        if (persisted?.reason === 'wrote' || persisted?.reason === 'aligned') {
+          this.afterSnapshotPersist(response.current_release_id, items);
+        }
+      } catch {
+        // Embeddings are best-effort; hydrate/index already persisted.
+      }
       if (this.session.view().sessionEpoch !== identity.sessionEpoch || !this.session.view().signedIn) throw new ProductHttpError('STALE');
       this.arm();
       return this.projection(identity);
