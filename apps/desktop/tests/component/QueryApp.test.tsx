@@ -239,6 +239,17 @@ describe('QueryApp', () => {
     if (eventStatus === 'disabled') expect(screen.getByTestId('match-reason-1')).toHaveTextContent('不记录事件');
     expect(copyText).not.toHaveBeenCalled(); expect(f.search).toHaveBeenCalledTimes(1);
   });
+  it('does not treat source_gate as an expired announcement during search', async () => {
+    const f = connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    const input = screen.getByTestId('question-input');
+    fireEvent.change(input, { target: { value: '什么时候发货' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'source_gate' })); });
+    expect(screen.queryByText('当前版本已失效，请重新核验')).not.toBeInTheDocument();
+  });
+
   it('does not treat a replaced session epoch as an expired announcement', async () => {
     const f = connectProduct();
     render(<QueryApp />);

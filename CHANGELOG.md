@@ -6,6 +6,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Changed
 
+- Query treats only an expired announce lease as “当前版本已失效”. Login-time source_gate / unavailable no longer looks like a stale release.
 - After login, a previous announce lease no longer flashes “当前版本已失效”. The session chip shows the operator name (Feishu `name`, otherwise the user id), not the role.
 - Feishu token exchange accepts receipts up to 32KB. A 4KB cap treated a real user_access_token JSON as `DEPENDENCY_UNAVAILABLE`.
 - Account HTTPS identity origin in how-tos is `https://agent-pass.jianghua.site`. Do not overwrite hostnames already used by another tunnel.
