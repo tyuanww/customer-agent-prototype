@@ -1,4 +1,5 @@
 import { parseContractSchema } from '@customer-agent/contracts';
+import { announceClientId } from './product-client-id';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 import {
@@ -75,9 +76,15 @@ export class ProductAnnounce implements AnnounceGate {
     if (remaining <= 0) { this.drop('expired'); return; }
     this.timer = setTimeout(() => this.drop('expired'), remaining); this.timer.unref?.();
   }
+  private boundClientId(): string {
+    const userId = this.session.view().userId;
+    if (!userId) throw new ProductHttpError('UNAUTHORIZED');
+    return announceClientId(this.clientId, userId);
+  }
+
   private headers(conditional = false) {
     return {
-      'x-client-id': this.clientId,
+      'x-client-id': this.boundClientId(),
       ...(conditional && this.lease ? { 'x-snapshot-lease': this.lease.token, ...(this.lease.etag ? { 'if-none-match': this.lease.etag } : {}) } : {}),
     };
   }
@@ -95,9 +102,15 @@ export class ProductAnnounce implements AnnounceGate {
       const current = await this.session.request(identity.sessionEpoch, '/v1/announce/current', { method: 'GET', headers: this.headers(true) });
       if (view.sessionEpoch !== this.session.view().sessionEpoch) throw new ProductHttpError('STALE');
       if (current.status === 304) {
-        if (!this.lease || !current.leaseToken || !LEASE.test(current.leaseToken) || current.leaseToken !== this.lease.token
-          || !current.leaseExpiresAt || !Number.isFinite(Date.parse(current.leaseExpiresAt))) throw new ProductHttpError('UNAVAILABLE');
-        this.lease = { ...this.lease, expiresAt: current.leaseExpiresAt, ...(current.etag ? { etag: current.etag } : {}) };
+        // 304 may arrive without x-snapshot-lease through a public HTTPS proxy.
+        // The client already holds the token it sent; keep it if the server confirmed.
+        if (!this.lease) throw new ProductHttpError('UNAVAILABLE');
+        const token = current.leaseToken ?? this.lease.token;
+        const expiresAt = current.leaseExpiresAt ?? this.lease.expiresAt;
+        if (!LEASE.test(token) || token !== this.lease.token || !Number.isFinite(Date.parse(expiresAt))) {
+          throw new ProductHttpError('UNAVAILABLE');
+        }
+        this.lease = { ...this.lease, expiresAt, ...(current.etag ? { etag: current.etag } : {}) };
         this.arm(); return this.projection(identity);
       }
       const response = parseContractSchema('CurrentAnnouncementResponse', current.value);
@@ -112,10 +125,18 @@ export class ProductAnnounce implements AnnounceGate {
         ? { title: response.announcement.title, summary: response.announcement.summary, createdAt: response.announcement.created_at }
         : null;
       this.snapshot = { releaseId: response.current_release_id, cursor: null };
-      const ack = await this.session.request(identity.sessionEpoch, '/v1/announce/ack', {
-        body: { client_id: this.clientId, release_id: response.current_release_id, release_seq: response.release_seq, offline_lease_token: response.offline_lease.token },
-      });
-      parseContractSchema('OkResponse', ack.value);
+      try {
+        const ack = await this.session.request(identity.sessionEpoch, '/v1/announce/ack', {
+          body: { client_id: this.boundClientId(), release_id: response.current_release_id, release_seq: response.release_seq, offline_lease_token: response.offline_lease.token },
+        });
+        parseContractSchema('OkResponse', ack.value);
+      } catch (error) {
+        // ACK writes client_sync_state. A prior synthetic login on this install binds
+        // the same desk_ id; Feishu then gets 403. Snapshot and local search only need
+        // the lease from /current.
+        if (!(error instanceof ProductHttpError) || error.code !== 'FORBIDDEN') throw error;
+        console.info('[desktop] announce ack FORBIDDEN; continuing with issued lease');
+      }
       if (Date.parse(this.lease.expiresAt) !== priorExpiry) throw new ProductHttpError('VALIDATION');
       const items: HydrateSnapshotItem[] = [];
       await this.page(identity.sessionEpoch, null, 0, items);
@@ -133,8 +154,10 @@ export class ProductAnnounce implements AnnounceGate {
       return this.projection(identity);
     } catch (error) {
       const code = error instanceof ProductHttpError ? error.code : 'UNAVAILABLE';
+      const name = error instanceof Error ? error.name : 'unknown';
+      console.info(`[desktop] announce refresh failed ${code} ${name}`);
       if (code === 'SOURCE_GATE_NOT_READY') this.drop('source_gate');
-      else if (code !== 'STALE' && code !== 'UNAUTHORIZED') this.drop('unavailable');
+      else if (code !== 'STALE' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') this.drop('unavailable');
       return announceFailure(code, identity);
     }
   }
@@ -144,7 +167,7 @@ export class ProductAnnounce implements AnnounceGate {
     if (cursor !== null && this.snapshot.cursor !== cursor) throw new ProductHttpError('VALIDATION');
     const query = new URLSearchParams({ release_id: this.lease.releaseId, limit: '200', ...(cursor ? { cursor } : {}) });
     const result = await this.session.request(epoch, `/v1/announce/snapshot?${query}`, {
-      method: 'GET', headers: { 'x-client-id': this.clientId, 'x-snapshot-lease': this.lease.token },
+      method: 'GET', headers: { 'x-client-id': this.boundClientId(), 'x-snapshot-lease': this.lease.token },
     });
     const snapshot = parseContractSchema('SnapshotResponse', result.value);
     if (snapshot.release_id !== this.lease.releaseId || snapshot.release_seq !== this.lease.releaseSeq) throw new ProductHttpError('VALIDATION');

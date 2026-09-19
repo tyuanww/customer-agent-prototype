@@ -252,7 +252,7 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 ### D3 桌面公告租约所有权
 
-`main/product-announce.ts` 持有 current/snapshot/ACK 与离线租约；renderer 只看到脱敏发布视图。ACK 不续租，也不表示已读。租约绑定 sessionEpoch；失效后清候选。
+`main/product-announce.ts` 持有 current/snapshot/ACK 与离线租约；renderer 只看到脱敏发布视图。ACK 不续租，也不表示已读。租约绑定 sessionEpoch；失效后清候选。`QueryApp` 对 `source_gate` / `unavailable`：查询中或已有结果时走 ERROR，文案分别是「内容暂不可用，请联系话术师核实」/「服务暂不可用，请重试」，空闲输入态静默回 SEARCH_INPUT；只有 `expired` 才显示「当前版本已失效，请重新核验」。
 
 ### D4 桌面合成求助入口
 

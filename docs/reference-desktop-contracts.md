@@ -76,7 +76,7 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `product:search` / `product:cancel-search` / `product:copy-adopt` | invoke | trusted Query 主框；绑定 sessionEpoch/generation；复制不接受 renderer 正文 |
 | `product:retrieval-preference-get` / `product:retrieval-preference-set` | invoke | trusted Query 主框；`{ smartEnabled: boolean }`；非法 payload 不写盘 |
 | `product:announce-refresh` | invoke | trusted Query 主框；只回显 generation；成功投影无 lease token |
-| `product:announce-invalidated` | Main → query | preload 精确校验；过期/替换/来源门后停止使用旧候选 |
+| `product:announce-invalidated` | Main → query | preload 精确校验；过期/替换/来源门后停止使用旧候选。查询中或已有结果时：`source_gate` 显示「内容暂不可用，请联系话术师核实」，`unavailable` 显示「服务暂不可用，请重试」，不得空白 overlay，也不得画「当前版本已失效」；空闲输入态这两类原因静默回 SEARCH_INPUT。只有 `expired` 才显示「当前版本已失效，请重新核验」 |
 | `clipboard:copy-text` | invoke | `isTrustedSender` + `role === 'query'` + `resolveClipboardWrite` |
 | `overlay:get-window-context` | invoke | 响应包含 `platform`；未受信 sender 返回带运行时平台、不可用快捷键状态的降级上下文 |
 | `overlay:open-search` | invoke | 若带 transform：必须 `role === 'fox'` 且 `isFoxVisualTransform` |
