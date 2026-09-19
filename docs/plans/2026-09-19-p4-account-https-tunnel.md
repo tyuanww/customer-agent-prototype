@@ -6,7 +6,7 @@
 ## 拍板
 
 1. 飞书走 `https://agent-auth.jianghua.site` → `127.0.0.1:43100`（已有）。
-2. 账号 POST `/password` 走 **另一个** 公网主机，例如 `https://agent-id.jianghua.site` → `127.0.0.1:43101`。两个 origin 必须不同。
+2. 账号 POST `/password` 走 **另一个** 公网主机，例如 `https://agent-pass.jianghua.site` → `127.0.0.1:43101`。两个 origin 必须不同。不要覆盖别的隧道已占用的主机名。
 3. 口令服务仍只接受 loopback 套接字。cloudflared 在本机连过来时 `remoteAddress` 是 `127.0.0.1`；`Host` 可以是公网名。
 4. API 侧 `/exchange` 仍打本机 `http://127.0.0.1:43101`，不经公网。
 5. 登录口令 POST 与 callback GET 的超时按隧道放宽到 15s。不阻塞、不重试。

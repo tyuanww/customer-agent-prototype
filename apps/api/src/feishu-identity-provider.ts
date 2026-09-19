@@ -5,7 +5,8 @@ export const FEISHU_AUTHORIZE_URL = 'https://accounts.feishu.cn/open-apis/authen
 export const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/authen/v2/oauth/token';
 export const FEISHU_USER_INFO_URL = 'https://open.feishu.cn/open-apis/authen/v1/user_info';
 const OPEN_ID_PATTERN = /^ou_[A-Za-z0-9]{6,64}$/;
-const MAX_BODY_BYTES = 4096;
+/** Feishu user_access_token JSON is often 1–2KB and can grow with scope; 4KB truncates a real receipt. */
+const MAX_BODY_BYTES = 32_768;
 
 export type FeishuIdentityProviderConfig = Readonly<{
   clientId: string;

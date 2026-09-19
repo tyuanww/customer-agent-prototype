@@ -14,7 +14,7 @@
 {
   "mode": "product-remote",
   "apiOrigin": "https://agent-auth.jianghua.site",
-  "identityOrigin": "https://agent-id.jianghua.site"
+  "identityOrigin": "https://agent-pass.jianghua.site"
 }
 ```
 
