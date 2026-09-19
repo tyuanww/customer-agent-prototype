@@ -32,6 +32,14 @@ All notable changes to this customer-agent product implementation repository are
 - On Windows, collapsing Query yields the previous app by hiding the idle fox for one frame, then `showInactive`. It does not call `app.hide()` or `app.focus({ steal: true })`. Not a Windows device pass. See `docs/plans/2026-09-19-windows-yield-focus.md`.
 - M5 lists `product-remote` as a separate re-verify table, all **未观察**. `synthetic-offline` cannot tick login / search / copy. See `docs/how-to-verify-macos-m5.md` §7.1.
 - Packaged and unpackaged desktop can use a `product-remote` HTTPS origin (no IP, no public HTTP, no userinfo). The API still binds `127.0.0.1`. Session files are keyed by API origin. See `docs/how-to-p4-remote-mac.md`.
+- The synthetic stack writes `synthetic-stack.json` to the Electron userData directory on Windows and Linux, not only macOS Application Support. See `docs/plans/2026-09-19-p10-desktop-userdata-path.md`.
+- How-tos for stack start and product-remote packaged profile include the Windows `%APPDATA%` userData path. See `docs/plans/2026-09-19-p10-userdata-docs.md`.
+- How-tos also name the Linux `~/.config` userData path. See `docs/plans/2026-09-19-p10-linux-userdata-docs.md`.
+- macOS M5 notes Windows/Linux userData paths without treating them as a pass. See `docs/plans/2026-09-19-p10-m5-userdata-note.md`.
+- Local unpushed branches have a merge-order note: keep the origin-keyed P7 stack, drop the earlier retrieval-delivery line. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- Office-machine product-remote checklist exists and stays **未观察** until a new UNSIGNED build after P4/P7 lands. See `docs/how-to-office-machine-product-remote.md`.
+- macOS packaged product-remote checklist exists and stays **未观察**. See `docs/how-to-macos-packaged-product-remote.md`.
+- Linux packaged product-remote checklist exists, stays **未观察**, and states there is no `package:linux` counterpart. See `docs/how-to-linux-packaged-product-remote.md`.
 
 ## [0.3.3] - 2026-09-18
 

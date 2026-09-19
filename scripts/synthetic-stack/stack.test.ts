@@ -97,8 +97,14 @@ describe('stack profile', () => {
     // The packaged file path is fixed by Electron's userData directory; assert
     // the location and the exact shape without disturbing a real installation.
     assert.match(path.basename(DESKTOP_PACKAGED_PROFILE_PATH), /^synthetic-stack\.json$/u);
-    assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('Library/Application Support'));
     assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('客服话术浮窗 Demo'));
+    if (process.platform === 'darwin') {
+      assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('Library/Application Support'));
+    } else if (process.platform === 'win32') {
+      assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('AppData'));
+    } else {
+      assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('.config'));
+    }
     const source = readFileSync(new URL('./profile.ts', import.meta.url), 'utf8');
     const start = source.indexOf('export function writeDesktopPackagedProfile');
     assert.notEqual(start, -1);

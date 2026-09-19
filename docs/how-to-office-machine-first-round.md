@@ -4,6 +4,8 @@
 
 首轮只验：安装 / 启动 / 狐狸头 / 快捷键 / 卸载。不断网以外的产品主链（登录、查询 Top 3、复制、STALE、SOP）都不在本轮。
 
+若本机合成栈要给打包客户端写配置，路径必须是 Electron userData：Windows `%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`，不是 macOS 的 `Library/Application Support`。
+
 安装包**不含** PostgreSQL、API、worker。办公机不要另装数据库来「补主链」。产品主链走远端配置（P4），检索由登录交付（P7）；包内后端（P10）本轮不做。
 
 安装包**禁止外发**、未签名，文件名带 `UNSIGNED`。不要写成已签名或可给客户。
@@ -40,6 +42,7 @@
 - SOP / 内容草稿 / 话术不准 / P0
 - Authenticode、Gatekeeper、企业分发
 - M5 设备清单
+- [办公机产品主链（远端）](how-to-office-machine-product-remote.md)（须新包，本页不得代填）
 
 ## 签署（办公机填写）
 

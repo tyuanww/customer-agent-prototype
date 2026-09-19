@@ -168,7 +168,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 `pnpm package:mac:local` 只证明构建图。要用 UNSIGNED `.app` 跑合成查询链：
 
-1. `node scripts/synthetic-stack/stack.ts start`（写入 `~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`，只含 `mode` 与两个精确 loopback origin，无 token）
+1. `node scripts/synthetic-stack/stack.ts start`（写入 Electron userData 下的 `synthetic-stack.json`：macOS `~/Library/Application Support/客服话术浮窗 Demo/`，Windows `%APPDATA%\客服话术浮窗 Demo\`，Linux `~/.config/客服话术浮窗 Demo/`。只含 `mode` 与两个精确 loopback origin，无 token）
 2. 需要单独刷新或打印路径：`node scripts/synthetic-stack/stack.ts packaged-profile`（stdout 只有路径，不含开发态环境变量）
 3. 打开 `release/local-unsigned/mac-universal/客服话术浮窗 Demo.app`，或安装同一目录下的 UNSIGNED DMG/ZIP
 
@@ -317,7 +317,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 打包态显式离线（P3 第一刀）
 
-缺 `synthetic-stack.json` 且包内没有精确 `synthetic-offline.json` 时仍是 fail-closed `missing`，**不会**变成 S0。当前安装包把 `resources/synthetic-offline.json` 打进 extraResources；userData 还没有 profile 时才拷成 `{ "mode": "synthetic-offline" }`。已有 `synthetic-local` 不覆盖。macOS userData：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`。Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`。
+缺 `synthetic-stack.json` 且包内没有精确 `synthetic-offline.json` 时仍是 fail-closed `missing`，**不会**变成 S0。当前安装包把 `resources/synthetic-offline.json` 打进 extraResources；userData 还没有 profile 时才拷成 `{ "mode": "synthetic-offline" }`。已有 `synthetic-local` 不覆盖。macOS userData：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`。Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`。Linux：`~/.config/客服话术浮窗 Demo/synthetic-stack.json`。
 
 办公机首轮勾选（未在本仓代填实机结果）：安装 → 启动出现狐狸头 → 快捷键唤起查询 → 卸载。卸载可能留下 userData，需手工删除上述目录。本勾选不是 M5 验收。
 

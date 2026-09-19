@@ -174,6 +174,8 @@ STALE 要看的是：**已经拿到的那条旧候选** 在回退后不得再被
 | 启动 | 栈已 `start` 的前提下，未签名 `.app` 能走第 2～4 节主链 | Gatekeeper 对外部下载放行、可发给别人 |
 | 环境变量 | 打包态即使误设 `CUSTOMER_AGENT_DESKTOP_*` 也必须忽略 | 用开发态 env 冒充打包路径已验 |
 
+Windows / Linux 打包客户端读 `%APPDATA%` / `~/.config` 下同名 `synthetic-stack.json`。本表只验 macOS UNSIGNED `.app`，不把那些路径记成本节通过。
+
 `codesign --verify` 对本机 UNSIGNED 包预期失败，只能证明未签名，不能证明 M5 通过。
 
 勾选：

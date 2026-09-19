@@ -140,19 +140,34 @@ export type StackProfile = Readonly<{
 }>;
 
 /**
- * Where the packaged desktop client looks for its synthetic profile. Electron's
- * `app.getPath('userData')` on macOS is `~/Library/Application Support/<name>`,
- * and the name is fixed by `app.setName` in the main process. The stack writes
- * the file; the client re-validates every field before using it and fail-closes
- * if the file is missing or not an exact pair of loopback origins.
+ * Where the packaged desktop client looks for its synthetic profile. Must match
+ * Electron `app.getPath('userData')` after `app.setName`:
+ * macOS `~/Library/Application Support/<name>`, Windows `%APPDATA%/<name>`,
+ * Linux `~/.config/<name>`. The stack writes the file; the client re-validates
+ * every field before using it and fail-closes if the file is missing or not a
+ * valid profile.
  *
  * `CUSTOMER_AGENT_DESKTOP_USERDATA` overrides the location for tests and for a
  * client launched with `--user-data-dir`.
  */
+export const DESKTOP_APP_NAME = '客服话术浮窗 Demo';
+
+export function defaultDesktopUserDataDirectory(): string {
+  if (process.env.CUSTOMER_AGENT_DESKTOP_USERDATA) {
+    return path.resolve(process.env.CUSTOMER_AGENT_DESKTOP_USERDATA);
+  }
+  if (process.platform === 'win32') {
+    const roaming = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    return path.join(roaming, DESKTOP_APP_NAME);
+  }
+  if (process.platform === 'linux') {
+    return path.join(os.homedir(), '.config', DESKTOP_APP_NAME);
+  }
+  return path.join(os.homedir(), 'Library', 'Application Support', DESKTOP_APP_NAME);
+}
+
 export const DESKTOP_PACKAGED_PROFILE_PATH = path.join(
-  process.env.CUSTOMER_AGENT_DESKTOP_USERDATA
-    ? path.resolve(process.env.CUSTOMER_AGENT_DESKTOP_USERDATA)
-    : path.join(os.homedir(), 'Library', 'Application Support', '客服话术浮窗 Demo'),
+  defaultDesktopUserDataDirectory(),
   'synthetic-stack.json',
 );
 

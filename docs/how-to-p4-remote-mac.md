@@ -45,7 +45,15 @@ cloudflared tunnel route dns customer-agent-local agent-id.jianghua.site
 }
 ```
 
+放到 Electron userData（与打包客户端读取路径相同）：
+
+- macOS：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`
+- Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`
+- Linux：`~/.config/客服话术浮窗 Demo/synthetic-stack.json`
+
 `synthetic-local` 仍只接受 loopback。会话文件按 API origin 分开，不会把本机 token 发到远端。
+
+打包态远端主链勾选（全部未观察，须新包）：[macOS](how-to-macos-packaged-product-remote.md) · [办公机 Windows](how-to-office-machine-product-remote.md) · [Linux](how-to-linux-packaged-product-remote.md)（无对等打包脚本）。
 
 ## TLS
 
