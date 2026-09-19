@@ -43,12 +43,17 @@ export function WordingLibraryModule() {
     let live = true;
     const api = window.dashboardWording;
     if (!api) return undefined;
-    void api.list().then((result) => {
-      if (!live || !result.ok) return;
-      setCatalog(result);
-    });
+    const load = () => {
+      void api.list().then((result) => {
+        if (!live || !result.ok) return;
+        setCatalog(result);
+      });
+    };
+    load();
+    window.addEventListener('focus', load);
     return () => {
       live = false;
+      window.removeEventListener('focus', load);
     };
   }, []);
 
@@ -95,26 +100,26 @@ export function WordingLibraryModule() {
   };
 
   const readinessLabel = !live
-    ? '本机话术库未挂载'
+    ? '当前发布未挂载'
     : domainCount > 0
-      ? '本机已挂载'
-      : '本机无此域';
+      ? '当前发布已挂载'
+      : '当前发布无此域';
   const sourceSummary = !live
     ? '工作台只读通道未接通。VOC / 工单仍是架构模拟。'
     : domainCount > 0
-      ? `${domainCount} 条 · 与查询胶囊同一份本机目录`
-      : '当前域在本机目录中没有条目。';
+      ? `${domainCount} 条 · 与查询胶囊同一份当前发布`
+      : '当前域在当前发布中没有条目。';
 
   return (
     <div className="dash-module" data-testid="module-wording">
       <header className="dash-module-head">
         <div>
           <h1>{data.title}</h1>
-          <p className="dash-kicker">本机话术库只读 · 与查询胶囊同一份目录</p>
+          <p className="dash-kicker">当前发布只读 · 与查询胶囊同一份目录</p>
         </div>
       </header>
       <p className="dash-scope dash-scope-important">
-        只读浏览本机话术库。不复制、不编辑、不发布、不发送。VOC / 工单仍是架构模拟。
+        只读浏览当前发布话术。不复制、不编辑、不发布、不发送。VOC / 工单仍是架构模拟。
       </p>
 
       <div className="wording-domain-tabs" role="tablist" aria-label="话术域">
@@ -146,7 +151,7 @@ export function WordingLibraryModule() {
       >
         <div className="source-readiness" data-testid="wording-source-readiness">
           <div>
-            <span className="dash-card-label">本机目录</span>
+            <span className="dash-card-label">当前发布</span>
             <strong>{source.label}</strong>
           </div>
           <StatusBadge

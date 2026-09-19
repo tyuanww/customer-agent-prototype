@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe('dashboard wording catalog', () => {
-  it('prefers the larger local index over a small hydrate snapshot', () => {
+  it('prefers the hydrate snapshot over a larger local index', () => {
     const root = mkdtempSync(join(tmpdir(), 'dash-wording-'));
     const hydrate = join(root, 'retrieval-hydrate.json');
     const index = join(root, 'retrieval-index.json');
@@ -55,12 +55,13 @@ describe('dashboard wording catalog', () => {
     process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydrate;
     process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = index;
     const result = listDashboardWording();
-    expect(result.total).toBe(2);
+    expect(result.total).toBe(1);
     expect(result.releaseId).toBe('rel_seed');
-    expect(result.entries.map((entry) => entry.scriptId)).toEqual(['mn-1', 'mn-2']);
+    expect(result.entries.map((entry) => entry.scriptId)).toEqual(['seed-1']);
     expect(result.entries[0]).toMatchObject({
-      domain: 'product',
+      domain: 'presale',
       lifecycle: 'published',
+      ownerRole: '当前发布',
       dataClass: 'local-catalog',
     });
   });

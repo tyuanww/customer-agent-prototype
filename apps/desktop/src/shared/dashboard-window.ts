@@ -172,7 +172,7 @@ export function resolveDashboardNativeChrome(platform: string): {
 export const DASHBOARD_ENV_BADGES = ['演示数据'] as const;
 
 export const DASHBOARD_STRUCTURE_DISCLAIMER =
-  '无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读本机目录';
+  '无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读当前发布';
 export const DASHBOARD_ARCHITECTURE_MARK = '架构模拟 / MOCK / NOT CONNECTED';
 export const DASHBOARD_REFRESHED_AT = '2026-08-13 18:40:00 CST';
 export const DASHBOARD_REFRESH_LABEL = `数据更新至：${DASHBOARD_REFRESHED_AT} · 固定快照`;

@@ -122,7 +122,7 @@ describe('DashboardApp', () => {
     expect(envBadges).toHaveTextContent('演示数据');
     expect(screen.getByTestId('dashboard-disclaimer')).toHaveTextContent('无后端 · 不保存');
     expect(screen.getByTestId('dashboard-boundary-disclaimer')).toHaveTextContent(
-      'VOC 明细为合成镜像 · 话术库读本机目录',
+      'VOC 明细为合成镜像 · 话术库读当前发布',
     );
     expect(screen.getByTestId('dashboard-refresh')).toHaveTextContent('固定快照');
 
@@ -133,7 +133,7 @@ describe('DashboardApp', () => {
     expect(boundary).toHaveTextContent('SYNTHETIC DATA');
     expect(boundary).toHaveTextContent('NO BACKEND');
     expect(boundary).toHaveTextContent('不保存');
-    expect(boundary).toHaveTextContent('VOC 明细为合成镜像 · 话术库读本机目录');
+    expect(boundary).toHaveTextContent('VOC 明细为合成镜像 · 话术库读当前发布');
 
     await user.click(screen.getByText('查看 Demo 技术指标与数据边界'));
     expect(screen.getByTestId('adopted-disclaimer')).toBeVisible();
@@ -1403,7 +1403,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('wording-list')).toHaveTextContent('满赠规则');
 
     await user.click(screen.getByTestId('wording-domain-presale'));
-    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机无此域');
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('当前发布无此域');
     expect(screen.getByTestId('wording-source-readiness')).not.toHaveTextContent('NOT_CREATED');
     expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配的话术');
   });
