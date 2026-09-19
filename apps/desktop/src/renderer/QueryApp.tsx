@@ -824,6 +824,14 @@ export function QueryApp() {
         reportPhase('SEARCH_INPUT');
         return;
       }
+      if (value.reason !== 'expired') {
+        setAnnounceInvalid(false);
+        if (!searchInFlightRef.current) {
+          setErrorMessage('');
+          reportPhase('SEARCH_INPUT');
+        }
+        return;
+      }
       if (!showingQueryContent) {
         setAnnounceInvalid(true);
         setErrorMessage('');
