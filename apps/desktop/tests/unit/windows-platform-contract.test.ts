@@ -85,6 +85,8 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(mergeOrder).toContain('feat/p10-linux-xdg-userdata');
     expect(mergeOrder).toContain('4f12bfc');
     expect(mergeOrder).toContain('feat/merge-order-p7-linux-tips');
+    expect(mergeOrder).toContain('已合入');
+    expect(mergeOrder).toContain('58dfac4');
     const remoteOffice = readFileSync(
       path.join(repositoryRoot, 'docs/how-to-office-machine-product-remote.md'),
       'utf8',

@@ -23,10 +23,12 @@
 
    | 文件 | 作用 |
    | --- | --- |
-   | `~/.customer-agent-synthetic-stack/retrieval-index.json` | BM25 索引；`questions[]` 由 `pnpm retrieval:questions` 写入 |
-   | `~/.customer-agent-synthetic-stack/retrieval-embeddings.json` | 正文向量；由 `pnpm retrieval:embeddings` 写入 |
-   | `~/.customer-agent-synthetic-stack/retrieval-hydrate.json` | 原文快照；登录后按当前发布自动对齐。更小的种子 snapshot 不会盖掉更大的已有文件 |
+   | `~/.customer-agent-synthetic-stack/retrieval-index.<origin>.json` | BM25 索引；`questions[]` 由 `pnpm retrieval:questions` 写入。`<origin>` 是 API origin 的 sha256 前 16 位十六进制 |
+   | `~/.customer-agent-synthetic-stack/retrieval-embeddings.<origin>.json` | 正文向量；由 `pnpm retrieval:embeddings` 写入 |
+   | `~/.customer-agent-synthetic-stack/retrieval-hydrate.<origin>.json` | 原文快照；登录后按当前发布自动对齐。更小的种子 snapshot 不会盖掉更大的已有文件 |
    | `~/.customer-agent-synthetic-stack/minimax.env` | MiniMax key，权限 600 |
+
+   未设 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 时仍可用未带后缀的 leftover 文件。产品模式会设 origin，只读带后缀路径。
 
    若索引里还没有 `questions[]`，先入库顾客问法（只改仓外文件，不 `stack start`，不提交）：
 
@@ -63,7 +65,7 @@
    set -a && . "$HOME/.customer-agent-synthetic-stack/minimax.env" && set +a
    ```
 
-   仓外 hydrate / BM25 文件若已在默认路径，开发态会自动挂上，不必再 export `CUSTOMER_AGENT_RETRIEVAL_INDEX` / `CUSTOMER_AGENT_HYDRATE_INDEX`。需要覆盖时再 export。
+   仓外 hydrate / BM25 文件若已在默认路径（有 origin 时是带后缀文件），开发态会自动挂上，不必再 export `CUSTOMER_AGENT_RETRIEVAL_INDEX` / `CUSTOMER_AGENT_HYDRATE_INDEX`。需要覆盖时再 export。
 
 4. 点胶囊「登录」。成功后按钮变成 `{角色} · 退出`，占位变成「输入或粘贴客户问题，回车查询」，不是红校验。
 
@@ -82,6 +84,6 @@
 | 现象 | 处理 |
 | --- | --- |
 | 「内容已变化，请重新查询」 | `content_current` 与 hydrate `releaseId` 不一致。再点胶囊「登录」回写 hydrate；不要 `stack start` |
-| 查询很慢或 400 | 旧路径会打 leftover `/v1/search`。有 hydrate 时本分支不再走这条路；确认 `CUSTOMER_AGENT_HYDRATE_INDEX` 已导出 |
+| 查询很慢或 400 | 旧路径会打 leftover `/v1/search`。有 hydrate 时不再走这条路。产品模式确认带后缀 hydrate 文件存在；显式覆盖时才 export `CUSTOMER_AGENT_HYDRATE_INDEX` |
 | MiniMax 证书错误 | main 必须用 Electron `net.fetch`，不要让 Node 的 `fetch` 直连 |
 | `stack start` 已经跑过 | 种子发布可能已覆盖 `rel_6`。按冻结点把 `rel_7` superseded、`rel_6` published，再点胶囊「登录」回写 hydrate。检索会优先更大的仓外索引，不会用 11 条种子盖掉已有大库 |

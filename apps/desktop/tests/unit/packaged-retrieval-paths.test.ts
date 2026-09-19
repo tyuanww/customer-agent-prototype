@@ -267,5 +267,17 @@ describe('packaged retrieval defaults', () => {
     expect(search).toContain("productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json')");
     expect(search).toContain("productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json')");
     expect(search).not.toMatch(/function loadIndexScripts\(\)[\s\S]{0,80}CUSTOMER_AGENT_RETRIEVAL_INDEX \?\? ''/);
+    const howto = readFileSync(
+      path.join(desktopRoot, '../../docs/how-to-run-macos-semantic-query.md'),
+      'utf8',
+    );
+    expect(howto).toContain('retrieval-index.<origin>.json');
+    expect(howto).toContain('retrieval-hydrate.<origin>.json');
+    expect(howto).toContain('只读带后缀路径');
+    const explanation = readFileSync(
+      path.join(desktopRoot, '../../docs/explanation-desktop-retrieval.md'),
+      'utf8',
+    );
+    expect(explanation).toContain('retrieval-*.<origin>.json');
   });
 });

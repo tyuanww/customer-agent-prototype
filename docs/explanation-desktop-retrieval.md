@@ -19,7 +19,7 @@ Query renderer ──IPC──► ProductSearch
 
 ## Trade-offs
 
-- 索引、原文快照和正文向量在仓外，git 里没有 MENOKIN 正文。换发布后点胶囊「登录」会把 hydrate 的 `releaseId` 对齐到当前公告（更小的种子 snapshot 不覆盖更大已有文件）；向量仍要 `pnpm retrieval:embeddings` 重算。
+- 索引、原文快照和正文向量在仓外，git 里没有 MENOKIN 正文。产品模式按 API origin 哈希分文件（`retrieval-*.<origin>.json`）；未设 origin 时才用未带后缀 leftover。换发布后点胶囊「登录」会把 hydrate 的 `releaseId` 对齐到当前公告（更小的种子 snapshot 不覆盖更大已有文件）；向量仍要 `pnpm retrieval:embeddings` 重算。
 - 第二路默认是仓外 `embo-01` 向量（`pnpm retrieval:embeddings`）；缺文件、hash 对不上或查询向量失败则退回 BM25(正文)。仓外 `questions[]` 仍由 `pnpm retrieval:questions` 写入。
 - 没有 hydrate 的 profile 仍会打 leftover HTTP，这是 D2 测试合同，不是演示主链。
 
