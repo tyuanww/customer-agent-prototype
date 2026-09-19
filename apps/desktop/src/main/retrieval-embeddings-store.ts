@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   answerContentHash,
   matchingDenseRows,
@@ -14,11 +14,16 @@ import {
   type DenseVectorRow,
 } from '../shared/dense-retrieve.ts';
 import type { RetrievalScript } from '../shared/hybrid-retrieve.ts';
-import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
+import { assertOffRepoIndexPath, type RetrievalSnapshotItem } from './retrieval-index-store.ts';
 import { EMBED_BATCH, minimaxEmbed, type EmbedKind } from './minimax-embed.ts';
-import type { MinimaxChatOptions } from './minimax-chat.ts';
+import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat.ts';
+import {
+  DEFAULT_EMBEDDING_INDEX_PATH,
+  productStackReadPath,
+  runtimeStackReadPath,
+} from './packaged-retrieval-paths.ts';
 
-export const DEFAULT_EMBED_PATH = join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-embeddings.json');
+export const DEFAULT_EMBED_PATH = DEFAULT_EMBEDDING_INDEX_PATH;
 
 export type DenseQueryRanker = Readonly<{
   rank(query: string, scripts: readonly RetrievalScript[], signal?: AbortSignal): Promise<readonly DenseRank[] | null>;
@@ -42,7 +47,9 @@ function writeAtomic(path: string, body: string): void {
   renameSync(tempPath, path);
 }
 
-export function loadDenseCatalog(path = process.env.CUSTOMER_AGENT_EMBEDDING_INDEX ?? DEFAULT_EMBED_PATH): DenseCatalog | null {
+export function loadDenseCatalog(
+  path = runtimeStackReadPath('CUSTOMER_AGENT_EMBEDDING_INDEX', 'retrieval-embeddings.json'),
+): DenseCatalog | null {
   if (!path || path.trim().length === 0 || !existsSync(path)) return null;
   try {
     return parseDenseCatalog(readFileSync(path, 'utf8'));
@@ -67,6 +74,79 @@ export function createDenseQueryRanker(
       return ranks.length > 0 ? ranks : null;
     },
   });
+}
+
+function desktopRepoRoot(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+}
+
+/** Re-reads the off-repo catalog so a background embed is visible on the next query. */
+export function liveDenseQueryRanker(options: MinimaxChatOptions = {}): DenseQueryRanker {
+  return Object.freeze({
+    async rank(query, scripts, signal) {
+      const path = (process.env.CUSTOMER_AGENT_EMBEDDING_INDEX ?? '').trim()
+        || productStackReadPath('CUSTOMER_AGENT_EMBEDDING_INDEX', 'retrieval-embeddings.json');
+      if (path.length === 0) return null;
+      const ranker = createDenseQueryRanker(loadDenseCatalog(path), options);
+      if (!ranker) return null;
+      return ranker.rank(query, scripts, signal);
+    },
+  });
+}
+
+function scriptsFromSnapshot(items: readonly RetrievalSnapshotItem[]): RetrievalScript[] {
+  const scripts: RetrievalScript[] = [];
+  for (const item of items) {
+    if (typeof item.script_id !== 'string' || item.script_id.length < 1) continue;
+    if (typeof item.title !== 'string' || item.title.trim().length < 1) continue;
+    if (typeof item.answer_text !== 'string' || item.answer_text.trim().length < 1) continue;
+    const questionText = typeof item.questions?.[0]?.question_text === 'string'
+      ? item.questions[0].question_text.trim()
+      : '';
+    scripts.push(Object.freeze({
+      scriptId: item.script_id,
+      title: item.title.trim(),
+      questionText,
+      answerText: item.answer_text,
+      ...(typeof item.category === 'string' && item.category.trim().length > 0
+        ? { category: item.category.trim() }
+        : {}),
+    }));
+  }
+  return scripts;
+}
+
+/**
+ * Embed snapshot answers whose content hash is missing or stale. Login must
+ * not await this; MiniMax failure keeps the BM25 answer lane.
+ */
+export async function deliverRetrievalEmbeddingsFromEnv(
+  items: readonly RetrievalSnapshotItem[],
+  options: Readonly<{
+    embed?: (texts: readonly string[], kind: EmbedKind) => Promise<readonly (readonly number[])[] | null>;
+    repoRoot?: string;
+  }> = {},
+): Promise<EmbedCatalogResult | null> {
+  if (!options.embed && !minimaxConfigured()) return null;
+  const catalogPath = (process.env.CUSTOMER_AGENT_EMBEDDING_INDEX ?? '').trim()
+    || productStackReadPath('CUSTOMER_AGENT_EMBEDDING_INDEX', 'retrieval-embeddings.json')
+    || DEFAULT_EMBED_PATH;
+  const scripts = scriptsFromSnapshot(items);
+  if (scripts.length === 0) return null;
+  try {
+    return await embedRetrievalIndex({
+      indexScripts: scripts,
+      catalogPath,
+      repoRoot: options.repoRoot ?? desktopRepoRoot(),
+      ...(options.embed ? { embed: options.embed } : {}),
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function scheduleRetrievalEmbeddingsFromEnv(items: readonly RetrievalSnapshotItem[]): void {
+  void deliverRetrievalEmbeddingsFromEnv(items);
 }
 
 export async function embedRetrievalIndex(options: Readonly<{

@@ -373,6 +373,27 @@ describe('product query and native copy provenance', () => {
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
     }
   });
+  it('does not call leftover HTTP when a desktop API origin is set', async () => {
+    const previousOrigin = process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
+    const previousHydrate = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    const f = await fixture();
+    delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN = 'https://agent-auth.jianghua.site';
+    try {
+      const search = new ProductSearch(
+        f.session, f.write, f.announce, f.help, { rank: () => [] }, null,
+      );
+      const before = f.transport.mock.calls.length;
+      expect(await search.search(1, { ...f.request, generation: 2 })).toMatchObject({ code: 'UNAVAILABLE' });
+      expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+      await f.session.logout();
+    } finally {
+      if (previousOrigin === undefined) delete process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
+      else process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN = previousOrigin;
+      if (previousHydrate === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+      else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previousHydrate;
+    }
+  });
   it('reloads live hydrate from disk when announce starts allowing a new release', async () => {
     const previous = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
     const hydratePath = join(mkdtempSync(join(tmpdir(), 'hydrate-live-')), 'retrieval-hydrate.json');

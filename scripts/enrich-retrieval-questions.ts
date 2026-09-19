@@ -11,15 +11,14 @@
  * never answer text. Does not commit, pack, or start the synthetic stack.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMinimaxQuestionGenerator } from '../apps/desktop/src/main/doc2query-generate.ts';
 import { enrichRetrievalIndex } from '../apps/desktop/src/main/retrieval-index-store.ts';
+import { defaultStackWritePath, defaultSyntheticStackFile } from '../apps/desktop/src/main/packaged-retrieval-paths.ts';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const defaultIndex = join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-index.json');
-const defaultEnv = join(homedir(), '.customer-agent-synthetic-stack', 'minimax.env');
+const defaultEnv = defaultSyntheticStackFile('minimax.env');
 
 function argValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -52,7 +51,9 @@ if (limitRaw !== undefined && (!Number.isInteger(limit) || (limit ?? 0) < 1)) {
   process.exitCode = 1;
 } else {
   loadEnvFile(process.env.MINIMAX_ENV_FILE?.trim() || defaultEnv);
-  const indexPath = argValue('--index') || process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX?.trim() || defaultIndex;
+  const indexPath = argValue('--index')
+    || process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX?.trim()
+    || defaultStackWritePath('retrieval-index.json');
   const result = await enrichRetrievalIndex({
     indexPath,
     repoRoot,

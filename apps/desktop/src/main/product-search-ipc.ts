@@ -1,6 +1,4 @@
 import { ipcMain, type WebContents } from 'electron';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import { exactKeys } from '../shared/product-session';
 import { isQueryIdentity, isProductCopyRequest, isProductSearchRequest, queryFailure } from '../shared/product-search';
@@ -14,13 +12,13 @@ import { isProductEscalateRequest, isProductTerminalRequest } from '../shared/pr
 import { loadRetrievalPreferenceStore } from './retrieval-preference-store';
 import { loadRetrievalPipeline } from './retrieval-pipeline';
 import { writeSystemClipboard } from './system-clipboard.ts';
-
-const preferenceStore = loadRetrievalPreferenceStore(
-  process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE
-    ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-preference.json'),
-);
+import { DEFAULT_RETRIEVAL_PREFERENCE_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 
 export function registerProductSearchIpc(session: ProductSession | null, announce: AnnounceGate | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined, help?: SearchHelp) {
+  const preferenceStore = loadRetrievalPreferenceStore(
+    productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_PREFERENCE', 'retrieval-preference.json')
+      || DEFAULT_RETRIEVAL_PREFERENCE_PATH,
+  );
   const search = session && announce
     ? new ProductSearch(session, writeSystemClipboard, announce, help, undefined, undefined, undefined, loadRetrievalPipeline(), preferenceStore)
     : null;

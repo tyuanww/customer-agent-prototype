@@ -46,7 +46,7 @@
 
    向量绑定 `sha256(answerText)`，不进 git。切发布后要重算。
 
-   hydrate 在点胶囊「登录」后自动对齐当前发布。只想检查文件、或从 snapshot JSON 手工写入：
+   hydrate 在点胶囊「登录」后自动对齐当前发布。只想检查文件、或从 snapshot JSON 手工写入。设了 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 时，CLI 默认写带 origin 后缀的文件：
 
    ```bash
    pnpm retrieval:hydrate -- --dry-run

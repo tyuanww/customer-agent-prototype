@@ -10,7 +10,7 @@
 
 有 hydrate 快照时，不再把问句或命中标题转发给 leftover `/v1/search`。没有 hydrate 时，仍走 D1–D5 的合成 HTTP 搜索（测试与未接索引的 profile）。
 
-本机交付：索引与 hydrate **不进 git、不打进安装包**。默认在 `~/.customer-agent-synthetic-stack/`。`packaged-retrieval-paths.ts` 只在文件已存在时挂路径。新机器要拷仓外文件或再跑 `retrieval:*` 并点「登录」。`synthetic-offline` 没有这条主链。P4 第一刀只让桌面连 HTTPS API，**不**把检索索引拉到远端。检索远端交付仍是 P7。详见 [Mac 开发机剩余项收口](plans/2026-09-18-mac-dev-remainder.md)、[P4](plans/2026-09-19-p4-remote-https-profile.md)。
+本机交付：索引、hydrate、正文向量与智能检索开关 **不进 git、不打进安装包**。默认在 `~/.customer-agent-synthetic-stack/`。产品模式、检索 CLI、管理台、查询运行时都按 API origin 哈希分文件。未带后缀的旧文件会拷进带后缀路径，之后只写带后缀文件。`synthetic-offline` 没有这条主链。详见 [P7 origin 隔离](plans/2026-09-19-p7-origin-keyed-retrieval.md)。
 
 工程锚点（自动化，不是 M5、不是真实 SKU）：产品 PR [#80](https://github.com/weiweity/customer-agent-prototype/pull/80) `questions[]`、[#81](https://github.com/weiweity/customer-agent-prototype/pull/81) 正文向量、[#82](https://github.com/weiweity/customer-agent-prototype/pull/82) hydrate 对齐、[#83](https://github.com/weiweity/customer-agent-prototype/pull/83) `query-route` / 非激活 palette。真实 MENOKIN SKU 替换澄芽/雾屿仍未获批；若获批仓外受控输入，必须重跑 `pnpm retrieval:questions`、`pnpm retrieval:embeddings`，并点胶囊「登录」或 `pnpm retrieval:hydrate`。不把真实客户原文写入 git。
 
@@ -40,7 +40,7 @@
 | `pnpm retrieval:embeddings` | `scripts/embed-retrieval-index.ts` | 把正文编成仓外向量（MiniMax `type=db`）。查询时 `type=query`。hash 对不上或查询失败则退回 BM25 正文 |
 | `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型。登录分页公告 snapshot 后自动对齐；空 snapshot 和更小的种子 snapshot 不覆盖。开发态文件存在则自动挂路径 |
 | `pnpm retrieval:hydrate` | `scripts/sync-retrieval-hydrate.ts` | 手工把 snapshot JSON 写入仓外 hydrate。`--dry-run` 不写。拒绝写进 git 工作树 |
-| `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` | main `loadRetrievalTelemetryStore` | 仓外 JSON。缺省写在 hydrate 同目录 `retrieval-telemetry.json`。只记 queryId / 命中 / 曝光 scriptId / 是否复制，**不记问句原文** |
+| `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` | main `loadRetrievalTelemetryStore` | 仓外 JSON。产品模式按 API origin 写成 `retrieval-telemetry.<id>.json`。只记 queryId / 命中 / 曝光 scriptId / 是否复制，**不记问句原文** |
 | `pnpm retrieval:never-hit` | `scripts/report-retrieval-never-hit.ts` | 对照 hydrate 目录，列出从未曝光、曝光未复制，以及 no_hit 率。不打 leftover `/v1/search` |
 | `CUSTOMER_AGENT_RETRIEVAL_PREFERENCE` | 偏好文件路径 | 默认 `~/.customer-agent-synthetic-stack/retrieval-preference.json` |
 | `MINIMAX_API_KEY` | main `minimax-chat.ts` | 未设置则智能检索等同 OFF |

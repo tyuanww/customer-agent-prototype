@@ -10,6 +10,7 @@ import { planQuery, type PlannedIntent } from './minimax-plan';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat';
 import { createDenseQueryRanker, loadDenseCatalog, type DenseQueryRanker } from './retrieval-embeddings-store.ts';
+import { productStackReadPath } from './packaged-retrieval-paths.ts';
 
 export type RetrievalRun = Readonly<{
   ranked: readonly RankedRetrieval[];
@@ -46,7 +47,7 @@ export function createRetrievalPipeline(
 }
 
 export function loadRetrievalPipeline(
-  indexPath = process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX,
+  indexPath = productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json') || undefined,
   options: MinimaxChatOptions & { rerank?: Reranker | null; dense?: DenseQueryRanker | null } = {},
 ): RetrievalPipeline {
   const empty: RetrievalPipeline = Object.freeze({

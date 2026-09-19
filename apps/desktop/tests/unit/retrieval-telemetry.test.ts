@@ -1,11 +1,13 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   createFileTelemetry,
+  defaultTelemetryPath,
   summarizeNeverHit,
 } from '../../src/main/retrieval-telemetry-store';
+import { defaultSyntheticStackFile, originKeyedStackFile } from '../../src/main/packaged-retrieval-paths';
 
 const hash = 'a'.repeat(64);
 
@@ -58,5 +60,23 @@ describe('retrieval never-hit ledger', () => {
   it('refuses to write inside the git worktree', () => {
     const repo = mkdtempSync(join(tmpdir(), 'telemetry-repo-'));
     expect(() => createFileTelemetry(join(repo, 'retrieval-telemetry.json'), repo)).toThrow(/outside the git worktree/);
+  });
+
+  it('keeps origin-keyed telemetry files apart from the shared leftover', () => {
+    const home = mkdtempSync(join(tmpdir(), 'telemetry-home-'));
+    const origin = 'https://agent-auth.jianghua.site';
+    const env: NodeJS.ProcessEnv = { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin };
+    expect(defaultTelemetryPath(env, home)).toBe(
+      originKeyedStackFile('retrieval-telemetry.json', origin, home),
+    );
+    mkdirSync(join(home, '.customer-agent-synthetic-stack'));
+    writeFileSync(defaultSyntheticStackFile('retrieval-telemetry.json', home), '{"version":1,"events":[]}\n');
+    expect(defaultTelemetryPath(env, home)).toBe(
+      originKeyedStackFile('retrieval-telemetry.json', origin, home),
+    );
+    expect(defaultTelemetryPath({}, home)).toBe('');
+    env.CUSTOMER_AGENT_HYDRATE_INDEX = join(home, 'retrieval-hydrate.json');
+    expect(defaultTelemetryPath({ CUSTOMER_AGENT_HYDRATE_INDEX: env.CUSTOMER_AGENT_HYDRATE_INDEX }, home))
+      .toBe(join(home, 'retrieval-telemetry.json'));
   });
 });

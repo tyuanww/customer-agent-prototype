@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
+import { runtimeStackReadPath } from './packaged-retrieval-paths.ts';
 
 export const RETRIEVAL_TELEMETRY_VERSION = 1;
 export const RETRIEVAL_TELEMETRY_MAX_EVENTS = 2000;
@@ -227,10 +228,17 @@ export function noopRetrievalTelemetry(): RetrievalTelemetry {
   });
 }
 
-export function defaultTelemetryPath(): string {
-  const explicit = (process.env.CUSTOMER_AGENT_RETRIEVAL_TELEMETRY ?? '').trim();
+export function defaultTelemetryPath(
+  env: NodeJS.ProcessEnv = process.env,
+  home?: string,
+): string {
+  const explicit = (env.CUSTOMER_AGENT_RETRIEVAL_TELEMETRY ?? '').trim();
   if (explicit.length > 0) return explicit;
-  const hydrate = (process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
+  const origin = (env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN ?? '').trim();
+  if (origin.length > 0) {
+    return runtimeStackReadPath('CUSTOMER_AGENT_RETRIEVAL_TELEMETRY', 'retrieval-telemetry.json', env, home);
+  }
+  const hydrate = (env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
   if (hydrate.length === 0) return '';
   return join(dirname(hydrate), 'retrieval-telemetry.json');
 }

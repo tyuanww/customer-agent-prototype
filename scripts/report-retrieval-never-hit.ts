@@ -8,14 +8,15 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { DEFAULT_HYDRATE_PATH } from '../apps/desktop/src/main/hydrate-catalog.ts';
+import { defaultStackWritePath } from '../apps/desktop/src/main/packaged-retrieval-paths.ts';
 import {
   defaultTelemetryPath,
   parseRetrievalTelemetry,
   summarizeNeverHit,
 } from '../apps/desktop/src/main/retrieval-telemetry-store.ts';
 
-const hydratePath = process.env.CUSTOMER_AGENT_HYDRATE_INDEX?.trim() || DEFAULT_HYDRATE_PATH;
+const hydratePath = process.env.CUSTOMER_AGENT_HYDRATE_INDEX?.trim()
+  || defaultStackWritePath('retrieval-hydrate.json');
 const telemetryPath = defaultTelemetryPath() || resolve(dirname(hydratePath), 'retrieval-telemetry.json');
 
 function hydrateRefs(): readonly { scriptId: string; title: string }[] {

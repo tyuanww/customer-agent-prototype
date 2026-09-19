@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProductCandidate } from '../shared/product-search';
 import type { RankedRetrieval, RetrievalScript } from '../shared/hybrid-retrieve';
-import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
+import { assertOffRepoIndexPath, syncRetrievalIndexFromSnapshot } from './retrieval-index-store.ts';
+import { DEFAULT_HYDRATE_INDEX_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 
 export type HydrateCatalog = Readonly<{
   releaseId: string;
@@ -14,7 +14,7 @@ export type HydrateCatalog = Readonly<{
 }>;
 
 export const HYDRATE_CATALOG_VERSION = 1;
-export const DEFAULT_HYDRATE_PATH = join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-hydrate.json');
+export const DEFAULT_HYDRATE_PATH = DEFAULT_HYDRATE_INDEX_PATH;
 
 export type HydrateSnapshotItem = Readonly<{
   script_id: string;
@@ -169,6 +169,12 @@ function parseSnapshotRow(item: object, releaseId: string): SnapshotRow | null {
 }
 
 function snapshotItemToObject(item: HydrateSnapshotItem): object {
+  const questions: string[] = [];
+  for (const question of item.questions ?? []) {
+    if (typeof question.question_text === 'string' && question.question_text.trim().length > 0) {
+      questions.push(question.question_text.trim());
+    }
+  }
   return {
     scriptId: item.script_id,
     scriptVersion: item.script_version,
@@ -187,6 +193,8 @@ function snapshotItemToObject(item: HydrateSnapshotItem): object {
     riskCategories: item.risk_categories,
     hasConflict: item.has_conflict,
     placeholderKeys: item.placeholder_keys,
+    questionText: questions[0] ?? '',
+    questions,
   };
 }
 
@@ -250,6 +258,7 @@ function serializeHydrateDocument(
       hasConflict: row.hasConflict,
       placeholderKeys: [...row.placeholderKeys],
       questionText,
+      questions: [...row.questions],
     })),
   })}\n`;
 }
@@ -339,15 +348,39 @@ export function persistHydrateFromEnv(
   releaseId: string,
   items: readonly HydrateSnapshotItem[],
 ): SyncHydrateResult | null {
-  const indexPath = (process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
-  if (indexPath.length === 0) return null;
+  const hydratePath = (process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
+  if (hydratePath.length === 0) return null;
   try {
-    return syncHydrateCatalog({
-      path: indexPath,
-      repoRoot: desktopRepoRoot(),
+    const repoRoot = desktopRepoRoot();
+    const hydrate = syncHydrateCatalog({
+      path: hydratePath,
+      repoRoot,
       releaseId,
       items,
     });
+    if (hydrate.reason === 'kept-larger' || hydrate.reason === 'empty' || hydrate.reason === 'invalid') {
+      return hydrate;
+    }
+    const retrievalPath = (process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX ?? '').trim();
+    let indexWrote = false;
+    if (retrievalPath.length > 0) {
+      try {
+        const index = syncRetrievalIndexFromSnapshot({
+          path: retrievalPath,
+          repoRoot,
+          releaseId,
+          items,
+        });
+        indexWrote = index.wrote;
+      } catch {
+        // Index persist is best-effort. Hydrate remains the copy SoR; BM25 can
+        // use hydrate.retrievalScripts() when the index file is missing.
+      }
+    }
+    if (indexWrote && hydrate.reason === 'aligned') {
+      return Object.freeze({ ...hydrate, wrote: true, skipped: false, reason: 'wrote' as const });
+    }
+    return hydrate;
   } catch {
     return null;
   }
@@ -377,7 +410,9 @@ function asCandidate(row: SnapshotRow, rank: 1 | 2 | 3): ProductCandidate {
   };
 }
 
-export function loadHydrateCatalog(indexPath = process.env.CUSTOMER_AGENT_HYDRATE_INDEX): HydrateCatalog | null {
+export function loadHydrateCatalog(
+  indexPath = productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json') || undefined,
+): HydrateCatalog | null {
   if (!indexPath || indexPath.trim().length === 0 || !existsSync(indexPath)) return null;
   try {
     const raw: unknown = JSON.parse(readFileSync(indexPath, 'utf8'));

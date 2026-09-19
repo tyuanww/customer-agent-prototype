@@ -1,10 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  DEFAULT_HYDRATE_INDEX_PATH,
-  DEFAULT_RETRIEVAL_INDEX_PATH,
-} from './packaged-retrieval-paths';
+import { runtimeStackReadPath } from './packaged-retrieval-paths';
 import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
 import type { DashboardWordingDomain, DashboardWordingEntry, DashboardWordingView } from '../shared/dashboard-wording';
@@ -48,13 +45,11 @@ function readJson(path: string): unknown {
 }
 
 function hydratePath(): string | null {
-  const fromEnv = (process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
-  return offRepoFile(fromEnv.length > 0 ? fromEnv : DEFAULT_HYDRATE_INDEX_PATH);
+  return offRepoFile(runtimeStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json'));
 }
 
 function indexPath(): string | null {
-  const fromEnv = (process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX ?? '').trim();
-  return offRepoFile(fromEnv.length > 0 ? fromEnv : DEFAULT_RETRIEVAL_INDEX_PATH);
+  return offRepoFile(runtimeStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json'));
 }
 
 function platformLabel(scope: unknown): string {

@@ -1,9 +1,10 @@
 // @vitest-environment node
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadHydrateCatalog, persistHydrateFromEnv, syncHydrateCatalog } from '../../src/main/hydrate-catalog';
+import { parseRetrievalIndex, scriptsOf } from '../../src/shared/retrieval-index';
 
 const valid = {
   releaseId: 'rel-synthetic-001',
@@ -204,12 +205,77 @@ describe('hydrate catalog auto-sync', () => {
     expect(dry).toMatchObject({ wrote: false, reason: 'dry-run', total: 1 });
     expect(loadHydrateCatalog(path)).toBeNull();
     const previous = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    const previousIndex = process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX;
     delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    delete process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX;
     try {
       expect(persistHydrateFromEnv('rel-synthetic-002', [snapshotItem])).toBeNull();
     } finally {
       if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
+      if (previousIndex === undefined) delete process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX;
+      else process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = previousIndex;
+    }
+  });
+
+  it('persistHydrateFromEnv also writes the BM25 index next to hydrate', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const hydratePath = join(outside, 'retrieval-hydrate.json');
+    const indexPath = join(outside, 'retrieval-index.json');
+    const previousHydrate = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    const previousIndex = process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX;
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydratePath;
+    process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = indexPath;
+    try {
+      const result = persistHydrateFromEnv('rel-synthetic-002', [snapshotItem]);
+      expect(result).toMatchObject({ wrote: true, reason: 'wrote', total: 1 });
+      expect(loadHydrateCatalog(hydratePath)?.releaseId).toBe('rel-synthetic-002');
+      const document = parseRetrievalIndex(readFileSync(indexPath, 'utf8'));
+      expect(document?.envelope).toMatchObject({
+        source: 'announce-snapshot',
+        releaseId: 'rel-synthetic-002',
+      });
+      expect(scriptsOf(document!)).toEqual([
+        expect.objectContaining({
+          scriptId: 'script-synthetic-001',
+          title: '合成发货',
+          questionText: '什么时候发货',
+          answerText: '合成订单 {订单号}',
+        }),
+      ]);
+    } finally {
+      if (previousHydrate === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+      else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previousHydrate;
+      if (previousIndex === undefined) delete process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX;
+      else process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = previousIndex;
+    }
+  });
+
+  it('does not write a smaller BM25 index when hydrate keeps a larger catalog', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hydrate-repo-'));
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const hydratePath = join(outside, 'retrieval-hydrate.json');
+    const indexPath = join(outside, 'retrieval-index.json');
+    const larger = [
+      snapshotItem,
+      { ...snapshotItem, script_id: 'script-synthetic-002', content_hash: 'b'.repeat(64) },
+    ];
+    syncHydrateCatalog({ path: hydratePath, repoRoot: repo, releaseId: 'rel-synthetic-001', items: larger });
+    const previousHydrate = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    const previousIndex = process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX;
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydratePath;
+    process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = indexPath;
+    try {
+      const result = persistHydrateFromEnv('rel-synthetic-099', [snapshotItem]);
+      expect(result).toMatchObject({ wrote: false, skipped: true, reason: 'kept-larger', total: 2 });
+      expect(existsSync(indexPath)).toBe(false);
+      expect(loadHydrateCatalog(hydratePath)?.releaseId).toBe('rel-synthetic-001');
+      expect(loadHydrateCatalog(hydratePath)?.candidate('script-synthetic-002')?.script_id).toBe('script-synthetic-002');
+    } finally {
+      if (previousHydrate === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+      else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previousHydrate;
+      if (previousIndex === undefined) delete process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX;
+      else process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = previousIndex;
     }
   });
 });
