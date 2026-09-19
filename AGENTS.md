@@ -100,7 +100,7 @@
 - 局部代码修改先运行受影响的测试及相关 lint / typecheck，涉及构建输入时追加 build。跨模块、公共合同、权限 / 安全边界、依赖或构建配置变更，以及完整基线验收 / 准备交付时，运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；影响面不确定时扩大验证并说明理由。获批计划或 CI 的专项门禁仍须执行。
 - `DEVELOPMENT_BRIEF.md` 的完整基线完成定义用于对应基线验收；`docs/how-to-verify-desktop.md` 提供命令与证据边界。日常任务如何选取检查以本节为准，不将文档中的“本轮”建议视作永久全量要求。通过后仅因新修改、失败或未解决风险重复运行；不能为得到干净工作树而自动提交或丢弃改动。
 - Float 行为变更运行 `pnpm test:float`；handoff / 原生窗口集成变更追加相关 Electron E2E，完整 drag-settle 需覆盖其专项矩阵，不能只用 float 快测代替。品牌资产变更追加 `pnpm test:assets`；Dashboard 局部行为运行对应 component，涉及窗口生命周期 / 信任边界时追加相关 E2E。具体路由以 `docs/how-to-verify-desktop.md` 为准。
-- 生成物、打包或目录调整追加 `pnpm workspace:check`；正式打包只使用对应 package 脚本及其 fail-closed 后验。
+- 生成物、打包或目录调整追加 `pnpm workspace:check`；正式打包只使用对应 package 脚本及其 fail-closed 后验。Linux 用 `pnpm package:linux`，必须在 Linux 主机上跑，产物是 local-unsigned AppImage。
 - 自动化不得冒充真实 Stage Manager、Dock、系统焦点、签名 / 公证或 Windows 合成器证据。未实机验证的项目必须明确标为未确认。
 - 若环境阻塞，保留实现并报告命令、关键输出、阻塞层级和未验证范围；不得把“测试文件存在”写成 PASS。
 - 检查结果按[工程工作流程的证据复用规则](docs/reference-engineering-workflow.md#5-验证与证据复用) 绑定被测内容、命令、输入和环境。报告、导出、评测及打包功能必须验证实际产物能被下游消费，不能以内部函数通过或子进程退出 0 代替完整结果验收。

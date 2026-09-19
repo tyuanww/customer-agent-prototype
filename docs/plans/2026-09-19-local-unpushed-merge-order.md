@@ -1,7 +1,8 @@
-# 本地未 push 分支合入顺序
+# 合入顺序记录
 
-> **状态：** 已刷新（`feat/merge-order-p7-linux-tips`）。相对 `origin/main` `0ab267b`。
-> **不包含：** 授权 push / 开 PR / 合 main / 配隧道。
+> **状态：** 已合入 `origin/main` `58dfac4`（PR #135–#141、#143）。#142 因 how-to 基线分支被删关掉，由 #143 承接。
+> **仍不要合：** `feat/p7-embeddings-delivery`。
+> **仍未做：** 配隧道、Linux 实机打包装、打包态远端勾选。
 
 本机有多条互不跟踪的 feature 线。**不要把两条 P7 都合进去。**
 

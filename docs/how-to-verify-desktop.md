@@ -37,10 +37,10 @@ pnpm -v    # 项目锁定 11.19.0
 | 全量 Electron Playwright | `pnpm test:e2e` | 含浮窗与 Dashboard smoke，仍不是真实设备门禁 | 否 | **是** |
 | 本机未签名 macOS 证明包 | `pnpm package:mac:local` | 否 | 会先 `generate:app-icons` | 会先 `pnpm build:services` 再桌面 `pnpm build` |
 | 本机合成栈（M1） | `node scripts/synthetic-stack/stack.ts start` | 否 | 否 | 需要先 `pnpm build:services`。**若当前已是 `rel_6` MENOKIN，不要 start**，见 [检索浮窗](how-to-run-macos-semantic-query.md) |
-| 仓外索引 `questions[]`（Doc2Query） | `pnpm retrieval:questions` | 否 | 否 | 只写仓外 `retrieval-index.json`。`--dry-run` 只计数。禁止写进 git 工作树，不 `stack start` |
-| 仓外正文向量（embo-01） | `pnpm retrieval:embeddings` | 否 | 否 | 只写仓外 `retrieval-embeddings.json`。缺文件或 hash 失配时查询退回 BM25 正文 |
-| 仓外 hydrate 对齐 | `pnpm retrieval:hydrate` | 否 | 否 | 点胶囊「登录」会按当前发布写仓外 `retrieval-hydrate.json`。CLI `--from` 手工写入；空 snapshot 和不大于现有文件的种子 snapshot 不覆盖。不 `stack start` |
-| 从未命中统计 | `pnpm retrieval:never-hit` | 否 | 否 | 对照仓外 hydrate 与 `retrieval-telemetry.json`。不记问句原文，不打 leftover `/v1/search` |
+| 仓外索引 `questions[]`（Doc2Query） | `pnpm retrieval:questions` | 否 | 否 | 只写仓外 `retrieval-index.json`（有 API origin 时带后缀）。`--dry-run` 只计数。禁止写进 git 工作树，不 `stack start` |
+| 仓外正文向量（embo-01） | `pnpm retrieval:embeddings` | 否 | 否 | 只写仓外 `retrieval-embeddings.json`（有 API origin 时带后缀）。缺文件或 hash 失配时查询退回 BM25 正文 |
+| 仓外 hydrate 对齐 | `pnpm retrieval:hydrate` | 否 | 否 | 点胶囊「登录」会按当前发布写仓外 `retrieval-hydrate.json`（有 API origin 时带后缀）。CLI `--from` 手工写入；空 snapshot 和不大于现有文件的种子 snapshot 不覆盖。不 `stack start` |
+| 从未命中统计 | `pnpm retrieval:never-hit` | 否 | 否 | 对照仓外 hydrate 与 `retrieval-telemetry.json`（有 API origin 时带后缀）。不记问句原文，不打 leftover `/v1/search` |
 | 正式 macOS 外发门禁 | `pnpm package:mac` | 否 | 同上 | 同上，但当前会因 Demo `appId` fail-closed |
 | 本机未签名 Windows 证明包 | `pnpm package:win` | 否 | 会先生成 ICO | 会先 electron-vite build |
 | 本机未签名 Linux 证明包 | `pnpm package:linux` | 否 | 会先生成 PNG | 须在 **Linux** 上跑；macOS 交叉会失败 |
