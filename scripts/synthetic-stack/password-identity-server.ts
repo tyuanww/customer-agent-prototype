@@ -1,5 +1,7 @@
 /**
- * Product-owned password identity (scheme C). Loopback only.
+ * Product-owned password identity (scheme C). Loopback sockets only.
+ * A same-machine cloudflared ingress may send Host as a public hostname;
+ * remoteAddress is still 127.0.0.1. Do not bind 0.0.0.0.
  *
  * POST /password {username, password} -> {code}  (one-time, 2 min)
  * POST /exchange {code}               -> {provider:'synthetic', binding_id}

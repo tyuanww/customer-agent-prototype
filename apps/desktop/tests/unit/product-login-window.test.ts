@@ -54,7 +54,10 @@ vi.mock('electron', () => ({
 
 vi.mock('../../src/main/overlay-renderer-loader', () => ({ loadRenderer: vi.fn() }));
 
-import { allowedLoginUrl, createLoginWindow, followAllowedLoginRedirects, isChooserUrl } from '../../src/main/product-login-window';
+import {
+  allowedLoginUrl, createLoginWindow, followAllowedLoginRedirects, isChooserUrl,
+  LOGIN_IDENTITY_TIMEOUT_MS,
+} from '../../src/main/product-login-window';
 
 const source = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/main/product-login-window.ts'),
@@ -75,6 +78,16 @@ it('allows only configured authorization and callback routes, not arbitrary loop
   expect(check('http://127.0.0.1:4201/authorize?state=s')).toBe(true);
   expect(check('http://127.0.0.1:4200/v1/auth/callback?state=s&code=c')).toBe(true);
   expect(check('https://accounts.feishu.cn/open-apis/authen/v1/authorize?client_id=cli_aaaaaaaaaaaaaaaa')).toBe(true);
+  expect(allowedLoginUrl(
+    'https://agent-id.jianghua.site/authorize?state=s',
+    'https://agent-id.jianghua.site',
+    'https://agent-auth.jianghua.site',
+  )).toBe(true);
+  expect(allowedLoginUrl(
+    'https://agent-auth.jianghua.site/v1/auth/callback?state=s&code=c',
+    'https://agent-id.jianghua.site',
+    'https://agent-auth.jianghua.site',
+  )).toBe(true);
   const credentialUrl = new URL('http://127.0.0.1:4201/authorize');
   credentialUrl.username = 'synthetic'; credentialUrl.password = 'invalid';
   expect(check(credentialUrl.href)).toBe(false);
@@ -175,6 +188,36 @@ describe('createLoginWindow', () => {
       'http://127.0.0.1:4200/v1/auth/callback?state=s&code=synthetic_agent',
       expect.objectContaining({ method: 'GET', redirect: 'error' }),
     );
+    expect(JSON.stringify(mocks.loadURL.mock.calls)).not.toContain('/v1/auth/callback');
+    await opened;
+  });
+
+  it('posts the account password to the HTTPS identity origin and callbacks the API origin', async () => {
+    const identity = 'https://agent-id.jianghua.site';
+    const api = 'https://agent-auth.jianghua.site';
+    const openExternal = vi.fn(async () => undefined);
+    const transport = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
+      const target = String(input);
+      if (init?.method === 'POST' && target === `${identity}/password`) return Response.json({ code: 'synthetic_agent' });
+      if (target.startsWith(`${api}/v1/auth/callback`)) return new Response('ok', { status: 200 });
+      return new Response('missing', { status: 404 });
+    });
+    const login = createLoginWindow(identity, api, () => 'http://127.0.0.1:5173', {
+      openExternal, fetch: transport as unknown as typeof fetch,
+    });
+    const opened = login.open(`${identity}/authorize?state=s`, new AbortController());
+    const submit = mocks.handlers.get('login-window:submit-account')!;
+    expect(await submit({ sender: mocks.webContents }, { username: 'synthetic_agent', password: 'synthetic-password' }))
+      .toEqual({ ok: true });
+    expect(openExternal).not.toHaveBeenCalled();
+    const passwordCall = transport.mock.calls.find((call) => call[1]?.method === 'POST');
+    expect(String(passwordCall?.[0])).toBe(`${identity}/password`);
+    expect(passwordCall?.[1]).toMatchObject({ method: 'POST', redirect: 'error' });
+    expect(transport).toHaveBeenCalledWith(
+      `${api}/v1/auth/callback?state=s&code=synthetic_agent`,
+      expect.objectContaining({ method: 'GET', redirect: 'error' }),
+    );
+    expect(LOGIN_IDENTITY_TIMEOUT_MS).toBe(15_000);
     expect(JSON.stringify(mocks.loadURL.mock.calls)).not.toContain('/v1/auth/callback');
     await opened;
   });

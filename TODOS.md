@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）：桌面可连受控 HTTPS，`product-remote` profile，API 仍绑 127.0.0.1。见 `docs/plans/2026-09-19-p4-remote-https-profile.md`、`docs/how-to-p4-remote-mac.md`。本机方案 C 已合入。未知 `open_id` 不自动建号。账号第二条隧道 / API 绑 `0.0.0.0` / 办公机实装仍未做。
+**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。第二刀（`feat/p4-account-https`）：账号 POST 走独立 HTTPS identity origin，口令服务仍 loopback；超时 15s。DNS / 第二条 ingress 按 how-to 配，本刀不改 Cloudflare。API 绑 `0.0.0.0` / 办公机实装仍未做。
 
 ### P5 · 会话未绑定后端身份
 
