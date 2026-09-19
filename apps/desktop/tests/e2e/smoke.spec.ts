@@ -677,7 +677,7 @@ test('documents that globalShortcut is exercised via the same main harness, not 
   }
 });
 
-test('@windows-feasibility launches transparent overlays, registers the shortcut, and exits cleanly', async () => {
+test('@windows-feasibility @linux-feasibility launches transparent overlays, registers the shortcut, and exits cleanly', async () => {
   const app = await launchApp();
   try {
     const fox = await waitForRole(app, 'fox');
@@ -685,7 +685,8 @@ test('@windows-feasibility launches transparent overlays, registers the shortcut
     await waitForHarness(app);
     await expect(fox.getByTestId('fox-button')).toBeVisible();
 
-    const startup = await app.evaluate(async ({ BrowserWindow }) => {
+    const captureAlpha = process.platform === 'win32';
+    const startup = await app.evaluate(async ({ BrowserWindow }, shouldCaptureAlpha: boolean) => {
       const harness = (globalThis as {
         __demoTest?: {
           shortcutRegistered: () => boolean;
@@ -696,21 +697,27 @@ test('@windows-feasibility launches transparent overlays, registers the shortcut
       const foxWindow = BrowserWindow.getAllWindows()
         .find((win) => win.webContents.getURL().includes('role=fox'));
       if (!foxWindow) throw new Error('Fox BrowserWindow missing');
-      const foxCornerAlpha = (await foxWindow.webContents.capturePage()).toBitmap()[3];
+      const foxCornerAlpha = shouldCaptureAlpha
+        ? (await foxWindow.webContents.capturePage()).toBitmap()[3]
+        : 0;
       harness.expand();
       return { shortcutRegistered: harness.shortcutRegistered(), foxCornerAlpha };
-    });
+    }, captureAlpha);
 
     expect(startup.shortcutRegistered).toBe(true);
-    expect(startup.foxCornerAlpha).toBe(0);
+    if (captureAlpha) {
+      expect(startup.foxCornerAlpha).toBe(0);
+    }
     await waitForInteractiveQuery(app, query);
-    const queryCornerAlpha = await app.evaluate(async ({ BrowserWindow }) => {
-      const queryWindow = BrowserWindow.getAllWindows()
-        .find((win) => win.webContents.getURL().includes('role=query'));
-      if (!queryWindow) throw new Error('Query BrowserWindow missing');
-      return (await queryWindow.webContents.capturePage()).toBitmap()[3];
-    });
-    expect(queryCornerAlpha).toBe(0);
+    if (captureAlpha) {
+      const queryCornerAlpha = await app.evaluate(async ({ BrowserWindow }) => {
+        const queryWindow = BrowserWindow.getAllWindows()
+          .find((win) => win.webContents.getURL().includes('role=query'));
+        if (!queryWindow) throw new Error('Query BrowserWindow missing');
+        return (await queryWindow.webContents.capturePage()).toBitmap()[3];
+      });
+      expect(queryCornerAlpha).toBe(0);
+    }
     await expect.poll(async () => {
       const windows = await windowSnapshot(app);
       return windows.find((item) => item.role === 'fox')?.visible;

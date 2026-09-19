@@ -39,7 +39,20 @@ All notable changes to this customer-agent product implementation repository are
 - Local unpushed branches have a merge-order note: keep the origin-keyed P7 stack, drop the earlier retrieval-delivery line. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
 - Office-machine product-remote checklist exists and stays **未观察** until a new UNSIGNED build after P4/P7 lands. See `docs/how-to-office-machine-product-remote.md`.
 - macOS packaged product-remote checklist exists and stays **未观察**. See `docs/how-to-macos-packaged-product-remote.md`.
-- Linux packaged product-remote checklist exists, stays **未观察**, and states there is no `package:linux` counterpart. See `docs/how-to-linux-packaged-product-remote.md`.
+- Linux packaged product-remote checklist exists and stays **未观察**. See `docs/how-to-linux-packaged-product-remote.md`.
+- Merge-order note now points at `feat/linux-packaged-remote-howto` as the P10/how-to stack tip. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- `pnpm package:linux` is local-unsigned, Linux-host only, and writes `release/local-unsigned/linux/`. See `docs/plans/2026-09-19-p10-package-linux-local.md`.
+- Linux packaging cleans temporary CA state when a step fails. See `docs/plans/2026-09-19-p10-package-linux-ca-cleanup.md`.
+- `how-to-verify-desktop` documents `pnpm package:linux` as Linux-host local-unsigned only. See `docs/plans/2026-09-19-p10-package-linux-verify-howto.md`.
+- CI runs `pnpm package:linux` on Ubuntu as a feasibility smoke, not a signed release. See `docs/plans/2026-09-19-p10-linux-ci-package.md`.
+- Linux CI overlay smoke runs under xvfb after packaging. See `docs/plans/2026-09-19-p10-linux-e2e-smoke.md`.
+- Linux CI installs Playwright/Electron OS libraries before the xvfb overlay smoke. See `docs/plans/2026-09-19-p10-linux-e2e-deps.md`.
+- CI uploads the UNSIGNED Linux AppImage as a workflow artifact, not a GitHub Release. See `docs/plans/2026-09-19-p10-linux-ci-artifact.md`.
+- Merge-order note now points at `feat/p10-linux-xdg-userdata` as the Linux packaging/CI stack tip. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- Linux packaged profile path follows Electron userData, including `XDG_CONFIG_HOME`, and is resolved at write time. See `docs/plans/2026-09-19-p10-linux-xdg-userdata.md`.
+- Merge-order note now points at `feat/p7-semantic-origin-path` `3878e4b` and `feat/merge-order-p7-linux-tips`. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- Linux AppImage uses ASCII `executableName` `customer-agent-desktop`. Electron-builder rejects the scoped package name.
+- Linux overlay feasibility smoke does not call `capturePage` (Xvfb raises UnknownVizError). Windows still checks corner alpha.
 
 ## [0.3.3] - 2026-09-18
 

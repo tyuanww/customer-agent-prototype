@@ -50,7 +50,7 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 本地未 push 分支合入顺序（两条 P7 只留 origin 隔离线） | [docs/plans/2026-09-19-local-unpushed-merge-order.md](docs/plans/2026-09-19-local-unpushed-merge-order.md) |
 | 办公机产品主链（远端，未观察；须合入后再打新包） | [docs/how-to-office-machine-product-remote.md](docs/how-to-office-machine-product-remote.md) |
 | macOS 打包态产品主链（远端，未观察；须合入后再打新包） | [docs/how-to-macos-packaged-product-remote.md](docs/how-to-macos-packaged-product-remote.md) |
-| Linux 打包态产品主链（远端，未观察；无对等 UNSIGNED 脚本） | [docs/how-to-linux-packaged-product-remote.md](docs/how-to-linux-packaged-product-remote.md) |
+| Linux 打包态产品主链（远端，未观察；`package:linux` 须在 Linux 上跑） | [docs/how-to-linux-packaged-product-remote.md](docs/how-to-linux-packaged-product-remote.md) |
 | 方案 C：飞书 OAuth + 产品自管账号口令（不用 Logto） | [docs/plans/2026-09-18-identity-c-password-and-feishu.md](docs/plans/2026-09-18-identity-c-password-and-feishu.md) · [how-to](docs/how-to-feishu-and-password-mac.md) |
 | P4 远端：桌面连受控 HTTPS，API 仍 loopback | [docs/plans/2026-09-19-p4-remote-https-profile.md](docs/plans/2026-09-19-p4-remote-https-profile.md) · [how-to](docs/how-to-p4-remote-mac.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |

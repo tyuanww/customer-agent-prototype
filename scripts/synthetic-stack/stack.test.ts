@@ -6,7 +6,10 @@ import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
-  DESKTOP_PACKAGED_PROFILE_PATH, PID_DIRECTORY, apiEnvironment, parseFeishuEnvFile, readProfile,
+  DESKTOP_APP_NAME,
+  defaultDesktopUserDataDirectory,
+  desktopPackagedProfilePath,
+  PID_DIRECTORY, apiEnvironment, parseFeishuEnvFile, readProfile,
 } from './profile.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
@@ -96,14 +99,15 @@ describe('stack profile', () => {
   it('writes only loopback origins to the packaged desktop profile', () => {
     // The packaged file path is fixed by Electron's userData directory; assert
     // the location and the exact shape without disturbing a real installation.
-    assert.match(path.basename(DESKTOP_PACKAGED_PROFILE_PATH), /^synthetic-stack\.json$/u);
-    assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('客服话术浮窗 Demo'));
+    const packagedPath = desktopPackagedProfilePath();
+    assert.match(path.basename(packagedPath), /^synthetic-stack\.json$/u);
+    assert.ok(packagedPath.includes('客服话术浮窗 Demo'));
     if (process.platform === 'darwin') {
-      assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('Library/Application Support'));
+      assert.ok(packagedPath.includes('Library/Application Support'));
     } else if (process.platform === 'win32') {
-      assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('AppData'));
+      assert.ok(packagedPath.includes('AppData'));
     } else {
-      assert.ok(DESKTOP_PACKAGED_PROFILE_PATH.includes('.config'));
+      assert.ok(packagedPath.includes('.config'));
     }
     const source = readFileSync(new URL('./profile.ts', import.meta.url), 'utf8');
     const start = source.indexOf('export function writeDesktopPackagedProfile');
@@ -122,6 +126,34 @@ describe('stack profile', () => {
     assert.ok(desktop.includes('writeDesktopPackagedProfile(profile)'), 'desktop handoff must refresh the packaged profile');
     assert.ok(stack.includes("case 'packaged-profile': commandPackagedProfile()"), 'packaged-profile must print the userData file path');
     assert.ok(stack.includes('<start|stop|restart|status|destroy|desktop|packaged-profile|anomaly>'));
+    assert.ok(written.includes('desktopPackagedProfilePath()'), 'packaged profile path must be resolved at write time');
+  });
+
+  it('follows Electron Linux userData, including XDG_CONFIG_HOME', () => {
+    const linuxHome = '/home/operator';
+    assert.equal(
+      defaultDesktopUserDataDirectory({ platform: 'linux', home: linuxHome, env: {} }),
+      path.join(linuxHome, '.config', DESKTOP_APP_NAME),
+    );
+    assert.equal(
+      desktopPackagedProfilePath({
+        platform: 'linux',
+        home: linuxHome,
+        env: { XDG_CONFIG_HOME: '/var/xdg' },
+      }),
+      path.join('/var/xdg', DESKTOP_APP_NAME, 'synthetic-stack.json'),
+    );
+    assert.equal(
+      desktopPackagedProfilePath({
+        platform: 'linux',
+        home: linuxHome,
+        env: {
+          XDG_CONFIG_HOME: '/var/xdg',
+          CUSTOMER_AGENT_DESKTOP_USERDATA: '/tmp/explicit-userdata',
+        },
+      }),
+      path.join('/tmp/explicit-userdata', 'synthetic-stack.json'),
+    );
   });
 
   it('rejects a profile file that is not the current version or root', () => {

@@ -16,7 +16,7 @@ test('only known documentation paths skip runtime lanes; rules retain semantic c
 });
 
 test('gate refuses failure, cancellation, skip and missing classifier output', () => {
-  const ok = Object.fromEntries(['changes','quality','postgres-15','windows-feasibility'].map((key) => [key, { result: 'success' }]));
+  const ok = Object.fromEntries(['changes','quality','postgres-15','windows-feasibility','linux-feasibility'].map((key) => [key, { result: 'success' }]));
   ok.changes.outputs = { mode: 'docs' };
   assertCiGate(ok);
   for (const key of Object.keys(ok)) {

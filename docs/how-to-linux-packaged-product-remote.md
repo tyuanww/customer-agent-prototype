@@ -2,7 +2,7 @@
 
 本页给**在 Linux 上打开打包客户端的人**勾选。全部行保持 **未观察**。登录只有 **飞书** 和 **账号**。不要在本机为这条主链另装 PostgreSQL。
 
-**当前仓库没有与 `package:win` / `package:mac:local` 对等的 Linux UNSIGNED 产物脚本。** 本页不能当成 Linux 包已交付。配置路径仍须写明：Electron Linux userData 是 `~/.config/客服话术浮窗 Demo/synthetic-stack.json`。
+`pnpm package:linux` 是 **local-unsigned**，必须在 **Linux** 上跑，产物在 `release/local-unsigned/linux/`，文件名含 `UNSIGNED`。macOS / Windows 开发机跑该脚本会失败。本页仍全部 **未观察**，不能当成 Linux 实机已交付。配置路径：`~/.config/客服话术浮窗 Demo/synthetic-stack.json`。若设置了 `XDG_CONFIG_HOME`，与 Electron userData 一样走该目录。
 
 须先按 [本地合入顺序](plans/2026-09-19-local-unpushed-merge-order.md) 合入 P4 / P7。有 Linux 包之后才填本页。
 
@@ -18,7 +18,7 @@
 }
 ```
 
-放到 `~/.config/客服话术浮窗 Demo/synthetic-stack.json`。两个 origin 必须不同、必须是 `https://` 主机名。
+放到 `~/.config/客服话术浮窗 Demo/synthetic-stack.json`（或 `$XDG_CONFIG_HOME/客服话术浮窗 Demo/synthetic-stack.json`）。两个 origin 必须不同、必须是 `https://` 主机名。
 
 ## 勾选（全部未观察）
 
@@ -33,6 +33,7 @@
 ## 不要当作已通过
 
 - 本页存在于仓库里
-- 有 `package:linux` 脚本
+- 在 macOS 上跑通 `package:linux`
+- Linux 实机勾选已通过
 - [macOS 打包态远端页](how-to-macos-packaged-product-remote.md)
 - [办公机 Windows 远端页](how-to-office-machine-product-remote.md)
