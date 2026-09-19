@@ -58,8 +58,8 @@ function platformLabel(scope: unknown): string {
   return labels.length > 0 ? labels.join(' / ') : '千牛 / 抖音';
 }
 
-function windowLabel(from: unknown, to: unknown): string {
-  if (typeof from !== 'string' || from.length < 1) return '本机目录';
+function windowLabel(from: unknown, to: unknown, empty = '本机目录'): string {
+  if (typeof from !== 'string' || from.length < 1) return empty;
   const start = from.slice(0, 10);
   const end = typeof to === 'string' && to.length > 0 ? to.slice(0, 10) : '长期有效';
   return `${start} → ${end}`;
@@ -83,7 +83,7 @@ function entryFromHydrate(item: object, releaseId: string): DashboardWordingEntr
     answerPreview: answer,
     platform: platformLabel(record.platformScope),
     version: releaseId,
-    effectiveWindow: windowLabel(record.effectiveFrom, record.effectiveTo),
+    effectiveWindow: windowLabel(record.effectiveFrom, record.effectiveTo, '当前发布'),
     risk: riskOf(record.riskLevel),
     lifecycle: 'published',
     lifecycleLabel: '已发布',

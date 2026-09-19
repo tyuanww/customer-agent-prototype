@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.7] - 2026-09-20
+
+### Fixed
+
+- Dashboard wording hydrate rows without an effective-from date show “当前发布”, not “本机目录”.
+
 ## [0.3.6] - 2026-09-19
 
 ### Fixed

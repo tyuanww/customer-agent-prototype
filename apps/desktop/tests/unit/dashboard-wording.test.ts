@@ -66,6 +66,19 @@ describe('dashboard wording catalog', () => {
     });
   });
 
+  it('labels hydrate rows without an effective-from as 当前发布', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dash-wording-'));
+    const hydrate = join(root, 'retrieval-hydrate.json');
+    writeFileSync(hydrate, `${JSON.stringify({
+      releaseId: 'rel_seed',
+      scripts: [{ scriptId: 'seed-1', title: '过敏了怎么办', questionText: '过敏了怎么办', answerText: '先安抚', category: 'aftersale' }],
+    })}\n`);
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydrate;
+    process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = join(root, 'missing-index.json');
+    const result = listDashboardWording();
+    expect(result.entries[0]).toMatchObject({ ownerRole: '当前发布', effectiveWindow: '当前发布' });
+  });
+
   it('returns an empty catalog when both off-repo files are missing', () => {
     process.env.CUSTOMER_AGENT_HYDRATE_INDEX = join(tmpdir(), 'missing-hydrate.json');
     process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = join(tmpdir(), 'missing-index.json');
