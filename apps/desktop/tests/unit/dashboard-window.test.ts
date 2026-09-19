@@ -141,7 +141,7 @@ describe('dashboard window contract', () => {
   it('uses one visible demo marker while keeping the non-Dafuyan boundary explicit', () => {
     expect(DASHBOARD_ENV_BADGES).toEqual(['演示数据']);
     expect(DASHBOARD_STRUCTURE_DISCLAIMER).toBe(
-      '无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读本机目录',
+      '无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读当前发布',
     );
   });
 });

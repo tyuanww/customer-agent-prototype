@@ -199,6 +199,16 @@ describe('QueryApp', () => {
     fireEvent.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(window.customerAgent!.productSearch!.search).toHaveBeenCalled());
   }
+  it('refreshes the announcement before every product search', async () => {
+    connectProduct();
+    await prepareProductQuery();
+    const refresh = window.customerAgent!.productAnnounce!.refresh as ReturnType<typeof vi.fn>;
+    const before = refresh.mock.calls.length;
+    expect(before).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(refresh.mock.calls.length).toBeGreaterThan(before));
+  });
+
   it('searches storewide after login without platform or product pickers', async () => {
     const f = connectProduct();
     render(<QueryApp />);

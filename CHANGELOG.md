@@ -10,6 +10,10 @@ All notable changes to this customer-agent product implementation repository are
 - Feishu login on a desk that already ACKed as the synthetic account no longer fails query. Announce `client_id` is per user. ACK 403 keeps the issued lease and still hydrates. A 304 without `x-snapshot-lease` headers keeps the local lease.
 - macOS UNSIGNED 0.3.6 product-remote: fox, Feishu login, query, and copy observed. Account login and offline rows stay unobserved. Allergy SOP is optional synthetic.
 
+### Changed
+
+- Product search refreshes the announcement before every query so a new publish is used on the next search, not only on the next login. Dashboard wording prefers the current hydrate release over a larger local index. VOC and work orders stay synthetic.
+
 ## [0.3.5] - 2026-09-19
 
 ### Fixed

@@ -107,7 +107,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(remoteMac).toContain('账号');
     expect(remoteMac).not.toMatch(/内部|外包/);
     expect(remoteMac).toContain('~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json');
-    expect(remoteMac).toContain('不授权现在执行 `pnpm package:mac:local`');
+    expect(remoteMac).toContain('本机：`pnpm package:mac:local`');
     expect(remoteMac).toContain('不要把 [M5](how-to-verify-macos-m5.md) 的 `synthetic-local` 勾选抄到本页');
     const remoteLinux = readFileSync(
       path.join(repositoryRoot, 'docs/how-to-linux-packaged-product-remote.md'),

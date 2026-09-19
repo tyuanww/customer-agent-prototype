@@ -87,7 +87,7 @@ function entryFromHydrate(item: object, releaseId: string): DashboardWordingEntr
     risk: riskOf(record.riskLevel),
     lifecycle: 'published',
     lifecycleLabel: '已发布',
-    ownerRole: '本机话术库',
+    ownerRole: '当前发布',
     dataClass: 'local-catalog',
   });
 }
@@ -106,11 +106,11 @@ function entryFromIndex(
     answerPreview: script.answerText,
     platform: '千牛 / 抖音',
     version: releaseId ?? 'local-index',
-    effectiveWindow: '本机目录',
+    effectiveWindow: releaseId ? '当前发布' : '本机目录',
     risk: 'low',
     lifecycle: 'published',
     lifecycleLabel: '已发布',
-    ownerRole: '本机话术库',
+    ownerRole: releaseId ? '当前发布' : '本机话术库',
     dataClass: 'local-catalog',
   });
 }
@@ -142,7 +142,7 @@ export function listDashboardWording(): DashboardWordingView {
     }
   }
 
-  const entries = fromIndex.length > fromHydrate.length ? fromIndex : fromHydrate;
+  const entries = fromHydrate.length > 0 ? fromHydrate : fromIndex;
   return Object.freeze({
     ok: true,
     releaseId: hydrateRelease,
