@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。第二刀（`feat/p4-account-https`）：账号 POST 走独立 HTTPS identity origin，口令服务仍 loopback；超时 15s。打包态远端勾选（未观察）：macOS / Windows 办公机 / Linux。`package:linux` 须在 Linux 上跑。DNS / 第二条 ingress 按 how-to 配。API 绑 `0.0.0.0` / 办公机实装仍未做。
+**Status:** OPEN · 代码已合入 main（#133 / #135 / #145）。账号 identity 用 `https://agent-pass.jianghua.site`，口令服务仍 loopback。打包态远端勾选仍未观察：macOS / Windows 办公机 / Linux。`package:linux` 须在 Linux 上跑。API 绑 `0.0.0.0` 仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -85,7 +85,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P4（若走远端才成为阻塞）
-**Status:** OPEN · P4 第一刀按 `apiOrigin` 哈希分文件（`product-session.<id>.enc`）。本机与远端 token 不再共用一个文件。
+**Status:** 代码已合入 main。会话文件按 `apiOrigin` 哈希分文件（`product-session.<id>.enc`）。本机与远端 token 不再共用一个文件。
 
 ### P6 · 两条网络栈的证书/代理覆盖
 
@@ -98,7 +98,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P3
 **Depends on:** P4
-**Status:** OPEN · 第一刀：ProductHttp / 登录 identity / MiniMax 共用 `electron.net.fetch`；登录隔离 session 走 `applySessionSecurity`。不做默认 pinning。
+**Status:** 代码已合入 main（#136）。ProductHttp / 登录 identity / MiniMax 共用 `electron.net.fetch`。不做默认 pinning。
 
 ### P7 · 检索资产的交付路径
 
@@ -111,7 +111,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 本机路径已冻结。P7 续刀：origin 分文件、登录写 BM25/向量、查询按 origin 读；产品模式写入 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN`。多公司 PG 分库未做。
+**Status:** 代码已合入 main（#140）。origin 分文件、登录写 BM25/向量、查询按 origin 读；产品模式写入 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN`。多公司 PG 分库未做。
 
 ### P8 · Windows DRAFT 与启动代码冲突
 

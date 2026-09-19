@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1–T6 合成身份、持久导入、worker/审核、发布/回退和读取及构建进程链已合并；schema.v1.17 / 第十四段 migration 已随收尾合入，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链。S0 桌面默认仍走合成 fixture；显式 loopback 接入 profile 已合并 D1 会话/HTTP、D2 搜索复制、D3 公告/租约/ACK、D4 无匹配求助、D5 同一 SHA 合成整链。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。Windows 安装包见 [DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工。正式飞书鉴权、真实数据与部署仍未接入。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。DEV-M0 的 W1～W6 已建立桌面、合同、API host、migration、runtime readiness 与非部署候选产物边界；DEV-M1 W0～W5 已前滚到 `schema.v1.14` 和十一段 migration，并完成 mock auth、策略读写、独立 runtime/admin 数据库能力、受控 SearchBackend、Search + Events 事务与 50 条纯合成 runner。当前负责人承接消费切片追加 `schema.v1.15` / 第十二段原子 migration，来源与验证见本文 B1/B2 记录。后端 T0 intake 将冻结合同推进到 OpenAPI 1.13.0 / schema.v1.16 和第十三段 migration，保留旧迁移；身份与审核命名空间的权限、函数、触发器纳入数据库后验。T1–T6 合成身份、持久导入、worker/审核、发布/回退和读取及构建进程链已合并；schema.v1.17 / 第十四段 migration 已随收尾合入，范围见[后端实施计划](plans/2026-09-08-backend-runtime-plan.md)。已合并 G1A-E0 T1～T3 的测试专用离线评测链。S0 桌面默认仍走合成 fixture；显式 loopback 接入 profile 已合并 D1 会话/HTTP、D2 搜索复制、D3 公告/租约/ACK、D4 无匹配求助、D5 同一 SHA 合成整链。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。Windows 安装包见 [DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工。本机可经仓外 `feishu.env` 与隧道走正式飞书 OAuth；账号走 loopback 口令服务再经独立 HTTPS identity origin。真实业务数据与部署仍未接入。
 
 ## 1. 先看整体
 
@@ -46,7 +46,7 @@ apps/api（DEV-M1 COMPLETE）
   ├─ runtime pg.Pool → readiness + policy read + SearchBackend + Events
   ├─ isolated admin pg.Pool → PolicyAdminRepository → set_policy_flag only
   ├─ product-auth-service → isolated auth pool → frozen identity SQL
-  │    └─ synthetic-identity-provider → bounded loopback code exchange
+  │    └─ synthetic / Feishu identity providers → PKCE login-requests + loopback password or Feishu OAuth
   ├─ content-object-store + content-import-service → CSV/XLSX persist then runtime enqueue
   └─ legacy synthetic G1a runner → isolated PG15 → same SearchBackend（NOT_EVALUATED）
 
@@ -55,7 +55,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链：狐狸浮窗打开查询 → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；显式接入 profile 下 D1–D5 桌面 adapter 已接线。真实内容和正式飞书身份仍未接通。
+桌面主链：狐狸浮窗打开查询 → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；显式接入 profile 下 D1–D5 桌面 adapter 已接线。真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
 
 ## 2. 目录归属
 
