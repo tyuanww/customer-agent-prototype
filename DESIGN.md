@@ -29,7 +29,7 @@
 - 锚定在狐狸位置附近，并钳制到当前屏 `workArea`。
 - 狐狸拖到当前屏左右边缘 18px 内时自动吸附：88px 原生窗始终完整留在工作区，renderer 在稳定窗口内平移裁切，令 64px 狐狸视觉左右都恰好露 32px；打开查询后仍从原侧向屏幕内展开。禁止把透明原生窗反复推到屏外与 WindowServer 争抢位置。
 - macOS 台前调度的最近 App 条带可能把后台透明窗限制在一个未由 Electron `screen.workArea` 暴露的“有效舞台边界”。此时以 WindowServer 实际接受的 `BrowserWindow.getBounds()` 为该 dock epoch 的位置真值；hover peek / retract 只改 renderer 裁切，不得再次 `setBounds(workArea.x)`。打开 Query、共享元素中心与关闭恢复都从实际 frame 采样。目标是在系统接受边界稳定半露且不横跳；Electron 公共 API 下不承诺后台窗口一定占据物理屏 x=0。
-- 查询胶囊不再贴 `DEMO`、`MOCK AUTH` 徽标。话术卡片不再贴 `DEMO · 合成数据`；身份与目录仍是合成。Dashboard 顶栏在 macOS integrated chrome 下就是 48px 单行标题栏：左侧模块名与紧凑刷新信息与标题栏同中心线；右侧只保留一个主题图标按钮、一个「演示数据」标识及极短边界文本「无后端 · 不保存」。完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 与安全免责声明收进侧栏「演示环境」，避免把管理端做成 Demo 徽标墙。
+- 查询胶囊不再贴 `DEMO`、`MOCK AUTH` 徽标。话术卡片不再贴 `DEMO · 合成数据`；身份与目录仍是合成。产品远端登录后，会话芯片只显示「{操作者姓名} · 退出」，禁止把 RBAC 角色（`owner` / `agent` / `coach`）画在查询主路径。Dashboard 顶栏在 macOS integrated chrome 下就是 48px 单行标题栏：左侧模块名与紧凑刷新信息与标题栏同中心线；右侧只保留一个主题图标按钮、一个「演示数据」标识及极短边界文本「无后端 · 不保存」（这条只约束工作台演示环境，不描述产品远端 API）。完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 与安全免责声明收进侧栏「演示环境」，避免把管理端做成 Demo 徽标墙。
 - macOS 查询窗保留可激活的普通窗口类型以保障 IME / 物理键盘焦点。应用必须保持 regular Dock / Cmd+Tab；Electron 只允许已是 `UIElementApplication` 时使用 `skipTransformProcessType: true`，因此本 Demo 不再把 Query 加入所有 Space 或覆盖全屏应用。当前 Space 内正常唤起仍成立。显示器新增、拔除、分辨率或 Dock 工作区变化后，Float 以防抖方式重新钳制到可用 `workArea`，不抢焦点、不重播动效、不打断共享元素交接。
 - `FOX_IDLE` 按“只显示狐狸头”的目标例外。
 

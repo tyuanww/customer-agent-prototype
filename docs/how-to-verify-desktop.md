@@ -296,7 +296,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## SOP
 
-过敏售后流程切片 1 是独立 SOP 窗，不是 Query 的第三种 overlay 角色。`OverlayRole` 仍只有 `fox | query`；`RendererRole` 增加 `sop`。
+过敏售后流程切片 1 是**合成**独立 SOP 窗，不是 Query 的第三种 overlay 角色，也不是产品远端发货查询的必经步。`OverlayRole` 仍只有 `fox | query`；`RendererRole` 增加 `sop`。问句须含「过敏」且判成售后（例如 `过敏了怎么办`）才出现入口；查发货不会出 SOP。
 
 | 你想证明 | 命令 |
 | --- | --- |

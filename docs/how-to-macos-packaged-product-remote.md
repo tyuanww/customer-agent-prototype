@@ -2,7 +2,9 @@
 
 本页给**本机打开 UNSIGNED `.app` 的人**勾选。全部行保持 **未观察**，直到真人看过窗口。不要把 [M5](how-to-verify-macos-m5.md) 的 `synthetic-local` 勾选抄到本页。
 
-**还不能用当前 main 上的 UNSIGNED 包当本页证据。** 须先按 [本地合入顺序](plans/2026-09-19-local-unpushed-merge-order.md) 把 P4 / P7 origin 隔离线合进再打新包。本页不授权现在执行 `pnpm package:mac:local`。
+须用 **v0.3.6**（#149 飞书登录 + #150 查询租约）及之后的 UNSIGNED `.app`。本机：`pnpm package:mac:local`。不要用 `0.3.4` / `#148` 旧包当本页证据。
+
+过敏售后 SOP 是**合成切片**，不是本页必勾项。查发货不会出现 SOP 入口；问「过敏了怎么办」才能看到「打开过敏售后流程」。本机已确认该问句可召回，不把 SOP 当成产品远端未完成项。
 
 登录只有 **飞书** 和 **账号**。不要在本机为这条主链另装 PostgreSQL。
 
