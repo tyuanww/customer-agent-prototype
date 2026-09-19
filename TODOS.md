@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 未开工 · **决策材料已就绪**（`docs/plans/2026-09-17-office-machine-delivery-path-decision.md`）。实证：这条路今天不可能直接落地——`scripts/synthetic-stack/postgres.ts:40-65` 的 PG15 发现只认 `CUSTOMER_AGENT_PG15_BIN` / `pg_config` / Homebrew 且**无 Windows 分支**，`scripts/synthetic-stack/profile.ts:93-98` 把配置写死到 macOS 的 `Library/Application Support`，`stack.ts:45-47` 依赖仓内 `apps/api/dist`，固定端口 43100/43101/43199 占用即 fail-closed，且本机 Homebrew PG15 依赖外部 dylib、**非自包含**，不能只拷 bin 目录。**它还把未澄清约束压到最强读法**：Windows 上 unix socket + `auth-local=trust` 必须改成 TCP loopback，会重新触发「本地监听」这一条。
+**Status:** OPEN · 第一刀冻结「包内不含 PG/API」（`feat/p10-no-bundled-stack`）。包内后端本轮不做；办公机首轮仍 P3，产品主链走 P4。缺配置文案不再叫人装数据库。见 `docs/plans/2026-09-19-p10-no-bundled-stack.md`。实证仍成立：PG15 发现无 Windows 分支、Homebrew 非自包含，不能只拷 bin。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 

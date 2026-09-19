@@ -22,7 +22,7 @@ import { PackagedProfileError, type PackagedProfileErrorKind } from './product-r
  */
 export const STARTUP_FAILURE_TITLE = '客服话术浮窗未能启动';
 export const STARTUP_PROFILE_MISSING_DETAIL =
-  '缺少本地合成环境配置，客户端无法启动。请先运行合成栈安装脚本生成本机配置，然后选择「重试」。';
+  '缺少运行配置，客户端无法启动。离线包应自带离线配置；产品主链请放置远端配置，不要在本机安装数据库。修复后选择「重试」。';
 export const STARTUP_PROFILE_INVALID_DETAIL =
   '本地合成环境配置无效，客户端无法启动。该文件已存在但未通过校验，请检查后再重新打开本应用。';
 export const STARTUP_PROFILE_UNREADABLE_DETAIL =

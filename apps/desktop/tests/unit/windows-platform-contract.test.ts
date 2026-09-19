@@ -55,6 +55,9 @@ describe('Windows local-unsigned packaging contract', () => {
       from: 'build/icon.ico',
       to: 'icon.ico',
     });
+    expect(JSON.stringify(packageJson.build)).not.toMatch(
+      /postgres|postgresql|pg15|apps\/api|synthetic-stack\/stack/i,
+    );
     expect(packageJson.build.win.certificateFile).toBeUndefined();
     expect(packageJson.build.win.certificateSha1).toBeUndefined();
     expect(packageJson.build.win.artifactName).toContain('-UNSIGNED.');

@@ -227,6 +227,9 @@ describe('macOS distribution contract', () => {
         },
       ]),
     );
+    expect(JSON.stringify(packageJson.build)).not.toMatch(
+      /postgres|postgresql|pg15|apps\/api|synthetic-stack\/stack/i,
+    );
   });
 });
 
