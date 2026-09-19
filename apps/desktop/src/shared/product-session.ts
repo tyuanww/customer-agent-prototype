@@ -3,6 +3,7 @@ export type ProductSessionView = {
   ok: true; enabled: boolean; signedIn: boolean; sessionEpoch: number;
   userId: string | null; role: 'agent' | 'coach' | 'owner' | null;
   authMode: 'mock' | 'feishu' | null; expiresAt: string | null;
+  displayName: string | null;
 };
 export const PRODUCT_ERRORS = {
   UNAUTHORIZED: '请先登录，或重新登录后继续', VALIDATION: '请求内容无效',
@@ -29,13 +30,16 @@ export function isProductSessionResult(value: unknown): value is ProductSessionR
   if (v.ok === false) return exactKeys(v, ['ok', 'code', 'sessionEpoch', 'message'])
     && typeof v.code === 'string' && Object.hasOwn(PRODUCT_ERRORS, v.code)
     && v.message === PRODUCT_ERRORS[v.code as ProductErrorCode];
-  if (!exactKeys(v, ['ok', 'enabled', 'signedIn', 'sessionEpoch', 'userId', 'role', 'authMode', 'expiresAt'])
+  if (!exactKeys(v, ['ok', 'enabled', 'signedIn', 'sessionEpoch', 'userId', 'role', 'authMode', 'expiresAt', 'displayName'])
     || v.ok !== true || typeof v.enabled !== 'boolean' || typeof v.signedIn !== 'boolean') return false;
-  if (!v.signedIn) return v.userId === null && v.role === null && v.authMode === null && v.expiresAt === null;
+  if (!v.signedIn) {
+    return v.userId === null && v.role === null && v.authMode === null && v.expiresAt === null && v.displayName === null;
+  }
   return v.enabled && typeof v.userId === 'string' && v.userId.length > 0 && v.userId.length <= 128
     && ['agent', 'coach', 'owner'].includes(v.role as string)
     && ['mock', 'feishu'].includes(v.authMode as string)
-    && typeof v.expiresAt === 'string' && Number.isFinite(Date.parse(v.expiresAt));
+    && typeof v.expiresAt === 'string' && Number.isFinite(Date.parse(v.expiresAt))
+    && typeof v.displayName === 'string' && v.displayName.length > 0 && v.displayName.length <= 64;
 }
 export type ProductSessionApi = {
   sessionStatus(): Promise<ProductSessionResult>;

@@ -156,7 +156,7 @@ describe('QueryApp', () => {
   });
 
   function connectProduct(options: { noHit?: boolean } = {}) {
-    const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString() };
+    const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString(), displayName: 'synthetic' };
     window.customerAgent!.product = { sessionStatus: vi.fn().mockResolvedValue(view), login: vi.fn().mockResolvedValue(view), logout: vi.fn(), onSessionChanged: () => () => {} };
     const search = vi.fn(async (r: import('../../src/shared/product-search').ProductSearchRequest) => ({
       ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, queryId: '11111111-1111-4111-8111-111111111111',
@@ -174,7 +174,7 @@ describe('QueryApp', () => {
       retrievalPreference: vi.fn(async () => ({ smartEnabled: true })),
       setRetrievalPreference: vi.fn(async (next) => next),
     };
-    const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' }) => void> = [];
+    const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' | 'replaced' | 'signed_out' | 'unavailable' | 'source_gate' }) => void> = [];
     window.customerAgent!.productAnnounce = {
       refresh: vi.fn(async r => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, releaseId: 'rel-synthetic', releaseSeq: 13,
         leaseExpiresAt: new Date(Date.now() + 600_000).toISOString(), announcement: { title: '合成公告', summary: '只读', createdAt: '2026-09-09T00:00:00.000Z' } })),
@@ -194,7 +194,7 @@ describe('QueryApp', () => {
     return { search, copyAdopt, invalidate, escalate, recordTerminal };
   }
   async function prepareProductQuery() {
-    render(<QueryApp />); await screen.findByRole('button', { name: 'agent · 退出' });
+    render(<QueryApp />); await screen.findByRole('button', { name: /· 退出$/ });
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(window.customerAgent!.productSearch!.search).toHaveBeenCalled());
@@ -202,7 +202,7 @@ describe('QueryApp', () => {
   it('searches storewide after login without platform or product pickers', async () => {
     const f = connectProduct();
     render(<QueryApp />);
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
@@ -239,6 +239,14 @@ describe('QueryApp', () => {
     if (eventStatus === 'disabled') expect(screen.getByTestId('match-reason-1')).toHaveTextContent('不记录事件');
     expect(copyText).not.toHaveBeenCalled(); expect(f.search).toHaveBeenCalledTimes(1);
   });
+  it('does not treat a replaced session epoch as an expired announcement', async () => {
+    const f = connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'replaced' })); });
+    expect(screen.queryByText('当前版本已失效，请重新核验')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
+  });
   it('clears candidates when the current announcement is invalidated', async () => {
     const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button'));
     await screen.findByTestId('copy-button-1');
@@ -256,7 +264,7 @@ describe('QueryApp', () => {
   it('keeps an idle signed-in overlay on the announce slot when the lease expires', async () => {
     const f = connectProduct();
     render(<QueryApp />);
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     expect(screen.queryByText('ACK 不是已读')).not.toBeInTheDocument();
     expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
     await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'expired' })); });
@@ -328,8 +336,8 @@ describe('QueryApp', () => {
   });
 
   it('blocks fixture search in product mode and exposes login/logout without credentials', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
-    const signedIn = { ...signedOut, signedIn: true, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedIn = { ...signedOut, signedIn: true, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedOut),
       login: vi.fn()
@@ -346,24 +354,24 @@ describe('QueryApp', () => {
     fireEvent.click(screen.getByTestId('search-button'));
     expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     expect(screen.getByTestId('question-input')).toHaveAttribute('placeholder', '输入或粘贴客户问题，回车查询');
     expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
     expect(document.body.textContent).not.toContain('access_token');
-    fireEvent.click(screen.getByRole('button', { name: 'agent · 退出' }));
+    fireEvent.click(screen.getByRole('button', { name: /· 退出$/ }));
     expect(await screen.findByRole('button', { name: '登录' })).toBeInTheDocument();
     expect(screen.getByTestId('question-input')).toHaveAttribute('placeholder', '登录后查询话术');
     expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
-    expect(await screen.findByRole('button', { name: 'agent · 退出' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /· 退出$/ })).toBeInTheDocument();
     expect(screen.getByTestId('question-input')).toHaveAttribute('placeholder', '输入或粘贴客户问题，回车查询');
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
   });
 
   it('shows the release banner after login instead of a failed query', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
     const signedIn = {
       ...signedOut,
       signedIn: true,
@@ -372,9 +380,10 @@ describe('QueryApp', () => {
       role: 'agent' as const,
       authMode: 'mock' as const,
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      displayName: 'synthetic_agent',
     };
     let sessionListener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
-    const invalidate: Array<(value: { sessionEpoch: number; reason: 'signed_out' | 'expired' | 'unavailable' }) => void> = [];
+    const invalidate: Array<(value: { sessionEpoch: number; reason: 'signed_out' | 'expired' | 'unavailable' | 'replaced' | 'source_gate' }) => void> = [];
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedOut),
       login: vi.fn().mockImplementation(async () => {
@@ -406,7 +415,7 @@ describe('QueryApp', () => {
     };
     render(<QueryApp />);
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
     expect(screen.queryByText('ACK 不是已读')).not.toBeInTheDocument();
     expect(screen.queryByText('查询未完成')).not.toBeInTheDocument();
@@ -416,7 +425,7 @@ describe('QueryApp', () => {
   it('restores a signed-in session without a residual invalid banner', async () => {
     connectProduct();
     render(<QueryApp />);
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
     expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
     expect(screen.queryByTestId('session-notice-unsigned')).not.toBeInTheDocument();
@@ -425,8 +434,8 @@ describe('QueryApp', () => {
   });
 
   it('distinguishes expiry and login failure from unsigned guidance', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
-    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 8, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 8, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedIn),
@@ -440,7 +449,7 @@ describe('QueryApp', () => {
       onSessionChanged: handler => { listener = handler; return () => {}; },
     };
     render(<QueryApp />);
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     act(() => listener({ ...signedOut, sessionEpoch: 9 }));
     expect(await screen.findByTestId('session-notice-expired')).toHaveTextContent('登录已失效，请重新登录');
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
@@ -471,16 +480,16 @@ describe('QueryApp', () => {
 
   it('ignores delayed old session events without clearing current UI', async () => {
     const pending = deferred<import('../../src/shared/product-session').ProductSessionResult>();
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
-    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 3, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 3, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
     window.customerAgent!.product = { sessionStatus: () => pending.promise, login: vi.fn().mockResolvedValue(signedIn), logout: vi.fn().mockResolvedValue(signedOut), onSessionChanged: handler => { listener = handler; return () => {}; } };
     render(<QueryApp />);
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     await act(async () => { pending.resolve(signedOut); });
     act(() => listener(signedOut));
-    expect(screen.getByRole('button', { name: 'agent · 退出' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /· 退出$/ })).toBeInTheDocument();
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('placeholder', '登录后查询话术');
   });
 
@@ -798,7 +807,7 @@ describe('QueryApp', () => {
     const pending = deferred<Awaited<ReturnType<typeof f.search>>>();
     f.search.mockImplementationOnce(() => pending.promise);
     render(<QueryApp />);
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(f.search).toHaveBeenCalled());
@@ -817,7 +826,7 @@ describe('QueryApp', () => {
     const pending = deferred<{ smartEnabled: boolean }>();
     window.customerAgent!.productSearch!.setRetrievalPreference = vi.fn(() => pending.promise);
     render(<QueryApp />);
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     fireEvent.click(screen.getByTestId('deep-thinking-toggle'));
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
@@ -1645,6 +1654,7 @@ describe('QueryApp', () => {
       role: null,
       authMode: null,
       expiresAt: null,
+      displayName: null,
     };
     const signedIn = {
       ...signedOut,
@@ -1654,6 +1664,7 @@ describe('QueryApp', () => {
       role: 'agent' as const,
       authMode: 'mock' as const,
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      displayName: 'synthetic_agent',
     };
     const pending = deferred<typeof signedIn>();
     const login = vi.fn().mockReturnValue(pending.promise);
@@ -1670,7 +1681,7 @@ describe('QueryApp', () => {
     expect(login).toHaveBeenCalledOnce();
     expect(openDashboard).not.toHaveBeenCalled();
     await act(async () => pending.resolve(signedIn));
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     await waitFor(() => expect(openDashboard).toHaveBeenCalledTimes(1));
   });
 
@@ -1685,6 +1696,7 @@ describe('QueryApp', () => {
       role: null,
       authMode: null,
       expiresAt: null,
+      displayName: null,
     };
     const signedIn = {
       ...signedOut,
@@ -1694,6 +1706,7 @@ describe('QueryApp', () => {
       role: 'agent' as const,
       authMode: 'mock' as const,
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      displayName: 'synthetic_agent',
     };
     const pending = deferred<typeof signedIn>();
     const login = vi.fn().mockReturnValue(pending.promise);
@@ -1726,6 +1739,7 @@ describe('QueryApp', () => {
       role: null,
       authMode: null,
       expiresAt: null,
+      displayName: null,
     };
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedOut),
@@ -1746,7 +1760,7 @@ describe('QueryApp', () => {
     const user = userEvent.setup();
     connectProduct();
     render(<QueryApp />);
-    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByRole('button', { name: /· 退出$/ });
     const login = window.customerAgent?.product?.login as ReturnType<typeof vi.fn>;
     login.mockClear();
 

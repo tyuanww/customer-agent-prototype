@@ -103,7 +103,7 @@ test('product session native Feishu login, logout and renderer isolation', async
     const login = app.windows().find((window) => window.url().includes('role=login'))!;
     await login.getByRole('button', { name: '飞书登录' }).click();
     expect(login.url()).toMatch(/role=login/);
-    await expect(query.getByRole('button', { name: 'agent · 退出' })).toBeVisible();
+    await expect(query.getByRole('button', { name: /· 退出$/ })).toBeVisible();
     await expect(query.getByTestId('announce-banner')).toHaveCount(0);
     const view = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());
     expect(JSON.stringify(view)).not.toContain(wire.token);
@@ -138,7 +138,7 @@ test('product session account login exchanges a synthetic password for the same 
     await login.getByRole('textbox', { name: '账号' }).fill('synthetic_agent');
     await login.locator('input[name="password"]').fill('synthetic-password');
     await login.getByRole('button', { name: '登录' }).click();
-    await expect(query.getByRole('button', { name: 'agent · 退出' })).toBeVisible();
+    await expect(query.getByRole('button', { name: /· 退出$/ })).toBeVisible();
     const view = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());
     expect(JSON.stringify(view)).not.toContain(wire.token);
     expect(existsSync(path.join(directory, 'product-session.enc'))).toBe(true);
