@@ -49,9 +49,11 @@ const stackProfile = readFileSync(
 
 describe('Windows local-unsigned packaging contract', () => {
   it('writes the packaged profile into Windows %APPDATA% userData, not macOS Application Support', () => {
-    expect(stackProfile).toContain("process.platform === 'win32'");
+    expect(stackProfile).toContain("platform === 'win32'");
     expect(stackProfile).toContain("'AppData', 'Roaming'");
     expect(stackProfile).toContain('DESKTOP_APP_NAME');
+    expect(stackProfile).toContain('XDG_CONFIG_HOME');
+    expect(stackProfile).toContain('desktopPackagedProfilePath');
     const verifyDesktop = readFileSync(path.join(repositoryRoot, 'docs/how-to-verify-desktop.md'), 'utf8');
     const p4 = readFileSync(path.join(repositoryRoot, 'docs/how-to-p4-remote-mac.md'), 'utf8');
     expect(verifyDesktop).toContain('%APPDATA%\\客服话术浮窗 Demo');
@@ -68,9 +70,21 @@ describe('Windows local-unsigned packaging contract', () => {
       'utf8',
     );
     expect(mergeOrder).toContain('feat/p7-publish-desktop-origin');
+    expect(mergeOrder).toContain('b04cc79');
+    expect(mergeOrder).toContain('feat/p7-semantic-origin-path');
+    expect(mergeOrder).toContain('3878e4b');
     expect(mergeOrder).toContain('feat/p7-embeddings-delivery');
     expect(mergeOrder).toContain('不要合');
     expect(mergeOrder).toContain('feat/p10-m5-userdata-note');
+    expect(mergeOrder).toContain('feat/linux-packaged-remote-howto');
+    expect(mergeOrder).toContain('59396a2');
+    expect(mergeOrder).toContain('feat/p10-linux-e2e-deps');
+    expect(mergeOrder).toContain('cfc4bed');
+    expect(mergeOrder).toContain('feat/p10-linux-ci-artifact');
+    expect(mergeOrder).toContain('9a1b519');
+    expect(mergeOrder).toContain('feat/p10-linux-xdg-userdata');
+    expect(mergeOrder).toContain('4f12bfc');
+    expect(mergeOrder).toContain('feat/merge-order-p7-linux-tips');
     const remoteOffice = readFileSync(
       path.join(repositoryRoot, 'docs/how-to-office-machine-product-remote.md'),
       'utf8',
@@ -102,7 +116,8 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(remoteLinux).toContain('账号');
     expect(remoteLinux).not.toMatch(/内部|外包/);
     expect(remoteLinux).toContain('~/.config/客服话术浮窗 Demo/synthetic-stack.json');
-    expect(remoteLinux).toContain('没有与 `package:win` / `package:mac:local` 对等的 Linux UNSIGNED 产物脚本');
+    expect(remoteLinux).toContain('package:linux');
+    expect(remoteLinux).toContain('必须在 **Linux** 上跑');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {

@@ -143,48 +143,61 @@ export type StackProfile = Readonly<{
  * Where the packaged desktop client looks for its synthetic profile. Must match
  * Electron `app.getPath('userData')` after `app.setName`:
  * macOS `~/Library/Application Support/<name>`, Windows `%APPDATA%/<name>`,
- * Linux `~/.config/<name>`. The stack writes the file; the client re-validates
- * every field before using it and fail-closes if the file is missing or not a
- * valid profile.
+ * Linux `$XDG_CONFIG_HOME/<name>` or `~/.config/<name>`. Resolved when called
+ * so test env and `XDG_CONFIG_HOME` are not frozen at import. The stack writes
+ * the file; the client re-validates every field before using it and fail-closes
+ * if the file is missing or not a valid profile.
  *
  * `CUSTOMER_AGENT_DESKTOP_USERDATA` overrides the location for tests and for a
  * client launched with `--user-data-dir`.
  */
 export const DESKTOP_APP_NAME = '客服话术浮窗 Demo';
 
-export function defaultDesktopUserDataDirectory(): string {
-  if (process.env.CUSTOMER_AGENT_DESKTOP_USERDATA) {
-    return path.resolve(process.env.CUSTOMER_AGENT_DESKTOP_USERDATA);
+export type DesktopUserDataLocator = Readonly<{
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  home?: string;
+}>;
+
+export function defaultDesktopUserDataDirectory(options: DesktopUserDataLocator = {}): string {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
+  const home = options.home ?? os.homedir();
+  const override = (env.CUSTOMER_AGENT_DESKTOP_USERDATA ?? '').trim();
+  if (override.length > 0) {
+    return path.resolve(override);
   }
-  if (process.platform === 'win32') {
-    const roaming = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+  if (platform === 'win32') {
+    const roaming = (env.APPDATA ?? '').trim() || path.join(home, 'AppData', 'Roaming');
     return path.join(roaming, DESKTOP_APP_NAME);
   }
-  if (process.platform === 'linux') {
-    return path.join(os.homedir(), '.config', DESKTOP_APP_NAME);
+  if (platform === 'linux') {
+    const xdg = (env.XDG_CONFIG_HOME ?? '').trim();
+    const configHome = xdg.length > 0 ? path.resolve(xdg) : path.join(home, '.config');
+    return path.join(configHome, DESKTOP_APP_NAME);
   }
-  return path.join(os.homedir(), 'Library', 'Application Support', DESKTOP_APP_NAME);
+  return path.join(home, 'Library', 'Application Support', DESKTOP_APP_NAME);
 }
 
-export const DESKTOP_PACKAGED_PROFILE_PATH = path.join(
-  defaultDesktopUserDataDirectory(),
-  'synthetic-stack.json',
-);
+export function desktopPackagedProfilePath(options: DesktopUserDataLocator = {}): string {
+  return path.join(defaultDesktopUserDataDirectory(options), 'synthetic-stack.json');
+}
 
 /**
  * Publish the resolved origins for the packaged client. Only the two loopback
  * origins and an exact mode marker are written — no token, DSN or secret.
  */
 export function writeDesktopPackagedProfile(profile: StackProfile): string {
-  mkdirSync(path.dirname(DESKTOP_PACKAGED_PROFILE_PATH), { recursive: true });
-  const temporary = `${DESKTOP_PACKAGED_PROFILE_PATH}.${process.pid}.tmp`;
+  const packagedPath = desktopPackagedProfilePath();
+  mkdirSync(path.dirname(packagedPath), { recursive: true });
+  const temporary = `${packagedPath}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify({
     mode: 'synthetic-local',
     apiOrigin: profile.apiOrigin,
     identityOrigin: profile.identityOrigin,
   }, null, 2)}\n`, { mode: 0o600 });
-  renameSync(temporary, DESKTOP_PACKAGED_PROFILE_PATH);
-  return DESKTOP_PACKAGED_PROFILE_PATH;
+  renameSync(temporary, packagedPath);
+  return packagedPath;
 }
 
 export function ensureStackDirectories(): void {

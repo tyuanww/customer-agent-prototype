@@ -285,9 +285,11 @@ describe('packaged synthetic product profile', () => {
     expect(main).not.toContain('developmentProductProfile(process.env)');
     expect(main).not.toContain('readPackagedProductProfile(userDataDirectory)');
     expect(stackProfile).toContain('defaultDesktopUserDataDirectory');
+    expect(stackProfile).toContain('desktopPackagedProfilePath');
     expect(stackProfile).toContain("'Library', 'Application Support', DESKTOP_APP_NAME");
     expect(stackProfile).toContain("'AppData', 'Roaming'");
     expect(stackProfile).toContain("'.config'");
+    expect(stackProfile).toContain('XDG_CONFIG_HOME');
     expect(stackProfile).toContain("'synthetic-stack.json'");
   });
 

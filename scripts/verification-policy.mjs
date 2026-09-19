@@ -30,7 +30,7 @@ export function changedFiles(base, head, cwd = root) {
 }
 
 export function assertCiGate(needs) {
-  for (const key of ['changes', 'quality', 'postgres-15', 'windows-feasibility']) {
+  for (const key of ['changes', 'quality', 'postgres-15', 'windows-feasibility', 'linux-feasibility']) {
     if (needs?.[key]?.result !== 'success') throw new Error(`CI_REQUIRED_JOB_NOT_SUCCESS: ${key}`);
   }
   if (!['docs', 'full'].includes(needs.changes.outputs?.mode)) throw new Error('CI_PLAN_MISSING');

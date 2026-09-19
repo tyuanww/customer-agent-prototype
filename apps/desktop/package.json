@@ -15,6 +15,7 @@
     "test:assets": "vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts",
     "test:e2e:float": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @float",
     "test:e2e:windows-feasibility": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @windows-feasibility",
+    "test:e2e:linux-feasibility": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @linux-feasibility",
     "build": "electron-vite build",
     "generate:mac-icon": "sh scripts/generate-mac-icon.sh",
     "generate:fox-head": "node scripts/generate-fox-head.mjs",
@@ -22,6 +23,7 @@
     "preview": "electron-vite preview",
     "test:e2e": "pnpm build && playwright test",
     "package:win": "node scripts/package-windows.mjs local",
+    "package:linux": "node scripts/package-linux.mjs local",
     "package:mac:local": "node scripts/package-macos.mjs local",
     "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"
   },
@@ -137,6 +139,20 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
       "differentialPackage": false
+    },
+    "linux": {
+      "executableName": "customer-agent-desktop",
+      "icon": "build/icon.png",
+      "category": "Office",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-linux-${arch}-UNSIGNED.${ext}"
     }
   }
 }
