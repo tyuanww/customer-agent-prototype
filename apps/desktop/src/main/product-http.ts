@@ -1,4 +1,5 @@
 import { PRODUCT_ERRORS, type ProductErrorCode } from '../shared/product-session';
+import { desktopFetch } from './desktop-fetch.ts';
 
 export class ProductHttpError extends Error {
   constructor(readonly code: ProductErrorCode) { super(PRODUCT_ERRORS[code]); }
@@ -42,7 +43,7 @@ export type ProductHttpResult = {
 };
 export class ProductHttp {
   readonly origin: string;
-  constructor(origin: string, private readonly transport: typeof fetch = fetch) {
+  constructor(origin: string, private readonly transport: typeof fetch = desktopFetch) {
     this.origin = productOrigin(origin);
   }
   /** Bounded response and deadline. No retries: mutations may have committed. */

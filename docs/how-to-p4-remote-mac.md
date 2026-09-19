@@ -46,3 +46,7 @@ cloudflared tunnel route dns customer-agent-local agent-id.jianghua.site
 ```
 
 `synthetic-local` 仍只接受 loopback。会话文件按 API origin 分开，不会把本机 token 发到远端。
+
+## TLS
+
+桌面 ProductHttp、账号 `/password` 和 MiniMax 走 Electron `net.fetch`（系统信任库），不是 Node `fetch`。不要关闭 TLS 校验。API 进程访问飞书仍可能需要 `NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem`。规格：[P6](plans/2026-09-19-p6-cert-proxy-paths.md)。

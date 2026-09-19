@@ -2,6 +2,8 @@ import { BrowserWindow, ipcMain, session, shell, type Event } from 'electron';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { productOrigin, ProductHttpError } from './product-http';
+import { desktopFetch } from './desktop-fetch.ts';
+import { applySessionSecurity } from './window-security.ts';
 import { loadRenderer } from './overlay-renderer-loader';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import type { LoginWindow } from './product-session';
@@ -35,7 +37,7 @@ export function isFeishuAuthorize(url: URL): boolean {
 export function followAllowedLoginRedirects(
   providerOrigin: string,
   apiOrigin: string,
-  transport: typeof fetch = fetch,
+  transport: typeof fetch = desktopFetch,
 ): (url: string) => Promise<void> {
   const provider = productOrigin(providerOrigin);
   const api = productOrigin(apiOrigin);
@@ -61,7 +63,7 @@ export function createLoginWindow(
 ): LoginWindow {
   const provider = productOrigin(providerOrigin); const api = productOrigin(apiOrigin);
   const openExternal = host.openExternal ?? ((url: string) => shell.openExternal(url));
-  const transport = host.fetch ?? fetch;
+  const transport = host.fetch ?? desktopFetch;
   return {
     open(url, operation) {
       const signal = operation.signal;
@@ -73,8 +75,7 @@ export function createLoginWindow(
         // Isolated cookies/storage. Renderer HTML must not emit `crossorigin`
         // (see stripCrossOriginAttributes) or this partition cannot load file:// modules.
         const isolated = session.fromPartition(`synthetic-login-${randomUUID()}`);
-        isolated.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-        isolated.setPermissionCheckHandler(() => false);
+        applySessionSecurity(isolated);
         isolated.webRequest.onBeforeRequest((details, callback) => {
           try { callback({ cancel: !isChooserUrl(details.url, devServerUrl?.()) }); }
           catch { callback({ cancel: true }); }

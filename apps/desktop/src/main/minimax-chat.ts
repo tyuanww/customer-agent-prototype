@@ -2,7 +2,7 @@
  * MiniMax OpenAI-compatible chat. Electron main uses Chromium net.fetch.
  * Never used to generate customer-facing script text.
  */
-import { createRequire } from 'node:module';
+import { electronNetFetch } from './desktop-fetch.ts';
 
 const DEFAULT_BASE = 'https://api.minimaxi.com/v1';
 const DEFAULT_MODEL = 'MiniMax-M3';
@@ -13,15 +13,6 @@ export type MinimaxChatOptions = Readonly<{
   maxTokens?: number;
   signal?: AbortSignal;
 }>;
-
-function electronFetch(): typeof fetch | null {
-  try {
-    const electron = createRequire(import.meta.url)('electron') as { net?: { fetch?: typeof fetch } };
-    return typeof electron.net?.fetch === 'function' ? electron.net.fetch.bind(electron.net) : null;
-  } catch {
-    return null;
-  }
-}
 
 export function minimaxConfigured(): boolean {
   return Boolean(process.env.MINIMAX_API_KEY?.trim());
@@ -36,7 +27,7 @@ export async function minimaxChatContent(
   const base = (process.env.MINIMAX_BASE_URL?.trim() || DEFAULT_BASE).replace(/\/$/, '');
   if (!base.startsWith('https://')) return null;
   const model = process.env.MINIMAX_MODEL?.trim() || DEFAULT_MODEL;
-  const netFetch = electronFetch();
+  const netFetch = electronNetFetch();
   const fetchImpl = options.fetchImpl ?? netFetch ?? fetch;
   if (!options.fetchImpl && !netFetch) console.warn('[minimax-chat] fallback Node fetch');
   const controller = new AbortController();
