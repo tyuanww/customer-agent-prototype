@@ -55,7 +55,9 @@ describe('startup failure notice', () => {
     expect(options.type).toBe('error');
   });
 
-  it('reports a missing profile file with the install-first message', async () => {
+  it('reports a missing profile without telling the operator to install PostgreSQL', async () => {
+    expect(STARTUP_PROFILE_MISSING_DETAIL).not.toMatch(/PostgreSQL|合成栈安装脚本|pg15/i);
+    expect(STARTUP_PROFILE_MISSING_DETAIL).toContain('不要在本机安装数据库');
     const showMessageBox = dialogReturning(1);
     const notify = createStartupFailureNotifier({ showMessageBox, log: vi.fn() });
 
