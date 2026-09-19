@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。第二刀（`feat/p4-account-https`）：账号 POST 走独立 HTTPS identity origin，口令服务仍 loopback；超时 15s。DNS / 第二条 ingress 按 how-to 配，本刀不改 Cloudflare。API 绑 `0.0.0.0` / 办公机实装仍未做。
+**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。第二刀（`feat/p4-account-https`）：账号 POST 走独立 HTTPS identity origin，口令服务仍 loopback；超时 15s。打包态远端勾选（未观察）：macOS / Windows 办公机 / Linux（Linux 无对等 UNSIGNED 脚本）。DNS / 第二条 ingress 按 how-to 配。API 绑 `0.0.0.0` / 办公机实装仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 第一刀冻结「包内不含 PG/API」（`feat/p10-no-bundled-stack`）。包内后端本轮不做；办公机首轮仍 P3，产品主链走 P4。缺配置文案不再叫人装数据库。见 `docs/plans/2026-09-19-p10-no-bundled-stack.md`。实证仍成立：PG15 发现无 Windows 分支、Homebrew 非自包含，不能只拷 bin。
+**Status:** OPEN · 第一刀冻结「包内不含 PG/API」。包内后端本轮不做；缺配置文案不再叫人装数据库。办公机远端主链 how-to 已写、全部未观察，须合入后再打新包。见 `docs/how-to-office-machine-product-remote.md`、`docs/plans/2026-09-19-p10-no-bundled-stack.md`。实证仍成立：PG15 发现无 Windows 分支、Homebrew 非自包含，不能只拷 bin。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 
@@ -147,7 +147,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P3 或 P4
-**Status:** P3 段不适用主链。P4 `product-remote` 适用但 **未观察**；清单见 `docs/how-to-verify-macos-m5.md` §7.1 与 `docs/plans/2026-09-19-p9-remote-m5.md`。本刀不把 M5 标完成，不授权再打包。
+**Status:** P3 段不适用主链。P4 `product-remote` 适用但 **未观察**；清单见 `docs/how-to-verify-macos-m5.md` §7.1、`docs/how-to-macos-packaged-product-remote.md`、`docs/plans/2026-09-19-p9-remote-m5.md`。本刀不把 M5 标完成，不授权再打包。
 
 ### Overlay · Windows 收起后交还前台输入框
 

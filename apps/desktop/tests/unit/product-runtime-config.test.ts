@@ -284,7 +284,10 @@ describe('packaged synthetic product profile', () => {
     expect(main).toContain('bundledOfflineProfilePath(process.resourcesPath)');
     expect(main).not.toContain('developmentProductProfile(process.env)');
     expect(main).not.toContain('readPackagedProductProfile(userDataDirectory)');
-    expect(stackProfile).toContain("'Library', 'Application Support', '客服话术浮窗 Demo'");
+    expect(stackProfile).toContain('defaultDesktopUserDataDirectory');
+    expect(stackProfile).toContain("'Library', 'Application Support', DESKTOP_APP_NAME");
+    expect(stackProfile).toContain("'AppData', 'Roaming'");
+    expect(stackProfile).toContain("'.config'");
     expect(stackProfile).toContain("'synthetic-stack.json'");
   });
 

@@ -60,6 +60,8 @@
 
 - `scripts/synthetic-stack/postgres.ts:40-65` 的 PG15 发现只认 `CUSTOMER_AGENT_PG15_BIN` / `pg_config` / Homebrew，`:114`/`:124` 用 unix socket + `auth-local=trust`；**没有 Windows 分支、没有 `.exe` 语义**。
 - `scripts/synthetic-stack/profile.ts:93-98` 把 `synthetic-stack.json` 写死到 macOS 的 `Library/Application Support`，**Windows 上落不到** `app.getPath('userData')`。
+
+> **2026-09-19 注：** 写入路径已按平台对齐 Electron userData，见 [P10 userData](2026-09-19-p10-desktop-userdata-path.md)。包内后端仍不做。
 - `scripts/synthetic-stack/stack.ts:45-47` 的 `API_ENTRY` 依赖仓内 `apps/api/dist/main.js`，即要求目标机先构建 API。
 - 固定端口 `43100`/`43101`/`43199` 占用即 fail-closed（`profile.ts:47-52`、`stack.ts:91-100`），终端用户机无法保证空闲。
 - 本机 Homebrew PG15 依赖外部 dylib、**非自包含**，不能只拷 bin 目录；mac 基线包已 213MB。

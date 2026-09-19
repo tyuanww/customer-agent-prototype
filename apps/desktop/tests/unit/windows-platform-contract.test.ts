@@ -42,8 +42,69 @@ const verifyWindowsPackage = readFileSync(
 const overlayController = readFileSync(path.join(root, 'src/main/overlay-controller.ts'), 'utf8');
 const readme = readFileSync(path.join(repositoryRoot, 'README.md'), 'utf8');
 const developmentBrief = readFileSync(path.join(repositoryRoot, 'DEVELOPMENT_BRIEF.md'), 'utf8');
+const stackProfile = readFileSync(
+  path.join(repositoryRoot, 'scripts/synthetic-stack/profile.ts'),
+  'utf8',
+);
 
 describe('Windows local-unsigned packaging contract', () => {
+  it('writes the packaged profile into Windows %APPDATA% userData, not macOS Application Support', () => {
+    expect(stackProfile).toContain("process.platform === 'win32'");
+    expect(stackProfile).toContain("'AppData', 'Roaming'");
+    expect(stackProfile).toContain('DESKTOP_APP_NAME');
+    const verifyDesktop = readFileSync(path.join(repositoryRoot, 'docs/how-to-verify-desktop.md'), 'utf8');
+    const p4 = readFileSync(path.join(repositoryRoot, 'docs/how-to-p4-remote-mac.md'), 'utf8');
+    expect(verifyDesktop).toContain('%APPDATA%\\客服话术浮窗 Demo');
+    expect(verifyDesktop).toContain('~/.config/客服话术浮窗 Demo/');
+    expect(p4).toContain('%APPDATA%\\客服话术浮窗 Demo\\synthetic-stack.json');
+    expect(p4).toContain('~/.config/客服话术浮窗 Demo/synthetic-stack.json');
+    const m5 = readFileSync(path.join(repositoryRoot, 'docs/how-to-verify-macos-m5.md'), 'utf8');
+    expect(m5).toContain('~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json');
+    expect(m5).toContain('%APPDATA%');
+    expect(m5).toContain('~/.config');
+    expect(m5).toContain('不把那些路径记成本节通过');
+    const mergeOrder = readFileSync(
+      path.join(repositoryRoot, 'docs/plans/2026-09-19-local-unpushed-merge-order.md'),
+      'utf8',
+    );
+    expect(mergeOrder).toContain('feat/p7-publish-desktop-origin');
+    expect(mergeOrder).toContain('feat/p7-embeddings-delivery');
+    expect(mergeOrder).toContain('不要合');
+    expect(mergeOrder).toContain('feat/p10-m5-userdata-note');
+    const remoteOffice = readFileSync(
+      path.join(repositoryRoot, 'docs/how-to-office-machine-product-remote.md'),
+      'utf8',
+    );
+    expect(remoteOffice).toContain('**未观察**');
+    expect(remoteOffice).toContain('飞书');
+    expect(remoteOffice).toContain('账号');
+    expect(remoteOffice).not.toMatch(/内部|外包/);
+    expect(remoteOffice).toContain('%APPDATA%\\客服话术浮窗 Demo\\synthetic-stack.json');
+    expect(remoteOffice).toContain('不要在办公机安装 PostgreSQL');
+    expect(remoteOffice).toContain('还不能用当前 main 上的安装包当本页证据');
+    const remoteMac = readFileSync(
+      path.join(repositoryRoot, 'docs/how-to-macos-packaged-product-remote.md'),
+      'utf8',
+    );
+    expect(remoteMac).toContain('**未观察**');
+    expect(remoteMac).toContain('飞书');
+    expect(remoteMac).toContain('账号');
+    expect(remoteMac).not.toMatch(/内部|外包/);
+    expect(remoteMac).toContain('~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json');
+    expect(remoteMac).toContain('不授权现在执行 `pnpm package:mac:local`');
+    expect(remoteMac).toContain('不要把 [M5](how-to-verify-macos-m5.md) 的 `synthetic-local` 勾选抄到本页');
+    const remoteLinux = readFileSync(
+      path.join(repositoryRoot, 'docs/how-to-linux-packaged-product-remote.md'),
+      'utf8',
+    );
+    expect(remoteLinux).toContain('**未观察**');
+    expect(remoteLinux).toContain('飞书');
+    expect(remoteLinux).toContain('账号');
+    expect(remoteLinux).not.toMatch(/内部|外包/);
+    expect(remoteLinux).toContain('~/.config/客服话术浮窗 Demo/synthetic-stack.json');
+    expect(remoteLinux).toContain('没有与 `package:win` / `package:mac:local` 对等的 Linux UNSIGNED 产物脚本');
+  });
+
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {
     expect(packageJson.scripts['package:win']).toBe('node scripts/package-windows.mjs local');
     expect(packageJson.scripts['package:win:distribution']).toBeUndefined();
