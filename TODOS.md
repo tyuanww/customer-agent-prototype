@@ -147,7 +147,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P3 或 P4
-**Status:** P3 段不适用主链 · P4 段仍 OPEN
+**Status:** P3 段不适用主链。P4 `product-remote` 适用但 **未观察**；清单见 `docs/how-to-verify-macos-m5.md` §7.1 与 `docs/plans/2026-09-19-p9-remote-m5.md`。本刀不把 M5 标完成，不授权再打包。
 
 ### Overlay · Windows 收起后交还前台输入框
 
