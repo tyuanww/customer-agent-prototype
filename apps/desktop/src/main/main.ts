@@ -10,6 +10,7 @@ import { registerProductAnnounceIpc } from './product-announce-ipc';
 import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
+import { registerDashboardContentIpc } from './dashboard-content-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
@@ -231,6 +232,11 @@ if (!gotLock) {
     registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerDashboardWordingIpc(
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+    );
+    registerDashboardContentIpc(
+      productSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
     );

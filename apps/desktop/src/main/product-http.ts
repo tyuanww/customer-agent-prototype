@@ -48,23 +48,30 @@ export class ProductHttp {
   }
   /** Bounded response and deadline. No retries: mutations may have committed. */
   async request(path: string, options: {
-    body?: unknown; token?: string; signal?: AbortSignal; method?: string;
+    body?: unknown; form?: FormData; token?: string; signal?: AbortSignal; method?: string;
+    timeoutMs?: number;
     headers?: Partial<Record<(typeof EXTRA_HEADERS)[number], string>>;
   } = {}): Promise<ProductHttpResult> {
     if (!path.startsWith('/v1/') || path.includes('..') || path.includes('://') || path.includes('\\')) throw new ProductHttpError('VALIDATION');
+    if (options.body !== undefined && options.form !== undefined) throw new ProductHttpError('VALIDATION');
+    const timeoutMs = options.timeoutMs ?? 5_000;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) throw new ProductHttpError('VALIDATION');
     const extra = options.headers ?? {};
     if (Object.keys(extra).some(name => !(EXTRA_HEADERS as readonly string[]).includes(name))) throw new ProductHttpError('VALIDATION');
-    const deadline = AbortSignal.timeout(5_000);
+    const deadline = AbortSignal.timeout(timeoutMs);
     const signal = options.signal ? AbortSignal.any([deadline, options.signal]) : deadline;
     const started = Date.now();
+    const hasPayload = options.body !== undefined || options.form !== undefined;
     try {
       const response = await this.transport(new URL(path, this.origin), {
-        method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
+        method: options.method ?? (hasPayload ? 'POST' : 'GET'),
         redirect: 'error', signal,
         headers: { ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
           ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
           ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== undefined)) },
-        ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+        ...(options.body !== undefined ? { body: JSON.stringify(options.body) }
+          : options.form !== undefined ? { body: options.form }
+          : {}),
       });
       const meta = {
         ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),

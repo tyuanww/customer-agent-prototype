@@ -1,5 +1,10 @@
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { DASHBOARD_MANIFEST, type DomainId } from '../../data/dashboard-manifest';
+import {
+  contentPublishGate,
+  CONTENT_PUBLISH_COPY,
+  type DashboardContentSessionView,
+} from '@shared/dashboard-content';
 import {
   parseCoachUploadCsv,
   readCoachUploadFile,
@@ -13,10 +18,11 @@ const data = DASHBOARD_MANIFEST.content;
 type UploadView =
   | { status: 'idle' }
   | { status: 'reading'; sourceName: string }
-  | { status: 'ready'; sourceName: string; rows: readonly CoachUploadRow[] }
+  | { status: 'ready'; sourceName: string; rows: readonly CoachUploadRow[]; csvText: string }
   | { status: 'error'; message: string };
 
-function pipelineItemClass(step: string, upload: UploadView): string {
+function pipelineItemClass(step: string, upload: UploadView, submitting: boolean): string {
+  if (submitting && step === 'Publish') return 'is-current';
   if (upload.status === 'reading' && step === 'Import') return 'is-current';
   if (upload.status !== 'ready') return '';
   if (step === 'Import' || step === 'Validate') return 'is-done';
@@ -31,7 +37,7 @@ function domainLabel(domain: DomainId | undefined): string {
 
 function applyUploadResult(result: CoachUploadResult): UploadView {
   if (result.ok) {
-    return { status: 'ready', sourceName: result.sourceName, rows: result.rows };
+    return { status: 'ready', sourceName: result.sourceName, rows: result.rows, csvText: result.csvText };
   }
   return { status: 'error', message: result.message };
 }
@@ -39,6 +45,9 @@ function applyUploadResult(result: CoachUploadResult): UploadView {
 export function ContentModule() {
   const [selectedId, setSelectedId] = useState(data.releases[0]?.releaseId ?? '');
   const [upload, setUpload] = useState<UploadView>({ status: 'idle' });
+  const [sessionView, setSessionView] = useState<DashboardContentSessionView | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
   const ingestGeneration = useRef(0);
   const selected = data.releases.find((release) => release.releaseId === selectedId) ?? data.releases[0];
   const hasDomain = upload.status === 'ready' && upload.rows.some((row) => row.domain);
@@ -50,13 +59,48 @@ export function ContentModule() {
       ? upload.message
       : '尚未导入。选择 CSV 或载入合成样例后，只在本页显示待审核草稿预览。二进制 xlsx 会失败关闭。';
 
+  useEffect(() => {
+    const api = window.dashboardContent;
+    if (!api) return undefined;
+    let live = true;
+    const load = () => {
+      void api.session().then((result) => {
+        if (!live) return;
+        setSessionView(result.ok ? result : null);
+      });
+    };
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      live = false;
+      window.removeEventListener('focus', load);
+    };
+  }, []);
+
+  const rows = upload.status === 'ready' ? upload.rows : [];
+  const gate = contentPublishGate({
+    productAvailable: Boolean(window.dashboardContent) && sessionView?.enabled !== false,
+    signedIn: sessionView?.signedIn === true,
+    role: sessionView?.role ?? null,
+    rows,
+    sourceBindings: [],
+  });
+  const publishDisabled = !gate.allowed || submitting;
+  const publishReason = submitting
+    ? CONTENT_PUBLISH_COPY.submitting
+    : gate.allowed
+      ? ''
+      : gate.message;
+
   const loadDemo = () => {
     ingestGeneration.current += 1;
+    setPublishFeedback(null);
     setUpload(applyUploadResult(parseCoachUploadCsv(data.upload.demoCsv, data.upload.demoFileName)));
   };
 
   const clearUpload = () => {
     ingestGeneration.current += 1;
+    setPublishFeedback(null);
     setUpload({ status: 'idle' });
   };
 
@@ -67,6 +111,7 @@ export function ContentModule() {
     if (!file) return;
     const generation = ingestGeneration.current + 1;
     ingestGeneration.current = generation;
+    setPublishFeedback(null);
     setUpload({ status: 'reading', sourceName: file.name.trim() || 'untitled.csv' });
     void readCoachUploadFile(file).then(
       (result) => {
@@ -83,6 +128,33 @@ export function ContentModule() {
     );
   };
 
+  const onPublish = () => {
+    if (!gate.allowed || upload.status !== 'ready' || submitting) return;
+    const api = window.dashboardContent;
+    if (!api) return;
+    const generation = ingestGeneration.current;
+    setSubmitting(true);
+    setPublishFeedback(null);
+    const title = upload.sourceName.trim().slice(0, 200) || '工作台草稿';
+    void api.publishDraft({
+      sourceName: upload.sourceName,
+      csvText: upload.csvText,
+      rows: upload.rows,
+      title,
+      summary: null,
+      sourceBindings: [],
+    }).then((result) => {
+      if (generation !== ingestGeneration.current) return;
+      if (!result.ok) {
+        setPublishFeedback(result.message);
+        return;
+      }
+      setPublishFeedback(`已提交发布 · ${result.releaseId}`);
+    }).finally(() => {
+      if (generation === ingestGeneration.current) setSubmitting(false);
+    });
+  };
+
   return (
     <div className="dash-module" data-testid="module-content">
       <header className="dash-module-head">
@@ -91,14 +163,23 @@ export function ContentModule() {
           <p className="dash-kicker">{data.kicker}</p>
         </div>
         <div className="dash-publish-box">
-          <button type="button" className="dash-publish" disabled data-testid="publish-action">Publish</button>
-          <span data-testid="publish-disabled-reason">{data.publishDisabledReason}</span>
+          <button
+            type="button"
+            className="dash-publish"
+            disabled={publishDisabled}
+            data-testid="publish-action"
+            onClick={onPublish}
+          >
+            Publish
+          </button>
+          <span data-testid="publish-disabled-reason">{publishReason}</span>
+          {publishFeedback ? <span data-testid="publish-feedback">{publishFeedback}</span> : null}
         </div>
       </header>
 
       <ol className="dash-pipeline" data-testid="content-pipeline">
         {data.pipeline.map((step, index) => (
-          <li key={step} className={pipelineItemClass(step, upload)} data-pipeline-step={step}>
+          <li key={step} className={pipelineItemClass(step, upload, submitting)} data-pipeline-step={step}>
             <span>{index + 1}</span>{step}
           </li>
         ))}
@@ -128,7 +209,7 @@ export function ContentModule() {
               type="file"
               accept={data.upload.accept}
               data-testid="content-upload-input"
-              disabled={upload.status === 'reading'}
+              disabled={upload.status === 'reading' || submitting}
               onChange={onFileChange}
             />
           </label>
@@ -136,7 +217,7 @@ export function ContentModule() {
             type="button"
             className="dash-action-primary"
             data-testid="content-upload-demo"
-            disabled={upload.status === 'reading'}
+            disabled={upload.status === 'reading' || submitting}
             onClick={loadDemo}
           >
             载入合成样例
@@ -145,7 +226,7 @@ export function ContentModule() {
             type="button"
             className="dash-reset"
             data-testid="content-upload-clear"
-            disabled={upload.status === 'idle' || upload.status === 'reading'}
+            disabled={upload.status === 'idle' || upload.status === 'reading' || submitting}
             onClick={clearUpload}
           >
             清除预览
@@ -243,7 +324,7 @@ export function ContentModule() {
           <div><dt>风险</dt><dd>{selected.risk}</dd></div>
         </dl>
         {selected.blockReason ? <p className="dash-block" data-testid="missing-domain-block">{selected.blockReason}</p> : null}
-        <p className="dash-footnote">选择只改变本地展示；发布、回滚、审核、绑定均不可操作，也不会写入任何系统。</p>
+        <p className="dash-footnote">选择只改变本地展示。正式导入与发布走产品会话，不连接飞书或 Wiki。</p>
       </section>
     </div>
   );

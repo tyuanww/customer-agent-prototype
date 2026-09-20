@@ -44,6 +44,9 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.OPEN_SEARCH,
       IPC_CHANNELS.OPEN_DASHBOARD,
       IPC_CHANNELS.DASHBOARD_WORDING_LIST,
+      IPC_CHANNELS.DASHBOARD_CONTENT_SESSION,
+      IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT,
+      IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH,
       IPC_CHANNELS.DISMISS,
       IPC_CHANNELS.REPORT_UI_PHASE,
       IPC_CHANNELS.REPORT_HANDOFF_MILESTONE,
@@ -92,9 +95,15 @@ describe('IPC whitelist', () => {
   it('keeps the dashboard wording preload free of shared overlay modules', () => {
     expect(dashboardPreload).not.toContain("from '../shared/");
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_WORDING_LIST}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_SESSION}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH}'`);
+    expect(dashboardPreload).toContain('dashboardContent');
     expect(dashboardPreload).not.toContain('product:search');
     expect(dashboardPreload).not.toContain('product:login');
     expect(dashboardPreload).not.toContain("from '../shared/product-session'");
+    expect(dashboardPreload).not.toContain('ipcRenderer.send(');
+    expect(dashboardPreload).not.toContain('ipcRenderer.on(');
   });
 
   it('keeps the SOP preload free of shared overlay modules', () => {

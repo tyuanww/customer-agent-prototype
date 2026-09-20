@@ -126,9 +126,10 @@ describe('dashboard manifest', () => {
     const upload = DASHBOARD_MANIFEST.content.upload;
     expect(upload.draftOnlyCopy).toBe('上传只进入待审核草稿，不是已发布。');
     expect(upload.roleNote).toContain('coach');
-    expect(upload.roleNote).toContain('owner（管理员）');
+    expect(upload.roleNote).toContain('管理员（owner）');
     expect(upload.roleNote).toContain('agent');
     expect(upload.roleNote).toContain('没有第四角色');
+    expect(upload.roleNote).toContain('产品与活动');
     expect(upload.boundaryCopy).toContain('不连接飞书或 Wiki');
     expect(upload.aftersaleNote).toContain('售后流程仍为合成样例');
     expect(upload.aftersaleNote).toContain('不展开 SOP 树');
@@ -136,7 +137,7 @@ describe('dashboard manifest', () => {
     expect(upload.accept).toContain('.xlsx');
     expect(upload.demoCsv).toMatch(/^scene,script\n/u);
     expect(upload.demoCsv).toContain('售后质量升级');
-    expect(DASHBOARD_MANIFEST.content.publishDisabledReason).toBe('演示禁用 · 正式需 owner + G0/Ddev');
+    expect(DASHBOARD_MANIFEST.content.publishDisabledReason).toBe('请先登录后再发布');
     expect(JSON.stringify(upload)).not.toMatch(/已连接飞书|Wiki 已接入|已写入已发布/);
   });
 
