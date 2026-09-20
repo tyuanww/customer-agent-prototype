@@ -20,6 +20,27 @@ describe('dashboard live actions', () => {
     expect(screen.queryByText('演示数据')).not.toBeInTheDocument();
   });
 
+  it('falls back to 未接入 when overview list rejects', async () => {
+    window.dashboardIteration = {
+      list: vi.fn(async () => {
+        throw new Error('ipc down');
+      }),
+      start: vi.fn(),
+      close: vi.fn(),
+    };
+    window.dashboardWording = {
+      list: vi.fn(async () => {
+        throw new Error('ipc down');
+      }),
+    };
+    render(<OverviewModule />);
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '待处理事项（未接入）' })).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('overview-alert-catalog')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('检索账');
+  });
+
   it('loads overview todos through dashboardIteration.list', async () => {
     const list = vi.fn(async () => ({
       ok: true as const,
@@ -115,5 +136,17 @@ describe('dashboard live actions', () => {
     await user.click(screen.getByTestId('software-check-update'));
     expect(screen.getByTestId('software-update-status')).toHaveTextContent('未接入');
     expect(screen.queryByText('v0.3.14')).not.toBeInTheDocument();
+  });
+
+  it('falls back to 未接入 when wording list rejects', async () => {
+    window.dashboardWording = {
+      list: vi.fn(async () => {
+        throw new Error('ipc down');
+      }),
+    };
+    render(<WordingLibraryModule />);
+    await waitFor(() => {
+      expect(screen.getByTestId('wording-empty')).toHaveTextContent('本机话术库未挂载');
+    });
   });
 });

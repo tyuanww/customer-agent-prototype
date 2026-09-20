@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { DASHBOARD_MANIFEST, type DomainId } from '../../data/dashboard-manifest';
+import { type DomainId } from '../../data/dashboard-manifest';
 import {
   bindingsForRows,
   contentPublishGate,
@@ -13,7 +13,20 @@ import {
 } from './coach-content-upload';
 import { StatusBadge } from './StatusBadge';
 
-const data = DASHBOARD_MANIFEST.content;
+const DOMAIN_LABELS: Readonly<Record<DomainId, string>> = {
+  product: '产品',
+  campaign: '活动',
+  presale: '售前',
+  aftersale: '售后',
+};
+
+const UPLOAD_COPY = {
+  title: '话术师上传',
+  draftOnlyCopy: '上传只进入待审核草稿，不是已发布。',
+  roleNote: '话术师（coach）可导入已标注的产品与活动草稿。一期发布仅管理员（owner）。售后、过敏或赔付需管理员。坐席（agent）不能发布。没有第四角色。',
+  boundaryCopy: '支持 CSV 与 xlsx。中文表头会映射到场景/标准话术。不连接飞书或 Wiki。',
+  accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+} as const;
 
 type UploadView =
   | { status: 'idle' }
@@ -46,7 +59,7 @@ function pipelineStepStatus(
 
 function domainLabel(domain: DomainId | undefined): string {
   if (!domain) return '未标注';
-  return data.domains.find((item) => item.id === domain)?.label ?? domain;
+  return DOMAIN_LABELS[domain];
 }
 
 function applyUploadResult(result: CoachUploadResult): UploadView {
@@ -97,6 +110,9 @@ export function ContentModule() {
       void api.session().then((result) => {
         if (!live) return;
         setSessionView(result.ok ? result : null);
+      }).catch(() => {
+        if (!live) return;
+        setSessionView(null);
       });
     };
     load();
@@ -201,6 +217,9 @@ export function ContentModule() {
         return;
       }
       setPublishFeedback(`已提交发布 · ${result.releaseId}`);
+    }).catch(() => {
+      if (generation !== ingestGeneration.current) return;
+      setPublishFeedback('未接入');
     }).finally(() => {
       if (generation === ingestGeneration.current) setSubmitting(false);
     });
@@ -251,11 +270,11 @@ export function ContentModule() {
 
       <section className="dash-card content-upload" data-testid="content-upload-panel" aria-labelledby="content-upload-title">
         <div className="content-upload-copy">
-          <span className="dash-card-label">{data.upload.title}</span>
+          <span className="dash-card-label">{UPLOAD_COPY.title}</span>
           <h2 id="content-upload-title">本地导入进入待审核草稿</h2>
-          <p data-testid="content-upload-draft-copy">{data.upload.draftOnlyCopy}</p>
-          <p data-testid="content-upload-role-note">{data.upload.roleNote}</p>
-          <p data-testid="content-upload-boundary">{data.upload.boundaryCopy}</p>
+          <p data-testid="content-upload-draft-copy">{UPLOAD_COPY.draftOnlyCopy}</p>
+          <p data-testid="content-upload-role-note">{UPLOAD_COPY.roleNote}</p>
+          <p data-testid="content-upload-boundary">{UPLOAD_COPY.boundaryCopy}</p>
           <p data-testid="content-aftersale-note">售后 SOP 写库未接入，本页不展开合成树。</p>
         </div>
 
@@ -265,7 +284,7 @@ export function ContentModule() {
             <input
               id="content-upload-file"
               type="file"
-              accept={data.upload.accept}
+              accept={UPLOAD_COPY.accept}
               data-testid="content-upload-input"
               disabled={upload.status === 'reading' || submitting}
               onChange={onFileChange}

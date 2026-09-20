@@ -65,6 +65,16 @@ describe('dashboard layout contract', () => {
     expect(charts).not.toContain('<linearGradient');
     expect(css).not.toContain('#000000');
     expect(css).not.toContain('#111014');
+    expect(css).toContain('.health-kpi dt');
+    expect(css).toContain('.content-pipeline-steps');
+    expect(css).toContain('.system-sync-tabs');
+    expect(css).toContain('.dash-publish:disabled');
+    expect(css).toContain('background: var(--dash-purple)');
+    expect(css).not.toContain('.overview-action-strip');
+    expect(css).not.toContain('.overview-action-card');
+    expect(css).toContain('.dashboard-shell button.dash-reset');
+    expect(css).toContain('font-size: 14px');
+    expect(css).toContain('font-weight: 600');
   });
 
   it('contains scroll inside the content region without global horizontal overflow', () => {

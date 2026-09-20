@@ -1,9 +1,10 @@
-import { type ChangeEvent, useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 
 const WRITE_UNAVAILABLE = '未接入：SOP 持久化需要 contracts:intake，当前没有写库命令。';
 
 export function SopLibraryModule() {
   const [writeMessage, setWriteMessage] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
   const refuseWrite = () => setWriteMessage(WRITE_UNAVAILABLE);
 
   return (
@@ -18,19 +19,25 @@ export function SopLibraryModule() {
         上传、更新、删除、导出、自定义步骤都需要 SOP 持久化合同。没有写库接口时按钮不会假装成功，也不用合成过敏树冒充已入库目录。
       </p>
       <div className="dash-filter-toolbar" aria-label="SOP 写操作">
-        <label className="dash-reset">
+        <input
+          ref={uploadRef}
+          data-testid="sop-upload-input"
+          type="file"
+          accept=".csv,.xlsx"
+          hidden
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            event.target.value = '';
+            refuseWrite();
+          }}
+        />
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="sop-upload"
+          onClick={() => uploadRef.current?.click()}
+        >
           上传
-          <input
-            data-testid="sop-upload-input"
-            type="file"
-            accept=".csv,.xlsx"
-            hidden
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              event.target.value = '';
-              refuseWrite();
-            }}
-          />
-        </label>
+        </button>
         <button type="button" className="dash-reset" data-testid="sop-update" onClick={refuseWrite}>更新</button>
         <button type="button" className="dash-reset" data-testid="sop-delete" onClick={refuseWrite}>删除</button>
         <button type="button" className="dash-reset" data-testid="sop-export" onClick={refuseWrite}>导出</button>

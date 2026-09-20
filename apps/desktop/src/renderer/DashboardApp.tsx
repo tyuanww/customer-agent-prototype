@@ -1118,7 +1118,6 @@ export function DashboardApp() {
                   <span className="dashboard-nav-icon"><DashboardNavIcon id={item.id} /></span>
                   <span className="dashboard-nav-label">{item.label}</span>
                 </button>
-                {null}
               </div>
             );
           })}

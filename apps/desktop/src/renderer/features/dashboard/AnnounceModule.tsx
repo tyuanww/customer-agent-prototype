@@ -24,6 +24,10 @@ function WordingTab() {
       }
       setCatalog(result);
       setMessage('');
+    }).catch(() => {
+      if (!live) return;
+      setCatalog(null);
+      setMessage('未接入当前发布。');
     });
     return () => {
       live = false;
@@ -32,7 +36,7 @@ function WordingTab() {
 
   return (
     <>
-      <p className="dash-scope">话术版本来自当前发布 hydrate，不是合成 ACK 演练。</p>
+      <p className="dash-scope">话术版本来自当前发布，不是合成演练。</p>
       {catalog ? (
         <div className="dash-card" data-testid="announce-wording-live">
           <div className="dash-card-row">
@@ -65,7 +69,7 @@ function SoftwareTab() {
         </div>
         <button
           type="button"
-          className="dash-action-primary"
+          className="dash-reset"
           data-testid="software-check-update"
           onClick={() => setMessage('未接入：没有安装包目录接口，UNSIGNED 禁止 latest.yml。')}
         >

@@ -26,6 +26,10 @@ describe('SopLibraryModule', () => {
   it('refuses upload, update, delete, export, and custom steps', async () => {
     const user = userEvent.setup();
     render(<SopLibraryModule />);
+    expect(screen.getByRole('button', { name: '上传' })).toBeInTheDocument();
+    const file = new File(['scene,script\n过敏,先停用\n'], 'sop.csv', { type: 'text/csv' });
+    await user.upload(screen.getByTestId('sop-upload-input'), file);
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('未接入');
     await user.click(screen.getByTestId('sop-update'));
     expect(screen.getByTestId('sop-write-status')).toHaveTextContent('未接入');
     await user.click(screen.getByTestId('sop-delete'));

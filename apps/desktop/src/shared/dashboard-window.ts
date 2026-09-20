@@ -175,6 +175,6 @@ export const DASHBOARD_STRUCTURE_DISCLAIMER =
   '未接入产品会话时不展示数字。话术库读当前发布；没有冻结合同命令的写操作保持未接入。';
 export const DASHBOARD_ARCHITECTURE_MARK = '未接入';
 export const DASHBOARD_REFRESHED_AT = '';
-export const DASHBOARD_REFRESH_LABEL = '未接入时显示空态，不使用固定快照。';
+export const DASHBOARD_REFRESH_LABEL = '未接入';
 export const DASHBOARD_METRIC_SCOPE =
   '口径：待办来自 iteration-tasks；话术条数来自当前发布。检索命中率没有冻结指标接口时显示未接入，不发明数字。';

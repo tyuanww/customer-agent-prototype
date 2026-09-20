@@ -37,6 +37,10 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         if (!live) return;
         setWordingReady(true);
         setWording(result.ok ? result : null);
+      }).catch(() => {
+        if (!live) return;
+        setWordingReady(true);
+        setWording(null);
       });
     } else {
       setWordingReady(false);
@@ -56,6 +60,10 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
       }
       setTasks(result.items);
       setTaskMessage(result.items.length === 0 ? ITERATION_COPY.empty : '');
+    }).catch(() => {
+      if (!live) return;
+      setTasks(null);
+      setTaskMessage('未接入');
     });
     return () => {
       live = false;
@@ -84,23 +92,24 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         </div>
       </header>
 
-      <section className="overview-action-strip" aria-label="今日状态">
-        <article className="overview-action-card" data-tone={openTasks.length > 0 ? 'danger' : 'ok'} data-testid="overview-alert-todos">
-          <strong className="overview-action-value">{tasks ? String(openTasks.length) : '—'}</strong>
-          <span className="overview-action-label">待处理待办</span>
-          <p className="overview-action-note">{tasks ? `${openTasks.filter((item) => item.status === 'open').length} 项未开始` : taskMessage}</p>
-        </article>
-        <article className="overview-action-card" data-tone="ok" data-testid="overview-alert-nohit">
-          <strong className="overview-action-value">未接入</strong>
-          <span className="overview-action-label">无命中率</span>
-          <p className="overview-action-note">冻结指标接口未提供检索账</p>
-        </article>
-        <article className="overview-action-card" data-tone={wordingConnected && wordingReady && catalogCount === 0 ? 'warn' : 'ok'} data-testid="overview-alert-catalog">
-          <strong className="overview-action-value">{catalogDisplay}</strong>
-          <span className="overview-action-label">当前发布话术</span>
-          <p className="overview-action-note">{wording?.releaseId ? wording.releaseId : wordingConnected ? (wordingReady ? '未挂载当前发布' : '加载中') : '未接入'}</p>
-        </article>
-      </section>
+      <dl className="overview-scope-summary" data-testid="overview-scope">
+        <div>
+          <dt>统计范围</dt>
+          <dd>{connected ? '当前产品会话' : '未接入产品会话'}</dd>
+        </div>
+        <div>
+          <dt>待办</dt>
+          <dd>{iterationConnected ? '话术优化待办' : '未接入'}</dd>
+        </div>
+        <div>
+          <dt>话术条数</dt>
+          <dd>{wordingConnected ? '当前发布' : '未接入'}</dd>
+        </div>
+        <div>
+          <dt>检索账</dt>
+          <dd>未接入</dd>
+        </div>
+      </dl>
 
       <section className="overview-kpi-grid" aria-labelledby="overview-kpi-title">
         <div className="dash-section-title">
@@ -108,7 +117,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
           <p data-testid="overview-kpi-source">{connected ? '待办与话术条数来自产品会话' : '未接入产品会话'}</p>
         </div>
         <dl className="health-strip" role="list" aria-label="核心运营指标">
-          <div className="health-kpi" role="listitem">
+          <div className="health-kpi" role="listitem" data-testid="overview-alert-nohit">
             <dt>无命中率</dt>
             <dd>未接入</dd>
             <p>没有冻结检索账接口</p>
@@ -118,15 +127,15 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
             <dd>未接入</dd>
             <p>没有冻结检索账接口</p>
           </div>
-          <div className="health-kpi" role="listitem">
+          <div className="health-kpi" role="listitem" data-testid="overview-alert-todos">
             <dt>开放待办</dt>
             <dd>{tasks ? String(openTasks.length) : '未接入'}</dd>
-            <p>GET /v1/metrics/iteration-tasks</p>
+            <p>话术优化待办</p>
           </div>
-          <div className="health-kpi" role="listitem">
+          <div className="health-kpi" role="listitem" data-testid="overview-alert-catalog">
             <dt>当前发布条数</dt>
             <dd>{catalogDisplay}</dd>
-            <p>话术库当前发布</p>
+            <p>{wording?.releaseId ? wording.releaseId : '与查询胶囊同一份目录'}</p>
           </div>
         </dl>
       </section>
@@ -134,7 +143,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
       <section className="overview-action-list" aria-labelledby="overview-decisions-title">
         <div className="dash-section-title">
           <div><h2 id="overview-decisions-title">{tasks === null ? '待处理事项（未接入）' : `待处理事项（${openTasks.length}）`}</h2></div>
-          <p>来自话术优化待办，不使用 8 月快照</p>
+          <p>来自话术优化待办</p>
         </div>
         {tasks === null ? (
           <div className="dash-empty-state" data-testid="overview-todos-empty">
@@ -147,6 +156,14 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
           </div>
         ) : (
           <div className="manager-decision-table" role="table" aria-label="待处理事项">
+            <div role="rowgroup" className="manager-decision-table-head">
+              <div role="row" className="manager-decision-row">
+                <div role="columnheader">状态</div>
+                <div role="columnheader">事项</div>
+                <div role="columnheader">Owner</div>
+                <div role="columnheader">下一步</div>
+              </div>
+            </div>
             <div role="rowgroup" className="manager-decision-list">
               {openTasks.map((item) => (
                 <div key={item.taskId} role="row" className="manager-decision-row manager-decision" data-testid={`decision-${item.taskId}`}>
@@ -185,6 +202,9 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
                             return;
                           }
                           setTasks((current) => (current ?? []).map((row) => (row.taskId === result.task.taskId ? result.task : row)));
+                        }).catch(() => {
+                          setBusyId(null);
+                          setTaskMessage('未接入');
                         });
                       }}
                     >

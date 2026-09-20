@@ -1245,8 +1245,10 @@ describe('DashboardApp', () => {
 
     expect(screen.getByRole('heading', { name: '待处理事项（未接入）' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '核心指标' })).toBeInTheDocument();
-    const actionStrip = screen.getByLabelText('今日状态');
-    expect(within(actionStrip).getAllByRole('article')).toHaveLength(3);
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('未接入产品会话');
+    expect(screen.queryByLabelText('今日状态')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('article')).toHaveLength(0);
+    expect(screen.getByLabelText('核心运营指标')).toBeInTheDocument();
     expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('未接入');
     expect(screen.getByTestId('overview-kpi-source')).not.toHaveTextContent('固定周期合成演示数据');
   });

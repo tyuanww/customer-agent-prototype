@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
   type DomainId,
   type WordingEntry,
@@ -62,6 +62,7 @@ export function WordingLibraryModule() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [writeMessage, setWriteMessage] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let live = true;
@@ -69,8 +70,11 @@ export function WordingLibraryModule() {
     if (!api) return undefined;
     const load = () => {
       void api.list().then((result) => {
-        if (!live || !result.ok) return;
-        setCatalog(result);
+        if (!live) return;
+        setCatalog(result.ok ? result : null);
+      }).catch(() => {
+        if (!live) return;
+        setCatalog(null);
       });
     };
     load();
@@ -148,37 +152,45 @@ export function WordingLibraryModule() {
         浏览与导出当前发布。上传会调用产品导入接口。单条更新/删除没有冻结合同，按钮保持未接入。
       </p>
       <div className="dash-filter-toolbar" aria-label="话术写操作">
-        <label className="dash-reset">
-          上传
-          <input
-            data-testid="wording-upload-input"
-            type="file"
-            accept=".csv,.xlsx"
-            hidden
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (!file) return;
-              const api = window.dashboardContent;
-              if (!api) {
-                setWriteMessage('未接入：没有内容导入通道。');
+        <input
+          ref={uploadRef}
+          data-testid="wording-upload-input"
+          type="file"
+          accept=".csv,.xlsx"
+          hidden
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file) return;
+            const api = window.dashboardContent;
+            if (!api) {
+              setWriteMessage('未接入：没有内容导入通道。');
+              return;
+            }
+            void readCoachUploadFile(file).then(async (parsed) => {
+              if (!parsed.ok) {
+                setWriteMessage(parsed.message);
                 return;
               }
-              void readCoachUploadFile(file).then(async (parsed) => {
-                if (!parsed.ok) {
-                  setWriteMessage(parsed.message);
-                  return;
-                }
-                const result = await api.importDraft({
-                  csvText: parsed.csvText,
-                  sourceName: parsed.sourceName,
-                  sourceBindings: bindingsForRows(parsed.rows),
-                });
-                setWriteMessage(result.ok ? `已导入草稿 ${result.importBatchId}` : result.message);
+              const result = await api.importDraft({
+                csvText: parsed.csvText,
+                sourceName: parsed.sourceName,
+                sourceBindings: bindingsForRows(parsed.rows),
               });
-            }}
-          />
-        </label>
+              setWriteMessage(result.ok ? `已导入草稿 ${result.importBatchId}` : result.message);
+            }).catch(() => {
+              setWriteMessage('未接入');
+            });
+          }}
+        />
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="wording-upload"
+          onClick={() => uploadRef.current?.click()}
+        >
+          上传
+        </button>
         <button
           type="button"
           className="dash-reset"
@@ -313,7 +325,7 @@ export function WordingLibraryModule() {
           )) : (
             <div className="dash-empty-state" data-testid="wording-empty">
               <strong>{live ? '没有匹配的话术' : '本机话术库未挂载'}</strong>
-              <span>{live ? '换一个域或清空筛选后再看。' : '未接入当前发布，不回退 fixture。'}</span>
+              <span>{live ? '换一个域或清空筛选后再看。' : '未接入当前发布，不回退本地样例。'}</span>
             </div>
           )}
           {visible.length > 0 ? (
