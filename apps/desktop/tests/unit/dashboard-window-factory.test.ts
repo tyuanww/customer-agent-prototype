@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => {
   const on = vi.fn();
   const BrowserWindow = vi.fn(function MockBrowserWindow(_options: Record<string, unknown>) {
     return {
-      getTitle: vi.fn(() => '客服运营工作台 · 演示数据'),
+      getTitle: vi.fn(() => '客服运营工作台'),
       on,
       setMenuBarVisibility,
       setTitle: vi.fn(),

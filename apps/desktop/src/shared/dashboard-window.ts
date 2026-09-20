@@ -1,4 +1,4 @@
-export const DASHBOARD_WINDOW_TITLE = '客服运营工作台 · 演示数据';
+export const DASHBOARD_WINDOW_TITLE = '客服运营工作台';
 
 export const DASHBOARD_WINDOW_CHROME = {
   width: 1180,
@@ -169,12 +169,12 @@ export function resolveDashboardNativeChrome(platform: string): {
   };
 }
 
-export const DASHBOARD_ENV_BADGES = ['演示数据'] as const;
+export const DASHBOARD_ENV_BADGES = [] as const;
 
 export const DASHBOARD_STRUCTURE_DISCLAIMER =
-  '无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读当前发布';
-export const DASHBOARD_ARCHITECTURE_MARK = '架构模拟 / MOCK / NOT CONNECTED';
-export const DASHBOARD_REFRESHED_AT = '2026-08-13 18:40:00 CST';
-export const DASHBOARD_REFRESH_LABEL = `数据更新至：${DASHBOARD_REFRESHED_AT} · 固定快照`;
+  '未接入产品会话时不展示数字。话术库读当前发布；没有冻结合同命令的写操作保持未接入。';
+export const DASHBOARD_ARCHITECTURE_MARK = '未接入';
+export const DASHBOARD_REFRESHED_AT = '';
+export const DASHBOARD_REFRESH_LABEL = '未接入';
 export const DASHBOARD_METRIC_SCOPE =
-  '口径：根问题与检索操作双账；adopted = 复制成功，不等于发送或正确。固定合成演示口径，非生产指标。';
+  '口径：待办来自 iteration-tasks；话术条数来自当前发布。检索命中率没有冻结指标接口时显示未接入，不发明数字。';
