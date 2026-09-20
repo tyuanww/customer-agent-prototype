@@ -148,6 +148,29 @@ it('imports and publishes with the product token when the role gate and bindings
   expect(JSON.stringify(published)).not.toContain('Bearer');
 });
 
+it('still returns the release when post-publish hydrate refresh throws', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request)
+    .mockResolvedValueOnce({
+      status: 202,
+      value: { import_batch_id: 'imp_owner_2', status: 'validating', source_binding_hash: 'a'.repeat(64) },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { import_batch_id: 'imp_owner_2', status: 'staged' },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { release_id: 'rel_2', release_seq: 3, announcement_id: 'ann_2', source_binding_hash: 'a'.repeat(64) },
+    });
+  const afterPublish = vi.fn(async () => {
+    throw new Error('announce down');
+  });
+  const published = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]), afterPublish);
+  expect(published).toEqual({ ok: true, releaseId: 'rel_2', releaseSeq: 3 });
+  expect(afterPublish).toHaveBeenCalledWith(1);
+});
+
 it('lets coach attempt product publish and surfaces API FORBIDDEN without faking success', async () => {
   const coach = fakeSession('coach');
   vi.mocked(coach.request)

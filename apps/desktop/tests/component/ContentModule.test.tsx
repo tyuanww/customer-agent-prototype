@@ -80,4 +80,32 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.sensitive);
     expect(api.publishDraft).not.toHaveBeenCalled();
   });
+
+  it('lets coach publish labeled product drafts with the stack product source version', async () => {
+    const api = mockSession('coach');
+    api.publishDraft = vi.fn(async () => ({
+      ok: true as const,
+      releaseId: 'rel_19',
+      releaseSeq: 19,
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const csv = new File(
+      ['scene,script,domain\n洁面用量确认,先确认产品版本,product\n'],
+      'product.csv',
+      { type: 'text/csv' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), csv);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
+    expect(screen.getByTestId('publish-action')).toBeEnabled();
+    await user.click(screen.getByTestId('publish-action'));
+    await waitFor(() => expect(api.publishDraft).toHaveBeenCalledTimes(1));
+    expect(api.publishDraft).toHaveBeenCalledWith(expect.objectContaining({
+      sourceBindings: [{ domain: 'product', source_version_id: 'srcv_stack_product_v1' }],
+    }));
+  });
 });

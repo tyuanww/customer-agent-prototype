@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONTENT_PUBLISH_COPY,
+  STACK_SOURCE_BINDINGS,
+  bindingsForRows,
   contentPublishGate,
   isDashboardContentImportRequest,
   isDashboardContentPublishRequest,
@@ -18,6 +20,18 @@ const unlabeledRow = { scene: '洁面用量确认', script: '先确认产品版�
 const presaleRow = { scene: '发货时效', script: '付款后发出', domain: 'presale' as const };
 
 describe('content publish role gate', () => {
+  it('maps draft domains onto the synthetic-stack registered source versions', () => {
+    expect(bindingsForRows([productRow])).toEqual([
+      { domain: 'product', source_version_id: 'srcv_stack_product_v1' },
+    ]);
+    expect(bindingsForRows([productRow, aftersaleRow]).map((binding) => binding.domain).sort()).toEqual([
+      'aftersale',
+      'product',
+    ]);
+    expect(bindingsForRows([unlabeledRow])).toEqual([]);
+    expect(STACK_SOURCE_BINDINGS).toHaveLength(4);
+  });
+
   it('requires owner for aftersale domain and 过敏/赔付 text', () => {
     expect(rowRequiresOwner(aftersaleRow)).toBe(true);
     expect(rowRequiresOwner(allergyRow)).toBe(true);

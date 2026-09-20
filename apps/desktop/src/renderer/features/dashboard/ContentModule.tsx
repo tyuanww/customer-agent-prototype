@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { DASHBOARD_MANIFEST, type DomainId } from '../../data/dashboard-manifest';
 import {
+  bindingsForRows,
   contentPublishGate,
   CONTENT_PUBLISH_COPY,
   type DashboardContentSessionView,
@@ -78,12 +79,13 @@ export function ContentModule() {
   }, []);
 
   const rows = upload.status === 'ready' ? upload.rows : [];
+  const sourceBindings = bindingsForRows(rows);
   const gate = contentPublishGate({
     productAvailable: Boolean(window.dashboardContent) && sessionView?.enabled !== false,
     signedIn: sessionView?.signedIn === true,
     role: sessionView?.role ?? null,
     rows,
-    sourceBindings: [],
+    sourceBindings,
   });
   const publishDisabled = !gate.allowed || submitting;
   const publishReason = submitting
@@ -142,7 +144,7 @@ export function ContentModule() {
       rows: upload.rows,
       title,
       summary: null,
-      sourceBindings: [],
+      sourceBindings,
     }).then((result) => {
       if (generation !== ingestGeneration.current) return;
       if (!result.ok) {

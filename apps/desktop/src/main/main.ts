@@ -239,6 +239,11 @@ if (!gotLock) {
       productSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
+      async (sessionEpoch) => {
+        const announce = productAnnounce;
+        if (!announce) return;
+        await announce.refresh({ sessionEpoch, generation: 0 });
+      },
     );
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {
