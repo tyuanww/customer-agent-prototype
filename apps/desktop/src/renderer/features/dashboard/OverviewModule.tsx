@@ -39,7 +39,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         setWording(result.ok ? result : null);
       });
     } else {
-      setWordingReady(true);
+      setWordingReady(false);
     }
     if (!iterationApi) {
       setTaskMessage('未接入');
@@ -62,9 +62,18 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
     };
   }, []);
 
+  const wordingConnected = Boolean(window.dashboardWording);
+  const iterationConnected = Boolean(window.dashboardIteration);
   const openTasks = (tasks ?? []).filter((task) => task.status === 'open' || task.status === 'in_progress');
   const catalogCount = wording?.total ?? 0;
-  const connected = Boolean(window.dashboardWording) && Boolean(window.dashboardIteration);
+  const catalogDisplay = !wordingConnected
+    ? '未接入'
+    : !wordingReady
+      ? '—'
+      : wording
+        ? String(catalogCount)
+        : '未接入';
+  const connected = wordingConnected && iterationConnected;
 
   return (
     <div className="dash-module" data-testid="module-overview">
@@ -86,10 +95,10 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
           <span className="overview-action-label">无命中率</span>
           <p className="overview-action-note">冻结指标接口未提供检索账</p>
         </article>
-        <article className="overview-action-card" data-tone={wordingReady && catalogCount === 0 ? 'warn' : 'ok'} data-testid="overview-alert-catalog">
-          <strong className="overview-action-value">{wordingReady ? String(catalogCount) : '—'}</strong>
+        <article className="overview-action-card" data-tone={wordingConnected && wordingReady && catalogCount === 0 ? 'warn' : 'ok'} data-testid="overview-alert-catalog">
+          <strong className="overview-action-value">{catalogDisplay}</strong>
           <span className="overview-action-label">当前发布话术</span>
-          <p className="overview-action-note">{wording?.releaseId ? wording.releaseId : wordingReady ? '未挂载当前发布' : '加载中'}</p>
+          <p className="overview-action-note">{wording?.releaseId ? wording.releaseId : wordingConnected ? (wordingReady ? '未挂载当前发布' : '加载中') : '未接入'}</p>
         </article>
       </section>
 
@@ -116,7 +125,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
           </div>
           <div className="health-kpi" role="listitem">
             <dt>当前发布条数</dt>
-            <dd>{wordingReady ? String(catalogCount) : '未接入'}</dd>
+            <dd>{catalogDisplay}</dd>
             <p>话术库当前发布</p>
           </div>
         </dl>
@@ -124,7 +133,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
 
       <section className="overview-action-list" aria-labelledby="overview-decisions-title">
         <div className="dash-section-title">
-          <div><h2 id="overview-decisions-title">待处理事项（{openTasks.length}）</h2></div>
+          <div><h2 id="overview-decisions-title">{tasks === null ? '待处理事项（未接入）' : `待处理事项（${openTasks.length}）`}</h2></div>
           <p>来自话术优化待办，不使用 8 月快照</p>
         </div>
         {tasks === null ? (

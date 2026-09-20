@@ -96,6 +96,17 @@ describe('dashboard live actions', () => {
     expect(screen.getByTestId('sop-write-status')).toHaveTextContent('contracts:intake');
   });
 
+  it('does not render fixture content releases when there is no live publish', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-content'));
+    expect(screen.queryByTestId('release-rel-demo-2026-08-a')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('release-rel-demo-2026-08-blocked')).not.toBeInTheDocument();
+    expect(screen.queryByText('结构演示')).not.toBeInTheDocument();
+    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('当前没有产品会话');
+  });
+
   it('fail-closes software update checks without mock version lists', async () => {
     const user = userEvent.setup();
     render(<AnnounceModule />);

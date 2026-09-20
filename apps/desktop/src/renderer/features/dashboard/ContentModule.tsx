@@ -44,15 +44,6 @@ function pipelineStepStatus(
   return 'pending';
 }
 
-function pipelineItemClass(step: string, upload: UploadView, submitting: boolean): string {
-  if (submitting && step === 'Publish') return 'is-current';
-  if (upload.status === 'reading' && step === 'Import') return 'is-current';
-  if (upload.status !== 'ready' && upload.status !== 'reviewed') return '';
-  if (step === 'Import' || step === 'Validate') return 'is-done';
-  if (step === 'Staged') return upload.status === 'reviewed' ? 'is-done' : 'is-current';
-  return '';
-}
-
 function domainLabel(domain: DomainId | undefined): string {
   if (!domain) return '未标注';
   return data.domains.find((item) => item.id === domain)?.label ?? domain;
@@ -81,13 +72,11 @@ function uploadSourceName(upload: UploadView): string {
 }
 
 export function ContentModule() {
-  const [selectedId, setSelectedId] = useState(data.releases[0]?.releaseId ?? '');
   const [upload, setUpload] = useState<UploadView>({ status: 'idle' });
   const [sessionView, setSessionView] = useState<DashboardContentSessionView | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
   const ingestGeneration = useRef(0);
-  const selected = data.releases.find((release) => release.releaseId === selectedId) ?? data.releases[0];
   const hasDomain = (upload.status === 'ready' || upload.status === 'reviewed')
     && upload.rows.some((row) => row.domain);
   const statusMessage = upload.status === 'reviewed'
@@ -226,8 +215,8 @@ export function ContentModule() {
     <div className="dash-module" data-testid="module-content">
       <header className="dash-module-head">
         <div>
-          <h1>{data.title}</h1>
-          <p className="dash-kicker">{data.kicker}</p>
+          <h1>内容管理</h1>
+          <p className="dash-kicker">导入草稿 · 审核 · 发布</p>
         </div>
         <div className="dash-publish-box">
           <button
@@ -254,14 +243,6 @@ export function ContentModule() {
         <li data-step-status={pipelineStepStatus('publish', upload, submitting)}>
           <span aria-hidden="true">3</span>发布
         </li>
-      </ol>
-
-      <ol className="dash-pipeline" data-testid="content-pipeline">
-        {data.pipeline.map((step, index) => (
-          <li key={step} className={pipelineItemClass(step, upload, submitting)} data-pipeline-step={step}>
-            <span>{index + 1}</span>{step}
-          </li>
-        ))}
       </ol>
 
       <p className="dash-scope dash-scope-important" data-testid="formal-source-warning">
@@ -392,56 +373,6 @@ export function ContentModule() {
             </table>
           </div>
         ) : null}
-      </section>
-
-      <div className="dash-release-grid" aria-label="选择合成发布结构">
-        {data.releases.map((release) => (
-          <button
-            key={release.releaseId}
-            type="button"
-            className={`dash-card dash-release-card${release.blocked ? ' is-blocked' : ''}${selected.releaseId === release.releaseId ? ' is-selected' : ''}`}
-            aria-pressed={selected.releaseId === release.releaseId}
-            data-testid={`release-${release.releaseId}`}
-            onClick={() => setSelectedId(release.releaseId)}
-          >
-            <span className="dash-card-row">
-              <strong>{release.title}</strong>
-              <StatusBadge label={release.blocked ? '阻断' : '结构演示'} tone={release.blocked ? 'danger' : 'mock'} />
-            </span>
-            <span className="dash-mini">{release.releaseId}</span>
-            <span className="dash-domain-summary">
-              {release.bindings.map((binding) => (
-                <span key={binding.domain} className={binding.bound ? 'is-bound' : 'is-missing'}>
-                  {binding.label} · {binding.bound ? '已绑定样例' : '缺域'}
-                </span>
-              ))}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <section className="dash-card dash-release-detail" aria-live="polite" data-testid="release-detail">
-        <div className="dash-card-row">
-          <div><span className="dash-card-label">所选合成发布门禁</span><h2>{selected.title}</h2></div>
-          <StatusBadge label={selected.blocked ? '不可继续' : '只读结构演练'} tone={selected.blocked ? 'danger' : 'mock'} />
-        </div>
-        <div className="release-gate-grid">
-          {selected.bindings.map((binding) => (
-            <article key={binding.domain} className={binding.bound ? 'is-bound' : 'is-missing'}>
-              <span>{binding.label}</span>
-              <strong>{binding.bound ? '已绑定合成样例' : '缺域阻断'}</strong>
-              <small>{binding.sourceId}</small>
-            </article>
-          ))}
-        </div>
-        <dl className="dash-dl dash-dl-grid">
-          <div><dt>审核</dt><dd>{selected.review}</dd></div>
-          <div><dt>质量</dt><dd>{selected.quality}</dd></div>
-          <div><dt>有效期</dt><dd>{selected.validity}</dd></div>
-          <div><dt>风险</dt><dd>{selected.risk}</dd></div>
-        </dl>
-        {selected.blockReason ? <p className="dash-block" data-testid="missing-domain-block">{selected.blockReason}</p> : null}
-        <p className="dash-footnote">选择只改变本地展示。正式导入与发布走产品会话，不连接飞书或 Wiki。</p>
       </section>
     </div>
   );

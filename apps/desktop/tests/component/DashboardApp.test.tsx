@@ -1243,7 +1243,7 @@ describe('DashboardApp', () => {
   it('presents overview work as a decision table, a continuous KPI strip, and operational charts', () => {
     render(<DashboardApp />);
 
-    expect(screen.getByRole('heading', { name: '待处理事项（0）' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '待处理事项（未接入）' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '核心指标' })).toBeInTheDocument();
     const actionStrip = screen.getByLabelText('今日状态');
     expect(within(actionStrip).getAllByRole('article')).toHaveLength(3);
@@ -1588,8 +1588,10 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
       '当前没有产品会话，无法发布',
     );
-    await user.click(screen.getByTestId('release-rel-demo-2026-08-blocked'));
-    expect(screen.getByTestId('missing-domain-block')).toHaveTextContent('缺域即阻断');
+    expect(screen.queryByTestId('release-rel-demo-2026-08-blocked')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('missing-domain-block')).not.toBeInTheDocument();
+    expect(screen.queryByText('结构演示')).not.toBeInTheDocument();
+    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
   });
 
   it('lets a coach import a synthetic csv/xlsx or demo file into staged preview without enabling publish', async () => {
@@ -1628,12 +1630,9 @@ describe('DashboardApp', () => {
     expect(demoPreview).not.toHaveTextContent('步骤');
     expect(demoPreview).toHaveTextContent('洁面用量确认');
     expect(demoPreview).toHaveTextContent('售后质量升级');
-    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Staged"]'))
-      .toHaveClass('is-current');
-    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Publish"]'))
-      .not.toHaveClass('is-current');
-    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Publish"]'))
-      .not.toHaveClass('is-done');
+    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('导入草稿');
+    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('审核确认');
+    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(window.customerAgent).toBeUndefined();
 
@@ -1707,10 +1706,8 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'idle');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('等待导入');
     expect(screen.getByTestId('content-upload-status')).not.toHaveTextContent('不是已发布');
-    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Staged"]'))
-      .not.toHaveClass('is-current');
-    expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Import"]'))
-      .not.toHaveClass('is-done');
+    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-pipeline')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(window.customerAgent).toBeUndefined();
   });
@@ -1747,8 +1744,7 @@ describe('DashboardApp', () => {
       expect(screen.getByTestId('content-upload-status')).toHaveTextContent('未进入草稿');
       expect(screen.getByTestId('content-upload-status')).toHaveTextContent(item.copy);
       expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
-      expect(screen.getByTestId('content-pipeline').querySelector('[data-pipeline-step="Staged"]'))
-        .not.toHaveClass('is-current');
+      expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
       expect(screen.getByTestId('publish-action')).toBeDisabled();
       expect(window.customerAgent).toBeUndefined();
     }
