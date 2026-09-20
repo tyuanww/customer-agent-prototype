@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DASHBOARD_MANIFEST,
   type DashboardModuleId,
@@ -26,6 +26,16 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
   const structure = data.operationStructure.find((item) => item.id === structureId) ?? data.operationStructure[0];
   const selectedHealth = data.health.find((item) => item.id === healthId) ?? data.health[0];
   const trendDisplay = `${trendValue(trendPoint, trendMetric).toFixed(metric.decimals)}${metric.unit}`;
+
+  const latestTrend = data.trend.at(-1);
+  const riskEscalated = data.operationStructure.find((item) => item.id === 'risk_escalated');
+  const top1AdoptionRate = useMemo(() => {
+    const rows = DASHBOARD_MANIFEST.ledger.rows;
+    const withChoice = rows.filter((row) => row.chosenRank !== null);
+    if (withChoice.length === 0) return null;
+    const top1Count = withChoice.filter((row) => row.chosenRank === 1).length;
+    return Math.round((top1Count / withChoice.length) * 100);
+  }, []);
 
   return (
     <div className="dash-module" data-testid="module-overview">
@@ -126,6 +136,38 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
           {selectedHealth.target !== 'overview' ? (
             <button type="button" onClick={() => onNavigate?.(selectedHealth.target)}>查看明细</button>
           ) : null}
+        </div>
+      </section>
+
+      <section className="overview-retrieval-metrics" aria-labelledby="overview-retrieval-title">
+        <div className="dash-section-title">
+          <div><h2 id="overview-retrieval-title">检索效果摘要</h2></div>
+          <p>当前周期关键指标 · 合成演示数据</p>
+        </div>
+        <dl className="health-strip" role="list" aria-label="检索效果关键指标">
+          <div className="health-kpi" role="listitem">
+            <dt>无命中率</dt>
+            <dd>{latestTrend ? `${latestTrend.noHitRate.toFixed(1)}%` : '暂无数据'}</dd>
+            <p>{latestTrend ? latestTrend.range : ''}</p>
+          </div>
+          <div className="health-kpi" role="listitem">
+            <dt>复制完成率</dt>
+            <dd>{latestTrend ? `${latestTrend.copyRate.toFixed(1)}%` : '暂无数据'}</dd>
+            <p>{latestTrend ? latestTrend.range : ''}</p>
+          </div>
+          <div className="health-kpi" role="listitem">
+            <dt>Top1 采纳率</dt>
+            <dd>{top1AdoptionRate !== null ? `${top1AdoptionRate}%` : '暂无数据'}</dd>
+            <p>有选择的操作中</p>
+          </div>
+          <div className="health-kpi" role="listitem">
+            <dt>风险升级次数</dt>
+            <dd>{riskEscalated ? riskEscalated.count : '暂无数据'}</dd>
+            <p>最近 8 个周期合计</p>
+          </div>
+        </dl>
+        <div className="health-definition">
+          <button type="button" onClick={() => onNavigate?.('ledger')}>查看检索效果详情</button>
         </div>
       </section>
 
