@@ -64,7 +64,7 @@ function buildImportForm(csvText: string, sourceName: string, bindings: Dashboar
 const IMPORT_BATCH_ID = /^imp_[A-Za-z0-9_-]{1,128}$/;
 const IMPORT_READY = new Set(['staged', 'publishing', 'published']);
 const IMPORT_DEAD = new Set(['failed', 'rolled_back']);
-const IMPORT_POLL_MS = 200;
+const IMPORT_POLL_MS = 1_500;
 const IMPORT_POLL_BUDGET_MS = CONTENT_IMPORT_TIMEOUT_MS;
 
 function parseImportBatchId(value: unknown): string | null {
@@ -90,7 +90,17 @@ async function waitUntilImportStaged(
   const path = `/v1/content/import/${importBatchId}`;
   const deadline = Date.now() + IMPORT_POLL_BUDGET_MS;
   while (Date.now() <= deadline) {
-    const result = await client.request(epoch, path, { timeoutMs: 5_000 });
+    let result: Awaited<ReturnType<DashboardContentSessionClient['request']>>;
+    try {
+      result = await client.request(epoch, path, { timeoutMs: 5_000 });
+    } catch (error) {
+      if (error instanceof ProductHttpError && error.code === 'RATE_LIMITED') {
+        if (Date.now() + IMPORT_POLL_MS > deadline) break;
+        await new Promise((resolve) => setTimeout(resolve, IMPORT_POLL_MS));
+        continue;
+      }
+      throw error;
+    }
     const status = parseImportStatus(result.value);
     if (status && IMPORT_READY.has(status)) return true;
     if (status && IMPORT_DEAD.has(status)) return dashboardContentFailure('CONFLICT');

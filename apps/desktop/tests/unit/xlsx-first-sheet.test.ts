@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseXlsxFirstSheet } from '../../src/main/xlsx-first-sheet';
 import { parseCoachUploadTable } from '../../src/shared/coach-content-upload';
 
-const FAQ_DIR = '/Users/hutou/Desktop/customer-agent- FAQ';
+const FAQ_DIR = '/Users/hutou/Desktop/customer-agent-prototype/faq';
 
 function zipLocal(name: string, payload: Buffer, method: 0 | 8 = 8): Buffer {
   const nameBytes = Buffer.from(name, 'utf8');
@@ -54,6 +54,31 @@ function workbook(): Buffer {
 }
 
 describe('xlsx first sheet', () => {
+  it('ignores out-of-range XML entities instead of throwing', () => {
+    const shared = Buffer.from(
+      '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>快捷短语</t></si><si><t>产品话术</t></si><si><t>场景&#x110000;</t></si><si><t>话术</t></si></sst>',
+    );
+    const sheet = Buffer.from(
+      '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+      + '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+      + '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c></row>'
+      + '</sheetData></worksheet>',
+    );
+    const workbookXml = Buffer.from(
+      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="产品话术" r:id="rId1"/></sheets></workbook>',
+    );
+    const rels = Buffer.from(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+    );
+    const table = parseXlsxFirstSheet(Buffer.concat([
+      zipLocal('xl/sharedStrings.xml', shared),
+      zipLocal('xl/worksheets/sheet1.xml', sheet),
+      zipLocal('xl/workbook.xml', workbookXml),
+      zipLocal('xl/_rels/workbook.xml.rels', rels),
+    ]));
+    expect(table[1]?.[0]).toBe('场景');
+  });
+
   it('reads the first worksheet and maps 快捷短语/产品话术', () => {
     const table = parseXlsxFirstSheet(workbook());
     expect(table[0]).toEqual(['快捷短语', '产品话术']);
