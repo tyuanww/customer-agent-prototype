@@ -6,12 +6,26 @@ import {
   type WordingLifecycle,
 } from '../../data/dashboard-manifest';
 import type { DashboardWordingView } from '@shared/dashboard-wording';
+import {
+  paginateWording,
+  wordingPublishedCsv,
+} from '@shared/wording-library-browse';
 import { StatusBadge } from './StatusBadge';
 
 const data = DASHBOARD_MANIFEST.wording;
 
 function riskTone(risk: WordingEntry['risk']): 'ok' | 'warn' | 'danger' {
   return risk === 'low' ? 'ok' : risk === 'medium' ? 'warn' : 'danger';
+}
+
+function downloadTextFile(filename: string, body: string): void {
+  const blob = new Blob([body], { type: 'text/csv;charset=utf-8' });
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(href);
 }
 
 function asWordingEntry(entry: DashboardWordingView['entries'][number]): WordingEntry {
@@ -38,6 +52,7 @@ export function WordingLibraryModule() {
   const [lifecycle, setLifecycle] = useState<WordingLifecycle | 'all'>('all');
   const [domain, setDomain] = useState<DomainId>('product');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let live = true;
@@ -74,12 +89,14 @@ export function WordingLibraryModule() {
       return !needle || `${entry.title} ${entry.scene} ${entry.answerPreview}`.toLocaleLowerCase('zh-CN').includes(needle);
     });
   }, [domain, entries, lifecycle, query]);
-  const selected = visible.find((entry) => entry.scriptId === selectedId) ?? visible[0];
+  const paged = useMemo(() => paginateWording(visible, page), [page, visible]);
+  const selected = paged.slice.find((entry) => entry.scriptId === selectedId) ?? paged.slice[0];
 
   const chooseDomain = (next: DomainId) => {
     setDomain(next);
     setQuery('');
     setLifecycle('all');
+    setPage(1);
     setSelectedId(entries.find((entry) => entry.domain === next)?.scriptId ?? null);
   };
 
@@ -168,7 +185,10 @@ export function WordingLibraryModule() {
             data-testid="wording-search"
             value={query}
             placeholder="搜索标题 / 场景 / 正文"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
           />
         </label>
         <label>
@@ -176,7 +196,10 @@ export function WordingLibraryModule() {
           <select
             data-testid="wording-lifecycle"
             value={lifecycle}
-            onChange={(event) => setLifecycle(event.target.value as WordingLifecycle | 'all')}
+            onChange={(event) => {
+              setLifecycle(event.target.value as WordingLifecycle | 'all');
+              setPage(1);
+            }}
           >
             <option value="all">全部</option>
             <option value="published">已发布</option>
@@ -188,10 +211,23 @@ export function WordingLibraryModule() {
           onClick={() => {
             setQuery('');
             setLifecycle('all');
+            setPage(1);
             setSelectedId(entries.find((entry) => entry.domain === domain)?.scriptId ?? null);
           }}
         >
           重置
+        </button>
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="wording-export"
+          disabled={visible.length === 0}
+          onClick={() => {
+            const stamp = new Date().toISOString().slice(0, 10);
+            downloadTextFile(`话术库-${source.label}-已发布-${stamp}.csv`, wordingPublishedCsv(visible));
+          }}
+        >
+          导出 CSV
         </button>
         </div>
 
@@ -201,7 +237,7 @@ export function WordingLibraryModule() {
 
         <div className="wording-layout">
         <div className="wording-list" data-testid="wording-list">
-          {visible.length ? visible.map((entry) => (
+          {visible.length ? paged.slice.map((entry) => (
             <button
               key={entry.scriptId}
               type="button"
@@ -221,6 +257,29 @@ export function WordingLibraryModule() {
               <span>{live ? '换一个域或清空筛选后再看。' : '工作台只读通道未接通，不会回退到合成样例。'}</span>
             </div>
           )}
+          {visible.length > 0 ? (
+            <div className="wording-pager" data-testid="wording-pager">
+              <button
+                type="button"
+                className="dash-reset"
+                data-testid="wording-page-prev"
+                disabled={paged.page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                上一页
+              </button>
+              <span data-testid="wording-page-status">第 {paged.page} / {paged.pageCount} 页</span>
+              <button
+                type="button"
+                className="dash-reset"
+                data-testid="wording-page-next"
+                disabled={paged.page >= paged.pageCount}
+                onClick={() => setPage((current) => Math.min(paged.pageCount, current + 1))}
+              >
+                下一页
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <aside className="dash-card wording-detail" data-testid="wording-detail">

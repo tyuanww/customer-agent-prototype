@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.9] - 2026-09-20
+
+### Added
+
+- Dashboard wording library paginates twenty published rows per page and exports the current filter as CSV. The library stays read-only.
+
 ## [0.3.8] - 2026-09-20
 
 ### Fixed
