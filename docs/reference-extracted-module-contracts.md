@@ -118,6 +118,7 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 | Shared overlay command | `apps/desktop/tests/unit/overlay-events.test.ts` |
 | Query layout ACK | `apps/desktop/tests/unit/query-layout.test.ts` |
 | Dashboard manifest / 外观 | `apps/desktop/tests/unit/dashboard-manifest.test.ts`、`apps/desktop/tests/unit/dashboard-appearance.test.ts` |
+| Dashboard SOP 只读树 | `apps/desktop/tests/component/SopLibraryModule.test.tsx`、`apps/desktop/tests/unit/dashboard-layout.test.ts` |
 | Fox presence 纯逻辑 / renderer runtime | `apps/desktop/tests/unit/fox-presence.test.ts`、`apps/desktop/tests/component/FoxApp.test.tsx` |
 | Test-only harness | `apps/desktop/tests/unit/overlay-test-harness.test.ts` |
 

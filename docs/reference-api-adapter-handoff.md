@@ -68,7 +68,8 @@ Windows Electron 壳
 | 「复制话术」 | `POST /v1/events/adoption` | events | 只写剪贴板 | 先确认 clipboard 成功，再带 `Idempotency-Key` 上报 `outcome=adopted` + `push_method=clipboard`；占位符缺值禁止复制 |
 | 空态 | escalate | events | 文案“转人工话术师”，**无按钮、无事件** | `open_feishu` / `copy_contact` 是辅助动作，不是 terminal |
 | 收起 / 切后台 | `dismissed` / `timeout` | events | 无上报 | 明确放弃才 `dismissed`；idle 达 `CLIENT_ACTION_TIMEOUT_MS` 才 `timeout` |
-| Dashboard 九模块 | metrics / workorders / content / announce | 对应端口 | 静态合成 | 只读 GET；coach/owner RBAC；agent 无管理权；Publish 仍仅 owner |
+| Dashboard 九模块（VOC / 工单 / 内容 / 公告等） | metrics / workorders / content / announce | 对应端口 | 静态合成 | 只读 GET；coach/owner RBAC；agent 无管理权；Publish 仍仅 owner |
+| Dashboard SOP 只读过敏树 | 无独立端口 | — | 合成 `allergySopTree()` | 持久化与发布需 `contracts:intake`；不在本仓发明 OpenAPI |
 | 架构图九端口 | 目标拓扑 | 九端口 | API 已实现 development/test 的 auth/policy/search/events 子集；桌面和真实运行均未接入 | 状态标签不是生产可用性声明 |
 
 正式检索 **唯一 SQL 边界** 是 `search_recommendable_scripts(...)`。Adapter 若在客户端自拼 WHERE、直扫 `scripts`、或把 Demo fixture 当 SoR，即违反 INV-EFF / INV-ACL。

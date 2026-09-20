@@ -2105,6 +2105,18 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .wording-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr); gap: 12px; }
 .wording-list { display: grid; align-content: start; gap: 6px; }
+.sop-library-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.sop-library-node {
+  padding: 10px 12px;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+  background: var(--dash-surface);
+}
+.sop-library-node-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.sop-library-node p { margin: 0; line-height: 20px; }
+.sop-library-stop { margin-top: 6px; color: var(--dash-danger); }
+.sop-library-note { margin-top: 6px; color: var(--dash-muted); }
+.sop-library-edges { margin-top: 6px; color: var(--dash-muted); }
 .wording-pager {
   display: flex;
   align-items: center;

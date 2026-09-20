@@ -45,7 +45,7 @@
 
 ### 保留开发基线：`PILOT-S0 · SYNTHETIC`
 
-- Fox → Query → Top 3 → 复制和九模块 Dashboard 已作为产品交互基线存在。
+- Fox → Query → Top 3 → 复制和十模块 Dashboard 已作为产品交互基线存在。
 - 仅使用编译期合成 fixture / manifest；桌面无正式 OAuth、API adapter 或真实客户数据。并行 Application API 已实现 development/test 的 mock auth、policy、Search + Events，但不改变桌面模式，也不构成真实运行接入。
 - 允许单人在本仓继续本地 UI、交互、纯状态模型、合成 fixture、测试、构建、开发诊断和 Windows feasibility smoke；新增付费为 0，2026-09-30 复核。
 - 这是 Menokin 试点的合成验证 profile，不是另一个 Demo 项目；它自身不接正式 API / worker / migration、真实数据或飞书运行链路。

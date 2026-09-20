@@ -328,6 +328,16 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 | --- | --- |
 | P0 横幅与 CAS 演练 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts tests/unit/dashboard-manifest.test.ts` |
 
+## Dashboard SOP 只读树
+
+侧栏「SOP」是工作台第十个一期模块，不是 Query 的独立 SOP 窗。只读渲染 `allergySopTree()`，不编辑、不发布、不写盘。coach / owner 可见内部停手；坐席和 `dashboardContent.session()` 失败时隐藏（fail-closed）。持久化与发布仍要 contracts:intake。
+
+| 你想证明 | 命令 |
+| --- | --- |
+| 只读树、角色红线和 fail-closed | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/SopLibraryModule.test.tsx tests/component/DashboardApp.test.tsx tests/unit/dashboard-manifest.test.ts tests/unit/dashboard-layout.test.ts` |
+
+黄金路径（人工）：打开运营工作台 → 话术运营 → SOP → 看到合成过敏树节点。不要把它当成 Query「打开过敏售后流程」。
+
 ## 打包态显式离线（P3 第一刀）
 
 缺 `synthetic-stack.json` 且包内没有精确 `synthetic-offline.json` 时仍是 fail-closed `missing`，**不会**变成 S0。当前安装包把 `resources/synthetic-offline.json` 打进 extraResources；userData 还没有 profile 时才拷成 `{ "mode": "synthetic-offline" }`。已有 `synthetic-local` 不覆盖。macOS userData：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`。Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`。Linux：`~/.config/客服话术浮窗 Demo/synthetic-stack.json`（`XDG_CONFIG_HOME` 优先）。

@@ -33,6 +33,10 @@ const charts = readFileSync(
   path.join(root, 'src/renderer/features/dashboard/DashboardCharts.tsx'),
   'utf8',
 );
+const sopLibrary = readFileSync(
+  path.join(root, 'src/renderer/features/dashboard/SopLibraryModule.tsx'),
+  'utf8',
+);
 
 describe('dashboard layout contract', () => {
   it('keeps a white-first light palette and a charcoal dark palette', () => {
@@ -93,6 +97,12 @@ describe('dashboard layout contract', () => {
     expect(css).not.toMatch(/border-left:\s*3px\s+solid\s+var\(--dash-purple\)/);
     expect(css).toContain('.wording-list > button.is-selected');
     expect(css).toContain('.iteration-list > button.is-selected');
+    expect(css).toContain('.sop-library-list');
+    expect(css).toContain('.sop-library-node {');
+    expect(css).toContain('.sop-library-node-head {');
+    expect(css).toContain('.sop-library-stop { margin-top: 6px; color: var(--dash-danger); }');
+    expect(css).toContain('.sop-library-note { margin-top: 6px; color: var(--dash-muted); }');
+    expect(css).toContain('.sop-library-edges { margin-top: 6px; color: var(--dash-muted); }');
     expect(css).toContain('.iteration-reminder');
     expect(css).toContain('.iteration-reminder.is-empty');
     expect(css).toContain('.iteration-reminder-list > li > button.is-selected');
@@ -503,6 +513,19 @@ describe('dashboard layout contract', () => {
     expect(announce).toContain('window.setTimeout');
     expect(announce).toContain('window.clearTimeout');
     expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
+  });
+
+  it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
+    expect(app).toContain('sop: SopLibraryModule');
+    expect(app).toContain("sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3']");
+    expect(sopLibrary).toContain('allergySopTree()');
+    expect(sopLibrary).toContain('data-testid="module-sop"');
+    expect(sopLibrary).toContain('data-testid="sop-library-list"');
+    expect(sopLibrary).toContain('dashboardContent');
+    expect(sopLibrary).toContain('api.session()');
+    expect(sopLibrary).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB/);
+    expect(sopLibrary).not.toContain('publishDraft');
+    expect(css).toContain('.sop-library-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }');
   });
 
   it('keeps coach content preview local and publishes only through dashboardContent', () => {
