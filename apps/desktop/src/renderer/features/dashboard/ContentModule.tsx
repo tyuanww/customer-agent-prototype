@@ -20,14 +20,37 @@ type UploadView =
   | { status: 'idle' }
   | { status: 'reading'; sourceName: string }
   | { status: 'ready'; sourceName: string; rows: readonly CoachUploadRow[]; csvText: string }
+  | { status: 'reviewed'; sourceName: string; rows: readonly CoachUploadRow[]; csvText: string; reviewedAt: string; reviewerRole: string }
   | { status: 'error'; message: string };
+
+type PipelineStepStatus = 'pending' | 'active' | 'done';
+
+function pipelineStepStatus(
+  step: 'import' | 'review' | 'publish',
+  upload: UploadView,
+  submitting: boolean,
+): PipelineStepStatus {
+  if (step === 'import') {
+    if (upload.status === 'idle' || upload.status === 'error') return 'active';
+    if (upload.status === 'reading') return 'active';
+    return 'done';
+  }
+  if (step === 'review') {
+    if (upload.status === 'idle' || upload.status === 'reading' || upload.status === 'error') return 'pending';
+    if (upload.status === 'ready') return 'active';
+    return 'done';
+  }
+  // publish
+  if (upload.status === 'reviewed') return submitting ? 'active' : 'active';
+  return 'pending';
+}
 
 function pipelineItemClass(step: string, upload: UploadView, submitting: boolean): string {
   if (submitting && step === 'Publish') return 'is-current';
   if (upload.status === 'reading' && step === 'Import') return 'is-current';
-  if (upload.status !== 'ready') return '';
+  if (upload.status !== 'ready' && upload.status !== 'reviewed') return '';
   if (step === 'Import' || step === 'Validate') return 'is-done';
-  if (step === 'Staged') return 'is-current';
+  if (step === 'Staged') return upload.status === 'reviewed' ? 'is-done' : 'is-current';
   return '';
 }
 
@@ -43,6 +66,21 @@ function applyUploadResult(result: CoachUploadResult): UploadView {
   return { status: 'error', message: result.message };
 }
 
+function uploadRows(upload: UploadView): readonly CoachUploadRow[] {
+  if (upload.status === 'ready' || upload.status === 'reviewed') return upload.rows;
+  return [];
+}
+
+function uploadCsvText(upload: UploadView): string {
+  if (upload.status === 'ready' || upload.status === 'reviewed') return upload.csvText;
+  return '';
+}
+
+function uploadSourceName(upload: UploadView): string {
+  if (upload.status === 'ready' || upload.status === 'reviewed') return upload.sourceName;
+  return '';
+}
+
 export function ContentModule() {
   const [selectedId, setSelectedId] = useState(data.releases[0]?.releaseId ?? '');
   const [upload, setUpload] = useState<UploadView>({ status: 'idle' });
@@ -51,9 +89,12 @@ export function ContentModule() {
   const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
   const ingestGeneration = useRef(0);
   const selected = data.releases.find((release) => release.releaseId === selectedId) ?? data.releases[0];
-  const hasDomain = upload.status === 'ready' && upload.rows.some((row) => row.domain);
-  const statusMessage = upload.status === 'ready'
-    ? `已进入待审核草稿 · ${upload.rows.length} 行 · ${upload.sourceName} · 不是已发布`
+  const hasDomain = (upload.status === 'ready' || upload.status === 'reviewed')
+    && upload.rows.some((row) => row.domain);
+  const statusMessage = upload.status === 'reviewed'
+    ? `审核通过 · ${upload.rows.length} 行 · ${upload.sourceName} · 可发布`
+    : upload.status === 'ready'
+      ? `已进入待审核草稿 · ${upload.rows.length} 行 · ${upload.sourceName} · 不是已发布`
     : upload.status === 'reading'
       ? `正在读取 ${upload.sourceName} · 只在本页预览，不会发布`
     : upload.status === 'error'
@@ -78,7 +119,7 @@ export function ContentModule() {
     };
   }, []);
 
-  const rows = upload.status === 'ready' ? upload.rows : [];
+  const rows = uploadRows(upload);
   const sourceBindings = bindingsForRows(rows);
   const gate = contentPublishGate({
     productAvailable: Boolean(window.dashboardContent) && sessionView?.enabled !== false,
@@ -87,12 +128,24 @@ export function ContentModule() {
     rows,
     sourceBindings,
   });
-  const publishDisabled = !gate.allowed || submitting;
+  // Owner must go through the review gate before publishing; coach can publish directly
+  // if contentPublishGate allows it (product/campaign content only).
+  const ownerNeedsReview = sessionView?.role === 'owner' && upload.status !== 'reviewed';
+  const publishDisabled = ownerNeedsReview || !gate.allowed || submitting;
+  const gateBlocksHard = !gate.allowed && gate.code !== 'VALIDATION';
   const publishReason = submitting
     ? CONTENT_PUBLISH_COPY.submitting
-    : gate.allowed
-      ? ''
-      : gate.message;
+    : gateBlocksHard
+      ? gate.message
+      : upload.status === 'idle' || upload.status === 'error'
+        ? '请先导入草稿'
+        : upload.status === 'reading'
+          ? '正在读取文件'
+          : ownerNeedsReview
+            ? '请先完成审核确认'
+            : gate.allowed
+              ? ''
+              : gate.message;
 
   const loadDemo = () => {
     ingestGeneration.current += 1;
@@ -130,18 +183,32 @@ export function ContentModule() {
     );
   };
 
+  const onReviewConfirm = () => {
+    if (upload.status !== 'ready' || sessionView?.role !== 'owner') return;
+    setUpload({
+      status: 'reviewed',
+      sourceName: upload.sourceName,
+      rows: upload.rows,
+      csvText: upload.csvText,
+      reviewedAt: new Date().toLocaleString('zh-CN'),
+      reviewerRole: 'owner',
+    });
+  };
+
   const onPublish = () => {
-    if (!gate.allowed || upload.status !== 'ready' || submitting) return;
+    if (publishDisabled || (upload.status !== 'ready' && upload.status !== 'reviewed') || submitting) return;
     const api = window.dashboardContent;
     if (!api) return;
     const generation = ingestGeneration.current;
     setSubmitting(true);
     setPublishFeedback(null);
-    const title = upload.sourceName.trim().slice(0, 200) || '工作台草稿';
+    const sourceName = uploadSourceName(upload);
+    const csvText = uploadCsvText(upload);
+    const title = sourceName.trim().slice(0, 200) || '工作台草稿';
     void api.publishDraft({
-      sourceName: upload.sourceName,
-      csvText: upload.csvText,
-      rows: upload.rows,
+      sourceName,
+      csvText,
+      rows,
       title,
       summary: null,
       sourceBindings,
@@ -156,6 +223,11 @@ export function ContentModule() {
       if (generation === ingestGeneration.current) setSubmitting(false);
     });
   };
+
+  const unreviewedDomainCount = upload.status === 'ready'
+    ? new Set(upload.rows.map((r) => r.domain).filter(Boolean)).size
+    : 0;
+  const hasUntaggedRows = upload.status === 'ready' && upload.rows.some((r) => !r.domain);
 
   return (
     <div className="dash-module" data-testid="module-content">
@@ -172,12 +244,24 @@ export function ContentModule() {
             data-testid="publish-action"
             onClick={onPublish}
           >
-            Publish
+            发布
           </button>
           <span data-testid="publish-disabled-reason">{publishReason}</span>
           {publishFeedback ? <span data-testid="publish-feedback">{publishFeedback}</span> : null}
         </div>
       </header>
+
+      <ol className="content-pipeline-steps" aria-label="发布流程" data-testid="content-pipeline-steps">
+        <li data-step-status={pipelineStepStatus('import', upload, submitting)}>
+          <span aria-hidden="true">1</span>导入草稿
+        </li>
+        <li data-step-status={pipelineStepStatus('review', upload, submitting)}>
+          <span aria-hidden="true">2</span>审核确认
+        </li>
+        <li data-step-status={pipelineStepStatus('publish', upload, submitting)}>
+          <span aria-hidden="true">3</span>发布
+        </li>
+      </ol>
 
       <ol className="dash-pipeline" data-testid="content-pipeline">
         {data.pipeline.map((step, index) => (
@@ -228,7 +312,7 @@ export function ContentModule() {
             type="button"
             className="dash-reset"
             data-testid="content-upload-clear"
-            disabled={upload.status === 'idle' || upload.status === 'reading' || submitting}
+            disabled={upload.status === 'idle' || upload.status === 'reading' || upload.status === 'reviewed' || submitting}
             onClick={clearUpload}
           >
             清除预览
@@ -243,21 +327,70 @@ export function ContentModule() {
           data-testid="content-upload-status"
         >
           <strong>{
-            upload.status === 'ready'
-              ? '待审核草稿'
-              : upload.status === 'reading'
-                ? '正在读取'
-                : upload.status === 'error'
-                  ? '未进入草稿'
-                  : '等待导入'
+            upload.status === 'reviewed'
+              ? '审核通过 · 待发布'
+              : upload.status === 'ready'
+                ? '待审核草稿'
+                : upload.status === 'reading'
+                  ? '正在读取'
+                  : upload.status === 'error'
+                    ? '未进入草稿'
+                    : '等待导入'
           }</strong>
           <span>{statusMessage}</span>
         </div>
 
-        {upload.status === 'ready' ? (
+        {upload.status === 'ready' && sessionView?.role === 'owner' ? (
+          <section
+            className="content-review-gate"
+            aria-labelledby="content-review-gate-title"
+            data-testid="content-review-gate"
+          >
+            <h3 id="content-review-gate-title">审核确认</h3>
+            <dl className="dash-dl">
+              <div>
+                <dt>导入行数</dt>
+                <dd data-testid="review-row-count">{upload.rows.length} 行</dd>
+              </div>
+              <div>
+                <dt>已标注域</dt>
+                <dd data-testid="review-domain-count">{unreviewedDomainCount} 个</dd>
+              </div>
+              <div>
+                <dt>未标注行</dt>
+                <dd data-testid="review-untagged">
+                  {hasUntaggedRows
+                    ? <span className="is-risk">有未标注行，发布前请确认域归属</span>
+                    : '无'}
+                </dd>
+              </div>
+              <div>
+                <dt>来源文件</dt>
+                <dd>{upload.sourceName}</dd>
+              </div>
+            </dl>
+            <button
+              type="button"
+              className="content-review-confirm dash-action-primary"
+              data-testid="content-review-confirm"
+              onClick={onReviewConfirm}
+            >
+              确认审核通过，进入发布
+            </button>
+          </section>
+        ) : null}
+
+        {upload.status === 'reviewed' ? (
+          <div className="content-review-result" data-testid="content-review-result" aria-live="polite">
+            <StatusBadge label="审核通过" tone="ok" />
+            <span>审核人：{upload.reviewerRole} · {upload.reviewedAt}</span>
+          </div>
+        ) : null}
+
+        {(upload.status === 'ready' || upload.status === 'reviewed') ? (
           <div className="dash-table-wrap content-staged-preview" data-testid="content-staged-preview">
             <table className="dash-table">
-              <caption>待审核草稿预览 · 场景 / 标准话术</caption>
+              <caption>草稿预览 · 场景 / 标准话术</caption>
               <thead>
                 <tr>
                   {hasDomain ? <th>域</th> : null}
