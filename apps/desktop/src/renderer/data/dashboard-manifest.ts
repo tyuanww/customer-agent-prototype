@@ -10,26 +10,16 @@ import {
 
 export const DASHBOARD_MODULE_IDS = [
   'overview',
-  'workorders',
   'ledger',
-  'review',
   'wording',
   'iteration',
   'sop',
   'content',
   'announce',
-  'architecture',
 ] as const;
 
 export type DashboardModuleId = (typeof DASHBOARD_MODULE_IDS)[number];
 
-export type ArchitectureDesignStatus = 'mapped' | 'pending';
-export type ArchitecturePrototypeStatus =
-  | 'runtime-interactive'
-  | 'static-interactive'
-  | 'visual-only'
-  | 'absent';
-export type ArchitectureFormalRuntimeStatus = 'not-started' | 'in-progress' | 'verified';
 export type LedgerTerminal = 'copied' | 'no_hit' | 'abandoned' | 'risk_escalated';
 export type IterationStatus = 'open' | 'in_progress' | 'resolved' | 'wont_fix';
 export type IterationKind = 'no_hit' | 'top1_skipped';
@@ -37,20 +27,11 @@ export type IterationKind = 'no_hit' | 'top1_skipped';
 export type IterationCause = 'content_gap' | 'ranking' | 'stale' | 'mixed';
 export type DomainId = 'presale' | 'campaign' | 'aftersale' | 'product';
 export type SyncFacet = 'published' | 'announced' | 'client_ack' | 'offline_lease';
-export type VocTimeGrain = 'year' | 'month' | 'day';
-
 export type DashboardNavItem = {
   id: DashboardModuleId;
   label: string;
   blurb: string;
   group: '经营总览' | '服务洞察' | '话术运营' | '治理与架构';
-};
-
-export type DashboardDeferredNavItem = {
-  id: 'workorder-trash';
-  label: string;
-  statusLabel: string;
-  group: '服务洞察';
 };
 
 export type WordingLifecycle = 'demo_effective' | 'demo_expiring' | 'structure_sample' | 'published';
@@ -113,54 +94,6 @@ export type OverviewStructureItem = {
   explanation: string;
 };
 
-export type VocInsight = {
-  id: string;
-  label: string;
-  count: number;
-  pct: number;
-  severity: 'watch' | 'warn' | 'risk';
-  productScope: readonly string[];
-  productBreakdown: readonly { product: string; count: number }[];
-  wordingGap: string;
-  owner: string;
-  nextStep: string;
-};
-
-export type VocTimeSlice = {
-  id: string;
-  grain: VocTimeGrain;
-  label: string;
-  rangeLabel: string;
-  ticketCount: number;
-  uniqueOrders: number;
-  issueCounts: readonly {
-    insightId: string;
-    productBreakdown: readonly { product: string; count: number }[];
-  }[];
-};
-
-export type OfflineReviewDimensionId = 'modified' | 'sent' | 'applicable';
-export type OfflineReviewOutcomeTone = 'positive' | 'neutral' | 'warning' | 'unknown';
-
-export type OfflineReviewOutcome = {
-  id: string;
-  label: string;
-  count: number;
-  definition: string;
-  tone: OfflineReviewOutcomeTone;
-};
-
-export type OfflineReviewDimension = {
-  id: OfflineReviewDimensionId;
-  label: string;
-  question: string;
-  reviewed: number;
-  verifiable: number;
-  unverifiable: number;
-  denominatorLabel: string;
-  evidenceGrade: string;
-  outcomes: readonly OfflineReviewOutcome[];
-};
 
 export type OverviewMetric = {
   id: string;
@@ -258,101 +191,20 @@ export type AnnounceRow = {
   offlineLease: boolean;
 };
 
-export type ArchitectureEvidence = {
-  designStatus: ArchitectureDesignStatus;
-  designStatusLabel: string;
-  prototypeStatus: ArchitecturePrototypeStatus;
-  prototypeStatusLabel: string;
-  formalRuntimeStatus: ArchitectureFormalRuntimeStatus;
-  formalRuntimeStatusLabel: string;
-};
-
-export type ArchitectureNode = ArchitectureEvidence & {
-  id: string;
-  title: string;
-  detail: string;
-  redline?: boolean;
-};
-
-export type ArchitectureFlowStep = ArchitectureEvidence & {
-  code: string;
-  title: string;
-  detail: string;
-};
-
-export type ArchitectureFlow = {
-  id: 'float' | 'dashboard';
-  title: string;
-  detail: string;
-  steps: readonly ArchitectureFlowStep[];
-};
-
-export type ArchitectureGuardrail = {
-  id: string;
-  title: string;
-  detail: string;
-};
-
-const ARCHITECTURE_EVIDENCE_LABELS = {
-  design: {
-    mapped: '设计已映射',
-    pending: '设计待映射',
-  },
-  prototype: {
-    'runtime-interactive': '本地合成运行',
-    'static-interactive': '静态合成交互',
-    'visual-only': '交互形状模拟',
-    absent: '原型未实现',
-  },
-  formalRuntime: {
-    'not-started': '正式未接入',
-    'in-progress': '正式实现中',
-    verified: '正式已验证',
-  },
-} as const;
-
-function architectureEvidence(
-  prototypeStatus: ArchitecturePrototypeStatus,
-  formalRuntimeStatus: ArchitectureFormalRuntimeStatus = 'not-started',
-  designStatus: ArchitectureDesignStatus = 'mapped',
-): ArchitectureEvidence {
-  return {
-    designStatus,
-    designStatusLabel: ARCHITECTURE_EVIDENCE_LABELS.design[designStatus],
-    prototypeStatus,
-    prototypeStatusLabel: ARCHITECTURE_EVIDENCE_LABELS.prototype[prototypeStatus],
-    formalRuntimeStatus,
-    formalRuntimeStatusLabel: ARCHITECTURE_EVIDENCE_LABELS.formalRuntime[formalRuntimeStatus],
-  };
-}
-
 export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'overview', label: '管理概览', blurb: '风险、责任与处理进度', group: '经营总览' },
-  { id: 'workorders', label: 'VOC / 工单洞察', blurb: '去标识聚合、筛选与下钻', group: '服务洞察' },
   { id: 'ledger', label: '检索效果', blurb: '根问题 / 检索操作双账', group: '服务洞察' },
-  { id: 'review', label: '离线抽样复核', blurb: '修改 / 发送 / 适用性分账', group: '服务洞察' },
   { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
   { id: 'iteration', label: '话术优化待办', blurb: '内容缺口 / 排序 / 过期召回', group: '话术运营' },
   { id: 'sop', label: 'SOP', blurb: '过敏流程只读合成树', group: '话术运营' },
   { id: 'content', label: '内容与发布', blurb: '话术师草稿与缺域阻断', group: '治理与架构' },
   { id: 'announce', label: '公告与同步', blurb: 'published / ACK / lease 分面', group: '治理与架构' },
-  { id: 'architecture', label: '架构能力图', blurb: '双表面与九端口故事', group: '治理与架构' },
-]);
-
-export const DASHBOARD_DEFERRED_NAV: readonly DashboardDeferredNavItem[] = deepFreeze([
-  {
-    id: 'workorder-trash',
-    label: '工单垃圾桶',
-    statusLabel: '二期待实施',
-    group: '服务洞察',
-  },
 ]);
 
 export const DASHBOARD_MANIFEST = deepFreeze({
   banners: {
     env: DASHBOARD_ENV_BADGES,
     disclaimer: DASHBOARD_STRUCTURE_DISCLAIMER,
-    architectureMark: DASHBOARD_ARCHITECTURE_MARK,
     refreshedAt: DASHBOARD_REFRESHED_AT,
     refreshLabel: DASHBOARD_REFRESH_LABEL,
     metricScope: DASHBOARD_METRIC_SCOPE,
@@ -371,18 +223,6 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         statusLabel: '发布阻断',
         reviewWindow: 'G0 前关闭',
         target: 'wording',
-      },
-      {
-        id: 'decision-voc-risk',
-        priority: 'P0',
-        title: 'VOC 风险项需要归因，不看一条总均值',
-        evidence: '面膜 / 棉片分表且字段不同；竞品表必须隔离，原始客户文本不得进 Dashboard。',
-        impact: '148 条高风险合成聚合待复核',
-        owner: '客服经理 + 产品 Owner',
-        nextStep: '按产品线、问题类型和风险等级下钻，再决定补库或产品改进。',
-        statusLabel: '待归因',
-        reviewWindow: '下次 VOC 复核',
-        target: 'workorders',
       },
       {
         id: 'decision-no-hit',
@@ -406,15 +246,6 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         period: '当前固定快照',
         definition: '只统计本页有明确证据、Owner 和下一步的经理决策项。',
         target: 'overview',
-      },
-      {
-        id: 'high-risk-voc',
-        label: '高风险 VOC',
-        value: '148',
-        note: '去标识合成聚合',
-        period: '工作簿结构镜像',
-        definition: '风险等级为 risk 的聚合问题数；不含客户原文，也不等于投诉率。',
-        target: 'workorders',
       },
       {
         id: 'no-hit-rate',
@@ -687,79 +518,6 @@ export const DASHBOARD_MANIFEST = deepFreeze({
       },
     ] satisfies LedgerRow[],
   },
-  review: {
-    title: '离线三维抽样复核',
-    kicker: '是否修改 / 是否发送 / 是否适用 · 三维分账',
-    scope:
-      '本页是 48 个去重根问题的全合成冻结样本池，只演示获批 Pilot 后的复核口径；当前没有真实复核 EVD，也不读取最终发送正文。',
-    inferenceBoundary:
-      '复制只证明剪贴板写入成功，不能推断已发送、已采纳、未修改或回答正确；三个维度必须分别由授权人工复核，无法证明时记为 unverifiable。',
-    pool: {
-      frozen: 48,
-      reviewed: 36,
-      coverage: '75.0%',
-      evidenceGrade: 'DEMO · 方法结构演示',
-    },
-    dimensions: [
-      {
-        id: 'modified',
-        label: '是否修改',
-        question: '坐席最终使用内容相对所选话术发生了什么程度的修改？',
-        reviewed: 36,
-        verifiable: 31,
-        unverifiable: 5,
-        denominatorLabel: '修改分布以 31 个可核验根问题为有效分母；不可核验另列，不从复制倒推。',
-        evidenceGrade: '合成离线复核 · 不含最终发送正文',
-        outcomes: [
-          { id: 'unchanged', label: '未修改', count: 16, definition: '授权复核证据确认与所选版本一致。', tone: 'positive' },
-          { id: 'minor', label: '轻微修改', count: 9, definition: '不改变承诺、范围与风险边界的轻量调整。', tone: 'neutral' },
-          { id: 'material', label: '实质修改', count: 4, definition: '关键信息、范围或表达发生实质变化，需回看话术缺口。', tone: 'warning' },
-          { id: 'rewrite', label: '重写', count: 2, definition: '最终表达不再能视为所选话术的直接使用。', tone: 'warning' },
-          { id: 'unverifiable', label: '不可核验', count: 5, definition: '缺少足够的授权离线证据，不能依据复制行为补值。', tone: 'unknown' },
-        ],
-      },
-      {
-        id: 'sent',
-        label: '是否发送',
-        question: '所选或调整后的话术是否实际发送给客户？',
-        reviewed: 36,
-        verifiable: 27,
-        unverifiable: 9,
-        denominatorLabel: '发送确认率只以 27 个可核验根问题为有效分母；不可核验不计为未发送。',
-        evidenceGrade: '合成离线复核 · 与复制操作账分离',
-        outcomes: [
-          { id: 'confirmed-sent', label: '确认已发送', count: 18, definition: '仅表示授权抽样证据确认发生发送，不表示内容正确或客户采纳。', tone: 'positive' },
-          { id: 'confirmed-not-sent', label: '确认未发送', count: 9, definition: '授权抽样证据确认未发生发送，与是否复制分开记录。', tone: 'neutral' },
-          { id: 'unverifiable', label: '不可核验', count: 9, definition: '没有足够证据确认发送状态，禁止用复制成功代填。', tone: 'unknown' },
-        ],
-      },
-      {
-        id: 'applicable',
-        label: '是否适用',
-        question: '所选话术的平台、商品、活动窗口、版本与风险边界是否适用于该问题？',
-        reviewed: 36,
-        verifiable: 28,
-        unverifiable: 8,
-        denominatorLabel: '适用率只以 28 个已完成业务复核的根问题为有效分母；它不是自动“正确率”。',
-        evidenceGrade: '合成业务复核 · 不由检索排名或复制推断',
-        outcomes: [
-          { id: 'applicable', label: '确认适用', count: 26, definition: '授权业务复核确认平台、范围、版本、有效期与风险均适用。', tone: 'positive' },
-          { id: 'not-applicable', label: '确认不适用', count: 2, definition: '至少一个适用条件不成立，需要进入话术或检索优化。', tone: 'warning' },
-          { id: 'unverifiable', label: '不可核验', count: 8, definition: '证据不足，不能从 Top1、复制或发送状态推断适用性。', tone: 'unknown' },
-        ],
-      },
-    ] satisfies OfflineReviewDimension[],
-    strata: [
-      { id: 'high-risk', label: '高风险问题', rule: '全审', planned: 8, reviewed: 8 },
-      { id: 'exception', label: '无命中 / 放弃 / 升级 / 重选', rule: '全审', planned: 12, reviewed: 12 },
-      { id: 'copied', label: '成功复制', rule: '合成分层抽样', planned: 28, reviewed: 16 },
-    ],
-    methodNotes: [
-      '分层键应为坐席层 × 业务场景 × 自动事实结果；本 Demo 只展示合成分层，不做个人排名。',
-      '三项结论分别报告样本量、有效分母、不可核验与证据等级，不共用一个“采纳率”。',
-      '真实复核只能在获批 G1b / Pilot 协议与受控 EVD 中执行；Dashboard 不采最终发送正文。',
-    ],
-  },
   wording: {
     title: '话术库',
     kicker: '资产浏览与正式来源就绪度 · Dashboard 一期零写正文',
@@ -872,224 +630,6 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         dataClass: 'synthetic',
       },
     ] satisfies WordingEntry[],
-  },
-  workorders: {
-    title: 'VOC / 工单洞察',
-    kicker: '基于用户提供工作簿结构设计的去标识合成镜像',
-    story:
-      '源工作簿包含面膜、棉片、精华液等分表与隐藏表。Demo 只保留聚合维度，不打包客户原文、订单号、评论或明细；竞品数据与自有产品严格分域。',
-    noWriteback: '明确不写回班牛。导出仅演示脱敏字段清单。',
-    noUpload: '本页没有可用的上传控件。',
-    stages: [
-      { id: 'precheck', label: '预检' },
-      { id: 'map', label: '映射' },
-      { id: 'aggregate', label: '聚合' },
-      { id: 'drill', label: '下钻' },
-      { id: 'redacted_export', label: '脱敏导出' },
-    ],
-    batch: {
-      batchId: 'voc-structure-demo-082',
-      title: 'VOC 结构镜像 · 合成聚合',
-      currentStage: 'aggregate',
-      ticketCount: 2400,
-      uniqueOrders: 2325,
-      rejectedFields: ['mobile', 'order_id_raw', 'receiver_address', 'id_number'],
-      distribution: [
-        { label: '棉片内部叠放混乱', count: 1450, pct: 60.4 },
-        { label: '纤维类问题', count: 290, pct: 12.1 },
-        { label: '精华料体含量不足', count: 203, pct: 8.5 },
-        { label: '黑点类问题', count: 107, pct: 4.5 },
-        { label: '精华液稀薄', count: 42, pct: 1.8 },
-        { label: '头发丝 / 异物', count: 41, pct: 1.7 },
-        { label: '其他已归类', count: 267, pct: 11.1 },
-      ],
-    } satisfies WorkorderBatch,
-    productFilters: ['全部产品线', '面膜', '棉片', '精华水 / 液'],
-    timeSlices: [
-      {
-        id: 'year-2026',
-        grain: 'year',
-        label: '2026 年（截至 08/13）',
-        rangeLabel: '2026-01-01–2026-08-13',
-        ticketCount: 2400,
-        uniqueOrders: 2325,
-        issueCounts: [
-          { insightId: 'stacking', productBreakdown: [{ product: '棉片', count: 1450 }] },
-          { insightId: 'fiber', productBreakdown: [{ product: '面膜', count: 120 }, { product: '棉片', count: 170 }] },
-          { insightId: 'essence-shortage', productBreakdown: [{ product: '面膜', count: 120 }, { product: '棉片', count: 83 }] },
-          { insightId: 'foreign-matter', productBreakdown: [{ product: '面膜', count: 93 }, { product: '棉片', count: 55 }] },
-          { insightId: 'thin-essence', productBreakdown: [{ product: '精华水 / 液', count: 42 }] },
-          { insightId: 'other-classified', productBreakdown: [{ product: '面膜', count: 90 }, { product: '棉片', count: 95 }, { product: '精华水 / 液', count: 82 }] },
-        ],
-      },
-      {
-        id: 'year-2025',
-        grain: 'year',
-        label: '2025 年',
-        rangeLabel: '2025-01-01–2025-12-31',
-        ticketCount: 1870,
-        uniqueOrders: 1812,
-        issueCounts: [
-          { insightId: 'stacking', productBreakdown: [{ product: '棉片', count: 1070 }] },
-          { insightId: 'fiber', productBreakdown: [{ product: '面膜', count: 105 }, { product: '棉片', count: 150 }] },
-          { insightId: 'essence-shortage', productBreakdown: [{ product: '面膜', count: 103 }, { product: '棉片', count: 72 }] },
-          { insightId: 'foreign-matter', productBreakdown: [{ product: '面膜', count: 78 }, { product: '棉片', count: 48 }] },
-          { insightId: 'thin-essence', productBreakdown: [{ product: '精华水 / 液', count: 39 }] },
-          { insightId: 'other-classified', productBreakdown: [{ product: '面膜', count: 70 }, { product: '棉片', count: 70 }, { product: '精华水 / 液', count: 65 }] },
-        ],
-      },
-      {
-        id: 'month-2026-08',
-        grain: 'month',
-        label: '2026 年 8 月（截至 13 日）',
-        rangeLabel: '2026-08-01–2026-08-13',
-        ticketCount: 820,
-        uniqueOrders: 795,
-        issueCounts: [
-          { insightId: 'stacking', productBreakdown: [{ product: '棉片', count: 480 }] },
-          { insightId: 'fiber', productBreakdown: [{ product: '面膜', count: 43 }, { product: '棉片', count: 62 }] },
-          { insightId: 'essence-shortage', productBreakdown: [{ product: '面膜', count: 44 }, { product: '棉片', count: 30 }] },
-          { insightId: 'foreign-matter', productBreakdown: [{ product: '面膜', count: 39 }, { product: '棉片', count: 22 }] },
-          { insightId: 'thin-essence', productBreakdown: [{ product: '精华水 / 液', count: 17 }] },
-          { insightId: 'other-classified', productBreakdown: [{ product: '面膜', count: 27 }, { product: '棉片', count: 30 }, { product: '精华水 / 液', count: 26 }] },
-        ],
-      },
-      {
-        id: 'month-2026-07',
-        grain: 'month',
-        label: '2026 年 7 月',
-        rangeLabel: '2026-07-01–2026-07-31',
-        ticketCount: 760,
-        uniqueOrders: 738,
-        issueCounts: [
-          { insightId: 'stacking', productBreakdown: [{ product: '棉片', count: 466 }] },
-          { insightId: 'fiber', productBreakdown: [{ product: '面膜', count: 39 }, { product: '棉片', count: 53 }] },
-          { insightId: 'essence-shortage', productBreakdown: [{ product: '面膜', count: 38 }, { product: '棉片', count: 25 }] },
-          { insightId: 'foreign-matter', productBreakdown: [{ product: '面膜', count: 27 }, { product: '棉片', count: 18 }] },
-          { insightId: 'thin-essence', productBreakdown: [{ product: '精华水 / 液', count: 13 }] },
-          { insightId: 'other-classified', productBreakdown: [{ product: '面膜', count: 26 }, { product: '棉片', count: 29 }, { product: '精华水 / 液', count: 26 }] },
-        ],
-      },
-      {
-        id: 'day-2026-08-13',
-        grain: 'day',
-        label: '2026 年 8 月 13 日',
-        rangeLabel: '2026-08-13',
-        ticketCount: 122,
-        uniqueOrders: 119,
-        issueCounts: [
-          { insightId: 'stacking', productBreakdown: [{ product: '棉片', count: 68 }] },
-          { insightId: 'fiber', productBreakdown: [{ product: '面膜', count: 7 }, { product: '棉片', count: 10 }] },
-          { insightId: 'essence-shortage', productBreakdown: [{ product: '面膜', count: 7 }, { product: '棉片', count: 5 }] },
-          { insightId: 'foreign-matter', productBreakdown: [{ product: '面膜', count: 6 }, { product: '棉片', count: 4 }] },
-          { insightId: 'thin-essence', productBreakdown: [{ product: '精华水 / 液', count: 3 }] },
-          { insightId: 'other-classified', productBreakdown: [{ product: '面膜', count: 4 }, { product: '棉片', count: 4 }, { product: '精华水 / 液', count: 4 }] },
-        ],
-      },
-      {
-        id: 'day-2026-08-12',
-        grain: 'day',
-        label: '2026 年 8 月 12 日',
-        rangeLabel: '2026-08-12',
-        ticketCount: 108,
-        uniqueOrders: 105,
-        issueCounts: [
-          { insightId: 'stacking', productBreakdown: [{ product: '棉片', count: 64 }] },
-          { insightId: 'fiber', productBreakdown: [{ product: '面膜', count: 5 }, { product: '棉片', count: 8 }] },
-          { insightId: 'essence-shortage', productBreakdown: [{ product: '面膜', count: 6 }, { product: '棉片', count: 4 }] },
-          { insightId: 'foreign-matter', productBreakdown: [{ product: '面膜', count: 4 }, { product: '棉片', count: 3 }] },
-          { insightId: 'thin-essence', productBreakdown: [{ product: '精华水 / 液', count: 2 }] },
-          { insightId: 'other-classified', productBreakdown: [{ product: '面膜', count: 4 }, { product: '棉片', count: 4 }, { product: '精华水 / 液', count: 4 }] },
-        ],
-      },
-    ] satisfies VocTimeSlice[],
-    insights: [
-      {
-        id: 'stacking',
-        label: '棉片内部叠放混乱',
-        count: 1450,
-        pct: 60.4,
-        severity: 'warn',
-        productScope: ['棉片'],
-        productBreakdown: [{ product: '棉片', count: 1450 }],
-        wordingGap: '需要把取用方法、外观预期与疑似异常分开回答。',
-        owner: '产品 Owner + 话术 Owner',
-        nextStep: '先归一产品版本，再补“正常形态 / 处理建议 / 升级条件”三段式话术。',
-      },
-      {
-        id: 'fiber',
-        label: '纤维类问题',
-        count: 290,
-        pct: 12.1,
-        severity: 'watch',
-        productScope: ['面膜', '棉片'],
-        productBreakdown: [
-          { product: '面膜', count: 120 },
-          { product: '棉片', count: 170 },
-        ],
-        wordingGap: '源分类存在“纤维状 / B5 纤维丝”近义拆分，不能直接当两类问题。',
-        owner: '数据 Owner + 品质 Owner',
-        nextStep: '先合并 issue_cluster，再由人工给出可承诺边界。',
-      },
-      {
-        id: 'essence-shortage',
-        label: '精华料体含量不足',
-        count: 203,
-        pct: 8.5,
-        severity: 'warn',
-        productScope: ['面膜', '棉片'],
-        productBreakdown: [
-          { product: '面膜', count: 120 },
-          { product: '棉片', count: 83 },
-        ],
-        wordingGap: '“精华含量缺少 / 料体含量缺少”需统一口径并绑定批次核验流程。',
-        owner: '品质 Owner + 售后流程 Owner',
-        nextStep: '补证据采集清单；客服不得直接判定少液原因。',
-      },
-      {
-        id: 'foreign-matter',
-        label: '黑点 / 头发丝等异物风险',
-        count: 148,
-        pct: 6.2,
-        severity: 'risk',
-        productScope: ['面膜', '棉片'],
-        productBreakdown: [
-          { product: '面膜', count: 93 },
-          { product: '棉片', count: 55 },
-        ],
-        wordingGap: '风险项不能由模型生成结论，也不能自动发送。',
-        owner: '质量 Owner + 客服经理',
-        nextStep: '进入人工升级，收集受控证据并关联售后流程；禁止原因承诺。',
-      },
-      {
-        id: 'thin-essence',
-        label: '精华液稀薄',
-        count: 42,
-        pct: 1.8,
-        severity: 'watch',
-        productScope: ['精华水 / 液'],
-        productBreakdown: [{ product: '精华水 / 液', count: 42 }],
-        wordingGap: '需区分质地预期、版本差异与异常升级，不能只用一个“正常”结论覆盖。',
-        owner: '产品 Owner + 品质 Owner',
-        nextStep: '先确认版本与批次口径，再补“正常预期 / 异常信号 / 人工升级”结构。',
-      },
-      {
-        id: 'other-classified',
-        label: '其他已归类',
-        count: 267,
-        pct: 11.1,
-        severity: 'watch',
-        productScope: ['面膜', '棉片', '精华水 / 液'],
-        productBreakdown: [
-          { product: '面膜', count: 90 },
-          { product: '棉片', count: 95 },
-          { product: '精华水 / 液', count: 82 },
-        ],
-        wordingGap: '长尾问题已经归类，但尚不足以直接判断应补话术还是改产品。',
-        owner: '数据 Owner + 客服经理',
-        nextStep: '按二级问题簇继续拆分，达到阈值后再进入对应 Owner 队列。',
-      },
-    ] satisfies VocInsight[],
   },
   iteration: {
     title: '话术优化待办',
@@ -1311,237 +851,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         offlineLease: false,
       },
     ] satisfies AnnounceRow[],
-  },
-  architecture: {
-    title: '架构能力图',
-    kicker: '双表面 + 九端口 · 设计 / 原型 / 正式三轴分账',
-    implementationDesign: {
-      title: '一期实现设计映射',
-      detail: '把一期开发框架图的两条闭环映射到产品表面；设计已映射、原型可见与正式运行必须分开取证。',
-      flows: [
-        {
-          id: 'float',
-          title: 'Float agent · 话术推荐闭环',
-          detail: 'A1–A6 · 问法进入、候选展示、复制与人工确认。',
-          steps: [
-            {
-              code: 'A1',
-              title: '问法输入',
-              detail: '粘贴或热键进入 Query；Demo 只接本地合成输入。',
-              ...architectureEvidence('runtime-interactive'),
-            },
-            {
-              code: 'A2',
-              title: 'Top 3 原文候选',
-              detail: '返回合成 fixture 原文；不映射正式已发布内容源。',
-              ...architectureEvidence('runtime-interactive'),
-            },
-            {
-              code: 'A3',
-              title: '复制剪贴板',
-              detail: '主 CTA 写入系统剪贴板，只反馈“已复制”。',
-              ...architectureEvidence('runtime-interactive'),
-            },
-            {
-              code: 'A4',
-              title: '占位符二次确认',
-              detail: '仅允许内存填值并二次确认；当前 Demo 未实现。',
-              ...architectureEvidence('absent'),
-            },
-            {
-              code: 'A5',
-              title: '澄清 / 拒答 / 升级',
-              detail: '由策略与人工承接；当前只展示风险与升级边界。',
-              ...architectureEvidence('visual-only'),
-            },
-            {
-              code: 'A6',
-              title: '平台人工确认',
-              detail: '平台适用性必须人工确认，系统不替坐席发送。',
-              ...architectureEvidence('absent'),
-            },
-          ],
-        },
-        {
-          id: 'dashboard',
-          title: 'Dashboard · coach / owner 闭环',
-          detail: 'B1–B7 · 经营判断、双账复核、治理和同步演练。',
-          steps: [
-            {
-              code: 'B1',
-              title: '概览与工具指标',
-              detail: '固定合成快照展示风险、Owner、下一步和处理窗口。',
-              ...architectureEvidence('static-interactive'),
-            },
-            {
-              code: 'B2',
-              title: '检索复制双账',
-              detail: '根问题账与检索操作账分开，复制不推断发送。',
-              ...architectureEvidence('static-interactive'),
-            },
-            {
-              code: 'B3',
-              title: '离线三维抽样复核',
-              detail: '修改、发送、适用性分别统计有效分母与不可核验。',
-              ...architectureEvidence('static-interactive'),
-            },
-            {
-              code: 'B4',
-              title: '工单分析',
-              detail: '只读展示去标识合成聚合、下钻与脱敏导出的交互形状；未读取批准文件。',
-              ...architectureEvidence('visual-only'),
-            },
-            {
-              code: 'B5',
-              title: '话术优化待办',
-              detail: '按内容缺口、排序与过期召回归因跟进，不自动改写 Answer。',
-              ...architectureEvidence('static-interactive'),
-            },
-            {
-              code: 'B6',
-              title: '内容导入 / 发布 / 回滚',
-              detail: '话术师可本地导入 CSV/XLSX 进入待审核草稿预览；正式 Publish 保持禁用。',
-              ...architectureEvidence('visual-only'),
-            },
-            {
-              code: 'B7',
-              title: '公告与离线租约',
-              detail: '本地演练四个同步分面，不联网、不发送、不保存。',
-              ...architectureEvidence('visual-only'),
-            },
-          ],
-        },
-      ] satisfies ArchitectureFlow[],
-      guardrails: [
-        {
-          id: 'human-in-loop',
-          title: '人在环',
-          detail: '系统只给候选；坐席自己选择、人工粘贴发送。',
-        },
-        {
-          id: 'no-auto-send',
-          title: '禁代发',
-          detail: '复制或演练回执不能推断已发送、已采纳、回答正确或问题已解决。',
-        },
-        {
-          id: 'no-new-port',
-          title: '不新增第十端口',
-          detail: 'Demo 不直连正式九端口，也不建立平行搜索平台。',
-        },
-        {
-          id: 'synthetic-only',
-          title: '合成数据边界',
-          detail: '编译期静态 manifest；不读聊天正文、不写盘、不接真实 API。',
-        },
-      ] satisfies ArchitectureGuardrail[],
-    },
-    surfaces: [
-      {
-        id: 'float',
-        title: 'Float',
-        detail: '狐狸头 → 搜索 → Top3 → 人工选择 → 安全复制',
-        ...architectureEvidence('runtime-interactive'),
-      },
-      {
-        id: 'dashboard',
-        title: 'Dashboard',
-        detail: '静态合成工作台，浏览架构故事，不接 SoR',
-        ...architectureEvidence('static-interactive'),
-      },
-      {
-        id: 'preload',
-        title: 'Preload',
-        detail: '白名单 IPC：复制 / 窗口 / dashboard:open',
-        ...architectureEvidence('runtime-interactive'),
-      },
-    ] satisfies ArchitectureNode[],
-    ports: [
-      {
-        id: 'auth',
-        title: 'auth',
-        detail: '正式身份与会话',
-        ...architectureEvidence('absent'),
-      },
-      {
-        id: 'search',
-        title: 'search',
-        detail: '正式检索与 Top3 合同',
-        ...architectureEvidence('absent'),
-        redline: true,
-      },
-      {
-        id: 'events',
-        title: 'events',
-        detail: '检索/复制自动事实流水',
-        ...architectureEvidence('absent'),
-        redline: true,
-      },
-      {
-        id: 'metrics',
-        title: 'metrics',
-        detail: '双账指标与复核',
-        ...architectureEvidence('absent'),
-      },
-      {
-        id: 'workorders',
-        title: 'workorders',
-        detail: '工单导入与分析',
-        ...architectureEvidence('absent'),
-        redline: true,
-      },
-      {
-        id: 'content',
-        title: 'content',
-        detail: '四域绑定与发布',
-        ...architectureEvidence('absent'),
-        redline: true,
-      },
-      {
-        id: 'announce',
-        title: 'announce',
-        detail: '公告与客户端确认',
-        ...architectureEvidence('absent'),
-      },
-      {
-        id: 'policy',
-        title: 'policy',
-        detail: '风险与升级策略',
-        ...architectureEvidence('absent'),
-      },
-      {
-        id: 'redaction',
-        title: 'redaction',
-        detail: '脱敏与导出裁剪',
-        ...architectureEvidence('absent'),
-      },
-    ] satisfies ArchitectureNode[],
-    dataPlane: [
-      {
-        id: 'postgres',
-        title: 'PostgreSQL SoR',
-        detail: '正式系统的记录系统',
-        ...architectureEvidence('absent'),
-      },
-      {
-        id: 'object-store',
-        title: '共享导入存储',
-        detail: '工单与内容包对象',
-        ...architectureEvidence('absent'),
-      },
-      {
-        id: 'outbox-worker',
-        title: 'outbox + Import Worker',
-        detail: 'TypeScript 异步导入',
-        ...architectureEvidence('absent'),
-      },
-    ] satisfies ArchitectureNode[],
-    llm: {
-      id: 'llm',
-      title: '可选 LLM',
-      detail: '只能可选重排且默认关闭，绝不改写 Answer。',
-      ...architectureEvidence('absent'),
-    } satisfies ArchitectureNode,
-  },
+  }
 });
 
 export function nextDashboardNavId(

@@ -195,15 +195,15 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
       <section className="overview-two-column">
         <article className="dash-card">
           <div className="dash-card-row">
-            <strong>重点 VOC 问题</strong>
-            <button type="button" className="dash-linkish" onClick={() => onNavigate?.('workorders')}>查看明细</button>
+            <strong>话术优化待办</strong>
+            <button type="button" className="dash-linkish" onClick={() => onNavigate?.('iteration')}>查看全部</button>
           </div>
           <ol className="overview-ranked-list">
-            {DASHBOARD_MANIFEST.workorders.insights.slice(0, 4).map((item, index) => (
-              <li key={item.id}>
+            {DASHBOARD_MANIFEST.iteration.tasks.slice(0, 4).map((item, index) => (
+              <li key={item.taskId}>
                 <span>{index + 1}</span>
-                <div><strong>{item.label}</strong><small>{item.count} 条合成镜像 · {item.owner}</small></div>
-                <em>{item.pct}%</em>
+                <div><strong>{item.title}</strong><small>{item.cause} · {item.owner}</small></div>
+                <em>{item.priority}</em>
               </li>
             ))}
           </ol>

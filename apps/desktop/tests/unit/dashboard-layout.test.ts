@@ -345,7 +345,6 @@ describe('dashboard layout contract', () => {
     expect(app).toContain('data-nav-phase={navPhase}');
     expect(app).toContain('useLayoutEffect');
     expect(app).toContain('focus({ preventScroll: true })');
-    expect(app).toContain('aria-disabled="true"');
     expect(app).toContain('role="separator"');
     expect(app).toContain('aria-label="调整工作台侧栏宽度"');
     expect(app).toContain('aria-valuemin={separatorAria.valuemin}');

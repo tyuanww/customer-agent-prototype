@@ -12,14 +12,12 @@ import {
   type ReactElement,
 } from 'react';
 import {
-  DASHBOARD_DEFERRED_NAV,
   DASHBOARD_MANIFEST,
   DASHBOARD_NAV,
   nextDashboardNavId,
   type DashboardModuleId,
 } from './data/dashboard-manifest';
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
-import { ArchitectureModule } from './features/dashboard/ArchitectureModule';
 import { DashboardBrandFox } from './components/DashboardBrandFox';
 import { ContentModule } from './features/dashboard/ContentModule';
 import { DashboardChromeIcon, DashboardNavIcon } from './features/dashboard/DashboardIcons';
@@ -27,8 +25,6 @@ import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
 import { IterationModule } from './features/dashboard/IterationModule';
 import { LedgerModule } from './features/dashboard/LedgerModule';
 import { OverviewModule } from './features/dashboard/OverviewModule';
-import { ReviewModule } from './features/dashboard/ReviewModule';
-import { WorkorderModule } from './features/dashboard/WorkorderModule';
 import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
 import {
@@ -73,14 +69,11 @@ type DashboardLeafModuleId = Exclude<DashboardModuleId, 'overview'>;
 
 const MODULES: Record<DashboardLeafModuleId, () => ReactElement> = {
   ledger: LedgerModule,
-  workorders: WorkorderModule,
-  review: ReviewModule,
   wording: WordingLibraryModule,
   iteration: IterationModule,
   sop: SopLibraryModule,
   content: ContentModule,
   announce: AnnounceModule,
-  architecture: ArchitectureModule,
 };
 
 type NavTooltipState = {
@@ -1130,33 +1123,7 @@ export function DashboardApp() {
                   <span className="dashboard-nav-icon"><DashboardNavIcon id={item.id} /></span>
                   <span className="dashboard-nav-label">{item.label}</span>
                 </button>
-                {item.id === 'workorders' ? DASHBOARD_DEFERRED_NAV.map((deferred) => (
-                  <button
-                    key={deferred.id}
-                    type="button"
-                    tabIndex={-1}
-                    disabled
-                    aria-disabled="true"
-                    aria-label={`${deferred.label}，${deferred.statusLabel}`}
-                    aria-describedby={navTooltip?.key === deferred.id && navTooltip.visible
-                      ? 'dashboard-nav-tooltip'
-                      : undefined}
-                    title={`${deferred.label} · ${deferred.statusLabel}`}
-                    className="is-deferred"
-                    data-testid={`nav-${deferred.id}`}
-                    onMouseEnter={(event) => showNavTooltip(
-                      event.currentTarget,
-                      deferred.id,
-                      `${deferred.label} · ${deferred.statusLabel}`,
-                      false,
-                    )}
-                    onMouseLeave={() => hideNavTooltip()}
-                  >
-                    <span className="dashboard-nav-icon"><DashboardNavIcon id={deferred.id} /></span>
-                    <span className="dashboard-nav-label">{deferred.label}</span>
-                    <small>{deferred.statusLabel}</small>
-                  </button>
-                )) : null}
+                {null}
               </div>
             );
           })}
