@@ -1923,6 +1923,9 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('module-iteration')).toHaveTextContent(
       '正式仅 coach / owner · agent 403 · 本页 MOCK AUTH',
     );
+    expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).toHaveTextContent(
+      '「话术不准」计数尚未接入。达到 24 小时 ≥ 3 或 7 天 ≥ 10 才会打开 iteration_task；本页不展示实时数字，也不自动改写或关单。',
+    );
 
     await user.selectOptions(screen.getByTestId('iteration-status-filter'), 'closed');
     expect(screen.queryByTestId('iteration-it-2055')).not.toBeInTheDocument();
