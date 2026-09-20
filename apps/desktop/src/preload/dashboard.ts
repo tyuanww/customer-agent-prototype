@@ -5,6 +5,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 // chunk the Windows sandbox cannot load, and Query stays parked.
 const LIST = 'dashboard:wording-list';
 const CONTENT_SESSION = 'dashboard:content-session';
+const CONTENT_PARSE = 'dashboard:content-parse';
 const CONTENT_IMPORT = 'dashboard:content-import';
 const CONTENT_PUBLISH = 'dashboard:content-publish';
 const ITERATION_LIST = 'dashboard:iteration-list';
@@ -179,11 +180,31 @@ contextBridge.exposeInMainWorld('dashboardWording', {
   },
 });
 
+function isContentParse(value: unknown): boolean {
+  if (isContentFailure(value)) return true;
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  if (record.ok === true) {
+    return typeof record.sourceName === 'string'
+      && typeof record.csvText === 'string'
+      && Array.isArray(record.rows);
+  }
+  return record.ok === false && typeof record.code === 'string' && typeof record.message === 'string';
+}
+
 contextBridge.exposeInMainWorld('dashboardContent', {
   async session() {
     try {
       const value: unknown = await ipcRenderer.invoke(CONTENT_SESSION);
       return isContentSession(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async parseUpload(request: unknown) {
+    try {
+      const value: unknown = await ipcRenderer.invoke(CONTENT_PARSE, request);
+      return isContentParse(value) ? value : unavailable;
     } catch {
       return unavailable;
     }

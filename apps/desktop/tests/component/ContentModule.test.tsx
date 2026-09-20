@@ -13,6 +13,11 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
       signedIn,
       role: signedIn ? role : null,
     })),
+    parseUpload: vi.fn(async () => ({
+      ok: false as const,
+      code: 'UNAVAILABLE' as const,
+      message: '服务暂不可用，请重试',
+    })),
     importDraft: vi.fn(async () => ({
       ok: false as const,
       code: 'UNAVAILABLE' as const,
@@ -81,12 +86,12 @@ describe('ContentModule publish gate', () => {
     expect(api.publishDraft).not.toHaveBeenCalled();
   });
 
-  it('lets coach publish labeled product drafts with the stack product source version', async () => {
+  it('lets coach submit labeled product drafts and shows owner-only publish copy on 403', async () => {
     const api = mockSession('coach');
     api.publishDraft = vi.fn(async () => ({
-      ok: true as const,
-      releaseId: 'rel_19',
-      releaseSeq: 19,
+      ok: false as const,
+      code: 'FORBIDDEN' as const,
+      message: CONTENT_PUBLISH_COPY.ownerPublish,
     }));
     window.dashboardContent = api;
     const user = userEvent.setup();
@@ -107,5 +112,37 @@ describe('ContentModule publish gate', () => {
     expect(api.publishDraft).toHaveBeenCalledWith(expect.objectContaining({
       sourceBindings: [{ domain: 'product', source_version_id: 'srcv_stack_product_v1' }],
     }));
+    expect(screen.getByTestId('publish-feedback')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
+  });
+
+  it('stages a zip xlsx through parseUpload without treating the preview as published', async () => {
+    const api = mockSession('coach');
+    api.parseUpload = vi.fn(async () => ({
+      ok: true as const,
+      sourceName: '【FAQ】MENOKIN话术.xlsx',
+      rows: [{ scene: '30秒泡泡面膜 · 面膜紫适用人群', script: '亲亲这是话术', domain: 'product' as const }],
+      csvText: 'scene,script,domain\n30秒泡泡面膜 · 面膜紫适用人群,亲亲这是话术,product\n',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const xlsx = new File(
+      [new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00])],
+      '【FAQ】MENOKIN话术.xlsx',
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
+    expect(api.parseUpload).toHaveBeenCalledWith(expect.objectContaining({
+      sourceName: '【FAQ】MENOKIN话术.xlsx',
+    }));
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('面膜紫适用人群');
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('产品');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
+    expect(screen.getByTestId('publish-action')).toBeEnabled();
+    expect(api.publishDraft).not.toHaveBeenCalled();
   });
 });
