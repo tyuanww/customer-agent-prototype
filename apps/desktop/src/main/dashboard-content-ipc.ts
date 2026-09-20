@@ -9,6 +9,7 @@ import {
 import { isTrustedMainFrameSender } from './sender-guard';
 import {
   dashboardContentImport,
+  dashboardContentParseUpload,
   dashboardContentPublish,
   dashboardContentSession,
   type DashboardContentAfterPublish,
@@ -33,6 +34,19 @@ export function registerDashboardContentIpc(
       if (args.length !== 0) return dashboardContentFailure('VALIDATION');
       try {
         return dashboardContentSession(session);
+      } catch {
+        return dashboardContentFailure('UNAVAILABLE');
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DASHBOARD_CONTENT_PARSE,
+    (event, ...args: unknown[]) => {
+      if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
+      if (args.length !== 1) return dashboardContentFailure('VALIDATION');
+      try {
+        return dashboardContentParseUpload(args[0]);
       } catch {
         return dashboardContentFailure('UNAVAILABLE');
       }

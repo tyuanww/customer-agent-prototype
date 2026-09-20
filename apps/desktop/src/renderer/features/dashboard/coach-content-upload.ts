@@ -48,12 +48,38 @@ export async function readCoachUploadFile(file: File): Promise<CoachUploadResult
     return fail('unsupported-type', '仅接受 .csv 或 .xlsx。');
   }
   if (file.size > COACH_UPLOAD_MAX_BYTES) {
-    return fail('too-large', `文件超过 ${COACH_UPLOAD_MAX_BYTES / 1024}KiB。当前切片只做本地草稿预览。`);
+    return fail('too-large', `文件超过 ${COACH_UPLOAD_MAX_BYTES / (1024 * 1024)}MiB。`);
   }
   const bytes = await readFileBytes(file);
-  // Renderer cannot unzip workbooks. ZIP/OLE files fail closed instead of
-  // pretending Feishu/Wiki or a real Excel parser is connected.
-  if (bytes.includes(0) || isZipSignature(bytes)) {
+  if (isZipSignature(bytes) || lower.endsWith('.xlsx') && bytes.includes(0)) {
+    const api = window.dashboardContent;
+    if (!api?.parseUpload) {
+      return fail('binary-workbook', 'Excel 需工作台主进程解析。当前没有产品会话通道。');
+    }
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    const parsed = await api.parseUpload({
+      sourceName,
+      bytes: copy.buffer,
+    });
+    if ('code' in parsed && parsed.ok === false && 'message' in parsed) {
+      return {
+        ok: false,
+        code: parsed.code === 'too-large' || parsed.code === 'unsupported-type' || parsed.code === 'empty'
+          || parsed.code === 'invalid-table' || parsed.code === 'binary-workbook'
+          ? parsed.code
+          : 'binary-workbook',
+        message: parsed.message,
+      };
+    }
+    if (parsed.ok === true && 'rows' in parsed && 'csvText' in parsed) {
+      return {
+        ok: true,
+        sourceName: parsed.sourceName,
+        rows: parsed.rows,
+        csvText: parsed.csvText,
+      };
+    }
     return fail('binary-workbook', BINARY_MESSAGE);
   }
   return parseCoachUploadCsv(new TextDecoder('utf-8').decode(bytes), sourceName);

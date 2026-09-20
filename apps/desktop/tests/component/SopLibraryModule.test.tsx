@@ -26,6 +26,11 @@ function mockSession(role: 'agent' | 'coach' | 'owner' | null, signedIn = true):
       signedIn,
       role: signedIn ? role : null,
     })),
+    parseUpload: vi.fn(async () => ({
+      ok: false as const,
+      code: 'UNAVAILABLE' as const,
+      message: '服务暂不可用，请重试',
+    })),
     importDraft: vi.fn(async () => ({
       ok: false as const,
       code: 'UNAVAILABLE' as const,

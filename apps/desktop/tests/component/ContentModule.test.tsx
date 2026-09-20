@@ -13,6 +13,11 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
       signedIn,
       role: signedIn ? role : null,
     })),
+    parseUpload: vi.fn(async () => ({
+      ok: false as const,
+      code: 'UNAVAILABLE' as const,
+      message: '服务暂不可用，请重试',
+    })),
     importDraft: vi.fn(async () => ({
       ok: false as const,
       code: 'UNAVAILABLE' as const,
@@ -81,12 +86,12 @@ describe('ContentModule publish gate', () => {
     expect(api.publishDraft).not.toHaveBeenCalled();
   });
 
-  it('lets coach publish labeled product drafts with the stack product source version', async () => {
+  it('lets coach submit labeled product drafts and shows owner-only publish copy on 403', async () => {
     const api = mockSession('coach');
     api.publishDraft = vi.fn(async () => ({
-      ok: true as const,
-      releaseId: 'rel_19',
-      releaseSeq: 19,
+      ok: false as const,
+      code: 'FORBIDDEN' as const,
+      message: CONTENT_PUBLISH_COPY.ownerPublish,
     }));
     window.dashboardContent = api;
     const user = userEvent.setup();
@@ -107,5 +112,6 @@ describe('ContentModule publish gate', () => {
     expect(api.publishDraft).toHaveBeenCalledWith(expect.objectContaining({
       sourceBindings: [{ domain: 'product', source_version_id: 'srcv_stack_product_v1' }],
     }));
+    expect(screen.getByTestId('publish-feedback')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
   });
 });

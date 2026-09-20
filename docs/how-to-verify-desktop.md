@@ -314,7 +314,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 内容与发布草稿（Dashboard 切片 1）
 
-「内容与发布」本地解析 CSV 成待审核草稿。Publish 仍 disabled。无 Dashboard preload、不 POST `/v1/content/import`。选文件先显示「正在读取」。二进制 xlsx fail-close；失败文案指出第几行以及 50 行 / 64KiB 上限（后端 10MiB / 5000 行不要对齐）。售后过敏树是 DEMO 样例，不接本页上传。
+「内容与发布」本地解析 CSV 或 xlsx 成待审核草稿。中文表头（快捷短语 / 产品话术 / 场景 / 标准话术）映射到场景与话术；空白行跳过。Publish 走现有 import/publish；一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。售后过敏树是 DEMO 样例说明仍在。
 
 | 你想证明 | 命令 |
 | --- | --- |

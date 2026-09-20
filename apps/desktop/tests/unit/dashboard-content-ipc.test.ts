@@ -171,7 +171,7 @@ it('still returns the release when post-publish hydrate refresh throws', async (
   expect(afterPublish).toHaveBeenCalledWith(1);
 });
 
-it('lets coach attempt product publish and surfaces API FORBIDDEN without faking success', async () => {
+it('lets coach import then surfaces owner-only FORBIDDEN without faking a release', async () => {
   const coach = fakeSession('coach');
   vi.mocked(coach.request)
     .mockResolvedValueOnce({
@@ -184,7 +184,11 @@ it('lets coach attempt product publish and surfaces API FORBIDDEN without faking
     })
     .mockRejectedValueOnce(new ProductHttpError('FORBIDDEN'));
   const result = await dashboardContentPublish(coach, publishPayload(csv, [productBinding]));
-  expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN', message: '当前身份不能执行此操作' });
+  expect(result).toMatchObject({
+    ok: false,
+    code: 'FORBIDDEN',
+    message: CONTENT_PUBLISH_COPY.ownerPublish,
+  });
   expect(coach.request).toHaveBeenCalledTimes(3);
 });
 

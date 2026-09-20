@@ -25,6 +25,43 @@ describe('coach content upload parser', () => {
     ]);
   });
 
+  it('maps 快捷短语/产品话术 and skips blank padding rows', () => {
+    const padding = Array.from({ length: 93 }, () => ',,');
+    const result = parseCoachUploadCsv(
+      [' ,快捷短语,产品话术', '30秒泡泡面膜,面膜紫适用人群,亲亲这是话术', ...padding].join('\n'),
+      '【FAQ】MENOKIN话术.xlsx',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows).toEqual([
+      { scene: '30秒泡泡面膜 · 面膜紫适用人群', script: '亲亲这是话术', domain: 'product' },
+    ]);
+  });
+
+  it('maps 业务填写问题/客满话术 and filename FAQ domain', () => {
+    const result = parseCoachUploadCsv(
+      '分类,产品,业务填写问题,客满话术|已审核\n,ALL 共性问题,需要清洗吗？,亲亲这是免洗\n',
+      '【FAQ】menokin产品QA&话术.xlsx',
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      rows: [{ scene: 'ALL 共性问题 · 需要清洗吗？', script: '亲亲这是免洗', domain: 'product' }],
+    });
+  });
+
+  it('maps two-column 售前/售后 files from the filename domain', () => {
+    const presale = parseCoachUploadCsv('快捷短语,产品话术\n到货时效,预计3-5天到货\n', '【售前】MENOKIN话术.xlsx');
+    expect(presale).toMatchObject({
+      ok: true,
+      rows: [{ scene: '到货时效', script: '预计3-5天到货', domain: 'presale' }],
+    });
+    const aftersale = parseCoachUploadCsv('快捷短语,产品话术\n试用不支持,暂时不支持试用装\n', '【售后】MENOKIN话术.xlsx');
+    expect(aftersale).toMatchObject({
+      ok: true,
+      rows: [{ scene: '试用不支持', script: '暂时不支持试用装', domain: 'aftersale' }],
+    });
+  });
+
   it('accepts quoted commas, chinese headers, step aliases, and optional domain', () => {
     const canonical = parseCoachUploadCsv(
       '场景,标准话术,域\n"洁面,用量",先确认版本,product\n',
@@ -82,13 +119,15 @@ describe('coach content upload parser', () => {
     expect(atCapResult.rows).toHaveLength(COACH_UPLOAD_MAX_ROWS);
 
     const noScene = parseCoachUploadCsv('scene,script\n,先确认版本\n', 'no-scene.csv');
-    expect(noScene).toMatchObject({ ok: false, code: 'invalid-table' });
-    if (noScene.ok) return;
-    expect(noScene.message).toContain('第 2 行');
-    const noScript = parseCoachUploadCsv('scene,script\n洁面用量确认,\n', 'no-script.csv');
-    expect(noScript).toMatchObject({ ok: false, code: 'invalid-table' });
-    if (noScript.ok) return;
-    expect(noScript.message).toContain('第 2 行');
+    expect(noScene).toMatchObject({ ok: false, code: 'empty' });
+    const mixed = parseCoachUploadCsv(
+      'scene,script\n洁面用量确认,先确认版本\n,缺场景\n用量说明,\n',
+      'skip-incomplete.csv',
+    );
+    expect(mixed.ok).toBe(true);
+    if (!mixed.ok) return;
+    expect(mixed.rows).toEqual([{ scene: '洁面用量确认', script: '先确认版本' }]);
+    expect(mixed.sourceName).toContain('已跳过空白或不完整 2 行');
     expect(parseCoachUploadCsv('﻿scene,script\r\n洁面,先确认版本\r\n', 'bom.csv')).toMatchObject({
       ok: true,
       rows: [{ scene: '洁面', script: '先确认版本' }],
@@ -125,7 +164,7 @@ describe('coach content upload parser', () => {
     ));
     expect(zip).toMatchObject({ ok: false, code: 'binary-workbook' });
     if (zip.ok) return;
-    expect(zip.message).toContain('未连接飞书或 Wiki');
+    expect(zip.message).toContain('Excel 需工作台主进程解析');
 
     const huge = await readCoachUploadFile(new File(
       ['x'.repeat(COACH_UPLOAD_MAX_BYTES + 1)],
@@ -134,7 +173,7 @@ describe('coach content upload parser', () => {
     ));
     expect(huge).toMatchObject({ ok: false, code: 'too-large' });
     if (huge.ok) return;
-    expect(huge.message).toContain(`${COACH_UPLOAD_MAX_BYTES / 1024}KiB`);
+    expect(huge.message).toContain('10MiB');
 
     const other = await readCoachUploadFile(new File(['scene,step\nA,B\n'], 'notes.txt'));
     expect(other).toMatchObject({ ok: false, code: 'unsupported-type' });
