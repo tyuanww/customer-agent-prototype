@@ -15,6 +15,7 @@ import {
   type DashboardContentAfterPublish,
   type DashboardContentSessionClient,
 } from './dashboard-content';
+import { completeSyntheticParkedReview } from './dashboard-content-review';
 
 export function registerDashboardContentIpc(
   session: DashboardContentSessionClient | null,
@@ -72,7 +73,13 @@ export function registerDashboardContentIpc(
       if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
       if (args.length !== 1) return dashboardContentFailure('VALIDATION');
       try {
-        return await dashboardContentPublish(session, args[0], afterPublish);
+        const origin = session && 'http' in session
+          ? (session as { http?: { origin?: string } }).http?.origin
+          : undefined;
+        const parkedReview = typeof origin === 'string' && origin.length > 0
+          ? (importBatchId: string) => completeSyntheticParkedReview(origin, importBatchId)
+          : undefined;
+        return await dashboardContentPublish(session, args[0], afterPublish, parkedReview);
       } catch {
         return dashboardContentFailure('UNAVAILABLE');
       }

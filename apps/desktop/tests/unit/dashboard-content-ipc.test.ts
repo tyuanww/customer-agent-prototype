@@ -309,3 +309,91 @@ it('does not publish when import validation fails', async () => {
   expect(owner.request).toHaveBeenCalledTimes(2);
   expect(vi.mocked(owner.request).mock.calls.some((call) => call[1] === '/v1/content/publish')).toBe(false);
 });
+
+it('completes parked dual-review then publishes', async () => {
+  const owner = fakeSession('owner');
+  const parkedReview = vi.fn(async () => true);
+  vi.mocked(owner.request)
+    .mockResolvedValueOnce({
+      status: 202,
+      value: { import_batch_id: 'imp_review_1', status: 'validating', source_binding_hash: 'a'.repeat(64) },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { import_batch_id: 'imp_review_1', status: 'validating' },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: {
+        items: [{
+          batch_id: 'imp_review_1',
+          review_revision: 'ab'.repeat(32),
+          state: 'waiting',
+          candidate_count: 1,
+        }],
+        next_cursor: null,
+      },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { import_batch_id: 'imp_review_1', status: 'staged' },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { release_id: 'rel_review', release_seq: 4, announcement_id: 'ann_r', source_binding_hash: 'a'.repeat(64) },
+    });
+  const published = await dashboardContentPublish(
+    owner,
+    publishPayload(csv, [productBinding]),
+    undefined,
+    parkedReview,
+  );
+  expect(published).toEqual({ ok: true, releaseId: 'rel_review', releaseSeq: 4 });
+  expect(parkedReview).toHaveBeenCalledWith('imp_review_1');
+  expect(vi.mocked(owner.request).mock.calls.map((call) => call[1])).toEqual([
+    '/v1/content/import',
+    '/v1/content/import/imp_review_1',
+    '/v1/admin/content/reviews?limit=100',
+    '/v1/content/import/imp_review_1',
+    '/v1/content/publish',
+  ]);
+});
+
+it('fail-closes with awaiting-review when dual-review cannot finish', async () => {
+  const owner = fakeSession('owner');
+  const parkedReview = vi.fn(async () => false);
+  vi.mocked(owner.request)
+    .mockResolvedValueOnce({
+      status: 202,
+      value: { import_batch_id: 'imp_review_2', status: 'validating', source_binding_hash: 'a'.repeat(64) },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { import_batch_id: 'imp_review_2', status: 'validating' },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: {
+        items: [{
+          batch_id: 'imp_review_2',
+          review_revision: 'cd'.repeat(32),
+          state: 'waiting',
+          candidate_count: 1,
+        }],
+        next_cursor: null,
+      },
+    });
+  const result = await dashboardContentPublish(
+    owner,
+    publishPayload(csv, [productBinding]),
+    undefined,
+    parkedReview,
+  );
+  expect(result).toMatchObject({
+    ok: false,
+    code: 'UNAVAILABLE',
+    message: CONTENT_PUBLISH_COPY.awaitingReview,
+  });
+  expect(parkedReview).toHaveBeenCalledWith('imp_review_2');
+  expect(vi.mocked(owner.request).mock.calls.some((call) => call[1] === '/v1/content/publish')).toBe(false);
+});

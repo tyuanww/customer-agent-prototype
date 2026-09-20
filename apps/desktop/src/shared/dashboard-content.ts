@@ -53,6 +53,7 @@ export const CONTENT_PUBLISH_COPY = Object.freeze({
   ownerPublish: '一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。',
   missingBindings: '缺少来源绑定，无法导入',
   submitting: '正在提交发布',
+  awaitingReview: '导入已进入双人复核。当前会话无法单独完成话术师、管理员和质检。',
 });
 
 const CONTENT_FAILURE_CODES = [
