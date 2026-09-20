@@ -58,7 +58,7 @@ export function ContentModule() {
       ? `正在读取 ${upload.sourceName} · 只在本页预览，不会发布`
     : upload.status === 'error'
       ? upload.message
-      : '尚未导入。选择 CSV 或载入合成样例后，只在本页显示待审核草稿预览。二进制 xlsx 会失败关闭。';
+      : '尚未导入。选择 CSV 或 xlsx；中文表头（快捷短语/产品话术）会映射到场景与标准话术。空白行会跳过。';
 
   useEffect(() => {
     const api = window.dashboardContent;
@@ -205,7 +205,7 @@ export function ContentModule() {
 
         <div className="dash-filter-toolbar compact content-upload-controls" aria-label="话术师上传">
           <label className="is-grow" htmlFor="content-upload-file">
-            <span>选择 CSV；二进制 xlsx 会失败关闭</span>
+            <span>选择 CSV 或 xlsx</span>
             <input
               id="content-upload-file"
               type="file"

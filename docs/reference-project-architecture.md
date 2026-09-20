@@ -111,13 +111,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration`） | 合成工作台、主题和导航；话术库只读当前发布 hydrate；VOC / 工单仍是架构模拟；SOP 只读 `allergySopTree()`（coach/owner 可见内部停手）；话术优化待办 live list/start/close（coach/owner，空列表合法）；CSV 草稿仍走内容通道 |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration`） | 合成工作台、主题和导航；话术库只读当前发布 hydrate；VOC / 工单仍是架构模拟；SOP 只读 `allergySopTree()`（coach/owner 可见内部停手）；话术优化待办 live list/start/close（coach/owner，空列表合法）；CSV/xlsx 草稿走内容通道（xlsx 只读第一张表，经 `dashboard:content-parse`） |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 
-Dashboard 没有 overlay 的 `customerAgent`（search / login / copy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/导入/发布、话术优化待办 list/start/close。这是有意收窄，不是「完全无 preload」。正式 Dashboard 若要接 VOC / 工单 API，应另开受信只读 adapter，而不是把通用 IPC 或 Node 权限塞进当前窗口。
+Dashboard 没有 overlay 的 `customerAgent`（search / login / copy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/导入/发布、话术优化待办 list/start/close。这是有意收窄，不是「完全无 preload」。正式 Dashboard 若要接 VOC / 工单 API，应另开受信只读 adapter，而不是把通用 IPC 或 Node 权限塞进当前窗口。
 
 ## 4. 数据边界
 
@@ -147,7 +147,7 @@ v1.17 migrated PG15
   └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
 ```
 
-上图 `DASHBOARD_MANIFEST ──read-only──> Dashboard modules` 只覆盖 VOC / 工单 / KPI。话术库走 `dashboard:wording-list` 读当前发布 hydrate，不画进该 ASCII。Dashboard SOP 读 `allergySopTree()`，同样不画进该 ASCII。话术优化待办在有产品会话时走 `dashboard:iteration-*` → 冻结 iteration-task HTTP，也不画进该 ASCII。
+上图 `DASHBOARD_MANIFEST ──read-only──> Dashboard modules` 只覆盖 VOC / 工单 / KPI。话术库走 `dashboard:wording-list` 读当前发布 hydrate，不画进该 ASCII。Dashboard SOP 读 `allergySopTree()`，同样不画进该 ASCII。话术优化待办在有产品会话时走 `dashboard:iteration-*` → 冻结 iteration-task HTTP，也不画进该 ASCII。内容与发布的 CSV/xlsx 走 `dashboard:content-parse` 后 import/publish，也不画进该 ASCII。
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 

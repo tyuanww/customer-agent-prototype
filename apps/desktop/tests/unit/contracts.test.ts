@@ -45,6 +45,7 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.OPEN_DASHBOARD,
       IPC_CHANNELS.DASHBOARD_WORDING_LIST,
       IPC_CHANNELS.DASHBOARD_CONTENT_SESSION,
+      IPC_CHANNELS.DASHBOARD_CONTENT_PARSE,
       IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT,
       IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH,
       IPC_CHANNELS.DASHBOARD_ITERATION_LIST,
@@ -99,6 +100,7 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).not.toContain("from '../shared/");
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_WORDING_LIST}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_SESSION}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PARSE}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_LIST}'`);

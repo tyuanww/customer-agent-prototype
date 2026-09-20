@@ -23,6 +23,13 @@ export const STACK_SOURCE_BINDINGS: readonly DashboardContentBinding[] = Object.
   Object.freeze({ domain: 'product', source_version_id: 'srcv_stack_product_v1' }),
 ]);
 
+export const STACK_SOURCE_REFS: Readonly<Record<string, string>> = Object.freeze({
+  srcv_stack_presale_v1: 'SRC-STACK-PRESALE',
+  srcv_stack_campaign_v1: 'SRC-STACK-CAMPAIGN',
+  srcv_stack_aftersale_v1: 'SRC-STACK-AFTERSALE',
+  srcv_stack_product_v1: 'SRC-STACK-PRODUCT',
+});
+
 export function bindingsForRows(rows: readonly DashboardContentRow[]): readonly DashboardContentBinding[] {
   const domains = new Set<DashboardContentDomain>();
   for (const row of rows) {
@@ -32,8 +39,8 @@ export function bindingsForRows(rows: readonly DashboardContentRow[]): readonly 
 }
 
 export const CONTENT_SOURCE_VERSION_ID = /^srcv_[A-Za-z0-9][A-Za-z0-9._-]{0,126}$/;
-export const CONTENT_IMPORT_MAX_BYTES = 64 * 1024;
-export const CONTENT_IMPORT_MAX_ROWS = 50;
+export const CONTENT_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
+export const CONTENT_IMPORT_MAX_ROWS = 5_000;
 export const CONTENT_IMPORT_TIMEOUT_MS = 30_000;
 
 export const CONTENT_PUBLISH_COPY = Object.freeze({
@@ -43,6 +50,7 @@ export const CONTENT_PUBLISH_COPY = Object.freeze({
   agent: '坐席不能发布内容',
   sensitive: '售后、过敏或赔付内容需管理员发布',
   coachScope: '话术师只能发布已标注的产品或活动内容',
+  ownerPublish: '一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。',
   missingBindings: '缺少来源绑定，无法导入',
   submitting: '正在提交发布',
 });
@@ -107,8 +115,19 @@ export type DashboardContentPublishView = Readonly<{
 
 export type DashboardContentPublishResult = DashboardContentPublishView | DashboardContentFailure;
 
+export type DashboardContentParseRequest = Readonly<{
+  sourceName: string;
+  bytes: ArrayBuffer;
+}>;
+
+export type DashboardContentParseResult =
+  | Readonly<{ ok: true; sourceName: string; rows: readonly DashboardContentRow[]; csvText: string }>
+  | DashboardContentFailure
+  | Readonly<{ ok: false; code: string; message: string }>;
+
 export type DashboardContentApi = {
   session(): Promise<DashboardContentSessionResult>;
+  parseUpload(request: DashboardContentParseRequest): Promise<DashboardContentParseResult>;
   importDraft(request: DashboardContentImportRequest): Promise<DashboardContentImportResult>;
   publishDraft(request: DashboardContentPublishRequest): Promise<DashboardContentPublishResult>;
 };

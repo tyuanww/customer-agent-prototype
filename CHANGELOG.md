@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.15] - 2026-09-20
+
+### Added
+
+- Dashboard 内容与发布 accepts local `.xlsx` as well as CSV. Chinese headers such as 快捷短语 / 产品话术 / 业务填写问题 / 客满话术 map onto scene and script. Blank and incomplete padding rows are skipped. Coach publish still returns 403 because phase-1 publish is owner-only.
+
 ## [0.3.14] - 2026-09-20
 
 ### Added

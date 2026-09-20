@@ -1205,9 +1205,9 @@ export const DASHBOARD_MANIFEST = deepFreeze({
     upload: {
       title: '话术师上传',
       roleNote:
-        '话术师（coach）可发布已标注的产品与活动内容；售后、过敏或赔付需管理员（owner）。坐席（agent）不能发布。角色仅为 agent / coach / owner，没有第四角色。',
+        '话术师（coach）可导入已标注的产品与活动草稿。一期发布仅管理员（owner）。冻结合同 POST /v1/content/publish。售后、过敏或赔付需管理员。坐席（agent）不能发布。没有第四角色。',
       draftOnlyCopy: '上传只进入待审核草稿，不是已发布。',
-      boundaryCopy: '本地合成预览：不连接飞书或 Wiki，也不写入任何已发布内容库。',
+      boundaryCopy: '支持 CSV 与 xlsx。中文表头会映射到场景/标准话术；不连接飞书或 Wiki。',
       aftersaleNote: '售后流程仍为合成样例，本页不展开 SOP 树。',
       accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       demoFileName: 'synthetic-coach-draft.csv',

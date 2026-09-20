@@ -1744,8 +1744,8 @@ describe('DashboardApp', () => {
     // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
     expect(screen.getByTestId('content-upload-input')).toHaveAttribute('accept', '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     expect(screen.getByTestId('content-upload-input')).toHaveAttribute('type', 'file');
-    expect(screen.getByLabelText('选择 CSV；二进制 xlsx 会失败关闭')).toBeInTheDocument();
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('二进制 xlsx 会失败关闭');
+    expect(screen.getByLabelText('选择 CSV 或 xlsx')).toBeInTheDocument();
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('选择 CSV 或 xlsx');
 
     await user.click(screen.getByTestId('content-upload-demo'));
     const demoPreview = screen.getByTestId('content-staged-preview');
@@ -1803,8 +1803,7 @@ describe('DashboardApp', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
     });
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('二进制 Excel 未解析');
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('未连接飞书或 Wiki');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('Excel 需工作台主进程解析');
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(window.customerAgent).toBeUndefined();
@@ -1843,12 +1842,12 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
 
     const cases = [
-      { file: new File(['title,body\nA,B\n'], 'bad-headers.csv', { type: 'text/csv' }), copy: '表头必须包含' },
+      { file: new File(['title,body\nA,B\n'], 'bad-headers.csv', { type: 'text/csv' }), copy: '表头必须能映射' },
       { file: new File([''], 'empty.csv', { type: 'text/csv' }), copy: '没有可预览的数据行' },
       { file: new File(['scene,step,domain\n用量,说明,legal\n'], 'bad-domain.csv', { type: 'text/csv' }), copy: '域只能是' },
       {
         file: new File(['x'.repeat(COACH_UPLOAD_MAX_BYTES + 1)], 'huge.csv', { type: 'text/csv' }),
-        copy: '64KiB',
+        copy: '10MiB',
       },
     ] as const;
 

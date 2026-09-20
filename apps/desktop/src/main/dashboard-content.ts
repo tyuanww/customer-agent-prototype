@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { parseCoachUploadCsv } from '../shared/coach-content-upload';
+import { parseCoachUploadCsv, parseCoachUploadTable } from '../shared/coach-content-upload';
+import { frozenImportCsv } from '../shared/content-frozen-import';
+import { parseXlsxFirstSheet } from './xlsx-first-sheet';
 import {
+  CONTENT_IMPORT_MAX_BYTES,
   CONTENT_IMPORT_TIMEOUT_MS,
   CONTENT_PUBLISH_COPY,
   contentPublishGate,
@@ -24,6 +27,9 @@ function asFailure(error: unknown): DashboardContentFailure {
   if (error.code === 'SOURCE_GATE_NOT_READY' || error.code === 'CLIPBOARD_FAILED') {
     return dashboardContentFailure('UNAVAILABLE');
   }
+  if (error.code === 'FORBIDDEN') {
+    return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.ownerPublish);
+  }
   return dashboardContentFailure(error.code);
 }
 
@@ -34,9 +40,17 @@ function importFileName(sourceName: string): string {
   return `${trimmed}.csv`;
 }
 
+function importCsvText(
+  rows: readonly { scene: string; script: string; domain?: 'presale' | 'campaign' | 'aftersale' | 'product' }[],
+  csvText: string,
+  bindings: DashboardContentImportRequest['sourceBindings'],
+): string | null {
+  return frozenImportCsv(rows, bindings) ?? (csvText.trim().length > 0 ? csvText : null);
+}
+
 function buildImportForm(csvText: string, sourceName: string, bindings: DashboardContentImportRequest['sourceBindings']): FormData {
   const form = new FormData();
-  form.set('file', new Blob([csvText], { type: 'text/csv' }), importFileName(sourceName));
+  form.set('file', new Blob([csvText], { type: 'text/csv' }), importFileName(sourceName).replace(/\.xlsx$/i, '.csv'));
   form.set(
     'source_bindings',
     JSON.stringify(bindings.map((binding) => ({
@@ -96,6 +110,33 @@ function parsePublishRelease(value: unknown): { releaseId: string; releaseSeq: n
   return { releaseId: record.release_id, releaseSeq: seq as number };
 }
 
+export function dashboardContentParseUpload(payload: unknown): ReturnType<typeof parseCoachUploadCsv> {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { ok: false, code: 'invalid-table', message: '无法解析上传文件。' };
+  }
+  const record = payload as Record<string, unknown>;
+  const bytes = record.bytes instanceof ArrayBuffer
+    ? Buffer.from(record.bytes)
+    : record.bytes instanceof Uint8Array
+      ? Buffer.from(record.bytes)
+      : Array.isArray(record.bytes)
+        ? Buffer.from(record.bytes as number[])
+        : null;
+  if (typeof record.sourceName !== 'string' || bytes === null) {
+    return { ok: false, code: 'invalid-table', message: '无法解析上传文件。' };
+  }
+  const sourceName = record.sourceName.trim() || 'upload.xlsx';
+  if (bytes.length > CONTENT_IMPORT_MAX_BYTES) {
+    return { ok: false, code: 'too-large', message: `文件超过 ${String(CONTENT_IMPORT_MAX_BYTES / (1024 * 1024))}MiB。` };
+  }
+  try {
+    const table = parseXlsxFirstSheet(bytes);
+    return parseCoachUploadTable(table, sourceName);
+  } catch {
+    return { ok: false, code: 'binary-workbook', message: 'Excel 未能解析。未连接飞书或 Wiki。' };
+  }
+}
+
 export function dashboardContentSession(
   session: DashboardContentSessionClient | null,
 ): DashboardContentSessionResult {
@@ -144,8 +185,10 @@ export async function dashboardContentImport(
     }
     const parsed = parseCoachUploadCsv(payload.csvText, payload.sourceName);
     if (!parsed.ok) return dashboardContentFailure('VALIDATION', parsed.message);
+    const frozen = importCsvText(parsed.rows, parsed.csvText, payload.sourceBindings);
+    if (!frozen) return dashboardContentFailure('VALIDATION', CONTENT_PUBLISH_COPY.missingBindings);
     const result = await client.request(epoch, '/v1/content/import', {
-      form: buildImportForm(payload.csvText, payload.sourceName, payload.sourceBindings),
+      form: buildImportForm(frozen, payload.sourceName, payload.sourceBindings),
       timeoutMs: CONTENT_IMPORT_TIMEOUT_MS,
       headers: { 'idempotency-key': randomUUID() },
     });
@@ -168,6 +211,8 @@ export async function dashboardContentPublish(
     }
     const parsed = parseCoachUploadCsv(payload.csvText, payload.sourceName);
     if (!parsed.ok) return dashboardContentFailure('VALIDATION', parsed.message);
+    const frozen = importCsvText(parsed.rows, parsed.csvText, payload.sourceBindings);
+    if (!frozen) return dashboardContentFailure('VALIDATION', CONTENT_PUBLISH_COPY.missingBindings);
     const gate = contentPublishGate({
       productAvailable: true,
       signedIn: true,
@@ -177,7 +222,7 @@ export async function dashboardContentPublish(
     });
     if (!gate.allowed) return dashboardContentFailure(gate.code, gate.message);
     const imported = await client.request(epoch, '/v1/content/import', {
-      form: buildImportForm(payload.csvText, payload.sourceName, payload.sourceBindings),
+      form: buildImportForm(frozen, payload.sourceName, payload.sourceBindings),
       timeoutMs: CONTENT_IMPORT_TIMEOUT_MS,
       headers: { 'idempotency-key': randomUUID() },
     });
