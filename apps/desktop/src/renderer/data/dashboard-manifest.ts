@@ -198,7 +198,7 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'iteration', label: '话术优化待办', blurb: '内容缺口 / 排序 / 过期召回', group: '话术运营' },
   { id: 'sop', label: 'SOP', blurb: '过敏流程只读合成树', group: '话术运营' },
   { id: 'content', label: '内容与发布', blurb: '话术师草稿与缺域阻断', group: '治理与架构' },
-  { id: 'announce', label: '公告与同步', blurb: 'published / ACK / lease 分面', group: '治理与架构' },
+  { id: 'announce', label: '系统同步', blurb: '话术版本 / 软件版本更新', group: '治理与架构' },
 ]);
 
 export const DASHBOARD_MANIFEST = deepFreeze({

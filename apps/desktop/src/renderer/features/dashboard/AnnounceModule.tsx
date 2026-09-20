@@ -6,17 +6,29 @@ const data = DASHBOARD_MANIFEST.announce;
 type AnnounceFilter = 'all' | 'attention' | 'ack_missing' | 'lease_expired';
 type SimulationOutcome = 'success' | 'error';
 type SimulationStatus = 'idle' | 'loading' | 'success' | 'error';
+type ActiveTab = 'wording' | 'software';
 
 type SimulationRun = {
   itemId: string;
   status: SimulationStatus;
 };
 
+type SoftwareUpdateStatus = 'idle' | 'checking' | 'up-to-date';
+
+const MOCK_SOFTWARE_VERSIONS = [
+  { version: 'v0.3.16', date: '2026-09-20', note: '修复导入状态轮询过慢，xlsx 解析加固' },
+  { version: 'v0.3.15', date: '2026-09-10', note: '登录流程优化' },
+  { version: 'v0.3.14', date: '2026-09-01', note: '公告与租约同步' },
+] as const;
+
+const CURRENT_VERSION = 'v0.3.16';
+const LATEST_VERSION = 'v0.3.16';
+
 function facetLabel(on: boolean, onText: string, offText: string): string {
   return on ? onText : offText;
 }
 
-export function AnnounceModule() {
+function WordingTab() {
   const [filter, setFilter] = useState<AnnounceFilter>('all');
   const [selectedId, setSelectedId] = useState(data.rows[0]?.itemId ?? '');
   const [outcome, setOutcome] = useState<SimulationOutcome>('success');
@@ -75,20 +87,13 @@ export function AnnounceModule() {
   useEffect(() => () => clearSimulationTimer(), []);
 
   return (
-    <div className="dash-module" data-testid="module-announce">
-      <header className="dash-module-head">
-        <div>
-          <h1>{data.title}</h1>
-          <p className="dash-kicker">{data.kicker}</p>
-        </div>
-        <StatusBadge label="四分面 · 不合并成已同步" tone="mock" />
-      </header>
+    <>
       <p className="dash-scope">{data.story}</p>
       <ul className="dash-facet-legend">
         {data.facets.map((facet) => <li key={facet.id}><strong>{facet.label}</strong>{facet.meaning}</li>)}
       </ul>
 
-      <div className="dash-filter-toolbar compact" aria-label="公告与同步筛选">
+      <div className="dash-filter-toolbar compact" aria-label="话术版本筛选">
         <div className="dash-filter-group is-grow" role="group" aria-label="状态筛选">
           <span>查看</span>
           <div className="dash-segmented">
@@ -217,6 +222,119 @@ export function AnnounceModule() {
         </aside>
       </div>
       <p className="dash-footnote" data-testid="announce-no-synced">表中没有「已同步」合成列。四列必须分开读。</p>
+    </>
+  );
+}
+
+function SoftwareTab() {
+  const [updateStatus, setUpdateStatus] = useState<SoftwareUpdateStatus>('idle');
+  const updateTimerRef = useRef<number | null>(null);
+
+  const checkUpdate = () => {
+    if (updateStatus === 'checking') return;
+    setUpdateStatus('checking');
+    updateTimerRef.current = window.setTimeout(() => {
+      setUpdateStatus('up-to-date');
+      updateTimerRef.current = null;
+    }, 1200);
+  };
+
+  useEffect(() => () => {
+    if (updateTimerRef.current !== null) window.clearTimeout(updateTimerRef.current);
+  }, []);
+
+  return (
+    <>
+      <div className="dash-card" data-testid="software-version-card">
+        <div className="dash-card-row">
+          <span className="dash-card-label">软件版本</span>
+          <StatusBadge label="未签名 · 手动更新" tone="warn" />
+        </div>
+        <dl className="dash-dl">
+          <div><dt>当前版本</dt><dd>{CURRENT_VERSION}</dd></div>
+          <div>
+            <dt>最新可用版本</dt>
+            <dd>{LATEST_VERSION}{updateStatus === 'up-to-date' ? '（当前已是最新版本）' : ''}</dd>
+          </div>
+        </dl>
+        <div className="dash-card-row">
+          <button
+            type="button"
+            className="dash-action-primary"
+            data-testid="software-check-update"
+            disabled={updateStatus === 'checking'}
+            onClick={checkUpdate}
+          >
+            {updateStatus === 'checking' ? '检查中…' : updateStatus === 'up-to-date' ? '已是最新' : '检查更新'}
+          </button>
+          {updateStatus === 'up-to-date' && (
+            <span aria-live="polite">当前已是最新版本（{LATEST_VERSION}）</span>
+          )}
+        </div>
+        <p className="system-sync-unsigned-note">
+          当前安装包为未签名版本（UNSIGNED），更新请联系管理员获取最新安装包并手动替换。自动更新功能待后续正式签名版本启用。
+        </p>
+      </div>
+
+      <section aria-labelledby="software-history-title">
+        <div className="dash-section-title">
+          <h2 id="software-history-title">版本历史</h2>
+        </div>
+        <table className="dash-table" data-testid="software-version-history">
+          <thead>
+            <tr><th>版本号</th><th>发布日期</th><th>更新说明</th></tr>
+          </thead>
+          <tbody>
+            {MOCK_SOFTWARE_VERSIONS.map((v) => (
+              <tr key={v.version}>
+                <td>{v.version}</td>
+                <td>{v.date}</td>
+                <td>{v.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </>
+  );
+}
+
+export function AnnounceModule() {
+  const [tab, setTab] = useState<ActiveTab>('wording');
+
+  return (
+    <div className="dash-module" data-testid="module-announce">
+      <header className="dash-module-head">
+        <div>
+          <h1>系统同步</h1>
+          <p className="dash-kicker">话术版本 / 软件版本更新</p>
+        </div>
+      </header>
+
+      <div className="system-sync-tabs" role="tablist" aria-label="系统同步选项">
+        <button
+          role="tab"
+          type="button"
+          aria-selected={tab === 'wording'}
+          data-testid="system-sync-tab-wording"
+          onClick={() => setTab('wording')}
+        >
+          话术版本更新
+        </button>
+        <button
+          role="tab"
+          type="button"
+          aria-selected={tab === 'software'}
+          data-testid="system-sync-tab-software"
+          onClick={() => setTab('software')}
+        >
+          软件版本更新
+        </button>
+      </div>
+
+      <div role="tabpanel" aria-label={tab === 'wording' ? '话术版本更新' : '软件版本更新'}>
+        {tab === 'wording' ? <WordingTab /> : <SoftwareTab />}
+      </div>
     </div>
   );
 }
