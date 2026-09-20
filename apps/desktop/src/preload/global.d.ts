@@ -1,5 +1,6 @@
 import type { CustomerAgentApi } from '../shared/contracts';
 import type { DashboardContentApi } from '../shared/dashboard-content';
+import type { DashboardIterationApi } from '../shared/dashboard-iteration';
 import type { DashboardWordingApi } from '../shared/dashboard-wording';
 import type { LoginWindowApi } from '../shared/login-window';
 import type { SopWindowApi } from '../shared/sop-window';
@@ -9,6 +10,7 @@ declare global {
     customerAgent?: CustomerAgentApi;
     dashboardWording?: DashboardWordingApi;
     dashboardContent?: DashboardContentApi;
+    dashboardIteration?: DashboardIterationApi;
     loginWindow?: LoginWindowApi;
     sopWindow?: SopWindowApi;
   }

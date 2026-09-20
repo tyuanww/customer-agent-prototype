@@ -306,7 +306,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 话术不准（Query 切片 1）
 
-结果卡发丝按钮「话术不准」按 `scriptId` 记在本次 Query 浮窗会话里，文案「已记录，待话术师核实」。同一浮窗再搜同一条仍在。收起查询后丢弃。不走 IPC / API / Dashboard / `copyAdopt`。数字键 1/2/3 仍只复制。EMPTY 无命中继续 escalate。
+结果卡发丝按钮「话术不准」按 `scriptId` 记在本次 Query 浮窗会话里，文案「已记录，待话术师核实」。同一浮窗再搜同一条仍在。收起查询后丢弃。不走 IPC / API / Dashboard / `copyAdopt`。数字键 1/2/3 仍只复制。EMPTY 无命中继续 escalate。达到阈值后打开 `iteration_task` 仍要 persist；Dashboard 活列表不会因这次点击自动出现新待办。
 
 | 你想证明 | 命令 |
 | --- | --- |
@@ -320,13 +320,16 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 | --- | --- |
 | 草稿解析与正式来源文案 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/coach-content-upload.test.ts tests/component/DashboardApp.test.tsx tests/unit/query-visual.test.ts` |
 
-## 话术优化待办提醒（Dashboard 切片 1）
+## 话术优化待办（Dashboard live list/start/close）
 
-现有「话术优化待办」模块顶部一条 P0 横幅 + 队列，不是新窗口。待处理 P0 被开始处理后离开横幅；全部离开后横幅仍在，文案「当前没有待处理 P0」。没有演练改动时「重置演练」禁用。会话内 CAS 演练：窗口里把模拟服务端 version +1、客户端快照不动，随后 start/close 可打出页内「待办已更新，请刷新后再处理」。无 HTTP start/close、无飞书推送、无 Dashboard preload。
+「话术优化待办」不是新窗口。有 `window.dashboardIteration` 时走产品会话：`GET /v1/metrics/iteration-tasks` 列表，`POST /v1/events/iteration-tasks/{task_id}/start|close` 开始/关闭。仅 coach / owner；空列表合法，文案「当前没有待办」，不得回落 DEMO 5 条。坐席 403 文案「坐席不能查看或处理话术优化待办」。没有产品会话时「当前没有产品会话，无法加载待办」。CAS 冲突显示「待办已更新，请刷新后再处理」。关闭不等于已发布。无飞书推送。从「话术不准」自动开单仍要 persist。
+
+无 `dashboardIteration` 的测试夹具才保留会话内合成演练（P0 横幅、「重置演练」、本地 CAS）。
 
 | 你想证明 | 命令 |
 | --- | --- |
-| P0 横幅与 CAS 演练 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts tests/unit/dashboard-manifest.test.ts` |
+| live 空列表、403、IPC 与 preload | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/IterationModule.test.tsx tests/unit/dashboard-iteration.test.ts tests/unit/dashboard-iteration-ipc.test.ts tests/unit/dashboard-iteration-preload.test.ts tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts tests/unit/contracts.test.ts` |
+| API list/start/close 合同 | `pnpm --filter @customer-agent/api exec vitest run tests/iteration-task-routes.test.ts tests/iteration-task-repository.test.ts` |
 
 ## Dashboard SOP 只读树
 

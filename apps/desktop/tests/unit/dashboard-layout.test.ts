@@ -29,6 +29,10 @@ const content = [
   readFileSync(path.join(root, 'src/renderer/features/dashboard/ContentModule.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/dashboard/coach-content-upload.ts'), 'utf8'),
 ].join('\n');
+const iteration = readFileSync(
+  path.join(root, 'src/renderer/features/dashboard/IterationModule.tsx'),
+  'utf8',
+);
 const charts = readFileSync(
   path.join(root, 'src/renderer/features/dashboard/DashboardCharts.tsx'),
   'utf8',
@@ -526,6 +530,17 @@ describe('dashboard layout contract', () => {
     expect(sopLibrary).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB/);
     expect(sopLibrary).not.toContain('publishDraft');
     expect(css).toContain('.sop-library-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }');
+  });
+
+  it('loads iteration tasks through dashboardIteration and never fetch or inaccuracy-reports', () => {
+    expect(iteration).toContain('dashboardIteration');
+    expect(iteration).toContain('ITERATION_COPY.empty');
+    expect(iteration).toContain('ITERATION_COPY.unavailable');
+    expect(iteration).not.toContain('/v1/inaccuracy-reports');
+    expect(iteration).not.toContain('customerAgent');
+    expect(iteration).not.toMatch(
+      /fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|ipcRenderer|preload/,
+    );
   });
 
   it('keeps coach content preview local and publishes only through dashboardContent', () => {

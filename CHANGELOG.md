@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.14] - 2026-09-20
+
+### Added
+
+- Dashboard 话术优化待办 lists, starts, and closes live iteration tasks through the frozen GET `/v1/metrics/iteration-tasks` and POST start/close events. Coach and owner only; empty list is valid. Auto-open from 话术不准 still needs persist.
+
 ## [0.3.13] - 2026-09-20
 
 ### Added

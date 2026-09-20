@@ -7,6 +7,9 @@ const LIST = 'dashboard:wording-list';
 const CONTENT_SESSION = 'dashboard:content-session';
 const CONTENT_IMPORT = 'dashboard:content-import';
 const CONTENT_PUBLISH = 'dashboard:content-publish';
+const ITERATION_LIST = 'dashboard:iteration-list';
+const ITERATION_START = 'dashboard:iteration-start';
+const ITERATION_CLOSE = 'dashboard:iteration-close';
 
 const CONTENT_FAILURE_CODES = [
   'UNAUTHORIZED',
@@ -90,6 +93,79 @@ function isContentPublish(value: unknown): boolean {
     && (record.releaseSeq as number) >= 1;
 }
 
+const ITERATION_CAUSES = ['content_gap', 'ranking', 'stale', 'mixed'] as const;
+const ITERATION_STATUSES = ['open', 'in_progress', 'resolved', 'wont_fix'] as const;
+const ITERATION_TASK_KEYS = [
+  'assigneeRole', 'clusterKey', 'createdAt', 'resolution', 'resolutionNote', 'resolvedAt',
+  'sampleQueryIds', 'signalId', 'status', 'suggestedScriptIds', 'suspectedCause', 'taskId',
+  'updatedAt', 'version',
+] as const;
+
+function isIsoTimestamp(value: unknown): boolean {
+  return typeof value === 'string'
+    && value.length >= 20
+    && value.length <= 64
+    && Number.isFinite(Date.parse(value));
+}
+
+function isIdList(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length > 50) return false;
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== 'string' || item.length < 1 || seen.has(item)) return false;
+    seen.add(item);
+  }
+  return true;
+}
+
+function isIterationTask(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (!exactKeys(record, ITERATION_TASK_KEYS)) return false;
+  if (typeof record.taskId !== 'string' || record.taskId.length < 1 || record.taskId.length > 128) return false;
+  if (typeof record.signalId !== 'string' || record.signalId.length < 1 || record.signalId.length > 128) return false;
+  if (typeof record.clusterKey !== 'string' || record.clusterKey.length < 1 || record.clusterKey.length > 512) {
+    return false;
+  }
+  if (!isIdList(record.sampleQueryIds) || !isIdList(record.suggestedScriptIds)) return false;
+  if (!(ITERATION_CAUSES as readonly string[]).includes(record.suspectedCause as string)) return false;
+  if (!(ITERATION_STATUSES as readonly string[]).includes(record.status as string)) return false;
+  if (!(record.assigneeRole === null
+    || (typeof record.assigneeRole === 'string' && record.assigneeRole.length >= 1
+      && record.assigneeRole.length <= 128))) {
+    return false;
+  }
+  if (!(record.resolution === null || record.resolution === 'resolved' || record.resolution === 'wont_fix')) {
+    return false;
+  }
+  if (!(record.resolutionNote === null
+    || (typeof record.resolutionNote === 'string' && record.resolutionNote.length >= 1
+      && record.resolutionNote.length <= 2000))) {
+    return false;
+  }
+  if (!Number.isSafeInteger(record.version) || (record.version as number) < 1) return false;
+  if (!isIsoTimestamp(record.createdAt) || !isIsoTimestamp(record.updatedAt)) return false;
+  return record.resolvedAt === null || isIsoTimestamp(record.resolvedAt);
+}
+
+function isIterationList(value: unknown): boolean {
+  if (isContentFailure(value)) return true;
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'items', 'nextCursor'])) return false;
+  if (!(record.nextCursor === null || (typeof record.nextCursor === 'string' && record.nextCursor.length >= 1))) {
+    return false;
+  }
+  return Array.isArray(record.items) && record.items.every(isIterationTask);
+}
+
+function isIterationTaskResult(value: unknown): boolean {
+  if (isContentFailure(value)) return true;
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return record.ok === true && exactKeys(record, ['ok', 'task']) && isIterationTask(record.task);
+}
+
 const unavailable = { ok: false as const, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' };
 
 contextBridge.exposeInMainWorld('dashboardWording', {
@@ -124,6 +200,33 @@ contextBridge.exposeInMainWorld('dashboardContent', {
     try {
       const value: unknown = await ipcRenderer.invoke(CONTENT_PUBLISH, request);
       return isContentPublish(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+});
+
+contextBridge.exposeInMainWorld('dashboardIteration', {
+  async list() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(ITERATION_LIST);
+      return isIterationList(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async start(request: unknown) {
+    try {
+      const value: unknown = await ipcRenderer.invoke(ITERATION_START, request);
+      return isIterationTaskResult(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async close(request: unknown) {
+    try {
+      const value: unknown = await ipcRenderer.invoke(ITERATION_CLOSE, request);
+      return isIterationTaskResult(value) ? value : unavailable;
     } catch {
       return unavailable;
     }

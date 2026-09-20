@@ -81,6 +81,7 @@ describe('DashboardApp', () => {
     delete window.customerAgent;
     delete window.dashboardWording;
     delete window.dashboardContent;
+    delete window.dashboardIteration;
     Object.defineProperty(window, 'PointerEvent', {
       configurable: true,
       writable: true,
@@ -98,6 +99,7 @@ describe('DashboardApp', () => {
     }
     delete window.dashboardWording;
     delete window.dashboardContent;
+    delete window.dashboardIteration;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,

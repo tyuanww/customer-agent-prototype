@@ -1,6 +1,6 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated`、`product:escalate/record-terminal`、`dashboard:wording-list`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 只有话术库只读 preload，没有 `customerAgent`。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated`、`product:escalate/record-terminal`、`dashboard:wording-list`、`dashboard:content-session/import/publish`、`dashboard:iteration-list/start/close`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 没有 `customerAgent`。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 
@@ -17,8 +17,8 @@ Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/
 | 典型尺寸 | 88×88（`FOX_SIZE`） | 宽 600；高见第 4 节 | 1180×760，最小 980×680 |
 | frame / 透明 / 置顶 | frameless、透明、`alwaysOnTop`、`skipTaskbar` | 同左；`resizable: false` | 标准 frame、不透明、非置顶、显示任务栏 |
 | macOS 形态 | `panel` + `hiddenInMissionControl` | 同左（命令面板：非激活 NSPanel）。收起要把键盘还给上一个 App：闲置狐狸 `setFocusable(false)`；仅当 Dashboard / 登录 / SOP 都不可见时才 `app.hide()`，再延迟 `showInactive` 狐狸。DevTools 窗不算「别 hide」。不 `app.focus({ steal })`。Dock 仍走 Dashboard 的 regular 激活。IME 级 NSPanel native 本轮不引入 | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
-| preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | `dashboard.ts` → `dashboard.cjs`（内联 `dashboard:wording-list`） |
-| `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无**；只有 `window.dashboardWording.list()` |
+| preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | `dashboard.ts` → `dashboard.cjs`（内联 wording / content / iteration 通道） |
+| `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无**；`dashboardWording` / `dashboardContent` / `dashboardIteration` |
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
 | webPreferences | `contextIsolation: true` `sandbox: true` `nodeIntegration: false` `spellcheck: false` | 同左；Query 另设 `backgroundThrottling: false` | `DASHBOARD_WINDOW_SECURITY` + 专用 preload；sandbox 三项不变 |
 
@@ -43,11 +43,12 @@ CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态�
 
 ---
 
-## 2. Dashboard：话术库只读 preload、无 `customerAgent`
+## 2. Dashboard：独立 preload、无 `customerAgent`
 
 - `createDashboardBrowserWindow` 使用 `DASHBOARD_WINDOW_SECURITY` 加专用 `dashboard.cjs`。
-- `readDashboardWindowSnapshot().hasPreload` 为 true。preload 只暴露 `dashboardWording.list()`，通道 `dashboard:wording-list`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
+- `readDashboardWindowSnapshot().hasPreload` 为 true。preload 暴露 `dashboardWording.list()`、`dashboardContent` 与 `dashboardIteration`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
 - 话术库优先读仓外当前发布 hydrate，hydrate 为空才回退检索索引（仓内路径拒绝），只读、不复制、不发布。无 `effectiveFrom` 的条目生效窗口标「当前发布」。详情卡左上标签与「来源」同为 `selected.ownerRole`（`当前发布` 或 `本机话术库`），不写死「本机话术库」。VOC / 工单仍是架构模拟。
+- 「话术优化待办」走 `dashboard:iteration-list` / `dashboard:iteration-start` / `dashboard:iteration-close`。Main 用产品会话调冻结 `GET /v1/metrics/iteration-tasks` 与 `POST /v1/events/iteration-tasks/{task_id}/start|close`。仅 coach / owner；空列表 `{ ok: true, items: [], nextCursor: null }` 合法。坐席 403。没有产品会话时返回「当前没有产品会话，无法加载待办」。有该 API 时 renderer 不得回落 DEMO 5 条。CAS 冲突文案「待办已更新，请刷新后再处理」。关闭不等于已发布。从「话术不准」自动开单仍要 persist。
 - 侧栏「SOP」（`SopLibraryModule`）只读渲染 `allergySopTree()`，不新增 IPC。内部停手只在 `window.dashboardContent.session()` 成功且 `signedIn` 且 role 为 `coach` / `owner` 时显示；session 失败或坐席角色 fail-closed 隐藏。不 persist、不 publish、不 fetch。持久化仍要 contracts:intake。这与 Query 的独立 `role=sop` 窗不是同一表面。
 - Dashboard renderer 拿不到 `window.customerAgent`，也调不了 search / login / copy。
 - 打开通道只有无参数 `dashboard:open`。Main 要求 `isTrustedSender` 且 `role === 'query'`（`canOpenDashboard`）。Fox / 未受信 sender fail-closed，返回 `OpenDashboardResult` `{ ok: false, message }`。
@@ -82,6 +83,11 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `overlay:get-window-context` | invoke | 响应包含 `platform`；未受信 sender 返回带运行时平台、不可用快捷键状态的降级上下文 |
 | `overlay:open-search` | invoke | 若带 transform：必须 `role === 'fox'` 且 `isFoxVisualTransform` |
 | `dashboard:open` | invoke | `trusted && role === 'query'` |
+| `dashboard:wording-list` | invoke | Dashboard 主框；无参数 |
+| `dashboard:content-session` / `dashboard:content-import` / `dashboard:content-publish` | invoke | Dashboard 主框；import/publish 各一精确 payload |
+| `dashboard:iteration-list` | invoke | Dashboard 主框；无参数。成功 `{ ok, items, nextCursor }`，空 `items` 合法 |
+| `dashboard:iteration-start` | invoke | Dashboard 主框；精确 `{ taskId, expectedVersion }` |
+| `dashboard:iteration-close` | invoke | Dashboard 主框；精确 `{ taskId, expectedVersion, status, resolutionNote }`；`status` 仅 `resolved \| wont_fix` |
 | `overlay:dismiss` | invoke | trusted overlay |
 | `overlay:report-ui-phase` | invoke | query-only；`isReportablePhase`；`resultCount ∈ {0,1,2,3}` |
 | `overlay:report-handoff-milestone` | invoke | `role === 'query'`；正整数 `handoffId`；枚举 `open-armed \| open-finished \| close-finished` |

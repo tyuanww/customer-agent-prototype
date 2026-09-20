@@ -11,6 +11,7 @@ import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { registerDashboardContentIpc } from './dashboard-content-ipc';
+import { registerDashboardIterationIpc } from './dashboard-iteration-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
@@ -244,6 +245,11 @@ if (!gotLock) {
         if (!announce) return;
         await announce.refresh({ sessionEpoch, generation: 0 });
       },
+    );
+    registerDashboardIterationIpc(
+      productSession,
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
     );
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {
