@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTENT_PUBLISH_COPY,
   STACK_SOURCE_BINDINGS,
+  STACK_SOURCE_REFS,
   bindingsForRows,
   contentPublishGate,
   isDashboardContentImportRequest,
@@ -30,6 +31,12 @@ describe('content publish role gate', () => {
     ]);
     expect(bindingsForRows([unlabeledRow])).toEqual([]);
     expect(STACK_SOURCE_BINDINGS).toHaveLength(4);
+    expect(STACK_SOURCE_REFS).toEqual({
+      srcv_stack_presale_v1: 'SRC-STACK-PRESALE',
+      srcv_stack_campaign_v1: 'SRC-STACK-CAMPAIGN',
+      srcv_stack_aftersale_v1: 'SRC-STACK-AFTERSALE',
+      srcv_stack_product_v1: 'SRC-STACK-PRODUCT',
+    });
   });
 
   it('requires owner for aftersale domain and 过敏/赔付 text', () => {

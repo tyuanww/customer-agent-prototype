@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { DASHBOARD_MANIFEST } from '../../src/renderer/data/dashboard-manifest';
 import {
   COACH_UPLOAD_MAX_BYTES,
@@ -177,5 +177,126 @@ describe('coach content upload parser', () => {
 
     const other = await readCoachUploadFile(new File(['scene,step\nA,B\n'], 'notes.txt'));
     expect(other).toMatchObject({ ok: false, code: 'unsupported-type' });
+  });
+
+  it('maps 活动/产品 filenames, chinese domain cells, 分类 fallback, and product=shortcut', () => {
+    const campaign = parseCoachUploadCsv('快捷短语,产品话术\n满赠,不承诺库存\n', '【活动】MENOKIN话术.xlsx');
+    expect(campaign).toMatchObject({
+      ok: true,
+      rows: [{ scene: '满赠', script: '不承诺库存', domain: 'campaign' }],
+    });
+    const productFile = parseCoachUploadCsv('快捷短语,产品话术\n适用人群,亲亲这是话术\n', '产品话术.xlsx');
+    expect(productFile).toMatchObject({
+      ok: true,
+      rows: [{ scene: '适用人群', script: '亲亲这是话术', domain: 'product' }],
+    });
+    const chineseDomain = parseCoachUploadCsv(
+      '问题,步骤,域\n需要清洗吗？,亲亲这是免洗,产品话术\n到货时效,预计3-5天,售前\n',
+      'mixed.csv',
+    );
+    expect(chineseDomain).toMatchObject({
+      ok: true,
+      rows: [
+        { scene: '需要清洗吗？', script: '亲亲这是免洗', domain: 'product' },
+        { scene: '到货时效', script: '预计3-5天', domain: 'presale' },
+      ],
+    });
+    const fallback = parseCoachUploadCsv(
+      '分类,快捷短语,产品话术\n未知分类,到货时效,预计3-5天到货\n',
+      '【售前】MENOKIN话术.xlsx',
+    );
+    expect(fallback).toMatchObject({
+      ok: true,
+      rows: [{ scene: '到货时效', script: '预计3-5天到货', domain: 'presale' }],
+    });
+    const sameProduct = parseCoachUploadCsv(
+      ' ,快捷短语,产品话术\n面膜紫,面膜紫,亲亲这是话术\n',
+      '【FAQ】MENOKIN话术.xlsx',
+    );
+    expect(sameProduct).toMatchObject({
+      ok: true,
+      rows: [{ scene: '面膜紫', script: '亲亲这是话术', domain: 'product' }],
+    });
+  });
+
+  it('keeps {订单号}/{日期} and skips other braces without failing the whole table', () => {
+    const mixed = parseCoachUploadCsv(
+      'scene,script\n可替换,订单{订单号}于{日期}发出\n非法,含{其他}占位\n',
+      'braces.csv',
+    );
+    expect(mixed.ok).toBe(true);
+    if (!mixed.ok) return;
+    expect(mixed.rows).toEqual([{ scene: '可替换', script: '订单{订单号}于{日期}发出' }]);
+    expect(mixed.sourceName).toContain('花括号 1 行');
+    const allBad = parseCoachUploadCsv('scene,script\n非法,含{其他}占位\n', 'all-braces.csv');
+    expect(allBad).toMatchObject({ ok: false, code: 'empty' });
+    if (allBad.ok) return;
+    expect(allBad.message).toContain('合同不允许的花括号');
+  });
+
+  describe('readCoachUploadFile parseUpload bridge', () => {
+    afterEach(() => {
+      delete window.dashboardContent;
+    });
+
+    it('forwards zip xlsx to parseUpload and maps IPC failures onto coach codes', async () => {
+      const zipFile = () => new File(
+        [new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00])],
+        'faq.xlsx',
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      );
+
+      window.dashboardContent = {
+        session: async () => ({ ok: true, enabled: true, signedIn: true, role: 'coach' }),
+        parseUpload: async () => ({
+          ok: true,
+          sourceName: 'faq.xlsx',
+          rows: [{ scene: '面膜紫适用人群', script: '亲亲这是话术', domain: 'product' as const }],
+          csvText: 'scene,script,domain\n面膜紫适用人群,亲亲这是话术,product',
+        }),
+        importDraft: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
+        publishDraft: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
+      };
+      const ok = await readCoachUploadFile(zipFile());
+      expect(ok).toMatchObject({
+        ok: true,
+        sourceName: 'faq.xlsx',
+        rows: [{ scene: '面膜紫适用人群', script: '亲亲这是话术', domain: 'product' }],
+      });
+
+      window.dashboardContent.parseUpload = async () => ({
+        ok: false,
+        code: 'too-large',
+        message: '文件超过 10MiB。',
+      });
+      expect(await readCoachUploadFile(zipFile())).toMatchObject({ ok: false, code: 'too-large' });
+
+      window.dashboardContent.parseUpload = async () => ({
+        ok: false,
+        code: 'empty',
+        message: '没有可预览的数据行。',
+      });
+      expect(await readCoachUploadFile(zipFile())).toMatchObject({ ok: false, code: 'empty' });
+
+      window.dashboardContent.parseUpload = async () => ({
+        ok: false,
+        code: 'FORBIDDEN',
+        message: '当前身份不能执行此操作',
+      });
+      const forbidden = await readCoachUploadFile(zipFile());
+      expect(forbidden).toMatchObject({ ok: false, code: 'binary-workbook' });
+      if (forbidden.ok) return;
+      expect(forbidden.message).toBe('当前身份不能执行此操作');
+
+      window.dashboardContent.parseUpload = async () => ({
+        ok: true,
+        sourceName: 'faq.xlsx',
+        csvText: 'x',
+      } as never);
+      const malformed = await readCoachUploadFile(zipFile());
+      expect(malformed).toMatchObject({ ok: false, code: 'binary-workbook' });
+      if (malformed.ok) return;
+      expect(malformed.message).toContain('当前切片只在本页读取 CSV');
+    });
   });
 });

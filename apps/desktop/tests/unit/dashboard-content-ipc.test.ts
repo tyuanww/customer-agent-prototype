@@ -1,8 +1,13 @@
 // @vitest-environment node
 import { expect, it, vi } from 'vitest';
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
+import { deflateRawSync } from 'node:zlib';
 import { registerDashboardContentIpc } from '../../src/main/dashboard-content-ipc';
-import { dashboardContentImport, dashboardContentPublish, dashboardContentSession } from '../../src/main/dashboard-content';
+import {
+  dashboardContentImport,
+  dashboardContentPublish,
+  dashboardContentSession,
+} from '../../src/main/dashboard-content';
 import { CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
 import { IPC_CHANNELS } from '../../src/shared/ipc-channels';
 import { ProductHttpError } from '../../src/main/product-http';
@@ -190,6 +195,102 @@ it('lets coach import then surfaces owner-only FORBIDDEN without faking a releas
     message: CONTENT_PUBLISH_COPY.ownerPublish,
   });
   expect(coach.request).toHaveBeenCalledTimes(3);
+});
+
+function zipLocal(name: string, payload: Buffer): Buffer {
+  const nameBytes = Buffer.from(name, 'utf8');
+  const compressed = deflateRawSync(payload);
+  const header = Buffer.alloc(30);
+  header.writeUInt32LE(0x04034b50, 0);
+  header.writeUInt16LE(8, 8);
+  header.writeUInt32LE(compressed.length, 18);
+  header.writeUInt32LE(payload.length, 22);
+  header.writeUInt16LE(nameBytes.length, 26);
+  return Buffer.concat([header, nameBytes, compressed]);
+}
+
+function workbookBytes(): Buffer {
+  const shared = Buffer.from(
+    '<?xml version="1.0"?><sst><si><t>快捷短语</t></si><si><t>产品话术</t></si><si><t>面膜紫适用人群</t></si><si><t>亲亲这是话术</t></si></sst>',
+  );
+  const sheet = Buffer.from(
+    '<?xml version="1.0"?><worksheet><sheetData>'
+    + '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+    + '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c></row>'
+    + '</sheetData></worksheet>',
+  );
+  const workbookXml = Buffer.from(
+    '<?xml version="1.0"?><workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="产品话术" r:id="rId1"/></sheets></workbook>',
+  );
+  const rels = Buffer.from(
+    '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+  );
+  return Buffer.concat([
+    zipLocal('xl/sharedStrings.xml', shared),
+    zipLocal('xl/worksheets/sheet1.xml', sheet),
+    zipLocal('xl/workbook.xml', workbookXml),
+    zipLocal('xl/_rels/workbook.xml.rels', rels),
+  ]);
+}
+
+it('parses xlsx through the dashboard content parse channel and fail-closes unsigned senders', async () => {
+  const frame = { parent: null };
+  const dashboard = {
+    id: 10,
+    isDestroyed: () => false,
+    getURL: () => 'http://127.0.0.1:5173/?role=dashboard',
+    mainFrame: frame,
+  } as unknown as WebContents;
+  const query = { ...dashboard, id: 1 } as WebContents;
+  registerDashboardContentIpc(
+    fakeSession('coach') as ProductSession,
+    () => dashboard,
+    () => 'http://127.0.0.1:5173/',
+  );
+  const event = (sender: WebContents, senderFrame: unknown = frame) => (
+    { sender, senderFrame } as IpcMainInvokeEvent
+  );
+  const parse = handlers.get(IPC_CHANNELS.DASHBOARD_CONTENT_PARSE)!;
+  const payload = {
+    sourceName: '【FAQ】MENOKIN话术.xlsx',
+    bytes: new Uint8Array(workbookBytes()),
+  };
+  expect(await parse(event(query), payload)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+  expect(await parse(event(dashboard))).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await parse(event(dashboard), payload, { extra: true })).toMatchObject({
+    ok: false,
+    code: 'VALIDATION',
+  });
+  const parsed = await parse(event(dashboard), payload);
+  expect(parsed).toMatchObject({
+    ok: true,
+    sourceName: '【FAQ】MENOKIN话术.xlsx',
+    rows: [{ scene: '面膜紫适用人群', script: '亲亲这是话术', domain: 'product' }],
+  });
+});
+
+it('posts frozen contract csv and rewrites xlsx filenames when stack bindings match', async () => {
+  const owner = fakeSession('owner');
+  const stackBinding = { domain: 'product' as const, source_version_id: 'srcv_stack_product_v1' };
+  vi.mocked(owner.request).mockResolvedValueOnce({
+    status: 202,
+    value: { import_batch_id: 'imp_owner_xlsx', status: 'validating', source_binding_hash: 'a'.repeat(64) },
+  });
+  const imported = await dashboardContentImport(owner, {
+    sourceName: '【FAQ】MENOKIN话术.xlsx',
+    csvText: csv,
+    sourceBindings: [stackBinding],
+  });
+  expect(imported).toEqual({ ok: true, importBatchId: 'imp_owner_xlsx' });
+  const form = vi.mocked(owner.request).mock.calls[0]?.[2]?.form as FormData;
+  const file = form.get('file') as File;
+  expect(file).toBeInstanceOf(Blob);
+  expect(file.name).toBe('【FAQ】MENOKIN话术.csv');
+  const text = await file.text();
+  expect(text).toContain('script_id,category,title,answer_text,source_version_id,source_ref,question_text');
+  expect(text).toContain('upl00001,product,');
+  expect(text).toContain('srcv_stack_product_v1,SRC-STACK-PRODUCT');
+  expect(text).not.toMatch(/^scene,script,domain/u);
 });
 
 it('does not publish when import validation fails', async () => {
