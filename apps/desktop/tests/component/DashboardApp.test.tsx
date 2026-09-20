@@ -1406,6 +1406,8 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('当前发布无此域');
     expect(screen.getByTestId('wording-source-readiness')).not.toHaveTextContent('NOT_CREATED');
     expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配的话术');
+    expect(screen.queryByTestId('wording-pager')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wording-export')).toBeDisabled();
   });
 
   it('labels the wording detail card with the entry ownerRole', async () => {
@@ -1438,6 +1440,170 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-wording'));
     expect(await screen.findByTestId('wording-detail-owner')).toHaveTextContent('当前发布');
     expect(screen.getByTestId('wording-detail-owner')).not.toHaveTextContent('本机话术库');
+  });
+
+  it('pages the wording library and exports the filtered published CSV', async () => {
+    const user = userEvent.setup();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const createObjectURL = vi.fn(() => 'blob:wording-export');
+    const revokeObjectURL = vi.fn();
+    const click = vi.fn();
+    let downloadLink: HTMLAnchorElement | undefined;
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURL });
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string, options?: ElementCreationOptions) => {
+      const node = originalCreateElement(tagName, options);
+      if (tagName === 'a') {
+        downloadLink = node as HTMLAnchorElement;
+        Object.defineProperty(node, 'click', { configurable: true, value: click });
+      }
+      return node;
+    }) as typeof document.createElement);
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_18',
+        total: 25,
+        entries: Array.from({ length: 25 }, (_, index) => ({
+          scriptId: `mn-${index + 1}`,
+          domain: 'product' as const,
+          title: `产品话术 ${index + 1}`,
+          scene: '怎么用',
+          answerPreview: `正文 ${index + 1}`,
+          platform: '千牛 / 抖音',
+          version: 'rel_18',
+          effectiveWindow: '当前发布',
+          risk: 'low' as const,
+          lifecycle: 'published' as const,
+          lifecycleLabel: '已发布' as const,
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog' as const,
+        })),
+      }),
+    };
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-wording'));
+    expect(await screen.findByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 20');
+    expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 21');
+    expect(screen.getByTestId('wording-page-prev')).toBeDisabled();
+    expect(screen.getByTestId('wording-page-next')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('wording-page-prev'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+    await user.click(screen.getByRole('button', { name: /产品话术 2 怎么用/ }));
+    expect(screen.getByTestId('wording-detail')).toHaveTextContent('产品话术 2');
+    await user.click(screen.getByTestId('wording-page-next'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 2 / 2 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 21');
+    expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 1');
+    expect(screen.getByTestId('wording-detail')).toHaveTextContent('产品话术 21');
+    expect(screen.getByTestId('wording-page-prev')).toBeEnabled();
+    expect(screen.getByTestId('wording-page-next')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('wording-page-next'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 2 / 2 页');
+    await user.click(screen.getByTestId('wording-page-prev'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
+    await user.click(screen.getByTestId('wording-export'));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:wording-export');
+    expect(downloadLink?.download).toMatch(/^话术库-产品话术-已发布-\d{4}-\d{2}-\d{2}\.csv$/);
+    const firstCall = createObjectURL.mock.calls[0] as unknown[] | undefined;
+    const blob = firstCall?.[0];
+    expect(blob instanceof Blob).toBe(true);
+    if (!(blob instanceof Blob)) throw new Error('expected csv blob');
+    expect(blob.type).toContain('text/csv');
+    const csv = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(blob);
+    });
+    expect(csv.startsWith('script_id,domain,title,')).toBe(true);
+    expect(csv).toContain('mn-1,product,产品话术 1,');
+    expect(csv).toContain('mn-25,product,产品话术 25,');
+    expect(csv).toContain('\r\n');
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: originalCreateObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: originalRevokeObjectURL });
+  });
+
+  it('resets the wording page when domain, lifecycle, search, or reset change', async () => {
+    const user = userEvent.setup();
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_18',
+        total: 26,
+        entries: [
+          ...Array.from({ length: 25 }, (_, index) => ({
+            scriptId: `mn-${index + 1}`,
+            domain: 'product' as const,
+            title: `产品话术 ${index + 1}`,
+            scene: '怎么用',
+            answerPreview: `正文 ${index + 1}`,
+            platform: '千牛 / 抖音',
+            version: 'rel_18',
+            effectiveWindow: '当前发布',
+            risk: 'low' as const,
+            lifecycle: 'published' as const,
+            lifecycleLabel: '已发布' as const,
+            ownerRole: '当前发布',
+            dataClass: 'local-catalog' as const,
+          })),
+          {
+            scriptId: 'mn-campaign-1',
+            domain: 'campaign' as const,
+            title: '活动话术 1',
+            scene: '活动',
+            answerPreview: '满赠不叠加',
+            platform: '千牛 / 抖音',
+            version: 'rel_18',
+            effectiveWindow: '当前发布',
+            risk: 'low' as const,
+            lifecycle: 'published' as const,
+            lifecycleLabel: '已发布' as const,
+            ownerRole: '当前发布',
+            dataClass: 'local-catalog' as const,
+          },
+        ],
+      }),
+    };
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-wording'));
+    expect(await screen.findByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+    await user.click(screen.getByTestId('wording-page-next'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 2 / 2 页');
+
+    await user.click(screen.getByTestId('wording-domain-campaign'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 1 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('活动话术 1');
+
+    await user.click(screen.getByTestId('wording-domain-product'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
+    expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 21');
+
+    await user.click(screen.getByTestId('wording-page-next'));
+    await user.selectOptions(screen.getByTestId('wording-lifecycle'), 'published');
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+
+    await user.click(screen.getByTestId('wording-page-next'));
+    await user.type(screen.getByTestId('wording-search'), '正文 25');
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 1 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 25');
+
+    await user.clear(screen.getByTestId('wording-search'));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
+
+    await user.click(screen.getByTestId('wording-page-next'));
+    await user.click(screen.getByRole('button', { name: '重置' }));
+    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
+    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
   });
 
   it('supports roving keyboard navigation between modules', async () => {

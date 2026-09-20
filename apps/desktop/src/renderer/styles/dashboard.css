@@ -2105,6 +2105,14 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .wording-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr); gap: 12px; }
 .wording-list { display: grid; align-content: start; gap: 6px; }
+.wording-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.wording-pager span { color: var(--dash-muted); font-size: 12px; }
 .wording-list > button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 9px 11px; border: 1px solid var(--dash-line); border-radius: 8px; background: var(--dash-surface); color: var(--dash-ink); text-align: left; }
 .wording-list > button > span:first-child { min-width: 0; }
 .wording-list > button small { display: block; margin-top: 3px; color: var(--dash-muted); }
@@ -2521,6 +2529,11 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .dash-reset:active:not(:disabled) {
   background: var(--dash-chrome-pressed);
+}
+
+.dash-reset:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
 }
 
 .dash-action-primary {
