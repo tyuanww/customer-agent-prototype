@@ -5,6 +5,7 @@ export type DashboardNavIconId =
   | 'review'
   | 'wording'
   | 'iteration'
+  | 'sop'
   | 'content'
   | 'announce'
   | 'architecture'
@@ -17,6 +18,7 @@ const NAV_ICON_PATHS: Record<DashboardNavIconId, readonly string[]> = {
   review: ['M5 4h14v16H5z', 'm8 10 2 2 5-5', 'M8 16h8'],
   wording: ['M4 5c3-1 6 0 8 2v13c-2-2-5-3-8-2z', 'M20 5c-3-1-6 0-8 2v13c2-2 5-3 8-2z'],
   iteration: ['M20 7v5h-5', 'M4 17v-5h5', 'M18.5 9A7 7 0 0 0 6 7', 'M5.5 15A7 7 0 0 0 18 17'],
+  sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3'],
   content: ['M12 3v12', 'm8 7 4-4 4 4', 'M5 14v6h14v-6'],
   announce: ['M6 17h12l-2-3v-4a4 4 0 0 0-8 0v4z', 'M10 20h4'],
   architecture: ['M12 4v5', 'M5 20v-5h14v5', 'M5 15h14', 'm12 9-7 6', 'm12-6 7 6'],

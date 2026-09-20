@@ -17,8 +17,8 @@ const sourcePath = path.resolve(
 );
 
 describe('dashboard manifest', () => {
-  it('is deeply frozen compile-time data with nine decision-oriented modules', () => {
-    expect(DASHBOARD_MODULE_IDS).toHaveLength(9);
+  it('is deeply frozen compile-time data with ten decision-oriented modules', () => {
+    expect(DASHBOARD_MODULE_IDS).toHaveLength(10);
     expect(DASHBOARD_NAV.map((item) => item.id)).toEqual([...DASHBOARD_MODULE_IDS]);
     expect(Object.isFrozen(DASHBOARD_MANIFEST)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.ledger.rows)).toBe(true);
@@ -27,6 +27,35 @@ describe('dashboard manifest', () => {
     expect(Object.isFrozen(DASHBOARD_MANIFEST.review.dimensions)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.workorders.timeSlices)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_DEFERRED_NAV)).toBe(true);
+  });
+
+  it('places SOP in 话术运营 between iteration and content', () => {
+    expect(DASHBOARD_MODULE_IDS).toEqual([
+      'overview',
+      'workorders',
+      'ledger',
+      'review',
+      'wording',
+      'iteration',
+      'sop',
+      'content',
+      'announce',
+      'architecture',
+    ]);
+    expect(DASHBOARD_NAV.find((item) => item.id === 'sop')).toEqual({
+      id: 'sop',
+      label: 'SOP',
+      blurb: '过敏流程只读合成树',
+      group: '话术运营',
+    });
+    expect(DASHBOARD_NAV.filter((item) => item.group === '话术运营').map((item) => item.id)).toEqual([
+      'wording',
+      'iteration',
+      'sop',
+    ]);
+    expect(nextDashboardNavId('iteration', 1)).toBe('sop');
+    expect(nextDashboardNavId('sop', 1)).toBe('content');
+    expect(nextDashboardNavId('sop', -1)).toBe('iteration');
   });
 
   it('does not invent live timestamps or persist anything', () => {

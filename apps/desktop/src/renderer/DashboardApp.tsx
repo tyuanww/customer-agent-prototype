@@ -29,6 +29,7 @@ import { LedgerModule } from './features/dashboard/LedgerModule';
 import { OverviewModule } from './features/dashboard/OverviewModule';
 import { ReviewModule } from './features/dashboard/ReviewModule';
 import { WorkorderModule } from './features/dashboard/WorkorderModule';
+import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
 import {
   DASHBOARD_WINDOW_TITLE,
@@ -76,6 +77,7 @@ const MODULES: Record<DashboardLeafModuleId, () => ReactElement> = {
   review: ReviewModule,
   wording: WordingLibraryModule,
   iteration: IterationModule,
+  sop: SopLibraryModule,
   content: ContentModule,
   announce: AnnounceModule,
   architecture: ArchitectureModule,

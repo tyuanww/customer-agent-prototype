@@ -48,6 +48,7 @@ CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态�
 - `createDashboardBrowserWindow` 使用 `DASHBOARD_WINDOW_SECURITY` 加专用 `dashboard.cjs`。
 - `readDashboardWindowSnapshot().hasPreload` 为 true。preload 只暴露 `dashboardWording.list()`，通道 `dashboard:wording-list`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
 - 话术库优先读仓外当前发布 hydrate，hydrate 为空才回退检索索引（仓内路径拒绝），只读、不复制、不发布。无 `effectiveFrom` 的条目生效窗口标「当前发布」。详情卡左上标签与「来源」同为 `selected.ownerRole`（`当前发布` 或 `本机话术库`），不写死「本机话术库」。VOC / 工单仍是架构模拟。
+- 侧栏「SOP」（`SopLibraryModule`）只读渲染 `allergySopTree()`，不新增 IPC。内部停手只在 `window.dashboardContent.session()` 成功且 `signedIn` 且 role 为 `coach` / `owner` 时显示；session 失败或坐席角色 fail-closed 隐藏。不 persist、不 publish、不 fetch。持久化仍要 contracts:intake。这与 Query 的独立 `role=sop` 窗不是同一表面。
 - Dashboard renderer 拿不到 `window.customerAgent`，也调不了 search / login / copy。
 - 打开通道只有无参数 `dashboard:open`。Main 要求 `isTrustedSender` 且 `role === 'query'`（`canOpenDashboard`）。Fox / 未受信 sender fail-closed，返回 `OpenDashboardResult` `{ ok: false, message }`。
 - 原生菜单 / Tray / Dock **不走**该 IPC：它们直接调 `OverlayController.openDashboard()`，失败用 `runDashboardOpenAttempt` + `notifyDashboardOpenFailure`（原生对话框），查询窗保持可用。

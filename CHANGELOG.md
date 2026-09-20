@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.13] - 2026-09-20
+
+### Added
+
+- Dashboard 话术运营 includes a read-only allergy SOP tree. Coach and owner sessions can see internal stop copy; sitters cannot. Persistence and publish still need contracts:intake.
+
 ## [0.3.12] - 2026-09-20
 
 ### Added

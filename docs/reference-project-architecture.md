@@ -111,7 +111,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（只暴露 `dashboardWording.list()`） | 合成工作台、主题和导航；话术库只读当前发布 hydrate；VOC / 工单仍是架构模拟；本窗还有 CSV 草稿解析与 P0 迭代提醒（会话内状态，不写盘） |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（只暴露 `dashboardWording.list()`） | 合成工作台、主题和导航；话术库只读当前发布 hydrate；VOC / 工单仍是架构模拟；SOP 只读 `allergySopTree()`（coach/owner 可见内部停手）；本窗还有 CSV 草稿解析与 P0 迭代提醒（会话内状态，不写盘） |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
@@ -147,7 +147,7 @@ v1.17 migrated PG15
   └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
 ```
 
-上图 `DASHBOARD_MANIFEST ──read-only──> Dashboard modules` 只覆盖 VOC / 工单 / KPI。话术库走 `dashboard:wording-list` 读当前发布 hydrate，不画进该 ASCII。
+上图 `DASHBOARD_MANIFEST ──read-only──> Dashboard modules` 只覆盖 VOC / 工单 / KPI。话术库走 `dashboard:wording-list` 读当前发布 hydrate，不画进该 ASCII。Dashboard SOP 读 `allergySopTree()`，同样不画进该 ASCII。
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 

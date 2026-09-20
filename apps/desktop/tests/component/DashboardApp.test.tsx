@@ -148,6 +148,41 @@ describe('DashboardApp', () => {
     }
   });
 
+  it('shows the allergy SOP tree as a read-only 话术运营 module', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-sop'));
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('合成过敏树只读');
+    expect(screen.getByTestId('sop-library-list')).toHaveTextContent('过敏凭证');
+    expect(screen.getByTestId('sop-node-severe-internal')).toHaveTextContent('不要对客户承诺补偿');
+    expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
+  });
+
+  it('keyboard-walks 话术运营 from iteration through SOP into content', async () => {
+    render(<DashboardApp />);
+    const sopNav = screen.getByTestId('nav-sop');
+    expect(sopNav).toHaveAccessibleName('SOP');
+    expect(sopNav).toHaveAttribute('data-nav-group', '话术运营');
+    expect(sopNav.querySelectorAll('svg path')).toHaveLength(4);
+
+    fireEvent.click(screen.getByTestId('nav-iteration'));
+    fireEvent.keyDown(screen.getByTestId('nav-iteration'), { key: 'ArrowDown' });
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
+    expect(screen.getByTestId('module-sop')).toBeInTheDocument();
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    expect(screen.getByTestId('nav-sop')).toHaveFocus();
+    expect(screen.getByTestId('nav-sop')).toHaveAttribute('aria-current', 'page');
+
+    fireEvent.keyDown(screen.getByTestId('nav-sop'), { key: 'ArrowDown' });
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'content');
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    expect(screen.getByTestId('nav-content')).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByTestId('nav-content'), { key: 'ArrowUp' });
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
+    expect(screen.getByTestId('module-sop')).toBeInTheDocument();
+  });
+
   it('uses the fox brand asset and keeps navigation compact without losing module context', () => {
     render(<DashboardApp />);
 
