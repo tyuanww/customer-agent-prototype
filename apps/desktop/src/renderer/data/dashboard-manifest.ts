@@ -10,9 +10,7 @@ import {
 
 export const DASHBOARD_MODULE_IDS = [
   'overview',
-  'ledger',
   'wording',
-  'iteration',
   'sop',
   'content',
   'announce',
@@ -193,11 +191,9 @@ export type AnnounceRow = {
 
 export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'overview', label: '管理概览', blurb: '风险、责任与处理进度', group: '经营总览' },
-  { id: 'ledger', label: '检索效果', blurb: '根问题 / 检索操作双账', group: '服务洞察' },
   { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
-  { id: 'iteration', label: '话术优化待办', blurb: '内容缺口 / 排序 / 过期召回', group: '话术运营' },
   { id: 'sop', label: 'SOP', blurb: '过敏流程只读合成树', group: '话术运营' },
-  { id: 'content', label: '内容与发布', blurb: '话术师草稿与缺域阻断', group: '治理与架构' },
+  { id: 'content', label: '内容管理', blurb: '草稿 · 审核 · 发布', group: '治理与架构' },
   { id: 'announce', label: '系统同步', blurb: '话术版本 / 软件版本更新', group: '治理与架构' },
 ]);
 
@@ -234,7 +230,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         nextStep: '查看检索效果并进入对应优化待办。',
         statusLabel: '待分流',
         reviewWindow: '本周内容复核',
-        target: 'iteration',
+        target: 'content',
       },
     ] satisfies ManagerDecision[],
     health: [
@@ -254,7 +250,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         note: '29 / 346 次合成操作',
         period: '最近 8 个固定周期',
         definition: '有效期过滤后无可用候选的操作占比；不等于坐席没有回答客户。',
-        target: 'ledger',
+        target: 'overview',
       },
       {
         id: 'source-gaps',

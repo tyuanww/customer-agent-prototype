@@ -16,8 +16,8 @@ const sourcePath = path.resolve(
 );
 
 describe('dashboard manifest', () => {
-  it('is deeply frozen compile-time data with seven decision-oriented modules', () => {
-    expect(DASHBOARD_MODULE_IDS).toHaveLength(7);
+  it('is deeply frozen compile-time data with five decision-oriented modules', () => {
+    expect(DASHBOARD_MODULE_IDS).toHaveLength(5);
     expect(DASHBOARD_NAV.map((item) => item.id)).toEqual([...DASHBOARD_MODULE_IDS]);
     expect(Object.isFrozen(DASHBOARD_MANIFEST)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.ledger.rows)).toBe(true);
@@ -25,12 +25,10 @@ describe('dashboard manifest', () => {
     expect(Object.isFrozen(DASHBOARD_MANIFEST.wording.entries)).toBe(true);
   });
 
-  it('places SOP in 话术运营 between iteration and content', () => {
+  it('places SOP in 话术运营 between wording and content', () => {
     expect(DASHBOARD_MODULE_IDS).toEqual([
       'overview',
-      'ledger',
       'wording',
-      'iteration',
       'sop',
       'content',
       'announce',
@@ -43,12 +41,10 @@ describe('dashboard manifest', () => {
     });
     expect(DASHBOARD_NAV.filter((item) => item.group === '话术运营').map((item) => item.id)).toEqual([
       'wording',
-      'iteration',
       'sop',
     ]);
-    expect(nextDashboardNavId('iteration', 1)).toBe('sop');
     expect(nextDashboardNavId('sop', 1)).toBe('content');
-    expect(nextDashboardNavId('sop', -1)).toBe('iteration');
+    expect(nextDashboardNavId('sop', -1)).toBe('wording');
   });
 
   it('does not invent live timestamps or persist anything', () => {
@@ -158,7 +154,9 @@ describe('dashboard manifest', () => {
     expect(DASHBOARD_MODULE_IDS).not.toContain('workorder-trash');
     expect(DASHBOARD_MODULE_IDS).not.toContain('review');
     expect(DASHBOARD_MODULE_IDS).not.toContain('architecture');
-    expect(nextDashboardNavId('overview', 1)).toBe('ledger');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('ledger');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('iteration');
+    expect(nextDashboardNavId('overview', 1)).toBe('wording');
     expect(nextDashboardNavId('announce', 1)).toBe('overview');
     expect(nextDashboardNavId('overview', -1)).toBe('announce');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不联网');

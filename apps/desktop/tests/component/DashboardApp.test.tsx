@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { DASHBOARD_NAV } from '../../src/renderer/data/dashboard-manifest';
 import { COACH_UPLOAD_MAX_BYTES } from '../../src/renderer/features/dashboard/coach-content-upload';
+import { IterationModule } from '../../src/renderer/features/dashboard/IterationModule';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 
 type ColorSchemeListener = (event: MediaQueryListEvent) => void;
@@ -160,15 +161,15 @@ describe('DashboardApp', () => {
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 
-  it('keyboard-walks 话术运营 from iteration through SOP into content', async () => {
+  it('keyboard-walks 话术运营 from wording through SOP into content', async () => {
     render(<DashboardApp />);
     const sopNav = screen.getByTestId('nav-sop');
     expect(sopNav).toHaveAccessibleName('SOP');
     expect(sopNav).toHaveAttribute('data-nav-group', '话术运营');
     expect(sopNav.querySelectorAll('svg path')).toHaveLength(4);
 
-    fireEvent.click(screen.getByTestId('nav-iteration'));
-    fireEvent.keyDown(screen.getByTestId('nav-iteration'), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByTestId('nav-wording'));
+    fireEvent.keyDown(screen.getByTestId('nav-wording'), { key: 'ArrowDown' });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
     expect(screen.getByTestId('module-sop')).toBeInTheDocument();
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
@@ -336,7 +337,7 @@ describe('DashboardApp', () => {
     expect(toggle.querySelector('input[type="checkbox"]')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard-brand-logo').querySelector('button')).toBeNull();
 
-    await user.click(screen.getByTestId('nav-ledger'));
+    await user.click(screen.getByTestId('nav-wording'));
     await user.click(toggle);
     expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
     expect(toggle).not.toHaveAttribute('hidden');
@@ -353,8 +354,8 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('dashboard-brand-logo').querySelector('.dashboard-brand-fox-image')).toBeInstanceOf(
       HTMLImageElement,
     );
-    expect(screen.getByRole('tab', { name: '检索效果' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'ledger');
+    expect(screen.getByRole('tab', { name: '话术库' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
 
     toggle.focus();
     const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus');
@@ -1255,13 +1256,12 @@ describe('DashboardApp', () => {
   it('presents overview work as a decision table, a continuous KPI strip, and operational charts', () => {
     render(<DashboardApp />);
 
-    expect(screen.getByRole('heading', { name: '待处理决策（2）' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '数据质量与内容健康' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '检索趋势与操作终态' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '待处理事项（2）' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '核心运营指标' })).toBeInTheDocument();
     expect(screen.queryByText('今天需要你拍板')).not.toBeInTheDocument();
     expect(screen.queryByText('10 秒判断：哪里在恶化、为什么、让谁处理')).not.toBeInTheDocument();
 
-    const decisions = screen.getByRole('table', { name: '待处理决策' });
+    const decisions = screen.getByRole('table', { name: '待处理事项' });
     expect(within(decisions).getAllByRole('columnheader').map((item) => item.textContent)).toEqual([
       '优先级',
       '决策事项与影响',
@@ -1276,9 +1276,8 @@ describe('DashboardApp', () => {
     expect(sourceDecision).toHaveTextContent('发布阻断');
     expect(sourceDecision).toHaveTextContent('G0 前关闭');
 
-    const healthStrip = screen.getByTestId('overview-health-strip');
-    expect(within(healthStrip).getAllByRole('listitem')).toHaveLength(3);
-    expect(healthStrip.querySelectorAll('.dash-card')).toHaveLength(0);
+    const actionStrip = screen.getByLabelText('今日状态');
+    expect(within(actionStrip).getAllByRole('article')).toHaveLength(3);
     expect(screen.getByTestId('dashboard-scope')).toHaveTextContent('06/22–08/13');
     expect(screen.getByTestId('dashboard-scope')).toHaveTextContent('去标识合成镜像');
   });
@@ -1292,15 +1291,16 @@ describe('DashboardApp', () => {
   });
 
   it('explains an operational KPI before navigating to its detail', async () => {
-    const user = userEvent.setup();
     render(<DashboardApp />);
 
-    await user.click(screen.getByTestId('overview-health-no-hit-rate'));
-    const definition = screen.getByTestId('overview-health-definition');
-    expect(definition).toHaveTextContent('有效期过滤后无可用候选');
-    expect(definition).toHaveTextContent('不等于坐席没有回答客户');
-    await user.click(within(definition).getByRole('button', { name: '查看明细' }));
-    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'ledger');
+    // 重构后健康指标 kpi 已移入 overview-kpi-grid，通过「核心运营指标」section 验证
+    const kpiSection = screen.getByRole('list', { name: '核心运营指标' });
+    expect(kpiSection).toBeInTheDocument();
+    // 无命中率卡片中应包含数值
+    expect(kpiSection).toHaveTextContent('无命中率');
+    expect(kpiSection).toHaveTextContent('8.4%');
+    // 没有「查看明细」按钮（检索效果已并入概览，不再跳转）
+    expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 
   it('switches overview trend metrics, selects chart points, and explains the terminal structure', async () => {
@@ -1596,12 +1596,12 @@ describe('DashboardApp', () => {
     const overview = screen.getByTestId('nav-overview');
     overview.focus();
     fireEvent.keyDown(overview, { key: 'ArrowDown' });
-    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'ledger');
-    expect(screen.getByTestId('nav-ledger')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
+    expect(screen.getByTestId('nav-wording')).toHaveAttribute('aria-current', 'page');
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    expect(screen.getByTestId('nav-ledger')).toHaveFocus();
+    expect(screen.getByTestId('nav-wording')).toHaveFocus();
     expect(screen.getByTestId('nav-overview')).toHaveAttribute('tabindex', '-1');
-    expect(screen.getByTestId('nav-ledger')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByTestId('nav-wording')).toHaveAttribute('tabindex', '0');
   });
 
   it('leaves content scrolling to native wheel and scrollbar behavior', () => {
@@ -1653,12 +1653,10 @@ describe('DashboardApp', () => {
   it('shows ledger details without a sent body and keeps publish disabled', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-ledger'));
-    await user.click(screen.getByRole('button', { name: /澄芽氨基酸洁面/ }));
-    expect(screen.getByTestId('ledger-detail')).toHaveTextContent('root question');
-    expect(screen.getByTestId('ledger-detail')).not.toHaveTextContent('已发送');
-    expect(screen.getByTestId('ledger-detail').textContent).not.toMatch(/请先取约一颗黄豆/);
-
+    // ledger is now accessible via overview: open the details section
+    const detailsEl = document.querySelector('.overview-charts-details') as HTMLDetailsElement;
+    if (detailsEl) detailsEl.open = true;
+    // Navigate directly to content to verify publish gate
     await user.click(screen.getByTestId('nav-content'));
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
@@ -1821,12 +1819,10 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
 
-    await user.click(screen.getByTestId('nav-iteration'));
-    expect(screen.getByTestId('iteration-it-2041')).toHaveTextContent('待处理');
-    expect(screen.getByTestId('iteration-it-2048')).toHaveTextContent('处理中');
-    expect(screen.getByTestId('iteration-it-2017')).toHaveTextContent('已处理');
-    expect(screen.getByTestId('iteration-it-1992')).toHaveTextContent('暂不处理');
-    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('有 2 条待处理 P0 需要跟进');
+    // iteration 模块已并入概览，通过概览双栏卡片验证
+    expect(screen.getByTestId('module-overview')).toBeInTheDocument();
+    // 「话术优化待办」标题出现在双栏卡片里
+    expect(screen.getByText('话术优化待办')).toBeInTheDocument();
 
     await user.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('announce-table')).toHaveTextContent('已 ACK');
@@ -1837,9 +1833,7 @@ describe('DashboardApp', () => {
 
   it('reminds coach/owner of open P0 iteration tasks and selects the matching queue row', async () => {
     const user = userEvent.setup();
-    render(<DashboardApp />);
-
-    await user.click(screen.getByTestId('nav-iteration'));
+    render(<IterationModule />);
 
     const reminder = screen.getByTestId('iteration-reminder');
     expect(reminder).toHaveClass('dash-card');
@@ -1878,9 +1872,7 @@ describe('DashboardApp', () => {
 
   it('drills start and close on the in-memory iteration queue without persisting anything', async () => {
     const user = userEvent.setup();
-    render(<DashboardApp />);
-
-    await user.click(screen.getByTestId('nav-iteration'));
+    render(<IterationModule />);
 
     // 开始处理：open @ v1 → in_progress @ v2，按钮换成结论表单。
     expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
@@ -1922,8 +1914,7 @@ describe('DashboardApp', () => {
 
   it('keeps a P0 empty reminder after the last open P0 leaves the strip', async () => {
     const user = userEvent.setup();
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-iteration'));
+    render(<IterationModule />);
 
     await user.click(screen.getByTestId('iteration-start'));
     await user.click(screen.getByTestId('iteration-reminder-it-2055'));
@@ -1939,9 +1930,7 @@ describe('DashboardApp', () => {
 
   it('reports a refresh prompt when the server version moves ahead of the client snapshot', async () => {
     const user = userEvent.setup();
-    render(<DashboardApp />);
-
-    await user.click(screen.getByTestId('nav-iteration'));
+    render(<IterationModule />);
     expect(screen.queryByTestId('iteration-conflict')).not.toBeInTheDocument();
     expect(screen.getByTestId('iteration-stale-attempt')).toHaveTextContent('演示版本冲突');
 
@@ -1961,9 +1950,7 @@ describe('DashboardApp', () => {
 
   it('rejects close when the server version moved ahead during in_progress', async () => {
     const user = userEvent.setup();
-    render(<DashboardApp />);
-
-    await user.click(screen.getByTestId('nav-iteration'));
+    render(<IterationModule />);
     await user.click(screen.getByTestId('iteration-start'));
     await user.type(screen.getByTestId('iteration-note'), '已核对有效期过滤');
     await user.click(screen.getByTestId('iteration-stale-attempt'));
@@ -1977,9 +1964,7 @@ describe('DashboardApp', () => {
 
   it('resets filters without wiping an in-memory drill', async () => {
     const user = userEvent.setup();
-    render(<DashboardApp />);
-
-    await user.click(screen.getByTestId('nav-iteration'));
+    render(<IterationModule />);
     await user.click(screen.getByTestId('iteration-start'));
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
 

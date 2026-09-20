@@ -22,8 +22,6 @@ import { DashboardBrandFox } from './components/DashboardBrandFox';
 import { ContentModule } from './features/dashboard/ContentModule';
 import { DashboardChromeIcon, DashboardNavIcon } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
-import { IterationModule } from './features/dashboard/IterationModule';
-import { LedgerModule } from './features/dashboard/LedgerModule';
 import { OverviewModule } from './features/dashboard/OverviewModule';
 import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
@@ -68,9 +66,7 @@ import './styles/dashboard.css';
 type DashboardLeafModuleId = Exclude<DashboardModuleId, 'overview'>;
 
 const MODULES: Record<DashboardLeafModuleId, () => ReactElement> = {
-  ledger: LedgerModule,
   wording: WordingLibraryModule,
-  iteration: IterationModule,
   sop: SopLibraryModule,
   content: ContentModule,
   announce: AnnounceModule,
