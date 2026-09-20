@@ -1388,7 +1388,7 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-wording'));
     expect(await screen.findByTestId('module-wording')).toHaveTextContent('产品话术');
-    expect(await screen.findByTestId('wording-detail')).toHaveTextContent('本机话术库');
+    expect(await screen.findByTestId('wording-detail-owner')).toHaveTextContent('本机话术库');
     expect(screen.getByTestId('wording-detail')).not.toHaveTextContent('DEMO · SYNTHETIC');
     expect(screen.getByTestId('wording-list')).toHaveTextContent('洁面用法');
 
@@ -1406,6 +1406,38 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('当前发布无此域');
     expect(screen.getByTestId('wording-source-readiness')).not.toHaveTextContent('NOT_CREATED');
     expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配的话术');
+  });
+
+  it('labels the wording detail card with the entry ownerRole', async () => {
+    const user = userEvent.setup();
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_18',
+        total: 1,
+        entries: [
+          {
+            scriptId: 'mn-1',
+            domain: 'product',
+            title: '洁面用法',
+            scene: '怎么用',
+            answerPreview: '先打湿再打圈',
+            platform: '千牛 / 抖音',
+            version: 'rel_18',
+            effectiveWindow: '当前发布',
+            risk: 'low',
+            lifecycle: 'published',
+            lifecycleLabel: '已发布',
+            ownerRole: '当前发布',
+            dataClass: 'local-catalog',
+          },
+        ],
+      }),
+    };
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-wording'));
+    expect(await screen.findByTestId('wording-detail-owner')).toHaveTextContent('当前发布');
+    expect(screen.getByTestId('wording-detail-owner')).not.toHaveTextContent('本机话术库');
   });
 
   it('supports roving keyboard navigation between modules', async () => {

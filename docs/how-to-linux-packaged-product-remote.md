@@ -4,7 +4,7 @@
 
 `pnpm package:linux` 是 **local-unsigned**，必须在 **Linux** 上跑，产物在 `release/local-unsigned/linux/`，文件名含 `UNSIGNED`。macOS / Windows 开发机跑该脚本会失败。本页仍全部 **未观察**，不能当成 Linux 实机已交付。配置路径：`~/.config/客服话术浮窗 Demo/synthetic-stack.json`。若设置了 `XDG_CONFIG_HOME`，与 Electron userData 一样走该目录。
 
-须先按 [本地合入顺序](plans/2026-09-19-local-unpushed-merge-order.md) 合入 P4 / P7。有 Linux 包之后才填本页。
+P4 / P7 已在 `main`。本页证据必须是 **Linux 主机**上对当前 `main`（v0.3.8）跑 `pnpm package:linux` 打出的 UNSIGNED AppImage，再由人在 Linux 上打开勾选。macOS / Windows 开发机跑该脚本会失败，也不能代填本页。
 
 ## 准备
 

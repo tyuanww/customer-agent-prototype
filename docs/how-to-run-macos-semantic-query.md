@@ -48,7 +48,7 @@
 
    向量绑定 `sha256(answerText)`，不进 git。切发布后要重算。
 
-   hydrate 在点胶囊「登录」后自动对齐当前发布。只想检查文件、或从 snapshot JSON 手工写入。设了 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 时，CLI 默认写带 origin 后缀的文件：
+   hydrate 文件在点胶囊「登录」后按当前发布回写。查询前的 `refreshAnnounce` 只更新公告租约，不改这个文件。只想检查文件、或从 snapshot JSON 手工写入。设了 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 时，CLI 默认写带 origin 后缀的文件：
 
    ```bash
    pnpm retrieval:hydrate -- --dry-run
@@ -67,9 +67,9 @@
 
    仓外 hydrate / BM25 文件若已在默认路径（有 origin 时是带后缀文件），开发态会自动挂上，不必再 export `CUSTOMER_AGENT_RETRIEVAL_INDEX` / `CUSTOMER_AGENT_HYDRATE_INDEX`。需要覆盖时再 export。
 
-4. 点胶囊「登录」。成功后按钮变成 `{角色} · 退出`，占位变成「输入或粘贴客户问题，回车查询」，不是红校验。
+4. 点胶囊「登录」。成功后按钮变成 `{操作者姓名} · 退出`（飞书 `name`，否则用户 id，不是 RBAC 角色），占位变成「输入或粘贴客户问题，回车查询」，不是红校验。登录 persist 会按当前公告回写仓外 hydrate。
 
-5. 输入顾客问句并回车。不要选手动平台/品类/SKU；范围由问句 intent 路由（默认全店）。胶囊「智能检索」小开关默认开。
+5. 输入顾客问句并回车。不要选手动平台/品类/SKU；范围由问句 intent 路由（默认全店）。胶囊「智能检索」小开关默认开。每次点查询都会先 `refreshAnnounce` 再检索，新发布不必等 600s 租约、也不必只靠下次登录才对齐公告。`refreshAnnounce` 不回写 hydrate 文件；`STALE` 仍要点「登录」。
 
 ## Verification
 

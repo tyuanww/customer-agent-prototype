@@ -55,7 +55,7 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 
 | 情况 | 坐席看到 |
 | --- | --- |
-| hydrate 的 `releaseId` 不在当前公告允许集合，且磁盘上还没有对齐后的快照 | `STALE`：内容已变化，请重新查询。再点胶囊「登录」让 snapshot 回写，不要 `stack start` |
+| hydrate 的 `releaseId` 不在当前公告允许集合，且磁盘上还没有对齐后的快照 | `STALE`：内容已变化，请重新查询。每次查询会 `refreshAnnounce` 更新租约，但 hydrate 文件仍要点胶囊「登录」让 snapshot 回写，不要 `stack start` |
 | 本地有排序但 hydrate 对不上 id，或过滤后为空 | `no_hit`，不打 leftover `/v1/search` |
 | 排序分过低，或问句二元组只打中正文、打不中标题/问法 | `no_hit`。不用余弦 0.7。不改 leftover `judgeSearch` |
 | hydrate 检索 | API 仍是 `collection_disabled`（合同里 query_events 只由 `/v1/search` 写入）。曝光记在仓外 telemetry，用 `pnpm retrieval:never-hit` 看从未命中 |

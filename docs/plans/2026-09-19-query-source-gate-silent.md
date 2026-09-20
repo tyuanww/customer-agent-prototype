@@ -1,6 +1,6 @@
 # 查询完成后空白
 
-> **状态：** 已实现（`feat/query-source-gate-silent`）。
+> **状态：** 已实现（`feat/query-source-gate-silent`）。后续 #153 把每次产品查询都改为 `refreshAnnounce`；下面拍板 1 是本切片当时的边界，不是现行 how-to。
 
 ## 拍板
 

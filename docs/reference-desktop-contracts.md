@@ -47,7 +47,7 @@ CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态�
 
 - `createDashboardBrowserWindow` 使用 `DASHBOARD_WINDOW_SECURITY` 加专用 `dashboard.cjs`。
 - `readDashboardWindowSnapshot().hasPreload` 为 true。preload 只暴露 `dashboardWording.list()`，通道 `dashboard:wording-list`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
-- 话术库读仓外 hydrate / 检索索引（仓内路径拒绝），只读、不复制、不发布。VOC / 工单仍是架构模拟。
+- 话术库优先读仓外当前发布 hydrate，hydrate 为空才回退检索索引（仓内路径拒绝），只读、不复制、不发布。无 `effectiveFrom` 的条目生效窗口标「当前发布」。详情卡左上标签与「来源」同为 `selected.ownerRole`（`当前发布` 或 `本机话术库`），不写死「本机话术库」。VOC / 工单仍是架构模拟。
 - Dashboard renderer 拿不到 `window.customerAgent`，也调不了 search / login / copy。
 - 打开通道只有无参数 `dashboard:open`。Main 要求 `isTrustedSender` 且 `role === 'query'`（`canOpenDashboard`）。Fox / 未受信 sender fail-closed，返回 `OpenDashboardResult` `{ ok: false, message }`。
 - 原生菜单 / Tray / Dock **不走**该 IPC：它们直接调 `OverlayController.openDashboard()`，失败用 `runDashboardOpenAttempt` + `notifyDashboardOpenFailure`（原生对话框），查询窗保持可用。
@@ -75,7 +75,7 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `product:session-changed` | Main → query | preload 精确校验，renderer 按 main epoch 拒绝旧状态 |
 | `product:search` / `product:cancel-search` / `product:copy-adopt` | invoke | trusted Query 主框；绑定 sessionEpoch/generation；复制不接受 renderer 正文 |
 | `product:retrieval-preference-get` / `product:retrieval-preference-set` | invoke | trusted Query 主框；`{ smartEnabled: boolean }`；非法 payload 不写盘 |
-| `product:announce-refresh` | invoke | trusted Query 主框；只回显 generation；成功投影无 lease token |
+| `product:announce-refresh` | invoke | trusted Query 主框；只回显 generation；成功投影无 lease token。QueryApp 每次产品检索都会先调它，不只在尚未持有租约时 |
 | `product:announce-invalidated` | Main → query | preload 精确校验；过期/替换/来源门后停止使用旧候选。查询中或已有结果时：`source_gate` 显示「内容暂不可用，请联系话术师核实」，`unavailable` 显示「服务暂不可用，请重试」，不得空白 overlay，也不得画「当前版本已失效」；空闲输入态这两类原因静默回 SEARCH_INPUT。只有 `expired` 才显示「当前版本已失效，请重新核验」 |
 | `clipboard:copy-text` | invoke | `isTrustedSender` + `role === 'query'` + `resolveClipboardWrite` |
 | `overlay:get-window-context` | invoke | 响应包含 `platform`；未受信 sender 返回带运行时平台、不可用快捷键状态的降级上下文 |

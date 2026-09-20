@@ -227,7 +227,7 @@ export function WordingLibraryModule() {
           {selected ? (
             <>
               <div className="dash-card-row">
-                <span className="dash-card-label">本机话术库</span>
+                <span className="dash-card-label" data-testid="wording-detail-owner">{selected.ownerRole}</span>
                 <StatusBadge label={`风险 ${selected.risk}`} tone={riskTone(selected.risk)} />
               </div>
               <h2>{selected.title}</h2>
