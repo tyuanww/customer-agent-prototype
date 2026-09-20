@@ -111,7 +111,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration`） | 合成工作台、主题和导航；话术库只读当前发布 hydrate；VOC / 工单仍是架构模拟；SOP 只读 `allergySopTree()`（coach/owner 可见内部停手）；话术优化待办 live list/start/close（coach/owner，空列表合法）；CSV/xlsx 草稿走内容通道（xlsx 只读第一张表，经 `dashboard:content-parse`） |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration`） | 合成工作台、主题和导航；话术库只读当前发布 hydrate；VOC / 工单仍是架构模拟；SOP 只读 `allergySopTree()`（coach/owner 可见内部停手）；话术优化待办 live list/start/close（coach/owner，空列表合法）；CSV/xlsx 草稿走内容通道（xlsx 只读第一张表，经 `dashboard:content-parse`；Publish 轮询导入状态 1.5s，429 退避） |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 

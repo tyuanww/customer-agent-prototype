@@ -314,7 +314,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 内容与发布草稿（Dashboard 切片 1）
 
-「内容与发布」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。Publish 走现有 import/publish；一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。售后过敏树是 DEMO 样例说明仍在。
+「内容与发布」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Publish 走现有 import/publish，等导入 staged 才发：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒，预算 30 秒，避免打满状态接口每分钟 120 次。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。售后过敏树是 DEMO 样例说明仍在。
 
 | 你想证明 | 命令 |
 | --- | --- |

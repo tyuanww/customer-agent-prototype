@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.16] - 2026-09-20
+
+### Fixed
+
+- Dashboard import status polling is 1.5s and backs off on 429, so one Publish click no longer trips the 120-request-per-minute gate. xlsx parse escapes sheet relationship ids and skips out-of-range XML entities.
+
 ## [0.3.15] - 2026-09-20
 
 ### Added
