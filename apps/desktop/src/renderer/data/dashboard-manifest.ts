@@ -1,6 +1,5 @@
 import { deepFreeze } from '@shared/deep-freeze';
 import {
-  DASHBOARD_ARCHITECTURE_MARK,
   DASHBOARD_ENV_BADGES,
   DASHBOARD_METRIC_SCOPE,
   DASHBOARD_REFRESH_LABEL,
@@ -192,7 +191,7 @@ export type AnnounceRow = {
 export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'overview', label: '管理概览', blurb: '风险、责任与处理进度', group: '经营总览' },
   { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
-  { id: 'sop', label: 'SOP', blurb: '过敏流程只读合成树', group: '话术运营' },
+  { id: 'sop', label: 'SOP', blurb: '过敏流程预览 · 写库未接入', group: '话术运营' },
   { id: 'content', label: '内容管理', blurb: '草稿 · 审核 · 发布', group: '治理与架构' },
   { id: 'announce', label: '系统同步', blurb: '话术版本 / 软件版本更新', group: '治理与架构' },
 ]);

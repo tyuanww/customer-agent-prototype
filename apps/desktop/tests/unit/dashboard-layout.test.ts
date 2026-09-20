@@ -513,8 +513,9 @@ describe('dashboard layout contract', () => {
   });
 
   it('keeps announce simulation local, transient, and timer-cleaned', () => {
-    expect(announce).toContain('window.setTimeout');
-    expect(announce).toContain('window.clearTimeout');
+    expect(announce).toContain('dashboardWording');
+    expect(announce).not.toContain('window.setTimeout');
+    expect(announce).not.toContain('MOCK_SOFTWARE_VERSIONS');
     expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
   });
 

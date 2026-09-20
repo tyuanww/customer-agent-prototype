@@ -7,7 +7,6 @@ import {
   type DashboardContentSessionView,
 } from '@shared/dashboard-content';
 import {
-  parseCoachUploadCsv,
   readCoachUploadFile,
   type CoachUploadResult,
   type CoachUploadRow,
@@ -147,12 +146,6 @@ export function ContentModule() {
               ? ''
               : gate.message;
 
-  const loadDemo = () => {
-    ingestGeneration.current += 1;
-    setPublishFeedback(null);
-    setUpload(applyUploadResult(parseCoachUploadCsv(data.upload.demoCsv, data.upload.demoFileName)));
-  };
-
   const clearUpload = () => {
     ingestGeneration.current += 1;
     setPublishFeedback(null);
@@ -272,9 +265,7 @@ export function ContentModule() {
       </ol>
 
       <p className="dash-scope dash-scope-important" data-testid="formal-source-warning">
-        正式来源现状：产品、活动已有受控材料，但四域整体签发尚未完成。售前仍为
-        NOT_CREATED / UPSTREAM_AUTHORING。售后仅合成过敏树样例（DEMO），非正式签发，不接本页上传。
-        下列 release 仅演示“缺域即阻断”的产品合同，不代表正式四域已齐。
+        导入与发布走产品会话。没有会话时按钮保持未接入，不会写入假发布。
       </p>
 
       <section className="dash-card content-upload" data-testid="content-upload-panel" aria-labelledby="content-upload-title">
@@ -299,15 +290,6 @@ export function ContentModule() {
               onChange={onFileChange}
             />
           </label>
-          <button
-            type="button"
-            className="dash-action-primary"
-            data-testid="content-upload-demo"
-            disabled={upload.status === 'reading' || submitting}
-            onClick={loadDemo}
-          >
-            载入合成样例
-          </button>
           <button
             type="button"
             className="dash-reset"

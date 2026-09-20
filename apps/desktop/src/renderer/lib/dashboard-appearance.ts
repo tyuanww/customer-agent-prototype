@@ -55,7 +55,7 @@ export const DASHBOARD_THEME_OPTIONS = [
   { mode: 'system', label: '跟随系统' },
 ] as const satisfies ReadonlyArray<{ mode: DashboardThemeMode; label: string }>;
 
-export const DASHBOARD_TOPBAR_BOUNDARY = '无后端 · 不保存';
+export const DASHBOARD_TOPBAR_BOUNDARY = '';
 
 export const DASHBOARD_GLASS_SELECTORS = [
   '.dashboard-nav',

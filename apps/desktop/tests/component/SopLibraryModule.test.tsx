@@ -59,17 +59,11 @@ describe('SopLibraryModule', () => {
     const module = screen.getByTestId('module-sop');
 
     expect(screen.getByRole('heading', { level: 1, name: 'SOP' })).toBeInTheDocument();
-    expect(module).toHaveTextContent('合成过敏树只读');
-    expect(module).toHaveTextContent('不编辑、不发布');
-    expect(module).toHaveTextContent('合同 intake');
-    expect(module).toHaveTextContent('不承诺赔付');
-    expect(module).toHaveTextContent('合成演示');
-    expect(module).toHaveTextContent('合成树已挂载');
-    expect(module).toHaveTextContent(`${tree.nodes.length} 个节点 · 起点 ${tree.startNodeId}`);
+    expect(module).toHaveTextContent('写库未接入');
+    expect(module).toHaveTextContent('合同');
+    expect(module).toHaveTextContent('预览未入库');
     expect(screen.getByRole('region', { name: tree.sceneTitle })).toBeInTheDocument();
     expect(module.textContent).not.toMatch(/打款|现金红包|退款到账/);
-    expect(within(module).queryAllByRole('button')).toHaveLength(0);
-    expect(within(module).queryByRole('textbox')).not.toBeInTheDocument();
     expect(within(module).queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 

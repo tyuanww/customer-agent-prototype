@@ -44,7 +44,6 @@ import {
   DASHBOARD_RENDERED_NAV_WIDTH_VAR,
   DASHBOARD_STRUCTURE_BOUNDARY_VAR,
   resolveDashboardNavResizeIntent,
-  DASHBOARD_TOPBAR_BOUNDARY,
   getDashboardNavMaxWidth,
   isDashboardNavRailPhase,
   isDashboardNavStablePhase,
@@ -1124,18 +1123,9 @@ export function DashboardApp() {
             );
           })}
         </div>
-        <details className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
-          <summary>演示环境</summary>
-          <p data-testid="dashboard-boundary-disclaimer">
-            {DASHBOARD_MANIFEST.banners.disclaimer}
-          </p>
-          <dl>
-            <div><dt>权限</dt><dd>MOCK AUTH</dd></div>
-            <div><dt>数据</dt><dd>SYNTHETIC DATA</dd></div>
-            <div><dt>服务</dt><dd>NO BACKEND</dd></div>
-            <div><dt>存储</dt><dd>不保存</dd></div>
-          </dl>
-        </details>
+        <p className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
+          <span data-testid="dashboard-boundary-disclaimer">{DASHBOARD_MANIFEST.banners.disclaimer}</span>
+        </p>
         <div
           ref={navResizeHandleRef}
           className="dashboard-nav-resizer dashboard-no-drag"
@@ -1195,18 +1185,6 @@ export function DashboardApp() {
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
             <DashboardThemeMenu themeMode={themeMode} onChange={setThemeMode} />
-            <div className="dashboard-banners" aria-label="数据环境与边界">
-              <div className="env-badges" role="list" data-testid="dashboard-env-badges">
-                {DASHBOARD_MANIFEST.banners.env.map((badge) => (
-                  <span key={badge} className="env-badge" role="listitem">
-                    {badge}
-                  </span>
-                ))}
-              </div>
-              <p className="dashboard-disclaimer" data-testid="dashboard-disclaimer">
-                {DASHBOARD_TOPBAR_BOUNDARY}
-              </p>
-            </div>
           </div>
         </header>
         <main

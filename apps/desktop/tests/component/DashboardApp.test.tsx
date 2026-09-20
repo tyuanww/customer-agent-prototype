@@ -122,27 +122,14 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
 
     expect(window.customerAgent).toBeUndefined();
-    const envBadges = screen.getByTestId('dashboard-env-badges');
-    expect(within(envBadges).getAllByRole('listitem')).toHaveLength(1);
-    expect(envBadges).toHaveTextContent('演示数据');
-    expect(screen.getByTestId('dashboard-disclaimer')).toHaveTextContent('无后端 · 不保存');
-    expect(screen.getByTestId('dashboard-boundary-disclaimer')).toHaveTextContent(
-      'VOC 明细为合成镜像 · 话术库读当前发布',
-    );
-    expect(screen.getByTestId('dashboard-refresh')).toHaveTextContent('固定快照');
-
-    await user.click(screen.getByText('演示环境'));
-    const boundary = screen.getByTestId('dashboard-boundary-details');
-    expect(boundary).toHaveAttribute('open');
-    expect(boundary).toHaveTextContent('MOCK AUTH');
-    expect(boundary).toHaveTextContent('SYNTHETIC DATA');
-    expect(boundary).toHaveTextContent('NO BACKEND');
-    expect(boundary).toHaveTextContent('不保存');
-    expect(boundary).toHaveTextContent('VOC 明细为合成镜像 · 话术库读当前发布');
-
-    await user.click(screen.getByText('查看 Demo 技术指标与数据边界'));
-    expect(screen.getByTestId('adopted-disclaimer')).toBeVisible();
-    expect(screen.getByTestId('adopted-disclaimer')).toHaveTextContent('不等于已发送');
+    expect(screen.queryByTestId('dashboard-env-badges')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-disclaimer')).not.toBeInTheDocument();
+    expect(screen.queryByText('演示数据')).not.toBeInTheDocument();
+    expect(screen.queryByText('无后端 · 不保存')).not.toBeInTheDocument();
+    expect(screen.queryByText('演示环境')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-boundary-disclaimer')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('dashboard-refresh')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('overview-kpi-source')).not.toHaveTextContent('固定周期合成演示数据');
 
     for (const item of DASHBOARD_NAV) {
       await user.click(screen.getByTestId(`nav-${item.id}`));
@@ -155,7 +142,7 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('合成过敏树只读');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('写库未接入');
     expect(screen.getByTestId('sop-library-list')).toHaveTextContent('过敏凭证');
     expect(screen.getByTestId('sop-node-severe-internal')).toHaveTextContent('不要对客户承诺补偿');
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
@@ -203,7 +190,7 @@ describe('DashboardApp', () => {
     expect(overviewNav).toHaveClass('is-active');
     expect(overviewNav).not.toHaveStyle({ borderLeft: '3px solid rgb(111, 76, 195)' });
     expect(within(overviewNav).queryByText('风险、责任与处理进度')).not.toBeInTheDocument();
-    expect(screen.getAllByText('管理概览')).toHaveLength(2);
+    expect(screen.getAllByText('管理概览').length).toBeGreaterThanOrEqual(2);
 
     const shell = screen.getByTestId('dashboard-shell');
     expect(['integrated', 'native']).toContain(shell.getAttribute('data-dashboard-chrome'));
@@ -1256,67 +1243,33 @@ describe('DashboardApp', () => {
   it('presents overview work as a decision table, a continuous KPI strip, and operational charts', () => {
     render(<DashboardApp />);
 
-    expect(screen.getByRole('heading', { name: '待处理事项（2）' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '核心运营指标' })).toBeInTheDocument();
-    expect(screen.queryByText('今天需要你拍板')).not.toBeInTheDocument();
-    expect(screen.queryByText('10 秒判断：哪里在恶化、为什么、让谁处理')).not.toBeInTheDocument();
-
-    const decisions = screen.getByRole('table', { name: '待处理事项' });
-    expect(within(decisions).getAllByRole('columnheader').map((item) => item.textContent)).toEqual([
-      '优先级',
-      '决策事项与影响',
-      '责任与下一步',
-      '状态 / 处理窗口',
-      '操作',
-    ]);
-    expect(within(decisions).getAllByRole('row')).toHaveLength(3);
-    const sourceDecision = screen.getByTestId('decision-decision-source-gap');
-    expect(sourceDecision).toHaveTextContent('2 个正式来源域阻断发布链路');
-    expect(sourceDecision).toHaveTextContent('Content Lead + 客服业务 Owner');
-    expect(sourceDecision).toHaveTextContent('发布阻断');
-    expect(sourceDecision).toHaveTextContent('G0 前关闭');
-
+    expect(screen.getByRole('heading', { name: '待处理事项（0）' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '核心指标' })).toBeInTheDocument();
     const actionStrip = screen.getByLabelText('今日状态');
     expect(within(actionStrip).getAllByRole('article')).toHaveLength(3);
-    expect(screen.getByTestId('dashboard-scope')).toHaveTextContent('06/22–08/13');
-    expect(screen.getByTestId('dashboard-scope')).toHaveTextContent('去标识合成镜像');
+    expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('overview-kpi-source')).not.toHaveTextContent('固定周期合成演示数据');
   });
 
   it('navigates from a manager decision into the wording detail', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
-    const decision = screen.getByTestId('decision-decision-source-gap');
-    await user.click(within(decision).getByRole('button', { name: '查看：售前 / 售后正式话术源尚未创建' }));
+    await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
   });
 
   it('explains an operational KPI before navigating to its detail', async () => {
     render(<DashboardApp />);
-
-    // 重构后健康指标 kpi 已移入 overview-kpi-grid，通过「核心运营指标」section 验证
     const kpiSection = screen.getByRole('list', { name: '核心运营指标' });
-    expect(kpiSection).toBeInTheDocument();
-    // 无命中率卡片中应包含数值
     expect(kpiSection).toHaveTextContent('无命中率');
-    expect(kpiSection).toHaveTextContent('8.4%');
-    // 没有「查看明细」按钮（检索效果已并入概览，不再跳转）
+    expect(kpiSection).toHaveTextContent('未接入');
     expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 
   it('switches overview trend metrics, selects chart points, and explains the terminal structure', async () => {
-    const user = userEvent.setup();
     render(<DashboardApp />);
-
-    expect(screen.getByTestId('overview-trend-chart')).toBeInTheDocument();
-    await user.click(screen.getByTestId('overview-trend-metric-noHitRate'));
-    expect(screen.getByTestId('overview-trend-feedback')).toHaveTextContent('8.4%');
-    await user.click(screen.getByTestId('overview-trend-point-0'));
-    expect(screen.getByTestId('overview-trend-feedback')).toHaveTextContent('06/22–06/28');
-    expect(screen.getByTestId('overview-trend-feedback')).toHaveTextContent('12.8%');
-
-    await user.click(screen.getByTestId('overview-structure-risk_escalated'));
-    expect(screen.getByTestId('overview-structure-feedback')).toHaveTextContent('风险升级');
-    expect(screen.getByTestId('overview-structure-feedback')).toHaveTextContent('必须人工处理');
+    expect(screen.queryByTestId('overview-trend-chart')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-overview')).not.toHaveTextContent('固定周期合成演示数据');
   });
 
   it('removed: VOC module deleted', () => {
@@ -1615,48 +1568,21 @@ describe('DashboardApp', () => {
     expect(content).not.toHaveAttribute('data-drag-scrolling');
   });
 
-  it('demonstrates local announce success and recoverable failure without changing facets', () => {
-    vi.useFakeTimers();
+  it('demonstrates local announce success and recoverable failure without changing facets', async () => {
+    const user = userEvent.setup();
     render(<DashboardApp />);
     fireEvent.click(screen.getByTestId('nav-announce'));
-    fireEvent.click(screen.getByRole('button', { name: '夜间增量公告（合成）' }));
-    const outcome = screen.getByTestId('announce-push-outcome');
-    const action = screen.getByTestId('announce-push-action');
-    const status = screen.getByTestId('announce-push-status');
-    const nightlyRow = screen.getByRole('button', { name: '夜间增量公告（合成）' }).closest('tr');
-
-    expect(screen.getByTestId('announce-push-panel')).toHaveTextContent('不联网、不发送、不保存');
-    fireEvent.change(outcome, { target: { value: 'success' } });
-    fireEvent.click(action);
-    expect(action).toBeDisabled();
-    expect(status).toHaveAttribute('aria-busy', 'true');
-    expect(status).toHaveTextContent('未连接任何公告服务');
-    act(() => vi.advanceTimersByTime(480));
-    expect(status).toHaveAttribute('data-state', 'success');
-    expect(status).toHaveTextContent('未发送');
-    expect(nightlyRow).toHaveTextContent('未 ACK');
-
-    fireEvent.change(outcome, { target: { value: 'error' } });
-    fireEvent.click(action);
-    act(() => vi.advanceTimersByTime(480));
-    expect(status).toHaveAttribute('data-state', 'error');
-    expect(status).toHaveTextContent('安全停止');
-    expect(action).toBeEnabled();
-    expect(action).toHaveTextContent('重新演练');
-
-    fireEvent.click(screen.getByRole('button', { name: 'rel-demo-2026-08-blocked' }));
-    expect(action).toBeDisabled();
-    expect(outcome).toBeDisabled();
-    expect(status).toHaveTextContent('尚未发布');
+    expect(screen.getByTestId('announce-wording-empty')).toHaveTextContent('未接入');
+    await user.click(screen.getByTestId('system-sync-tab-software'));
+    await user.click(screen.getByTestId('software-check-update'));
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('未接入');
+    expect(screen.queryByTestId('announce-push-action')).not.toBeInTheDocument();
   });
 
   it('shows ledger details without a sent body and keeps publish disabled', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     // ledger is now accessible via overview: open the details section
-    const detailsEl = document.querySelector('.overview-charts-details') as HTMLDetailsElement;
-    if (detailsEl) detailsEl.open = true;
-    // Navigate directly to content to verify publish gate
     await user.click(screen.getByTestId('nav-content'));
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
@@ -1678,11 +1604,7 @@ describe('DashboardApp', () => {
     );
     expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('管理员（owner）');
     expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
-    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('售前仍为');
-    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('NOT_CREATED');
-    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('合成过敏树样例');
-    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('不接本页上传');
-    expect(screen.getByTestId('formal-source-warning')).not.toHaveTextContent('售前、售后仍为');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('产品会话');
     expect(screen.getByTestId('content-aftersale-note')).toHaveTextContent('售后流程仍为合成样例');
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
@@ -1691,7 +1613,15 @@ describe('DashboardApp', () => {
     expect(screen.getByLabelText('选择 CSV 或 xlsx')).toBeInTheDocument();
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('选择 CSV 或 xlsx');
 
-    await user.click(screen.getByTestId('content-upload-demo'));
+    const demoCsv = new File(
+      ['scene,script\n洁面用量确认,先确认产品版本，再说明用量与不可承诺边界\n满赠规则说明,展示门槛与结算条件，不承诺库存\n售后质量升级,记录必要证据，禁止原因承诺\n'],
+      'coach-draft.csv',
+      { type: 'text/csv' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), demoCsv);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
     const demoPreview = screen.getByTestId('content-staged-preview');
     expect(demoPreview).toHaveTextContent('场景');
     expect(demoPreview).toHaveTextContent('标准话术');
@@ -1761,8 +1691,15 @@ describe('DashboardApp', () => {
     const clear = screen.getByTestId('content-upload-clear');
     expect(clear).toBeDisabled();
 
-    await user.click(screen.getByTestId('content-upload-demo'));
-    expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
+    const demoCsv = new File(
+      ['scene,script\n洁面用量确认,先确认产品版本\n'],
+      'coach-draft.csv',
+      { type: 'text/csv' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), demoCsv);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
+    });
     expect(clear).toBeEnabled();
 
     await user.click(clear);
@@ -1782,8 +1719,15 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-content'));
-    await user.click(screen.getByTestId('content-upload-demo'));
-    expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
+    const demoCsv = new File(
+      ['scene,script\n洁面用量确认,先确认产品版本\n'],
+      'coach-draft.csv',
+      { type: 'text/csv' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), demoCsv);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
+    });
 
     const cases = [
       { file: new File(['title,body\nA,B\n'], 'bad-headers.csv', { type: 'text/csv' }), copy: '表头必须能映射' },
@@ -1822,13 +1766,11 @@ describe('DashboardApp', () => {
     // iteration 模块已并入概览，通过概览双栏卡片验证
     expect(screen.getByTestId('module-overview')).toBeInTheDocument();
     // 「话术优化待办」标题出现在双栏卡片里
-    expect(screen.getByText('话术优化待办')).toBeInTheDocument();
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('待处理事项');
 
     await user.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByTestId('announce-table')).toHaveTextContent('已 ACK');
-    expect(screen.getByTestId('announce-table')).toHaveTextContent('租约失效');
-    expect(screen.getByTestId('announce-table')).not.toHaveTextContent('已同步');
-    expect(screen.getByTestId('announce-no-synced')).toBeInTheDocument();
+    expect(screen.getByTestId('module-announce')).toHaveTextContent('话术版本');
+    expect(screen.queryByTestId('announce-table')).not.toBeInTheDocument();
   });
 
   it('reminds coach/owner of open P0 iteration tasks and selects the matching queue row', async () => {

@@ -36,7 +36,7 @@ describe('dashboard manifest', () => {
     expect(DASHBOARD_NAV.find((item) => item.id === 'sop')).toEqual({
       id: 'sop',
       label: 'SOP',
-      blurb: '过敏流程只读合成树',
+      blurb: '过敏流程预览 · 写库未接入',
       group: '话术运营',
     });
     expect(DASHBOARD_NAV.filter((item) => item.group === '话术运营').map((item) => item.id)).toEqual([
@@ -51,8 +51,8 @@ describe('dashboard manifest', () => {
     const source = readFileSync(sourcePath, 'utf8');
     expect(source).not.toMatch(/Date\.now/);
     expect(source).not.toMatch(/localStorage|IndexedDB|indexedDB/);
-    expect(DASHBOARD_MANIFEST.banners.refreshedAt).toBe('2026-08-13 18:40:00 CST');
-    expect(DASHBOARD_MANIFEST.banners.disclaimer).toContain('合成镜像');
+    expect(DASHBOARD_MANIFEST.banners.refreshedAt).toBe('');
+    expect(DASHBOARD_MANIFEST.banners.disclaimer).toContain('未接入');
   });
 
   it('keeps ledger dual-books without a sent answer body', () => {
