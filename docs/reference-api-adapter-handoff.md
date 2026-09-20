@@ -42,7 +42,7 @@ Dashboard renderer（无 customerAgent）
        └─ VOC / 工单 / KPI 不读 Float 输入，不写盘
 ```
 
-话术库不走上面这条 `DASHBOARD_MANIFEST` 链：独立 `dashboard.cjs` 暴露 `dashboardWording.list()`，读当前发布 hydrate。话术优化待办在有产品会话时走 `dashboardIteration` → Main → 冻结 `GET /v1/metrics/iteration-tasks` 与 `POST .../start|close`（仅 coach / owner；空列表合法）；无会话时 fail-closed，不回落 DEMO 5 条。从「话术不准」自动开单仍要 persist。
+话术库不走上面这条 `DASHBOARD_MANIFEST` 链：独立 `dashboard.cjs` 暴露 `dashboardWording.list()`，读当前发布 hydrate。话术优化待办在有产品会话时走 `dashboardIteration` → Main → 冻结 `GET /v1/metrics/iteration-tasks` 与 `POST .../start|close`（仅 coach / owner；空列表合法）；无会话时 fail-closed，不回落 DEMO 5 条。从「话术不准」自动开单仍要 persist。内容与发布的 zip xlsx 由 `dashboardContent.parseUpload` 在 Main 解析第一张表，预览转成 CSV 后再走既有 `POST /v1/content/import`；renderer 不直连导入端口，也不把二进制工作簿交给 API。
 
 正式一期拓扑是另一条链：
 

@@ -314,11 +314,11 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 内容与发布草稿（Dashboard 切片 1）
 
-「内容与发布」本地解析 CSV 或 xlsx 成待审核草稿。中文表头（快捷短语 / 产品话术 / 场景 / 标准话术）映射到场景与话术；空白行跳过。Publish 走现有 import/publish；一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。售后过敏树是 DEMO 样例说明仍在。
+「内容与发布」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。Publish 走现有 import/publish；一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。售后过敏树是 DEMO 样例说明仍在。
 
 | 你想证明 | 命令 |
 | --- | --- |
-| 草稿解析与正式来源文案 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/coach-content-upload.test.ts tests/component/DashboardApp.test.tsx tests/unit/query-visual.test.ts` |
+| 草稿解析、xlsx 第一张表与正式来源文案 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/coach-content-upload.test.ts tests/unit/xlsx-first-sheet.test.ts tests/unit/dashboard-content-parse.test.ts tests/unit/dashboard-content-preload.test.ts tests/unit/dashboard-content-ipc.test.ts tests/unit/content-frozen-import.test.ts tests/component/ContentModule.test.tsx tests/component/DashboardApp.test.tsx tests/unit/query-visual.test.ts` |
 
 ## 话术优化待办（Dashboard live list/start/close）
 
