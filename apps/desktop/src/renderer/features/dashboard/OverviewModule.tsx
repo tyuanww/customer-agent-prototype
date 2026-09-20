@@ -1,251 +1,225 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  DASHBOARD_MANIFEST,
-  type DashboardModuleId,
-  type OverviewStructureItem,
-  type OverviewTrendMetricId,
-} from '../../data/dashboard-manifest';
-import { StructureDonut, TrendChart } from './DashboardCharts';
+  ITERATION_COPY,
+  type DashboardIterationTask,
+} from '@shared/dashboard-iteration';
+import type { DashboardWordingView } from '@shared/dashboard-wording';
+import type { DashboardModuleId } from '../../data/dashboard-manifest';
 import { StatusBadge } from './StatusBadge';
 
-const data = DASHBOARD_MANIFEST.overview;
+const CAUSE_LABELS = {
+  content_gap: '内容缺口',
+  ranking: '排序问题',
+  stale: '过期仍召回',
+  mixed: '待判',
+} as const;
 
-function trendValue(point: (typeof data.trend)[number], metric: OverviewTrendMetricId): number {
-  if (metric === 'questions') return point.questions;
-  if (metric === 'noHitRate') return point.noHitRate;
-  return point.copyRate;
+function statusLabel(status: DashboardIterationTask['status']): string {
+  if (status === 'open') return '待处理';
+  if (status === 'in_progress') return '处理中';
+  if (status === 'resolved') return '已处理';
+  return '暂不处理';
 }
 
 export function OverviewModule({ onNavigate }: { onNavigate?: (target: DashboardModuleId) => void }) {
-  const [trendMetric, setTrendMetric] = useState<OverviewTrendMetricId>('questions');
-  const [trendIndex, setTrendIndex] = useState(data.trend.length - 1);
-  const [structureId, setStructureId] = useState<OverviewStructureItem['id']>('copied');
-  const [healthId, setHealthId] = useState(data.health[0].id);
-  const metric = data.trendMetrics.find((item) => item.id === trendMetric) ?? data.trendMetrics[0];
-  const trendPoint = data.trend[trendIndex] ?? data.trend.at(-1) ?? data.trend[0];
-  const structure = data.operationStructure.find((item) => item.id === structureId) ?? data.operationStructure[0];
-  const selectedHealth = data.health.find((item) => item.id === healthId) ?? data.health[0];
-  const trendDisplay = `${trendValue(trendPoint, trendMetric).toFixed(metric.decimals)}${metric.unit}`;
+  const [wording, setWording] = useState<DashboardWordingView | null>(null);
+  const [wordingReady, setWordingReady] = useState(false);
+  const [tasks, setTasks] = useState<readonly DashboardIterationTask[] | null>(null);
+  const [taskMessage, setTaskMessage] = useState('加载中…');
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const wordingApi = window.dashboardWording;
+    const iterationApi = window.dashboardIteration;
+    if (wordingApi) {
+      void wordingApi.list().then((result) => {
+        if (!live) return;
+        setWordingReady(true);
+        setWording(result.ok ? result : null);
+      }).catch(() => {
+        if (!live) return;
+        setWordingReady(true);
+        setWording(null);
+      });
+    } else {
+      setWordingReady(false);
+    }
+    if (!iterationApi) {
+      setTaskMessage('未接入');
+      return () => {
+        live = false;
+      };
+    }
+    void iterationApi.list().then((result) => {
+      if (!live) return;
+      if (!result.ok) {
+        setTasks(null);
+        setTaskMessage(result.message);
+        return;
+      }
+      setTasks(result.items);
+      setTaskMessage(result.items.length === 0 ? ITERATION_COPY.empty : '');
+    }).catch(() => {
+      if (!live) return;
+      setTasks(null);
+      setTaskMessage('未接入');
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const wordingConnected = Boolean(window.dashboardWording);
+  const iterationConnected = Boolean(window.dashboardIteration);
+  const openTasks = (tasks ?? []).filter((task) => task.status === 'open' || task.status === 'in_progress');
+  const catalogCount = wording?.total ?? 0;
+  const catalogDisplay = !wordingConnected
+    ? '未接入'
+    : !wordingReady
+      ? '—'
+      : wording
+        ? String(catalogCount)
+        : '未接入';
+  const connected = wordingConnected && iterationConnected;
 
   return (
     <div className="dash-module" data-testid="module-overview">
       <header className="dash-module-head overview-hero">
         <div>
-          <h1>运营概览</h1>
-          <p className="dash-kicker">最近 8 个固定周期 · 全渠道结构样例</p>
+          <h1>管理概览</h1>
+          <p className="dash-kicker">哪里在恶化、为什么、让谁处理</p>
         </div>
       </header>
 
-      <dl className="overview-scope-summary" aria-label="当前统计范围" data-testid="dashboard-scope">
-        <div><dt>统计周期</dt><dd>06/22–08/13 · 固定 8 期</dd></div>
-        <div><dt>业务范围</dt><dd>全渠道结构样例</dd></div>
-        <div><dt>数据级别</dt><dd>去标识合成镜像</dd></div>
+      <dl className="overview-scope-summary" data-testid="overview-scope">
+        <div>
+          <dt>统计范围</dt>
+          <dd>{connected ? '当前产品会话' : '未接入产品会话'}</dd>
+        </div>
+        <div>
+          <dt>待办</dt>
+          <dd>{iterationConnected ? '话术优化待办' : '未接入'}</dd>
+        </div>
+        <div>
+          <dt>话术条数</dt>
+          <dd>{wordingConnected ? '当前发布' : '未接入'}</dd>
+        </div>
+        <div>
+          <dt>检索账</dt>
+          <dd>未接入</dd>
+        </div>
       </dl>
 
-      <section className="manager-decision-panel" aria-labelledby="manager-decisions-title">
+      <section className="overview-kpi-grid" aria-labelledby="overview-kpi-title">
         <div className="dash-section-title">
-          <div><h2 id="manager-decisions-title">待处理决策（{data.decisions.length}）</h2></div>
-          <p>按阻断和风险排序，不做个人排名</p>
+          <div><h2 id="overview-kpi-title">核心指标</h2></div>
+          <p data-testid="overview-kpi-source">{connected ? '待办与话术条数来自产品会话' : '未接入产品会话'}</p>
         </div>
-        <div className="manager-decision-table" role="table" aria-label="待处理决策">
-          <div role="rowgroup" className="manager-decision-table-head">
-            <div role="row" className="manager-decision-row">
-              <span role="columnheader">优先级</span>
-              <span role="columnheader">决策事项与影响</span>
-              <span role="columnheader">责任与下一步</span>
-              <span role="columnheader">状态 / 处理窗口</span>
-              <span role="columnheader">操作</span>
-            </div>
+        <dl className="health-strip" role="list" aria-label="核心运营指标">
+          <div className="health-kpi" role="listitem" data-testid="overview-alert-nohit">
+            <dt>无命中率</dt>
+            <dd>未接入</dd>
+            <p>没有冻结检索账接口</p>
           </div>
-          <div role="rowgroup" className="manager-decision-list">
-            {data.decisions.map((item) => (
-              <div key={item.id} role="row" className="manager-decision-row manager-decision" data-testid={`decision-${item.id}`}>
-                <div role="cell" className="manager-decision-priority">
-                  <StatusBadge label={item.priority} tone={item.priority === 'P0' ? 'danger' : 'warn'} />
-                </div>
-                <div role="cell" className="manager-decision-main">
-                  <h3>{item.title}</h3>
-                  <p>{item.evidence}</p>
-                  <strong>{item.impact}</strong>
-                </div>
-                <div role="cell" className="manager-decision-owner">
-                  <dl>
-                    <div><dt>Owner</dt><dd>{item.owner}</dd></div>
-                    <div><dt>下一步</dt><dd>{item.nextStep}</dd></div>
-                  </dl>
-                </div>
-                <div role="cell" className="manager-decision-state">
-                  <strong>{item.statusLabel}</strong>
-                  <span>{item.reviewWindow}</span>
-                </div>
-                <div role="cell" className="manager-decision-action">
-                  <button
-                    type="button"
-                    aria-label={`查看：${item.title}`}
-                    onClick={() => onNavigate?.(item.target)}
-                  >
-                    查看
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="health-kpi" role="listitem">
+            <dt>复制完成率</dt>
+            <dd>未接入</dd>
+            <p>没有冻结检索账接口</p>
           </div>
-        </div>
+          <div className="health-kpi" role="listitem" data-testid="overview-alert-todos">
+            <dt>开放待办</dt>
+            <dd>{tasks ? String(openTasks.length) : '未接入'}</dd>
+            <p>话术优化待办</p>
+          </div>
+          <div className="health-kpi" role="listitem" data-testid="overview-alert-catalog">
+            <dt>当前发布条数</dt>
+            <dd>{catalogDisplay}</dd>
+            <p>{wording?.releaseId ? wording.releaseId : '与查询胶囊同一份目录'}</p>
+          </div>
+        </dl>
       </section>
 
-      <section className="overview-health">
+      <section className="overview-action-list" aria-labelledby="overview-decisions-title">
         <div className="dash-section-title">
-          <div><h2>数据质量与内容健康</h2></div>
-          <p>选择指标查看口径与明细入口</p>
+          <div><h2 id="overview-decisions-title">{tasks === null ? '待处理事项（未接入）' : `待处理事项（${openTasks.length}）`}</h2></div>
+          <p>来自话术优化待办</p>
         </div>
-        <div className="health-strip" role="list" aria-label="数据质量与内容健康指标" data-testid="overview-health-strip">
-          {data.health.map((item) => (
-            <article
-              key={item.id}
-              className={`health-kpi${item.id === selectedHealth.id ? ' is-selected' : ''}`}
-              role="listitem"
-              data-metric-id={item.id}
-            >
-              <button
-                type="button"
-                aria-pressed={item.id === selectedHealth.id}
-                data-testid={`overview-health-${item.id}`}
-                onClick={() => setHealthId(item.id)}
-              >
-                <span>{item.label}</span><strong>{item.value}</strong><small>{item.note}</small>
-              </button>
-            </article>
-          ))}
-        </div>
-        <div className="health-definition" role="status" aria-live="polite" data-testid="overview-health-definition">
-          <div>
-            <strong>{selectedHealth.label}</strong>
-            <span>{selectedHealth.period}</span>
-            <p>{selectedHealth.definition}</p>
+        {tasks === null ? (
+          <div className="dash-empty-state" data-testid="overview-todos-empty">
+            <strong>{taskMessage}</strong>
+            <span>没有产品会话时不展示待办数字。</span>
           </div>
-          {selectedHealth.target !== 'overview' ? (
-            <button type="button" onClick={() => onNavigate?.(selectedHealth.target)}>查看明细</button>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="overview-charts" aria-labelledby="overview-signal-title">
-        <div className="dash-section-title">
-          <div><h2 id="overview-signal-title">检索趋势与操作终态</h2></div>
-          <p>最近 8 个固定周期 · 选择指标或数据点查看口径</p>
-        </div>
-        <div className="overview-chart-grid">
-          <article className="dash-card dash-chart-card">
-            <div className="dash-chart-head">
-              <div>
-                <span className="dash-card-label">八周期趋势</span>
-                <h3>{metric.label}</h3>
-              </div>
-              <div className="dash-segmented" role="group" aria-label="选择概览趋势指标">
-                {data.trendMetrics.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={item.id === trendMetric ? 'is-active' : ''}
-                    aria-pressed={item.id === trendMetric}
-                    data-testid={`overview-trend-metric-${item.id}`}
-                    onClick={() => {
-                      setTrendMetric(item.id);
-                      setTrendIndex(data.trend.length - 1);
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+        ) : openTasks.length === 0 ? (
+          <div className="dash-empty-state" data-testid="overview-todos-empty">
+            <strong>{ITERATION_COPY.empty}</strong>
+          </div>
+        ) : (
+          <div className="manager-decision-table" role="table" aria-label="待处理事项">
+            <div role="rowgroup" className="manager-decision-table-head">
+              <div role="row" className="manager-decision-row">
+                <div role="columnheader">状态</div>
+                <div role="columnheader">事项</div>
+                <div role="columnheader">Owner</div>
+                <div role="columnheader">下一步</div>
               </div>
             </div>
-            <TrendChart
-              points={data.trend}
-              metric={trendMetric}
-              metricLabel={metric.label}
-              unit={metric.unit}
-              decimals={metric.decimals}
-              selectedIndex={trendIndex}
-              onSelect={setTrendIndex}
-            />
-            <div className="dash-chart-feedback" aria-live="polite" data-testid="overview-trend-feedback">
-              <div><strong>{trendPoint.range}</strong><span>{metric.label}</span></div>
-              <b>{trendDisplay}</b>
-              <p>{metric.explanation}</p>
+            <div role="rowgroup" className="manager-decision-list">
+              {openTasks.map((item) => (
+                <div key={item.taskId} role="row" className="manager-decision-row manager-decision" data-testid={`decision-${item.taskId}`}>
+                  <div role="cell" className="manager-decision-priority">
+                    <StatusBadge label={statusLabel(item.status)} tone={item.status === 'open' ? 'danger' : 'warn'} />
+                  </div>
+                  <div role="cell" className="manager-decision-main">
+                    <h3>{item.clusterKey}</h3>
+                    <p>{CAUSE_LABELS[item.suspectedCause]} · {item.signalId}</p>
+                  </div>
+                  <div role="cell" className="manager-decision-owner">
+                    <dl>
+                      <div><dt>指派</dt><dd>{item.assigneeRole && item.assigneeRole.length > 0 ? item.assigneeRole : '未指派'}</dd></div>
+                    </dl>
+                  </div>
+                  <div role="cell" className="manager-decision-action">
+                    <button
+                      type="button"
+                      disabled={busyId === item.taskId}
+                      onClick={() => {
+                        const api = window.dashboardIteration;
+                        if (!api) return;
+                        setBusyId(item.taskId);
+                        const request = item.status === 'open'
+                          ? api.start({ taskId: item.taskId, expectedVersion: item.version })
+                          : api.close({
+                            taskId: item.taskId,
+                            expectedVersion: item.version,
+                            status: 'resolved',
+                            resolutionNote: '概览关闭',
+                          });
+                        void request.then((result) => {
+                          setBusyId(null);
+                          if (!result.ok) {
+                            setTaskMessage(result.message);
+                            return;
+                          }
+                          setTasks((current) => (current ?? []).map((row) => (row.taskId === result.task.taskId ? result.task : row)));
+                        }).catch(() => {
+                          setBusyId(null);
+                          setTaskMessage('未接入');
+                        });
+                      }}
+                    >
+                      {item.status === 'open' ? '开始' : '关闭'}
+                    </button>
+                    <button type="button" className="dash-linkish" onClick={() => onNavigate?.('content')}>
+                      去内容管理
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          </article>
-
-          <article className="dash-card dash-chart-card">
-            <div className="dash-chart-head">
-              <div>
-                <span className="dash-card-label">检索终态结构</span>
-                <h3>346 次合成检索操作</h3>
-              </div>
-              <span className="dash-chart-context">四类终态分账</span>
-            </div>
-            <StructureDonut items={data.operationStructure} selectedId={structure.id} onSelect={setStructureId} />
-            <div className="dash-chart-feedback is-structure" aria-live="polite" data-testid="overview-structure-feedback">
-              <div><strong>{structure.label}</strong><span>{structure.count} 次</span></div>
-              <p>{structure.explanation}</p>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section className="overview-two-column">
-        <article className="dash-card">
-          <div className="dash-card-row">
-            <strong>重点 VOC 问题</strong>
-            <button type="button" className="dash-linkish" onClick={() => onNavigate?.('workorders')}>查看明细</button>
           </div>
-          <ol className="overview-ranked-list">
-            {DASHBOARD_MANIFEST.workorders.insights.slice(0, 4).map((item, index) => (
-              <li key={item.id}>
-                <span>{index + 1}</span>
-                <div><strong>{item.label}</strong><small>{item.count} 条合成镜像 · {item.owner}</small></div>
-                <em>{item.pct}%</em>
-              </li>
-            ))}
-          </ol>
-        </article>
-        <article className="dash-card">
-          <div className="dash-card-row">
-            <strong>四域来源健康</strong>
-            <button type="button" className="dash-linkish" onClick={() => onNavigate?.('wording')}>查看话术库</button>
-          </div>
-          <ul className="domain-health-list">
-            {DASHBOARD_MANIFEST.wording.domains.map((item) => (
-              <li key={item.id}>
-                <div><strong>{item.label}</strong><small>{item.sourceSummary}</small></div>
-                <StatusBadge
-                  label={item.readiness === 'upstream_authoring' ? '待建设' : '结构已确认'}
-                  tone={item.readiness === 'upstream_authoring' ? 'danger' : 'warn'}
-                />
-              </li>
-            ))}
-          </ul>
-        </article>
+        )}
       </section>
-
-      <details className="dash-contract-details overview-technical">
-        <summary>查看 Demo 技术指标与数据边界</summary>
-        <p className="dash-scope">{DASHBOARD_MANIFEST.banners.metricScope}</p>
-        <div className="dash-metric-grid compact">
-          {data.metrics.map((item) => (
-            <article key={item.id} className="dash-card" data-testid={`metric-${item.id}`}>
-              <p className="dash-card-label">{item.label}</p>
-              <p className="dash-card-value">
-                {item.value}{item.unit ? <span className="dash-card-unit">{item.unit}</span> : null}
-              </p>
-              <p className="dash-card-note">{item.sampleNote}</p>
-              {item.explanation ? (
-                <p className="dash-card-explain" data-testid="adopted-disclaimer">{item.explanation}</p>
-              ) : null}
-            </article>
-          ))}
-        </div>
-        <ul className="dash-notes">{data.notes.map((note) => <li key={note}>{note}</li>)}</ul>
-      </details>
     </div>
   );
 }

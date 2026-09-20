@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   DASHBOARD_MANIFEST,
-  DASHBOARD_DEFERRED_NAV,
   DASHBOARD_MODULE_IDS,
   DASHBOARD_NAV,
   listOpenP0IterationTasks,
@@ -17,53 +16,43 @@ const sourcePath = path.resolve(
 );
 
 describe('dashboard manifest', () => {
-  it('is deeply frozen compile-time data with ten decision-oriented modules', () => {
-    expect(DASHBOARD_MODULE_IDS).toHaveLength(10);
+  it('is deeply frozen compile-time data with five decision-oriented modules', () => {
+    expect(DASHBOARD_MODULE_IDS).toHaveLength(5);
     expect(DASHBOARD_NAV.map((item) => item.id)).toEqual([...DASHBOARD_MODULE_IDS]);
     expect(Object.isFrozen(DASHBOARD_MANIFEST)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.ledger.rows)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.overview.metrics[0])).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.wording.entries)).toBe(true);
-    expect(Object.isFrozen(DASHBOARD_MANIFEST.review.dimensions)).toBe(true);
-    expect(Object.isFrozen(DASHBOARD_MANIFEST.workorders.timeSlices)).toBe(true);
-    expect(Object.isFrozen(DASHBOARD_DEFERRED_NAV)).toBe(true);
   });
 
-  it('places SOP in 话术运营 between iteration and content', () => {
+  it('places SOP in 话术运营 between wording and content', () => {
     expect(DASHBOARD_MODULE_IDS).toEqual([
       'overview',
-      'workorders',
-      'ledger',
-      'review',
       'wording',
-      'iteration',
       'sop',
       'content',
       'announce',
-      'architecture',
     ]);
     expect(DASHBOARD_NAV.find((item) => item.id === 'sop')).toEqual({
       id: 'sop',
       label: 'SOP',
-      blurb: '过敏流程只读合成树',
+      blurb: '过敏流程预览 · 写库未接入',
       group: '话术运营',
     });
     expect(DASHBOARD_NAV.filter((item) => item.group === '话术运营').map((item) => item.id)).toEqual([
       'wording',
-      'iteration',
       'sop',
     ]);
-    expect(nextDashboardNavId('iteration', 1)).toBe('sop');
     expect(nextDashboardNavId('sop', 1)).toBe('content');
-    expect(nextDashboardNavId('sop', -1)).toBe('iteration');
+    expect(nextDashboardNavId('sop', -1)).toBe('wording');
   });
 
   it('does not invent live timestamps or persist anything', () => {
     const source = readFileSync(sourcePath, 'utf8');
     expect(source).not.toMatch(/Date\.now/);
     expect(source).not.toMatch(/localStorage|IndexedDB|indexedDB/);
-    expect(DASHBOARD_MANIFEST.banners.refreshedAt).toBe('2026-08-13 18:40:00 CST');
-    expect(DASHBOARD_MANIFEST.banners.disclaimer).toContain('合成镜像');
+    expect(DASHBOARD_MANIFEST.banners.refreshedAt).toBe('');
+    expect(DASHBOARD_MANIFEST.banners.disclaimer).toContain('未接入');
   });
 
   it('keeps ledger dual-books without a sent answer body', () => {
@@ -76,73 +65,10 @@ describe('dashboard manifest', () => {
     }
   });
 
-  it('keeps offline review as three separate evidence accounts without raw text', () => {
-    const review = DASHBOARD_MANIFEST.review;
-    expect(review.dimensions.map((dimension) => dimension.id)).toEqual([
-      'modified',
-      'sent',
-      'applicable',
-    ]);
-    expect(review.inferenceBoundary).toContain('不能推断已发送');
-    expect(review.inferenceBoundary).toContain('回答正确');
-    for (const dimension of review.dimensions) {
-      expect(dimension.reviewed).toBe(dimension.verifiable + dimension.unverifiable);
-      expect(dimension.outcomes.reduce((total, outcome) => total + outcome.count, 0)).toBe(
-        dimension.reviewed,
-      );
-      expect(dimension.outcomes.some((outcome) => outcome.id === 'unverifiable')).toBe(true);
-    }
-    expect(JSON.stringify(review)).not.toMatch(/answerText|customerText|order_id|image_url|sentBody/i);
-  });
-
-  it('marks search/events/content/workorders as redline and keeps LLM off', () => {
-    const redline = DASHBOARD_MANIFEST.architecture.ports
-      .filter((port) => 'redline' in port && port.redline)
-      .map((port) => port.id);
-    expect(redline).toEqual(['search', 'events', 'workorders', 'content']);
-    expect(DASHBOARD_MANIFEST.architecture.llm.detail).toContain('默认关闭');
-    expect(DASHBOARD_MANIFEST.architecture.llm.detail).toContain('绝不改写');
-  });
-
-  it('maps the phase-one implementation design with separate design, prototype, and formal axes', () => {
-    const implementation = DASHBOARD_MANIFEST.architecture.implementationDesign;
-    expect(implementation.flows.map((flow) => flow.id)).toEqual(['float', 'dashboard']);
-    expect(implementation.flows[0].steps.map((step) => step.code)).toEqual([
-      'A1', 'A2', 'A3', 'A4', 'A5', 'A6',
-    ]);
-    expect(implementation.flows[1].steps.map((step) => step.code)).toEqual([
-      'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7',
-    ]);
-    const steps = implementation.flows.flatMap((flow) => flow.steps);
-    expect(steps.every((step) => step.designStatus === 'mapped')).toBe(true);
-    expect(steps.every((step) => step.formalRuntimeStatus === 'not-started')).toBe(true);
-    expect(steps.find((step) => step.code === 'A2')).toMatchObject({
-      prototypeStatus: 'runtime-interactive',
-      prototypeStatusLabel: '本地合成运行',
-    });
-    expect(steps.find((step) => step.code === 'A4')).toMatchObject({
-      prototypeStatus: 'absent',
-      prototypeStatusLabel: '原型未实现',
-    });
-    expect(steps.find((step) => step.code === 'B1')).toMatchObject({
-      prototypeStatus: 'static-interactive',
-      prototypeStatusLabel: '静态合成交互',
-    });
-    expect(steps.find((step) => step.code === 'B4')).toMatchObject({
-      prototypeStatus: 'visual-only',
-      formalRuntimeStatus: 'not-started',
-    });
-    expect(DASHBOARD_MANIFEST.architecture.ports.every((port) => (
-      port.prototypeStatus === 'absent' && port.formalRuntimeStatus === 'not-started'
-    ))).toBe(true);
-    expect(implementation.guardrails.map((guardrail) => guardrail.id)).toEqual([
-      'human-in-loop',
-      'no-auto-send',
-      'no-new-port',
-      'synthetic-only',
-    ]);
-    expect(implementation.guardrails.find((guardrail) => guardrail.id === 'no-new-port')?.detail)
-      .toContain('不直连正式九端口');
+  it('removed offline review, architecture, and VOC/workorder modules', () => {
+    expect(DASHBOARD_MODULE_IDS).not.toContain('review');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('architecture');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('workorders');
   });
 
   it('blocks a four-domain release when product is missing', () => {
@@ -203,7 +129,6 @@ describe('dashboard manifest', () => {
     }
     expect(DASHBOARD_MANIFEST.overview.decisions.map((item) => item.priority)).toEqual([
       'P0',
-      'P0',
       'P1',
     ]);
   });
@@ -225,61 +150,15 @@ describe('dashboard manifest', () => {
     );
   });
 
-  it('keeps the VOC Pareto and product heatmap as aggregate-only synthetic structures', () => {
-    const workorders = DASHBOARD_MANIFEST.workorders;
-    expect(workorders.insights.reduce((sum, item) => sum + item.count, 0)).toBe(
-      workorders.batch.ticketCount,
-    );
-    for (const item of workorders.insights) {
-      expect(item.productBreakdown.reduce((sum, part) => sum + part.count, 0)).toBe(item.count);
-      expect(item.owner.length).toBeGreaterThan(0);
-      expect(item.nextStep.length).toBeGreaterThan(0);
-    }
-    expect(JSON.stringify(workorders.insights)).not.toMatch(
-      /customerText|commentText|mobile|order_id|receiver_address|image_url/i,
-    );
-  });
-
-  it('keeps every synthetic VOC time slice internally consistent and referentially valid', () => {
-    const workorders = DASHBOARD_MANIFEST.workorders;
-    const insightIds = new Set(workorders.insights.map((item) => item.id));
-    const productIds = new Set(workorders.productFilters.slice(1));
-
-    expect(new Set(workorders.timeSlices.map((slice) => slice.id)).size).toBe(
-      workorders.timeSlices.length,
-    );
-    expect(new Set(workorders.timeSlices.map((slice) => slice.grain))).toEqual(
-      new Set(['year', 'month', 'day']),
-    );
-    for (const slice of workorders.timeSlices) {
-      expect(slice.uniqueOrders).toBeLessThanOrEqual(slice.ticketCount);
-      expect(new Set(slice.issueCounts.map((item) => item.insightId)).size).toBe(
-        slice.issueCounts.length,
-      );
-      expect(slice.issueCounts.every((item) => insightIds.has(item.insightId))).toBe(true);
-      expect(
-        slice.issueCounts.every((item) => item.productBreakdown.every((part) => productIds.has(part.product))),
-      ).toBe(true);
-      expect(
-        slice.issueCounts.reduce(
-          (sliceTotal, item) => sliceTotal + item.productBreakdown.reduce(
-            (itemTotal, part) => itemTotal + part.count,
-            0,
-          ),
-          0,
-        ),
-      ).toBe(slice.ticketCount);
-    }
-  });
-
-  it('keeps deferred trash and announce simulation explicitly non-operational', () => {
-    expect(DASHBOARD_DEFERRED_NAV).toEqual([
-      expect.objectContaining({ id: 'workorder-trash', statusLabel: '二期待实施' }),
-    ]);
+  it('keeps offline review removed and announce simulation explicitly non-operational', () => {
     expect(DASHBOARD_MODULE_IDS).not.toContain('workorder-trash');
-    expect(nextDashboardNavId('overview', 1)).toBe('workorders');
-    expect(nextDashboardNavId('architecture', 1)).toBe('overview');
-    expect(nextDashboardNavId('overview', -1)).toBe('architecture');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('review');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('architecture');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('ledger');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('iteration');
+    expect(nextDashboardNavId('overview', 1)).toBe('wording');
+    expect(nextDashboardNavId('announce', 1)).toBe('overview');
+    expect(nextDashboardNavId('overview', -1)).toBe('announce');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不联网');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不发送');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不保存');

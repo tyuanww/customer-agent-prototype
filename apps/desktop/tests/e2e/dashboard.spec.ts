@@ -149,8 +149,8 @@ test('opens one isolated Dashboard from trusted desktop entries', async () => {
     const dashboard = await waitForRole(app, 'dashboard');
     await expect(dashboard.getByTestId('dashboard-shell')).toBeVisible();
     await expect(dashboard.getByTestId('module-overview')).toBeVisible();
-    await expect(dashboard.getByTestId('dashboard-env-badges')).toHaveText('演示数据');
-    await expect(dashboard.getByTestId('dashboard-disclaimer')).toHaveText('无后端 · 不保存');
+    await expect(dashboard.getByTestId('dashboard-env-badges')).toHaveCount(0);
+    await expect(dashboard.getByTestId('dashboard-disclaimer')).toHaveCount(0);
     await expect(dashboard.getByTestId('dashboard-boundary-disclaimer')).toContainText(
       'VOC 明细为合成镜像 · 话术库读当前发布',
     );
@@ -200,7 +200,7 @@ test('opens one isolated Dashboard from trusted desktop entries', async () => {
       transparent: false,
       hasPreload: true,
       closable: true,
-      title: '客服运营工作台 · 演示数据',
+      title: '客服运营工作台',
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
       integratedChrome: process.platform === 'darwin',
     });

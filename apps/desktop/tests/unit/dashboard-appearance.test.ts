@@ -270,7 +270,7 @@ describe('dashboard appearance contract', () => {
     expect(isDashboardNavStructureTransition(shell, shell, 'grid-template-columns')).toBe(true);
     expect(isDashboardNavStructureTransition(child, shell, 'grid-template-columns')).toBe(false);
     expect(isDashboardNavStructureTransition(shell, shell, 'opacity')).toBe(false);
-    expect(DASHBOARD_TOPBAR_BOUNDARY).toBe('无后端 · 不保存');
+    expect(DASHBOARD_TOPBAR_BOUNDARY).toBe('');
     expect(DASHBOARD_GLASS_SELECTORS).toEqual([
       '.dashboard-nav',
       '.dashboard-nav-tooltip',

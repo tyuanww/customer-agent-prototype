@@ -65,6 +65,16 @@ describe('dashboard layout contract', () => {
     expect(charts).not.toContain('<linearGradient');
     expect(css).not.toContain('#000000');
     expect(css).not.toContain('#111014');
+    expect(css).toContain('.health-kpi dt');
+    expect(css).toContain('.content-pipeline-steps');
+    expect(css).toContain('.system-sync-tabs');
+    expect(css).toContain('.dash-publish:disabled');
+    expect(css).toContain('background: var(--dash-purple)');
+    expect(css).not.toContain('.overview-action-strip');
+    expect(css).not.toContain('.overview-action-card');
+    expect(css).toContain('.dashboard-shell button.dash-reset');
+    expect(css).toContain('font-size: 14px');
+    expect(css).toContain('font-weight: 600');
   });
 
   it('contains scroll inside the content region without global horizontal overflow', () => {
@@ -345,7 +355,6 @@ describe('dashboard layout contract', () => {
     expect(app).toContain('data-nav-phase={navPhase}');
     expect(app).toContain('useLayoutEffect');
     expect(app).toContain('focus({ preventScroll: true })');
-    expect(app).toContain('aria-disabled="true"');
     expect(app).toContain('role="separator"');
     expect(app).toContain('aria-label="调整工作台侧栏宽度"');
     expect(app).toContain('aria-valuemin={separatorAria.valuemin}');
@@ -514,22 +523,21 @@ describe('dashboard layout contract', () => {
   });
 
   it('keeps announce simulation local, transient, and timer-cleaned', () => {
-    expect(announce).toContain('window.setTimeout');
-    expect(announce).toContain('window.clearTimeout');
+    expect(announce).toContain('dashboardWording');
+    expect(announce).not.toContain('window.setTimeout');
+    expect(announce).not.toContain('MOCK_SOFTWARE_VERSIONS');
     expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
   });
 
   it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
     expect(app).toContain('sop: SopLibraryModule');
     expect(app).toContain("sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3']");
-    expect(sopLibrary).toContain('allergySopTree()');
+    expect(sopLibrary).not.toContain('allergySopTree()');
     expect(sopLibrary).toContain('data-testid="module-sop"');
-    expect(sopLibrary).toContain('data-testid="sop-library-list"');
-    expect(sopLibrary).toContain('dashboardContent');
-    expect(sopLibrary).toContain('api.session()');
+    expect(sopLibrary).toContain('data-testid="sop-library-empty"');
+    expect(sopLibrary).toContain('未接入');
     expect(sopLibrary).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB/);
     expect(sopLibrary).not.toContain('publishDraft');
-    expect(css).toContain('.sop-library-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }');
   });
 
   it('loads iteration tasks through dashboardIteration and never fetch or inaccuracy-reports', () => {

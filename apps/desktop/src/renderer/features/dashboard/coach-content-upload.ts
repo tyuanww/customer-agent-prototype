@@ -16,7 +16,7 @@ import {
 } from '@shared/coach-content-upload';
 
 const BINARY_MESSAGE =
-  '当前切片只在本页读取 CSV 文本表。二进制 Excel 未解析，也未连接飞书或 Wiki。可改用合成样例按钮。';
+  '当前切片只在本页读取 CSV 文本表。二进制 Excel 未解析，也未连接飞书或 Wiki。';
 
 function fail(code: 'unsupported-type' | 'too-large' | 'binary-workbook', message: string): CoachUploadResult {
   return Object.freeze({ ok: false, code, message });

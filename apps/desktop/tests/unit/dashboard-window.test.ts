@@ -57,7 +57,7 @@ describe('dashboard window contract', () => {
       spellcheck: false,
     });
     expect('preload' in DASHBOARD_WINDOW_SECURITY).toBe(false);
-    expect(DASHBOARD_WINDOW_TITLE).toBe('客服运营工作台 · 演示数据');
+    expect(DASHBOARD_WINDOW_TITLE).toBe('客服运营工作台');
   });
 
   it('hides the native macOS title text with hiddenInset while keeping Windows and Linux native', () => {
@@ -139,9 +139,9 @@ describe('dashboard window contract', () => {
   });
 
   it('uses one visible demo marker while keeping the non-Dafuyan boundary explicit', () => {
-    expect(DASHBOARD_ENV_BADGES).toEqual(['演示数据']);
+    expect(DASHBOARD_ENV_BADGES).toEqual([]);
     expect(DASHBOARD_STRUCTURE_DISCLAIMER).toBe(
-      '无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读当前发布',
+      '未接入产品会话时不展示数字。话术库读当前发布；没有冻结合同命令的写操作保持未接入。',
     );
   });
 });

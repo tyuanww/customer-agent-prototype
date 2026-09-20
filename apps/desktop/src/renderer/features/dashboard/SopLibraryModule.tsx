@@ -1,93 +1,53 @@
-import { useEffect, useState } from 'react';
-import { allergySopTree } from '@shared/synthetic-sops';
-import type { SopNodeKind } from '@shared/sop-window';
-import { StatusBadge } from './StatusBadge';
+import { type ChangeEvent, useRef, useState } from 'react';
 
-function nodeKindLabel(kind: SopNodeKind): string {
-  if (kind === 'copyable') return '可复制话术';
-  if (kind === 'decision') return '分支';
-  return '内部停手';
-}
-
-function privilegedFromSession(role: string | null | undefined, signedIn: boolean | undefined): boolean {
-  return signedIn === true && (role === 'coach' || role === 'owner');
-}
+const WRITE_UNAVAILABLE = '未接入：SOP 持久化需要 contracts:intake，当前没有写库命令。';
 
 export function SopLibraryModule() {
-  const tree = allergySopTree();
-  const [privileged, setPrivileged] = useState(false);
-
-  useEffect(() => {
-    const api = window.dashboardContent;
-    if (!api) {
-      setPrivileged(false);
-      return undefined;
-    }
-    let live = true;
-    let generation = 0;
-    const load = () => {
-      const current = ++generation;
-      void api.session().then((result) => {
-        if (!live || current !== generation) return;
-        setPrivileged(result.ok === true && privilegedFromSession(result.role, result.signedIn));
-      }).catch(() => {
-        if (!live || current !== generation) return;
-        setPrivileged(false);
-      });
-    };
-    load();
-    window.addEventListener('focus', load);
-    return () => {
-      live = false;
-      window.removeEventListener('focus', load);
-    };
-  }, []);
+  const [writeMessage, setWriteMessage] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const refuseWrite = () => setWriteMessage(WRITE_UNAVAILABLE);
 
   return (
     <div className="dash-module" data-testid="module-sop">
       <header className="dash-module-head">
         <div>
           <h1>SOP</h1>
-          <p className="dash-kicker">合成过敏树只读 · 不编辑、不发布</p>
+          <p className="dash-kicker">写库未接入 · 不展示合成树当正式目录</p>
         </div>
-        <StatusBadge label="合成演示" tone="mock" />
       </header>
       <p className="dash-scope dash-scope-important">
-        只读浏览坐席窗同一份过敏售后树。持久化与话术师更新要等合同 intake。过敏步骤含停手文案，不承诺赔付。
+        上传、更新、删除、导出、自定义步骤都需要 SOP 持久化合同。没有写库接口时按钮不会假装成功，也不用合成过敏树冒充已入库目录。
       </p>
-      <section className="sop-library" aria-label={tree.sceneTitle}>
-        <div className="source-readiness">
-          <div>
-            <span className="dash-card-label">当前场景</span>
-            <strong>{tree.sceneTitle}</strong>
-          </div>
-          <StatusBadge label="合成树已挂载" tone="warn" />
-          <p>{tree.nodes.length} 个节点 · 起点 {tree.startNodeId}</p>
-        </div>
-        <ol className="sop-library-list" data-testid="sop-library-list">
-          {tree.nodes.map((node) => (
-            <li key={node.id} className="sop-library-node" data-testid={`sop-node-${node.id}`}>
-              <div className="sop-library-node-head">
-                <StatusBadge label={nodeKindLabel(node.kind)} tone={node.kind === 'internal' ? 'danger' : 'neutral'} />
-                {node.riskLevel === 'high' ? <StatusBadge label="高风险" tone="danger" /> : null}
-                <strong>{node.scopeLabel ?? node.prompt ?? node.id}</strong>
-              </div>
-              <p>{node.answerText || node.prompt}</p>
-              {privileged && node.internalNote ? (
-                <p className="sop-library-note">{node.internalNote}</p>
-              ) : null}
-              {privileged && node.internalTask ? (
-                <p className="sop-library-stop">{node.internalTask}</p>
-              ) : null}
-              {node.edges.length > 0 ? (
-                <p className="sop-library-edges">
-                  分支：{node.edges.map((edge) => edge.label).join(' / ')}
-                </p>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      </section>
+      <div className="dash-filter-toolbar" aria-label="SOP 写操作">
+        <input
+          ref={uploadRef}
+          data-testid="sop-upload-input"
+          type="file"
+          accept=".csv,.xlsx"
+          hidden
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            event.target.value = '';
+            refuseWrite();
+          }}
+        />
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="sop-upload"
+          onClick={() => uploadRef.current?.click()}
+        >
+          上传
+        </button>
+        <button type="button" className="dash-reset" data-testid="sop-update" onClick={refuseWrite}>更新</button>
+        <button type="button" className="dash-reset" data-testid="sop-delete" onClick={refuseWrite}>删除</button>
+        <button type="button" className="dash-reset" data-testid="sop-export" onClick={refuseWrite}>导出</button>
+        <button type="button" className="dash-reset" data-testid="sop-custom-step" onClick={refuseWrite}>自定义步骤</button>
+      </div>
+      {writeMessage ? <p className="dash-scope" data-testid="sop-write-status">{writeMessage}</p> : null}
+      <div className="dash-empty-state" data-testid="sop-library-empty">
+        <strong>未接入 SOP 库</strong>
+        <span>坐席过敏窗仍可用预览树；工作台不把合成树当作可运营目录。</span>
+      </div>
     </div>
   );
 }

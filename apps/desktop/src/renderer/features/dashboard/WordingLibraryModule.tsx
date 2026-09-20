@@ -1,18 +1,26 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
-  DASHBOARD_MANIFEST,
   type DomainId,
   type WordingEntry,
   type WordingLifecycle,
 } from '../../data/dashboard-manifest';
 import type { DashboardWordingView } from '@shared/dashboard-wording';
+import { bindingsForRows } from '@shared/dashboard-content';
 import {
   paginateWording,
   wordingPublishedCsv,
 } from '@shared/wording-library-browse';
+import { readCoachUploadFile } from './coach-content-upload';
 import { StatusBadge } from './StatusBadge';
 
-const data = DASHBOARD_MANIFEST.wording;
+const WRITE_UNAVAILABLE = '未接入：冻结合同没有单条更新/删除命令。';
+
+const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
+  { id: 'product', label: '产品话术' },
+  { id: 'campaign', label: '活动话术' },
+  { id: 'presale', label: '售前流程' },
+  { id: 'aftersale', label: '售后流程' },
+];
 
 function riskTone(risk: WordingEntry['risk']): 'ok' | 'warn' | 'danger' {
   return risk === 'low' ? 'ok' : risk === 'medium' ? 'warn' : 'danger';
@@ -53,6 +61,8 @@ export function WordingLibraryModule() {
   const [domain, setDomain] = useState<DomainId>('product');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [writeMessage, setWriteMessage] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let live = true;
@@ -60,8 +70,11 @@ export function WordingLibraryModule() {
     if (!api) return undefined;
     const load = () => {
       void api.list().then((result) => {
-        if (!live || !result.ok) return;
-        setCatalog(result);
+        if (!live) return;
+        setCatalog(result.ok ? result : null);
+      }).catch(() => {
+        if (!live) return;
+        setCatalog(null);
       });
     };
     load();
@@ -78,7 +91,7 @@ export function WordingLibraryModule() {
   );
   const live = catalog !== null;
 
-  const source = data.domains.find((item) => item.id === domain) ?? data.domains[0];
+  const source = WORDING_DOMAINS.find((item) => item.id === domain) ?? WORDING_DOMAINS[0];
   const domainCount = entries.filter((entry) => entry.domain === domain).length;
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('zh-CN');
@@ -101,15 +114,15 @@ export function WordingLibraryModule() {
   };
 
   const handleDomainKeyDown = (event: KeyboardEvent<HTMLButtonElement>, current: DomainId) => {
-    const currentIndex = data.domains.findIndex((item) => item.id === current);
+    const currentIndex = WORDING_DOMAINS.findIndex((item) => item.id === current);
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % data.domains.length;
-    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + data.domains.length) % data.domains.length;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % WORDING_DOMAINS.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + WORDING_DOMAINS.length) % WORDING_DOMAINS.length;
     if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = data.domains.length - 1;
+    if (event.key === 'End') nextIndex = WORDING_DOMAINS.length - 1;
     if (nextIndex === null) return;
     event.preventDefault();
-    const next = data.domains[nextIndex];
+    const next = WORDING_DOMAINS[nextIndex];
     chooseDomain(next.id);
     window.requestAnimationFrame(() => {
       document.getElementById(`wording-tab-${next.id}`)?.focus();
@@ -122,7 +135,7 @@ export function WordingLibraryModule() {
       ? '当前发布已挂载'
       : '当前发布无此域';
   const sourceSummary = !live
-    ? '工作台只读通道未接通。VOC / 工单仍是架构模拟。'
+    ? '未接入当前发布通道。'
     : domainCount > 0
       ? `${domainCount} 条 · 与查询胶囊同一份当前发布`
       : '当前域在当前发布中没有条目。';
@@ -131,16 +144,74 @@ export function WordingLibraryModule() {
     <div className="dash-module" data-testid="module-wording">
       <header className="dash-module-head">
         <div>
-          <h1>{data.title}</h1>
-          <p className="dash-kicker">当前发布只读 · 与查询胶囊同一份目录</p>
+          <h1>话术库</h1>
+          <p className="dash-kicker">列表读当前发布 · 上传走内容导入 · 单条改删未接入</p>
         </div>
       </header>
       <p className="dash-scope dash-scope-important">
-        只读浏览当前发布话术。不复制、不编辑、不发布、不发送。VOC / 工单仍是架构模拟。
+        浏览与导出当前发布。上传会调用产品导入接口。单条更新/删除没有冻结合同，按钮保持未接入。
       </p>
+      <div className="dash-filter-toolbar" aria-label="话术写操作">
+        <input
+          ref={uploadRef}
+          data-testid="wording-upload-input"
+          type="file"
+          accept=".csv,.xlsx"
+          hidden
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file) return;
+            const api = window.dashboardContent;
+            if (!api) {
+              setWriteMessage('未接入：没有内容导入通道。');
+              return;
+            }
+            void readCoachUploadFile(file).then(async (parsed) => {
+              if (!parsed.ok) {
+                setWriteMessage(parsed.message);
+                return;
+              }
+              const result = await api.importDraft({
+                csvText: parsed.csvText,
+                sourceName: parsed.sourceName,
+                sourceBindings: bindingsForRows(parsed.rows),
+              });
+              setWriteMessage(result.ok ? `已导入草稿 ${result.importBatchId}` : result.message);
+            }).catch(() => {
+              setWriteMessage('未接入');
+            });
+          }}
+        />
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="wording-upload"
+          onClick={() => uploadRef.current?.click()}
+        >
+          上传
+        </button>
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="wording-update"
+          onClick={() => setWriteMessage(WRITE_UNAVAILABLE)}
+        >
+          更新
+        </button>
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="wording-delete"
+          onClick={() => setWriteMessage(WRITE_UNAVAILABLE)}
+        >
+          删除
+        </button>
+      </div>
+      {writeMessage ? <p className="dash-scope" data-testid="wording-write-status">{writeMessage}</p> : null}
 
       <div className="wording-domain-tabs" role="tablist" aria-label="话术域">
-        {data.domains.map((item) => (
+        {WORDING_DOMAINS.map((item) => (
           <button
             key={item.id}
             id={`wording-tab-${item.id}`}
@@ -254,7 +325,7 @@ export function WordingLibraryModule() {
           )) : (
             <div className="dash-empty-state" data-testid="wording-empty">
               <strong>{live ? '没有匹配的话术' : '本机话术库未挂载'}</strong>
-              <span>{live ? '换一个域或清空筛选后再看。' : '工作台只读通道未接通，不会回退到合成样例。'}</span>
+              <span>{live ? '换一个域或清空筛选后再看。' : '未接入当前发布，不回退本地样例。'}</span>
             </div>
           )}
           {visible.length > 0 ? (
@@ -297,7 +368,7 @@ export function WordingLibraryModule() {
                 <div><dt>有效窗</dt><dd>{selected.effectiveWindow}</dd></div>
                 <div><dt>来源</dt><dd>{selected.ownerRole}</dd></div>
               </dl>
-              <p className="dash-footnote">只读浏览 · 不复制、不编辑、不发布、不发送</p>
+              <p className="dash-footnote">列表来自当前发布。单条更新/删除未接入冻结合同。</p>
             </>
           ) : (
             <p className="dash-empty">选择一条话术查看正文</p>
