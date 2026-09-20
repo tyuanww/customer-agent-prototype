@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
-  DASHBOARD_MANIFEST,
   type DomainId,
   type WordingEntry,
   type WordingLifecycle,
@@ -16,7 +15,12 @@ import { StatusBadge } from './StatusBadge';
 
 const WRITE_UNAVAILABLE = '未接入：冻结合同没有单条更新/删除命令。';
 
-const data = DASHBOARD_MANIFEST.wording;
+const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
+  { id: 'product', label: '产品话术' },
+  { id: 'campaign', label: '活动话术' },
+  { id: 'presale', label: '售前流程' },
+  { id: 'aftersale', label: '售后流程' },
+];
 
 function riskTone(risk: WordingEntry['risk']): 'ok' | 'warn' | 'danger' {
   return risk === 'low' ? 'ok' : risk === 'medium' ? 'warn' : 'danger';
@@ -83,7 +87,7 @@ export function WordingLibraryModule() {
   );
   const live = catalog !== null;
 
-  const source = data.domains.find((item) => item.id === domain) ?? data.domains[0];
+  const source = WORDING_DOMAINS.find((item) => item.id === domain) ?? WORDING_DOMAINS[0];
   const domainCount = entries.filter((entry) => entry.domain === domain).length;
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('zh-CN');
@@ -106,15 +110,15 @@ export function WordingLibraryModule() {
   };
 
   const handleDomainKeyDown = (event: KeyboardEvent<HTMLButtonElement>, current: DomainId) => {
-    const currentIndex = data.domains.findIndex((item) => item.id === current);
+    const currentIndex = WORDING_DOMAINS.findIndex((item) => item.id === current);
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % data.domains.length;
-    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + data.domains.length) % data.domains.length;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % WORDING_DOMAINS.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + WORDING_DOMAINS.length) % WORDING_DOMAINS.length;
     if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = data.domains.length - 1;
+    if (event.key === 'End') nextIndex = WORDING_DOMAINS.length - 1;
     if (nextIndex === null) return;
     event.preventDefault();
-    const next = data.domains[nextIndex];
+    const next = WORDING_DOMAINS[nextIndex];
     chooseDomain(next.id);
     window.requestAnimationFrame(() => {
       document.getElementById(`wording-tab-${next.id}`)?.focus();
@@ -127,7 +131,7 @@ export function WordingLibraryModule() {
       ? '当前发布已挂载'
       : '当前发布无此域';
   const sourceSummary = !live
-    ? '工作台只读通道未接通。VOC / 工单仍是架构模拟。'
+    ? '未接入当前发布通道。'
     : domainCount > 0
       ? `${domainCount} 条 · 与查询胶囊同一份当前发布`
       : '当前域在当前发布中没有条目。';
@@ -136,7 +140,7 @@ export function WordingLibraryModule() {
     <div className="dash-module" data-testid="module-wording">
       <header className="dash-module-head">
         <div>
-          <h1>{data.title}</h1>
+          <h1>话术库</h1>
           <p className="dash-kicker">列表读当前发布 · 上传走内容导入 · 单条改删未接入</p>
         </div>
       </header>
@@ -195,7 +199,7 @@ export function WordingLibraryModule() {
       {writeMessage ? <p className="dash-scope" data-testid="wording-write-status">{writeMessage}</p> : null}
 
       <div className="wording-domain-tabs" role="tablist" aria-label="话术域">
-        {data.domains.map((item) => (
+        {WORDING_DOMAINS.map((item) => (
           <button
             key={item.id}
             id={`wording-tab-${item.id}`}
@@ -309,7 +313,7 @@ export function WordingLibraryModule() {
           )) : (
             <div className="dash-empty-state" data-testid="wording-empty">
               <strong>{live ? '没有匹配的话术' : '本机话术库未挂载'}</strong>
-              <span>{live ? '换一个域或清空筛选后再看。' : '工作台只读通道未接通，不会回退到合成样例。'}</span>
+              <span>{live ? '换一个域或清空筛选后再看。' : '未接入当前发布，不回退 fixture。'}</span>
             </div>
           )}
           {visible.length > 0 ? (

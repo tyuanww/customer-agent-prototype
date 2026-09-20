@@ -94,6 +94,7 @@ describe('dashboard live actions', () => {
     expect(screen.getByTestId('sop-write-status')).toHaveTextContent('未接入');
     await user.click(screen.getByTestId('sop-export'));
     expect(screen.getByTestId('sop-write-status')).toHaveTextContent('contracts:intake');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
   });
 
   it('does not render fixture content releases when there is no live publish', async () => {

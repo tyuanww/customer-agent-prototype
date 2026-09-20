@@ -256,7 +256,7 @@ export function ContentModule() {
           <p data-testid="content-upload-draft-copy">{data.upload.draftOnlyCopy}</p>
           <p data-testid="content-upload-role-note">{data.upload.roleNote}</p>
           <p data-testid="content-upload-boundary">{data.upload.boundaryCopy}</p>
-          <p data-testid="content-aftersale-note">{data.upload.aftersaleNote}</p>
+          <p data-testid="content-aftersale-note">售后 SOP 写库未接入，本页不展开合成树。</p>
         </div>
 
         <div className="dash-filter-toolbar compact content-upload-controls" aria-label="话术师上传">

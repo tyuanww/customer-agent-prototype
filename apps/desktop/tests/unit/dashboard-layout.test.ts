@@ -522,14 +522,12 @@ describe('dashboard layout contract', () => {
   it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
     expect(app).toContain('sop: SopLibraryModule');
     expect(app).toContain("sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3']");
-    expect(sopLibrary).toContain('allergySopTree()');
+    expect(sopLibrary).not.toContain('allergySopTree()');
     expect(sopLibrary).toContain('data-testid="module-sop"');
-    expect(sopLibrary).toContain('data-testid="sop-library-list"');
-    expect(sopLibrary).toContain('dashboardContent');
-    expect(sopLibrary).toContain('api.session()');
+    expect(sopLibrary).toContain('data-testid="sop-library-empty"');
+    expect(sopLibrary).toContain('未接入');
     expect(sopLibrary).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB/);
     expect(sopLibrary).not.toContain('publishDraft');
-    expect(css).toContain('.sop-library-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }');
   });
 
   it('loads iteration tasks through dashboardIteration and never fetch or inaccuracy-reports', () => {

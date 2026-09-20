@@ -143,8 +143,8 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
     expect(screen.getByTestId('module-sop')).toHaveTextContent('写库未接入');
-    expect(screen.getByTestId('sop-library-list')).toHaveTextContent('过敏凭证');
-    expect(screen.getByTestId('sop-node-severe-internal')).toHaveTextContent('不要对客户承诺补偿');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
+    expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 
@@ -1607,7 +1607,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('管理员（owner）');
     expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
     expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('产品会话');
-    expect(screen.getByTestId('content-aftersale-note')).toHaveTextContent('售后流程仍为合成样例');
+    expect(screen.getByTestId('content-aftersale-note')).toHaveTextContent('SOP 写库未接入');
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
     expect(screen.getByTestId('content-upload-input')).toHaveAttribute('accept', '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
