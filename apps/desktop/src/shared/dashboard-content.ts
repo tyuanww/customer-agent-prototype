@@ -15,6 +15,22 @@ export type DashboardContentBinding = Readonly<{
   source_version_id: string;
 }>;
 
+/** Registered by `scripts/synthetic-stack/bootstrap.ts`. Not invented client-side IDs. */
+export const STACK_SOURCE_BINDINGS: readonly DashboardContentBinding[] = Object.freeze([
+  Object.freeze({ domain: 'presale', source_version_id: 'srcv_stack_presale_v1' }),
+  Object.freeze({ domain: 'campaign', source_version_id: 'srcv_stack_campaign_v1' }),
+  Object.freeze({ domain: 'aftersale', source_version_id: 'srcv_stack_aftersale_v1' }),
+  Object.freeze({ domain: 'product', source_version_id: 'srcv_stack_product_v1' }),
+]);
+
+export function bindingsForRows(rows: readonly DashboardContentRow[]): readonly DashboardContentBinding[] {
+  const domains = new Set<DashboardContentDomain>();
+  for (const row of rows) {
+    if (row.domain) domains.add(row.domain);
+  }
+  return STACK_SOURCE_BINDINGS.filter((binding) => domains.has(binding.domain));
+}
+
 export const CONTENT_SOURCE_VERSION_ID = /^srcv_[A-Za-z0-9][A-Za-z0-9._-]{0,126}$/;
 export const CONTENT_IMPORT_MAX_BYTES = 64 * 1024;
 export const CONTENT_IMPORT_MAX_ROWS = 50;

@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.12] - 2026-09-20
+
+### Added
+
+- Dashboard publish uses the synthetic-stack registered `srcv_stack_*` source versions and refreshes announce/hydrate after a successful release.
+
 ## [0.3.11] - 2026-09-20
 
 ### Added

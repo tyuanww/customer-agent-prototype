@@ -17,6 +17,7 @@ import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 
 export type DashboardContentSessionClient = Pick<ProductSession, 'view' | 'request'>;
+export type DashboardContentAfterPublish = (sessionEpoch: number) => Promise<void>;
 
 function asFailure(error: unknown): DashboardContentFailure {
   if (!(error instanceof ProductHttpError)) return dashboardContentFailure('UNAVAILABLE');
@@ -157,6 +158,7 @@ export async function dashboardContentImport(
 export async function dashboardContentPublish(
   session: DashboardContentSessionClient | null,
   payload: unknown,
+  afterPublish?: DashboardContentAfterPublish,
 ): Promise<DashboardContentPublishResult> {
   if (!isDashboardContentPublishRequest(payload)) return dashboardContentFailure('VALIDATION');
   return withSession(session, async (client, epoch) => {
@@ -193,6 +195,13 @@ export async function dashboardContentPublish(
     });
     const release = parsePublishRelease(published.value);
     if (!release) return dashboardContentFailure('UNAVAILABLE');
+    if (afterPublish) {
+      try {
+        await afterPublish(epoch);
+      } catch {
+        // Publish already committed. Next product search still refreshAnnounce.
+      }
+    }
     return Object.freeze({ ok: true, releaseId: release.releaseId, releaseSeq: release.releaseSeq });
   });
 }

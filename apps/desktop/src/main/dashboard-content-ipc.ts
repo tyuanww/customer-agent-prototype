@@ -11,6 +11,7 @@ import {
   dashboardContentImport,
   dashboardContentPublish,
   dashboardContentSession,
+  type DashboardContentAfterPublish,
   type DashboardContentSessionClient,
 } from './dashboard-content';
 
@@ -18,6 +19,7 @@ export function registerDashboardContentIpc(
   session: DashboardContentSessionClient | null,
   dashboardContents: () => WebContents | null,
   devUrl: () => string | undefined,
+  afterPublish?: DashboardContentAfterPublish,
 ): void {
   const guard = (event: Parameters<Parameters<typeof ipcMain.handle>[1]>[0]): boolean => {
     const contents = dashboardContents();
@@ -56,7 +58,7 @@ export function registerDashboardContentIpc(
       if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
       if (args.length !== 1) return dashboardContentFailure('VALIDATION');
       try {
-        return await dashboardContentPublish(session, args[0]);
+        return await dashboardContentPublish(session, args[0], afterPublish);
       } catch {
         return dashboardContentFailure('UNAVAILABLE');
       }
