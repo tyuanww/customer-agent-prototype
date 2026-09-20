@@ -1,6 +1,7 @@
 {
   "name": "customer-agent-demo",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "客服 Agent 产品实施仓 workspace；Electron 产品包位于 apps/desktop，正式 API 骨架位于 apps/api",
   "packageManager": "pnpm@11.19.0",
