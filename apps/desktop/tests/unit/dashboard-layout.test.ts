@@ -505,13 +505,16 @@ describe('dashboard layout contract', () => {
     expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
   });
 
-  it('keeps coach content upload in the renderer without IPC or persistence', () => {
+  it('keeps coach content preview local and publishes only through dashboardContent', () => {
     expect(content).toContain('待审核草稿');
     expect(content).toContain('标准话术');
     expect(content).toContain('readCoachUploadFile');
+    expect(content).toContain('dashboardContent');
+    expect(content).toContain('publishDraft');
     expect(content).not.toContain('synthetic-sops');
+    expect(content).not.toContain('customerAgent');
     expect(content).not.toMatch(
-      /fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|customerAgent|ipcRenderer|preload/,
+      /fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|ipcRenderer|preload/,
     );
   });
 

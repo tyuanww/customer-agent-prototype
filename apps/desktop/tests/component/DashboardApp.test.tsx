@@ -80,6 +80,7 @@ describe('DashboardApp', () => {
     originalPointerEvent = window.PointerEvent;
     delete window.customerAgent;
     delete window.dashboardWording;
+    delete window.dashboardContent;
     Object.defineProperty(window, 'PointerEvent', {
       configurable: true,
       writable: true,
@@ -96,6 +97,7 @@ describe('DashboardApp', () => {
       delete window.customerAgent;
     }
     delete window.dashboardWording;
+    delete window.dashboardContent;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -1677,7 +1679,7 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-content'));
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
-      '演示禁用 · 正式需 owner + G0/Ddev',
+      '当前没有产品会话，无法发布',
     );
     await user.click(screen.getByTestId('release-rel-demo-2026-08-blocked'));
     expect(screen.getByTestId('missing-domain-block')).toHaveTextContent('缺域即阻断');
@@ -1693,7 +1695,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('content-upload-draft-copy')).toHaveTextContent(
       '上传只进入待审核草稿，不是已发布',
     );
-    expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('owner（管理员）');
+    expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('管理员（owner）');
     expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
     expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('售前仍为');
     expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('NOT_CREATED');
@@ -1751,7 +1753,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('不承诺库存');
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
-      '演示禁用 · 正式需 owner + G0/Ddev',
+      '当前没有产品会话，无法发布',
     );
     expect(window.customerAgent).toBeUndefined();
 

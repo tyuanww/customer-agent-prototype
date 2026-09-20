@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.10] - 2026-09-20
+
+### Added
+
+- Dashboard content publish uses the product session in main, waits until import is staged, and keeps coach/owner gates. Missing source bindings fail closed.
+
 ## [0.3.9] - 2026-09-20
 
 ### Added

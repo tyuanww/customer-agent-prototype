@@ -1199,11 +1199,11 @@ export const DASHBOARD_MANIFEST = deepFreeze({
     title: '内容与发布',
     kicker: 'Import → Validate → Staged → Publish → Announce → ACK/Lease',
     pipeline: ['Import', 'Validate', 'Staged', 'Publish', 'Announce', 'ACK/Lease'],
-    publishDisabledReason: '演示禁用 · 正式需 owner + G0/Ddev',
+    publishDisabledReason: '请先登录后再发布',
     upload: {
       title: '话术师上传',
       roleNote:
-        '话术师（coach）只写入待审核草稿；发布与回滚仅 owner（管理员）。坐席（agent）不能上传。角色仅为 agent / coach / owner，没有第四角色。',
+        '话术师（coach）可发布已标注的产品与活动内容；售后、过敏或赔付需管理员（owner）。坐席（agent）不能发布。角色仅为 agent / coach / owner，没有第四角色。',
       draftOnlyCopy: '上传只进入待审核草稿，不是已发布。',
       boundaryCopy: '本地合成预览：不连接飞书或 Wiki，也不写入任何已发布内容库。',
       aftersaleNote: '售后流程仍为合成样例，本页不展开 SOP 树。',
