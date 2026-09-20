@@ -34,6 +34,7 @@ import { registerContentImportRoutes, type ContentImportRouteDependencies } from
 import { registerContentReviewRoutes, type ContentReviewRouteDependencies } from './content-review-routes.js';
 import { registerContentReleaseRoutes, type ContentReleaseRouteDependencies } from './content-release-routes.js';
 import { registerAnnounceRoutes, type AnnounceRouteDependencies } from './announce-routes.js';
+import { registerIterationTaskRoutes, type IterationTaskRouteDependencies } from './iteration-task-routes.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -59,6 +60,7 @@ export function createApiApp(
   contentReviewDependencies?: ContentReviewRouteDependencies,
   contentReleaseDependencies?: ContentReleaseRouteDependencies,
   announceDependencies?: AnnounceRouteDependencies,
+  iterationTaskDependencies?: IterationTaskRouteDependencies,
 ): FastifyInstance {
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
@@ -106,6 +108,7 @@ export function createApiApp(
   registerContentReviewRoutes(app, authService, contentReviewDependencies);
   registerContentReleaseRoutes(app, authService, contentReleaseDependencies);
   registerAnnounceRoutes(app, authService, announceDependencies);
+  registerIterationTaskRoutes(app, authService, iterationTaskDependencies);
 
   app.get('/health', async (_request, reply) => {
     const payload = parseContractSchema('HealthResponse', {

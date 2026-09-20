@@ -7,6 +7,7 @@ import { createContentImportService } from './content-import-service.js';
 import { createContentReviewService } from './content-review-service.js';
 import { createContentReleaseServiceForPool } from './content-release-service.js';
 import { createAnnounceServiceForPool } from './announce-service.js';
+import { createIterationTaskRepository } from './iteration-task-repository.js';
 import { sharedPolicyAdminPool } from './policy-admin-repository.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
@@ -92,11 +93,15 @@ export async function startApi(
         const announce = runtimePool === undefined ? undefined : {
           service: createAnnounceServiceForPool(runtimePool, bootstrap.logHash, false),
         };
+        const iterationTasks = runtimePool === undefined ? undefined : {
+          repository: createIterationTaskRepository(runtimePool),
+          idempotencyHmac: bootstrap.idempotencyHmac,
+        };
         return createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
-          contentImport, contentReview, contentRelease, announce);
+          contentImport, contentReview, contentRelease, announce, iterationTasks);
       } catch (error) {
         await auth?.close();
         throw error;

@@ -17,7 +17,7 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 你现在要做什么 | 打开 |
 | --- | --- |
 | 按统一流程开发、审查、提交 PR、合并、验收和发布，处理授权与证据复用 | [工程工作流程](docs/reference-engineering-workflow.md) |
-| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP 窗、Dashboard 只读 SOP、话术不准、内容草稿、P0 待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
+| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP 窗、Dashboard 只读 SOP、话术不准、内容草稿、话术优化待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
 | 在办公机 Windows 上勾首轮离线安装 / 浮窗 / 快捷键 / 卸载（人填，开发机不代填） | [docs/how-to-office-machine-first-round.md](docs/how-to-office-machine-first-round.md) |
 | 查阅 Fox / Query / Dashboard / 登录 / SOP 窗口、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
@@ -104,7 +104,7 @@ curl --fail --silent http://127.0.0.1:3100/health
 curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/审核/发布与 announce 读取；部署型 profile 和 Feishu auth 在监听前拒启。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
+`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/审核/发布、announce 读取，以及 coach/owner 的冻结 iteration-task 列表/开始/关闭；部署型 profile 和 Feishu auth 在监听前拒启。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 W4 数据库包只接受调用方提供的已连接 migration-owner `pg.Client`；下面的命令只生成/核验不可变 catalogue，并在隔离临时 PostgreSQL 15 cluster 中测试，不会访问共享本机或生产数据库：
 
@@ -150,7 +150,7 @@ FOX_IDLE → SEARCH_INPUT → RESULTS | EMPTY | ERROR → COPIED → FOX_IDLE
 
 闲置时显示约 88px 的透明狐狸窗（狐狸视觉约 64px），待机动效约 3 秒一轮：4px 浮动、2° 摆动、轮廓呼吸。指针只在这只 88px 窗内时，整只狐狸会做非常克制的局部跟随，这不是全局眼球追踪。片刻无操作后会打盹、再睡着；窗口隐藏时睡眠钟暂停，重新可见后从头计时。任何局部活动或打开查询都会唤醒。点按有短促的戳感，拖过 4px 后会顺着方向被提起，拖太久会有一次很克制的烦躁反应。拖到当前屏左/右边缘 18px 内会自动吸附：原生窗口始终完整留在工作区，由 renderer 平移裁出等效 44px 窗区，对应 64px 狐狸视觉各露一半（32px），并重播一次方向性吸附。稳定半露时会做左右镜像的 inward-ready 动效：峰值向屏内探 3px、上抬 2px、内倾 5°并轻微放大，呈现“跃跃欲试”，但仍保持半露裁切和共享元素姿态连续。悬停或键盘聚焦时，狐狸用 420ms 镜像探头动效过渡到等效 80px 裁切；移开后用 300ms 反向动效缩回。这套贴边半露就是本项目的 mini mode，不是桌宠自由漫游。这样不会让 macOS WindowServer 与屏外透明窗反复争抢位置。打开采用两阶段共享元素交接：隐藏查询窗先按点击瞬间狐狸的真实位置、同尺寸 64px 和当前 2D 位移 / 旋转 / 缩放矩阵准备首帧，renderer 回执后才交换窗口并用约 260ms 的 `clip-path` 展开；贴边查询窗从物理屏幕边缘起步，保持 32px 半露轮廓连续。关闭约 200ms，抵达末帧后再反向换窗。玻璃只淡入淡出，不缩放模糊层；正常完成由动画回执驱动，定时器仅兜底。每个状态只一次性提交最终窗口 bounds，不逐帧 resize、不先弹出整颗贴边狐狸，也不让狐狸和查询同时消失。正常结果路径的高度是 Query 对 DOM 的实测 hug（capsule + banner + `result-content` + chrome + 容差），经 typed query-only layout / 纵向 resize IPC 上报后，Main 钳制到 `240..min(620, availableHeight)`（`availableHeight` 为当前 workArea 高减去 16px 边距），一次 `setBounds` 并 ACK，然后才展示内容。旧分档 `600×240 / 340 / 430 / 620` **只属于**测量缺失、过期或被拒绝时的异常 fallback，不是正常 Top 3 的固定窗高。查询中的狐狸会来回寻找，命中会弹跳，空态会歪头，复制后会点头；业务状态优先于待机动效。首击立即打开查询，不为识别双击增加延迟。
 
-Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。顶栏只保留一个「演示数据」标识，并写「无后端 · 不保存」（VOC / 工单 / KPI 仍是编译期合成样本，所以这个标识不会因为话术库已读当前发布而消失）。侧栏「演示环境」写完整边界：`无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读当前发布`。完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 也在「演示环境」。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作，深色模式使用独立的炭灰层级。界面采用成熟运营工具的紧凑可折叠导航、1px 分隔线、统一 8px 的矩形圆角和无悬浮阴影数据面板，不把玻璃与桌宠动效铺进管理端。侧栏展开宽度可在 `216–360px` 内鼠标拖动或键盘调整，默认 `248px`；折叠后 macOS 保留固定 `120px` 控制岛 / 图标轨，Windows 与 Linux 保留固定 `72px` 图标轨，并维持原分组占位，图标位置不变、只隐藏文字，hover / focus 会在右侧显示模块名称。macOS 的同一个 PanelLeft 按钮始终固定在红绿灯右侧的侧栏控制岛内，展开 / 折叠只切换图标，不覆盖狐狸 Logo，也不与原生拖动区域重叠；Windows / Linux 则保留原生标题栏与稳定侧栏控制槽。外观可切换「浅色 / 深色 / 跟随系统」，默认跟随系统且只在当前 Dashboard 会话有效。管理概览使用语义化决策表和连续 KPI 条，显示影响、Owner、下一步、状态、处理窗口、固定统计范围与指标定义。十个一期模块使用滚轮 / 触控 / 原生滚动条；鼠标按住拖动不再滚页。侧栏「SOP」只读浏览与坐席过敏窗同一份合成树；coach / owner 可见内部停手文案，坐席看不到；不编辑、不发布，持久化仍要 contracts:intake。导航另有禁用的「工单垃圾桶 · 二期待实施」占位，不算已实现模块。VOC 可切换预编译合成年 / 月 / 日切片并联动 KPI、Pareto、热力图和详情；「公告与同步」可演练本地成功 / 失败推送回执，但不会联网、发送、保存或改变四分面。VOC / 工单 / KPI 数字全部是编译期合成样本；话术库条数与正文来自仓外 hydrate。adopted 只等于复制成功。
+Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。顶栏只保留一个「演示数据」标识，并写「无后端 · 不保存」（VOC / 工单 / KPI 仍是编译期合成样本，所以这个标识不会因为话术库已读当前发布而消失）。侧栏「演示环境」写完整边界：`无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读当前发布`。完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 也在「演示环境」。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作，深色模式使用独立的炭灰层级。界面采用成熟运营工具的紧凑可折叠导航、1px 分隔线、统一 8px 的矩形圆角和无悬浮阴影数据面板，不把玻璃与桌宠动效铺进管理端。侧栏展开宽度可在 `216–360px` 内鼠标拖动或键盘调整，默认 `248px`；折叠后 macOS 保留固定 `120px` 控制岛 / 图标轨，Windows 与 Linux 保留固定 `72px` 图标轨，并维持原分组占位，图标位置不变、只隐藏文字，hover / focus 会在右侧显示模块名称。macOS 的同一个 PanelLeft 按钮始终固定在红绿灯右侧的侧栏控制岛内，展开 / 折叠只切换图标，不覆盖狐狸 Logo，也不与原生拖动区域重叠；Windows / Linux 则保留原生标题栏与稳定侧栏控制槽。外观可切换「浅色 / 深色 / 跟随系统」，默认跟随系统且只在当前 Dashboard 会话有效。管理概览使用语义化决策表和连续 KPI 条，显示影响、Owner、下一步、状态、处理窗口、固定统计范围与指标定义。十个一期模块使用滚轮 / 触控 / 原生滚动条；鼠标按住拖动不再滚页。侧栏「SOP」只读浏览与坐席过敏窗同一份合成树；coach / owner 可见内部停手文案，坐席看不到；不编辑、不发布，持久化仍要 contracts:intake。「话术优化待办」在有产品会话时由 coach / owner 拉取冻结 `GET /v1/metrics/iteration-tasks` 并 `POST` start/close；空列表合法，显示「当前没有待办」。坐席 403。没有产品会话时显示「当前没有产品会话，无法加载待办」，不回落 DEMO 5 条。从「话术不准」自动开单仍要 persist。导航另有禁用的「工单垃圾桶 · 二期待实施」占位，不算已实现模块。VOC 可切换预编译合成年 / 月 / 日切片并联动 KPI、Pareto、热力图和详情；「公告与同步」可演练本地成功 / 失败推送回执，但不会联网、发送、保存或改变四分面。VOC / 工单 / KPI 数字全部是编译期合成样本；话术库条数与正文来自仓外 hydrate。adopted 只等于复制成功。
 
 Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色切换为白 / 浅灰耳麦以提高对比，狐狸本体保持原紫色。侧栏业务导航图标为 20px，文字比图标再靠近约 4px；折叠时图标中心仍固定在 macOS `nav.left+60` / Windows·Linux `nav.left+36`。
 
@@ -167,9 +167,9 @@ VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准�
 - 不使用 Menokin 名义、真实产品事实或真实客户原文；正式 Menokin 数据只可在 G0 / Ddev 与数据门通过后由受控 adapter 接入。
 - 不复制或迁移旧 `dafuyan-wording` 项目的代码、词典、权重、数据或配置；查询能力是在本仓按合成合同独立实现。
 - 过期与未生效话术永不返回；卡片不展示匹配分。
-- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 只有话术库只读 preload，没有 `customerAgent`。话术库读仓外 hydrate / 索引，与查询胶囊同一份目录。
+- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 独立 `dashboard.ts` preload（话术库只读、内容会话/导入/发布、话术优化待办 list/start/close），没有 `customerAgent`。话术库读仓外 hydrate / 索引，与查询胶囊同一份目录。
 - 复制成功只显示「已复制」，不表示已发送、已采纳或回答正确。
-- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。API host 已有合成范围的 `search/adoption/escalate` 事务端口；默认 S0 不连接，显式 loopback 已接线 D1–D5，hydrate 检索不打 leftover `/v1/search`。合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
+- Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。API host 已有合成范围的 `search/adoption/escalate` 事务端口，以及 coach/owner 的冻结 iteration-task 列表/开始/关闭；默认 S0 不连接，显式 loopback 已接线 D1–D5 与待办 adapter，hydrate 检索不打 leftover `/v1/search`。合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*` / `iteration_tasks`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
 - 「智能检索」默认 ON：MiniMax 只规划检索式并重排已有 `scriptId`，不生成、不改写、不发送。失败 fail-open 到 BM25。未登录的 S0 fixture 路径仍不调用模型。
 - 客户问题最多 2000 字。
 

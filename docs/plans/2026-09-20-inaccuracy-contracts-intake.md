@@ -13,7 +13,7 @@
 ## 当前事实（本切片不改）
 
 - Query 卡片「话术不准」只在本次浮窗会话按 `scriptId` 本地记下，文案「已记录，待话术师核实」。收起查询后丢弃。不走 IPC / API / Dashboard / `copyAdopt`。
-- Dashboard「话术优化待办」是合成演练队列，形状对齐冻结 `IterationTask`。本页不展示实时「话术不准」计数。
+- Dashboard「话术优化待办」在有 `dashboardIteration` 时走冻结 GET `/v1/metrics/iteration-tasks` 与 POST start/close（仅 coach / owner；空列表合法）。本页不展示实时「话术不准」计数，也不自动开单。
 - 冻结 OpenAPI 已有 iteration_task 域，且合同说明禁止 `/tickets` 与跨域原始明细。
 
 ## 未来 POST `/v1/inaccuracy-reports`

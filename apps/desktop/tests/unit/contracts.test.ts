@@ -47,6 +47,9 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.DASHBOARD_CONTENT_SESSION,
       IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT,
       IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH,
+      IPC_CHANNELS.DASHBOARD_ITERATION_LIST,
+      IPC_CHANNELS.DASHBOARD_ITERATION_START,
+      IPC_CHANNELS.DASHBOARD_ITERATION_CLOSE,
       IPC_CHANNELS.DISMISS,
       IPC_CHANNELS.REPORT_UI_PHASE,
       IPC_CHANNELS.REPORT_HANDOFF_MILESTONE,
@@ -98,7 +101,12 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_SESSION}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_LIST}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_START}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_CLOSE}'`);
     expect(dashboardPreload).toContain('dashboardContent');
+    expect(dashboardPreload).toContain('dashboardIteration');
+    expect(dashboardPreload).not.toContain("from '../shared/dashboard-iteration'");
     expect(dashboardPreload).not.toContain('product:search');
     expect(dashboardPreload).not.toContain('product:login');
     expect(dashboardPreload).not.toContain("from '../shared/product-session'");

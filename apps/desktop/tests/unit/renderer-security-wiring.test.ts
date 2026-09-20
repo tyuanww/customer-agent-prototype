@@ -22,6 +22,7 @@ describe('renderer runtime security wiring', () => {
     expect(main).toContain('applyContentSecurityPolicy(rendererDevServerUrl)');
     expect(main).toContain('rendererDevServerUrl,');
     expect(main).toContain('() => controller?.rendererDevServerUrl');
+    expect(main).toContain('registerDashboardIterationIpc');
     expect(controller).toContain('this.rendererDevServerUrl = options.rendererDevServerUrl');
     expect(controller).toContain("loadRenderer(this.fox, 'fox', this.rendererDevServerUrl");
     expect(overlayIpc).toContain('controller.rendererDevServerUrl');

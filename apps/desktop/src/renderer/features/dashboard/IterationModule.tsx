@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   INACCURACY_TASK_THRESHOLD_24H,
   INACCURACY_TASK_THRESHOLD_7D,
 } from '@shared/inaccuracy-report';
+import {
+  ITERATION_COPY,
+  type DashboardIterationTask,
+} from '@shared/dashboard-iteration';
 import {
   DASHBOARD_MANIFEST,
   listOpenP0IterationTasks,
@@ -65,16 +69,88 @@ function initialServerVersions(): Record<string, number> {
   return Object.fromEntries(data.tasks.map((task) => [task.taskId, task.version]));
 }
 
+function asModuleTask(task: DashboardIterationTask): IterationTask {
+  return {
+    taskId: task.taskId,
+    signalId: task.signalId,
+    clusterKey: task.clusterKey,
+    kind: task.clusterKey.includes('top1_skipped') ? 'top1_skipped' : 'no_hit',
+    status: task.status,
+    priority: 'P2',
+    cause: task.suspectedCause,
+    suggestedScriptIds: task.suggestedScriptIds,
+    sampleQueryIds: task.sampleQueryIds,
+    version: task.version,
+    resolution: task.resolution,
+    resolutionNote: task.resolutionNote,
+    owner: task.assigneeRole && task.assigneeRole.length > 0 ? task.assigneeRole : '未指派',
+    evidenceCount: task.sampleQueryIds.length,
+    title: task.clusterKey,
+    detail: task.signalId,
+    nextStep: '不自动改写 Answer。关闭待办不等于已发布。',
+  };
+}
+
 export function IterationModule() {
-  // 会话内演练：克隆 manifest 到 React state，刷新即丢。不落盘、不联网、不发 IPC。
-  const [tasks, setTasks] = useState<readonly IterationTask[]>(data.tasks);
-  // 演练里的「服务端」版本号。start / close 用 expected_version 比对，不一致就当成 409。
-  const [serverVersions, setServerVersions] = useState<Record<string, number>>(initialServerVersions);
+  const [liveCapable] = useState(() => Boolean(window.dashboardIteration));
+  // 无 dashboardIteration 时保持合成演练；有该 API 时绝不回落到 DEMO 5 条。
+  const [tasks, setTasks] = useState<readonly IterationTask[]>(() => (liveCapable ? [] : data.tasks));
+  const [serverVersions, setServerVersions] = useState<Record<string, number>>(() => (
+    liveCapable ? {} : initialServerVersions()
+  ));
+  const [liveStatus, setLiveStatus] = useState<'off' | 'loading' | 'ready' | 'unavailable'>(
+    liveCapable ? 'loading' : 'off',
+  );
+  const [liveMessage, setLiveMessage] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [status, setStatus] = useState<QueueStatusFilter>('all');
   const [cause, setCause] = useState<IterationCause | 'all'>('all');
-  const [selectedId, setSelectedId] = useState(data.tasks[0]?.taskId ?? '');
+  const [selectedId, setSelectedId] = useState(() => (liveCapable ? '' : (data.tasks[0]?.taskId ?? '')));
   const [note, setNote] = useState('');
   const [conflict, setConflict] = useState<string | null>(null);
+  const live = liveStatus !== 'off';
+
+  useEffect(() => {
+    if (!liveCapable) return undefined;
+    const api = window.dashboardIteration;
+    if (!api) {
+      setLiveStatus('unavailable');
+      setLiveMessage(ITERATION_COPY.unavailable);
+      setTasks([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setLiveStatus('loading');
+    void api.list().then((result) => {
+      if (cancelled) return;
+      if (!result.ok) {
+        setLiveStatus('unavailable');
+        setLiveMessage(
+          result.code === 'UNAVAILABLE' || result.code === 'OVERLOADED'
+            ? ITERATION_COPY.unavailable
+            : result.message,
+        );
+        setTasks([]);
+        return;
+      }
+      const mapped = result.items.map(asModuleTask);
+      setTasks(mapped);
+      setLiveStatus('ready');
+      setLiveMessage(null);
+      setSelectedId((current) => (
+        mapped.some((task) => task.taskId === current) ? current : (mapped[0]?.taskId ?? '')
+      ));
+      setConflict(null);
+    }).catch(() => {
+      if (cancelled) return;
+      setLiveStatus('unavailable');
+      setLiveMessage(ITERATION_COPY.unavailable);
+      setTasks([]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveCapable, reloadToken]);
 
   const visible = useMemo(
     () =>
@@ -88,11 +164,12 @@ export function IterationModule() {
   // 详情独立于筛选：横幅点选后即使筛掉了该行，详情仍跟随选中项。
   const selected = tasks.find((task) => task.taskId === selectedId) ?? visible[0];
   const p0Open = listOpenP0IterationTasks(tasks);
-  const edited =
+  const edited = !live && (
     tasks.some((task) => {
       const source = data.tasks.find((item) => item.taskId === task.taskId);
       return source ? isEdited(task, source) : false;
-    }) || data.tasks.some((task) => serverVersions[task.taskId] !== task.version);
+    }) || data.tasks.some((task) => serverVersions[task.taskId] !== task.version)
+  );
 
   function selectTask(taskId: string) {
     const task = tasks.find((item) => item.taskId === taskId);
@@ -110,7 +187,7 @@ export function IterationModule() {
   /** CAS：客户端快照版本必须等于演练里的服务端版本，否则不落地任何状态。 */
   function passesExpectedVersion(task: IterationTask): boolean {
     if (task.version === serverVersions[task.taskId]) return true;
-    setConflict('待办已更新，请刷新后再处理');
+    setConflict(ITERATION_COPY.conflict);
     return false;
   }
 
@@ -125,20 +202,62 @@ export function IterationModule() {
     setConflict(null);
   }
 
+  function applyLiveTask(next: DashboardIterationTask) {
+    const mapped = asModuleTask(next);
+    setTasks((current) => current.map((item) => (item.taskId === mapped.taskId ? mapped : item)));
+    setConflict(null);
+  }
+
   function startTask(task: IterationTask) {
-    if (task.status !== 'open' || !passesExpectedVersion(task)) return;
-    mutate(task, { status: 'in_progress', version: task.version + 1 });
+    if (task.status !== 'open') return;
+    if (!live) {
+      if (!passesExpectedVersion(task)) return;
+      mutate(task, { status: 'in_progress', version: task.version + 1 });
+      return;
+    }
+    const api = window.dashboardIteration;
+    if (!api) return;
+    void api.start({ taskId: task.taskId, expectedVersion: task.version }).then((result) => {
+      if (!result.ok) {
+        setConflict(result.code === 'CONFLICT' ? ITERATION_COPY.conflict : result.message);
+        return;
+      }
+      applyLiveTask(result.task);
+    }).catch(() => {
+      setConflict(ITERATION_COPY.unavailable);
+    });
   }
 
   function closeTask(task: IterationTask, next: 'resolved' | 'wont_fix') {
-    if (task.status !== 'in_progress' || !noteValid || !passesExpectedVersion(task)) return;
-    mutate(task, {
+    if (task.status !== 'in_progress' || !noteValid) return;
+    if (!live) {
+      if (!passesExpectedVersion(task)) return;
+      mutate(task, {
+        status: next,
+        resolution: next,
+        resolutionNote: note.trim(),
+        version: task.version + 1,
+      });
+      setNote('');
+      return;
+    }
+    const api = window.dashboardIteration;
+    if (!api) return;
+    void api.close({
+      taskId: task.taskId,
+      expectedVersion: task.version,
       status: next,
-      resolution: next,
       resolutionNote: note.trim(),
-      version: task.version + 1,
+    }).then((result) => {
+      if (!result.ok) {
+        setConflict(result.code === 'CONFLICT' ? ITERATION_COPY.conflict : result.message);
+        return;
+      }
+      applyLiveTask(result.task);
+      setNote('');
+    }).catch(() => {
+      setConflict(ITERATION_COPY.unavailable);
     });
-    setNote('');
   }
 
   /** 服务端抢先 +1，客户端快照不动。真实 CAS 是 expected_version 落后，不是把本地 version 改小。 */
@@ -153,7 +272,7 @@ export function IterationModule() {
   function resetFilters() {
     setStatus('all');
     setCause('all');
-    setSelectedId(data.tasks[0]?.taskId ?? '');
+    setSelectedId(live ? (tasks[0]?.taskId ?? '') : (data.tasks[0]?.taskId ?? ''));
   }
 
   function resetDrill() {
@@ -173,8 +292,11 @@ export function IterationModule() {
           <p className="dash-kicker">{data.kicker}</p>
         </div>
         <div className="iteration-role-note">
-          <StatusBadge label="正式仅 coach / owner · agent 403 · 本页 MOCK AUTH" tone="mock" />
-          <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />
+          <StatusBadge
+            label={live ? '正式仅 coach / owner · agent 403' : '正式仅 coach / owner · agent 403 · 本页 MOCK AUTH'}
+            tone="mock"
+          />
+          {live ? null : <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />}
         </div>
       </header>
       <p className="dash-scope">{data.domainNote}</p>
@@ -182,6 +304,15 @@ export function IterationModule() {
         「话术不准」计数尚未接入。达到 24 小时 ≥ {INACCURACY_TASK_THRESHOLD_24H} 或 7 天 ≥ {INACCURACY_TASK_THRESHOLD_7D} 才会打开 iteration_task；本页不展示实时数字，也不自动改写或关单。
       </p>
 
+      {liveStatus === 'unavailable' ? (
+        <p className="dash-empty-state" role="alert" data-testid="iteration-live-status">
+          <strong>{liveMessage ?? ITERATION_COPY.unavailable}</strong>
+        </p>
+      ) : liveStatus === 'loading' ? (
+        <p className="dash-empty-state" data-testid="iteration-live-status">正在加载待办</p>
+      ) : liveStatus === 'ready' && tasks.length === 0 ? (
+        <p className="dash-empty-state" data-testid="iteration-live-status">{ITERATION_COPY.empty}</p>
+      ) : live ? null : (
       <section
         className={`dash-card iteration-reminder${p0Open.length === 0 ? ' is-empty' : ''}`}
         aria-labelledby="iteration-reminder-title"
@@ -191,7 +322,7 @@ export function IterationModule() {
           <h2 id="iteration-reminder-title">
             {p0Open.length > 0 ? `有 ${p0Open.length} 条待处理 P0 需要跟进` : '当前没有待处理 P0'}
           </h2>
-          <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />
+          {live ? null : <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />}
         </div>
         {p0Open.length > 0 ? (
           <ul className="iteration-reminder-list">
@@ -211,11 +342,13 @@ export function IterationModule() {
           </ul>
         ) : (
           <p className="dash-footnote" data-testid="iteration-reminder-empty">
-            处理中或已关闭的不出现在这里。重置演练可恢复合成清单。
+            {live ? '处理中或已关闭的不出现在这里。' : '处理中或已关闭的不出现在这里。重置演练可恢复合成清单。'}
           </p>
         )}
       </section>
+      )}
 
+      {liveStatus === 'off' || (liveStatus === 'ready' && tasks.length > 0) ? <>
       <div className="dash-filter-toolbar compact" aria-label="优化待办筛选">
         <label>
           <span>根因</span>
@@ -250,18 +383,31 @@ export function IterationModule() {
         <button type="button" className="dash-reset" data-testid="iteration-reset-filters" onClick={resetFilters}>
           重置筛选
         </button>
-        <button
-          type="button"
-          className="dash-reset"
-          data-testid="iteration-reset-drill"
-          disabled={!edited}
-          onClick={resetDrill}
-        >
-          重置演练
-        </button>
+        {live ? (
+          <button
+            type="button"
+            className="dash-reset"
+            data-testid="iteration-refresh"
+            onClick={() => setReloadToken((current) => current + 1)}
+          >
+            刷新待办
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="dash-reset"
+            data-testid="iteration-reset-drill"
+            disabled={!edited}
+            onClick={resetDrill}
+          >
+            重置演练
+          </button>
+        )}
       </div>
       <div className="dash-selection-status" aria-live="polite" data-testid="iteration-filter-status">
-        <span>当前队列</span><strong>{visible.length} 项合成待办</strong><em>{KICKER_CAUSE}</em>
+        <span>当前队列</span>
+        <strong>{visible.length} {live ? '项待办' : '项合成待办'}</strong>
+        <em>{KICKER_CAUSE}</em>
       </div>
 
       <div className="iteration-layout">
@@ -276,16 +422,21 @@ export function IterationModule() {
               onClick={() => selectTask(task.taskId)}
             >
               <span className="iteration-item-top">
-                <StatusBadge label={task.priority} tone={task.priority === 'P0' ? 'danger' : task.priority === 'P1' ? 'warn' : 'neutral'} />
+                {live ? null : (
+                  <StatusBadge label={task.priority} tone={task.priority === 'P0' ? 'danger' : task.priority === 'P1' ? 'warn' : 'neutral'} />
+                )}
                 <StatusBadge label={CAUSE_LABELS[task.cause]} />
                 <StatusBadge label={statusLabelOf(task.status)} tone={toneFor(task.status)} />
               </span>
               <strong>{task.title}</strong>
-              <small>{task.evidenceCount} 条合成证据 · {task.owner}</small>
+              <small>{task.evidenceCount} {live ? '条证据' : '条合成证据'} · {task.owner}</small>
             </button>
           ))}
           {!visible.length ? (
-            <div className="dash-empty-state"><strong>当前筛选没有合成待办</strong><span>重置筛选查看完整只读队列。</span></div>
+            <div className="dash-empty-state">
+              <strong>{live ? '当前筛选没有待办' : '当前筛选没有合成待办'}</strong>
+              <span>重置筛选查看完整只读队列。</span>
+            </div>
           ) : null}
         </div>
 
@@ -302,18 +453,18 @@ export function IterationModule() {
                 <div><dt>根因</dt><dd>{CAUSE_LABELS[selected.cause]}</dd></div>
                 <div><dt>版本</dt><dd data-testid="iteration-detail-version">v{selected.version}</dd></div>
                 <div><dt>信号</dt><dd data-testid="iteration-detail-signal">{selected.signalId}</dd></div>
-                <div><dt>标记</dt><dd>{selected.priority}</dd></div>
+                {live ? null : <div><dt>标记</dt><dd>{selected.priority}</dd></div>}
                 <div><dt>Owner</dt><dd>{selected.owner}</dd></div>
-                <div><dt>证据量</dt><dd>{selected.evidenceCount} 条合成事实</dd></div>
+                <div><dt>证据量</dt><dd>{selected.evidenceCount} {live ? '条证据' : '条合成事实'}</dd></div>
               </dl>
               <p className="dash-next-step"><span>建议下一步</span>{selected.nextStep}</p>
               <p className="dash-footnote" data-testid="iteration-detail-meta">
                 聚类键 {selected.clusterKey} · 建议话术 {selected.suggestedScriptIds.join(' / ') || '暂无'} ·
-                样本 {selected.sampleQueryIds.length} 条脱敏合成查询
+                样本 {selected.sampleQueryIds.length} {live ? '条查询' : '条脱敏合成查询'}
               </p>
 
               <div className="iteration-drill" data-testid="iteration-drill">
-                <h3>会话内演练</h3>
+                <h3>{live ? '处理待办' : '会话内演练'}</h3>
                 {selected.status === 'open' ? (
                   <button
                     type="button"
@@ -360,7 +511,7 @@ export function IterationModule() {
                   </div>
                 ) : null}
 
-                {selected.status === 'open' || selected.status === 'in_progress' ? (
+                {!live && (selected.status === 'open' || selected.status === 'in_progress') ? (
                   <button
                     type="button"
                     className="dash-reset"
@@ -384,9 +535,11 @@ export function IterationModule() {
                 ) : null}
               </div>
 
-              <p className="dash-footnote">{data.footnote}</p>
+              {live ? null : <p className="dash-footnote">{data.footnote}</p>}
               <p className="dash-footnote" data-testid="iteration-detail-footnote">
-                不自动改写 Answer。关闭待办不等于已发布。演练不保存、不联网。
+                {live
+                  ? '不自动改写 Answer。关闭待办不等于已发布。'
+                  : '不自动改写 Answer。关闭待办不等于已发布。演练不保存、不联网。'}
               </p>
             </>
           ) : <p className="dash-empty">选择一项待办查看处理口径</p>}
@@ -397,6 +550,16 @@ export function IterationModule() {
         <p className="dash-footnote" data-testid="iteration-drill-state">
           演练改动仅存在本页内存；「重置演练」恢复合成清单。
         </p>
+      ) : null}
+      </> : liveStatus === 'unavailable' || liveStatus === 'ready' ? (
+        <button
+          type="button"
+          className="dash-reset"
+          data-testid="iteration-refresh"
+          onClick={() => setReloadToken((current) => current + 1)}
+        >
+          刷新待办
+        </button>
       ) : null}
     </div>
   );

@@ -11,6 +11,7 @@
 - auth 由所选身份服务返回实际状态；T2–T5 已接通合成导入、worker/审核、发布/回退、announce current/snapshot/ack。storage readiness 必须实际 persist/read/verify，content readiness 必须实际执行无副作用的 `search_recommendable_scripts`。真实飞书导入与运行激活仍未实现。
 - `/v1/search` 仅接受 `collection_mode=synthetic`，原始输入只在 HTTP 边界内参与版本化 HMAC，`query_events` 固定以 `text_storage_status=suppressed` 记录，不持久化查询原文或其可关联文本 hash。搜索、query、impression 与幂等完成同事务提交；来源门失败先回滚，再由独立短事务写安全拒绝审计。
 - `/v1/events/adoption` 的 `adopted` 只表示候选成功复制，且每个 query 仅允许一个 terminal；`/v1/events/escalate` 是非终态辅助动作，同一 `(query_id, action)` 返回同一事实。无状态 `collection_disabled` 搜索不会留下 query/idempotency，后续事件返回 404。
+- coach / owner 可调用冻结 `GET /v1/metrics/iteration-tasks` 与 `POST /v1/events/iteration-tasks/{task_id}/start|close`；空列表合法；agent 403；start/close 必须 `Idempotency-Key` 与 `expected_version`；关闭不等于已发布。不发明 `/tickets`。不因「话术不准」自动开单。
 - migration 自动执行、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
 - 启动与 readiness 失败只输出稳定字段，不回显环境变量值、token、DSN、SQL 或异常正文。
 - 同一时刻只运行一个 readiness 探针；连接等待与 readiness 响应分别由 `DB_CONNECTION_TIMEOUT_MS`、`DB_READINESS_TIMEOUT_MS` 控制，timer 与单调时钟都会拒绝 deadline 后才完成的成功结果。
@@ -74,6 +75,16 @@ Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用�
 ## 合成读取与就绪（T5）
 
 认证客户端通过 `GET /v1/announce/current`、`GET /v1/announce/snapshot` 与 `POST /v1/announce/ack` 读取固定 release。current 只调用 `read_current_announcement_with_lease`，snapshot 只调用 `read_snapshot_page`，ACK 只调用 `ack_client_release`；app_runtime 不直读 SoR 底表。短租约 60–900 秒，默认 600；304 只回显仍有效的原 token，不续期。来源门/租约拒绝先回滚业务事务，再用独立短事务写 `record_runtime_source_denial_audit`。查询继续要求 `collection_mode=synthetic`，来源暂停后 search/current/snapshot 失败关闭。复用 runtime 池，不新增连接。真实数据模式仍关闭。
+
+## 合成话术优化待办
+
+在已有 runtime pool 上注册冻结合同，不新增 OpenAPI：
+
+- `GET /v1/metrics/iteration-tasks`：分页列表；`limit` 默认 50、最大 200；可选 `status` / `signal_id` / `assignee_role` / `cursor`。空 `items` 是合法 200。
+- `POST /v1/events/iteration-tasks/{task_id}/start`：body 仅 `expected_version`；必填 `Idempotency-Key`。
+- `POST /v1/events/iteration-tasks/{task_id}/close`：body 为 `expected_version`、`status`（`resolved` 或 `wont_fix`）、`resolution_note`。
+
+仅 `coach` / `owner`。缺会话 401，坐席 403，版本冲突 409。仓储走冻结 `start_iteration_task` / `close_iteration_task`。桌面经 Dashboard preload 消费同一端口。从 Query「话术不准」自动打开待办仍要 persist。
 
 ## 合成整链产物（T6）
 
