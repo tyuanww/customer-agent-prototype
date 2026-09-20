@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.11] - 2026-09-20
+
+### Added
+
+- Query 「话术不准」 is scoped to the current search session. Persistence still needs contracts:intake.
+
 ## [0.3.10] - 2026-09-20
 
 ### Added

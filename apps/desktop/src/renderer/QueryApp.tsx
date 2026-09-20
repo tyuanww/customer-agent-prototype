@@ -39,6 +39,7 @@ import { QueryCapsule } from './features/search/QueryCapsule';
 import { QueryResultsPane } from './features/search/QueryResultsPane';
 import { searchScripts } from './features/search/search-service';
 import type { RankedScript } from './features/search/types';
+import { inaccuracyReportKey, shouldAcceptInaccuracyReport } from '@shared/inaccuracy-report';
 import {
   COPY_FEEDBACK_MS,
   DEEP_THINKING_DESCRIPTION,
@@ -914,6 +915,7 @@ export function QueryApp() {
         setSessionNotice(null);
       }
       lastProductQueryRef.current = null; setHelpStatus('待核实');
+      setReportedScriptIds(new Set());
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
       const search = () => preferenceWriteRef.current.then(() => api.search({
@@ -975,6 +977,7 @@ export function QueryApp() {
     searchInFlightRef.current = true;
     setSearching(true);
     setResults([]);
+    setReportedScriptIds(new Set());
     const generation = ++searchGenerationRef.current;
 
     searchTimerRef.current = window.setTimeout(() => {
@@ -1647,8 +1650,17 @@ export function QueryApp() {
             onOpenSop={openAllergySop}
             reportedScriptIds={reportedScriptIds}
             onReportInaccuracy={(script) => {
+              const sessionKey = lastProductQueryRef.current?.queryId
+                ?? `local:${searchGenerationRef.current}`;
               setReportedScriptIds((current) => {
-                if (current.has(script.scriptId)) {
+                const seenKeys = new Set(
+                  [...current].map((scriptId) => inaccuracyReportKey({ sessionKey, scriptId })),
+                );
+                if (!shouldAcceptInaccuracyReport({
+                  sessionKey,
+                  scriptId: script.scriptId,
+                  seenKeys,
+                })) {
                   return current;
                 }
                 const next = new Set(current);

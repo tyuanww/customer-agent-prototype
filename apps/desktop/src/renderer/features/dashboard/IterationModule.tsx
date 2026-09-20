@@ -1,5 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
+  INACCURACY_TASK_THRESHOLD_24H,
+  INACCURACY_TASK_THRESHOLD_7D,
+} from '@shared/inaccuracy-report';
+import {
   DASHBOARD_MANIFEST,
   listOpenP0IterationTasks,
   type IterationCause,
@@ -174,6 +178,9 @@ export function IterationModule() {
         </div>
       </header>
       <p className="dash-scope">{data.domainNote}</p>
+      <p className="dash-footnote" data-testid="iteration-inaccuracy-counts-footnote">
+        「话术不准」计数尚未接入。达到 24 小时 ≥ {INACCURACY_TASK_THRESHOLD_24H} 或 7 天 ≥ {INACCURACY_TASK_THRESHOLD_7D} 才会打开 iteration_task；本页不展示实时数字，也不自动改写或关单。
+      </p>
 
       <section
         className={`dash-card iteration-reminder${p0Open.length === 0 ? ' is-empty' : ''}`}
