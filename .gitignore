@@ -2,6 +2,7 @@ node_modules/
 dist/
 out/
 release/
+/faq/
 /apps/desktop/build/icon.icns
 /apps/desktop/build/icon.png
 /apps/desktop/build/icon.ico

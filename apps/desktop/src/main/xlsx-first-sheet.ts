@@ -9,10 +9,17 @@ function assertBudget(startedAt: number): void {
   if (Date.now() - startedAt > PARSE_TIMEOUT_MS) throw new Error('PARSE_TIMEOUT');
 }
 
+function xmlCodePoint(raw: string, radix: number): string {
+  const value = Number.parseInt(raw, radix);
+  if (!Number.isInteger(value) || value < 0 || value > 0x10ffff) return '';
+  if (value >= 0xd800 && value <= 0xdfff) return '';
+  return String.fromCodePoint(value);
+}
+
 function decodeXml(value: string): string {
   return value
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number.parseInt(dec, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => xmlCodePoint(hex, 16))
+    .replace(/&#(\d+);/g, (_, dec: string) => xmlCodePoint(dec, 10))
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
@@ -99,8 +106,9 @@ function sheetPath(files: ReadonlyMap<string, Buffer>): string {
   const rid = sheetMatch?.[1];
   if (!rid) throw new Error('UNSUPPORTED_FORMAT');
   const relXml = stripNs(rels.toString('utf8'));
-  const relMatch = relXml.match(new RegExp(`<Relationship\\b[^>]*Id="${rid}"[^>]*Target="([^"]+)"`))
-    ?? relXml.match(new RegExp(`<Relationship\\b[^>]*Target="([^"]+)"[^>]*Id="${rid}"`));
+  const escapedRid = rid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const relMatch = relXml.match(new RegExp(`<Relationship\\b[^>]*Id="${escapedRid}"[^>]*Target="([^"]+)"`))
+    ?? relXml.match(new RegExp(`<Relationship\\b[^>]*Target="([^"]+)"[^>]*Id="${escapedRid}"`));
   const target = relMatch?.[1];
   if (!target) throw new Error('UNSUPPORTED_FORMAT');
   const path = target.startsWith('/') ? target.slice(1) : `xl/${target.replace(/^\.\//, '')}`;
