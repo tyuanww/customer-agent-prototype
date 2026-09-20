@@ -25,7 +25,7 @@
 │  App.tsx 按 WindowRole 分发                                     │
 │   ├─ FoxApp       浮窗、拖拽、贴边、睡眠与交接                   │
 │   ├─ QueryApp     查询胶囊、BM25/embedding/hydrate Top 3、复制   │
-│   ├─ DashboardApp 静态合成工作台、主题与导航                      │
+│   ├─ DashboardApp 五项工作台（概览 / 话术库 / SOP / 内容 / 同步） │
 │   ├─ LoginApp     飞书 / 账号 chooser（独立原生窗，非 overlay）   │
 │   └─ SopApp       过敏售后流程切片 1（独立 SOP 窗，非 overlay）   │
 └────────────────────────────────────────────────────────────────┘
@@ -55,7 +55,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard VOC / 工单 / KPI 仍读编译期 `DASHBOARD_MANIFEST`；话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先当前发布 hydrate，hydrate 为空才回退本机检索索引。话术优化待办在有产品会话时走 `dashboard:iteration-*` → 冻结 `GET /v1/metrics/iteration-tasks` 与 `POST .../start|close`（仅 coach / owner；空列表合法）；renderer 仍不直连 API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告、导入审核发布与 iteration-task 列表/开始/关闭，但当前只放行 synthetic；显式接入 profile 下 D1–D5 桌面 adapter 已接线。真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
+桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 一期五项：管理概览、话术库、SOP、内容管理、系统同步。没有冻结合同的数字写「未接入」，不读 VOC / 工单合成 manifest 冒充生产。话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先当前发布 hydrate。待办走 `dashboard:iteration-*` → 冻结 iteration-tasks。Owner 发布在 Main 里于导入 parked 后走 `/v1/admin/content/reviews*`，再 `POST /v1/content/publish`。renderer 仍不直连 API。并行 API 只放行 synthetic；真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
 
 ## 2. 目录归属
 
@@ -111,13 +111,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration`） | 合成工作台、主题和导航；话术库只读当前发布 hydrate；VOC / 工单仍是架构模拟；SOP 只读 `allergySopTree()`（coach/owner 可见内部停手）；话术优化待办 live list/start/close（coach/owner，空列表合法）；CSV/xlsx 草稿走内容通道（xlsx 只读第一张表，经 `dashboard:content-parse`；Publish 轮询导入状态 1.5s，429 退避） |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration`） | 五项工作台；话术库只读当前发布 hydrate；SOP 写操作未接入；待办 live list/start/close；CSV/xlsx 经 `dashboard:content-parse`；Owner 发布 parked 后 dual-review 再 publish |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 
-Dashboard 没有 overlay 的 `customerAgent`（search / login / copy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/导入/发布、话术优化待办 list/start/close。这是有意收窄，不是「完全无 preload」。正式 Dashboard 若要接 VOC / 工单 API，应另开受信只读 adapter，而不是把通用 IPC 或 Node 权限塞进当前窗口。
+Dashboard 没有 overlay 的 `customerAgent`（search / login / copy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/导入/发布、话术优化待办 list/start/close。这是有意收窄，不是「完全无 preload」。检索账 / SOP 写库若以后要接 HTTP，应另开受信 adapter 并先 `contracts:intake`，而不是把通用 IPC 或 Node 权限塞进当前窗口。
 
 ## 4. 数据边界
 
@@ -125,7 +125,10 @@ Dashboard 没有 overlay 的 `customerAgent`（search / login / copy）。独立
 SYNTHETIC_SCRIPTS ──local searchScripts──> Query view model
                                       └──copyText──> system clipboard
 
-DASHBOARD_MANIFEST ──read-only──> Dashboard modules
+dashboardWording.list ──hydrate──> 话术库
+dashboardIteration     ──iteration-tasks──> 管理概览待办
+dashboardContent       ──parse/import/reviews/publish──> 内容管理
+SOP / 检索账 / 软件目录 ──无冻结合同──> 未接入
 
 contracts/upstream/customer-agent/<contract_set_id>
   ──VERIFIED_NOT_ACTIVATED──> packages/contracts codegen
@@ -147,7 +150,7 @@ v1.17 migrated PG15
   └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
 ```
 
-上图 `DASHBOARD_MANIFEST ──read-only──> Dashboard modules` 只覆盖 VOC / 工单 / KPI。话术库走 `dashboard:wording-list` 读当前发布 hydrate，不画进该 ASCII。Dashboard SOP 读 `allergySopTree()`，同样不画进该 ASCII。话术优化待办在有产品会话时走 `dashboard:iteration-*` → 冻结 iteration-task HTTP，也不画进该 ASCII。内容与发布的 CSV/xlsx 走 `dashboard:content-parse` 后 import/publish，也不画进该 ASCII。
+上图 Dashboard 数据面不再走 `DASHBOARD_MANIFEST` 冒充生产数字。话术库、待办、内容发布画在该 ASCII；SOP 写库 / 检索账 KPI / 软件目录没有冻结合同，保持未接入。
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
