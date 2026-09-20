@@ -97,7 +97,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(remoteOffice).not.toMatch(/内部|外包/);
     expect(remoteOffice).toContain('%APPDATA%\\客服话术浮窗 Demo\\synthetic-stack.json');
     expect(remoteOffice).toContain('不要在办公机安装 PostgreSQL');
-    expect(remoteOffice).toContain('还不能用当前 main 上的安装包当本页证据');
+    expect(remoteOffice).toContain('那台 Windows **新打、并在那台上安装勾选**');
     const remoteMac = readFileSync(
       path.join(repositoryRoot, 'docs/how-to-macos-packaged-product-remote.md'),
       'utf8',

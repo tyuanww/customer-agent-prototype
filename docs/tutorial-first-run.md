@@ -41,7 +41,7 @@ export NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem
 本页命令默认使用这台已核实的 Node 24 位置：
 
 ```bash
-cd ~/Desktop/customer-agent-prototype
+cd /path/to/customer-agent-prototype   # 仓根
 export PATH="$HOME/homebrew/opt/node@24/bin:$HOME/homebrew/bin:$PATH"
 hash -r
 node -v    # 成功标志：v24.x
@@ -135,7 +135,7 @@ Query Top 3 每张卡有发丝「话术不准」。点后该卡显示「已记�
 | --- | --- |
 | 出现运营工作台标准窗，约 1180×760，可缩放、非置顶、出现在任务栏 | 浮窗自己变成 520×760 工作台 |
 | 标题为「客服运营工作台 · 演示数据」；顶栏有「演示数据」和「无后端 · 不保存」 | 工作台内出现真实 OAuth 或真实工单号 |
-| 「话术库」列出本机 hydrate/索引条目，不是 DEMO · SYNTHETIC 假样例 | 话术库可编辑、可发布、可复制发送 |
+| 「话术库」在产品远端列出当前发布 hydrate（空才回退本机索引），kicker 为「当前发布只读」；S0 离线才是本机索引 | 话术库可编辑、可发布、可复制发送；顶栏「演示数据」消失 |
 | 打开成功后，浮窗收起为狐狸头；关掉 Dashboard 后狐狸仍在 | Dashboard 关闭导致整应用退出 |
 | 左侧能切到「管理概览」「VOC / 工单洞察」等九个一期模块 | Publish 按钮可点；「工单垃圾桶」可进入 |
 

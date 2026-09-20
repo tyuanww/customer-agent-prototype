@@ -15,7 +15,7 @@
 | 问题 | 答案 |
 | --- | --- |
 | 正式机器合同是否已进入产品仓？ | **已按双哈希接收冻结合同并生成类型、组件校验器和迁移，但未激活。** 当前版本以锁文件和后端实施计划为准。本机 PG15 测试不是业务 runtime 或生产证据。 |
-| Demo 现在有没有 API adapter？ | **默认 S0 没有。** 未设置 loopback 时 Query 仍同步调用本地 `searchScripts()`；Dashboard 只读编译期 `DASHBOARD_MANIFEST`。显式 loopback 接入 profile 下，main 持有合成会话/检索/公告/求助 adapter，renderer 无 token。并行 `apps/api` 已实现合成身份、内容导入/审核/发布/回退、公告与 synthetic-only Search + Events。正式真实内容运行接入未放行。 |
+| Demo 现在有没有 API adapter？ | **默认 S0 没有。** 未设置 loopback 时 Query 仍同步调用本地 `searchScripts()`；Dashboard VOC / 工单 / KPI 只读编译期 `DASHBOARD_MANIFEST`，话术库走 `dashboard:wording-list` 读当前发布 hydrate。显式 loopback 接入 profile 下，main 持有合成会话/检索/公告/求助 adapter，renderer 无 token。并行 `apps/api` 已实现合成身份、内容导入/审核/发布/回退、公告与 synthetic-only Search + Events。正式真实内容运行接入未放行。 |
 | 能否把 fixture / manifest **直接 INSERT** 进正式表？ | **不能。** 缺必填治理字段，枚举/日期/版本/租户形状非法，且正式写路径禁止绕过 DEFINER 函数。 |
 | 能否在 renderer 里“换一个 search URL”就接到后端？ | **不能。** 生产 CSP 为 `connect-src 'self'`；Dashboard 只有话术库只读 preload，没有 search；正式检索只能走 `POST /v1/search` → `search_recommendable_scripts`，禁止客户端直扫 `scripts`。 |
 | 视觉主链能否在正式客户端复用？ | **交互节奏可以参考**（狐狸头 → Top 3 → 人工点选 → 剪贴板）。**桌面类型映射、会话和事件接线、发布版本与租约消费必须按现有合同实施**，不能把本仓 `ScriptFixture` / `LedgerRow` 当 OpenAPI 类型。 |
@@ -41,6 +41,8 @@ Dashboard renderer（无 customerAgent）
   └─ 深冻结 DASHBOARD_MANIFEST
        └─ 不读 Float 输入，不写盘，不调 /v1/*
 ```
+
+话术库不走上面这条 `DASHBOARD_MANIFEST` 链：独立 `dashboard.cjs` 只暴露 `dashboardWording.list()`，读当前发布 hydrate。
 
 正式一期拓扑是另一条链：
 

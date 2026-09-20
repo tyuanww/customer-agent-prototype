@@ -2,7 +2,7 @@
 
 本页按「要证明什么 → 跑哪条命令 → 它实际证明了什么」组织。命令都可以复制。先看本机静态 / 自动化结果，再单独列出只有真实设备才能证明的门禁。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [桌面语义检索](reference-desktop-retrieval.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) · [macOS M5 人工核验](how-to-verify-macos-m5.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [桌面语义检索](reference-desktop-retrieval.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) · [macOS M5 人工核验](how-to-verify-macos-m5.md) · [macOS 打包态远端](how-to-macos-packaged-product-remote.md) · [办公机远端](how-to-office-machine-product-remote.md) · [Linux 打包态远端](how-to-linux-packaged-product-remote.md)
 
 > 本 Demo 是合成数据、不代发。默认狐狸路径可以不接 API；显式 loopback 合成栈才接通本机 API。验证通过不等于可以正式发包，也不等于真实 OS 焦点 / 台前调度已被证明。
 
@@ -11,7 +11,7 @@
 ## 0. 本机环境（验证前）
 
 ```bash
-cd ~/Desktop/customer-agent-prototype
+cd /path/to/customer-agent-prototype   # 仓根
 export PATH="$HOME/homebrew/opt/node@24/bin:$HOME/homebrew/bin:$PATH"
 hash -r
 node -v    # 需要 v24.x
@@ -352,7 +352,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 仅开发态显式设置 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN` 后运行 `pnpm dev`。两者须不同，且各自是 `http://127.0.0.1:端口` 或 `https://公网主机名`（无路径、无 userinfo、https 不要自定义端口）。桌面 origin **不能**写成 `accounts.feishu.cn`。缺一项或非法 origin 拒启。打包态忽略这两项环境变量，只读 userData 里的 `synthetic-stack.json`（`synthetic-local` / `product-remote` / `synthetic-offline`）。无配置继续显式 S0。接入故障不回退 S0。真飞书见 [方案 C how-to](how-to-feishu-and-password-mac.md)；HTTPS 远端见 [P4 how-to](how-to-p4-remote-mac.md)。
 
-Query 的「登录」打开独立受控登录窗（窗标题「登录」）。飞书走系统浏览器（校验后 `openExternal`），账号仍在本窗提交；打开浏览器后再点取消会中止会话交换。成功以 `exchange` 拿到产品会话为准，返回后显示 `{角色} · 退出`，悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。未登录时输入框占位「登录后查询话术」，点查询不再另写一条「请先合成登录」notice。未登录时点胶囊 Dashboard 图标同样先走「登录」，成功后才打开工作台；取消则不打开。右键 / Tray / 程序坞仍直接打开工作台。失效与失败仍显示在输入框下（危险色）。恢复已登录会话不得残留红字。D2 起登录后可查询复制；不得再写成 D1 之后仍未接通搜索。打包态若设置上述变量会拒启，因此当前未签名 Windows 包不能用于产品会话验收。
+Query 的「登录」打开独立受控登录窗（窗标题「登录」）。飞书走系统浏览器（校验后 `openExternal`），账号仍在本窗提交；打开浏览器后再点取消会中止会话交换。成功以 `exchange` 拿到产品会话为准，返回后显示 `{操作者姓名} · 退出`（飞书 `name`，否则用户 id；禁止把 `owner` / `agent` / `coach` 画在查询主路径），悬停可见到期时间；退出立即清除本地会话并尝试远端撤销。加密存储不可用时不登录、不落明文。未登录时输入框占位「登录后查询话术」，点查询不再另写一条「请先合成登录」notice。未登录时点胶囊 Dashboard 图标同样先走「登录」，成功后才打开工作台；取消则不打开。右键 / Tray / 程序坞仍直接打开工作台。失效与失败仍显示在输入框下（危险色）。恢复已登录会话不得残留红字。D2 起登录后可查询复制；不得再写成 D1 之后仍未接通搜索。打包态若设置上述环境变量会拒启；产品远端验收走 userData `synthetic-stack.json`，见 [办公机远端](how-to-office-machine-product-remote.md)，不是这条开发态 env。
 
 自动化窗口验收：`pnpm --filter @customer-agent/desktop build` 后运行 `pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts`。该测试使用真实 Electron 与合成 HTTP double，校验加密文件生命周期、Query 状态及 token 不跨 preload；不等于真实身份、PG 整链或人工/Windows 验收。
 
@@ -360,7 +360,7 @@ Query 的「登录」打开独立受控登录窗（窗标题「登录」）。�
 
 沿用 D1 的两个 loopback 配置。登录后即可查询：不要选手动平台/品类/SKU。问句由 MiniMax 规划 intent 路由——发货/地址/售后走全店，活动走活动类，问句点到款名才绑 SKU。有占位符的候选须填写合成订单号或日期后复制。复制成功只表示剪贴板写入，不表示发送。macOS 上收起 Query（复制后、Esc、点狐狸头或再按快捷键）应把键盘还给刚才的应用输入框，不必再点那个窗口。工作台 / 登录窗 / SOP 正开着时不整应用 `app.hide()`。Windows 交还焦点尚未做。
 
-登录后第一次查询会 `refreshAnnounce`。lease 未就绪会 `drop('source_gate')`。查询进行中或已有结果时，overlay 必须显示「内容暂不可用，请联系话术师核实」（`source_gate`）或「服务暂不可用，请重试」（`unavailable`），不得空白，也不得画「当前版本已失效」。空闲已登录输入态这两类原因仍静默。只有 `expired` 才画「当前版本已失效，请重新核验」。
+有 `productAnnounce` 时，**每次**点查询都先 `refreshAnnounce` 再检索，不只在第一次查询或下次登录时对齐公告（租约默认 600s，只靠登录会让坐席继续用旧稿）。lease 未就绪会 `drop('source_gate')`。查询进行中或已有结果时，overlay 必须显示「内容暂不可用，请联系话术师核实」（`source_gate`）或「服务暂不可用，请重试」（`unavailable`），不得空白，也不得画「当前版本已失效」。空闲已登录输入态这两类原因仍静默。只有 `expired` 才画「当前版本已失效，请重新核验」。`refreshAnnounce` 只更新公告租约；仓外 hydrate 快照仍在登录 persist 时回写。hydrate 的 `releaseId` 对不上当前公告时仍是 `STALE`，要点胶囊「登录」回写快照，不要 `stack start`。
 
 `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/product-search.test.ts` 检查候选归属、隔离、半开有效期、并发复制、取消及事件失败。`pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx` 检查查询中 `source_gate` / `unavailable` 掉租约时的 overlay 文案，且不得出现「当前版本已失效」。`pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/product-session.spec.ts` 在 build 后运行真实 Electron 登录/搜索/复制/退出，HTTP 为合成 double；不是 PG 整链、人工观察或 Windows 实机证据。
 

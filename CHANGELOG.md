@@ -2,6 +2,16 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.8] - 2026-09-20
+
+### Fixed
+
+- Dashboard wording detail card uses the same source label as 来源 (`当前发布` or `本机话术库`), not a hardcoded “本机话术库”.
+
+### Changed
+
+- Docs match the shipped query and Dashboard wording behavior: every product search refreshes the announcement; the wording library hydrates from the current publish; macOS UNSIGNED fox / Feishu / query / copy stay observed; account login and offline stay unobserved.
+
 ## [0.3.7] - 2026-09-20
 
 ### Fixed

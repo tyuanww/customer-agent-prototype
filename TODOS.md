@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 代码已合入 main（#133 / #135 / #145）。账号 identity 用 `https://agent-pass.jianghua.site`，口令服务仍 loopback。打包态远端勾选仍未观察：macOS / Windows 办公机 / Linux。`package:linux` 须在 Linux 上跑。API 绑 `0.0.0.0` 仍未做。
+**Status:** OPEN · 代码已合入 main（#133 / #135 / #145 / #153 / #154）。账号 identity 用 `https://agent-pass.jianghua.site`，口令服务仍 loopback。macOS UNSIGNED v0.3.7：狐狸 / 飞书 / 查询 / 复制已观察，账号登录与关窗/断网未观察。现行文档/详情卡口径是 v0.3.8。Windows 办公机与 Linux 打包态远端仍全部未观察。`package:linux` 须在 Linux 上跑。API 绑 `0.0.0.0` 仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -147,7 +147,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P3 或 P4
-**Status:** P3 段不适用主链。P4 `product-remote` 适用但 **未观察**；清单见 `docs/how-to-verify-macos-m5.md` §7.1、`docs/how-to-macos-packaged-product-remote.md`、`docs/plans/2026-09-19-p9-remote-m5.md`。本刀不把 M5 标完成，不授权再打包。
+**Status:** P3 段不适用主链。macOS 打包态 how-to 的狐狸 / 飞书 / 查询 / 复制已在 v0.3.7 观察，**不等于**本项完成。P9 要的断网 / STALE / 干净 userData 仍 **未观察**。账号登录、Windows 办公机、Linux 打包态远端仍未观察。清单见 `docs/how-to-verify-macos-m5.md` §7.1、`docs/how-to-macos-packaged-product-remote.md`、`docs/plans/2026-09-19-p9-remote-m5.md`。本刀不把 M5 标完成。
 
 ### Overlay · Windows 收起后交还前台输入框
 

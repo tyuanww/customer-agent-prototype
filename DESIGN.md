@@ -132,7 +132,7 @@ VOC 页面使用用户提供工作簿做**只读结构与聚合校准**，Git �
 
 Dashboard 的 BI 表达至少包含：概览的可切指标固定周期趋势图、检索终态构成图，以及 VOC 的问题 Pareto 与产品×问题热力图。图表必须有标题、单位 / 周期、合成口径、键盘可达的选择态和联动详情；筛选或选择必须真实改变本地视图，不能只是装饰。
 
-全部数据来自编译期静态、深冻结的合成 manifest。不读取 Float 真实输入，不写磁盘，不用 localStorage / IndexedDB。
+VOC / 工单 / KPI 仍来自编译期静态、深冻结的合成 manifest。话术库读当前发布 hydrate（见上），不因此改写 VOC 数字。不读取 Float 真实输入，不写磁盘，不用 localStorage / IndexedDB。
 
 Publish 若出现，必须 disabled，并附 `演示禁用 · 正式需 owner + G0/Ddev`。
 
