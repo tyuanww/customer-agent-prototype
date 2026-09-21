@@ -219,13 +219,19 @@ describe('iteration task HTTP routes', () => {
     });
     expect(invalid.statusCode).toBe(400);
 
-    const invented = await app.inject({
+    const inaccuracy = await app.inject({
       method: 'POST',
       url: '/v1/inaccuracy-reports',
       headers: { ...coachHeaders, 'idempotency-key': 'idem-invented' },
       payload: { query_id: '4d690ef7-a98d-4a56-a9c4-92ae4c52168f', script_id: 'script-1' },
     });
-    expect(invented.statusCode).toBe(404);
+    expect(inaccuracy.statusCode).toBe(503);
+    const tickets = await app.inject({
+      method: 'POST',
+      url: '/v1/tickets',
+      headers: coachHeaders,
+    });
+    expect(tickets.statusCode).toBe(404);
     expect(repository.list).not.toHaveBeenCalled();
   });
 
