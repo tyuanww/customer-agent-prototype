@@ -50,7 +50,7 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 核对 Mac 开发机 NSPanel / P7 / P9 收口（不引入 native、索引不进包、离线 S0 不验 M5 主链） | [docs/plans/2026-09-18-mac-dev-remainder.md](docs/plans/2026-09-18-mac-dev-remainder.md) |
 | 已合入 main 的分支合入记录（两条 P7 只留 origin 隔离线） | [docs/plans/2026-09-19-local-unpushed-merge-order.md](docs/plans/2026-09-19-local-unpushed-merge-order.md) |
 | 办公机产品主链（远端；Windows 实机仍未观察，用当前 main v0.3.16 的 UNSIGNED.exe） | [docs/how-to-office-machine-product-remote.md](docs/how-to-office-machine-product-remote.md) |
-| macOS 打包态产品主链（远端；v0.3.7 狐狸 / 飞书 / 查询 / 复制已观察，账号与断网未观察；详情卡标签从 v0.3.8 起跟 ownerRole） | [docs/how-to-macos-packaged-product-remote.md](docs/how-to-macos-packaged-product-remote.md) |
+| macOS 打包态产品主链（远端；0.3.18 上线切面，须重打 UNSIGNED 再勾；账号与断网未观察） | [docs/how-to-macos-packaged-product-remote.md](docs/how-to-macos-packaged-product-remote.md) |
 | Linux 打包态产品主链（远端，全部未观察；`package:linux` 须在 Linux 上跑） | [docs/how-to-linux-packaged-product-remote.md](docs/how-to-linux-packaged-product-remote.md) |
 | 方案 C：飞书 OAuth + 产品自管账号口令（不用 Logto） | [docs/plans/2026-09-18-identity-c-password-and-feishu.md](docs/plans/2026-09-18-identity-c-password-and-feishu.md) · [how-to](docs/how-to-feishu-and-password-mac.md) |
 | P4 远端：桌面连受控 HTTPS，API 仍 loopback | [docs/plans/2026-09-19-p4-remote-https-profile.md](docs/plans/2026-09-19-p4-remote-https-profile.md) · [how-to](docs/how-to-p4-remote-mac.md) |

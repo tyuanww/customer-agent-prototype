@@ -8,6 +8,27 @@
 
 登录只有 **飞书** 和 **账号**。不要在本机为这条主链另装 PostgreSQL。
 
+## 0.3.18 上线切面
+
+当前产品 `main` 是 **0.3.18**。第一版只证明这条链，不扩范围：
+
+1. 管理员发布（话术师发产品/活动仍是立项仓合同，产品仓还是 owner-only）。
+2. 坐席飞书或账号登录后查询、复制。
+3. 未签名包，没有 `latest.yml`，不自动更新。
+4. 缺配置必须弹窗，不能闪退。
+5. 不改备案隧道，不把 API / PostgreSQL 打进安装包。
+
+做法：
+
+1. 在产品仓 `main` 上跑 `pnpm package:mac:local`。产物在 `release/local-unsigned/`，文件名含 `UNSIGNED` 和 `0.3.18`。
+2. 确认 `https://agent-auth.jianghua.site/health` 为 200。本机不要另装 PostgreSQL。
+3. 把下面的 `synthetic-stack.json` 放到 `~/Library/Application Support/客服话术浮窗 Demo/`。打包态忽略 `CUSTOMER_AGENT_DESKTOP_*`。
+4. 关掉旧 `.app`，打开这次的 UNSIGNED。按下面表格勾 1–4。账号登录、关窗/断网仍是未观察。
+5. 内容发布按 [管理员导入并发布](tutorial-menokin-content-publish.md) 勾 6–7。话术师点发布预期仍是 403。
+6. 办公机首轮不要用这份远端配置。离线安装/启动/浮窗/快捷键/卸载见 [办公机首轮](how-to-office-machine-first-round.md)。
+
+未在这台机器上打开 0.3.18 包之前，不要把下表改成通过。
+
 ## 准备
 
 1. 合入后的 UNSIGNED `.app`（文件名含 `UNSIGNED`）。
@@ -26,7 +47,7 @@
 
 ## 勾选
 
-本机 v0.3.7 UNSIGNED（`52a16db` / #154 包）于 2026-09-20 核对：狐狸 → 飞书 → 查询 → 复制（下表 1 / 2 / 4）。话术库列表来源为「当前发布」。v0.3.8 只补详情卡标签与「来源」同为 `ownerRole`，不推翻 1 / 2 / 4。`main` `3b88992` 起工作台是五项导航，顶栏不再放「演示数据」；Owner 发布走 dual-review。请用当前 main 重打的 UNSIGNED 再勾工作台，不要用 0.3.7 包当五项导航证据。账号登录与关窗/断网仍未观察。
+历史：v0.3.7 UNSIGNED 曾核对狐狸 → 飞书 → 查询 → 复制（下表 1 / 2 / 4）。那不是 0.3.18 的证据。工作台五项导航、dual-review、不准落库和 SOP 停手文案都在其后的 main 上。请用 **0.3.18** 的 UNSIGNED 重勾。账号登录与关窗/断网仍未观察。
 
 | # | 步骤 | 预期 | 通过 / 未通过 / 未观察 |
 | --- | --- | --- | --- |
