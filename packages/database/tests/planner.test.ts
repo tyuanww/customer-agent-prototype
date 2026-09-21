@@ -30,7 +30,7 @@ describe('database migration planner', () => {
     const partial = deriveMigrationStatus([ledgerRow(0), ledgerRow(1)], generatedMigrationCatalogue);
     expect(partial.state).toBe('PARTIAL');
     expect(partial.pending[0]?.id).toBe('0003_events_and_metrics');
-    expect(planMigrationCatalogue(partial).migrations).toHaveLength(12);
+    expect(planMigrationCatalogue(partial).migrations).toHaveLength(13);
 
     const complete = deriveMigrationStatus(
       generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)),
@@ -132,7 +132,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(14);
+    expect(status.pending).toHaveLength(15);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });
