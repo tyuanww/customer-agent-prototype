@@ -4,7 +4,8 @@ import { parseContractSchema } from '@customer-agent/contracts';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 import { queryFailure, type ProductCandidate, type ProductSearchRequest, type ProductCopyRequest,
-  type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
+  type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity,
+  type ProductInaccuracyRequest, type ProductInaccuracyResult } from '../shared/product-search';
 import type { AnnounceGate } from '../shared/product-announce';
 import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
@@ -374,6 +375,35 @@ export class ProductSearch {
       return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, copied: true, eventStatus };
     } catch (error) { return this.failure(error, request); }
     finally { if (state && acquired) state.copying = false; }
+  }
+  async reportInaccuracy(sender: number, request: ProductInaccuracyRequest): Promise<ProductInaccuracyResult> {
+    try {
+      const state = this.states.get(sender);
+      const result = state?.result;
+      if (!state || !result || state.generation !== request.generation || state.sessionEpoch !== request.sessionEpoch) {
+        throw new ProductHttpError('STALE');
+      }
+      if (result.queryId !== request.queryId) throw new ProductHttpError('STALE');
+      const candidate = result.candidates.find((item) => item.script_id === request.scriptId);
+      if (result.telemetryStatus === 'collection_disabled') {
+        return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, recorded: false };
+      }
+      await this.session.request(request.sessionEpoch, '/v1/inaccuracy-reports', {
+        headers: { 'idempotency-key': randomUUID() },
+        body: {
+          query_id: request.queryId,
+          script_id: request.scriptId,
+          ...(candidate ? {
+            script_version: candidate.script_version,
+            rank: candidate.rank,
+            content_hash: candidate.content_hash,
+          } : {}),
+        },
+      });
+      return { ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation, recorded: true };
+    } catch (error) {
+      return this.failure(error, request);
+    }
   }
   async escalate(sender: number, request: ProductEscalateRequest): Promise<ProductEscalateResult> {
     try {

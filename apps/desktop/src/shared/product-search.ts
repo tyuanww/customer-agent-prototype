@@ -43,10 +43,30 @@ export function isProductCopyRequest(v: unknown): v is ProductCopyRequest {
     && !Array.isArray(v.placeholderValues) && Object.entries(v.placeholderValues).every(([k, value]) => ['order_id', 'date'].includes(k)
       && typeof value === 'string' && value.trim().length > 0 && value.length <= 128 && !/[\p{Cc}{}]/u.test(value) && (k !== 'date' || (/^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value)));
 }
+export type ProductInaccuracyRequest = QueryIdentity & {
+  queryId: string;
+  scriptId: string;
+  scriptVersion?: number;
+  rank?: 1 | 2 | 3;
+  contentHash?: string;
+};
+export type ProductInaccuracyResult =
+  | (QueryIdentity & { ok: true; recorded: boolean })
+  | ProductSearchFailure;
+export function isProductInaccuracyRequest(v: unknown): v is ProductInaccuracyRequest {
+  return !!v && typeof v === 'object'
+    && isQueryIdentity(v)
+    && typeof (v as ProductInaccuracyRequest).queryId === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((v as ProductInaccuracyRequest).queryId)
+    && typeof (v as ProductInaccuracyRequest).scriptId === 'string'
+    && (v as ProductInaccuracyRequest).scriptId.length >= 1
+    && (v as ProductInaccuracyRequest).scriptId.length <= 128;
+}
 export type ProductSearchApi = {
   search(request: ProductSearchRequest): Promise<ProductSearchResult>;
   cancelSearch(request: QueryIdentity): Promise<ProductCancelResult>;
   copyAdopt(request: ProductCopyRequest): Promise<ProductCopyResult>;
+  reportInaccuracy?(request: ProductInaccuracyRequest): Promise<ProductInaccuracyResult>;
   retrievalPreference?(): Promise<import('./retrieval-preference').RetrievalPreference>;
   setRetrievalPreference?(next: import('./retrieval-preference').RetrievalPreference): Promise<import('./retrieval-preference').RetrievalPreference>;
 };

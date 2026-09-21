@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DashboardWordingView } from '@shared/dashboard-wording';
+import type { DashboardSoftwareCatalog } from '@shared/dashboard-ops-loop';
 import { StatusBadge } from './StatusBadge';
 
 type ActiveTab = 'wording' | 'software';
@@ -58,20 +59,55 @@ function WordingTab() {
 }
 
 function SoftwareTab() {
+  const [catalog, setCatalog] = useState<DashboardSoftwareCatalog | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const load = () => {
+    const api = window.dashboardOps;
+    if (!api) {
+      setCatalog(null);
+      setMessage('未接入：没有安装包目录接口，UNSIGNED 禁止 latest.yml。');
+      return;
+    }
+    void api.softwareCatalog().then((result) => {
+      if (!result.ok) {
+        setCatalog(null);
+        setMessage(result.message);
+        return;
+      }
+      setCatalog(result);
+      const current = result.current;
+      setMessage(current
+        ? `${current.version} · ${current.signed ? '已签名' : 'UNSIGNED'} · 不跑 latest.yml`
+        : '目录为空，没有当前建议版本。');
+    }).catch(() => {
+      setCatalog(null);
+      setMessage('未接入：没有安装包目录接口，UNSIGNED 禁止 latest.yml。');
+    });
+  };
+
   return (
     <>
-      <p className="dash-scope">安装包目录和自动更新没有冻结合同，不能假装检查成功。</p>
+      <p className="dash-scope">软件目录只展示 https 下载地址。UNSIGNED 必须 signed=false。禁止 latest.yml。</p>
       <div className="dash-card" data-testid="software-version-card">
         <div className="dash-card-row">
           <span className="dash-card-label">软件版本</span>
-          <StatusBadge label="未接入" tone="warn" />
+          <StatusBadge
+            label={catalog?.current ? catalog.current.version : '未接入'}
+            tone={catalog?.current ? (catalog.current.signed ? 'ok' : 'warn') : 'warn'}
+          />
         </div>
+        {catalog?.current ? (
+          <dl className="dash-dl">
+            <div><dt>平台</dt><dd>{catalog.current.platform}</dd></div>
+            <div><dt>签名</dt><dd>{catalog.current.signed ? '已签名' : 'UNSIGNED'}</dd></div>
+          </dl>
+        ) : null}
         <button
           type="button"
           className="dash-reset"
           data-testid="software-check-update"
-          onClick={() => setMessage('未接入：没有安装包目录接口，UNSIGNED 禁止 latest.yml。')}
+          onClick={load}
         >
           检查更新
         </button>
@@ -89,7 +125,7 @@ export function AnnounceModule() {
       <header className="dash-module-head">
         <div>
           <h1>系统同步</h1>
-          <p className="dash-kicker">话术版本读当前发布 · 软件更新未接入</p>
+          <p className="dash-kicker">话术版本读当前发布 · 软件目录只展示不自动更新</p>
         </div>
       </header>
 

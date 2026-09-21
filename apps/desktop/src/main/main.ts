@@ -12,6 +12,7 @@ import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { registerDashboardContentIpc } from './dashboard-content-ipc';
 import { registerDashboardIterationIpc } from './dashboard-iteration-ipc';
+import { registerDashboardOpsLoopIpc } from './dashboard-ops-loop-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
@@ -259,6 +260,11 @@ if (!gotLock) {
       },
     );
     registerDashboardIterationIpc(
+      productSession,
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+    );
+    registerDashboardOpsLoopIpc(
       productSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,

@@ -1650,23 +1650,39 @@ export function QueryApp() {
             onOpenSop={openAllergySop}
             reportedScriptIds={reportedScriptIds}
             onReportInaccuracy={(script) => {
-              const sessionKey = lastProductQueryRef.current?.queryId
-                ?? `local:${searchGenerationRef.current}`;
-              setReportedScriptIds((current) => {
-                const seenKeys = new Set(
-                  [...current].map((scriptId) => inaccuracyReportKey({ sessionKey, scriptId })),
-                );
-                if (!shouldAcceptInaccuracyReport({
-                  sessionKey,
+              const last = lastProductQueryRef.current;
+              const sessionKey = last?.queryId ?? `local:${searchGenerationRef.current}`;
+              const report = window.customerAgent?.productSearch?.reportInaccuracy;
+              const markLocal = () => {
+                setReportedScriptIds((current) => {
+                  const seenKeys = new Set(
+                    [...current].map((scriptId) => inaccuracyReportKey({ sessionKey, scriptId })),
+                  );
+                  if (!shouldAcceptInaccuracyReport({
+                    sessionKey,
+                    scriptId: script.scriptId,
+                    seenKeys,
+                  })) {
+                    return current;
+                  }
+                  const next = new Set(current);
+                  next.add(script.scriptId);
+                  return next;
+                });
+              };
+              if (report && last && /^[0-9a-f-]{36}$/i.test(last.queryId)) {
+                void report({
+                  sessionEpoch: last.sessionEpoch,
+                  generation: last.generation,
+                  queryId: last.queryId,
                   scriptId: script.scriptId,
-                  seenKeys,
-                })) {
-                  return current;
-                }
-                const next = new Set(current);
-                next.add(script.scriptId);
-                return next;
-              });
+                  rank: script.rank,
+                }).then((result) => {
+                  if (result.ok) markLocal();
+                });
+                return;
+              }
+              markLocal();
             }}
             onRetry={retry}
             onCopy={(item, trigger) => {

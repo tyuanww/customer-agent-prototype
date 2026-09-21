@@ -1,4 +1,4 @@
-import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity } from '../shared/product-search';
+import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductInaccuracyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity, type ProductInaccuracyResult } from '../shared/product-search';
 import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isProductAnnounceInvalidation, type ProductAnnounceInvalidation } from '../shared/product-announce';
 import { helpFailure, isProductEscalateRequest, isProductEscalateResult, isProductTerminalRequest, isProductTerminalResult } from '../shared/product-help';
 import { catalogFailure, isProductCatalogResult } from '../shared/product-catalog';
@@ -120,6 +120,21 @@ const api: CustomerAgentApi = {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
     copyAdopt: request => queryInvoke(IPC_CHANNELS.PRODUCT_COPY_ADOPT, request) as Promise<ProductCopyResult>,
     cancelSearch: request => queryInvoke(IPC_CHANNELS.PRODUCT_CANCEL_SEARCH, request) as Promise<ProductCancelResult>,
+    async reportInaccuracy(request) {
+      if (!isProductInaccuracyRequest(request)) return queryFailure('VALIDATION', { sessionEpoch: 0, generation: 0 });
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_INACCURACY_REPORT, request);
+        if (!value || typeof value !== 'object') return queryFailure('UNAVAILABLE', request);
+        const record = value as ProductInaccuracyResult;
+        if (record.ok === false) return record;
+        if (record.ok === true && record.sessionEpoch === request.sessionEpoch && record.generation === request.generation) {
+          return record;
+        }
+        return queryFailure('UNAVAILABLE', request);
+      } catch {
+        return queryFailure('UNAVAILABLE', request);
+      }
+    },
     async retrievalPreference() {
       return readRetrievalPreference();
     },

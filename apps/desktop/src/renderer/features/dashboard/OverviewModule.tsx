@@ -4,8 +4,13 @@ import {
   type DashboardIterationTask,
 } from '@shared/dashboard-iteration';
 import type { DashboardWordingView } from '@shared/dashboard-wording';
+import type { DashboardRetrievalMetrics } from '@shared/dashboard-ops-loop';
 import type { DashboardModuleId } from '../../data/dashboard-manifest';
 import { StatusBadge } from './StatusBadge';
+
+function percent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
 
 const CAUSE_LABELS = {
   content_gap: '内容缺口',
@@ -27,11 +32,22 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
   const [tasks, setTasks] = useState<readonly DashboardIterationTask[] | null>(null);
   const [taskMessage, setTaskMessage] = useState('加载中…');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [retrieval, setRetrieval] = useState<DashboardRetrievalMetrics | null>(null);
 
   useEffect(() => {
     let live = true;
     const wordingApi = window.dashboardWording;
     const iterationApi = window.dashboardIteration;
+    const opsApi = window.dashboardOps;
+    if (opsApi) {
+      void opsApi.retrieval('current_release').then((result) => {
+        if (!live) return;
+        setRetrieval(result.ok ? result : null);
+      }).catch(() => {
+        if (!live) return;
+        setRetrieval(null);
+      });
+    }
     if (wordingApi) {
       void wordingApi.list().then((result) => {
         if (!live) return;
@@ -107,7 +123,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         </div>
         <div>
           <dt>检索账</dt>
-          <dd>未接入</dd>
+          <dd>{retrieval ? (retrieval.window === 'last_7d' ? '近 7 天' : '当前发布') : '未接入'}</dd>
         </div>
       </dl>
 
@@ -119,13 +135,13 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         <dl className="health-strip" role="list" aria-label="核心运营指标">
           <div className="health-kpi" role="listitem" data-testid="overview-alert-nohit">
             <dt>无命中率</dt>
-            <dd>未接入</dd>
-            <p>没有冻结检索账接口</p>
+            <dd>{retrieval ? percent(retrieval.noHitRate) : '未接入'}</dd>
+            <p>{retrieval ? '当前发布检索账' : '没有检索账'}</p>
           </div>
           <div className="health-kpi" role="listitem">
             <dt>复制完成率</dt>
-            <dd>未接入</dd>
-            <p>没有冻结检索账接口</p>
+            <dd>{retrieval ? percent(retrieval.copyCompleteRate) : '未接入'}</dd>
+            <p>{retrieval ? '当前发布检索账' : '没有检索账'}</p>
           </div>
           <div className="health-kpi" role="listitem" data-testid="overview-alert-todos">
             <dt>开放待办</dt>

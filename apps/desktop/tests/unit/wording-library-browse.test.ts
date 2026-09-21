@@ -8,18 +8,22 @@ import {
 
 function entry(partial: Partial<DashboardWordingEntry> & Pick<DashboardWordingEntry, 'scriptId' | 'title'>): DashboardWordingEntry {
   return {
-    domain: 'product',
-    scene: '怎么用',
-    answerPreview: '先打湿',
-    platform: '千牛',
-    version: 'rel_18',
-    effectiveWindow: '当前发布',
-    risk: 'low',
+    scriptId: partial.scriptId,
+    title: partial.title,
+    domain: partial.domain ?? 'product',
+    scene: partial.scene ?? '怎么用',
+    answerPreview: partial.answerPreview ?? '先打湿',
+    platform: partial.platform ?? '千牛',
+    version: partial.version ?? 'rel_18',
+    scriptVersion: partial.scriptVersion ?? null,
+    effectiveFrom: partial.effectiveFrom ?? null,
+    effectiveTo: partial.effectiveTo ?? null,
+    effectiveWindow: partial.effectiveWindow ?? '当前发布',
+    risk: partial.risk ?? 'low',
     lifecycle: 'published',
     lifecycleLabel: '已发布',
-    ownerRole: '当前发布',
+    ownerRole: partial.ownerRole ?? '当前发布',
     dataClass: 'local-catalog',
-    ...partial,
   };
 }
 
