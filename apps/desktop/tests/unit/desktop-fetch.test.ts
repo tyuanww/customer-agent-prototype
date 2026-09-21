@@ -20,6 +20,8 @@ describe('desktop fetch', () => {
       const response = await desktopFetch('https://example.invalid/health');
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(response.status).toBe(200);
+      await desktopFetch('http://127.0.0.1:43100/health');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     } finally {
       globalThis.fetch = previous;
     }
