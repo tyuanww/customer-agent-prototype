@@ -45,8 +45,9 @@ function isWordingList(value: unknown): boolean {
       && (record.code === 'FORBIDDEN' || record.code === 'VALIDATION' || record.code === 'UNAVAILABLE');
   }
   return record.ok === true
-    && Object.keys(record).length === 4
+    && Object.keys(record).length === 5
     && (record.releaseId === null || typeof record.releaseId === 'string')
+    && (record.catalogRefreshedAt === null || typeof record.catalogRefreshedAt === 'string')
     && Number.isSafeInteger(record.total)
     && (record.total as number) >= 0
     && Array.isArray(record.entries)

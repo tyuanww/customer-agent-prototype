@@ -1290,6 +1290,7 @@ describe('DashboardApp', () => {
       list: async () => ({
         ok: true as const,
         releaseId: 'rel_18',
+        catalogRefreshedAt: null,
         total: 2,
         entries: [
           {
@@ -1362,6 +1363,7 @@ describe('DashboardApp', () => {
       list: async () => ({
         ok: true as const,
         releaseId: 'rel_18',
+        catalogRefreshedAt: null,
         total: 1,
         entries: [
           {
@@ -1414,6 +1416,7 @@ describe('DashboardApp', () => {
       list: async () => ({
         ok: true as const,
         releaseId: 'rel_18',
+        catalogRefreshedAt: null,
         total: 25,
         entries: Array.from({ length: 25 }, (_, index) => ({
           scriptId: `mn-${index + 1}`,
@@ -1489,6 +1492,7 @@ describe('DashboardApp', () => {
       list: async () => ({
         ok: true as const,
         releaseId: 'rel_18',
+        catalogRefreshedAt: null,
         total: 26,
         entries: [
           ...Array.from({ length: 25 }, (_, index) => ({

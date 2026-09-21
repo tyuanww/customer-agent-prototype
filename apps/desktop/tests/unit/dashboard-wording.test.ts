@@ -58,6 +58,7 @@ describe('dashboard wording catalog', () => {
     expect(result.total).toBe(1);
     expect(result.releaseId).toBe('rel_seed');
     expect(result.entries.map((entry) => entry.scriptId)).toEqual(['seed-1']);
+    expect(result.catalogRefreshedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(result.entries[0]).toMatchObject({
       domain: 'presale',
       lifecycle: 'published',
