@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  INACCURACY_TASK_THRESHOLD_24H,
-  INACCURACY_TASK_THRESHOLD_7D,
-} from '@shared/inaccuracy-report';
-import {
   ITERATION_COPY,
   type DashboardIterationTask,
 } from '@shared/dashboard-iteration';
+import {
+  INACCURACY_TODO_COPY,
+  aggregateInaccuracyTodoCounts,
+  inaccuracyScriptIdFromTask,
+} from '@shared/inaccuracy-todo';
 import {
   DASHBOARD_MANIFEST,
   listOpenP0IterationTasks,
@@ -70,6 +71,8 @@ function initialServerVersions(): Record<string, number> {
 }
 
 function asModuleTask(task: DashboardIterationTask): IterationTask {
+  const scriptId = inaccuracyScriptIdFromTask(task);
+  const sampleCount = new Set(task.sampleQueryIds.filter((queryId) => queryId.length > 0)).size;
   return {
     taskId: task.taskId,
     signalId: task.signalId,
@@ -84,9 +87,9 @@ function asModuleTask(task: DashboardIterationTask): IterationTask {
     resolution: task.resolution,
     resolutionNote: task.resolutionNote,
     owner: task.assigneeRole && task.assigneeRole.length > 0 ? task.assigneeRole : '未指派',
-    evidenceCount: task.sampleQueryIds.length,
-    title: task.clusterKey,
-    detail: task.signalId,
+    evidenceCount: sampleCount,
+    title: scriptId ? `话术不准 · ${scriptId}` : task.clusterKey,
+    detail: scriptId ? `稿 ${scriptId} · 样本 ${sampleCount} 次` : task.signalId,
     nextStep: '不自动改写 Answer。关闭待办不等于已发布。',
   };
 }
@@ -164,6 +167,7 @@ export function IterationModule() {
   // 详情独立于筛选：横幅点选后即使筛掉了该行，详情仍跟随选中项。
   const selected = tasks.find((task) => task.taskId === selectedId) ?? visible[0];
   const p0Open = listOpenP0IterationTasks(tasks);
+  const inaccuracyCounts = useMemo(() => aggregateInaccuracyTodoCounts(tasks), [tasks]);
   const edited = !live && (
     tasks.some((task) => {
       const source = data.tasks.find((item) => item.taskId === task.taskId);
@@ -301,8 +305,26 @@ export function IterationModule() {
       </header>
       <p className="dash-scope">{data.domainNote}</p>
       <p className="dash-footnote" data-testid="iteration-inaccuracy-counts-footnote">
-        「话术不准」计数尚未接入。达到 24 小时 ≥ {INACCURACY_TASK_THRESHOLD_24H} 或 7 天 ≥ {INACCURACY_TASK_THRESHOLD_7D} 才会打开 iteration_task；本页不展示实时数字，也不自动改写或关单。
+        {live ? INACCURACY_TODO_COPY.footnoteLive : INACCURACY_TODO_COPY.footnoteMock}
       </p>
+      {liveStatus === 'ready' ? (
+        <section className="dash-card" data-testid="iteration-inaccuracy-counts">
+          <div className="dash-card-row">
+            <h2>{INACCURACY_TODO_COPY.heading}</h2>
+          </div>
+          {inaccuracyCounts.length === 0 ? (
+            <p className="dash-footnote" data-testid="iteration-inaccuracy-empty">{INACCURACY_TODO_COPY.empty}</p>
+          ) : (
+            <ul className="iteration-reminder-list">
+              {inaccuracyCounts.map((row) => (
+                <li key={row.scriptId} data-testid={`iteration-inaccuracy-${row.scriptId}`}>
+                  稿 {row.scriptId} · 样本 {row.sampleCount} 次 · 开放待办 {row.openTaskCount}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {liveStatus === 'unavailable' ? (
         <p className="dash-empty-state" role="alert" data-testid="iteration-live-status">
