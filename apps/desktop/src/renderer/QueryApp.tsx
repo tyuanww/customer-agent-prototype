@@ -40,6 +40,7 @@ import { QueryResultsPane } from './features/search/QueryResultsPane';
 import { searchScripts } from './features/search/search-service';
 import type { RankedScript } from './features/search/types';
 import { inaccuracyReportKey, shouldAcceptInaccuracyReport } from '@shared/inaccuracy-report';
+import { PRODUCT_QUERY_UUID } from '@shared/product-search';
 import {
   COPY_FEEDBACK_MS,
   DEEP_THINKING_DESCRIPTION,
@@ -1650,23 +1651,39 @@ export function QueryApp() {
             onOpenSop={openAllergySop}
             reportedScriptIds={reportedScriptIds}
             onReportInaccuracy={(script) => {
-              const sessionKey = lastProductQueryRef.current?.queryId
-                ?? `local:${searchGenerationRef.current}`;
-              setReportedScriptIds((current) => {
-                const seenKeys = new Set(
-                  [...current].map((scriptId) => inaccuracyReportKey({ sessionKey, scriptId })),
-                );
-                if (!shouldAcceptInaccuracyReport({
-                  sessionKey,
+              const last = lastProductQueryRef.current;
+              const sessionKey = last?.queryId ?? `local:${searchGenerationRef.current}`;
+              const report = window.customerAgent?.productSearch?.reportInaccuracy;
+              const markLocal = () => {
+                setReportedScriptIds((current) => {
+                  const seenKeys = new Set(
+                    [...current].map((scriptId) => inaccuracyReportKey({ sessionKey, scriptId })),
+                  );
+                  if (!shouldAcceptInaccuracyReport({
+                    sessionKey,
+                    scriptId: script.scriptId,
+                    seenKeys,
+                  })) {
+                    return current;
+                  }
+                  const next = new Set(current);
+                  next.add(script.scriptId);
+                  return next;
+                });
+              };
+              if (report && last && PRODUCT_QUERY_UUID.test(last.queryId)) {
+                void report({
+                  sessionEpoch: last.sessionEpoch,
+                  generation: last.generation,
+                  queryId: last.queryId,
                   scriptId: script.scriptId,
-                  seenKeys,
-                })) {
-                  return current;
-                }
-                const next = new Set(current);
-                next.add(script.scriptId);
-                return next;
-              });
+                  rank: script.rank,
+                }).then((result) => {
+                  if (result.ok) markLocal();
+                });
+                return;
+              }
+              markLocal();
             }}
             onRetry={retry}
             onCopy={(item, trigger) => {

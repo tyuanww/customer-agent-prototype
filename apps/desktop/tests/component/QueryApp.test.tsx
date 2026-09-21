@@ -1309,7 +1309,9 @@ describe('QueryApp', () => {
     await screen.findByTestId('copy-button-1');
 
     fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
-    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    await waitFor(() => {
+      expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    });
     expect(f.copyAdopt).not.toHaveBeenCalled();
     expect(f.escalate).not.toHaveBeenCalled();
     expect(f.recordTerminal).not.toHaveBeenCalled();
@@ -1327,6 +1329,109 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('report-inaccuracy-button-1')).toBeDisabled();
 
     await searchCleanser(user);
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-inaccuracy-button-1')).not.toBeDisabled();
+  });
+
+  it('calls reportInaccuracy only for live UUID query ids', async () => {
+    const f = connectProduct();
+    const reportInaccuracy = vi.fn(async (
+      request: import('../../src/shared/product-search').ProductInaccuracyRequest,
+    ) => ({
+      ok: true as const,
+      sessionEpoch: request.sessionEpoch,
+      generation: request.generation,
+      recorded: true,
+    }));
+    window.customerAgent!.productSearch!.reportInaccuracy = reportInaccuracy;
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    await waitFor(() => expect(reportInaccuracy).toHaveBeenCalledWith(expect.objectContaining({
+      queryId: '11111111-1111-4111-8111-111111111111',
+      scriptId: 'script-synthetic',
+    })));
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+
+    reportInaccuracy.mockClear();
+    f.search.mockImplementation(async (request) => ({
+      ok: true as const,
+      sessionEpoch: request.sessionEpoch,
+      generation: request.generation,
+      queryId: 'local-not-a-uuid',
+      hitStatus: 'hit' as const,
+      releaseId: 'rel-synthetic',
+      telemetryStatus: 'recorded' as const,
+      candidates: [{
+        rank: 1, release_id: 'rel-synthetic', script_id: 'script-synthetic', script_version: 1,
+        content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const,
+        answer_text: '合成订单 {订单号}', platform_scope: ['qianniu', 'douyin'] as Array<'qianniu' | 'douyin'>,
+        product_scope_type: 'storewide' as const, product_scope_refs: [],
+        effective_from: '2026-01-01T00:00:00Z', effective_to: null,
+        intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping',
+        risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const],
+      }],
+    }));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '另一发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('report-inaccuracy-button-1');
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    expect(reportInaccuracy).not.toHaveBeenCalled();
+  });
+
+  it('still invokes reportInaccuracy for collection_disabled UUID queries', async () => {
+    const f = connectProduct();
+    f.search.mockImplementation(async (request) => ({
+      ok: true as const,
+      sessionEpoch: request.sessionEpoch,
+      generation: request.generation,
+      queryId: '11111111-1111-4111-8111-111111111111',
+      hitStatus: 'hit' as const,
+      releaseId: 'rel-synthetic',
+      telemetryStatus: 'collection_disabled' as const,
+      candidates: [{
+        rank: 1, release_id: 'rel-synthetic', script_id: 'script-synthetic', script_version: 1,
+        content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const,
+        answer_text: '合成订单 {订单号}', platform_scope: ['qianniu', 'douyin'] as Array<'qianniu' | 'douyin'>,
+        product_scope_type: 'storewide' as const, product_scope_refs: [],
+        effective_from: '2026-01-01T00:00:00Z', effective_to: null,
+        intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping',
+        risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const],
+      }],
+    }));
+    const reportInaccuracy = vi.fn(async (
+      request: import('../../src/shared/product-search').ProductInaccuracyRequest,
+    ) => ({
+      ok: true as const,
+      sessionEpoch: request.sessionEpoch,
+      generation: request.generation,
+      recorded: false,
+    }));
+    window.customerAgent!.productSearch!.reportInaccuracy = reportInaccuracy;
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    await waitFor(() => expect(reportInaccuracy).toHaveBeenCalledWith(expect.objectContaining({
+      queryId: '11111111-1111-4111-8111-111111111111',
+      scriptId: 'script-synthetic',
+    })));
+    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+  });
+
+  it('does not mark a local inaccuracy report when the live post fails', async () => {
+    connectProduct();
+    const reportInaccuracy = vi.fn(async (
+      request: import('../../src/shared/product-search').ProductInaccuracyRequest,
+    ) => ({
+      ok: false as const,
+      sessionEpoch: request.sessionEpoch,
+      generation: request.generation,
+      code: 'RATE_LIMITED' as const,
+      message: '操作过于频繁，请稍后重试',
+    }));
+    window.customerAgent!.productSearch!.reportInaccuracy = reportInaccuracy;
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    await waitFor(() => expect(reportInaccuracy).toHaveBeenCalled());
     expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-inaccuracy-button-1')).not.toBeDisabled();
   });

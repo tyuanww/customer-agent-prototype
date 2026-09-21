@@ -10,6 +10,9 @@ export type DashboardWordingEntry = Readonly<{
   answerPreview: string;
   platform: string;
   version: string;
+  scriptVersion: number | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
   effectiveWindow: string;
   risk: 'low' | 'medium' | 'high';
   lifecycle: 'published';

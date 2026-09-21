@@ -10,6 +10,42 @@
 
 ## Open
 
+### P1 · 待办页按稿展示「话术不准」次数
+
+**What:** `POST /v1/inaccuracy-reports` 已接线，但 Dashboard 话术优化待办仍不展示按 `script_id` 聚合的次数。
+
+**Why:** 拍板 D 的验收是「工作台待办页能看到按稿聚合的次数」。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md` during `/ship` on `feat/ops-loop-api-desktop`.
+
+**Priority:** P1
+**Status:** OPEN · 适配器 PR 未做 UI 投影
+
+### P1 · 无命中 / 跳过 Top1 / stale 召回开 iteration_task
+
+**What:** 待办真信号目前只有不准阈值开单（0015）。无命中缺口、跳过 Top1 排序、有效窗口已过仍召回还没有写 `iteration_tasks` 的源。
+
+**Why:** 拍板 E。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
+
+**Priority:** P1
+**Status:** OPEN
+
+### P1 · 新发布后提示可关单
+
+**What:** 人改稿并发布后，系统应提示「已有新发布 / 可关单」，人手关。当前 close 仍是原 iteration 按钮，无发布后提示。
+
+**Why:** 拍板 E。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
+
+**Priority:** P1
+**Status:** OPEN
+
+### P1 · SOP 过敏步骤无停手文案不能发
+
+**What:** `parseSopCsv` / `import_sop_catalog` 不校验过敏域停手文案。CSV 只有 title/body/sort_key。
+
+**Why:** 拍板 F。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
+
+**Priority:** P1
+**Status:** OPEN
+
 ### P1 · 打包态配置失败没有可见反馈
 
 **What:** 打包构建在 userData 缺 `synthetic-stack.json`、其中 origin 非法、或该文件不可读时，`product-runtime-config.ts` 抛错，`main.ts` 的 catch 后 `app.quit()`。双击 exe 时看不到 stdout，使用者只看到「闪一下」。

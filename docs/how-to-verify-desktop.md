@@ -306,15 +306,15 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 话术不准（Query 切片 1）
 
-结果卡发丝按钮「话术不准」按 `scriptId` 记在本次 Query 浮窗会话里，文案「已记录，待话术师核实」。同一浮窗再搜同一条仍在。收起查询后丢弃。不走 IPC / API / Dashboard / `copyAdopt`。数字键 1/2/3 仍只复制。EMPTY 无命中继续 escalate。达到阈值后打开 `iteration_task` 仍要 persist；Dashboard 活列表不会因这次点击自动出现新待办。
+结果卡发丝按钮「话术不准」文案「已记录，待话术师核实」。Live UUID 查询走 `product:inaccuracy-report` → `POST /v1/inaccuracy-reports`，等 `ok` 才点亮；同一 `query_id` + `script_id` 由服务端去重。S0 非 UUID 只记在本浮窗会话，收起查询后丢弃。`collection_disabled` 不发 HTTP。不走 `copyAdopt`。数字键 1/2/3 仍只复制。EMPTY 无命中继续 escalate。Dashboard 待办页仍不展示按稿聚合次数；单次点击不会在待办列表里长出一行。
 
 | 你想证明 | 命令 |
 | --- | --- |
-| 话术不准入口与复制路径隔离 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx tests/component/SopApp.test.tsx tests/unit/query-view.test.ts tests/unit/query-visual.test.ts` |
+| 话术不准入口与复制路径隔离 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx tests/component/SopApp.test.tsx tests/unit/query-view.test.ts tests/unit/query-visual.test.ts tests/unit/product-search.test.ts tests/unit/product-search-ipc.test.ts` |
 
 ## 内容管理草稿（Dashboard 切片 1）
 
-「内容管理」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；parked 后走 dual-review，再 `POST /v1/content/publish`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库没有冻结合同，保持未接入。
+「内容管理」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；parked 后走 dual-review，再 `POST /v1/content/publish`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库走 ops-loop，见下方 Dashboard SOP。
 
 | 你想证明 | 命令 |
 | --- | --- |
@@ -322,7 +322,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 话术优化待办（Dashboard live list/start/close）
 
-「话术优化待办」不是新窗口。有 `window.dashboardIteration` 时走产品会话：`GET /v1/metrics/iteration-tasks` 列表，`POST /v1/events/iteration-tasks/{task_id}/start|close` 开始/关闭。仅 coach / owner；空列表合法，文案「当前没有待办」，不得回落 DEMO 5 条。坐席 403 文案「坐席不能查看或处理话术优化待办」。没有产品会话时「当前没有产品会话，无法加载待办」。CAS 冲突显示「待办已更新，请刷新后再处理」。关闭不等于已发布。无飞书推送。从「话术不准」自动开单仍要 persist。
+「话术优化待办」不是新窗口。有 `window.dashboardIteration` 时走产品会话：`GET /v1/metrics/iteration-tasks` 列表，`POST /v1/events/iteration-tasks/{task_id}/start|close` 开始/关闭。仅 coach / owner；空列表合法，文案「当前没有待办」，不得回落 DEMO 5 条。坐席 403 文案「坐席不能查看或处理话术优化待办」。没有产品会话时「当前没有产品会话，无法加载待办」。CAS 冲突显示「待办已更新，请刷新后再处理」。关闭不等于已发布。无飞书推送。Query「话术不准」已 persist；本页脚注仍写计数尚未接入。
 
 无 `dashboardIteration` 的测试夹具才保留会话内合成演练（P0 横幅、「重置演练」、本地 CAS）。
 
@@ -333,13 +333,14 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## Dashboard SOP
 
-侧栏「SOP」是五个一期模块之一，不是 Query 的独立 SOP 窗。没有持久化合同时，上传 / 更新 / 删除 / 导出 / 自定义步骤保持未接入，不把合成过敏树当运营目录。
+侧栏「SOP」是五个一期模块之一，不是 Query 的独立 SOP 窗。有产品会话且存在 `dashboardOps` 时：上传 CSV（≤256KB）覆盖当前会话树，更新针对选中节点，删除仅 Owner，导出是本机 CSV。没有会话时保持未接入，不把合成过敏树当运营目录。过敏停手文案尚未校验。
 
 | 你想证明 | 命令 |
 | --- | --- |
-| 写操作 fail-closed | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/SopLibraryModule.test.tsx tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts` |
+| SOP / 检索账 / 话术草稿 / 软件目录 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/SopLibraryModule.test.tsx tests/component/dashboard-live-actions.test.tsx tests/unit/dashboard-ops-loop.test.ts tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts tests/unit/contracts.test.ts` |
+| API ops-loop 合同 | `pnpm --filter @customer-agent/api exec vitest run tests/ops-loop-routes.test.ts tests/ops-loop-repository.test.ts tests/ops-loop-csv.test.ts` |
 
-黄金路径（人工）：打开运营工作台 → SOP → 点上传看到未接入。不要把它当成 Query「打开过敏售后流程」。
+黄金路径（人工）：产品远端登录 → 打开运营工作台 → SOP → 上传 CSV 看到节点数；没有产品会话时点上传仍是未接入。不要把它当成 Query「打开过敏售后流程」。
 
 ## 打包态显式离线（P3 第一刀）
 

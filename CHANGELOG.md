@@ -2,6 +2,20 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.18] - 2026-09-21
+
+### Added
+
+- You can persist 话术不准 for a live UUID query. Dashboard SOP can import, update, and delete the current product-session tree. Wording single-row update/delete enters a pending_review draft and still cannot skip dual-review. Overview shows live retrieval no-hit and copy-complete rates. Owner software catalog lists signed/unsigned rows and never uses latest.yml.
+
+### Changed
+
+- SOP write buttons talk to the ops-loop API when a product session exists. Wording copy says pending_review instead of 未接入冻结合同.
+
+### Fixed
+
+- 话术不准 waits for the API before marking the card recorded. Wording update/delete no longer targets the first catalog row when the current filter is empty.
+
 ## [0.3.17] - 2026-09-21
 
 ### Added

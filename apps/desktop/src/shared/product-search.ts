@@ -16,6 +16,7 @@ export type ProductSearchResult = (QueryIdentity & { ok: true; queryId: string; 
   telemetryStatus: 'recorded' | 'collection_disabled'; candidates: ProductCandidate[] }) | ProductSearchFailure;
 export type ProductCopyResult = (QueryIdentity & { ok: true; copied: true; eventStatus: 'recorded' | 'unrecorded' | 'disabled' }) | ProductSearchFailure;
 export type ProductCancelResult = (QueryIdentity & { ok: true; cancelled: true }) | ProductSearchFailure;
+export const PRODUCT_QUERY_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const queryFailure = (code: ProductFailure['code'], identity: QueryIdentity): ProductSearchFailure => ({ ...productFailure(code, identity.sessionEpoch), generation: identity.generation });
 export function isQueryIdentity(v: unknown): v is QueryIdentity & Record<string, unknown> {
   if (!v || typeof v !== 'object') return false;
@@ -35,7 +36,7 @@ export function isProductSearchRequest(v: unknown): v is ProductSearchRequest {
 }
 export function isProductCopyRequest(v: unknown): v is ProductCopyRequest {
   return exactKeys(v, ['sessionEpoch', 'generation', 'queryId', 'rank', 'scriptId', 'scriptVersion', 'contentHash', 'placeholderValues'])
-    && isQueryIdentity(v) && typeof v.queryId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.queryId)
+    && isQueryIdentity(v) && typeof v.queryId === 'string' && PRODUCT_QUERY_UUID.test(v.queryId)
     && Number.isInteger(v.rank) && (v.rank as number) >= 1 && (v.rank as number) <= 3
     && typeof v.scriptId === 'string' && v.scriptId.length > 0 && v.scriptId.length <= 128
     && Number.isSafeInteger(v.scriptVersion) && (v.scriptVersion as number) > 0 && typeof v.contentHash === 'string'
@@ -43,10 +44,30 @@ export function isProductCopyRequest(v: unknown): v is ProductCopyRequest {
     && !Array.isArray(v.placeholderValues) && Object.entries(v.placeholderValues).every(([k, value]) => ['order_id', 'date'].includes(k)
       && typeof value === 'string' && value.trim().length > 0 && value.length <= 128 && !/[\p{Cc}{}]/u.test(value) && (k !== 'date' || (/^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value)));
 }
+export type ProductInaccuracyRequest = QueryIdentity & {
+  queryId: string;
+  scriptId: string;
+  scriptVersion?: number;
+  rank?: 1 | 2 | 3;
+  contentHash?: string;
+};
+export type ProductInaccuracyResult =
+  | (QueryIdentity & { ok: true; recorded: boolean })
+  | ProductSearchFailure;
+export function isProductInaccuracyRequest(v: unknown): v is ProductInaccuracyRequest {
+  return !!v && typeof v === 'object'
+    && isQueryIdentity(v)
+    && typeof (v as ProductInaccuracyRequest).queryId === 'string'
+    && PRODUCT_QUERY_UUID.test((v as ProductInaccuracyRequest).queryId)
+    && typeof (v as ProductInaccuracyRequest).scriptId === 'string'
+    && (v as ProductInaccuracyRequest).scriptId.length >= 1
+    && (v as ProductInaccuracyRequest).scriptId.length <= 128;
+}
 export type ProductSearchApi = {
   search(request: ProductSearchRequest): Promise<ProductSearchResult>;
   cancelSearch(request: QueryIdentity): Promise<ProductCancelResult>;
   copyAdopt(request: ProductCopyRequest): Promise<ProductCopyResult>;
+  reportInaccuracy?(request: ProductInaccuracyRequest): Promise<ProductInaccuracyResult>;
   retrievalPreference?(): Promise<import('./retrieval-preference').RetrievalPreference>;
   setRetrievalPreference?(next: import('./retrieval-preference').RetrievalPreference): Promise<import('./retrieval-preference').RetrievalPreference>;
 };

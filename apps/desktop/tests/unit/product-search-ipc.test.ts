@@ -23,7 +23,7 @@ it('rejects Fox, unknown windows, subframes, extra arguments and unsigned Query'
   registerProductSearchIpc(null, null, () => [query, fox], wc => wc.id === 1 ? 'query' : 'fox', () => 'http://127.0.0.1:5173/');
   const event = (sender: WebContents, senderFrame: unknown = frame) => ({ sender, senderFrame }) as IpcMainInvokeEvent;
   for (const channel of [IPC_CHANNELS.PRODUCT_SEARCH, IPC_CHANNELS.PRODUCT_COPY_ADOPT, IPC_CHANNELS.PRODUCT_CANCEL_SEARCH,
-    IPC_CHANNELS.PRODUCT_ESCALATE, IPC_CHANNELS.PRODUCT_RECORD_TERMINAL]) {
+    IPC_CHANNELS.PRODUCT_ESCALATE, IPC_CHANNELS.PRODUCT_RECORD_TERMINAL, IPC_CHANNELS.PRODUCT_INACCURACY_REPORT]) {
     const invoke = handlers.get(channel)!;
     expect(await invoke(event(fox), {})).toMatchObject({ code: 'FORBIDDEN' });
     expect(await invoke(event(query, {}), {})).toMatchObject({ code: 'FORBIDDEN' });
@@ -49,4 +49,20 @@ it('defaults retrieval preference for Fox senders and refuses invalid writes', a
   expect(await set(event(query), { smartEnabled: false }, 'extra')).toEqual({ smartEnabled: false });
   expect(await set(event(query), { smartEnabled: 'yes' })).toEqual({ smartEnabled: false });
   expect(await get(event(fox))).toEqual(DEFAULT_RETRIEVAL_PREFERENCE);
+});
+
+it('guards inaccuracy IPC senders the same as other query channels', async () => {
+  const frame = { parent: null };
+  const query = { id: 1, isDestroyed: () => false, getURL: () => 'http://127.0.0.1:5173/?role=query', mainFrame: frame } as unknown as WebContents;
+  const fox = { ...query, id: 2 } as WebContents;
+  registerProductSearchIpc(null, null, () => [query, fox], wc => wc.id === 1 ? 'query' : 'fox', () => 'http://127.0.0.1:5173/');
+  const event = (sender: WebContents, senderFrame: unknown = frame) => ({ sender, senderFrame }) as IpcMainInvokeEvent;
+  const invoke = handlers.get(IPC_CHANNELS.PRODUCT_INACCURACY_REPORT)!;
+  const uuid = {
+    sessionEpoch: 1, generation: 1, queryId: '11111111-1111-4111-8111-111111111111', scriptId: 'script-synthetic-001',
+  };
+  expect(await invoke(event(fox), uuid)).toMatchObject({ code: 'FORBIDDEN' });
+  expect(await invoke(event(query, {}), uuid)).toMatchObject({ code: 'FORBIDDEN' });
+  expect(await invoke(event(query), uuid, {})).toMatchObject({ code: 'VALIDATION' });
+  expect(await invoke(event(query), uuid)).toMatchObject({ code: 'UNAUTHORIZED' });
 });

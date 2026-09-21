@@ -36,7 +36,7 @@ describe('dashboard manifest', () => {
     expect(DASHBOARD_NAV.find((item) => item.id === 'sop')).toEqual({
       id: 'sop',
       label: 'SOP',
-      blurb: '过敏流程预览 · 写库未接入',
+      blurb: '当前产品会话 SOP 树',
       group: '话术运营',
     });
     expect(DASHBOARD_NAV.filter((item) => item.group === '话术运营').map((item) => item.id)).toEqual([

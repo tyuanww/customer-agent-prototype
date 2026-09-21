@@ -1,7 +1,7 @@
 import { ipcMain, type WebContents } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import { exactKeys } from '../shared/product-session';
-import { isQueryIdentity, isProductCopyRequest, isProductSearchRequest, queryFailure } from '../shared/product-search';
+import { isQueryIdentity, isProductCopyRequest, isProductSearchRequest, isProductInaccuracyRequest, queryFailure } from '../shared/product-search';
 import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { isTrustedMainFrameSender } from './sender-guard';
 import type { OverlayRole } from '../shared/overlay-events';
@@ -39,6 +39,8 @@ export function registerProductSearchIpc(session: ProductSession | null, announc
       return queryFailure('VALIDATION', isQueryIdentity(value) ? value : { sessionEpoch: 0, generation: 0 });
     }));
   }
+  ipcMain.handle(IPC_CHANNELS.PRODUCT_INACCURACY_REPORT, (event, ...args: unknown[]) => guard(event, args, (id, value) =>
+    isProductInaccuracyRequest(value) ? search!.reportInaccuracy(id, value) : queryFailure('VALIDATION', isQueryIdentity(value) ? value : { sessionEpoch: 0, generation: 0 })));
   ipcMain.handle(IPC_CHANNELS.PRODUCT_ESCALATE, (event, ...args: unknown[]) => guard(event, args, (id, value) =>
     isProductEscalateRequest(value) ? search!.escalate(id, value) : queryFailure('VALIDATION', isQueryIdentity(value) ? value : { sessionEpoch: 0, generation: 0 })));
   ipcMain.handle(IPC_CHANNELS.PRODUCT_RECORD_TERMINAL, (event, ...args: unknown[]) => guard(event, args, (id, value) =>

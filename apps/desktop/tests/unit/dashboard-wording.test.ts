@@ -63,6 +63,50 @@ describe('dashboard wording catalog', () => {
       lifecycle: 'published',
       ownerRole: '当前发布',
       dataClass: 'local-catalog',
+      scriptVersion: 1,
+      effectiveFrom: '2026-01-01T00:00:00Z',
+      effectiveTo: null,
+    });
+  });
+
+  it('keeps hydrate scriptVersion only for integers >= 1 and index rows at null', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dash-wording-'));
+    const hydrate = join(root, 'retrieval-hydrate.json');
+    const index = join(root, 'retrieval-index.json');
+    writeFileSync(hydrate, `${JSON.stringify({
+      releaseId: 'rel_seed',
+      scripts: [{
+        scriptId: 'seed-1',
+        scriptVersion: 0,
+        title: '种子发货',
+        category: 'presale',
+        answerText: '三到五天到',
+        questionText: '什么时候发货',
+        effectiveFrom: '2026-01-01T00:00:00Z',
+        effectiveTo: '2026-12-31T00:00:00Z',
+      }],
+    })}\n`);
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydrate;
+    process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = join(root, 'missing-index.json');
+    expect(listDashboardWording().entries[0]).toMatchObject({
+      scriptVersion: null,
+      effectiveFrom: '2026-01-01T00:00:00Z',
+      effectiveTo: '2026-12-31T00:00:00Z',
+    });
+
+    writeFileSync(index, `${JSON.stringify({
+      version: 1,
+      scripts: [
+        { scriptId: 'mn-1', title: '洁面用法', questionText: '怎么用', answerText: '先打湿再打圈', category: 'product' },
+      ],
+    })}\n`);
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = join(root, 'missing-hydrate.json');
+    process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = index;
+    expect(listDashboardWording().entries[0]).toMatchObject({
+      scriptId: 'mn-1',
+      scriptVersion: null,
+      effectiveFrom: null,
+      effectiveTo: null,
     });
   });
 
