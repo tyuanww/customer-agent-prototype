@@ -1,6 +1,174 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
 export interface paths {
+    "/v1/software/releases/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 当前建议软件版本
+         * @description 仅 owner。客户端只展示目录并打开下载提示，不跑 latest.yml 自动更新。
+         */
+        get: operations["getCurrentSoftwareRelease"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/software/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 软件版本目录
+         * @description 仅 owner。download_url 只允许 https。UNSIGNED 条目 signed=false。禁止 electron-updater latest.yml 打正式域。
+         */
+        get: operations["listSoftwareReleases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metrics/retrieval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 检索账 KPI
+         * @description coach/owner。window 仅 current_release 或 last_7d。分母为有产品会话的查询/复制事件；collection_disabled 无事件行，不进分母。不得返回个人排名或坐席姓名。
+         */
+        get: operations["getRetrievalMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/content/scripts/{script_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 话术单条软删除进草稿
+         * @description 仅 owner。软删除进草稿，发布后才离开 current。expected_version 冲突 409。
+         */
+        delete: operations["deleteContentScript"];
+        options?: never;
+        head?: never;
+        /**
+         * 话术单条进入待审核草稿
+         * @description 仅 owner。只改 title/answer_text/有效期白名单字段。改完进入待审核草稿，不得绕过 dual-review 直接 current。expected_version 冲突 409。
+         */
+        patch: operations["patchContentScript"];
+        trace?: never;
+    };
+    "/v1/sop/nodes/{node_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 删除 SOP 节点
+         * @description 仅 owner。expected_version 冲突 409。软删除。
+         */
+        delete: operations["deleteSopNode"];
+        options?: never;
+        head?: never;
+        /**
+         * 更新 SOP 节点
+         * @description coach/owner。expected_version 冲突 409。
+         */
+        patch: operations["patchSopNode"];
+        trace?: never;
+    };
+    "/v1/sop/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 导入 SOP 表
+         * @description coach/owner。multipart CSV。必填 Idempotency-Key。
+         */
+        post: operations["importSopCatalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sop/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取当前产品会话 SOP 树
+         * @description coach/owner 可读。agent 403。坐席 overlay 只读预览不经本写库。
+         */
+        get: operations["getSopCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inaccuracy-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 记录话术不准
+         * @description 同一 (query_id, script_id) 只计一次。重放同体 200 且计数不 +1。达到 24h≥3 或 7d≥10 时可打开已有域 iteration_task（open ≠ start）。不得自动改 Answer，不得返回已处理/已建单。禁止 /tickets。
+         */
+        post: operations["recordInaccuracyReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/content/reviews/{batch_id}/cancel": {
         parameters: {
             query?: never;
@@ -839,6 +1007,97 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        SoftwareReleaseList: {
+            items: components["schemas"]["SoftwareRelease"][];
+        };
+        SoftwareRelease: {
+            version: string;
+            /** @enum {string} */
+            platform: "mac-universal" | "win-x64" | "linux-x64";
+            sha256: string;
+            download_url: string;
+            /** Format: date-time */
+            created_at: string;
+            signed: boolean;
+        };
+        RetrievalMetrics: {
+            no_hit_rate: number;
+            copy_complete_rate: number;
+            open_task_count: number;
+            current_release_script_count: number;
+            window: components["schemas"]["RetrievalWindow"];
+            release_id: string | null;
+        };
+        /** @enum {string} */
+        RetrievalWindow: "current_release" | "last_7d";
+        ScriptMutationResponse: {
+            /** @constant */
+            ok: true;
+            script_id: string;
+            mutation_id: string;
+            /** @constant */
+            review_status: "pending_review";
+        };
+        ScriptDeleteRequest: {
+            expected_version: number;
+        };
+        ScriptPatchRequest: {
+            expected_version: number;
+            title: string;
+            answer_text: string;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+        };
+        SopNodeDelete: {
+            expected_version: number;
+        };
+        SopNodePatch: {
+            expected_version: number;
+            title?: string;
+            body?: string;
+            sort_key?: number;
+        };
+        SopImportAccepted: {
+            /** @constant */
+            ok: true;
+            product_session_id: string;
+            node_count: number;
+        };
+        SopImportRequest: {
+            /** Format: binary */
+            file: string;
+        };
+        SopCatalogResponse: {
+            product_session_id: string;
+            items: components["schemas"]["SopNode"][];
+        };
+        SopNode: {
+            node_id: string;
+            parent_node_id: string | null;
+            title: string;
+            body: string;
+            sort_key: number;
+            version: number;
+            /** @enum {string} */
+            lifecycle: "active" | "deleted";
+        };
+        InaccuracyReportResponse: {
+            /** @constant */
+            ok: true;
+            /** Format: uuid */
+            query_id: string;
+            script_id: string;
+        };
+        InaccuracyReportRequest: {
+            /** Format: uuid */
+            query_id: string;
+            script_id: string;
+            script_version?: number;
+            rank?: number;
+            content_hash?: string;
+        };
         ReviewResumed: {
             job_id: string;
         };
@@ -2410,6 +2669,351 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getCurrentSoftwareRelease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前建议版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoftwareRelease"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    listSoftwareReleases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 软件目录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoftwareReleaseList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    getRetrievalMetrics: {
+        parameters: {
+            query: {
+                window: components["schemas"]["RetrievalWindow"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 检索账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetrievalMetrics"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    deleteContentScript: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 同 scope/key/body 重放首次终态响应；同键异体或处理中返回 409。建议 UUID。
+                 *     终态 TTL 至少 24 小时。
+                 * @example 5a5d8ff9-a23e-4c04-b902-64d0e33502cf
+                 */
+                "Idempotency-Key": components["parameters"]["RequiredIdempotencyKey"];
+            };
+            path: {
+                script_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description 已进入待审核草稿 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptMutationResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    patchContentScript: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 同 scope/key/body 重放首次终态响应；同键异体或处理中返回 409。建议 UUID。
+                 *     终态 TTL 至少 24 小时。
+                 * @example 5a5d8ff9-a23e-4c04-b902-64d0e33502cf
+                 */
+                "Idempotency-Key": components["parameters"]["RequiredIdempotencyKey"];
+            };
+            path: {
+                script_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description 已进入待审核草稿 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptMutationResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    deleteSopNode: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 同 scope/key/body 重放首次终态响应；同键异体或处理中返回 409。建议 UUID。
+                 *     终态 TTL 至少 24 小时。
+                 * @example 5a5d8ff9-a23e-4c04-b902-64d0e33502cf
+                 */
+                "Idempotency-Key": components["parameters"]["RequiredIdempotencyKey"];
+            };
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SopNodeDelete"];
+            };
+        };
+        responses: {
+            /** @description 节点已软删除 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SopNode"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    patchSopNode: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 同 scope/key/body 重放首次终态响应；同键异体或处理中返回 409。建议 UUID。
+                 *     终态 TTL 至少 24 小时。
+                 * @example 5a5d8ff9-a23e-4c04-b902-64d0e33502cf
+                 */
+                "Idempotency-Key": components["parameters"]["RequiredIdempotencyKey"];
+            };
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SopNodePatch"];
+            };
+        };
+        responses: {
+            /** @description 节点已更新 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SopNode"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    importSopCatalog: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 同 scope/key/body 重放首次终态响应；同键异体或处理中返回 409。建议 UUID。
+                 *     终态 TTL 至少 24 小时。
+                 * @example 5a5d8ff9-a23e-4c04-b902-64d0e33502cf
+                 */
+                "Idempotency-Key": components["parameters"]["RequiredIdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["SopImportRequest"];
+            };
+        };
+        responses: {
+            /** @description SOP 导入已接受 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SopImportAccepted"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    getSopCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前会话 SOP 树 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SopCatalogResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
+    recordInaccuracyReport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 同 scope/key/body 重放首次终态响应；同键异体或处理中返回 409。建议 UUID。
+                 *     终态 TTL 至少 24 小时。
+                 * @example 5a5d8ff9-a23e-4c04-b902-64d0e33502cf
+                 */
+                "Idempotency-Key": components["parameters"]["RequiredIdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InaccuracyReportRequest"];
+            };
+        };
+        responses: {
+            /** @description 首次写入或同体重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InaccuracyReportResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["Overloaded"];
+        };
+    };
     cancelReviewedImport: {
         parameters: {
             query?: never;

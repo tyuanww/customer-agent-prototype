@@ -16,7 +16,7 @@ import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
-const EXPECTED_DATABASE_SHA256 = '419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133';
+const EXPECTED_DATABASE_SHA256 = '5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa';
 const BASELINE = Object.freeze({
   contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c',
   sourceGitSha: '1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38',
@@ -158,7 +158,20 @@ const PRIOR_V1_16 = Object.freeze({
   "migrationCount": 13,
   "schemaFile": "schema-v1.16.sql"
 });
-const REVIEWED_UPGRADES = Object.freeze([PRIOR_REVIEWED_UPGRADE, PRIOR_V1_14, PRIOR_V1_15, PRIOR_V1_16]);
+const PRIOR_V1_17 = Object.freeze({
+  position: 14,
+  id: '0014_release_deferred_guard_v1_17',
+  file: '0014_release_deferred_guard_v1_17.sql',
+  sha256: 'ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339',
+  bytes: 912,
+  source_ranges: Object.freeze([Object.freeze({ start_line: 10726, end_line: 10730 })]),
+  contractSetId: 'cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2',
+  sourceGitSha: '0904a0aa11f2dc29ae7700871a943c41295cd329',
+  sourceSchemaSha256: '419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133',
+  migrationCount: 14,
+  schemaFile: 'schema-v1.17.sql',
+});
+const REVIEWED_UPGRADES = Object.freeze([PRIOR_REVIEWED_UPGRADE, PRIOR_V1_14, PRIOR_V1_15, PRIOR_V1_16, PRIOR_V1_17]);
 
 function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
@@ -169,18 +182,18 @@ function linesForRanges(lines, ranges) {
 }
 
 // The runner owns the migration transaction; the entire predecessor remains immutable.
-function backendUpgradeRanges(source, projectRoot) {
-  const previousPath = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_V1_16.contractSetId, PRIOR_V1_16.schemaFile);
-  if (!existsSync(previousPath) || !lstatSync(previousPath).isFile()) throw new Error('Immutable v1.16 source must be a regular file');
+function opsLoopUpgradeRanges(source, projectRoot) {
+  const previousPath = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_V1_17.contractSetId, PRIOR_V1_17.schemaFile);
+  if (!existsSync(previousPath) || !lstatSync(previousPath).isFile()) throw new Error('Immutable v1.17 source must be a regular file');
   const previous = readFileSync(previousPath, 'utf8');
-  if (sha256(previous) !== PRIOR_V1_16.sourceSchemaSha256) throw new Error('Immutable v1.16 digest drifted');
-  const prefix = '-- schema.v1.17 — synthetic backend closure clean-install reference\n' + previous + '\n';
-  if (!source.startsWith(prefix)) throw new Error('Closure predecessor differs from immutable v1.16');
-  const match = source.slice(prefix.length).match(/^-- BEGIN CLOSURE ([0-9a-f]{64})\n([\s\S]+)-- END CLOSURE\n$/);
-  if (!match || sha256(match[2]) !== match[1]) throw new Error('Closure source digest drifted');
+  if (sha256(previous) !== PRIOR_V1_17.sourceSchemaSha256) throw new Error('Immutable v1.17 digest drifted');
+  const prefix = '-- schema.v1.18 — ops-loop clean-install reference\n' + previous + '\n';
+  if (!source.startsWith(prefix)) throw new Error('Ops-loop predecessor differs from immutable v1.17');
+  const match = source.slice(prefix.length).match(/^-- BEGIN OPS LOOP ([0-9a-f]{64})\n([\s\S]+)-- END OPS LOOP\n$/);
+  if (!match || sha256(match[2]) !== match[1]) throw new Error('Ops-loop source digest drifted');
   const body = match[2].trimEnd().split('\n');
   const begin = body.indexOf('BEGIN;');
-  if (begin < 0 || body.filter(line => line === 'BEGIN;').length !== 1 || body.at(-1) !== 'COMMIT;' || body.filter(line => line === 'COMMIT;').length !== 1) throw new Error('Closure transaction anchors drifted');
+  if (begin < 0 || body.filter(line => line === 'BEGIN;').length !== 1 || body.at(-1) !== 'COMMIT;' || body.filter(line => line === 'COMMIT;').length !== 1) throw new Error('Ops-loop transaction anchors drifted');
   const offset = prefix.split('\n').length + 1;
   return { lines: source.trimEnd().split('\n'), ranges: [{ start_line: offset + begin + 1, end_line: offset + body.length - 2 }] };
 }
@@ -223,10 +236,10 @@ function loadPriorReviewedUpgrade(projectRoot, provenance) {
 }
 
 function renderUpgradeMigration(sourceBody, ranges, snapshot) {
-  const descriptor = { position: 14, id: '0014_release_deferred_guard_v1_17', file: '0014_release_deferred_guard_v1_17.sql', source_ranges: ranges };
+  const descriptor = { position: 15, id: '0015_ops_loop_v1_18', file: '0015_ops_loop_v1_18.sql', source_ranges: ranges };
   const sql = [
     `-- ${GENERATED_HEADER}`,
-    `-- ${descriptor.id}; source schema.v1.17 lines ${ranges.map((r) => `${r.start_line}-${r.end_line}`).join(', ')}`,
+    `-- ${descriptor.id}; source schema.v1.18 lines ${ranges.map((r) => `${r.start_line}-${r.end_line}`).join(', ')}`,
     `-- contract_set_id=${snapshot.contract_set_id}`,
     `-- source_git_sha=${snapshot.source_git_sha}`,
     `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
@@ -259,7 +272,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (snapshot.manifest?.database?.sha256 !== EXPECTED_DATABASE_SHA256 || sha256(snapshot.database_source) !== EXPECTED_DATABASE_SHA256) {
     throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
   }
-  const { lines, ranges } = backendUpgradeRanges(snapshot.database_source, projectRoot);
+  const { lines, ranges } = opsLoopUpgradeRanges(snapshot.database_source, projectRoot);
   const upgradeSourceBody = linesForRanges(lines, ranges);
   const upgrade = renderUpgradeMigration(upgradeSourceBody, ranges, snapshot);
   const migrations = Object.freeze([

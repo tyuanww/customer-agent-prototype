@@ -169,14 +169,18 @@ function validateManifest(rawManifest) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
   // Version and both paths form one reviewed pair; mixed generations fail closed.
+  const opsLoopPair = openapi.version === '1.14.0' && database.version === 'schema.v1.18';
   const backendPair = openapi.version === '1.13.0' && ['schema.v1.16', 'schema.v1.17'].includes(database.version);
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (!backendPair && !ownerPair && !legacyPair) throw new Error('Unsupported contract version pair');
+  if (!opsLoopPair && !backendPair && !ownerPair && !legacyPair) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
-  if (backendPair) {
+  if (opsLoopPair) {
+    openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.14.yaml`;
+    databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.18.sql`;
+  } else if (backendPair) {
     openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.13.yaml`;
     databasePath = `${OWNER_SOURCE_ROOT}/${database.version}.sql`;
   } else if (ownerPair) {

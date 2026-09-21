@@ -184,6 +184,7 @@ describe('customer-agent contract-set intake', () => {
     'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701',
     'cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e',
     'cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2',
+    'cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534',
   ])('accepts %s and rejects mixed or unreviewed version/source pairs', (id) => {
     const source = path.join(repositoryRoot, 'contracts/upstream/customer-agent', id);
     const directory = temporaryDirectory('owner-pair');
@@ -200,7 +201,7 @@ describe('customer-agent contract-set intake', () => {
     }
     const mixed = structuredClone(original);
     mixed.openapi.version = '1.11.0';
-    mixed.contract_set_id = mixed.contract_set_id.replace(/openapi-1\.(12|13)\.0/, 'openapi-1.11.0');
+    mixed.contract_set_id = mixed.contract_set_id.replace(/openapi-1\.(12|13|14)\.0/, 'openapi-1.11.0');
     writeFileSync(manifestPath, JSON.stringify(mixed));
     expect(() => contractSet.verifyContractSetDirectory(directory)).toThrow(/version pair/);
   });
@@ -468,8 +469,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2',
-      source_git_sha: '0904a0aa11f2dc29ae7700871a943c41295cd329',
+      contract_set_id: 'cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534',
+      source_git_sha: '260ef224c5340a4d26e857bd02119044dd813f9a',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -479,13 +480,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      'bf12fc9a6a9869a5effce1dc7a5b55b1df0dc619e358a40b4af399d374196246',
+      '4799468a36febe0c383163ebbb4c8a3b490bbada6e2707a2a31bccf63ca668c8',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      'c3c14659261ed01ff4f0c187026601844f59d3cd26be605a34f647bc130cc94c',
+      '39f69edfdbffcad6a57d3e9fc43e1f6a3cbdc1e8fdd951e30bdbbfe97eb3e394',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.17.sql')))).toBe(
-      '419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.18.sql')))).toBe(
+      '5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa',
     );
   });
 });

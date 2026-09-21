@@ -39,7 +39,7 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 5-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 6-migration current suffix',
     );
   });
 
@@ -58,6 +58,7 @@ describe('database migration planner', () => {
       '0012_owner_acceptance_v1_15',
         '0013_backend_identity_content_v1_16',
       '0014_release_deferred_guard_v1_17',
+      '0015_ops_loop_v1_18',
     ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
