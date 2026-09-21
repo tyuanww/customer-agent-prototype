@@ -26,7 +26,7 @@
 **Why:** 拍板 E。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
 
 **Priority:** P1
-**Status:** OPEN
+**Status:** IN PROGRESS · leftover `/v1/search` 无命中与过期召回、adoption 跳过 Top1 在同一事务开单；hydrate 主链 collection_disabled 仍不写事件
 
 ### P1 · 新发布后提示可关单
 

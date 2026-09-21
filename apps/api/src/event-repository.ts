@@ -9,6 +9,11 @@ import {
   createApiRuntimeDiagnostic,
   type ApiRuntimeDiagnosticSink,
 } from './runtime-diagnostics.js';
+import {
+  openIterationSignal,
+  openSignalsFromRecordedSearch,
+  rankingClusterKey,
+} from './iteration-task-signals.js';
 import { createSearchRepository } from './search-repository.js';
 import { createSearchBackend } from './search-service.js';
 import type { PreparedSearchOperation } from './search-routes.js';
@@ -333,6 +338,13 @@ export function createEventRepository(
               ],
             );
           }
+          await openSignalsFromRecordedSearch(client, {
+            queryId: request.queryId,
+            platform: request.search.platform,
+            productContextType: request.search.productContextType,
+            productContextRef: request.search.productContextRef,
+            candidates: search.candidates,
+          });
           await completeIdempotency(
             client,
             SEARCH_SCOPE,
@@ -444,6 +456,26 @@ export function createEventRepository(
             request.event.push_method,
           ],
         );
+        if (request.event.outcome === 'adopted' && request.event.chosen_rank !== null && request.event.chosen_rank > 1) {
+          const top1 = await client.query<{ script_id: string }>(
+            `SELECT script_id FROM public.candidate_impressions
+             WHERE query_id = $1 AND rank = 1`,
+            [request.event.query_id],
+          );
+          const skipped = top1.rows[0]?.script_id?.trim() ?? '';
+          if (skipped.length > 0) {
+            const clusterKey = rankingClusterKey(skipped);
+            await openIterationSignal(client, {
+              clusterKey,
+              signalId: clusterKey,
+              cause: 'ranking',
+              queryId: request.event.query_id,
+              suggestedScriptIds: [skipped, request.event.chosen_script_id ?? '']
+                .map((scriptId) => scriptId.trim())
+                .filter((scriptId) => scriptId.length > 0),
+            });
+          }
+        }
         const response = parseContractSchema('AdoptionEventResponse', {
           ok: true,
           query_id: request.event.query_id,
