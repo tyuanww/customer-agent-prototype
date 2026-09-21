@@ -60,7 +60,9 @@ export function parseSopCsv(text: string): SopCsvNode[] | null {
     const parent = (cells[1]?.trim() ?? '') === '' ? null : cells[1]?.trim() ?? null;
     const title = cells[2]?.trim() ?? '';
     const body = cells[3] ?? '';
-    const sortKey = Number(cells[4]?.trim());
+    const sortRaw = cells[4]?.trim() ?? '';
+    if (!/^-?\d+$/.test(sortRaw)) return null;
+    const sortKey = Number(sortRaw);
     if (nodeId.length < 1 || nodeId.length > 128 || seen.has(nodeId)) return null;
     if (parent !== null && (parent.length < 1 || parent.length > 128)) return null;
     if (title.length < 1 || title.length > 256) return null;

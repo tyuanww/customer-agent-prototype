@@ -49,6 +49,9 @@ describe('parseSopCsv', () => {
     expect(parseSopCsv(`${header}\n${'n'.repeat(129)},,停手,先停,0\n`)).toBeNull();
     expect(parseSopCsv(`${header}\nn1,,停手,${'正'.repeat(20_001)},0\n`)).toBeNull();
     expect(parseSopCsv(`${header}\nn1,,停手,先停\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\nn1,,停手,先停,\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\nn1,,停手,先停,1e3\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\nn1,,停手,先停,0x10\n`)).toBeNull();
     expect(parseSopCsv(`${header}\r\nn1,,停手,先停手,0\r\n`)).toEqual([
       { node_id: 'n1', parent_node_id: null, title: '停手', body: '先停手', sort_key: 0 },
     ]);

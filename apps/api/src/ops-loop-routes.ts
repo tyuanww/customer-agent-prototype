@@ -107,11 +107,20 @@ export function registerOpsLoopRoutes(
   dependencies?: OpsLoopRouteDependencies,
 ): void {
   const windows = new Map<string, { start: number; count: number }>();
+  const RATE_LIMIT_WINDOW_MS = 60_000;
+  const RATE_LIMIT_MAX_KEYS = 4096;
+  function pruneRateLimitWindows(now: number): void {
+    for (const [key, value] of windows) {
+      if (now - value.start >= RATE_LIMIT_WINDOW_MS) windows.delete(key);
+    }
+  }
   function limit(operation: string, userId: string, maximum: number): boolean {
     const now = performance.now();
+    pruneRateLimitWindows(now);
     const key = `${operation}:${userId}`;
     const prior = windows.get(key);
-    const window = prior && now - prior.start < 60_000 ? prior : { start: now, count: 0 };
+    if (!prior && windows.size >= RATE_LIMIT_MAX_KEYS) return false;
+    const window = prior && now - prior.start < RATE_LIMIT_WINDOW_MS ? prior : { start: now, count: 0 };
     windows.set(key, window);
     return ++window.count <= maximum;
   }
