@@ -84,7 +84,19 @@ Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用�
 - `POST /v1/events/iteration-tasks/{task_id}/start`：body 仅 `expected_version`；必填 `Idempotency-Key`。
 - `POST /v1/events/iteration-tasks/{task_id}/close`：body 为 `expected_version`、`status`（`resolved` 或 `wont_fix`）、`resolution_note`。
 
-仅 `coach` / `owner`。缺会话 401，坐席 403，版本冲突 409。仓储走冻结 `start_iteration_task` / `close_iteration_task`。桌面经 Dashboard preload 消费同一端口。从 Query「话术不准」自动打开待办仍要 persist。
+仅 `coach` / `owner`。缺会话 401，坐席 403，版本冲突 409。仓储走冻结 `start_iteration_task` / `close_iteration_task`。桌面经 Dashboard preload 消费同一端口。Query「话术不准」已 persist；待办页仍不展示按稿聚合次数。
+
+## 合成 ops-loop
+
+在已有 runtime pool 上注册冻结 OpenAPI 1.14.0，不新增平行 `/tickets`：
+
+- `POST /v1/inaccuracy-reports`：agent / coach / owner；必填 `Idempotency-Key`；同一 `query_id` + `script_id` 去重。Query 只对 Live UUID 调用。
+- `GET /v1/sop/catalog`：coach / owner。`POST /v1/sop/import` multipart CSV（字段 `file`，≤256KB）覆盖当前产品会话树，202。`PATCH /v1/sop/nodes/{node_id}` coach/owner；`DELETE` 仅 owner。均需 `Idempotency-Key` 与 `expected_version`。
+- `PATCH` / `DELETE /v1/content/scripts/{script_id}`：仅 owner；成功 `reviewStatus=pending_review`，不能跳过 dual-review。
+- `GET /v1/metrics/retrieval?window=current_release|last_7d`：coach / owner。
+- `GET /v1/software/releases` 与 `/current`：仅 owner；UNSIGNED 必须 `signed=false`；禁止 `latest.yml`。
+
+缺会话 401，角色不够 403，版本冲突 409。桌面经 `dashboardOps` 与 overlay `productSearch.reportInaccuracy` 消费同一端口。过敏 SOP 停手文案尚未校验。
 
 ## 合成整链产物（T6）
 

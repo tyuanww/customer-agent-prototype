@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeAll, expect, it, vi } from 'vitest';
 import type { DashboardContentApi } from '../../src/shared/dashboard-content';
+import type { DashboardOpsApi } from '../../src/shared/dashboard-ops-loop';
 
 const expose = vi.hoisted(() => vi.fn());
 const invoke = vi.hoisted(() => vi.fn());
@@ -60,4 +61,37 @@ it('accepts xlsx parse success and parser codes, and fail-closes malformed IPC',
 
   invoke.mockRejectedValueOnce(new Error('ipc down'));
   await expect(api.parseUpload(request)).resolves.toEqual(unavailable);
+});
+
+it('fail-closes dashboardOps invoke throws and non-string SOP import args', async () => {
+  const call = expose.mock.calls.find((entry) => entry[0] === 'dashboardOps');
+  const api = call?.[1] as DashboardOpsApi;
+  invoke.mockResolvedValueOnce({
+    ok: true,
+    noHitRate: 0.1,
+    copyCompleteRate: 0.2,
+    openTaskCount: 1,
+    currentReleaseScriptCount: 8,
+    window: 'current_release',
+    releaseId: null,
+  });
+  await expect(api.retrieval('current_release')).resolves.toMatchObject({
+    ok: true, window: 'current_release', noHitRate: 0.1,
+  });
+  expect(invoke).toHaveBeenCalledWith('dashboard:ops-retrieval', 'current_release');
+
+  invoke.mockResolvedValueOnce({ ok: false, code: 'FORBIDDEN', message: '当前身份不能执行此操作' });
+  await expect(api.softwareCatalog()).resolves.toMatchObject({ ok: false, code: 'FORBIDDEN' });
+
+  invoke.mockResolvedValueOnce(null);
+  await expect(api.sopCatalog()).resolves.toEqual(unavailable);
+
+  invoke.mockRejectedValueOnce(new Error('ipc down'));
+  await expect(api.scriptDelete({ scriptId: 'script-1', expectedVersion: 1 })).resolves.toEqual(unavailable);
+
+  invoke.mockResolvedValueOnce({ ok: true, productSessionId: 'default', nodeCount: 0 });
+  await expect(api.sopImport(12 as unknown as string)).resolves.toEqual({
+    ok: true, productSessionId: 'default', nodeCount: 0,
+  });
+  expect(invoke).toHaveBeenCalledWith('dashboard:ops-sop-import', '');
 });

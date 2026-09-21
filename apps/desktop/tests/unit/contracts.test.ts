@@ -36,6 +36,7 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.PRODUCT_ANNOUNCE_INVALIDATED,
       IPC_CHANNELS.PRODUCT_ESCALATE,
       IPC_CHANNELS.PRODUCT_RECORD_TERMINAL,
+      IPC_CHANNELS.PRODUCT_INACCURACY_REPORT,
       IPC_CHANNELS.PRODUCT_CATALOG,
       IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET,
       IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET,
@@ -51,6 +52,14 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.DASHBOARD_ITERATION_LIST,
       IPC_CHANNELS.DASHBOARD_ITERATION_START,
       IPC_CHANNELS.DASHBOARD_ITERATION_CLOSE,
+      IPC_CHANNELS.DASHBOARD_OPS_RETRIEVAL,
+      IPC_CHANNELS.DASHBOARD_OPS_SOP_CATALOG,
+      IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT,
+      IPC_CHANNELS.DASHBOARD_OPS_SOP_PATCH,
+      IPC_CHANNELS.DASHBOARD_OPS_SOP_DELETE,
+      IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_PATCH,
+      IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_DELETE,
+      IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE,
       IPC_CHANNELS.DISMISS,
       IPC_CHANNELS.REPORT_UI_PHASE,
       IPC_CHANNELS.REPORT_HANDOFF_MILESTONE,
@@ -86,6 +95,10 @@ describe('IPC whitelist', () => {
     expect(loginPreload).toContain(`'${IPC_CHANNELS.LOGIN_WINDOW_CANCEL}'`);
   });
 
+  it('exposes inaccuracy report from the overlay preload', () => {
+    expect(overlayPreload).toContain(`IPC_CHANNELS.PRODUCT_INACCURACY_REPORT`);
+  });
+
   it('parses SOP open results in the overlay preload without importing sop-window', () => {
     expect(overlayPreload).not.toContain("from '../shared/sop-window'");
     expect(overlayPreload).toContain('parseSopWindowOpenResult');
@@ -106,6 +119,8 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_LIST}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_START}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_CLOSE}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_OPS_RETRIEVAL}'`);
+    expect(dashboardPreload).toContain('dashboardOps');
     expect(dashboardPreload).toContain('dashboardContent');
     expect(dashboardPreload).toContain('dashboardIteration');
     expect(dashboardPreload).not.toContain("from '../shared/dashboard-iteration'");

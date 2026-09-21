@@ -11,6 +11,14 @@ const CONTENT_PUBLISH = 'dashboard:content-publish';
 const ITERATION_LIST = 'dashboard:iteration-list';
 const ITERATION_START = 'dashboard:iteration-start';
 const ITERATION_CLOSE = 'dashboard:iteration-close';
+const OPS_RETRIEVAL = 'dashboard:ops-retrieval';
+const OPS_SOP_CATALOG = 'dashboard:ops-sop-catalog';
+const OPS_SOP_IMPORT = 'dashboard:ops-sop-import';
+const OPS_SOP_PATCH = 'dashboard:ops-sop-patch';
+const OPS_SOP_DELETE = 'dashboard:ops-sop-delete';
+const OPS_SCRIPT_PATCH = 'dashboard:ops-script-patch';
+const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
+const OPS_SOFTWARE = 'dashboard:ops-software';
 
 const CONTENT_FAILURE_CODES = [
   'UNAUTHORIZED',
@@ -224,6 +232,43 @@ contextBridge.exposeInMainWorld('dashboardContent', {
     } catch {
       return unavailable;
     }
+  },
+});
+
+async function invokeOps(channel: string, ...args: unknown[]) {
+  try {
+    const value: unknown = await ipcRenderer.invoke(channel, ...args);
+    if (isContentFailure(value)) return value;
+    return value ?? unavailable;
+  } catch {
+    return unavailable;
+  }
+}
+
+contextBridge.exposeInMainWorld('dashboardOps', {
+  retrieval(window: unknown) {
+    return invokeOps(OPS_RETRIEVAL, window);
+  },
+  sopCatalog() {
+    return invokeOps(OPS_SOP_CATALOG);
+  },
+  sopImport(csvText: unknown) {
+    return invokeOps(OPS_SOP_IMPORT, typeof csvText === 'string' ? csvText : '');
+  },
+  sopPatch(request: unknown) {
+    return invokeOps(OPS_SOP_PATCH, request);
+  },
+  sopDelete(request: unknown) {
+    return invokeOps(OPS_SOP_DELETE, request);
+  },
+  scriptPatch(request: unknown) {
+    return invokeOps(OPS_SCRIPT_PATCH, request);
+  },
+  scriptDelete(request: unknown) {
+    return invokeOps(OPS_SCRIPT_DELETE, request);
+  },
+  softwareCatalog() {
+    return invokeOps(OPS_SOFTWARE);
   },
 });
 

@@ -120,6 +120,8 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 | Dashboard manifest / 外观 | `apps/desktop/tests/unit/dashboard-manifest.test.ts`、`apps/desktop/tests/unit/dashboard-appearance.test.ts` |
 | Dashboard SOP 只读树 | `apps/desktop/tests/component/SopLibraryModule.test.tsx`、`apps/desktop/tests/unit/dashboard-layout.test.ts` |
 | Dashboard 话术优化待办 | `apps/desktop/tests/component/IterationModule.test.tsx`、`apps/desktop/tests/unit/dashboard-iteration.test.ts`、`apps/desktop/tests/unit/dashboard-iteration-ipc.test.ts`、`apps/desktop/tests/unit/dashboard-iteration-preload.test.ts` |
+| Dashboard ops-loop | `apps/desktop/tests/unit/dashboard-ops-loop.test.ts`、`apps/desktop/tests/component/dashboard-live-actions.test.tsx`、`apps/desktop/tests/component/SopLibraryModule.test.tsx` |
+| Query 话术不准 persist | `apps/desktop/tests/unit/product-search.test.ts`、`apps/desktop/tests/component/QueryApp.test.tsx` |
 | Fox presence 纯逻辑 / renderer runtime | `apps/desktop/tests/unit/fox-presence.test.ts`、`apps/desktop/tests/component/FoxApp.test.tsx` |
 | Test-only harness | `apps/desktop/tests/unit/overlay-test-harness.test.ts` |
 

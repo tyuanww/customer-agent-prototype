@@ -7,7 +7,7 @@ import { ProductSearch } from '../../src/main/product-search';
 import { noopRetrievalTelemetry } from '../../src/main/retrieval-telemetry-store';
 import { ProductSession } from '../../src/main/product-session';
 import { ProductHttp } from '../../src/main/product-http';
-import { isProductSearchRequest, isProductCopyRequest, type ProductCandidate, type ProductSearchRequest } from '../../src/shared/product-search';
+import { isProductSearchRequest, isProductCopyRequest, isProductInaccuracyRequest, type ProductCandidate, type ProductSearchRequest } from '../../src/shared/product-search';
 const candidate: ProductCandidate = { rank: 1, release_id: 'rel-synthetic-001', script_id: 'script-synthetic-001', script_version: 1,
   content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale', answer_text: '合成订单 {订单号}', platform_scope: ['qianniu'],
   product_scope_type: 'storewide', product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
@@ -546,6 +546,107 @@ describe('product query and native copy provenance', () => {
     const f = await fixture(); f.announce.allows = () => false;
     expect(await f.search.copy(1, f.copy)).toMatchObject({ code: 'STALE' });
     expect(f.write).not.toHaveBeenCalled(); await f.session.logout();
+  });
+  it('posts inaccuracy only for live UUID query ids and rejects non-UUID requests', async () => {
+    const f = await fixture();
+    expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: 'local-query', scriptId: candidate.script_id,
+    })).toBe(false);
+    expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: '',
+    })).toBe(false);
+    expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: 's'.repeat(129),
+    })).toBe(false);
+    expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: candidate.script_id,
+    })).toBe(true);
+    expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: 's'.repeat(128),
+    })).toBe(true);
+    const before = f.transport.mock.calls.length;
+    expect(await f.search.reportInaccuracy(1, {
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: candidate.script_id,
+    })).toMatchObject({ ok: true, recorded: true });
+    const posted = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/inaccuracy-reports'));
+    expect(posted).toHaveLength(1);
+    expect(JSON.parse(String(posted[0]?.[1]?.body))).toMatchObject({
+      query_id: f.queryId, script_id: candidate.script_id,
+    });
+    expect(await f.search.reportInaccuracy(1, {
+      sessionEpoch: f.request.sessionEpoch, generation: 1,
+      queryId: '22222222-2222-4222-8222-222222222222', scriptId: candidate.script_id,
+    })).toMatchObject({ code: 'STALE' });
+    expect(await f.search.reportInaccuracy(2, {
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: candidate.script_id,
+    })).toMatchObject({ code: 'STALE' });
+    await f.session.logout();
+  });
+  it('keeps collection_disabled inaccuracy local-only without posting', async () => {
+    const pipeline = {
+      run: async () => ({
+        intent: 'shipping' as const,
+        ranked: [{
+          scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
+          answerText: candidate.answer_text, score: 1,
+        }],
+      }),
+    };
+    const hydrate = {
+      releaseId: candidate.release_id,
+      candidate: () => candidate,
+      hydrate: () => [candidate],
+    };
+    const preference = { read: () => ({ smartEnabled: true }), write: (next: { smartEnabled: boolean }) => next };
+    const f = await fixture();
+    const search = new ProductSearch(
+      f.session, f.write, f.announce, f.help, { rank: () => [] }, hydrate, null, pipeline, preference,
+    );
+    const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
+    if (!result.ok) throw new Error(result.code);
+    expect(result.telemetryStatus).toBe('collection_disabled');
+    const before = f.transport.mock.calls.length;
+    expect(await search.reportInaccuracy(1, {
+      sessionEpoch: result.sessionEpoch, generation: result.generation,
+      queryId: result.queryId, scriptId: candidate.script_id,
+    })).toMatchObject({ ok: true, recorded: false });
+    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/inaccuracy-reports')))
+      .toHaveLength(0);
+    await f.session.logout();
+  });
+  it('maps inaccuracy HTTP errors via queryFailure and posts only query_id+script_id without a candidate', async () => {
+    const f = await fixture();
+    const before = f.transport.mock.calls.length;
+    expect(await f.search.reportInaccuracy(1, {
+      sessionEpoch: f.request.sessionEpoch, generation: 1,
+      queryId: f.queryId, scriptId: 'missing-script',
+    })).toMatchObject({ ok: true, recorded: true });
+    const posted = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/inaccuracy-reports'));
+    expect(posted).toHaveLength(1);
+    expect(JSON.parse(String(posted[0]?.[1]?.body))).toEqual({
+      query_id: f.queryId, script_id: 'missing-script',
+    });
+
+    const prior = f.transport.getMockImplementation()!;
+    f.transport.mockImplementation(async (url, init) => {
+      if (String(url).includes('/v1/inaccuracy-reports')) {
+        return new Response(JSON.stringify({
+          error: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后重试', details: { retry_after_sec: 1 } },
+        }), { status: 429, headers: { 'content-type': 'application/json' } });
+      }
+      return prior(url, init);
+    });
+    expect(await f.search.reportInaccuracy(1, {
+      sessionEpoch: f.request.sessionEpoch, generation: 1,
+      queryId: f.queryId, scriptId: candidate.script_id,
+    })).toEqual({
+      ok: false,
+      sessionEpoch: f.request.sessionEpoch,
+      generation: 1,
+      code: 'RATE_LIMITED',
+      message: '操作过于频繁，请稍后重试',
+    });
+    await f.session.logout();
   });
 });
 

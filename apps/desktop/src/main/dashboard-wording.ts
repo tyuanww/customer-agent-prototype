@@ -75,6 +75,7 @@ function entryFromHydrate(item: object, releaseId: string): DashboardWordingEntr
   if (typeof title !== 'string' || title.trim().length < 1) return null;
   if (typeof answer !== 'string' || answer.trim().length < 1) return null;
   const questionText = typeof record.questionText === 'string' ? record.questionText.trim() : '';
+  const scriptVersion = record.scriptVersion;
   return Object.freeze({
     scriptId,
     domain: domainOf(record.category),
@@ -83,6 +84,11 @@ function entryFromHydrate(item: object, releaseId: string): DashboardWordingEntr
     answerPreview: answer,
     platform: platformLabel(record.platformScope),
     version: releaseId,
+    scriptVersion: typeof scriptVersion === 'number' && Number.isInteger(scriptVersion) && scriptVersion >= 1
+      ? scriptVersion
+      : null,
+    effectiveFrom: typeof record.effectiveFrom === 'string' ? record.effectiveFrom : null,
+    effectiveTo: typeof record.effectiveTo === 'string' ? record.effectiveTo : null,
     effectiveWindow: windowLabel(record.effectiveFrom, record.effectiveTo, '当前发布'),
     risk: riskOf(record.riskLevel),
     lifecycle: 'published',
@@ -106,6 +112,9 @@ function entryFromIndex(
     answerPreview: script.answerText,
     platform: '千牛 / 抖音',
     version: releaseId ?? 'local-index',
+    scriptVersion: null,
+    effectiveFrom: null,
+    effectiveTo: null,
     effectiveWindow: releaseId ? '当前发布' : '本机目录',
     risk: 'low',
     lifecycle: 'published',

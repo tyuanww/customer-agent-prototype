@@ -10,10 +10,9 @@ import {
   paginateWording,
   wordingPublishedCsv,
 } from '@shared/wording-library-browse';
+import { OPS_LOOP_COPY } from '@shared/dashboard-ops-loop';
 import { readCoachUploadFile } from './coach-content-upload';
 import { StatusBadge } from './StatusBadge';
-
-const WRITE_UNAVAILABLE = '未接入：冻结合同没有单条更新/删除命令。';
 
 const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
   { id: 'product', label: '产品话术' },
@@ -145,11 +144,11 @@ export function WordingLibraryModule() {
       <header className="dash-module-head">
         <div>
           <h1>话术库</h1>
-          <p className="dash-kicker">列表读当前发布 · 上传走内容导入 · 单条改删未接入</p>
+          <p className="dash-kicker">列表读当前发布 · 上传走内容导入 · 单条改删进待审核草稿</p>
         </div>
       </header>
       <p className="dash-scope dash-scope-important">
-        浏览与导出当前发布。上传会调用产品导入接口。单条更新/删除没有冻结合同，按钮保持未接入。
+        浏览与导出当前发布。上传走内容导入。单条更新/删除只进入待审核草稿，不能绕过 dual-review。
       </p>
       <div className="dash-filter-toolbar" aria-label="话术写操作">
         <input
@@ -195,7 +194,30 @@ export function WordingLibraryModule() {
           type="button"
           className="dash-reset"
           data-testid="wording-update"
-          onClick={() => setWriteMessage(WRITE_UNAVAILABLE)}
+          onClick={() => {
+            const api = window.dashboardOps;
+            const row = selected
+              ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
+              : undefined;
+            if (!row) {
+              setWriteMessage(OPS_LOOP_COPY.selectWording);
+              return;
+            }
+            if (!api || row.scriptVersion === null) {
+              setWriteMessage(api ? OPS_LOOP_COPY.noVersion : OPS_LOOP_COPY.noProduct);
+              return;
+            }
+            void api.scriptPatch({
+              scriptId: row.scriptId,
+              expectedVersion: row.scriptVersion,
+              title: row.title,
+              answerText: row.answerPreview,
+              effectiveFrom: row.effectiveFrom ?? new Date().toISOString(),
+              effectiveTo: row.effectiveTo,
+            }).then((result) => {
+              setWriteMessage(result.ok ? `${OPS_LOOP_COPY.pendingReview} ${result.mutationId}` : result.message);
+            });
+          }}
         >
           更新
         </button>
@@ -203,7 +225,26 @@ export function WordingLibraryModule() {
           type="button"
           className="dash-reset"
           data-testid="wording-delete"
-          onClick={() => setWriteMessage(WRITE_UNAVAILABLE)}
+          onClick={() => {
+            const api = window.dashboardOps;
+            const row = selected
+              ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
+              : undefined;
+            if (!row) {
+              setWriteMessage(OPS_LOOP_COPY.selectWording);
+              return;
+            }
+            if (!api || row.scriptVersion === null) {
+              setWriteMessage(api ? OPS_LOOP_COPY.noVersion : OPS_LOOP_COPY.noProduct);
+              return;
+            }
+            void api.scriptDelete({
+              scriptId: row.scriptId,
+              expectedVersion: row.scriptVersion,
+            }).then((result) => {
+              setWriteMessage(result.ok ? `${OPS_LOOP_COPY.pendingReview} ${result.mutationId}` : result.message);
+            });
+          }}
         >
           删除
         </button>
@@ -368,7 +409,7 @@ export function WordingLibraryModule() {
                 <div><dt>有效窗</dt><dd>{selected.effectiveWindow}</dd></div>
                 <div><dt>来源</dt><dd>{selected.ownerRole}</dd></div>
               </dl>
-              <p className="dash-footnote">列表来自当前发布。单条更新/删除未接入冻结合同。</p>
+              <p className="dash-footnote">列表来自当前发布。单条更新/删除进入待审核草稿，不能绕过 dual-review。</p>
             </>
           ) : (
             <p className="dash-empty">选择一条话术查看正文</p>

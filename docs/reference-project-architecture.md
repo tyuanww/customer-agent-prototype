@@ -55,20 +55,20 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 一期五项：管理概览、话术库、SOP、内容管理、系统同步。没有冻结合同的数字写「未接入」，不读 VOC / 工单合成 manifest 冒充生产。话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先当前发布 hydrate。待办走 `dashboard:iteration-*` → 冻结 iteration-tasks。Owner 发布在 Main 里于导入 parked 后走 `/v1/admin/content/reviews*`，再 `POST /v1/content/publish`。renderer 仍不直连 API。并行 API 只放行 synthetic；真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
+桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。Live UUID 查询的「话术不准」走 `product:inaccuracy-report` → `POST /v1/inaccuracy-reports`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 一期五项：管理概览、话术库、SOP、内容管理、系统同步。没有产品会话或没有冻结合同的数字写「未接入」，不读 VOC / 工单合成 manifest 冒充生产。话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先当前发布 hydrate。待办走 `dashboard:iteration-*` → 冻结 iteration-tasks。ops-loop 走 `dashboardOps`：检索账、SOP 树、话术单条 `pending_review`、软件目录。Owner 发布在 Main 里于导入 parked 后走 `/v1/admin/content/reviews*`，再 `POST /v1/content/publish`。renderer 仍不直连 API。并行 API 只放行 synthetic；真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
 
 ## 2. 目录归属
 
 | 目录 | 只负责什么 | 不应该放什么 |
 | --- | --- | --- |
-| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页、D4 无命中求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排；Dashboard 话术库只读 `dashboard:wording-list`、内容 `dashboard:content-*`、话术优化待办 `dashboard:iteration-*` | React 视图、业务 fixture、通用 HTTP 客户端 |
+| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页、D4 无命中求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排；Query `product:inaccuracy-report`；Dashboard 话术库只读 `dashboard:wording-list`、内容 `dashboard:content-*`、话术优化待办 `dashboard:iteration-*`、ops-loop `dashboard:ops-*` | React 视图、业务 fixture、通用 HTTP 客户端 |
 | `apps/desktop/src/preload/` | overlay `index.ts` 把 `CustomerAgentApi` 白名单暴露给 Fox/Query；`login.ts` / `sop.ts` 是独立入口，通道字符串必须内联 | `ipcRenderer` 通用转发、Node 文件系统、token、独立 preload 去 import `ipc-channels.ts` |
 | `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard、登录 chooser、SOP 投影和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
 | `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何、状态纯函数，以及 BM25+RRF `hybrid-retrieve` | 依赖 DOM、Electron、React 的实现 |
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
-| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness、策略读写、受控搜索与事件事务边界、合成 CSV/XLSX 持久接收、冻结 iteration-task 列表/开始/关闭 | 桌面 fixture、renderer、migration owner、正式 Feishu auth、真实数据、桌面 adapter、worker 解析或外部 bind |
+| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness、策略读写、受控搜索与事件事务边界、合成 CSV/XLSX 持久接收、冻结 iteration-task 列表/开始/关闭、OpenAPI 1.14.0 ops-loop HTTP（不准、SOP、话术草稿、检索账、软件目录） | 桌面 fixture、renderer、migration owner、正式 Feishu auth、真实数据、桌面 adapter、worker 解析或外部 bind |
 | `apps/api/tests/support/g1a-e0/` | 测试专用仓外输入校验、一次性 PG15 装载、同一 SearchBackend 评测、聚合报告与清理 | HTTP route、事件写入、桌面依赖、长期数据库、真实内容或正式构建产物 |
 | `apps/api/src/search-decision.ts`、`search-relations.ts` | 产品搜索判定、内部诊断，以及有界正文关系/否定/论元语义；实验复用同一规则 | 人工来源注解、实验 fixture、HTTP 诊断字段或绕过来源门禁 |
 | `apps/api/experiments/search-decision/` | 合成搜索判定实验与验收工具：固定产品源码哈希 + 仅重定位 import 的诊断副本、合成夹具、需求判定和事实/行为/失败门禁 | 产品 `src` 行为、SearchBackend、真实来源、runtime 依赖、正式构建产物 |
@@ -111,13 +111,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration`） | 五项工作台；话术库只读当前发布 hydrate；SOP 写操作未接入；待办 live list/start/close；CSV/xlsx 经 `dashboard:content-parse`；Owner 发布 parked 后 dual-review 再 publish |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 五项工作台；话术库只读当前发布 hydrate；Owner 单条写进入 pending_review；SOP 读/导入/更新当前会话树（删除仅 Owner）；待办 live list/start/close；KPI 走 retrieval metrics；CSV/xlsx 经 `dashboard:content-parse`；Owner 发布 parked 后 dual-review 再 publish；软件目录禁止 latest.yml |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 
-Dashboard 没有 overlay 的 `customerAgent`（search / login / copy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/导入/发布、话术优化待办 list/start/close。这是有意收窄，不是「完全无 preload」。检索账 / SOP 写库若以后要接 HTTP，应另开受信 adapter 并先 `contracts:intake`，而不是把通用 IPC 或 Node 权限塞进当前窗口。
+Dashboard 没有 overlay 的 `customerAgent`（search / login / copy / inaccuracy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/导入/发布、话术优化待办 list/start/close、以及 `dashboardOps`（检索账 / SOP / 话术单条写 / 软件目录）。这是有意收窄，不是「完全无 preload」。ops-loop HTTP 已由 Main `dashboard-ops-loop.ts` 消费冻结合同；不要把通用 IPC 或 Node 权限塞进当前窗口。
 
 ## 4. 数据边界
 
@@ -126,9 +126,13 @@ SYNTHETIC_SCRIPTS ──local searchScripts──> Query view model
                                       └──copyText──> system clipboard
 
 dashboardWording.list ──hydrate──> 话术库
+dashboardOps           ──script patch/delete pending_review──> 话术库单条写
 dashboardIteration     ──iteration-tasks──> 管理概览待办
 dashboardContent       ──parse/import/reviews/publish──> 内容管理
-SOP / 检索账 / 软件目录 ──无冻结合同──> 未接入
+dashboardOps           ──sop catalog/import/patch/delete──> SOP
+dashboardOps           ──metrics/retrieval──> 管理概览 KPI
+dashboardOps           ──software/releases──> 系统同步软件目录
+productSearch.reportInaccuracy ──POST /v1/inaccuracy-reports──> 话术不准
 
 contracts/upstream/customer-agent/<contract_set_id>
   ──VERIFIED_NOT_ACTIVATED──> packages/contracts codegen
@@ -139,7 +143,7 @@ contracts/upstream/customer-agent/<contract_set_id>
                                           └─ Ready/NotReady ──> apps/api GET /ready
 
 v1.17 migrated PG15
-  ├─ app_runtime pool ──> readiness / search / events / import / announce / iteration-tasks
+  ├─ app_runtime pool ──> readiness / search / events / import / announce / iteration-tasks / ops-loop
   ├─ isolated app_content_admin pool ──> policy / publish / rollback
   └─ 独立 auth / worker / review 能力池 ──> 产品会话 / 导入处理 / 审核质量门
 
@@ -150,11 +154,11 @@ v1.17 migrated PG15
   └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
 ```
 
-上图 Dashboard 数据面不再走 `DASHBOARD_MANIFEST` 冒充生产数字。话术库、待办、内容发布画在该 ASCII；SOP 写库 / 检索账 KPI / 软件目录没有冻结合同，保持未接入。
+上图 Dashboard 数据面不再走 `DASHBOARD_MANIFEST` 冒充生产数字。话术库、待办、内容发布、ops-loop（SOP / 检索账 / 话术草稿 / 软件目录）和 Query 不准落库画在该 ASCII。没有产品会话时这些写口仍 fail-closed 为「未接入」。
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链，以及 coach/owner 的冻结 iteration-task 列表/开始/关闭；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，方案为 APPROVED。真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，不准落库与 `dashboardOps` 已接到同一产品会话，方案为 APPROVED。真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
 
 ## 5. 测试和验证层级
 
