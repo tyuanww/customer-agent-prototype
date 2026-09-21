@@ -92,6 +92,7 @@ interface RuntimeSchemaProbeRow extends QueryResultRow {
   database_probe: number;
   server_version_num: number;
   schema_comment: string;
+  ops_loop_comment: string;
   repository_boundary_present: boolean;
   runtime_identity_safe: boolean;
   runtime_effective_acl_safe: boolean;
@@ -101,6 +102,17 @@ interface RuntimeSchemaProbeRow extends QueryResultRow {
 interface RuntimePolicyFlagsRow extends QueryResultRow, ServicePolicyFlags {}
 
 const EXPECTED_SCHEMA_PREFIX = `CS-AI-C11 ${CONTRACT_PROVENANCE.database_version};`;
+const PUBLIC_SCHEMA_V17_PREFIX = 'CS-AI-C11 schema.v1.17;';
+
+function schemaEvidenceMatches(row: Pick<RuntimeSchemaProbeRow, 'schema_comment' | 'ops_loop_comment'>): boolean {
+  if (row.schema_comment.startsWith(EXPECTED_SCHEMA_PREFIX)) {
+    return true;
+  }
+  return (
+    row.schema_comment.startsWith(PUBLIC_SCHEMA_V17_PREFIX)
+    && row.ops_loop_comment.includes(CONTRACT_PROVENANCE.database_version)
+  );
+}
 const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = 'cf33ad08f0e6ef34dfa6f212e69aaac151a69603d69ee52db32c9e7bd02333ec';
 const RUNTIME_SCHEMA_PROBE = `
   WITH expected_runtime_relation_acl(relation_name, privilege_type) AS (
@@ -160,7 +172,16 @@ const RUNTIME_SCHEMA_PROBE = `
       ('public.idempotency_request_hash_version(text,text,text)'),
       ('public.idempotency_claim(text,text,text,text,text,text,integer)'),
       ('public.idempotency_complete(text,text,text,bigint,integer,jsonb,boolean)'),
-      ('public.idempotency_heartbeat(text,text,text,bigint,integer)')
+      ('public.idempotency_heartbeat(text,text,text,bigint,integer)'),
+      ('ops_loop.record_inaccuracy_report(text,text,integer,integer,text,text,text)'),
+      ('ops_loop.read_sop_catalog(text,text)'),
+      ('ops_loop.import_sop_catalog(text,jsonb,text,text)'),
+      ('ops_loop.patch_sop_node(text,integer,text,text,integer,text)'),
+      ('ops_loop.delete_sop_node(text,integer,text)'),
+      ('ops_loop.mutate_script(text,text,integer,text,text,timestamp with time zone,timestamp with time zone,text,text)'),
+      ('ops_loop.read_retrieval_metrics(text,text)'),
+      ('ops_loop.list_software_releases(text)'),
+      ('ops_loop.current_software_release(text)')
   ),
   expected_search_functions(signature) AS (
     VALUES
@@ -218,6 +239,14 @@ const RUNTIME_SCHEMA_PROBE = `
       pg_catalog.obj_description('public'::pg_catalog.regnamespace, 'pg_namespace'),
       ''
     ) AS schema_comment,
+    coalesce(
+      (
+        SELECT pg_catalog.obj_description(namespace.oid, 'pg_namespace')
+        FROM pg_catalog.pg_namespace namespace
+        WHERE namespace.nspname = 'ops_loop'
+      ),
+      ''
+    ) AS ops_loop_comment,
     pg_catalog.to_regprocedure(
       'public.search_recommendable_scripts(text,text,text)'
     ) IS NOT NULL
@@ -343,7 +372,7 @@ const RUNTIME_SCHEMA_PROBE = `
             JOIN LATERAL pg_catalog.aclexplode(guarded_schema.nspacl) acl ON true
             WHERE acl.grantee = runtime_role.oid
               AND (
-                guarded_schema.nspname <> 'public'
+                guarded_schema.nspname NOT IN ('public', 'ops_loop')
                 OR acl.privilege_type <> 'USAGE'
                 OR acl.is_grantable
               )
@@ -353,6 +382,15 @@ const RUNTIME_SCHEMA_PROBE = `
             FROM pg_catalog.pg_namespace public_schema
             JOIN LATERAL pg_catalog.aclexplode(public_schema.nspacl) acl ON true
             WHERE public_schema.nspname = 'public'
+              AND acl.grantee = runtime_role.oid
+              AND acl.privilege_type = 'USAGE'
+              AND NOT acl.is_grantable
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_namespace ops_loop_schema
+            JOIN LATERAL pg_catalog.aclexplode(ops_loop_schema.nspacl) acl ON true
+            WHERE ops_loop_schema.nspname = 'ops_loop'
               AND acl.grantee = runtime_role.oid
               AND acl.privilege_type = 'USAGE'
               AND NOT acl.is_grantable
@@ -639,7 +677,13 @@ const RUNTIME_POLICY_FLAGS_READ = `
   FROM runtime_boundary
   WHERE runtime_boundary.database_probe = 1
     AND runtime_boundary.server_version_num / 10000 = 15
-    AND runtime_boundary.schema_comment LIKE ($1 || '%')
+    AND (
+      runtime_boundary.schema_comment LIKE ($1 || '%')
+      OR (
+        runtime_boundary.schema_comment LIKE ($2 || '%')
+        AND position($3 in runtime_boundary.ops_loop_comment) > 0
+      )
+    )
     AND runtime_boundary.repository_boundary_present
     AND runtime_boundary.runtime_identity_safe
     AND runtime_boundary.runtime_effective_acl_safe
@@ -752,7 +796,7 @@ class PostgresServiceRepository implements ServiceRepository {
     try {
       const result = await this.pool.query<RuntimePolicyFlagsRow>(
         RUNTIME_POLICY_FLAGS_READ,
-        [EXPECTED_SCHEMA_PREFIX],
+        [EXPECTED_SCHEMA_PREFIX, PUBLIC_SCHEMA_V17_PREFIX, CONTRACT_PROVENANCE.database_version],
       );
       if (this.closed) return null;
       const row = result.rows[0];
@@ -780,7 +824,7 @@ class PostgresServiceRepository implements ServiceRepository {
       const row = result.rows[0];
       if (row?.database_probe !== 1) return freezeChecks('not_ready', 'not_ready');
       const schema = Math.trunc(row.server_version_num / 10_000) === 15
-        && row.schema_comment.startsWith(EXPECTED_SCHEMA_PREFIX)
+        && schemaEvidenceMatches(row)
         && row.repository_boundary_present
         && row.runtime_identity_safe
         && row.runtime_effective_acl_safe

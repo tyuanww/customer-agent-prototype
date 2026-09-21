@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.13.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.14.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -51,6 +51,8 @@ export const COMPONENT_SCHEMA_NAMES = [
   "ImportStatus",
   "ImportStatusResponse",
   "ImportStatusResponseBase",
+  "InaccuracyReportRequest",
+  "InaccuracyReportResponse",
   "IntentId",
   "IntentTaxonomyVersion",
   "InteractionReason",
@@ -109,6 +111,8 @@ export const COMPONENT_SCHEMA_NAMES = [
   "ReadyCheckStatus",
   "ReadyChecks",
   "ReadyResponse",
+  "RetrievalMetrics",
+  "RetrievalWindow",
   "ReviewDecision",
   "ReviewList",
   "ReviewMode",
@@ -126,11 +130,22 @@ export const COMPONENT_SCHEMA_NAMES = [
   "RollbackResponse",
   "SafeSourceRef",
   "ScriptCategory",
+  "ScriptDeleteRequest",
+  "ScriptMutationResponse",
+  "ScriptPatchRequest",
   "SearchCandidate",
   "SearchRequest",
   "SearchResponse",
   "SnapshotItem",
   "SnapshotResponse",
+  "SoftwareRelease",
+  "SoftwareReleaseList",
+  "SopCatalogResponse",
+  "SopImportAccepted",
+  "SopImportRequest",
+  "SopNode",
+  "SopNodeDelete",
+  "SopNodePatch",
   "SourceBindingHash",
   "SourceContractReason",
   "TelemetryStatus",
@@ -157,7 +172,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.13.0:components",
+  "$id": "urn:customer-agent:openapi:1.14.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -1973,6 +1988,61 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "InaccuracyReportRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "script_id"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "script_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "script_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "InaccuracyReportResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "query_id",
+        "script_id"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "query_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "script_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
     "IntentId": {
       "type": "string",
       "pattern": "^intent_[A-Za-z0-9][A-Za-z0-9._-]{0,126}$"
@@ -3486,6 +3556,56 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "RetrievalMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_hit_rate",
+        "copy_complete_rate",
+        "open_task_count",
+        "current_release_script_count",
+        "window",
+        "release_id"
+      ],
+      "properties": {
+        "no_hit_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "copy_complete_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "open_task_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "current_release_script_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "window": {
+          "$ref": "#/$defs/RetrievalWindow"
+        },
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "RetrievalWindow": {
+      "type": "string",
+      "enum": [
+        "current_release",
+        "last_7d"
+      ]
+    },
     "ReviewDecision": {
       "type": "object",
       "additionalProperties": false,
@@ -4028,6 +4148,84 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "aftersale",
         "product"
       ]
+    },
+    "ScriptDeleteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_version"
+      ],
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "ScriptMutationResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "script_id",
+        "mutation_id",
+        "review_status"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "script_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "mutation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "review_status": {
+          "const": "pending_review"
+        }
+      }
+    },
+    "ScriptPatchRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_version",
+        "title",
+        "answer_text",
+        "effective_from"
+      ],
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "answer_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "effective_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "effective_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
     },
     "SearchCandidate": {
       "type": "object",
@@ -4597,6 +4795,210 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "SoftwareRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "platform",
+        "sha256",
+        "download_url",
+        "created_at",
+        "signed"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "mac-universal",
+            "win-x64",
+            "linux-x64"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "download_url": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "signed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "SoftwareReleaseList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SoftwareRelease"
+          }
+        }
+      }
+    },
+    "SopCatalogResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_session_id",
+        "items"
+      ],
+      "properties": {
+        "product_session_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SopNode"
+          }
+        }
+      }
+    },
+    "SopImportAccepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "product_session_id",
+        "node_count"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "product_session_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "SopImportRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "format": "binary"
+        }
+      }
+    },
+    "SopNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_id",
+        "parent_node_id",
+        "title",
+        "body",
+        "sort_key",
+        "version",
+        "lifecycle"
+      ],
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parent_node_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "sort_key": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lifecycle": {
+          "type": "string",
+          "enum": [
+            "active",
+            "deleted"
+          ]
+        }
+      }
+    },
+    "SopNodeDelete": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_version"
+      ],
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "SopNodePatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_version"
+      ],
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "sort_key": {
+          "type": "integer"
         }
       }
     },

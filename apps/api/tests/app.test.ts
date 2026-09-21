@@ -10,6 +10,7 @@ import {
 } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { ClientConfig } from 'pg';
+import { CONTRACT_PROVENANCE } from '@customer-agent/contracts/provenance';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createApiApp } from '../src/app.js';
@@ -909,7 +910,8 @@ describe('ServiceRepository readiness', () => {
     return {
       database_probe: 1,
       server_version_num: 150_013,
-      schema_comment: 'CS-AI-C11 schema.v1.17; synthetic unit fixture',
+      schema_comment: `CS-AI-C11 ${CONTRACT_PROVENANCE.database_version}; synthetic unit fixture`,
+      ops_loop_comment: '',
       repository_boundary_present: true,
       runtime_identity_safe: true,
       runtime_effective_acl_safe: true,

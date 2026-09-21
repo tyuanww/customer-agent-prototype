@@ -42,9 +42,9 @@ const contractSetId = JSON.parse(readFileSync(path.join(projectRoot, 'contracts/
 const contractRoot = path.join(projectRoot, 'contracts/upstream/customer-agent', contractSetId);
 const manifest = JSON.parse(readFileSync(path.join(contractRoot, 'contract-set.json'), 'utf8')) as {
   source_git_sha: string;
-  database: Readonly<{ sha256: string }>;
+  database: Readonly<{ sha256: string; file: string }>;
 };
-const databaseSource = readFileSync(path.join(contractRoot, 'schema-v1.17.sql'), 'utf8');
+const databaseSource = readFileSync(path.join(contractRoot, manifest.database.file), 'utf8');
 let generator: GeneratorModule;
 
 beforeAll(async () => {
@@ -81,11 +81,11 @@ function prepareExistingPublication(root: string): void {
 }
 
 describe('database migration generator', () => {
-  it('preserves all thirteen immutable migrations and appends the deferred guard fix', () => {
+  it('preserves all fourteen immutable migrations and appends the ops-loop suffix', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());
 
-    expect(first.migrations).toHaveLength(14);
+    expect(first.migrations).toHaveLength(15);
     expect(first.migrations.map(({ id }) => id)).toEqual([
       '0001_extensions',
       '0002_identity_and_content',
@@ -101,6 +101,7 @@ describe('database migration generator', () => {
       '0012_owner_acceptance_v1_15',
       '0013_backend_identity_content_v1_16',
       '0014_release_deferred_guard_v1_17',
+      '0015_ops_loop_v1_18',
     ]);
     expect([...first.outputs]).toEqual([...second.outputs]);
     expect(first.migrations.slice(0, 9).map(({ sha256 }) => sha256)).toEqual([
@@ -120,8 +121,12 @@ describe('database migration generator', () => {
     expect(first.migrations[11]?.contract_set_id).toContain('schema-1.15-');
     expect(first.migrations[11]?.sha256).toBe('3bc06f81ed596049e0539a679e066b7a6c2d1814314c3d2ba9fd4d65f469be18');
     expect(first.migrations[12]?.sha256).toBe('8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2');
-    expect(first.migrations[13]?.contract_set_id).toBe(contractSetId);
-    expect(first.migrations[13]?.sql).toContain('SECURITY DEFINER');
+    expect(first.migrations[13]?.contract_set_id).toContain('schema-1.17-');
+    expect(first.migrations[13]?.sha256).toBe('ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339');
+    expect(first.migrations[14]?.contract_set_id).toBe(contractSetId);
+    expect(first.migrations[14]?.sql).toContain('CREATE SCHEMA ops_loop');
+    expect(first.migrations[14]?.sql).toContain('SECURITY DEFINER');
+    expect(first.migrations[14]?.sql).not.toMatch(/^BEGIN;$/m);
     expect(first.migrations[12]?.sql).toContain('CS-AI-C11 schema.v1.16;');
     expect(first.migrations[12]?.sql).not.toMatch(/^BEGIN;$/m);
     expect(first.migrations[10]?.sha256).toBe('8f5337b69b1a10fb85013694699e683c99e14399fa3471bd970eb89ac8591a0f');
