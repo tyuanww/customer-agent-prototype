@@ -4,6 +4,8 @@ import {
   dashboardOpsFailure,
   OPS_LOOP_COPY,
   SOP_UPLOAD_MAX_BYTES,
+  sopAllergyStepNeedsStopCopy,
+  sopCsvAllergyStopMissing,
   type DashboardOpsFailure,
   type DashboardRetrievalMetrics,
   type DashboardScriptMutation,
@@ -106,6 +108,9 @@ export async function dashboardSopImport(
   if (typeof csvText !== 'string' || csvText.trim().length < 1 || csvText.length > SOP_UPLOAD_MAX_BYTES) {
     return dashboardOpsFailure('VALIDATION');
   }
+  if (sopCsvAllergyStopMissing(csvText)) {
+    return dashboardOpsFailure('VALIDATION', OPS_LOOP_COPY.allergyStop);
+  }
   return withSession(session, ['coach', 'owner'], async (client, epoch) => {
     const form = new FormData();
     form.append('file', new Blob([csvText], { type: 'text/csv' }), 'sop.csv');
@@ -132,6 +137,10 @@ export async function dashboardSopPatch(
   const expectedVersion = record.expectedVersion;
   if (typeof nodeId !== 'string' || !Number.isInteger(expectedVersion)) {
     return dashboardOpsFailure('VALIDATION');
+  }
+  if (typeof record.title === 'string' && typeof record.body === 'string'
+    && sopAllergyStepNeedsStopCopy(record.title, record.body)) {
+    return dashboardOpsFailure('VALIDATION', OPS_LOOP_COPY.allergyStop);
   }
   return withSession(session, ['coach', 'owner'], async (client, epoch) => {
     const result = await client.request(
