@@ -17,7 +17,8 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 你现在要做什么 | 打开 |
 | --- | --- |
 | 按统一流程开发、审查、提交 PR、合并、验收和发布，处理授权与证据复用 | [工程工作流程](docs/reference-engineering-workflow.md) |
-| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP 窗、Dashboard 只读 SOP、话术不准、内容草稿、话术优化待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
+| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP 窗、话术不准、内容管理草稿、概览待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
+| 管理员导入仓外 MENOKIN FAQ、dual-review 发布，再查「面膜紫适用人群」 | [docs/tutorial-menokin-content-publish.md](docs/tutorial-menokin-content-publish.md) |
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
 | 在办公机 Windows 上勾首轮离线安装 / 浮窗 / 快捷键 / 卸载（人填，开发机不代填） | [docs/how-to-office-machine-first-round.md](docs/how-to-office-machine-first-round.md) |
 | 查阅 Fox / Query / Dashboard / 登录 / SOP 窗口、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
@@ -150,20 +151,20 @@ FOX_IDLE → SEARCH_INPUT → RESULTS | EMPTY | ERROR → COPIED → FOX_IDLE
 
 闲置时显示约 88px 的透明狐狸窗（狐狸视觉约 64px），待机动效约 3 秒一轮：4px 浮动、2° 摆动、轮廓呼吸。指针只在这只 88px 窗内时，整只狐狸会做非常克制的局部跟随，这不是全局眼球追踪。片刻无操作后会打盹、再睡着；窗口隐藏时睡眠钟暂停，重新可见后从头计时。任何局部活动或打开查询都会唤醒。点按有短促的戳感，拖过 4px 后会顺着方向被提起，拖太久会有一次很克制的烦躁反应。拖到当前屏左/右边缘 18px 内会自动吸附：原生窗口始终完整留在工作区，由 renderer 平移裁出等效 44px 窗区，对应 64px 狐狸视觉各露一半（32px），并重播一次方向性吸附。稳定半露时会做左右镜像的 inward-ready 动效：峰值向屏内探 3px、上抬 2px、内倾 5°并轻微放大，呈现“跃跃欲试”，但仍保持半露裁切和共享元素姿态连续。悬停或键盘聚焦时，狐狸用 420ms 镜像探头动效过渡到等效 80px 裁切；移开后用 300ms 反向动效缩回。这套贴边半露就是本项目的 mini mode，不是桌宠自由漫游。这样不会让 macOS WindowServer 与屏外透明窗反复争抢位置。打开采用两阶段共享元素交接：隐藏查询窗先按点击瞬间狐狸的真实位置、同尺寸 64px 和当前 2D 位移 / 旋转 / 缩放矩阵准备首帧，renderer 回执后才交换窗口并用约 260ms 的 `clip-path` 展开；贴边查询窗从物理屏幕边缘起步，保持 32px 半露轮廓连续。关闭约 200ms，抵达末帧后再反向换窗。玻璃只淡入淡出，不缩放模糊层；正常完成由动画回执驱动，定时器仅兜底。每个状态只一次性提交最终窗口 bounds，不逐帧 resize、不先弹出整颗贴边狐狸，也不让狐狸和查询同时消失。正常结果路径的高度是 Query 对 DOM 的实测 hug（capsule + banner + `result-content` + chrome + 容差），经 typed query-only layout / 纵向 resize IPC 上报后，Main 钳制到 `240..min(620, availableHeight)`（`availableHeight` 为当前 workArea 高减去 16px 边距），一次 `setBounds` 并 ACK，然后才展示内容。旧分档 `600×240 / 340 / 430 / 620` **只属于**测量缺失、过期或被拒绝时的异常 fallback，不是正常 Top 3 的固定窗高。查询中的狐狸会来回寻找，命中会弹跳，空态会歪头，复制后会点头；业务状态优先于待机动效。首击立即打开查询，不为识别双击增加延迟。
 
-Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。顶栏只保留一个「演示数据」标识，并写「无后端 · 不保存」（VOC / 工单 / KPI 仍是编译期合成样本，所以这个标识不会因为话术库已读当前发布而消失）。侧栏「演示环境」写完整边界：`无后端 · 不保存 · VOC 明细为合成镜像 · 话术库读当前发布`。完整 `MOCK AUTH / SYNTHETIC DATA / NO BACKEND` 也在「演示环境」。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作，深色模式使用独立的炭灰层级。界面采用成熟运营工具的紧凑可折叠导航、1px 分隔线、统一 8px 的矩形圆角和无悬浮阴影数据面板，不把玻璃与桌宠动效铺进管理端。侧栏展开宽度可在 `216–360px` 内鼠标拖动或键盘调整，默认 `248px`；折叠后 macOS 保留固定 `120px` 控制岛 / 图标轨，Windows 与 Linux 保留固定 `72px` 图标轨，并维持原分组占位，图标位置不变、只隐藏文字，hover / focus 会在右侧显示模块名称。macOS 的同一个 PanelLeft 按钮始终固定在红绿灯右侧的侧栏控制岛内，展开 / 折叠只切换图标，不覆盖狐狸 Logo，也不与原生拖动区域重叠；Windows / Linux 则保留原生标题栏与稳定侧栏控制槽。外观可切换「浅色 / 深色 / 跟随系统」，默认跟随系统且只在当前 Dashboard 会话有效。管理概览使用语义化决策表和连续 KPI 条，显示影响、Owner、下一步、状态、处理窗口、固定统计范围与指标定义。十个一期模块使用滚轮 / 触控 / 原生滚动条；鼠标按住拖动不再滚页。侧栏「SOP」只读浏览与坐席过敏窗同一份合成树；coach / owner 可见内部停手文案，坐席看不到；不编辑、不发布，持久化仍要 contracts:intake。「话术优化待办」在有产品会话时由 coach / owner 拉取冻结 `GET /v1/metrics/iteration-tasks` 并 `POST` start/close；空列表合法，显示「当前没有待办」。坐席 403。没有产品会话时显示「当前没有产品会话，无法加载待办」，不回落 DEMO 5 条。从「话术不准」自动开单仍要 persist。「内容与发布」接受本地 CSV 或 xlsx（只读第一张表）；中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与标准话术，空白或不完整行会跳过。上限 10MiB / 5000 行。点 Publish 后会等导入 staged：状态每 1.5 秒问一次，遇 429 退避，单次点击不会打满每分钟 120 次。xlsx 解析会转义 sheet relationship id，越界 XML 实体跳过。一期发布仅 Owner。导航另有禁用的「工单垃圾桶 · 二期待实施」占位，不算已实现模块。VOC 可切换预编译合成年 / 月 / 日切片并联动 KPI、Pareto、热力图和详情；「公告与同步」可演练本地成功 / 失败推送回执，但不会联网、发送、保存或改变四分面。VOC / 工单 / KPI 数字全部是编译期合成样本；话术库条数与正文来自仓外 hydrate。adopted 只等于复制成功。
+Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。窗口标题是「客服运营工作台」。顶栏不再放「演示数据」或「无后端 · 不保存」；没有产品会话或没有冻结合同时用空态 / 「未接入」，不发明数字。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作。五个一期模块：管理概览、话术库、SOP、内容管理、系统同步。管理概览是统计范围 + 连续 KPI 条 + 待办决策表；待办走冻结 `GET /v1/metrics/iteration-tasks` 与 start/close，无命中率 / 复制完成率没有接口所以写「未接入」。话术库读当前发布 hydrate（与查询胶囊同一份目录），可导出 CSV；上传走内容导入；单条更新/删除未接入。SOP 写按钮没有持久化合同，点了保持「未接入」，不把合成过敏树当运营目录。「内容管理」接受本地 CSV 或 xlsx（只读第一张表）；中文表头映射到场景与标准话术。Owner 点发布后：导入 parked 时走 dual-review（lead / manager / quality / resume），再 `POST /v1/content/publish`；飞书会话若不能完成三条身份，提示进入双人复核，不空等超时。一期发布仅 Owner。系统同步分话术版本（当前发布）和软件版本（安装包目录未接入）。adopted 只等于复制成功。
 
 Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色切换为白 / 浅灰耳麦以提高对比，狐狸本体保持原紫色。侧栏业务导航图标为 20px，文字比图标再靠近约 4px；折叠时图标中心仍固定在 macOS `nav.left+60` / Windows·Linux `nav.left+36`。
 
 离线三维抽样复核将“是否修改 / 是否发送 / 是否适用”分别显示，维度 tab、合成结论与分层样本可交互；每项都报告有效分母、不可核验与证据等级。该页不读取最终发送正文，也不会从复制动作推断发送、采纳、未修改或回答正确。
 
-VOC 页面基于用户提供的工作簿做过一次只读结构与聚合校准，仓内仅保留去标识合成镜像：不包含客户原文、订单号、图片、批次、员工、快递或竞品原始评价。话术库将产品 / 活动 / 售前 / 售后分域，列表优先读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），窗口失焦再聚焦会重读仓外 hydrate 文件，不 `refreshAnnounce`；无日期条目的生效窗口标「当前发布」。这不是 Menokin 企业工作簿的实时镜像，也不能据此宣称工作台已接正式后端。Menokin 四域材料是否存在以项目记录仓的受控证据为准，Demo 中的 `NOT_CREATED / UPSTREAM_AUTHORING` 等标签不得反向解释为当前上游事实。
+话术库将产品 / 活动 / 售前 / 售后分域，列表优先读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），窗口失焦再聚焦会重读仓外 hydrate 文件，不 `refreshAnnounce`。这不是 Menokin 企业工作簿的实时镜像。Menokin 四域材料是否存在以项目记录仓的受控证据为准，Demo 中的 `NOT_CREATED / UPSTREAM_AUTHORING` 等标签不得反向解释为当前上游事实。
 
 检索按钮至少显示 280ms 的本地反馈；无命中有独立空态动效。未登录的默认 S0 仍用仓内合成 fixture 的完整问法 + 字符 n-gram（答案正文不参与召回）。合成登录且已加载 hydrate 快照后，主链是本地字段加权 BM25 + RRF，可选 MiniMax 规划 / 重排（默认 ON），卡片原文来自仓外快照，不再打 leftover `/v1/search`。细节见 [桌面语义检索](docs/reference-desktop-retrieval.md)。检索期间若继续改问题，会取消旧检索。登录后查询中若 announce 因来源门或瞬时失败掉租约，overlay 显示「内容暂不可用，请联系话术师核实」或「服务暂不可用，请重试」，不画空白，也不把这两类原因画成「当前版本已失效」。复制成功只反馈「已复制」约 900ms，随后自动收起回狐狸头，并在 macOS 上把键盘还给刚才的应用；复制失败则保留候选供重试。
 
 ## 当前原型模式边界
 
-- 仓内话术 fixture 与 Dashboard VOC / 工单 / KPI 仍是虚构合成内容；产品远端下话术库与查询胶囊读仓外当前发布 hydrate。查询卡片不再贴 `DEMO · 合成数据`。本机检索索引与 MENOKIN 原文在仓外，不进 git。
-- 运行时不自动读取飞书、客户工作簿、凭证、URL 或 token。Dashboard「内容与发布」只解析使用者当场选择的本地 CSV / xlsx，不连飞书或 Wiki。用户提供的 VOC Excel 仅在设计阶段做过只读聚合校准，原文件与明细不随 Demo 分发。
+- 未登录的 S0 查询仍用仓内合成 fixture。产品远端下话术库与查询胶囊读仓外当前发布 hydrate。工作台没有冻结合同的数字写「未接入」。查询卡片不再贴 `DEMO · 合成数据`。本机检索索引与 MENOKIN 原文在仓外，不进 git。
+- 运行时不自动读取飞书、客户工作簿、凭证、URL 或 token。Dashboard「内容管理」只解析使用者当场选择的本地 CSV / xlsx，不连飞书或 Wiki。用户提供的 VOC Excel 仅在设计阶段做过只读聚合校准，原文件与明细不随 Demo 分发。
 - 不使用 Menokin 名义、真实产品事实或真实客户原文；正式 Menokin 数据只可在 G0 / Ddev 与数据门通过后由受控 adapter 接入。
 - 不复制或迁移旧 `dafuyan-wording` 项目的代码、词典、权重、数据或配置；查询能力是在本仓按合成合同独立实现。
 - 过期与未生效话术永不返回；卡片不展示匹配分。

@@ -312,9 +312,9 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 | --- | --- |
 | 话术不准入口与复制路径隔离 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx tests/component/SopApp.test.tsx tests/unit/query-view.test.ts tests/unit/query-visual.test.ts` |
 
-## 内容与发布草稿（Dashboard 切片 1）
+## 内容管理草稿（Dashboard 切片 1）
 
-「内容与发布」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Publish 走现有 import/publish，等导入 staged 才发：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒，预算 30 秒，避免打满状态接口每分钟 120 次。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。售后过敏树是 DEMO 样例说明仍在。
+「内容管理」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；parked 后走 dual-review，再 `POST /v1/content/publish`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库没有冻结合同，保持未接入。
 
 | 你想证明 | 命令 |
 | --- | --- |
@@ -331,15 +331,15 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 | live 空列表、403、IPC 与 preload | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/IterationModule.test.tsx tests/unit/dashboard-iteration.test.ts tests/unit/dashboard-iteration-ipc.test.ts tests/unit/dashboard-iteration-preload.test.ts tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts tests/unit/contracts.test.ts` |
 | API list/start/close 合同 | `pnpm --filter @customer-agent/api exec vitest run tests/iteration-task-routes.test.ts tests/iteration-task-repository.test.ts` |
 
-## Dashboard SOP 只读树
+## Dashboard SOP
 
-侧栏「SOP」是工作台第十个一期模块，不是 Query 的独立 SOP 窗。只读渲染 `allergySopTree()`，不编辑、不发布、不写盘。coach / owner 可见内部停手；坐席和 `dashboardContent.session()` 失败时隐藏（fail-closed）。持久化与发布仍要 contracts:intake。
+侧栏「SOP」是五个一期模块之一，不是 Query 的独立 SOP 窗。没有持久化合同时，上传 / 更新 / 删除 / 导出 / 自定义步骤保持未接入，不把合成过敏树当运营目录。
 
 | 你想证明 | 命令 |
 | --- | --- |
-| 只读树、角色红线和 fail-closed | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/SopLibraryModule.test.tsx tests/component/DashboardApp.test.tsx tests/unit/dashboard-manifest.test.ts tests/unit/dashboard-layout.test.ts` |
+| 写操作 fail-closed | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/SopLibraryModule.test.tsx tests/component/DashboardApp.test.tsx tests/unit/dashboard-layout.test.ts` |
 
-黄金路径（人工）：打开运营工作台 → 话术运营 → SOP → 看到合成过敏树节点。不要把它当成 Query「打开过敏售后流程」。
+黄金路径（人工）：打开运营工作台 → SOP → 点上传看到未接入。不要把它当成 Query「打开过敏售后流程」。
 
 ## 打包态显式离线（P3 第一刀）
 

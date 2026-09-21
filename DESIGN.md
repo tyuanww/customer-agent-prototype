@@ -102,40 +102,27 @@
 
 ### 演示级 Dashboard
 
-左侧可折叠分组导航 + 顶栏 + 内容区，键盘可访问。展开宽度可在 `216–360px` 内拖动或键盘调整，默认 `248px`；折叠采用平台化 collapsed surface（macOS integrated `120px`，Windows / Linux native `72px`），展开时恢复本次会话的上次宽度。折叠态分隔条仍可命中：向右拖从 collapsed surface 连续预览到 207，超过滞回 expand threshold（`208`，相对 collapse `192`）后先保持当前 raw 至少一个已提交布局帧，再进入既有 expanding 并约 190ms 恢复 `lastExpandedWidth`（至少 min `216`），无需 pointerup；阈值以下松手 / `pointercancel` / `lostpointercapture`（即使 `buttons===1`）/ blur / `buttons=0` 从当前 preview 平滑弹回 collapsed surface 且不误展开；回滚后分隔条公开 `aria-valuenow=平台折叠宽度`，保留 `lastExpandedWidth`，不把上次展开宽度写回 collapsed 态。键盘分隔条在折叠态：ArrowRight / Enter 展开，End 展开到 max，Home / ArrowLeft 保持 collapsed surface。拖动期间 titlebar drag 临时 no-drag，pointer 合帧，不每帧 setState，不动画 backdrop-filter / filter / box-shadow / padding / margin。图标锚点在四阶段不变（mac `nav.left+60` / native `nav.left+36`），只裁切文字；collapsing / collapsed / expanding 期间 brand copy 与 nav labels 必须 `opacity:0`，expanded 结构过渡完成后再用 100–120ms 淡入。折叠态图标在 hover / focus 时于侧栏外显示明确名称。狐狸 Logo 保持原槽位，不再叠加展开按钮。主内容只使用系统滚轮、触控滚动与原生滚动条，不把鼠标按住拖动解释为滚页。`980×680`、`1180×760` 与更大窗口下不得出现页面级横向遮挡，图表和卡片按断点重排。10 个可切换模块：
+左侧可折叠分组导航 + 顶栏 + 内容区，键盘可访问。展开宽度可在 `216–360px` 内拖动或键盘调整，默认 `248px`；折叠采用平台化 collapsed surface（macOS integrated `120px`，Windows / Linux native `72px`），展开时恢复本次会话的上次宽度。折叠态分隔条仍可命中：向右拖从 collapsed surface 连续预览到 207，超过滞回 expand threshold（`208`，相对 collapse `192`）后先保持当前 raw 至少一个已提交布局帧，再进入既有 expanding 并约 190ms 恢复 `lastExpandedWidth`（至少 min `216`），无需 pointerup；阈值以下松手 / `pointercancel` / `lostpointercapture`（即使 `buttons===1`）/ blur / `buttons=0` 从当前 preview 平滑弹回 collapsed surface 且不误展开；回滚后分隔条公开 `aria-valuenow=平台折叠宽度`，保留 `lastExpandedWidth`，不把上次展开宽度写回 collapsed 态。键盘分隔条在折叠态：ArrowRight / Enter 展开，End 展开到 max，Home / ArrowLeft 保持 collapsed surface。拖动期间 titlebar drag 临时 no-drag，pointer 合帧，不每帧 setState，不动画 backdrop-filter / filter / box-shadow / padding / margin。图标锚点在四阶段不变（mac `nav.left+60` / native `nav.left+36`），只裁切文字；collapsing / collapsed / expanding 期间 brand copy 与 nav labels 必须 `opacity:0`，expanded 结构过渡完成后再用 100–120ms 淡入。折叠态图标在 hover / focus 时于侧栏外显示明确名称。狐狸 Logo 保持原槽位，不再叠加展开按钮。主内容只使用系统滚轮、触控滚动与原生滚动条，不把鼠标按住拖动解释为滚页。`980×680`、`1180×760` 与更大窗口下不得出现页面级横向遮挡，图表和卡片按断点重排。5 个可切换模块：
 
 品牌区使用用户的透明狐狸头 Logo，不使用紫底「狐」字块。模块导航只显示短名称，页面解释放在内容标题或顶栏。侧栏是唯一固定玻璃层：浅色最终视觉约 `#f2f2f6..#f5f5f8`，深色约 `#121116..#17161c`，与 main 平均 RGB 差至少约 9；`20px` blur + saturate、单一中性 hairline 与极轻顶部高光。顶栏、主区、卡片与表格使用不透明实色（main light `#fff` / dark `#1c1b20`）和极轻内高光，不单独做 blur，正文保持 `--dash-ink` 对比。外观由 `data-dashboard-theme` 显式 token 与 shell / form control 继承的 `color-scheme` 共同决定，手动浅色 / 深色不得再走 `light-dark()` 的系统分支。侧栏导航未选中行默认透明；hover / focus-visible 在 120–160ms 内出现完整中性灰高亮框；selected / active 使用淡紫完整高亮面，selected icon 可用克制紫色，不再使用 3px 左侧紫色竖线、inset rail 或任何 selected 紫色定向边框，也不因此改变图标坐标。侧栏折叠使用固定 Logo DOM + 同一个持久 PanelLeft 按钮（同一 ref / testid / aria-controls），四阶段只切换 `aria-expanded` / label / icon。结构以 shell 的 `grid-template-columns` `transitionend` 正常收口为显式 `expanded / collapsing / collapsed / expanding` phase；`transitioncancel` 仅在实际结构边界已到达当前目标时 settle，否则等待新的 `transitionend`。动态切换到 `prefers-reduced-motion` 必须立即终态。折叠 180–200ms `cubic-bezier(.2,.8,.2,1)`，labels / brand copy 在 collapsing / collapsed / expanding 保持 `opacity:0`，expanded 结构完成后再淡入，不以 `max-width` 瞬断造成布局跳。品牌、标签与列表必须稳定裁切，resizer 保持可命中。不 bounce，不让 icon x/y 位移，toggle glyph 只在同一槽位 crossfade/scale。`prefers-reduced-motion` 直接终态。鼠标操作不强制焦点，键盘 / 虚拟点击在终态用 `useLayoutEffect` + `focus({ preventScroll: true })` 交接。Logo 槽与按钮 `no-drag`，独立 titlebar strip 保持 drag；拖宽期间 topbar / titlebar strip 必须临时 no-drag。侧栏按钮、主题 trigger 与 `menuitemradio` 桌面最小 `40×40px`，粗指针提升到 `44px`，使用行业通用的 PanelLeft 线框图标。Dashboard 外观由右上单一主题 trigger（`aria-haspopup=menu`）打开小型 menu，内含浅色 / 深色 / 跟随系统三个 roving `menuitemradio`；ArrowDown / ArrowUp 可从 trigger 打开；支持 Home / End、Enter / Space、Escape。Escape 与提交归还 trigger；Tab / Shift+Tab 关闭并移出到相邻可聚焦控件，不抢外部焦点；外部指针只关闭、不归还焦点。默认跟随系统，仅在当前 Dashboard 会话内生效，不读取或写入持久化存储，并保持 `matchMedia` 实时联动。菜单当前项用淡紫 selected，hover 灰。`forced-colors` 下选中面必须 `Highlight` + `HighlightText`；tooltip / popover 必须 `Canvas` / `CanvasText` 且 `backdrop-filter: none`。管理概览去掉装饰性上下 / 竖分隔与列表首项顶线，只保留结构线。矩形筛选状态用 8px，语义 chip 用 pill。其余动效优先 `opacity / color / background`，不沿用桌宠的弹跳、发光或漂浮语言。
 
-Dashboard 主标题只使用「客服运营工作台 / 运营管理端」，不使用英文概念口号。管理概览以固定统计范围、语义化待处理决策表和连续 KPI 条为首屏骨架；决策行必须显示影响、Owner、下一步、状态与处理窗口，操作使用可区分的具体名称。Demo 只有一个编译期合成数据集，不提供无法真正改变数据的假全局筛选；VOC 模块例外提供同一数据集内预编译的年 / 月 / 日切片，选择后必须真实联动 KPI、Pareto、热力图与详情。
+Dashboard 主标题只使用「客服运营工作台 / 运营管理端」，不使用英文概念口号。管理概览以固定统计范围、语义化待处理决策表和连续 KPI 条为首屏骨架。决策行只渲染冻结合同已有字段（事项、Owner、下一步、状态）；影响 / 处理窗口没有接口时写「未接入」，不得发明数字。没有活数据时整页空态，不提供无法真正改变数据的假全局筛选。
 
-1. 管理概览：今日需要拍板、VOC 信号、四域健康
-2. VOC / 工单洞察：产品筛选、问题 Pareto、聚合归因与数据契约
-3. 检索效果：根问题 / 操作双账
-4. 离线三维抽样复核：是否修改、是否发送、是否适用分别报告样本量、有效分母、不可核验与证据等级
-5. 话术库：产品话术、活动话术、售前流程、售后流程分域浏览
-6. 话术优化待办
-7. SOP：过敏售后只读合成树（与坐席 SOP 窗同一份 allergySopTree；coach/owner 可见内部停手，坐席不可见；持久化与发布另走合同）
-8. 内容与发布
-9. 公告与同步
-10. 架构能力图
+1. 管理概览：统计范围、KPI 条、话术优化待办
+2. 话术库：产品话术、活动话术、售前流程、售后流程分域浏览当前发布
+3. SOP：写操作没有持久化合同时保持未接入，不把合成过敏树当运营目录
+4. 内容管理：本地 CSV / xlsx 导入；Owner 发布走 dual-review 再 publish
+5. 系统同步：话术版本读当前发布；软件版本没有安装包目录时未接入
 
 侧栏业务导航图标由单一 `--dash-nav-icon-size: 20px` 同时驱动 `.dashboard-nav-icon` wrapper 与 SVG `width/height`，保留 24 viewBox / path / stroke。导航文字用静态 `--dash-nav-label-shift: calc(var(--dash-brand-copy-shift) - 4px)` 再靠近约 4px，expanded 态 icon-to-label 间隙约 14px。不改 PanelLeft toggle、品牌狐狸 40px、icon slot、macOS `nav.left+60` / native `+36` 锚点、8px inset、42px hit row、selected `::before inset:0`，也不给 icon transform。
 
-导航在「VOC / 工单洞察」下另显示禁用的「工单垃圾桶 · 二期待实施」占位。它不进入 10 个一期可切换模块、不可聚焦、不可执行，也不暗示功能已完成。
+一期导航不再包含 VOC / 工单垃圾桶 / 离线抽样 / 架构图。复制不能推断发送、采纳、未修改或回答正确。
 
-「公告与同步」提供本地推送演练：用户可选择合成成功 / 失败回执并观察 loading、结果和重试反馈；演练不得联网、发送、保存或修改 published / announced / client ACK / offline lease 四分面。
+话术库与内容发布必须分开：前者浏览当前发布（可导出 CSV；上传走内容导入），后者是导入 / 审核 / 发布。话术库读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），不复制、不单条改删。没有冻结合同的数字写「未接入」，不得因为话术库挂上当前发布就宣称工作台已接正式后端。
 
-离线三维抽样复核必须与检索自动事实分账：复制不能推断发送、采纳、未修改或回答正确；三项均以全合成冻结样本演示交互，`unverifiable` 单独列示，不采最终发送正文，也不冒充真实 Pilot EVD。
+不读取 Float 真实输入，不写磁盘，不用 localStorage / IndexedDB。
 
-话术库与内容发布必须分开：前者是只读资产浏览，后者是治理生命周期。话术库读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），只读、不复制、不发布。VOC / 工单 / 架构页仍是架构模拟，不得因为话术库挂上当前发布就宣称工作台已接正式后端。
-
-VOC 页面使用用户提供工作簿做**只读结构与聚合校准**，Git 内只保存去标识合成镜像。不得保存客户原文、订单号、图片、批次、员工、快递或竞品原始评价；自有与竞品分域；时间精度混合时不得伪造日 / 周趋势。
-
-Dashboard 的 BI 表达至少包含：概览的可切指标固定周期趋势图、检索终态构成图，以及 VOC 的问题 Pareto 与产品×问题热力图。图表必须有标题、单位 / 周期、合成口径、键盘可达的选择态和联动详情；筛选或选择必须真实改变本地视图，不能只是装饰。
-
-VOC / 工单 / KPI 仍来自编译期静态、深冻结的合成 manifest。话术库读当前发布 hydrate（见上），不因此改写 VOC 数字。不读取 Float 真实输入，不写磁盘，不用 localStorage / IndexedDB。
-
-Publish 若出现，必须 disabled，并附 `演示禁用 · 正式需 owner + G0/Ddev`。
+Owner 发布必须走冻结合同：导入 parked 后 dual-review，再 `POST /v1/content/publish`。没有会话或角色不够时按钮保持未接入 / 禁用，禁止合成成功。
 
 ### 状态与反馈
 
