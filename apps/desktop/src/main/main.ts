@@ -17,6 +17,11 @@ import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { scheduleRetrievalEmbeddingsFromEnv } from './retrieval-embeddings-store.ts';
 import { app, Menu, screen, session, shell } from 'electron';
+import {
+  applyChromiumLoopbackProxyBypass,
+  applySessionLoopbackProxyBypass,
+  ensureNoProxyLoopback,
+} from './loopback-proxy';
 import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
 import { registerClipboardIpc } from './clipboard-ipc';
@@ -69,6 +74,8 @@ function applyContentSecurityPolicy(devServerUrl?: string): void {
 // materializes that path; otherwise a packaged build looks under
 // @customer-agent/desktop and fail-closes.
 app.setName('客服话术浮窗 Demo');
+ensureNoProxyLoopback();
+applyChromiumLoopbackProxyBypass(app.commandLine);
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -149,6 +156,11 @@ if (!gotLock) {
     );
     applyContentSecurityPolicy(rendererDevServerUrl);
     applySessionSecurity(session.defaultSession);
+    try {
+      await applySessionLoopbackProxyBypass(session.defaultSession);
+    } catch {
+      // Tests and hosts without session.setProxy still reach loopback via Node fetch.
+    }
 
     const testAccelerator = isTestHarnessEnabled()
       ? process.env.DEMO_E2E_ACCELERATOR

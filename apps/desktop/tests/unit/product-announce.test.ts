@@ -204,6 +204,28 @@ describe('product announce lease and snapshot', () => {
     await f.session.logout();
   });
 
+  it('retries announce current without conditionals when 304 arrives before a lease', async () => {
+    const expiry = expiresAt();
+    const f = await setup(async _url => new Response(null, { status: 404 }));
+    const seen: Array<string | null> = [];
+    f.transport.mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') {
+        seen.push(new Headers(init?.headers).get('if-none-match'));
+        if (seen.length === 1) return new Response(null, { status: 304, headers: { etag: 'W/"13"' } });
+        return Response.json(currentBody(expiry), { headers: { etag: 'W/"13"' } });
+      }
+      if (url.pathname === '/v1/announce/ack') return Response.json({ ok: true });
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody());
+      return new Response(null, { status: 404 });
+    });
+    expect(await f.announce.refresh(f.identity)).toMatchObject({ ok: true, releaseId, leaseExpiresAt: expiry });
+    expect(seen).toEqual([null, null]);
+    expect(f.announce.allows(releaseId)).toBe(true);
+    await f.session.logout();
+  });
+
   it('keeps the local lease when a 304 omits snapshot-lease headers', async () => {
     const expiry = expiresAt();
     const f = await setup(async _url => new Response(null, { status: 404 }));

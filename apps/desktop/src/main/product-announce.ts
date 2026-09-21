@@ -99,8 +99,11 @@ export class ProductAnnounce implements AnnounceGate {
       const view = this.session.view();
       if (!view.signedIn) throw new ProductHttpError('UNAUTHORIZED');
       if (view.sessionEpoch !== identity.sessionEpoch) throw new ProductHttpError('STALE');
-      const current = await this.session.request(identity.sessionEpoch, '/v1/announce/current', { method: 'GET', headers: this.headers(true) });
+      let current = await this.session.request(identity.sessionEpoch, '/v1/announce/current', { method: 'GET', headers: this.headers(true) });
       if (view.sessionEpoch !== this.session.view().sessionEpoch) throw new ProductHttpError('STALE');
+      if (current.status === 304 && !this.lease) {
+        current = await this.session.request(identity.sessionEpoch, '/v1/announce/current', { method: 'GET', headers: this.headers(false) });
+      }
       if (current.status === 304) {
         // 304 may arrive without x-snapshot-lease through a public HTTPS proxy.
         // The client already holds the token it sent; keep it if the server confirmed.
