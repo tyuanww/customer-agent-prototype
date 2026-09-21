@@ -20,6 +20,7 @@ export type InaccuracyTodoTask = Readonly<{
   suggestedScriptIds: readonly string[];
   sampleQueryIds: readonly string[];
   status: 'open' | 'in_progress' | 'resolved' | 'wont_fix';
+  suspectedCause?: 'content_gap' | 'ranking' | 'stale' | 'mixed';
 }>;
 
 export type InaccuracyTodoCount = Readonly<{

@@ -9,6 +9,11 @@ import {
   inaccuracyScriptIdFromTask,
 } from '@shared/inaccuracy-todo';
 import {
+  ITERATION_CLOSE_HINT_COPY,
+  hasPublishCloseHint,
+} from '@shared/iteration-close-hint';
+import type { DashboardWordingView } from '@shared/dashboard-wording';
+import {
   DASHBOARD_MANIFEST,
   listOpenP0IterationTasks,
   type IterationCause,
@@ -91,6 +96,7 @@ function asModuleTask(task: DashboardIterationTask): IterationTask {
     title: scriptId ? `话术不准 · ${scriptId}` : task.clusterKey,
     detail: scriptId ? `稿 ${scriptId} · 样本 ${sampleCount} 次` : task.signalId,
     nextStep: '不自动改写 Answer。关闭待办不等于已发布。',
+    createdAt: task.createdAt,
   };
 }
 
@@ -111,7 +117,26 @@ export function IterationModule() {
   const [selectedId, setSelectedId] = useState(() => (liveCapable ? '' : (data.tasks[0]?.taskId ?? '')));
   const [note, setNote] = useState('');
   const [conflict, setConflict] = useState<string | null>(null);
+  const [wording, setWording] = useState<DashboardWordingView | null>(null);
   const live = liveStatus !== 'off';
+
+  useEffect(() => {
+    const api = window.dashboardWording;
+    if (!api) {
+      setWording(null);
+      return undefined;
+    }
+    let cancelled = false;
+    void api.list().then((result) => {
+      if (cancelled) return;
+      setWording(result.ok ? result : null);
+    }).catch(() => {
+      if (!cancelled) setWording(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!liveCapable) return undefined;
@@ -480,6 +505,19 @@ export function IterationModule() {
                 <div><dt>证据量</dt><dd>{selected.evidenceCount} {live ? '条证据' : '条合成事实'}</dd></div>
               </dl>
               <p className="dash-next-step"><span>建议下一步</span>{selected.nextStep}</p>
+              {selected.createdAt && hasPublishCloseHint({
+                signalId: selected.signalId,
+                clusterKey: selected.clusterKey,
+                suggestedScriptIds: selected.suggestedScriptIds,
+                sampleQueryIds: selected.sampleQueryIds,
+                status: selected.status,
+                suspectedCause: selected.cause,
+                createdAt: selected.createdAt,
+              }, wording) ? (
+                <p className="dash-footnote" data-testid="iteration-close-hint">
+                  {ITERATION_CLOSE_HINT_COPY.badge} / {ITERATION_CLOSE_HINT_COPY.action}。{ITERATION_CLOSE_HINT_COPY.footnote}
+                </p>
+              ) : null}
               <p className="dash-footnote" data-testid="iteration-detail-meta">
                 聚类键 {selected.clusterKey} · 建议话术 {selected.suggestedScriptIds.join(' / ') || '暂无'} ·
                 样本 {selected.sampleQueryIds.length} {live ? '条查询' : '条脱敏合成查询'}

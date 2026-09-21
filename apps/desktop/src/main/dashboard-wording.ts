@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runtimeStackReadPath } from './packaged-retrieval-paths';
@@ -152,10 +152,19 @@ export function listDashboardWording(): DashboardWordingView {
   }
 
   const entries = fromHydrate.length > 0 ? fromHydrate : fromIndex;
+  let catalogRefreshedAt: string | null = null;
+  if (fromHydrate.length > 0 && hydrateFile) {
+    try {
+      catalogRefreshedAt = statSync(hydrateFile).mtime.toISOString();
+    } catch {
+      catalogRefreshedAt = null;
+    }
+  }
   return Object.freeze({
     ok: true,
     releaseId: hydrateRelease,
     total: entries.length,
     entries: Object.freeze(entries),
+    catalogRefreshedAt,
   });
 }
