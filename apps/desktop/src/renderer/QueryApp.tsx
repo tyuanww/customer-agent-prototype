@@ -40,6 +40,7 @@ import { QueryResultsPane } from './features/search/QueryResultsPane';
 import { searchScripts } from './features/search/search-service';
 import type { RankedScript } from './features/search/types';
 import { inaccuracyReportKey, shouldAcceptInaccuracyReport } from '@shared/inaccuracy-report';
+import { PRODUCT_QUERY_UUID } from '@shared/product-search';
 import {
   COPY_FEEDBACK_MS,
   DEEP_THINKING_DESCRIPTION,
@@ -1670,7 +1671,7 @@ export function QueryApp() {
                   return next;
                 });
               };
-              if (report && last && /^[0-9a-f-]{36}$/i.test(last.queryId)) {
+              if (report && last && PRODUCT_QUERY_UUID.test(last.queryId)) {
                 void report({
                   sessionEpoch: last.sessionEpoch,
                   generation: last.generation,

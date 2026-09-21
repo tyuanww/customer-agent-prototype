@@ -3,6 +3,7 @@ import { parseContractSchema } from '@customer-agent/contracts';
 import {
   dashboardOpsFailure,
   OPS_LOOP_COPY,
+  SOP_UPLOAD_MAX_BYTES,
   type DashboardOpsFailure,
   type DashboardRetrievalMetrics,
   type DashboardScriptMutation,
@@ -16,6 +17,26 @@ import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 
 export type DashboardOpsSessionClient = Pick<ProductSession, 'view' | 'request'>;
+
+function toDashboardSopNode(parsed: {
+  node_id: string;
+  parent_node_id: string | null;
+  title: string;
+  body: string;
+  sort_key: number;
+  version: number;
+  lifecycle: DashboardSopNode['lifecycle'];
+}): DashboardSopNode {
+  return Object.freeze({
+    nodeId: parsed.node_id,
+    parentNodeId: parsed.parent_node_id,
+    title: parsed.title,
+    body: parsed.body,
+    sortKey: parsed.sort_key,
+    version: parsed.version,
+    lifecycle: parsed.lifecycle,
+  });
+}
 
 function asFailure(error: unknown): DashboardOpsFailure {
   if (!(error instanceof ProductHttpError)) return dashboardOpsFailure('UNAVAILABLE');
@@ -73,15 +94,7 @@ export async function dashboardSopCatalog(
     return Object.freeze({
       ok: true as const,
       productSessionId: parsed.product_session_id,
-      items: Object.freeze(parsed.items.map((item) => Object.freeze({
-        nodeId: item.node_id,
-        parentNodeId: item.parent_node_id,
-        title: item.title,
-        body: item.body,
-        sortKey: item.sort_key,
-        version: item.version,
-        lifecycle: item.lifecycle,
-      }))),
+      items: Object.freeze(parsed.items.map((item) => toDashboardSopNode(item))),
     });
   });
 }
@@ -90,7 +103,7 @@ export async function dashboardSopImport(
   session: DashboardOpsSessionClient | null,
   csvText: string,
 ): Promise<DashboardSopImport | DashboardOpsFailure> {
-  if (typeof csvText !== 'string' || csvText.trim().length < 1 || csvText.length > 256 * 1024) {
+  if (typeof csvText !== 'string' || csvText.trim().length < 1 || csvText.length > SOP_UPLOAD_MAX_BYTES) {
     return dashboardOpsFailure('VALIDATION');
   }
   return withSession(session, ['coach', 'owner'], async (client, epoch) => {
@@ -136,15 +149,7 @@ export async function dashboardSopPatch(
       },
     );
     const parsed = parseContractSchema('SopNode', result.value);
-    return Object.freeze({
-      nodeId: parsed.node_id,
-      parentNodeId: parsed.parent_node_id,
-      title: parsed.title,
-      body: parsed.body,
-      sortKey: parsed.sort_key,
-      version: parsed.version,
-      lifecycle: parsed.lifecycle,
-    });
+    return toDashboardSopNode(parsed);
   });
 }
 
@@ -170,15 +175,7 @@ export async function dashboardSopDelete(
       },
     );
     const parsed = parseContractSchema('SopNode', result.value);
-    return Object.freeze({
-      nodeId: parsed.node_id,
-      parentNodeId: parsed.parent_node_id,
-      title: parsed.title,
-      body: parsed.body,
-      sortKey: parsed.sort_key,
-      version: parsed.version,
-      lifecycle: parsed.lifecycle,
-    });
+    return toDashboardSopNode(parsed);
   });
 }
 

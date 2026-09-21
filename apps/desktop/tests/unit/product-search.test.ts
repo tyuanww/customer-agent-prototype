@@ -553,7 +553,16 @@ describe('product query and native copy provenance', () => {
       sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: 'local-query', scriptId: candidate.script_id,
     })).toBe(false);
     expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: '',
+    })).toBe(false);
+    expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: 's'.repeat(129),
+    })).toBe(false);
+    expect(isProductInaccuracyRequest({
       sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: candidate.script_id,
+    })).toBe(true);
+    expect(isProductInaccuracyRequest({
+      sessionEpoch: f.request.sessionEpoch, generation: 1, queryId: f.queryId, scriptId: 's'.repeat(128),
     })).toBe(true);
     const before = f.transport.mock.calls.length;
     expect(await f.search.reportInaccuracy(1, {

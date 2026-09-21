@@ -10,10 +10,9 @@ import {
   paginateWording,
   wordingPublishedCsv,
 } from '@shared/wording-library-browse';
+import { OPS_LOOP_COPY } from '@shared/dashboard-ops-loop';
 import { readCoachUploadFile } from './coach-content-upload';
 import { StatusBadge } from './StatusBadge';
-
-const WRITE_UNAVAILABLE = '未接入：没有产品会话或当前话术版本号。';
 
 const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
   { id: 'product', label: '产品话术' },
@@ -201,11 +200,11 @@ export function WordingLibraryModule() {
               ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
               : undefined;
             if (!row) {
-              setWriteMessage('请先选中话术。');
+              setWriteMessage(OPS_LOOP_COPY.selectWording);
               return;
             }
             if (!api || row.scriptVersion === null) {
-              setWriteMessage(WRITE_UNAVAILABLE);
+              setWriteMessage(api ? OPS_LOOP_COPY.noVersion : OPS_LOOP_COPY.noProduct);
               return;
             }
             void api.scriptPatch({
@@ -216,7 +215,7 @@ export function WordingLibraryModule() {
               effectiveFrom: row.effectiveFrom ?? new Date().toISOString(),
               effectiveTo: row.effectiveTo,
             }).then((result) => {
-              setWriteMessage(result.ok ? `已进入待审核草稿 ${result.mutationId}` : result.message);
+              setWriteMessage(result.ok ? `${OPS_LOOP_COPY.pendingReview} ${result.mutationId}` : result.message);
             });
           }}
         >
@@ -232,18 +231,18 @@ export function WordingLibraryModule() {
               ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
               : undefined;
             if (!row) {
-              setWriteMessage('请先选中话术。');
+              setWriteMessage(OPS_LOOP_COPY.selectWording);
               return;
             }
             if (!api || row.scriptVersion === null) {
-              setWriteMessage(WRITE_UNAVAILABLE);
+              setWriteMessage(api ? OPS_LOOP_COPY.noVersion : OPS_LOOP_COPY.noProduct);
               return;
             }
             void api.scriptDelete({
               scriptId: row.scriptId,
               expectedVersion: row.scriptVersion,
             }).then((result) => {
-              setWriteMessage(result.ok ? `已进入待审核草稿 ${result.mutationId}` : result.message);
+              setWriteMessage(result.ok ? `${OPS_LOOP_COPY.pendingReview} ${result.mutationId}` : result.message);
             });
           }}
         >

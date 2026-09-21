@@ -41,4 +41,16 @@ describe('parseSopCsv', () => {
       },
     ]);
   });
+
+  it('rejects blank input, overlong ids/bodies, short data rows, and still parses CRLF trees', () => {
+    const header = 'node_id,parent_node_id,title,body,sort_key';
+    expect(parseSopCsv('   ')).toBeNull();
+    expect(parseSopCsv(`${header}\n,,停手,先停,0\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\n${'n'.repeat(129)},,停手,先停,0\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\nn1,,停手,${'正'.repeat(20_001)},0\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\nn1,,停手,先停\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\r\nn1,,停手,先停手,0\r\n`)).toEqual([
+      { node_id: 'n1', parent_node_id: null, title: '停手', body: '先停手', sort_key: 0 },
+    ]);
+  });
 });

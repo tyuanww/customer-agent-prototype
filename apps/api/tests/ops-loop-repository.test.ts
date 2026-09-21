@@ -341,4 +341,112 @@ describe('ops-loop repository', () => {
       .toEqual({ ok: false, code: 'INTERNAL' });
     expect(JSON.stringify(corrupt.query.mock.calls)).not.toContain('mutate_script');
   });
+
+  it('records inaccuracy on proceed, fail-closes rotated hashes, and maps read/timestamp faults', async () => {
+    const recorded = scriptedPool((sql, params) => {
+      if (sql.includes('idempotency_request_hash_version')) return { rows: [{ version: null }] };
+      if (sql.includes('idempotency_lookup')) return { rows: [{ action: 'miss' }] };
+      if (sql.includes('idempotency_claim')) return { rows: [{ action: 'proceed', lease_version: 1 }] };
+      if (sql.includes('record_inaccuracy_report')) {
+        expect(params).toEqual([
+          '11111111-1111-1111-1111-111111111111',
+          'script-1',
+          1,
+          1,
+          'a'.repeat(64),
+          agent.user_id,
+          agent.role,
+        ]);
+        return { rows: [{ ok: true, query_id: params?.[0], script_id: params?.[1] }] };
+      }
+      return { rows: [] };
+    });
+    expect(await createOpsLoopRepository(recorded.pool as never).recordInaccuracy(inaccuracyRequest()))
+      .toEqual({
+        ok: true,
+        response: {
+          ok: true,
+          query_id: '11111111-1111-1111-1111-111111111111',
+          script_id: 'script-1',
+        },
+      });
+
+    const rotated = scriptedPool((sql) => {
+      if (sql.includes('idempotency_request_hash_version')) {
+        return { rows: [{ version: 'hmac-idempotency-v0' }] };
+      }
+      return { rows: [] };
+    });
+    expect(await createOpsLoopRepository(rotated.pool as never).recordInaccuracy(inaccuracyRequest()))
+      .toEqual({ ok: false, code: 'INTERNAL' });
+    expect(JSON.stringify(rotated.query.mock.calls)).not.toContain('record_inaccuracy_report');
+
+    const noLease = scriptedPool((sql) => {
+      if (sql.includes('idempotency_request_hash_version')) return { rows: [{ version: null }] };
+      if (sql.includes('idempotency_lookup')) return { rows: [{ action: 'miss' }] };
+      if (sql.includes('idempotency_claim')) return { rows: [{ action: 'proceed' }] };
+      return { rows: [] };
+    });
+    expect(await createOpsLoopRepository(noLease.pool as never).recordInaccuracy(inaccuracyRequest()))
+      .toEqual({ ok: false, code: 'INTERNAL' });
+    expect(JSON.stringify(noLease.query.mock.calls)).not.toContain('record_inaccuracy_report');
+
+    const brokenRollback = scriptedPool((sql) => {
+      if (sql === 'ROLLBACK') throw new Error('rollback failed');
+      if (sql.includes('idempotency_lookup')) return { rows: [{ action: 'conflict' }] };
+      return { rows: [] };
+    });
+    expect(await createOpsLoopRepository(brokenRollback.pool as never).recordInaccuracy(inaccuracyRequest()))
+      .toEqual({ ok: false, code: 'CONFLICT' });
+    expect(brokenRollback.release).toHaveBeenCalledWith(true);
+
+    const overloadedRead = { connect: async () => { throw new Error('too many clients'); } };
+    expect(await createOpsLoopRepository(overloadedRead as never).readSopCatalog(owner))
+      .toEqual({ ok: false, code: 'OVERLOADED' });
+
+    const patchedScript = scriptedPool((sql, params) => {
+      if (sql.includes('idempotency_request_hash_version')) return { rows: [{ version: null }] };
+      if (sql.includes('idempotency_lookup')) return { rows: [{ action: 'miss' }] };
+      if (sql.includes('idempotency_claim')) return { rows: [{ action: 'proceed', lease_version: 2 }] };
+      if (sql.includes('mutate_script')) {
+        expect(params?.[1]).toBe('patch');
+        expect(params?.[3]).toBe('标题');
+        return { rows: [{ ok: true, script_id: 'script-1', mutation_id: 'smut_p', review_status: 'approved' }] };
+      }
+      return { rows: [] };
+    });
+    expect(await createOpsLoopRepository(patchedScript.pool as never).mutateScript({
+      ...scriptRequest(),
+      action: 'patch',
+      title: '标题',
+      answerText: '正文',
+      effectiveFrom: '2026-09-21T00:00:00.000Z',
+    })).toEqual({
+      ok: true,
+      response: {
+        ok: true, script_id: 'script-1', mutation_id: 'smut_p', review_status: 'pending_review',
+      },
+    });
+
+    const sink = vi.fn(() => {
+      throw new Error('sink down');
+    });
+    const badStamp = scriptedPool((sql) => {
+      if (sql.includes('current_software_release')) {
+        return { rows: [{ ...softwareRow, created_at: 'not-a-timestamp' }] };
+      }
+      return { rows: [] };
+    });
+    expect(await createOpsLoopRepository(badStamp.pool as never, 'api_ops_loop_test', sink)
+      .currentSoftwareRelease(owner)).toEqual({ ok: false, code: 'INTERNAL' });
+    expect(sink).toHaveBeenCalledWith({ code: 'OPS_LOOP_FAILED' });
+
+    const current = scriptedPool((sql, params) => {
+      expect(sql).toContain('current_software_release');
+      expect(params).toEqual(['owner']);
+      return { rows: [softwareRow] };
+    });
+    expect(await createOpsLoopRepository(current.pool as never).currentSoftwareRelease(owner))
+      .toEqual({ ok: true, response: { ...softwareRow, signed: true } });
+  });
 });

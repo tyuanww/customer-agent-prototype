@@ -24,15 +24,17 @@ export function SopLibraryModule() {
   const [message, setMessage] = useState('加载中…');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const liveRef = useRef(true);
 
   const load = () => {
     const api = window.dashboardOps;
     if (!api) {
       setItems(null);
-      setMessage('未接入：没有 SOP 写库通道。');
+      setMessage(OPS_LOOP_COPY.sopChannel);
       return;
     }
     void api.sopCatalog().then((result) => {
+      if (!liveRef.current) return;
       if (!result.ok) {
         setItems(null);
         setMessage(result.message);
@@ -45,13 +47,18 @@ export function SopLibraryModule() {
         : active[0]?.nodeId ?? null);
       setMessage(active.length === 0 ? '当前产品会话没有 SOP 节点。' : '');
     }).catch(() => {
+      if (!liveRef.current) return;
       setItems(null);
       setMessage(OPS_LOOP_COPY.unavailable);
     });
   };
 
   useEffect(() => {
+    liveRef.current = true;
     load();
+    return () => {
+      liveRef.current = false;
+    };
   }, []);
 
   const selected = (items ?? []).find((item) => item.nodeId === selectedId) ?? null;
@@ -108,11 +115,11 @@ export function SopLibraryModule() {
           onClick={() => {
             const api = window.dashboardOps;
             if (!api) {
-              setMessage('未接入：没有 SOP 写库通道。');
+              setMessage(OPS_LOOP_COPY.sopChannel);
               return;
             }
             if (!selected) {
-              setMessage('请先选中节点。');
+              setMessage(OPS_LOOP_COPY.selectSop);
               return;
             }
             void api.sopPatch({
@@ -140,11 +147,11 @@ export function SopLibraryModule() {
           onClick={() => {
             const api = window.dashboardOps;
             if (!api) {
-              setMessage('未接入：没有 SOP 写库通道。');
+              setMessage(OPS_LOOP_COPY.sopChannel);
               return;
             }
             if (!selected) {
-              setMessage('请先选中节点。');
+              setMessage(OPS_LOOP_COPY.selectSop);
               return;
             }
             void api.sopDelete({

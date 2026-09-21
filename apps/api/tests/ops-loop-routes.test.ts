@@ -551,4 +551,107 @@ describe('ops-loop HTTP routes', () => {
     expect(JSON.stringify(ownerCurrent.json())).not.toContain('latest.yml');
     expect(ops.currentSoftwareRelease).toHaveBeenCalledOnce();
   });
+
+  it('rejects SOP import without auth, content-type, or a wired repository, and parses a quoted boundary', async () => {
+    const ops = repository();
+    const app = appWith(ops);
+    const csv = 'node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n';
+    const unsigned = await app.inject({
+      method: 'POST',
+      url: '/v1/sop/import',
+      headers: { 'content-type': sopContentType, 'idempotency-key': 'idem-unauth' },
+      payload: sopMultipart(csv),
+    });
+    expect(unsigned.statusCode).toBe(401);
+    expect(ops.importSopCatalog).not.toHaveBeenCalled();
+
+    const missingType = await app.inject({
+      method: 'POST',
+      url: '/v1/sop/import',
+      headers: { ...coachHeaders, 'idempotency-key': 'idem-no-type' },
+      payload: sopMultipart(csv),
+    });
+    expect(missingType.statusCode).toBe(400);
+    expect(missingType.json()).toMatchObject({ error: { code: 'VALIDATION' } });
+
+    const quotedToken = '----ops-quoted';
+    const quoted = await app.inject({
+      method: 'POST',
+      url: '/v1/sop/import',
+      headers: {
+        ...coachHeaders,
+        'content-type': `multipart/form-data; boundary="${quotedToken}"`,
+        'idempotency-key': 'idem-quoted',
+      },
+      payload: Buffer.concat([
+        Buffer.from(`--${quotedToken}\r\nContent-Disposition: form-data; name="file"; filename="sop.csv"\r\nContent-Type: text/csv\r\n\r\n`),
+        Buffer.from(csv),
+        Buffer.from(`\r\n--${quotedToken}--\r\n`),
+      ]),
+    });
+    expect(quoted.statusCode).toBe(202);
+    expect(quoted.json()).toEqual({ ok: true, product_session_id: 'default', node_count: 1 });
+    expect(ops.importSopCatalog).toHaveBeenCalledOnce();
+
+    const unwired = appWith();
+    const missing = await unwired.inject({
+      method: 'POST',
+      url: '/v1/sop/import',
+      headers: {
+        ...coachHeaders,
+        'content-type': sopContentType,
+        'idempotency-key': 'idem-import-unwired',
+      },
+      payload: sopMultipart(csv),
+    });
+    expect(missing.statusCode).toBe(503);
+    expect(missing.json()).toMatchObject({ error: { code: 'OVERLOADED' } });
+  });
+
+  it('forwards inaccuracy optionals, rejects SOP patch without a key or id, and keeps retrieval signed-in', async () => {
+    const ops = repository();
+    const app = appWith(ops);
+    const recorded = await app.inject({
+      method: 'POST',
+      url: '/v1/inaccuracy-reports',
+      headers: { ...agentHeaders, 'content-type': 'application/json', 'idempotency-key': 'idem-opt' },
+      payload: {
+        query_id: '11111111-1111-1111-1111-111111111111',
+        script_id: 'script-1',
+        script_version: 3,
+        rank: 2,
+        content_hash: 'b'.repeat(64),
+      },
+    });
+    expect(recorded.statusCode).toBe(200);
+    expect(vi.mocked(ops.recordInaccuracy).mock.calls[0]?.[0]).toMatchObject({
+      scriptVersion: 3, rank: 2, contentHash: 'b'.repeat(64),
+    });
+
+    const missingKey = await app.inject({
+      method: 'PATCH',
+      url: '/v1/sop/nodes/n1',
+      headers: { ...coachHeaders, 'content-type': 'application/json' },
+      payload: { expected_version: 1, title: '停手' },
+    });
+    expect(missingKey.statusCode).toBe(400);
+    expect(ops.patchSopNode).not.toHaveBeenCalled();
+
+    const invalidBody = await app.inject({
+      method: 'PATCH',
+      url: '/v1/sop/nodes/n1',
+      headers: { ...coachHeaders, 'content-type': 'application/json', 'idempotency-key': 'idem-body' },
+      payload: { title: '停手' },
+    });
+    expect(invalidBody.statusCode).toBe(400);
+    expect(ops.patchSopNode).not.toHaveBeenCalled();
+
+    const unsigned = await app.inject({ method: 'GET', url: '/v1/metrics/retrieval?window=last_7d' });
+    expect(unsigned.statusCode).toBe(401);
+    const agent = await app.inject({
+      method: 'GET', url: '/v1/metrics/retrieval?window=last_7d', headers: agentHeaders,
+    });
+    expect(agent.statusCode).toBe(403);
+    expect(ops.readRetrievalMetrics).not.toHaveBeenCalled();
+  });
 });

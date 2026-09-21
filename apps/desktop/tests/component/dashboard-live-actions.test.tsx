@@ -6,6 +6,7 @@ import { OverviewModule } from '../../src/renderer/features/dashboard/OverviewMo
 import { WordingLibraryModule } from '../../src/renderer/features/dashboard/WordingLibraryModule';
 import { SopLibraryModule } from '../../src/renderer/features/dashboard/SopLibraryModule';
 import { AnnounceModule } from '../../src/renderer/features/dashboard/AnnounceModule';
+import { OPS_LOOP_COPY } from '../../src/shared/dashboard-ops-loop';
 
 describe('dashboard live actions', () => {
   afterEach(() => {
@@ -263,7 +264,7 @@ describe('dashboard live actions', () => {
     expect(scriptPatch.mock.calls[0]?.[0]).toMatchObject({
       scriptId: 'script-1', expectedVersion: 1, title: '用量',
     });
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('待审核草稿 smut_1');
+    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.pendingReview} smut_1`);
     unmount();
 
     render(<OverviewModule />);
@@ -332,7 +333,7 @@ describe('dashboard live actions', () => {
     expect(scriptDelete.mock.calls[0]?.[0]).toEqual({
       scriptId: 'script-1', expectedVersion: 2,
     });
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('待审核草稿 smut_del');
+    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.pendingReview} smut_del`);
   });
 
   it('labels last_7d retrieval as 近 7 天', async () => {
@@ -379,5 +380,86 @@ describe('dashboard live actions', () => {
     await waitFor(() => {
       expect(screen.getByTestId('wording-empty')).toHaveTextContent('本机话术库未挂载');
     });
+  });
+
+  it('refuses wording writes without a scriptVersion and shows UNSIGNED software current', async () => {
+    const scriptPatch = vi.fn();
+    const scriptDelete = vi.fn();
+    window.dashboardOps = {
+      retrieval: vi.fn(async () => ({
+        ok: false as const, code: 'FORBIDDEN' as const, message: '当前角色不能执行这个操作。',
+      })),
+      sopCatalog: vi.fn(),
+      sopImport: vi.fn(),
+      sopPatch: vi.fn(),
+      sopDelete: vi.fn(),
+      scriptPatch,
+      scriptDelete,
+      softwareCatalog: vi.fn(async () => ({
+        ok: true as const,
+        items: [],
+        current: {
+          version: '0.3.18',
+          platform: 'mac-universal' as const,
+          sha256: 'a'.repeat(64),
+          downloadUrl: 'https://example.com/app.dmg',
+          createdAt: '2026-09-21T00:00:00.000Z',
+          signed: false,
+        },
+      })),
+    };
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_20',
+        total: 1,
+        entries: [{
+          scriptId: 'script-1',
+          domain: 'product',
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_20',
+          scriptVersion: null,
+          effectiveFrom: null,
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low',
+          lifecycle: 'published',
+          lifecycleLabel: '已发布',
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog',
+        }],
+      }),
+    };
+    window.dashboardIteration = {
+      list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
+      start: vi.fn(),
+      close: vi.fn(),
+    };
+    const user = userEvent.setup();
+    const { unmount } = render(<WordingLibraryModule />);
+    await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
+    await user.click(screen.getByTestId('wording-update'));
+    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.noVersion);
+    await user.click(screen.getByTestId('wording-delete'));
+    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.noVersion);
+    expect(scriptPatch).not.toHaveBeenCalled();
+    expect(scriptDelete).not.toHaveBeenCalled();
+    unmount();
+
+    render(<OverviewModule />);
+    await waitFor(() => expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('未接入'));
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('未接入');
+
+    render(<AnnounceModule />);
+    await user.click(screen.getByTestId('system-sync-tab-software'));
+    await user.click(screen.getByTestId('software-check-update'));
+    await waitFor(() => {
+      expect(screen.getByTestId('software-update-status')).toHaveTextContent('0.3.18');
+    });
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('UNSIGNED');
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('不跑 latest.yml');
   });
 });

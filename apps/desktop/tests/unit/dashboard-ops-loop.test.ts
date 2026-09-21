@@ -8,12 +8,18 @@ import { registerDashboardOpsLoopIpc } from '../../src/main/dashboard-ops-loop-i
 import {
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
+  dashboardScriptPatch,
   dashboardSoftwareCatalog,
   dashboardSopCatalog,
+  dashboardSopDelete,
   dashboardSopImport,
   dashboardSopPatch,
 } from '../../src/main/dashboard-ops-loop';
-import { OPS_LOOP_COPY } from '../../src/shared/dashboard-ops-loop';
+import {
+  isDashboardOpsFailure,
+  OPS_LOOP_COPY,
+  SOP_UPLOAD_MAX_BYTES,
+} from '../../src/shared/dashboard-ops-loop';
 import { IPC_CHANNELS } from '../../src/shared/ipc-channels';
 import { ProductHttpError } from '../../src/main/product-http';
 import type { ProductSession } from '../../src/main/product-session';
@@ -244,4 +250,143 @@ it('maps software list 404 to NOT_FOUND for the whole catalog', async () => {
   expect(vi.mocked(owner.request).mock.calls.length).toBeGreaterThanOrEqual(1);
   expect(vi.mocked(owner.request).mock.calls[0]?.[1]).toBe('/v1/software/releases');
   expect(JSON.stringify(catalog)).not.toContain('latest.yml');
+});
+
+it('deletes SOP and patches scripts, mapping session and HTTP failures without leaking product copy', async () => {
+  expect(isDashboardOpsFailure({ ok: false, code: 'VALIDATION', message: '请求内容无效' })).toBe(true);
+  expect(isDashboardOpsFailure({ ok: false, code: 'VALIDATION', message: '' })).toBe(false);
+  expect(isDashboardOpsFailure({ ok: true, nodeId: 'n1' })).toBe(false);
+
+  const unsigned = fakeSession(null, false);
+  expect(await dashboardSopCatalog(unsigned)).toMatchObject({
+    ok: false, code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession,
+  });
+  expect(unsigned.request).not.toHaveBeenCalled();
+
+  const disabled = fakeSession('owner', true, false);
+  expect(await dashboardSoftwareCatalog(disabled)).toMatchObject({
+    ok: false, code: 'UNAVAILABLE', message: OPS_LOOP_COPY.noProduct,
+  });
+  expect(disabled.request).not.toHaveBeenCalled();
+
+  expect(await dashboardSopDelete(fakeSession('owner'), null)).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await dashboardScriptPatch(fakeSession('owner'), {
+    scriptId: 'script-1', expectedVersion: 1, answerText: '正文', effectiveFrom: '2026-01-01T00:00:00.000Z',
+  })).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await dashboardSopImport(fakeSession('owner'), 'n'.repeat(SOP_UPLOAD_MAX_BYTES + 1)))
+    .toMatchObject({ ok: false, code: 'VALIDATION' });
+
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request)
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { ...sopNode, version: 2, lifecycle: 'deleted' },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: {
+        ok: true, script_id: 'script-1', mutation_id: 'smut_p', review_status: 'pending_review',
+      },
+    })
+    .mockRejectedValueOnce(new ProductHttpError('STALE'))
+    .mockRejectedValueOnce(new ProductHttpError('RATE_LIMITED'))
+    .mockRejectedValueOnce(new Error('ECONNRESET'));
+  expect(await dashboardSopDelete(owner, { nodeId: 'n1', expectedVersion: 1 })).toEqual({
+    nodeId: 'n1',
+    parentNodeId: null,
+    title: '停手',
+    body: '先停手',
+    sortKey: 0,
+    version: 2,
+    lifecycle: 'deleted',
+  });
+  expect(vi.mocked(owner.request).mock.calls[0]?.[1]).toBe('/v1/sop/nodes/n1');
+  expect(vi.mocked(owner.request).mock.calls[0]?.[2]?.method).toBe('DELETE');
+
+  expect(await dashboardScriptPatch(owner, {
+    scriptId: 'script-1',
+    expectedVersion: 4,
+    title: '用量',
+    answerText: '先打湿',
+    effectiveFrom: '2026-01-01T00:00:00.000Z',
+    effectiveTo: null,
+  })).toEqual({
+    ok: true, scriptId: 'script-1', mutationId: 'smut_p', reviewStatus: 'pending_review',
+  });
+  expect(vi.mocked(owner.request).mock.calls[1]?.[1]).toBe('/v1/content/scripts/script-1');
+  expect(vi.mocked(owner.request).mock.calls[1]?.[2]?.method).toBe('PATCH');
+
+  expect(await dashboardSopCatalog(owner)).toMatchObject({
+    ok: false, code: 'UNAVAILABLE', message: OPS_LOOP_COPY.unavailable,
+  });
+  expect(await dashboardSopCatalog(owner)).toMatchObject({
+    ok: false, code: 'RATE_LIMITED', message: '操作过于频繁，请稍后重试',
+  });
+  expect(await dashboardSopCatalog(owner)).toMatchObject({
+    ok: false, code: 'UNAVAILABLE', message: OPS_LOOP_COPY.unavailable,
+  });
+});
+
+it('invokes remaining ops IPC channels and keeps a present software current without latest.yml', async () => {
+  const { dashboard, event } = trustedDashboard();
+  const session = fakeSession('owner');
+  registerDashboardOpsLoopIpc(session as ProductSession, () => dashboard, () => 'http://127.0.0.1:5173/');
+  vi.mocked(session.request)
+    .mockResolvedValueOnce({
+      status: 202,
+      value: { ok: true, product_session_id: 'default', node_count: 1 },
+    })
+    .mockResolvedValueOnce({ status: 200, value: { ...sopNode, lifecycle: 'deleted', version: 3 } })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: {
+        ok: true, script_id: 'script-1', mutation_id: 'smut_p', review_status: 'pending_review',
+      },
+    })
+    .mockResolvedValueOnce({ status: 200, value: { items: [release] } })
+    .mockResolvedValueOnce({ status: 200, value: release });
+
+  const imported = await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT)!(
+    event(dashboard),
+    'node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n',
+  );
+  expect(imported).toEqual({ ok: true, productSessionId: 'default', nodeCount: 1 });
+
+  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_DELETE)!(
+    event(dashboard),
+    { nodeId: 'n1', expectedVersion: 1 },
+  )).toMatchObject({ nodeId: 'n1', lifecycle: 'deleted', version: 3 });
+
+  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_PATCH)!(
+    event(dashboard),
+    {
+      scriptId: 'script-1',
+      expectedVersion: 1,
+      title: '用量',
+      answerText: '先打湿',
+      effectiveFrom: '2026-01-01T00:00:00.000Z',
+    },
+  )).toEqual({
+    ok: true, scriptId: 'script-1', mutationId: 'smut_p', reviewStatus: 'pending_review',
+  });
+
+  const catalog = await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE)!(event(dashboard));
+  expect(catalog).toMatchObject({
+    ok: true,
+    current: { version: '0.3.17', signed: false, downloadUrl: 'https://example.com/app.dmg' },
+  });
+  expect(JSON.stringify(catalog)).not.toContain('latest.yml');
+
+  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT)!(event(dashboard), 12))
+    .toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_DELETE)!(event(dashboard)))
+    .toMatchObject({ ok: false, code: 'VALIDATION' });
+
+  const rateLimited = fakeSession('owner');
+  vi.mocked(rateLimited.request)
+    .mockResolvedValueOnce({ status: 200, value: { items: [release] } })
+    .mockRejectedValueOnce(new ProductHttpError('RATE_LIMITED'));
+  expect(await dashboardSoftwareCatalog(rateLimited)).toMatchObject({
+    ok: false, code: 'RATE_LIMITED', message: '操作过于频繁，请稍后重试',
+  });
 });

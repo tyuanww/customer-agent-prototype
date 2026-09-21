@@ -1417,6 +1417,25 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
   });
 
+  it('does not mark a local inaccuracy report when the live post fails', async () => {
+    connectProduct();
+    const reportInaccuracy = vi.fn(async (
+      request: import('../../src/shared/product-search').ProductInaccuracyRequest,
+    ) => ({
+      ok: false as const,
+      sessionEpoch: request.sessionEpoch,
+      generation: request.generation,
+      code: 'RATE_LIMITED' as const,
+      message: '操作过于频繁，请稍后重试',
+    }));
+    window.customerAgent!.productSearch!.reportInaccuracy = reportInaccuracy;
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    await waitFor(() => expect(reportInaccuracy).toHaveBeenCalled());
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-inaccuracy-button-1')).not.toBeDisabled();
+  });
+
   it('dismisses with Esc after copy without implying the reply was sent', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
