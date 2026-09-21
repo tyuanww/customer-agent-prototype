@@ -10,6 +10,10 @@ import {
   aggregateInaccuracyTodoCounts,
   inaccuracyScriptIdFromTask,
 } from '@shared/inaccuracy-todo';
+import {
+  ITERATION_CLOSE_HINT_COPY,
+  hasPublishCloseHint,
+} from '@shared/iteration-close-hint';
 import type { DashboardModuleId } from '../../data/dashboard-manifest';
 import { StatusBadge } from './StatusBadge';
 
@@ -238,6 +242,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
                 const detail = inaccuracyScriptId
                   ? `话术不准 · 稿 ${inaccuracyScriptId} · 样本 ${sampleCount} 次`
                   : `${CAUSE_LABELS[item.suspectedCause]} · ${item.signalId}`;
+                const closeHint = hasPublishCloseHint(item, wording);
                 return (
                 <div key={item.taskId} role="row" className="manager-decision-row manager-decision" data-testid={`decision-${item.taskId}`}>
                   <div role="cell" className="manager-decision-priority">
@@ -246,6 +251,11 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
                   <div role="cell" className="manager-decision-main">
                     <h3>{title}</h3>
                     <p>{detail}</p>
+                    {closeHint ? (
+                      <p data-testid={`decision-close-hint-${item.taskId}`}>
+                        {ITERATION_CLOSE_HINT_COPY.badge} / {ITERATION_CLOSE_HINT_COPY.action}
+                      </p>
+                    ) : null}
                   </div>
                   <div role="cell" className="manager-decision-owner">
                     <dl>

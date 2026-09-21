@@ -35,7 +35,7 @@
 **Why:** 拍板 E。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
 
 **Priority:** P1
-**Status:** OPEN
+**Status:** IN PROGRESS · 当前 hydrate 新于待办且相关稿仍在目录时提示「已有新发布 / 可关单」；不自动关
 
 ### P1 · SOP 过敏步骤无停手文案不能发
 

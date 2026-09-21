@@ -71,13 +71,67 @@ describe('dashboard live actions', () => {
       close: vi.fn(),
     };
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [] })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
     };
     render(<OverviewModule />);
     await waitFor(() => expect(list).toHaveBeenCalled());
     expect(screen.getByTestId('decision-it-live-1')).toHaveTextContent('面膜紫适用人群');
     expect(screen.getByTestId('overview-kpi-source')).toHaveTextContent('产品会话');
     expect(screen.getByTestId('overview-inaccuracy-empty')).toHaveTextContent('当前没有达到开单阈值的不准稿');
+    expect(screen.queryByTestId('decision-close-hint-it-live-1')).not.toBeInTheDocument();
+  });
+
+  it('shows 已有新发布 / 可关单 when the catalog is newer than an open inaccuracy task', async () => {
+    const list = vi.fn(async () => ({
+      ok: true as const,
+      items: [{
+        taskId: 'it-hint-1',
+        signalId: 'inaccuracy:script-1',
+        clusterKey: 'script-1',
+        sampleQueryIds: ['q-a'],
+        suspectedCause: 'mixed' as const,
+        suggestedScriptIds: ['script-1'],
+        status: 'open' as const,
+        assigneeRole: 'coach',
+        resolution: null,
+        resolutionNote: null,
+        version: 1,
+        createdAt: '2026-09-20T00:00:00.000Z',
+        updatedAt: '2026-09-20T00:00:00.000Z',
+        resolvedAt: null,
+      }],
+      nextCursor: null,
+    }));
+    window.dashboardIteration = { list, start: vi.fn(), close: vi.fn() };
+    window.dashboardWording = {
+      list: vi.fn(async () => ({
+        ok: true as const,
+        releaseId: 'rel_21',
+        catalogRefreshedAt: '2026-09-21T12:00:00.000Z',
+        total: 1,
+        entries: [{
+          scriptId: 'script-1',
+          domain: 'product' as const,
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_21',
+          scriptVersion: 2,
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low' as const,
+          lifecycle: 'published' as const,
+          lifecycleLabel: '已发布' as const,
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog' as const,
+        }],
+      })),
+    };
+    render(<OverviewModule />);
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    expect(screen.getByTestId('decision-close-hint-it-hint-1')).toHaveTextContent('已有新发布 / 可关单');
   });
 
   it('projects inaccuracy todos by script_id with sample query counts', async () => {
@@ -110,6 +164,7 @@ describe('dashboard live actions', () => {
       list: vi.fn(async () => ({
         ok: true as const,
         releaseId: 'rel_20',
+        catalogRefreshedAt: null,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -154,7 +209,7 @@ describe('dashboard live actions', () => {
       publishDraft: vi.fn(),
     };
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [] })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
     };
     const user = userEvent.setup();
     render(<WordingLibraryModule />);
@@ -167,7 +222,7 @@ describe('dashboard live actions', () => {
   it('fail-closes wording update/delete and SOP writes instead of mock success', async () => {
     const user = userEvent.setup();
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: null, total: 0, entries: [] })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: null, total: 0, entries: [], catalogRefreshedAt: null })),
     };
     render(<WordingLibraryModule />);
     await user.click(screen.getByTestId('wording-update'));
@@ -293,6 +348,7 @@ describe('dashboard live actions', () => {
       list: async () => ({
         ok: true as const,
         releaseId: 'rel_20',
+        catalogRefreshedAt: null,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -367,6 +423,7 @@ describe('dashboard live actions', () => {
       list: async () => ({
         ok: true as const,
         releaseId: 'rel_20',
+        catalogRefreshedAt: null,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -420,7 +477,7 @@ describe('dashboard live actions', () => {
       softwareCatalog: vi.fn(),
     };
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [] })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
     };
     window.dashboardIteration = {
       list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
@@ -475,6 +532,7 @@ describe('dashboard live actions', () => {
       list: async () => ({
         ok: true as const,
         releaseId: 'rel_20',
+        catalogRefreshedAt: null,
         total: 1,
         entries: [{
           scriptId: 'script-1',

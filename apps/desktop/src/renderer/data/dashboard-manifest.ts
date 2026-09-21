@@ -154,6 +154,7 @@ export type IterationTask = {
   title: string;
   detail: string;
   nextStep: string;
+  createdAt?: string;
 };
 
 export type ContentRelease = {

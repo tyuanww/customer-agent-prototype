@@ -169,6 +169,52 @@ describe('IterationModule live list', () => {
     expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).not.toHaveTextContent('尚未接入');
   });
 
+  it('shows a close hint after a newer catalog still contains the related script', async () => {
+    const inaccuracyTask: DashboardIterationTask = {
+      ...openTask,
+      taskId: 'itask-hint',
+      signalId: 'inaccuracy:script-a',
+      clusterKey: 'script-a',
+      sampleQueryIds: ['q-1'],
+      suspectedCause: 'mixed',
+      suggestedScriptIds: ['script-a'],
+      createdAt: '2026-09-20T00:00:00.000Z',
+    };
+    window.dashboardIteration = mockApi({
+      list: vi.fn(async () => ({ ok: true as const, items: [inaccuracyTask], nextCursor: null })),
+    });
+    window.dashboardWording = {
+      list: vi.fn(async () => ({
+        ok: true as const,
+        releaseId: 'rel_21',
+        catalogRefreshedAt: '2026-09-21T12:00:00.000Z',
+        total: 1,
+        entries: [{
+          scriptId: 'script-a',
+          domain: 'product' as const,
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_21',
+          scriptVersion: 2,
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low' as const,
+          lifecycle: 'published' as const,
+          lifecycleLabel: '已发布' as const,
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog' as const,
+        }],
+      })),
+    };
+    render(<IterationModule />);
+    await waitFor(() => expect(screen.getByTestId('iteration-close-hint')).toBeInTheDocument());
+    expect(screen.getByTestId('iteration-close-hint')).toHaveTextContent('已有新发布 / 可关单');
+    expect(screen.getByTestId('iteration-close-hint')).toHaveTextContent('不自动关单');
+  });
+
   it('surfaces live CONFLICT/GONE, closes wont_fix, and never shows DEMO 5 or P0 reminder', async () => {
     const inProgress: DashboardIterationTask = {
       ...openTask,

@@ -26,6 +26,7 @@ export type DashboardWordingView = Readonly<{
   releaseId: string | null;
   total: number;
   entries: readonly DashboardWordingEntry[];
+  catalogRefreshedAt: string | null;
 }>;
 
 export type DashboardWordingFailure = Readonly<{
@@ -52,7 +53,8 @@ export function isDashboardWordingResult(value: unknown): value is DashboardWord
     return exactKeys(record, ['ok', 'code'])
       && (record.code === 'FORBIDDEN' || record.code === 'VALIDATION' || record.code === 'UNAVAILABLE');
   }
-  if (record.ok !== true || !exactKeys(record, ['ok', 'releaseId', 'total', 'entries'])) return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'releaseId', 'total', 'entries', 'catalogRefreshedAt'])) return false;
+  if (!(record.catalogRefreshedAt === null || typeof record.catalogRefreshedAt === 'string')) return false;
   if (!(record.releaseId === null || typeof record.releaseId === 'string')) return false;
   if (!Number.isSafeInteger(record.total) || (record.total as number) < 0) return false;
   return Array.isArray(record.entries) && record.entries.length === record.total;
