@@ -60,6 +60,7 @@ describe('IterationModule live list', () => {
     render(<IterationModule />);
     await waitFor(() => expect(api.list).toHaveBeenCalled());
     expect(screen.getByTestId('iteration-live-status')).toHaveTextContent('当前没有待办');
+    expect(screen.getByTestId('iteration-inaccuracy-empty')).toHaveTextContent('当前没有达到开单阈值的不准稿');
     expect(screen.queryByTestId('iteration-it-2041')).not.toBeInTheDocument();
     expect(screen.queryByTestId('iteration-it-2048')).not.toBeInTheDocument();
     expect(screen.queryByTestId('iteration-reset-drill')).not.toBeInTheDocument();
@@ -120,6 +121,7 @@ describe('IterationModule live list', () => {
     const user = userEvent.setup();
     render(<IterationModule />);
     await waitFor(() => expect(screen.getByTestId('iteration-itask-01J4PF9TQX7G')).toBeInTheDocument());
+    expect(screen.getByTestId('iteration-inaccuracy-empty')).toHaveTextContent('当前没有达到开单阈值的不准稿');
     expect(screen.queryByTestId('iteration-it-2041')).not.toBeInTheDocument();
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
     expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
@@ -143,6 +145,28 @@ describe('IterationModule live list', () => {
     await waitFor(() => expect(screen.getByTestId('iteration-terminal')).toHaveTextContent('已核对有效期过滤'));
     expect(screen.getByTestId('iteration-detail-footnote')).toHaveTextContent('不自动改写 Answer');
     expect(screen.getByTestId('iteration-detail-footnote')).not.toHaveTextContent('演练不保存');
+  });
+
+  it('lists inaccuracy tasks by script with unique sample counts', async () => {
+    const inaccuracyTask: DashboardIterationTask = {
+      ...openTask,
+      taskId: 'itask-inacc',
+      signalId: 'inaccuracy:script-a',
+      clusterKey: 'script-a',
+      sampleQueryIds: ['q-1', 'q-2', 'q-2'],
+      suspectedCause: 'mixed',
+      suggestedScriptIds: ['script-a'],
+    };
+    const api = mockApi({
+      list: vi.fn(async () => ({ ok: true as const, items: [inaccuracyTask], nextCursor: null })),
+    });
+    window.dashboardIteration = api;
+    render(<IterationModule />);
+    await waitFor(() => expect(screen.getByTestId('iteration-inaccuracy-script-a')).toBeInTheDocument());
+    expect(screen.getByTestId('iteration-inaccuracy-script-a')).toHaveTextContent('稿 script-a · 样本 2 次 · 开放待办 1');
+    expect(screen.getByTestId('iteration-itask-inacc')).toHaveTextContent('话术不准 · script-a');
+    expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).toHaveTextContent('样本查询数');
+    expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).not.toHaveTextContent('尚未接入');
   });
 
   it('surfaces live CONFLICT/GONE, closes wont_fix, and never shows DEMO 5 or P0 reminder', async () => {

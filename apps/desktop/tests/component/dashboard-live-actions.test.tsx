@@ -41,6 +41,7 @@ describe('dashboard live actions', () => {
     });
     expect(screen.getByTestId('overview-alert-catalog')).toHaveTextContent('未接入');
     expect(screen.getByTestId('overview-scope')).toHaveTextContent('检索账');
+    expect(screen.queryByTestId('overview-inaccuracy-counts')).not.toBeInTheDocument();
   });
 
   it('loads overview todos through dashboardIteration.list', async () => {
@@ -76,6 +77,68 @@ describe('dashboard live actions', () => {
     await waitFor(() => expect(list).toHaveBeenCalled());
     expect(screen.getByTestId('decision-it-live-1')).toHaveTextContent('面膜紫适用人群');
     expect(screen.getByTestId('overview-kpi-source')).toHaveTextContent('产品会话');
+    expect(screen.getByTestId('overview-inaccuracy-empty')).toHaveTextContent('当前没有达到开单阈值的不准稿');
+  });
+
+  it('projects inaccuracy todos by script_id with sample query counts', async () => {
+    const list = vi.fn(async () => ({
+      ok: true as const,
+      items: [{
+        taskId: 'it-inacc-1',
+        signalId: 'inaccuracy:script-1',
+        clusterKey: 'script-1',
+        sampleQueryIds: ['q-a', 'q-a', 'q-b'],
+        suspectedCause: 'mixed' as const,
+        suggestedScriptIds: ['script-1'],
+        status: 'open' as const,
+        assigneeRole: 'coach',
+        resolution: null,
+        resolutionNote: null,
+        version: 1,
+        createdAt: '2026-09-20T00:00:00Z',
+        updatedAt: '2026-09-20T00:00:00Z',
+        resolvedAt: null,
+      }],
+      nextCursor: null,
+    }));
+    window.dashboardIteration = {
+      list,
+      start: vi.fn(),
+      close: vi.fn(),
+    };
+    window.dashboardWording = {
+      list: vi.fn(async () => ({
+        ok: true as const,
+        releaseId: 'rel_20',
+        total: 1,
+        entries: [{
+          scriptId: 'script-1',
+          domain: 'product' as const,
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_20',
+          scriptVersion: 1,
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low' as const,
+          lifecycle: 'published' as const,
+          lifecycleLabel: '已发布' as const,
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog' as const,
+        }],
+      })),
+    };
+    render(<OverviewModule />);
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    expect(screen.getByTestId('overview-inaccuracy-script-1')).toHaveTextContent('script-1');
+    expect(screen.getByTestId('overview-inaccuracy-script-1')).toHaveTextContent('用量');
+    expect(screen.getByTestId('overview-inaccuracy-script-1')).toHaveTextContent('2');
+    expect(screen.getByTestId('decision-it-inacc-1')).toHaveTextContent('用量');
+    expect(screen.getByTestId('decision-it-inacc-1')).toHaveTextContent('话术不准 · 稿 script-1 · 样本 2 次');
+    expect(screen.queryByTestId('overview-inaccuracy-empty')).not.toBeInTheDocument();
   });
 
   it('uploads wording drafts through dashboardContent.importDraft', async () => {

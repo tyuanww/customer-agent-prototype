@@ -17,7 +17,7 @@
 **Why:** 拍板 D 的验收是「工作台待办页能看到按稿聚合的次数」。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md` during `/ship` on `feat/ops-loop-api-desktop`.
 
 **Priority:** P1
-**Status:** OPEN · 适配器 PR 未做 UI 投影
+**Status:** IN PROGRESS · 概览按 `inaccuracy:` 待办投影样本查询数；24h/7d 窗口读面仍无合同 GET
 
 ### P1 · 无命中 / 跳过 Top1 / stale 召回开 iteration_task
 
