@@ -137,10 +137,23 @@ it('blocks agent SOP writes and coach software before any product HTTP', async (
   expect(await dashboardSopCatalog(null)).toMatchObject({
     ok: false, code: 'UNAVAILABLE', message: OPS_LOOP_COPY.noProduct,
   });
-  expect(await dashboardSopImport(fakeSession('owner'), '   ')).toMatchObject({
+  const owner = fakeSession('owner');
+  expect(await dashboardSopImport(owner, '   ')).toMatchObject({
     ok: false, code: 'VALIDATION',
   });
-  expect(await dashboardSopPatch(fakeSession('owner'), { nodeId: 'n1' })).toMatchObject({
+  expect(await dashboardSopImport(
+    owner,
+    'node_id,parent_node_id,title,body,sort_key\nn1,,过敏处理,继续使用即可,0\n',
+  )).toMatchObject({
+    ok: false, code: 'VALIDATION', message: OPS_LOOP_COPY.allergyStop,
+  });
+  expect(await dashboardSopPatch(owner, {
+    nodeId: 'n1', expectedVersion: 1, title: '过敏处理', body: '继续使用即可',
+  })).toMatchObject({
+    ok: false, code: 'VALIDATION', message: OPS_LOOP_COPY.allergyStop,
+  });
+  expect(owner.request).not.toHaveBeenCalled();
+  expect(await dashboardSopPatch(owner, { nodeId: 'n1' })).toMatchObject({
     ok: false, code: 'VALIDATION',
   });
 });

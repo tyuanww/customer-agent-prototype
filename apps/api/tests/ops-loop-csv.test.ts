@@ -56,4 +56,19 @@ describe('parseSopCsv', () => {
       { node_id: 'n1', parent_node_id: null, title: '停手', body: '先停手', sort_key: 0 },
     ]);
   });
+
+  it('rejects allergy steps that lack 停手 and 确认 copy', () => {
+    const header = 'node_id,parent_node_id,title,body,sort_key';
+    expect(parseSopCsv(`${header}\nn1,,过敏处理,继续使用即可,0\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\nn1,,核对,面膜过敏了先观察,0\n`)).toBeNull();
+    expect(parseSopCsv(`${header}\nn1,,过敏处理,先停手、再确认是否就医,0\n`)).toEqual([
+      {
+        node_id: 'n1',
+        parent_node_id: null,
+        title: '过敏处理',
+        body: '先停手、再确认是否就医',
+        sort_key: 0,
+      },
+    ]);
+  });
 });

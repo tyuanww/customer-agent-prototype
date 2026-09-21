@@ -510,6 +510,19 @@ describe('ops-loop HTTP routes', () => {
     expect(oversized.statusCode).toBe(400);
     expect(oversized.json()).toMatchObject({ error: { code: 'VALIDATION' } });
     expect(ops.importSopCatalog).not.toHaveBeenCalled();
+
+    const allergy = await app.inject({
+      method: 'POST',
+      url: '/v1/sop/import',
+      headers: {
+        ...coachHeaders,
+        'content-type': sopContentType,
+        'idempotency-key': 'idem-allergy-stop',
+      },
+      payload: sopMultipart('node_id,parent_node_id,title,body,sort_key\nn1,,过敏处理,继续使用即可,0\n'),
+    });
+    expect(allergy.statusCode).toBe(400);
+    expect(ops.importSopCatalog).not.toHaveBeenCalled();
   });
 
   it('patches SOP nodes for coach with expected_version', async () => {
@@ -529,6 +542,16 @@ describe('ops-loop HTTP routes', () => {
     expect(vi.mocked(ops.patchSopNode).mock.calls[0]?.[0]).toMatchObject({
       nodeId: 'n1', expectedVersion: 7, title: '停手', body: '先停',
     });
+
+    const allergy = await app.inject({
+      method: 'PATCH',
+      url: '/v1/sop/nodes/n1',
+      headers: { ...coachHeaders, 'content-type': 'application/json', 'idempotency-key': 'idem-allergy-patch' },
+      payload: { expected_version: 7, title: '过敏处理', body: '继续使用即可' },
+    });
+    expect(allergy.statusCode).toBe(400);
+    expect(allergy.json()).toMatchObject({ error: { code: 'VALIDATION', details: { reason: 'allergy_stop_copy' } } });
+    expect(ops.patchSopNode).toHaveBeenCalledOnce();
   });
 
   it('returns the signed current software release for owner', async () => {

@@ -3,6 +3,8 @@ import {
   isDashboardOpsFailure,
   OPS_LOOP_COPY,
   SOP_UPLOAD_MAX_BYTES,
+  sopAllergyStepNeedsStopCopy,
+  sopCsvAllergyStopMissing,
   type DashboardSopNode,
 } from '@shared/dashboard-ops-loop';
 import { StatusBadge } from './StatusBadge';
@@ -94,6 +96,10 @@ export function SopLibraryModule() {
               return;
             }
             void file.text().then(async (csvText) => {
+              if (sopCsvAllergyStopMissing(csvText)) {
+                setMessage(OPS_LOOP_COPY.allergyStop);
+                return;
+              }
               const result = await api.sopImport(csvText);
               setMessage(result.ok ? `已导入 ${result.nodeCount} 个节点` : result.message);
               if (result.ok) load();
@@ -120,6 +126,10 @@ export function SopLibraryModule() {
             }
             if (!selected) {
               setMessage(OPS_LOOP_COPY.selectSop);
+              return;
+            }
+            if (sopAllergyStepNeedsStopCopy(selected.title, selected.body)) {
+              setMessage(OPS_LOOP_COPY.allergyStop);
               return;
             }
             void api.sopPatch({
