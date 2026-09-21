@@ -10,42 +10,6 @@
 
 ## Open
 
-### P1 · 待办页按稿展示「话术不准」次数
-
-**What:** `POST /v1/inaccuracy-reports` 已接线，但 Dashboard 话术优化待办仍不展示按 `script_id` 聚合的次数。
-
-**Why:** 拍板 D 的验收是「工作台待办页能看到按稿聚合的次数」。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md` during `/ship` on `feat/ops-loop-api-desktop`.
-
-**Priority:** P1
-**Status:** IN PROGRESS · 概览按 `inaccuracy:` 待办投影样本查询数；24h/7d 窗口读面仍无合同 GET
-
-### P1 · 无命中 / 跳过 Top1 / stale 召回开 iteration_task
-
-**What:** 待办真信号目前只有不准阈值开单（0015）。无命中缺口、跳过 Top1 排序、有效窗口已过仍召回还没有写 `iteration_tasks` 的源。
-
-**Why:** 拍板 E。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
-
-**Priority:** P1
-**Status:** IN PROGRESS · leftover `/v1/search` 无命中与过期召回、adoption 跳过 Top1 在同一事务开单；hydrate 主链 collection_disabled 仍不写事件
-
-### P1 · 新发布后提示可关单
-
-**What:** 人改稿并发布后，系统应提示「已有新发布 / 可关单」，人手关。当前 close 仍是原 iteration 按钮，无发布后提示。
-
-**Why:** 拍板 E。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
-
-**Priority:** P1
-**Status:** IN PROGRESS · 当前 hydrate 新于待办且相关稿仍在目录时提示「已有新发布 / 可关单」；不自动关
-
-### P1 · SOP 过敏步骤无停手文案不能发
-
-**What:** `parseSopCsv` / `import_sop_catalog` 不校验过敏域停手文案。CSV 只有 title/body/sort_key。
-
-**Why:** 拍板 F。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
-
-**Priority:** P1
-**Status:** IN PROGRESS · title/body 含「过敏」时 body 必须同时有「停手」和「确认」；导入与 PATCH 均拦；不改 CSV 列
-
 ### P1 · 打包态配置失败没有可见反馈
 
 **What:** 打包构建在 userData 缺 `synthetic-stack.json`、其中 origin 非法、或该文件不可读时，`product-runtime-config.ts` 抛错，`main.ts` 的 catch 后 `app.quit()`。双击 exe 时看不到 stdout，使用者只看到「闪一下」。
@@ -212,6 +176,38 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Status:** 本轮不做 native · IME 级隐身仍待产品明确
 
 ## Completed
+
+### P1 · 待办页按稿展示「话术不准」次数
+
+**What:** 概览待办按 `inaccuracy:{script_id}` 展示去重后的样本查询数。没有产品会话不画这块。
+
+**Why:** 拍板 D。24h/7d 窗口次数仍没有合同 GET，未达开单阈值的稿不会出现。
+
+**Completed:** 2026-09-22（产品 PR #9，`d388ef6`）
+
+### P1 · 无命中 / 跳过 Top1 / stale 召回开 iteration_task
+
+**What:** 记录到的搜索无命中、复制跳过 Top1、过期仍被召回，会在同一事务打开 `iteration_task`。
+
+**Why:** 拍板 E。hydrate 主链仍是 `collection_disabled`，不写这些事件。
+
+**Completed:** 2026-09-22（产品 PR #10，`70f6c4c`）
+
+### P1 · 新发布后提示可关单
+
+**What:** 当前 hydrate 新于待办、相关稿仍在目录时，提示「已有新发布 / 可关单」。人手关。
+
+**Why:** 拍板 E。不自动关单。
+
+**Completed:** 2026-09-22（产品 PR #11，`103eb94`）
+
+### P1 · SOP 过敏步骤无停手文案不能发
+
+**What:** title 或 body 含「过敏」时，body 必须同时有「停手」和「确认」，否则导入和 PATCH 失败。
+
+**Why:** 拍板 F。不改 CSV 列。
+
+**Completed:** 2026-09-22（产品 PR #12，`4c1d87a`）
 
 ### Login residual invalid banner
 
