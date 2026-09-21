@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { desktopFetch, electronNetFetch } from '../../src/main/desktop-fetch';
+import { desktopFetch } from '../../src/main/desktop-fetch';
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -11,17 +11,14 @@ function source(relative: string): string {
 }
 
 describe('desktop fetch', () => {
-  it('falls back to global fetch when Electron net.fetch is absent', async () => {
-    expect(electronNetFetch()).toBeNull();
+  it('uses Node fetch for loopback so HTTP_PROXY cannot intercept 127.0.0.1', async () => {
     const previous = globalThis.fetch;
     const fetchMock = vi.fn(async () => new Response('ok', { status: 200 }));
     globalThis.fetch = fetchMock as typeof fetch;
     try {
-      const response = await desktopFetch('https://example.invalid/health');
+      const response = await desktopFetch('http://127.0.0.1:43100/health');
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(response.status).toBe(200);
-      await desktopFetch('http://127.0.0.1:43100/health');
-      expect(fetchMock).toHaveBeenCalledTimes(2);
     } finally {
       globalThis.fetch = previous;
     }
@@ -40,5 +37,6 @@ describe('desktop fetch', () => {
     expect(chat).not.toContain('createRequire');
     expect(embed).toContain('electronNetFetch()');
     expect(embed).not.toContain('createRequire');
+    expect(source('src/main/desktop-fetch.ts')).toContain('electronNetFetch() ?? fetch');
   });
 });
