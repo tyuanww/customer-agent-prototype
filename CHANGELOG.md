@@ -2,6 +2,20 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.17] - 2026-09-21
+
+### Added
+
+- You can open a five-page workbench: 管理概览, 话术库, SOP, 内容管理, 系统同步. Owner publish runs parked dual-review then `POST /v1/content/publish`. Feishu sessions that cannot finish the three identities get awaiting-review copy. Follow [管理员导入 MENOKIN FAQ 并发布](docs/tutorial-menokin-content-publish.md) to import a local xlsx and search 面膜紫适用人群.
+
+### Changed
+
+- Window title is 客服运营工作台. Top bar no longer shows 演示数据 / 无后端 · 不保存. SOP write buttons stay 未接入. Wording library lists/exports the current release and uploads through content import; single-row update/delete has no frozen command.
+
+### Removed
+
+- VOC, work-order trash, offline sampling, and architecture pages.
+
 ## [0.3.16] - 2026-09-20
 
 ### Fixed
