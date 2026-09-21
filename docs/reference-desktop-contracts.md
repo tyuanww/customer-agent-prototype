@@ -1,6 +1,6 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated`、`product:escalate/record-terminal`、`dashboard:wording-list`、`dashboard:content-session/parse/import/publish`、`dashboard:iteration-list/start/close`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 没有 `customerAgent`。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated`、`product:escalate/record-terminal`、`product:inaccuracy-report`、`dashboard:wording-list`、`dashboard:content-session/parse/import/publish`、`dashboard:iteration-list/start/close`、`dashboard:ops-retrieval` / `ops-sop-*` / `ops-script-*` / `ops-software`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 没有 `customerAgent`。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
 
 相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
 
@@ -17,8 +17,8 @@ Fox / Query / Dashboard / 登录 / SOP 都使用同一份 renderer 入口 `apps/
 | 典型尺寸 | 88×88（`FOX_SIZE`） | 宽 600；高见第 4 节 | 1180×760，最小 980×680 |
 | frame / 透明 / 置顶 | frameless、透明、`alwaysOnTop`、`skipTaskbar` | 同左；`resizable: false` | 标准 frame、不透明、非置顶、显示任务栏 |
 | macOS 形态 | `panel` + `hiddenInMissionControl` | 同左（命令面板：非激活 NSPanel）。收起要把键盘还给上一个 App：闲置狐狸 `setFocusable(false)`；仅当 Dashboard / 登录 / SOP 都不可见时才 `app.hide()`，再延迟 `showInactive` 狐狸。DevTools 窗不算「别 hide」。不 `app.focus({ steal })`。Dock 仍走 Dashboard 的 regular 激活。IME 级 NSPanel native 本轮不引入 | `hiddenInset`，交通灯 `{ x: 14, y: 16 }` |
-| preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | `dashboard.ts` → `dashboard.cjs`（内联 wording / content / iteration 通道） |
-| `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无**；`dashboardWording` / `dashboardContent` / `dashboardIteration` |
+| preload | `apps/desktop/src/preload/index.ts` → `apps/desktop/out/preload/index.cjs` | 同左 | `dashboard.ts` → `dashboard.cjs`（内联 wording / content / iteration / ops 通道） |
+| `customerAgent` | 有（白名单） | 有（白名单，且多数写通道仅 query） | **无**；`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps` |
 | `trustedContents()` | 是 | 是 | **否**（`overlayRoleOf` 对 Dashboard 返回 `null`） |
 | webPreferences | `contextIsolation: true` `sandbox: true` `nodeIntegration: false` `spellcheck: false` | 同左；Query 另设 `backgroundThrottling: false` | `DASHBOARD_WINDOW_SECURITY` + 专用 preload；sandbox 三项不变 |
 
@@ -46,10 +46,11 @@ CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态�
 ## 2. Dashboard：独立 preload、无 `customerAgent`
 
 - `createDashboardBrowserWindow` 使用 `DASHBOARD_WINDOW_SECURITY` 加专用 `dashboard.cjs`。
-- `readDashboardWindowSnapshot().hasPreload` 为 true。preload 暴露 `dashboardWording.list()`、`dashboardContent` 与 `dashboardIteration`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
+- `readDashboardWindowSnapshot().hasPreload` 为 true。preload 暴露 `dashboardWording.list()`、`dashboardContent`、`dashboardIteration` 与 `dashboardOps`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
 - 话术库优先读仓外当前发布 hydrate，hydrate 为空才回退检索索引（仓内路径拒绝），只读、不复制、不发布。无 `effectiveFrom` 的条目生效窗口标「当前发布」。详情卡左上标签与「来源」同为 `selected.ownerRole`（`当前发布` 或 `本机话术库`），不写死「本机话术库」。VOC / 工单仍是架构模拟。
-- 「话术优化待办」走 `dashboard:iteration-list` / `dashboard:iteration-start` / `dashboard:iteration-close`。Main 用产品会话调冻结 `GET /v1/metrics/iteration-tasks` 与 `POST /v1/events/iteration-tasks/{task_id}/start|close`。仅 coach / owner；空列表 `{ ok: true, items: [], nextCursor: null }` 合法。坐席 403。没有产品会话时返回「当前没有产品会话，无法加载待办」。有该 API 时 renderer 不得回落 DEMO 5 条。CAS 冲突文案「待办已更新，请刷新后再处理」。关闭不等于已发布。从「话术不准」自动开单仍要 persist。
-- 侧栏「SOP」（`SopLibraryModule`）只读渲染 `allergySopTree()`，不新增 IPC。内部停手只在 `window.dashboardContent.session()` 成功且 `signedIn` 且 role 为 `coach` / `owner` 时显示；session 失败或坐席角色 fail-closed 隐藏。不 persist、不 publish、不 fetch。持久化仍要 contracts:intake。这与 Query 的独立 `role=sop` 窗不是同一表面。
+- 「话术优化待办」走 `dashboard:iteration-list` / `dashboard:iteration-start` / `dashboard:iteration-close`。Main 用产品会话调冻结 `GET /v1/metrics/iteration-tasks` 与 `POST /v1/events/iteration-tasks/{task_id}/start|close`。仅 coach / owner；空列表 `{ ok: true, items: [], nextCursor: null }` 合法。坐席 403。没有产品会话时返回「当前没有产品会话，无法加载待办」。有该 API 时 renderer 不得回落 DEMO 5 条。CAS 冲突文案「待办已更新，请刷新后再处理」。关闭不等于已发布。Query「话术不准」已 persist；待办页仍不展示按 `script_id` 聚合次数。
+- 侧栏「SOP」（`SopLibraryModule`）有产品会话时走 `dashboardOps.sopCatalog/import/patch/delete` → `GET /v1/sop/catalog`、`POST /v1/sop/import`（multipart CSV，≤256KB，覆盖整树）、`PATCH /v1/sop/nodes/{id}`（coach/owner）、`DELETE` 仅 owner。没有 `dashboardOps` 或没有产品会话时「未接入：没有 SOP 写库通道」。导出是本机 CSV，不另打 HTTP。这与 Query 的独立 `role=sop` 窗不是同一表面。
+- 管理概览 KPI 走 `dashboardOps.retrieval('current_release'|'last_7d')` → `GET /v1/metrics/retrieval`。话术库 Owner 单条更新/删除走 `dashboardOps.scriptPatch/scriptDelete` → `PATCH|DELETE /v1/content/scripts/{id}`，成功 `reviewStatus=pending_review`。系统同步软件目录走 `dashboardOps.softwareCatalog` → `GET /v1/software/releases` 与 `/current`；Owner only；UNSIGNED 必须 `signed=false`；禁止 `latest.yml`。
 - 「内容与发布」本地解析 CSV 或 xlsx。zip xlsx 走 `dashboard:content-parse`（`dashboardContent.parseUpload`），payload 为 `{ sourceName, bytes }`；Main 只读第一张表并映射中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）。缺 parse 通道时 renderer 仍 fail-close 二进制工作簿。上限 10MiB / 5000 行，不再使用 64KiB / 50 行。xlsx 匹配 sheet relationship id 前会转义正则元字符；`&#...;` / `&#x...;` 超出 Unicode 或落在代理区则跳过该实体，不 `fromCodePoint` 抛错。import 把预览转成 CSV 再 POST。Publish 在 `POST /v1/content/import` 之后轮询 `GET /v1/content/import/{import_batch_id}`：间隔 1.5s（`IMPORT_POLL_MS`），预算 30s（`CONTENT_IMPORT_TIMEOUT_MS`），`RATE_LIMITED` / 429 再退避 1.5s，避免打满状态接口每分钟 120 次。一期发布仅 Owner。
 - Dashboard renderer 拿不到 `window.customerAgent`，也调不了 search / login / copy。
 - 打开通道只有无参数 `dashboard:open`。Main 要求 `isTrustedSender` 且 `role === 'query'`（`canOpenDashboard`）。Fox / 未受信 sender fail-closed，返回 `OpenDashboardResult` `{ ok: false, message }`。
@@ -77,6 +78,7 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `product:login` / `product:logout` | invoke | trusted main-frame，query-only，无参数 |
 | `product:session-changed` | Main → query | preload 精确校验，renderer 按 main epoch 拒绝旧状态 |
 | `product:search` / `product:cancel-search` / `product:copy-adopt` | invoke | trusted Query 主框；绑定 sessionEpoch/generation；复制不接受 renderer 正文 |
+| `product:inaccuracy-report` | invoke | trusted Query 主框；Live UUID `queryId` 才 POST `/v1/inaccuracy-reports`；须 `Idempotency-Key`；`collection_disabled` 不发 HTTP |
 | `product:retrieval-preference-get` / `product:retrieval-preference-set` | invoke | trusted Query 主框；`{ smartEnabled: boolean }`；非法 payload 不写盘 |
 | `product:announce-refresh` | invoke | trusted Query 主框；只回显 generation；成功投影无 lease token。QueryApp 每次产品检索都会先调它，不只在尚未持有租约时 |
 | `product:announce-invalidated` | Main → query | preload 精确校验；过期/替换/来源门后停止使用旧候选。查询中或已有结果时：`source_gate` 显示「内容暂不可用，请联系话术师核实」，`unavailable` 显示「服务暂不可用，请重试」，不得空白 overlay，也不得画「当前版本已失效」；空闲输入态这两类原因静默回 SEARCH_INPUT。只有 `expired` 才显示「当前版本已失效，请重新核验」 |
@@ -89,6 +91,14 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `dashboard:iteration-list` | invoke | Dashboard 主框；无参数。成功 `{ ok, items, nextCursor }`，空 `items` 合法 |
 | `dashboard:iteration-start` | invoke | Dashboard 主框；精确 `{ taskId, expectedVersion }` |
 | `dashboard:iteration-close` | invoke | Dashboard 主框；精确 `{ taskId, expectedVersion, status, resolutionNote }`；`status` 仅 `resolved \| wont_fix` |
+| `dashboard:ops-retrieval` | invoke | Dashboard 主框；`current_release \| last_7d`；coach/owner |
+| `dashboard:ops-sop-catalog` | invoke | Dashboard 主框；无参数；coach/owner |
+| `dashboard:ops-sop-import` | invoke | Dashboard 主框；CSV 字符串，≤256KB；覆盖当前产品会话树 |
+| `dashboard:ops-sop-patch` | invoke | Dashboard 主框；`{ nodeId, expectedVersion, title?, body?, sortKey? }` |
+| `dashboard:ops-sop-delete` | invoke | Dashboard 主框；`{ nodeId, expectedVersion }`；仅 owner |
+| `dashboard:ops-script-patch` | invoke | Dashboard 主框；Owner；成功 `pending_review` |
+| `dashboard:ops-script-delete` | invoke | Dashboard 主框；Owner；成功 `pending_review` |
+| `dashboard:ops-software` | invoke | Dashboard 主框；仅 owner；禁止 latest.yml |
 | `overlay:dismiss` | invoke | trusted overlay |
 | `overlay:report-ui-phase` | invoke | query-only；`isReportablePhase`；`resultCount ∈ {0,1,2,3}` |
 | `overlay:report-handoff-milestone` | invoke | `role === 'query'`；正整数 `handoffId`；枚举 `open-armed \| open-finished \| close-finished` |
@@ -257,6 +267,8 @@ apps/desktop/src/main/sender-guard.ts         trusted + main-frame
 apps/desktop/src/main/window-security.ts      导航 / 权限锁
 apps/desktop/src/main/dashboard-window.ts     标准窗 + 话术库只读 preload
 apps/desktop/src/main/dashboard-wording.ts    仓外 hydrate/index 投影
+apps/desktop/src/main/dashboard-ops-loop.ts   SOP / 检索账 / 话术草稿 / 软件目录 HTTP
+apps/desktop/src/main/dashboard-ops-loop-ipc.ts Dashboard ops invoke 门禁
 apps/desktop/src/preload/dashboard.ts         工作台独立 preload（内联通道）
 apps/desktop/src/main/dashboard-open-failure.ts 原生失败对话框
 apps/desktop/src/main/desktop-shell.ts        菜单 / Tray
@@ -295,3 +307,5 @@ renderer 无 Node 权限。`apps/desktop/package.json` 的打包 `files` 只含 
 新增 `product:search`、`product:cancel-search`、`product:copy-adopt`，全部仅限可信 Query 主 frame。通过 `customerAgent.productSearch` 暴露窄方法。输入输出须绑定 sessionEpoch/generation；查询/取消严格递增，复制必须等于已保存候选。搜索文本上限为 500 Unicode code point；平台手选，商品上下文成对。本切片只提交 original 查询，parentQueryId 固定 null。
 
 复制只接受 queryId/rank/scriptId/scriptVersion/contentHash 和已声明占位符值，不接受正文。main 用缓存原文中的 `{订单号}`/`{日期}` 替换，先复制再记账；记账失败返回 copied=true/eventStatus=unrecorded，collection_disabled 不发事件。接入模式旧 clipboard:copy-text 被拒绝。S0 未接入 profile 保留原逻辑，HTTP 失败不得回退 S0。
+
+`product:inaccuracy-report` 与复制同门禁。Query 只在 Live UUID `queryId` 时调用；Main 校验当前 generation 候选后 `POST /v1/inaccuracy-reports`。卡片「已记录，待话术师核实」等 `ok` 才点亮。S0 非 UUID 不发 IPC。`collection_disabled` 返回 `ok: true, recorded: false` 且不 POST。不走 `copyAdopt`。
