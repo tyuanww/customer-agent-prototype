@@ -11,7 +11,58 @@ export const OPS_LOOP_COPY = Object.freeze({
   selectSop: '请先选中节点。',
   sopChannel: '未接入：没有 SOP 写库通道。',
   sopTooLarge: 'SOP 文件超过 256KB。',
+  allergyStop: '过敏步骤没有停手文案，不能发。',
 });
+
+export function sopAllergyStepNeedsStopCopy(title: string, body: string): boolean {
+  if (!title.includes('过敏') && !body.includes('过敏')) return false;
+  return !(body.includes('停手') && body.includes('确认'));
+}
+
+function splitSopCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (quoted) {
+      if (char === '"' && line[index + 1] === '"') {
+        current += '"';
+        index += 1;
+        continue;
+      }
+      if (char === '"') {
+        quoted = false;
+        continue;
+      }
+      current += char;
+      continue;
+    }
+    if (char === '"') {
+      quoted = true;
+      continue;
+    }
+    if (char === ',') {
+      cells.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  cells.push(current);
+  return cells;
+}
+
+export function sopCsvAllergyStopMissing(csvText: string): boolean {
+  const lines = csvText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+  for (const line of lines.slice(1)) {
+    if (line.trim().length < 1) continue;
+    const cells = splitSopCsvLine(line);
+    if (cells.length < 4) continue;
+    if (sopAllergyStepNeedsStopCopy(cells[2]?.trim() ?? '', cells[3] ?? '')) return true;
+  }
+  return false;
+}
 
 export const SOP_UPLOAD_MAX_BYTES = 256 * 1024;
 

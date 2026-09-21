@@ -13,7 +13,7 @@ import {
   sendValidationError,
 } from './contract-http-errors.js';
 import { prepareIdempotencyHashes, type CanonicalJsonValue } from './idempotency.js';
-import { parseSopCsv } from './ops-loop-csv.js';
+import { parseSopCsv, sopAllergyStepNeedsStopCopy } from './ops-loop-csv.js';
 import type { OpsLoopRepository } from './ops-loop-repository.js';
 import { sendOperationFailure } from './operation-result.js';
 import type { ApiHmacKeyRing } from './runtime-config.js';
@@ -218,6 +218,10 @@ export function registerOpsLoopRoutes(
     if (key === null) return sendValidationError(reply);
     const contract = validateContractSchema('SopNodePatch', request.body);
     if (!contract.ok) return sendValidationError(reply);
+    if (typeof contract.value.title === 'string' && typeof contract.value.body === 'string'
+      && sopAllergyStepNeedsStopCopy(contract.value.title, contract.value.body)) {
+      return sendValidationError(reply, { reason: 'allergy_stop_copy' });
+    }
     if (dependencies === undefined) return sendOverloaded(reply);
     if (!limit('sop-patch', actor.user_id, 30)) return sendRateLimited(reply);
     const result = await dependencies.repository.patchSopNode({

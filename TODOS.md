@@ -44,7 +44,7 @@
 **Why:** 拍板 F。Deferred from plan: `docs/plans/2026-09-20-script-ops-content-loop.md`.
 
 **Priority:** P1
-**Status:** OPEN
+**Status:** IN PROGRESS · title/body 含「过敏」时 body 必须同时有「停手」和「确认」；导入与 PATCH 均拦；不改 CSV 列
 
 ### P1 · 打包态配置失败没有可见反馈
 

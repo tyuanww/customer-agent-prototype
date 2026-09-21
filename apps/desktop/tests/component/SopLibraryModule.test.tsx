@@ -103,6 +103,33 @@ describe('SopLibraryModule', () => {
     await waitFor(() => expect(sopCatalog).toHaveBeenCalledTimes(3));
   });
 
+  it('blocks updating an allergy step that lacks 停手确认 copy', async () => {
+    const sopPatch = vi.fn();
+    window.dashboardOps = {
+      retrieval: vi.fn(),
+      sopCatalog: vi.fn(async () => ({
+        ok: true as const,
+        productSessionId: 'default',
+        items: [{
+          nodeId: 'n1', parentNodeId: null, title: '过敏处理', body: '继续使用即可',
+          sortKey: 0, version: 1, lifecycle: 'active' as const,
+        }],
+      })),
+      sopImport: vi.fn(),
+      sopPatch,
+      sopDelete: vi.fn(),
+      scriptPatch: vi.fn(),
+      scriptDelete: vi.fn(),
+      softwareCatalog: vi.fn(),
+    };
+    const user = userEvent.setup();
+    render(<SopLibraryModule />);
+    await waitFor(() => expect(screen.getByTestId('sop-library-list')).toHaveTextContent('过敏处理'));
+    await user.click(screen.getByTestId('sop-update'));
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('过敏步骤没有停手文案，不能发。');
+    expect(sopPatch).not.toHaveBeenCalled();
+  });
+
   it('blocks oversized SOP files and imports a custom step as replace-all', async () => {
     const sopImport = vi.fn(async (_csvText: string) => ({
       ok: true as const, productSessionId: 'default', nodeCount: 2,

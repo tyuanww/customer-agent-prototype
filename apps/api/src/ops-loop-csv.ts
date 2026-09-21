@@ -1,3 +1,8 @@
+export function sopAllergyStepNeedsStopCopy(title: string, body: string): boolean {
+  if (!title.includes('过敏') && !body.includes('过敏')) return false;
+  return !(body.includes('停手') && body.includes('确认'));
+}
+
 export type SopCsvNode = Readonly<{
   node_id: string;
   parent_node_id: string | null;
@@ -67,6 +72,7 @@ export function parseSopCsv(text: string): SopCsvNode[] | null {
     if (parent !== null && (parent.length < 1 || parent.length > 128)) return null;
     if (title.length < 1 || title.length > 256) return null;
     if (body.length < 1 || body.length > 20_000) return null;
+    if (sopAllergyStepNeedsStopCopy(title, body)) return null;
     if (!Number.isInteger(sortKey)) return null;
     seen.add(nodeId);
     nodes.push(Object.freeze({
