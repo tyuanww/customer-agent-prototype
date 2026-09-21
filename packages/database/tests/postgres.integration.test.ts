@@ -141,7 +141,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(14);
+      expect(fresh.pending).toHaveLength(15);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -153,12 +153,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 14,
+        migrationCount: 15,
         inventory: { tables: 49, views: 2, functions: 181 },
         capabilityRoles: { total: 9, safe: 9, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 5-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 6-migration current suffix',
         },
       });
 
@@ -249,6 +249,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         '0012_owner_acceptance_v1_15',
         '0013_backend_identity_content_v1_16',
       '0014_release_deferred_guard_v1_17',
+      '0015_ops_loop_v1_18',
       ]);
 
       const upgraded = await applyDatabaseMigrations(client);
@@ -258,6 +259,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         '0012_owner_acceptance_v1_15',
         '0013_backend_identity_content_v1_16',
       '0014_release_deferred_guard_v1_17',
+      '0015_ops_loop_v1_18',
       ]);
       const afterProjection = await client.query<TextRow>(`
         SELECT pg_get_function_result(
@@ -268,14 +270,14 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 14,
+        migrationCount: 15,
       });
     } finally {
       await client.end();
     }
   }, 120_000);
 
-  it('upgrades v1.16 with only the deferred guard migration and rejects privilege drift', async () => {
+  it('upgrades v1.16 with the deferred guard and ops-loop migrations and rejects privilege drift', async () => {
     const database = harness.createDatabase('upgrade_closure');
     const client = await harness.connect(database.config);
     try {
@@ -286,11 +288,31 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 13) };
       await applyMigrationCatalogue(client, baseline);
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0014_release_deferred_guard_v1_17']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual([
+        '0014_release_deferred_guard_v1_17',
+        '0015_ops_loop_v1_18',
+      ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM release_source_bindings', '42501', undefined, 'app_content_admin');
       await expectVerificationFailureAfterMutation(client, 'ALTER FUNCTION public.trg_release_source_set_complete() SECURITY INVOKER');
       await expectVerificationFailureAfterMutation(client, 'GRANT SELECT ON public.release_source_bindings TO app_content_admin');
+    } finally { await client.end(); }
+  });
+
+  it('upgrades v1.17 with only the ops-loop migration', async () => {
+    const database = harness.createDatabase('upgrade_ops_loop');
+    const client = await harness.connect(database.config);
+    try {
+      const reviewed = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades[4]!;
+      const baseline = { ...v113ReviewedCatalogue(), ...reviewed,
+        compatibility: { ...generatedMigrationCatalogue.compatibility,
+          priorReviewedUpgrades: generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, 4) },
+        migrations: generatedMigrationCatalogue.migrations.slice(0, 14) };
+      await applyMigrationCatalogue(client, baseline);
+      const upgraded = await applyDatabaseMigrations(client);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0015_ops_loop_v1_18']);
+      expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
+      await expectSqlState(client, 'SELECT * FROM ops_loop.inaccuracy_reports', '42501', undefined, 'app_runtime');
     } finally { await client.end(); }
   });
 
@@ -305,9 +327,9 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 12) };
       await applyMigrationCatalogue(client, baseline);
       expect((await inspectDatabaseMigrations(client)).pending.map(({ id }) => id))
-        .toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17']);
+        .toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18']);
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM backend_identity.sessions', '42501', undefined, 'app_backend_auth');
       await expectSqlState(client, 'SELECT * FROM backend_review.waits', '42501', undefined, 'app_backend_review');
@@ -325,14 +347,14 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 11) };
       await applyMigrationCatalogue(client, baseline);
       const plan = await inspectDatabaseMigrations(client);
-      expect(plan.pending.map(({ id }) => id)).toEqual(['0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17']);
+      expect(plan.pending.map(({ id }) => id)).toEqual(['0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18']);
       await client.query('CREATE ROLE app_owner_acceptance_registrar NOLOGIN');
       await expect(applyDatabaseMigrations(client)).rejects.toMatchObject({ code: 'MIGRATION_APPLY_FAILED' });
       expect((await inspectDatabaseMigrations(client)).applied).toHaveLength(11);
       expect((await client.query("SELECT to_regclass('public.owner_acceptance_records') AS relation")).rows[0].relation).toBeNull();
       await client.query('DROP ROLE app_owner_acceptance_registrar');
       await applyDatabaseMigrations(client);
-      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(14);
+      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(15);
       await expectSqlState(client, 'SELECT * FROM owner_acceptance_records', '42501', undefined, 'app_runtime');
       await expectSqlState(client, "SELECT register_owner_acceptance('synthetic','{}','bad','bad')", '42501', undefined, 'app_runtime');
       await expectVerificationFailureAfterMutation(client, 'ALTER ROLE app_owner_acceptance_registrar LOGIN');
@@ -361,10 +383,10 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
 
       const pending = await inspectDatabaseMigrations(client);
       expect(pending.state).toBe('PARTIAL');
-      expect(pending.pending.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17']);
+      expect(pending.pending.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18']);
 
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18']);
       const afterNoHitContext = await client.query<TextRow>(`
         SELECT pg_get_function_result(
           'public.search_recommendable_scripts(text,text,text)'::regprocedure
@@ -373,7 +395,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 14,
+        migrationCount: 15,
       });
     } finally {
       await client.end();
@@ -513,7 +535,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(recovered.state).toBe('PARTIAL');
       expect(recovered.applied.map(({ id }) => id)).toEqual(['0001_extensions']);
       const resumed = await applyDatabaseMigrations(recoveryClient);
-      expect(resumed.applied).toHaveLength(13);
+      expect(resumed.applied).toHaveLength(14);
       expect(resumed.after.state).toBe('COMPLETE');
     } finally {
       await recoveryClient.end();
@@ -530,12 +552,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         applyDatabaseMigrations(firstClient),
         applyDatabaseMigrations(secondClient),
       ]);
-      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 14]);
+      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 15]);
       expect(results.every(({ after }) => after.state === 'COMPLETE')).toBe(true);
       const ledger = await firstClient.query<CountRow>(`
         SELECT count(*)::int AS count FROM customer_agent_meta.schema_migrations
       `);
-      expect(ledger.rows[0]?.count).toBe(14);
+      expect(ledger.rows[0]?.count).toBe(15);
     } finally {
       await firstClient.end();
       secondClient.release();

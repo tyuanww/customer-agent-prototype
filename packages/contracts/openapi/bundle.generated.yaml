@@ -3,7 +3,7 @@ openapi: 3.1.1
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: CS-AI-C11 Customer Service Agent API
-  version: 1.13.0
+  version: 1.14.0
   license:
     name: Proprietary - internal use only
     identifier: LicenseRef-Proprietary
@@ -202,6 +202,8 @@ servers:
   - url: /
     description: 与当前 Web/Electron 客户端同源的 API 根路径
 tags:
+  - name: ops-loop
+    description: DEV-M2 运营闭环：不准落库、SOP 写库、话术单条草稿、检索账、软件目录
   - name: backend-candidate
     description: Synthetic backend contract candidate
   - name: auth
@@ -229,6 +231,418 @@ security:
   - mockUser: []
     mockRole: []
 paths:
+  /v1/software/releases/current:
+    get:
+      operationId: getCurrentSoftwareRelease
+      summary: 当前建议软件版本
+      description: 仅 owner。客户端只展示目录并打开下载提示，不跑 latest.yml 自动更新。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - owner
+      x-phase1-owner-only: true
+      responses:
+        "200":
+          description: 当前建议版本
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoftwareRelease"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+  /v1/software/releases:
+    get:
+      operationId: listSoftwareReleases
+      summary: 软件版本目录
+      description: 仅 owner。download_url 只允许 https。UNSIGNED 条目 signed=false。禁止 electron-updater latest.yml 打正式域。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - owner
+      x-phase1-owner-only: true
+      responses:
+        "200":
+          description: 软件目录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoftwareReleaseList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+  /v1/metrics/retrieval:
+    get:
+      operationId: getRetrievalMetrics
+      summary: 检索账 KPI
+      description: coach/owner。window 仅 current_release 或 last_7d。分母为有产品会话的查询/复制事件；collection_disabled 无事件行，不进分母。不得返回个人排名或坐席姓名。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - coach
+        - owner
+      parameters:
+        - name: window
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/RetrievalWindow"
+      responses:
+        "200":
+          description: 检索账
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetrievalMetrics"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+  /v1/content/scripts/{script_id}:
+    patch:
+      operationId: patchContentScript
+      summary: 话术单条进入待审核草稿
+      description: 仅 owner。只改 title/answer_text/有效期白名单字段。改完进入待审核草稿，不得绕过 dual-review 直接 current。expected_version 冲突 409。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - owner
+      x-phase1-owner-only: true
+      parameters:
+        - $ref: "#/components/parameters/RequiredIdempotencyKey"
+        - name: script_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScriptPatchRequest"
+      responses:
+        "200":
+          description: 已进入待审核草稿
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+    delete:
+      operationId: deleteContentScript
+      summary: 话术单条软删除进草稿
+      description: 仅 owner。软删除进草稿，发布后才离开 current。expected_version 冲突 409。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - owner
+      x-phase1-owner-only: true
+      parameters:
+        - $ref: "#/components/parameters/RequiredIdempotencyKey"
+        - name: script_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScriptDeleteRequest"
+      responses:
+        "200":
+          description: 已进入待审核草稿
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+  /v1/sop/nodes/{node_id}:
+    patch:
+      operationId: patchSopNode
+      summary: 更新 SOP 节点
+      description: coach/owner。expected_version 冲突 409。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - coach
+        - owner
+      parameters:
+        - $ref: "#/components/parameters/RequiredIdempotencyKey"
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SopNodePatch"
+      responses:
+        "200":
+          description: 节点已更新
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SopNode"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+    delete:
+      operationId: deleteSopNode
+      summary: 删除 SOP 节点
+      description: 仅 owner。expected_version 冲突 409。软删除。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - owner
+      x-phase1-owner-only: true
+      parameters:
+        - $ref: "#/components/parameters/RequiredIdempotencyKey"
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SopNodeDelete"
+      responses:
+        "200":
+          description: 节点已软删除
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SopNode"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+  /v1/sop/import:
+    post:
+      operationId: importSopCatalog
+      summary: 导入 SOP 表
+      description: coach/owner。multipart CSV。必填 Idempotency-Key。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - coach
+        - owner
+      parameters:
+        - $ref: "#/components/parameters/RequiredIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/SopImportRequest"
+            encoding:
+              file:
+                contentType: text/csv
+      responses:
+        "202":
+          description: SOP 导入已接受
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SopImportAccepted"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+  /v1/sop/catalog:
+    get:
+      operationId: getSopCatalog
+      summary: 读取当前产品会话 SOP 树
+      description: coach/owner 可读。agent 403。坐席 overlay 只读预览不经本写库。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - coach
+        - owner
+      responses:
+        "200":
+          description: 当前会话 SOP 树
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SopCatalogResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
+  /v1/inaccuracy-reports:
+    post:
+      operationId: recordInaccuracyReport
+      summary: 记录话术不准
+      description: 同一 (query_id, script_id) 只计一次。重放同体 200 且计数不 +1。达到 24h≥3 或 7d≥10 时可打开已有域 iteration_task（open ≠ start）。不得自动改 Answer，不得返回已处理/已建单。禁止 /tickets。
+      tags:
+        - ops-loop
+      x-required-roles:
+        - agent
+        - coach
+        - owner
+      parameters:
+        - $ref: "#/components/parameters/RequiredIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InaccuracyReportRequest"
+      responses:
+        "200":
+          description: 首次写入或同体重放
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InaccuracyReportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Overloaded"
+      security:
+        - ProductSession: []
   /v1/admin/content/reviews/{batch_id}/cancel:
     post:
       operationId: cancelReviewedImport
@@ -3693,6 +4107,293 @@ components:
                   code: INTERNAL
                   message: 服务内部错误
   schemas:
+    SoftwareReleaseList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SoftwareRelease"
+    SoftwareRelease:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+        - platform
+        - sha256
+        - download_url
+        - created_at
+        - signed
+      properties:
+        version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        platform:
+          type: string
+          enum:
+            - mac-universal
+            - win-x64
+            - linux-x64
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        download_url:
+          type: string
+          pattern: ^https://
+        created_at:
+          type: string
+          format: date-time
+        signed:
+          type: boolean
+    RetrievalMetrics:
+      type: object
+      additionalProperties: false
+      required:
+        - no_hit_rate
+        - copy_complete_rate
+        - open_task_count
+        - current_release_script_count
+        - window
+        - release_id
+      properties:
+        no_hit_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        copy_complete_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        open_task_count:
+          type: integer
+          minimum: 0
+        current_release_script_count:
+          type: integer
+          minimum: 0
+        window:
+          $ref: "#/components/schemas/RetrievalWindow"
+        release_id:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 128
+    RetrievalWindow:
+      type: string
+      enum:
+        - current_release
+        - last_7d
+    ScriptMutationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - ok
+        - script_id
+        - mutation_id
+        - review_status
+      properties:
+        ok:
+          const: true
+        script_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        mutation_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        review_status:
+          const: pending_review
+    ScriptDeleteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+    ScriptPatchRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+        - title
+        - answer_text
+        - effective_from
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        answer_text:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        effective_from:
+          type: string
+          format: date-time
+        effective_to:
+          type:
+            - string
+            - "null"
+          format: date-time
+    SopNodeDelete:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+    SopNodePatch:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        body:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        sort_key:
+          type: integer
+    SopImportAccepted:
+      type: object
+      additionalProperties: false
+      required:
+        - ok
+        - product_session_id
+        - node_count
+      properties:
+        ok:
+          const: true
+        product_session_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        node_count:
+          type: integer
+          minimum: 0
+    SopImportRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+    SopCatalogResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - product_session_id
+        - items
+      properties:
+        product_session_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SopNode"
+    SopNode:
+      type: object
+      additionalProperties: false
+      required:
+        - node_id
+        - parent_node_id
+        - title
+        - body
+        - sort_key
+        - version
+        - lifecycle
+      properties:
+        node_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        parent_node_id:
+          type:
+            - string
+            - "null"
+          maxLength: 128
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        body:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        sort_key:
+          type: integer
+        version:
+          type: integer
+          minimum: 1
+        lifecycle:
+          type: string
+          enum:
+            - active
+            - deleted
+    InaccuracyReportResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - ok
+        - query_id
+        - script_id
+      properties:
+        ok:
+          const: true
+        query_id:
+          type: string
+          format: uuid
+        script_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+    InaccuracyReportRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - query_id
+        - script_id
+      properties:
+        query_id:
+          type: string
+          format: uuid
+        script_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        script_version:
+          type: integer
+          minimum: 1
+        rank:
+          type: integer
+          minimum: 1
+          maximum: 3
+        content_hash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
     ReviewResumed:
       type: object
       additionalProperties: false
@@ -7478,3 +8179,8 @@ x-backend-development:
   approval: DEC-BACKEND-SYNTHETIC-20260909
   runtime_activated: false
   sqlContract: schema.v1.16
+x-ops-loop-development:
+  status: SYNTHETIC_DEVELOPMENT_ONLY
+  runtime_activated: false
+  sqlContract: schema.v1.18
+  latestYml: false
