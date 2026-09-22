@@ -12,7 +12,7 @@ export const CUSTOMER_AGENT_PROFILES = Object.freeze([
 ] as const);
 
 export type CustomerAgentProfile = (typeof CUSTOMER_AGENT_PROFILES)[number];
-export type ApiProfile = Extract<CustomerAgentProfile, 'formal-dev' | 'test'>;
+export type ApiProfile = Extract<CustomerAgentProfile, 'formal-dev' | 'test' | 'production'>;
 export type AuthMode = 'mock' | 'feishu';
 export type ApiShutdownSignal = 'SIGINT' | 'SIGTERM';
 export type ApiRuntimeEnvironment = Readonly<Record<string, string | undefined>>;
@@ -487,9 +487,10 @@ export function parseApiRuntimeConfig(
   const port = parsePort(environment, profile, issues);
   const buildVersion = parseBuildVersion(environment, issues);
 
+  const runnable = profile === 'formal-dev' || profile === 'test' || profile === 'production';
   if (profile === 'demo') {
     issues.push(issue('CUSTOMER_AGENT_PROFILE', 'profile_not_service'));
-  } else if (profile && profile !== 'formal-dev' && profile !== 'test') {
+  } else if (profile && !runnable) {
     issues.push(issue('CUSTOMER_AGENT_PROFILE', 'profile_not_available'));
   }
 
@@ -505,7 +506,7 @@ export function parseApiRuntimeConfig(
     issues.push(issue('CUSTOMER_AGENT_API_HOST', 'external_bind_not_allowed'));
   }
 
-  if (issues.length > 0 || (profile !== 'formal-dev' && profile !== 'test')
+  if (issues.length > 0 || (profile !== 'formal-dev' && profile !== 'test' && profile !== 'production')
     || (authMode !== 'mock' && authMode !== 'feishu')) {
     throw new ApiConfigError(issues);
   }
@@ -727,7 +728,7 @@ export function formatApiStartupFailure(
       : 'Problem: 服务启动未完成，未形成可用监听。',
     `Cause: ${cause}`,
     isConfigFailure
-      ? 'Fix: 使用 formal-dev/test + AUTH_MODE=mock，保持 127.0.0.1，并提供有效 DATABASE_URL；部署型 profile 等后续门完成。'
+      ? 'Fix: 使用 production/formal-dev/test，AUTH_MODE 用 feishu 或 mock，保持 127.0.0.1，并提供有效 DATABASE_URL。single-host 与 multi-instance 仍未开放。'
       : 'Fix: 根据稳定 Cause 检查本机监听条件；Diagnostic 仅关联本次失败，不传播原始异常或环境值。',
     'Docs: docs/reference-api-runtime-config.md',
     `Diagnostic: ${safeDiagnosticId}`,

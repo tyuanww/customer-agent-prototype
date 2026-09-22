@@ -54,7 +54,7 @@ describe('API runtime configuration', () => {
       'CUSTOMER_AGENT_PROFILE',
       'profile_not_service',
     );
-    for (const profile of ['single-host', 'multi-instance', 'production']) {
+    for (const profile of ['single-host', 'multi-instance']) {
       expectConfigIssue(
         { CUSTOMER_AGENT_PROFILE: profile, AUTH_MODE: 'feishu' },
         'CUSTOMER_AGENT_PROFILE',
@@ -70,10 +70,23 @@ describe('API runtime configuration', () => {
       'auth_mode_not_available',
     );
     expectConfigIssue(
-      { CUSTOMER_AGENT_PROFILE: 'production', AUTH_MODE: 'mock' },
-      'CUSTOMER_AGENT_PROFILE',
-      'profile_not_available',
+      { CUSTOMER_AGENT_PROFILE: 'production', AUTH_MODE: 'feishu' },
+      'AUTH_MODE',
+      'auth_mode_not_available',
     );
+  });
+
+  it('accepts production on loopback with mock auth', () => {
+    expect(parseApiRuntimeConfig({
+      CUSTOMER_AGENT_PROFILE: 'production',
+      AUTH_MODE: 'mock',
+      CUSTOMER_AGENT_BUILD_VERSION: '0.3.18',
+    })).toMatchObject({
+      profile: 'production',
+      authMode: 'mock',
+      host: '127.0.0.1',
+      runtimeActivated: false,
+    });
   });
 
   it('returns a frozen, non-secret formal-dev configuration', () => {

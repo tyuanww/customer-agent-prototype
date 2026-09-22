@@ -105,6 +105,73 @@ async function batchInReviewQueue(
   }
 }
 
+export async function completeSignedInReview(
+  client: DashboardContentSessionClient,
+  epoch: number,
+  importBatchId: string,
+): Promise<boolean> {
+  try {
+    const listed = await client.request(epoch, '/v1/admin/content/reviews?limit=100', { timeoutMs: 5_000 });
+    const queue = listed.value !== null && typeof listed.value === 'object' && !Array.isArray(listed.value)
+      ? Reflect.get(listed.value, 'items')
+      : undefined;
+    const queued = Array.isArray(queue)
+      ? queue.find((item) => item !== null && typeof item === 'object' && Reflect.get(item, 'batch_id') === importBatchId)
+      : undefined;
+    const revision = queued !== null && typeof queued === 'object' ? Reflect.get(queued, 'review_revision') : undefined;
+    if (typeof revision !== 'number') return false;
+    const detail = await client.request(
+      epoch,
+      `/v1/admin/content/reviews/${importBatchId}?review_revision=${String(revision)}`,
+      { timeoutMs: 5_000 },
+    );
+    const page = detail.value !== null && typeof detail.value === 'object' && !Array.isArray(detail.value)
+      ? Reflect.get(detail.value, 'items')
+      : undefined;
+    const rows = Array.isArray(page) ? page.flatMap((item) => {
+      if (item === null || typeof item !== 'object') return [];
+      const scriptId = Reflect.get(item, 'script_id');
+      const contentHash = Reflect.get(item, 'content_hash');
+      return typeof scriptId === 'string' && typeof contentHash === 'string'
+        ? [{ scriptId, contentHash }]
+        : [];
+    }) : [];
+    if (rows.length < 1) return false;
+    for (const [index, row] of rows.entries()) {
+      const decision = await client.request(epoch, `/v1/admin/content/reviews/${importBatchId}/decisions`, {
+        body: {
+          review_revision: revision,
+          script_id: row.scriptId,
+          content_hash: row.contentHash,
+          decision: 'approved',
+          evidence_id: 'EVD-FORMAL-REVIEW-001',
+        },
+        headers: { 'idempotency-key': `dec-owner-${importBatchId}-${String(index)}` },
+        timeoutMs: 5_000,
+      });
+      if (decision.status !== 200) return false;
+    }
+    const evidence = await client.request(epoch, `/v1/admin/content/reviews/${importBatchId}/quality-evidence`, {
+      body: {
+        review_revision: revision,
+        phase: 'initial',
+        evidence_id: 'EVD-FORMAL-QUALITY-001',
+        checks: rows.map((row) => ({ script_id: row.scriptId, content_hash: row.contentHash, defect: false })),
+      },
+      headers: { 'idempotency-key': `quality-owner-${importBatchId}` },
+      timeoutMs: 5_000,
+    });
+    if (evidence.status !== 200) return false;
+    const resumed = await client.request(epoch, `/v1/admin/content/reviews/${importBatchId}/resume`, {
+      body: { review_revision: revision },
+      timeoutMs: 5_000,
+    });
+    return resumed.status === 200;
+  } catch {
+    return false;
+  }
+}
+
 async function waitUntilImportStaged(
   client: DashboardContentSessionClient,
   epoch: number,

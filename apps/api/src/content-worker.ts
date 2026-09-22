@@ -84,7 +84,7 @@ export function createContentWorker(
     statement_timeout: 8_000,
     query_timeout: 10_000,
     idle_in_transaction_session_timeout: 10_000,
-    application_name: 'cs-ai-synthetic-content-worker',
+    application_name: 'cs-ai-content-worker',
     maxLifetimeSeconds: 300,
   });
   const leaseOwner = options.leaseOwner ?? `worker_${randomBytes(8).toString('hex')}`;
