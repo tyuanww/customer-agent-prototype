@@ -24,9 +24,14 @@ function loadEnv() {
   env.PATH = process.env.PATH ?? '';
   env.CONTENT_INTENT_TAXONOMY_VERSION = env.CONTENT_INTENT_TAXONOMY_VERSION ?? 'itax_synthetic_stack_v1';
   env.CONTENT_INTENT_ID = env.CONTENT_INTENT_ID ?? 'intent_synthetic_stack_shipping';
-  env.CONTENT_REVIEW_LEAD_SUBJECT = env.CONTENT_REVIEW_LEAD_SUBJECT ?? 'synthetic_coach';
-  env.CONTENT_REVIEW_MANAGER_SUBJECT = env.CONTENT_REVIEW_MANAGER_SUBJECT ?? 'synthetic_owner';
-  env.CONTENT_REVIEW_EVIDENCE_ID = env.CONTENT_REVIEW_EVIDENCE_ID ?? 'EVD-STACK-REVIEW-001';
+  const owner = (env.FEISHU_BINDINGS ?? '').split(',').map((part) => part.split(':')).find((pair) => pair[1] === 'owner');
+  const subject = owner?.[0];
+  if (subject) {
+    env.CONTENT_REVIEW_LEAD_SUBJECT = subject;
+    env.CONTENT_REVIEW_MANAGER_SUBJECT = subject;
+  }
+  env.CONTENT_REVIEW_EVIDENCE_ID = env.CONTENT_REVIEW_EVIDENCE_ID ?? 'EVD-FORMAL-REVIEW-001';
+  delete env.CUSTOMER_AGENT_REVIEW_LOGIN_PORT;
   return env;
 }
 
