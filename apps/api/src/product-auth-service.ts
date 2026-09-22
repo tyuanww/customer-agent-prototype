@@ -151,6 +151,29 @@ export async function createProductAuthService(
         access_token: token, token_type: 'Bearer', expires_at: rows[0].expires_at.toISOString(),
       });
     },
+    async issueBoundSession(bindingId: string) {
+      if (!/^synthetic_(coach|owner|quality)$/.test(bindingId)) throw new IdentityFailure('REQUEST_INVALID');
+      const verifier = randomToken();
+      const challenge = createHash('sha256').update(verifier).digest('base64url');
+      const loginId = `login_${randomToken()}`;
+      const state = randomToken();
+      await query('SELECT backend_identity.create_login($1,$2,$3)', [loginId, digest(state), challenge]);
+      const started = await query<{ login_id: string }>('SELECT backend_identity.begin_callback($1) AS login_id', [state]);
+      const startedId = started[0]?.login_id;
+      if (!startedId) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
+      await query('SELECT backend_identity.complete_callback($1,$2)', [startedId, bindingId]);
+      const token = randomToken();
+      const rows = await query<ExpiryRow>('SELECT backend_identity.exchange($1,$2,$3) AS expires_at', [startedId, verifier, token]);
+      if (!rows[0]?.expires_at) throw new IdentityFailure('LOGIN_INVALID');
+      const actor = await query<IdentityRow>('SELECT * FROM backend_identity.actor($1)', [token]);
+      if (actor[0]?.role !== 'coach') {
+        await query('SELECT backend_identity.logout($1)', [token]);
+        throw new IdentityFailure('CAPABILITY_DENIED');
+      }
+      return parseContractSchema('LoginSession', {
+        access_token: token, token_type: 'Bearer', expires_at: rows[0].expires_at.toISOString(),
+      });
+    },
     async authenticate(credentials: MockCredentials) {
       if (credentials.mockUser !== undefined || credentials.mockRole !== undefined
         || typeof credentials.authorization !== 'string') return null;

@@ -107,3 +107,80 @@ it('approves lead and manager then records quality and resume', async () => {
   expect(seen.some((row) => row.includes('/quality-evidence'))).toBe(true);
   expect(seen.some((row) => row.includes('/resume'))).toBe(true);
 });
+
+it('uses the loopback review login when authorize leaves the API origin', async () => {
+  const seen: string[] = [];
+  const transport = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    seen.push(`${method} ${url}`);
+    if (url.endsWith('/v1/auth/login-requests') && method === 'POST' && !url.includes('exchange')) {
+      return jsonResponse(201, {
+        login_id: `login_${'c'.repeat(43)}`,
+        authorize_url: 'https://accounts.feishu.cn/open-apis/authen/v1/authorize?state=s',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+    }
+    if (url.includes('accounts.feishu.cn')) {
+      return new Response(null, { status: 302, headers: { location: 'https://accounts.feishu.cn/next' } });
+    }
+    if (url === 'http://127.0.0.1:43112/v1/auth/review-login') {
+      return jsonResponse(200, {
+        access_token: token,
+        token_type: 'Bearer',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+    }
+    if (url.includes('/v1/admin/content/reviews?limit=100')) {
+      return jsonResponse(200, {
+        items: [{ batch_id: batchId, review_revision: revision, state: 'waiting', candidate_count: 1 }],
+        next_cursor: null,
+      });
+    }
+    if (url.includes(`/v1/admin/content/reviews/${batchId}?review_revision=`)) {
+      return jsonResponse(200, {
+        batch_id: batchId,
+        review_revision: revision,
+        items: [{ script_id: 'upl00001', content_hash: 'cd'.repeat(32) }],
+        next_after: null,
+        total: 1,
+      });
+    }
+    if (url.endsWith(`/v1/admin/content/reviews/${batchId}/decisions`)
+      || url.endsWith(`/v1/admin/content/reviews/${batchId}/quality-evidence`)) {
+      return jsonResponse(200, { ok: true });
+    }
+    if (url.endsWith(`/v1/admin/content/reviews/${batchId}/resume`)) {
+      return jsonResponse(200, { job_id: 'job_1' });
+    }
+    return jsonResponse(404, {});
+  }) as unknown as typeof fetch;
+
+  expect(await completeSyntheticParkedReview(origin, batchId, transport)).toBe(true);
+  expect(seen.filter((row) => row.includes('/v1/auth/review-login'))).toHaveLength(3);
+  expect(seen.some((row) => row.includes('/v1/auth/callback'))).toBe(false);
+  expect(seen.some((row) => row.startsWith('POST http://127.0.0.1:43110/v1/admin/content/reviews/'))).toBe(true);
+  expect(seen.some((row) => row.includes(`${origin}/v1/admin/`))).toBe(false);
+});
+
+it('does not mint a review token when authorize leaves for a non-Feishu host', async () => {
+  const seen: string[] = [];
+  const transport = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    seen.push(`${init?.method ?? 'GET'} ${url}`);
+    if (url.endsWith('/v1/auth/login-requests') && (init?.method ?? 'GET') === 'POST') {
+      return jsonResponse(201, {
+        login_id: `login_${'d'.repeat(43)}`,
+        authorize_url: 'https://evil.example/authorize?state=s',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+    }
+    if (url.includes('evil.example')) {
+      return new Response(null, { status: 302, headers: { location: 'https://evil.example/next' } });
+    }
+    return jsonResponse(200, { access_token: token });
+  }) as unknown as typeof fetch;
+  expect(await completeSyntheticParkedReview('https://evil.example', batchId, transport)).toBe(false);
+  expect(seen.some((row) => row.includes('/v1/auth/review-login'))).toBe(false);
+  expect(seen.some((row) => row.includes('/v1/admin/'))).toBe(false);
+});

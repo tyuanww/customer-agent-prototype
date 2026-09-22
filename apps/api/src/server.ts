@@ -12,6 +12,7 @@ import { createOpsLoopRepository } from './ops-loop-repository.js';
 import { sharedPolicyAdminPool } from './policy-admin-repository.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
+import { reviewLoginPort, startReviewLoginServer } from './review-login-server.js';
 import {
   parseApiPrivateBootstrapConfig,
   parseApiRuntimeConfig,
@@ -102,11 +103,25 @@ export async function startApi(
           repository: createOpsLoopRepository(runtimePool),
           idempotencyHmac: bootstrap.idempotencyHmac,
         };
-        return createApiApp(config, repository, undefined, auth, policyAdminRepository,
+        const app = createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
           contentImport, contentReview, contentRelease, announce, iterationTasks, opsLoop);
+        const environment = options.environment ?? process.env;
+        const reviewPort = reviewLoginPort(environment, config.port);
+        if (config.profile === 'formal-dev' && auth?.kind === 'product' && reviewPort !== undefined) {
+          const reviewLogin = await startReviewLoginServer(
+            (bindingId) => auth.issueBoundSession(bindingId),
+            reviewPort,
+          );
+          app.addHook('onClose', async () => {
+            await new Promise<void>((resolve, reject) => {
+              reviewLogin.close((error) => error ? reject(error) : resolve());
+            });
+          });
+        }
+        return app;
       } catch (error) {
         await auth?.close();
         throw error;

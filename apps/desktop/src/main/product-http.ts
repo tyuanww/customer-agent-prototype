@@ -2,7 +2,7 @@ import { PRODUCT_ERRORS, type ProductErrorCode } from '../shared/product-session
 import { desktopFetch } from './desktop-fetch.ts';
 
 export class ProductHttpError extends Error {
-  constructor(readonly code: ProductErrorCode) { super(PRODUCT_ERRORS[code]); }
+  constructor(readonly code: ProductErrorCode, readonly reason?: string) { super(PRODUCT_ERRORS[code]); }
 }
 /** Only configured loopback origins; no userinfo, path, fragment, query or implicit ports. */
 export function loopbackOrigin(value: string): string {
@@ -80,9 +80,9 @@ export class ProductHttp {
       };
       if (response.status === 304) { await response.body?.cancel(); return { status: 304, value: null, ...meta }; }
       if (!response.ok) {
-        const code = await mapFailure(response);
-        console.info(`[desktop] product-http ${options.method ?? (options.body === undefined ? 'GET' : 'POST')} ${path} ${response.status} ${code} ${String(Date.now() - started)}ms`);
-        throw new ProductHttpError(code);
+        const failure = await mapFailure(response);
+        console.info(`[desktop] product-http ${options.method ?? (options.body === undefined ? 'GET' : 'POST')} ${path} ${response.status} ${failure.code} ${String(Date.now() - started)}ms`);
+        throw new ProductHttpError(failure.code, failure.reason);
       }
       if (response.status === 204) return { status: 204, value: null, ...meta };
       return { status: response.status, value: JSON.parse(await readBounded(response)), ...meta };
@@ -114,12 +114,14 @@ async function readBounded(response: Response): Promise<string> {
   } finally { reader.releaseLock(); }
   return Buffer.concat(chunks).toString('utf8');
 }
-async function mapFailure(response: Response): Promise<ProductErrorCode> {
+async function mapFailure(response: Response): Promise<{ code: ProductErrorCode; reason?: string }> {
   const codes: Record<number, ProductErrorCode> = { 400: 'VALIDATION', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'GONE', 409: 'CONFLICT', 410: 'GONE', 429: 'RATE_LIMITED', 503: 'OVERLOADED' };
   let mapped = codes[response.status] ?? 'UNAVAILABLE';
+  let reason: string | undefined;
   try {
     const parsed = JSON.parse(await readBounded(response)) as { error?: { details?: { reason?: unknown } } };
-    if (parsed?.error?.details?.reason === 'SOURCE_GATE_NOT_READY') mapped = 'SOURCE_GATE_NOT_READY';
+    if (typeof parsed?.error?.details?.reason === 'string') reason = parsed.error.details.reason;
+    if (reason === 'SOURCE_GATE_NOT_READY') mapped = 'SOURCE_GATE_NOT_READY';
   } catch { await response.body?.cancel().catch(() => undefined); }
-  return mapped;
+  return reason === undefined ? { code: mapped } : { code: mapped, reason };
 }

@@ -82,17 +82,12 @@ describe('ContentModule publish gate', () => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
     expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.sensitive);
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
     expect(api.publishDraft).not.toHaveBeenCalled();
   });
 
-  it('lets coach submit labeled product drafts and shows owner-only publish copy on 403', async () => {
+  it('keeps Publish off for coach product drafts while the API is owner-only', async () => {
     const api = mockSession('coach');
-    api.publishDraft = vi.fn(async () => ({
-      ok: false as const,
-      code: 'FORBIDDEN' as const,
-      message: CONTENT_PUBLISH_COPY.ownerPublish,
-    }));
     window.dashboardContent = api;
     const user = userEvent.setup();
     render(<ContentModule />);
@@ -106,13 +101,9 @@ describe('ContentModule publish gate', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
-    expect(screen.getByTestId('publish-action')).toBeEnabled();
-    await user.click(screen.getByTestId('publish-action'));
-    await waitFor(() => expect(api.publishDraft).toHaveBeenCalledTimes(1));
-    expect(api.publishDraft).toHaveBeenCalledWith(expect.objectContaining({
-      sourceBindings: [{ domain: 'product', source_version_id: 'srcv_stack_product_v1' }],
-    }));
-    expect(screen.getByTestId('publish-feedback')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
+    expect(api.publishDraft).not.toHaveBeenCalled();
   });
 
   it('stages a zip xlsx through parseUpload without treating the preview as published', async () => {
@@ -142,7 +133,7 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('面膜紫适用人群');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('产品');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
-    expect(screen.getByTestId('publish-action')).toBeEnabled();
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(api.publishDraft).not.toHaveBeenCalled();
   });
 });

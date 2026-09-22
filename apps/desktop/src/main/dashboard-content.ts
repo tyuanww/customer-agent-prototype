@@ -29,6 +29,9 @@ function asFailure(error: unknown): DashboardContentFailure {
     return dashboardContentFailure('UNAVAILABLE');
   }
   if (error.code === 'FORBIDDEN') {
+    if (error.reason === 'SOURCE_NOT_ELIGIBLE' || error.reason === 'SOURCE_SUSPENDED') {
+      return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.sourceIneligible);
+    }
     return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.ownerPublish);
   }
   return dashboardContentFailure(error.code);

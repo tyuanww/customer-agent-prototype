@@ -5,6 +5,29 @@ const PKCE_VERIFIER = 'v'.repeat(43);
 const REVIEW_EVIDENCE = 'EVD-STACK-REVIEW-001';
 const QUALITY_EVIDENCE = 'EVD-STACK-QUALITY-001';
 const BINDINGS = ['synthetic_coach', 'synthetic_owner', 'synthetic_quality'] as const;
+const FEISHU_AUTHORIZE_HOSTS = new Set(['accounts.feishu.cn', 'open.feishu.cn']);
+
+function loopbackPort(name: string, fallback: string): string {
+  const raw = process.env[name] ?? fallback;
+  return /^[0-9]+$/.test(raw) ? raw : fallback;
+}
+
+function reviewLoginUrl(): string {
+  return `http://127.0.0.1:${loopbackPort('CUSTOMER_AGENT_REVIEW_LOGIN_PORT', '43112')}/v1/auth/review-login`;
+}
+
+function loopbackApiOrigin(): string {
+  return `http://127.0.0.1:${loopbackPort('CUSTOMER_AGENT_API_PORT', '43110')}`;
+}
+
+function feishuAuthorizeLocation(location: string): boolean {
+  try {
+    const url = new URL(location);
+    return url.protocol === 'https:' && FEISHU_AUTHORIZE_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 export type ReviewFetch = typeof fetch;
 
@@ -42,7 +65,7 @@ async function loginAs(
   apiOrigin: string,
   bindingId: string,
   transport: ReviewFetch,
-): Promise<string> {
+): Promise<{ token: string; reviewOrigin: string }> {
   const challenge = createHash('sha256').update(PKCE_VERIFIER).digest('base64url');
   const created = await transport(`${apiOrigin}/v1/auth/login-requests`, {
     method: 'POST',
@@ -63,7 +86,10 @@ async function loginAs(
   const location = authorize.headers.get('location');
   if (!location) throw new Error('authorize did not redirect');
   const callback = callbackFromAuthorize(location, apiOrigin, bindingId);
-  if (!callback) throw new Error('authorize is not the synthetic callback');
+  if (!callback) {
+    if (!feishuAuthorizeLocation(location)) throw new Error('authorize is not the synthetic callback');
+    return { token: await loginReviewActor(bindingId, transport), reviewOrigin: loopbackApiOrigin() };
+  }
   const callbackResponse = await transport(callback, {
     redirect: 'error',
     signal: AbortSignal.timeout(5_000),
@@ -79,7 +105,7 @@ async function loginAs(
   if (exchanged.status !== 200) throw new Error(`exchange HTTP ${String(exchanged.status)}`);
   const session = await readJson(exchanged);
   if (typeof session.access_token !== 'string') throw new Error('exchange returned no access_token');
-  return session.access_token;
+  return { token: session.access_token, reviewOrigin: apiOrigin };
 }
 
 async function waitForRevision(
@@ -147,10 +173,26 @@ async function loadReviewItems(
   return items;
 }
 
+async function loginReviewActor(bindingId: string, transport: ReviewFetch): Promise<string> {
+  const response = await transport(reviewLoginUrl(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ binding_id: bindingId }),
+    redirect: 'error',
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`review login HTTP ${String(response.status)}`);
+  const session = await readJson(response);
+  if (typeof session.access_token !== 'string') throw new Error('review login returned no access_token');
+  return session.access_token;
+}
+
 /**
  * Drive the frozen dual-review chain the same way stack seed does.
  * Uses synthetic_coach / synthetic_owner / synthetic_quality.
- * Feishu authorize URLs fail closed (no synthetic callback).
+ * A Feishu authorize URL does not receive those binding ids. The desktop
+ * asks the loopback review login for the same three actors, then sends
+ * those tokens only to the loopback API.
  */
 export async function completeSyntheticParkedReview(
   apiOrigin: string,
@@ -159,13 +201,14 @@ export async function completeSyntheticParkedReview(
 ): Promise<boolean> {
   if (!/^imp_[A-Za-z0-9_-]{1,128}$/.test(batchId)) return false;
   try {
-    const lead = await loginAs(apiOrigin, BINDINGS[0], transport);
-    const revision = await waitForRevision(apiOrigin, lead, batchId, transport, 15_000);
-    const items = await loadReviewItems(apiOrigin, lead, batchId, revision, transport);
-    const manager = await loginAs(apiOrigin, BINDINGS[1], transport);
+    const leadLogin = await loginAs(apiOrigin, BINDINGS[0], transport);
+    const reviewOrigin = leadLogin.reviewOrigin;
+    const revision = await waitForRevision(reviewOrigin, leadLogin.token, batchId, transport, 15_000);
+    const items = await loadReviewItems(reviewOrigin, leadLogin.token, batchId, revision, transport);
+    const managerLogin = await loginAs(apiOrigin, BINDINGS[1], transport);
     for (const [index, item] of items.entries()) {
-      for (const [token, key] of [[lead, 'lead'], [manager, 'manager']] as const) {
-        const decision = await transport(`${apiOrigin}/v1/admin/content/reviews/${batchId}/decisions`, {
+      for (const [token, key] of [[leadLogin.token, 'lead'], [managerLogin.token, 'manager']] as const) {
+        const decision = await transport(`${reviewOrigin}/v1/admin/content/reviews/${batchId}/decisions`, {
           method: 'POST',
           headers: {
             authorization: `Bearer ${token}`,
@@ -185,11 +228,11 @@ export async function completeSyntheticParkedReview(
         if (!decision.ok) throw new Error(`decision ${key} HTTP ${String(decision.status)}`);
       }
     }
-    const quality = await loginAs(apiOrigin, BINDINGS[2], transport);
-    const evidence = await transport(`${apiOrigin}/v1/admin/content/reviews/${batchId}/quality-evidence`, {
+    const qualityLogin = await loginAs(apiOrigin, BINDINGS[2], transport);
+    const evidence = await transport(`${reviewOrigin}/v1/admin/content/reviews/${batchId}/quality-evidence`, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${quality}`,
+        authorization: `Bearer ${qualityLogin.token}`,
         'content-type': 'application/json',
         'idempotency-key': `quality-${batchId}`,
       },
@@ -207,10 +250,10 @@ export async function completeSyntheticParkedReview(
       signal: AbortSignal.timeout(5_000),
     });
     if (!evidence.ok) throw new Error(`quality evidence HTTP ${String(evidence.status)}`);
-    const resume = await transport(`${apiOrigin}/v1/admin/content/reviews/${batchId}/resume`, {
+    const resume = await transport(`${reviewOrigin}/v1/admin/content/reviews/${batchId}/resume`, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${quality}`,
+        authorization: `Bearer ${qualityLogin.token}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify({ review_revision: revision }),
