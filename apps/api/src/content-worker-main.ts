@@ -8,8 +8,12 @@ function reviewCommitment(environment: NodeJS.ProcessEnv) {
   const leadSubject = environment.CONTENT_REVIEW_LEAD_SUBJECT;
   const managerSubject = environment.CONTENT_REVIEW_MANAGER_SUBJECT;
   const evidenceId = environment.CONTENT_REVIEW_EVIDENCE_ID;
-  if (!leadSubject || !managerSubject || !evidenceId) return undefined;
-  return { leadSubject, managerSubject, evidenceId };
+  if (!leadSubject || !evidenceId) return undefined;
+  return {
+    leadSubject,
+    ...(managerSubject && managerSubject !== leadSubject ? { managerSubject } : {}),
+    evidenceId,
+  };
 }
 
 async function run(): Promise<void> {
