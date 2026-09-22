@@ -14,9 +14,9 @@
 
 1. 从已跑过 `pnpm package:win` 的机器拷贝：
 
-   `release/local-unsigned/windows/客服话术浮窗 Demo-0.3.18-win-x64-UNSIGNED.exe`
+   `release/local-unsigned/windows/客服话术浮窗 Demo-0.3.19-win-x64-UNSIGNED.exe`
 
-   不要从 Git 拉安装包（产物不入库）。2026-09-22 已在本机打出上述 0.3.18 文件。`release/` 是本地构建缓存，可删后重打。
+   不要从 Git 拉安装包（产物不入库）。2026-09-22 起用 0.3.19。`release/` 是本地构建缓存，可删后重打。
 2. 办公机**断开网络**。
 3. 不安装 Node / pnpm / Git。Electron 自带运行时即可。
 4. 记下日期、机器名、操作人。

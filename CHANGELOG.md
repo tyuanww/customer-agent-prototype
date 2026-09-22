@@ -2,6 +2,17 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.19] - 2026-09-22
+
+### Fixed
+
+- Feishu login stays signed in when the office clock is up to two minutes behind the server. A network timeout says 服务暂不可用 and no longer clears the session or shows 操作已取消. The session button shows 管理员 when the only id is a Feishu open id.
+- Signed-in publish review reads the revision as text and walks every page. Quality checks cover the initial sample only. One person is not hashed as both lead and manager.
+
+### Changed
+
+- The local formal API profile can be production on 127.0.0.1. Coach publish stays closed while the frozen API is owner-only. The wording library names the local release id.
+
 ## [0.3.18] - 2026-09-21
 
 ### Added
