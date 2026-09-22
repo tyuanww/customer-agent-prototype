@@ -128,6 +128,12 @@ describe('session notice projection', () => {
   it('labels the session chip with the operator name, not the role', () => {
     expect(sessionEntryLabel(signedIn)).toBe('合成客服');
     expect(sessionEntryLabel({ ...signedIn, displayName: null })).toBe('synthetic_agent');
+    expect(sessionEntryLabel({
+      ...signedIn,
+      role: 'owner',
+      userId: 'usr_ou_example',
+      displayName: 'ou_example',
+    })).toBe('管理员');
   });
 
   it('keeps restored signed-in sessions free of residual banners', () => {
