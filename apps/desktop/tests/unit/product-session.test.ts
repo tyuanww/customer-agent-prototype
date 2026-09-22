@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductSession, type SessionStore } from '../../src/main/product-session';
-import { ProductHttp } from '../../src/main/product-http';
+import { ProductHttp, ProductHttpError } from '../../src/main/product-http';
 import { isProductSessionResult } from '../../src/shared/product-session';
 
 const token = 't'.repeat(43);
@@ -72,12 +72,19 @@ describe('product session lifetime', () => {
     expect(await f.session.restore()).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
     expect(f.session.view().signedIn).toBe(false);
   });
-  it('clears local state on revoked session, even when the service is unavailable', async () => {
+  it('clears local state when the server rejects the session', async () => {
+    const f = fixture(); await f.session.login();
+    vi.spyOn(f.session.http, 'request').mockRejectedValue(new ProductHttpError('UNAUTHORIZED'));
+    const result = await f.session.status();
+    expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    expect(f.session.view().signedIn).toBe(false);
+  });
+  it('keeps the signed-in session when a status check cannot reach the service', async () => {
     const f = fixture(); await f.session.login();
     vi.spyOn(f.session.http, 'request').mockRejectedValue(new Error('sensitive-provider-token'));
     const result = await f.session.status();
-    expect(result).toMatchObject({ ok: false, code: 'UNAVAILABLE' });
-    expect(JSON.stringify(result)).not.toContain('sensitive'); expect(f.session.view().signedIn).toBe(false);
+    expect(result.ok && result.signedIn).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('sensitive');
   });
   it('fails closed when encrypted persistence is unavailable', async () => {
     const f = fixture({ store: { write: () => { throw new Error('secure storage unavailable'); } } });

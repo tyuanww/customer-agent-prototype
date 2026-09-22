@@ -96,7 +96,9 @@ export class ProductHttp {
         ? ` ${String(cause.code ?? '')} ${String(cause.message ?? '').replace(/https?:\/\/\S+/gi, '[url]').slice(0, 80)}`
         : '';
       console.info(`[desktop] product-http ${path} transport ${name}${causeBit} ${String(Date.now() - started)}ms`);
-      throw new ProductHttpError(options.signal?.aborted ? 'CANCELLED' : 'UNAVAILABLE');
+      const reason = options.signal?.reason;
+      const timedOut = name === 'TimeoutError' || (reason instanceof Error && reason.name === 'TimeoutError');
+      throw new ProductHttpError(!timedOut && options.signal?.aborted ? 'CANCELLED' : 'UNAVAILABLE');
     }
   }
 }

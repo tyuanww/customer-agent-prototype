@@ -11,6 +11,13 @@ function validSession(v: unknown): v is StoredSession {
   return exactKeys(v, ['access_token', 'expires_at']) && typeof v.access_token === 'string'
     && /^[A-Za-z0-9_-]{43}$/.test(v.access_token) && typeof v.expires_at === 'string' && Number.isFinite(Date.parse(v.expires_at));
 }
+const SESSION_LIFETIME_MS = 15 * 60_000;
+/** Server expiry is exactly 15 minutes from server time. A slightly slow office clock must still be accepted. */
+const SESSION_CLOCK_SKEW_MS = 2 * 60_000;
+export function sessionExpiryAccepted(expiresAt: string, now = Date.now()): boolean {
+  const remaining = Date.parse(expiresAt) - now;
+  return remaining > 0 && remaining <= SESSION_LIFETIME_MS + SESSION_CLOCK_SKEW_MS;
+}
 /** Owns credential lifetime and epoch. Sync store operations cannot race with logout. */
 export class ProductSession {
   private epoch = 0;
@@ -40,7 +47,7 @@ export class ProductSession {
     this.emit(state); return state;
   }
   private async identify(token: StoredSession, signal: AbortSignal) {
-    const { value } = await this.http.request('/v1/auth/me', { token: token.access_token, signal });
+    const { value } = await this.http.request('/v1/auth/me', { token: token.access_token, signal, timeoutMs: 20_000 });
     if (!exactKeys(value, ['user_id', 'role', 'auth_mode']) || typeof value.user_id !== 'string'
       || value.user_id.length < 1 || value.user_id.length > 128
       || !['agent', 'coach', 'owner'].includes(value.role as string)
@@ -50,7 +57,7 @@ export class ProductSession {
   private install(token: StoredSession, user: NonNullable<ProductSession['user']>, epoch: number, signal: AbortSignal) {
     if (signal.aborted || epoch !== this.epoch) throw new ProductHttpError('STALE');
     const remaining = Date.parse(token.expires_at) - Date.now();
-    if (remaining <= 0 || remaining > 15 * 60_000) throw new ProductHttpError('UNAUTHORIZED');
+    if (!sessionExpiryAccepted(token.expires_at)) throw new ProductHttpError('UNAUTHORIZED');
     this.store.write(token); this.epoch++; this.token = token; this.user = user;
     this.expiry = setTimeout(() => this.invalidate(), remaining); this.expiry.unref?.();
     const state = this.view(); this.emit(state); return state;
@@ -79,7 +86,13 @@ export class ProductSession {
         this.epoch++; this.user = user; this.emit(this.view());
       }
       return this.view();
-    } catch (error) { return this.fail(error, epoch); }
+    } catch (error) {
+      if (epoch !== this.epoch) return productFailure('STALE', epoch);
+      if (error instanceof ProductHttpError && (error.code === 'UNAUTHORIZED' || error.code === 'GONE')) {
+        return this.fail(error, epoch);
+      }
+      return this.view();
+    }
   }
   /** Main-only capability. Credentials remain private; late responses cannot cross identities. */
   async request(epoch: number, path: string, options: {
@@ -108,12 +121,12 @@ export class ProductSession {
     try {
       const verifier = randomBytes(32).toString('base64url');
       const challenge = createHash('sha256').update(verifier).digest('base64url');
-      const { value: created } = await this.http.request('/v1/auth/login-requests', { body: { client_challenge: challenge, challenge_method: 'S256' }, signal: operation.signal });
+      const { value: created } = await this.http.request('/v1/auth/login-requests', { body: { client_challenge: challenge, challenge_method: 'S256' }, signal: operation.signal, timeoutMs: 20_000 });
       if (!exactKeys(created, ['login_id', 'authorize_url', 'expires_at']) || typeof created.login_id !== 'string'
         || !/^login_[A-Za-z0-9_-]{43}$/.test(created.login_id) || typeof created.authorize_url !== 'string') throw new ProductHttpError('VALIDATION');
       await this.window.open(created.authorize_url, operation);
       for (;;) {
-        const result = await this.http.request(`/v1/auth/login-requests/${created.login_id}/exchange`, { body: { client_verifier: verifier }, signal: operation.signal });
+        const result = await this.http.request(`/v1/auth/login-requests/${created.login_id}/exchange`, { body: { client_verifier: verifier }, signal: operation.signal, timeoutMs: 20_000 });
         if (result.status === 202) { await delay(2_000, undefined, { signal: operation.signal }); continue; }
         const v = result.value;
         if (!exactKeys(v, ['access_token', 'token_type', 'expires_at']) || v.token_type !== 'Bearer') throw new ProductHttpError('VALIDATION');
