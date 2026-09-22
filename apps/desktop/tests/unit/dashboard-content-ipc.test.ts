@@ -89,7 +89,7 @@ it('blocks agent publish and coach aftersale before any product HTTP', async () 
   expect(await dashboardContentPublish(coach, publishPayload(aftersaleCsv))).toMatchObject({
     ok: false,
     code: 'FORBIDDEN',
-    message: CONTENT_PUBLISH_COPY.sensitive,
+    message: CONTENT_PUBLISH_COPY.ownerPublish,
   });
   expect(coach.request).not.toHaveBeenCalled();
   expect(await dashboardContentPublish(null, publishPayload())).toMatchObject({
@@ -176,25 +176,26 @@ it('still returns the release when post-publish hydrate refresh throws', async (
   expect(afterPublish).toHaveBeenCalledWith(1);
 });
 
-it('lets coach import then surfaces owner-only FORBIDDEN without faking a release', async () => {
+it('stops coach publish before the request because the frozen API is owner-only', async () => {
   const coach = fakeSession('coach');
-  vi.mocked(coach.request)
-    .mockResolvedValueOnce({
-      status: 202,
-      value: { import_batch_id: 'imp_coach_1', status: 'validating', source_binding_hash: 'a'.repeat(64) },
-    })
-    .mockResolvedValueOnce({
-      status: 200,
-      value: { import_batch_id: 'imp_coach_1', status: 'staged' },
-    })
-    .mockRejectedValueOnce(new ProductHttpError('FORBIDDEN'));
   const result = await dashboardContentPublish(coach, publishPayload(csv, [productBinding]));
   expect(result).toMatchObject({
     ok: false,
     code: 'FORBIDDEN',
     message: CONTENT_PUBLISH_COPY.ownerPublish,
   });
-  expect(coach.request).toHaveBeenCalledTimes(3);
+  expect(coach.request).not.toHaveBeenCalled();
+});
+
+it('shows the source denial instead of the owner-only sentence', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN', 'SOURCE_NOT_ELIGIBLE'));
+  const result = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
+  expect(result).toMatchObject({
+    ok: false,
+    code: 'FORBIDDEN',
+    message: CONTENT_PUBLISH_COPY.sourceIneligible,
+  });
 });
 
 function zipLocal(name: string, payload: Buffer): Buffer {

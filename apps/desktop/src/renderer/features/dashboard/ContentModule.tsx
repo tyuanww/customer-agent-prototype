@@ -132,8 +132,7 @@ export function ContentModule() {
     rows,
     sourceBindings,
   });
-  // Owner must go through the review gate before publishing; coach can publish directly
-  // if contentPublishGate allows it (product/campaign content only).
+  // Frozen publish is owner-only. Coach can still import a draft on the import path.
   const ownerNeedsReview = sessionView?.role === 'owner' && upload.status !== 'reviewed';
   const publishDisabled = ownerNeedsReview || !gate.allowed || submitting;
   const gateBlocksHard = !gate.allowed && gate.code !== 'VALIDATION';

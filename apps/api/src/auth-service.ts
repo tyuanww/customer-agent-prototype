@@ -25,6 +25,8 @@ export type ProductAuthService = SharedAuthService & Readonly<{
   createLogin: (challenge: string) => Promise<components['schemas']['LoginCreated']>;
   callback: (state: string, code: string | undefined) => Promise<void>;
   exchange: (loginId: string, verifier: string) => Promise<components['schemas']['LoginSession'] | null>;
+  /** Local review actors only. Callers must already have rejected every other binding id. */
+  issueBoundSession: (bindingId: string) => Promise<components['schemas']['LoginSession']>;
   logout: (token: string) => Promise<void>;
 }>;
 

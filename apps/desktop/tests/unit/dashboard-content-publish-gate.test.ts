@@ -71,30 +71,30 @@ describe('content publish role gate', () => {
     })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
   });
 
-  it('allows coach only for labeled product/campaign without 过敏/赔付', () => {
+  it('keeps coach publish closed while the frozen API is owner-only', () => {
     const bindings = [{ domain: 'product' as const, source_version_id: 'srcv_a' }];
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', rows: [productRow, campaignRow],
       sourceBindings: bindings,
-    })).toEqual({ allowed: true });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', rows: [productRow],
-    })).toEqual({ allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.missingBindings });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', rows: [aftersaleRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', rows: [productRow, allergyRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', rows: [compensationRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', rows: [unlabeledRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.coachScope });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', rows: [presaleRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.coachScope });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
   });
 
   it('allows owner to publish restricted drafts', () => {

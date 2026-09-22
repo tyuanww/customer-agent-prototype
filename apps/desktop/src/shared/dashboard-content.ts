@@ -51,6 +51,7 @@ export const CONTENT_PUBLISH_COPY = Object.freeze({
   sensitive: '售后、过敏或赔付内容需管理员发布',
   coachScope: '话术师只能发布已标注的产品或活动内容',
   ownerPublish: '一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。',
+  sourceIneligible: '来源未登记或已停用，不能导入或发布。',
   missingBindings: '缺少来源绑定，无法导入',
   submitting: '正在提交发布',
   awaitingReview: '导入已进入双人复核。当前会话无法单独完成话术师、管理员和质检。',
@@ -189,16 +190,7 @@ export function contentPublishGate(input: ContentPublishGateInput): ContentPubli
     }
     return { allowed: true };
   }
-  if (input.rows.some(rowRequiresOwner)) {
-    return { allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive };
-  }
-  if (!input.rows.every(rowCoachPublishable)) {
-    return { allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.coachScope };
-  }
-  if ((input.sourceBindings?.length ?? 0) < 1) {
-    return { allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.missingBindings };
-  }
-  return { allowed: true };
+  return { allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish };
 }
 
 function isContentDomain(value: unknown): value is DashboardContentDomain {

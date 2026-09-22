@@ -133,11 +133,12 @@ export function WordingLibraryModule() {
     : domainCount > 0
       ? '当前发布已挂载'
       : '当前发布无此域';
+  const releaseLabel = catalog?.releaseId ?? '未标明发布号';
   const sourceSummary = !live
-    ? '未接入当前发布通道。'
+    ? '未读到本机话术目录。'
     : domainCount > 0
-      ? `${domainCount} 条 · 与查询胶囊同一份当前发布`
-      : '当前域在当前发布中没有条目。';
+      ? `${domainCount} 条 · 本机目录 ${releaseLabel}。查询以登录后拉到的发布为准。`
+      : `本机目录 ${releaseLabel}。当前域没有条目。`;
 
   return (
     <div className="dash-module" data-testid="module-wording">
