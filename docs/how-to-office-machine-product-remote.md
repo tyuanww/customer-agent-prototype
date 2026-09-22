@@ -2,7 +2,7 @@
 
 本页给**办公机操作员**勾选。开发机不得代填。全部行保持 **未观察**，直到真人在那台 Windows 上看过窗口。
 
-P4 / P7 已在 `main`。本页证据必须是当前 `main`（v0.3.16）**为**那台 Windows **新打、并在那台上安装勾选**的 `UNSIGNED.exe`。开发机可 `pnpm package:win` 出包，不得代填勾选。macOS 打包态勾选不能抄到本页。首轮离线勾选仍走 [办公机首轮](how-to-office-machine-first-round.md)，两页不要混填。
+P4 / P7 已在 `main`。本页证据必须是当前 `main`（v0.3.18）**为**那台 Windows **新打、并在那台上安装勾选**的 `UNSIGNED.exe`。开发机可 `pnpm package:win` 出包，不得代填勾选。macOS 打包态勾选不能抄到本页。首轮离线勾选仍走 [办公机首轮](how-to-office-machine-first-round.md)，两页不要混填。
 
 不要在办公机安装 PostgreSQL、Node、合成栈。产品主链走远端 HTTPS；检索由登录交付到 `%APPDATA%\客服话术浮窗 Demo` 旁的仓外目录。登录只有 **飞书** 和 **账号**。
 
@@ -10,7 +10,7 @@ P4 / P7 已在 `main`。本页证据必须是当前 `main`（v0.3.16）**为**�
 
 ## 准备
 
-1. 当前 `main`（v0.3.16）的 UNSIGNED Windows 安装包（文件名含 `UNSIGNED`）。开发机可 `pnpm package:win` 出包，勾选仍须在那台办公机上由人完成。
+1. 当前 `main`（v0.3.18）的 UNSIGNED Windows 安装包（文件名含 `UNSIGNED`）。本机产物是 `release/local-unsigned/windows/客服话术浮窗 Demo-0.3.18-win-x64-UNSIGNED.exe`。勾选仍须在那台办公机上由人完成。
 2. 办公机**需要网络**（与首轮断网相反）。
 3. 把 `synthetic-stack.json` 放到 `%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`：
 
