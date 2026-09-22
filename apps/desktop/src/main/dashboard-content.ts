@@ -105,6 +105,47 @@ async function batchInReviewQueue(
   }
 }
 
+function reviewRevision(value: unknown): string | undefined {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value) ? value : undefined;
+}
+
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+async function loadSignedInReviewRows(
+  client: DashboardContentSessionClient,
+  epoch: number,
+  importBatchId: string,
+  revision: string,
+): Promise<readonly { scriptId: string; contentHash: string; initialSample: boolean }[]> {
+  const rows: { scriptId: string; contentHash: string; initialSample: boolean }[] = [];
+  for (let after = 0; ;) {
+    const detail = await client.request(
+      epoch,
+      `/v1/admin/content/reviews/${importBatchId}?review_revision=${encodeURIComponent(revision)}&after=${String(after)}&limit=100`,
+      { timeoutMs: 5_000 },
+    );
+    const body = recordOf(detail.value);
+    const page = Array.isArray(body?.items) ? body.items : [];
+    for (const item of page) {
+      const row = recordOf(item);
+      if (!row || typeof row.script_id !== 'string' || typeof row.content_hash !== 'string') continue;
+      rows.push({
+        scriptId: row.script_id,
+        contentHash: row.content_hash,
+        initialSample: row.initial_sample === true,
+      });
+    }
+    const next = body?.next_after;
+    if (typeof next !== 'number' || page.length === 0) break;
+    after = next;
+  }
+  return rows;
+}
+
 export async function completeSignedInReview(
   client: DashboardContentSessionClient,
   epoch: number,
@@ -112,30 +153,13 @@ export async function completeSignedInReview(
 ): Promise<boolean> {
   try {
     const listed = await client.request(epoch, '/v1/admin/content/reviews?limit=100', { timeoutMs: 5_000 });
-    const queue = listed.value !== null && typeof listed.value === 'object' && !Array.isArray(listed.value)
-      ? Reflect.get(listed.value, 'items')
-      : undefined;
+    const queue = recordOf(listed.value)?.items;
     const queued = Array.isArray(queue)
-      ? queue.find((item) => item !== null && typeof item === 'object' && Reflect.get(item, 'batch_id') === importBatchId)
+      ? queue.find((item) => recordOf(item)?.batch_id === importBatchId)
       : undefined;
-    const revision = queued !== null && typeof queued === 'object' ? Reflect.get(queued, 'review_revision') : undefined;
-    if (typeof revision !== 'number') return false;
-    const detail = await client.request(
-      epoch,
-      `/v1/admin/content/reviews/${importBatchId}?review_revision=${String(revision)}`,
-      { timeoutMs: 5_000 },
-    );
-    const page = detail.value !== null && typeof detail.value === 'object' && !Array.isArray(detail.value)
-      ? Reflect.get(detail.value, 'items')
-      : undefined;
-    const rows = Array.isArray(page) ? page.flatMap((item) => {
-      if (item === null || typeof item !== 'object') return [];
-      const scriptId = Reflect.get(item, 'script_id');
-      const contentHash = Reflect.get(item, 'content_hash');
-      return typeof scriptId === 'string' && typeof contentHash === 'string'
-        ? [{ scriptId, contentHash }]
-        : [];
-    }) : [];
+    const revision = reviewRevision(recordOf(queued)?.review_revision);
+    if (!revision) return false;
+    const rows = await loadSignedInReviewRows(client, epoch, importBatchId, revision);
     if (rows.length < 1) return false;
     for (const [index, row] of rows.entries()) {
       const decision = await client.request(epoch, `/v1/admin/content/reviews/${importBatchId}/decisions`, {
@@ -156,7 +180,11 @@ export async function completeSignedInReview(
         review_revision: revision,
         phase: 'initial',
         evidence_id: 'EVD-FORMAL-QUALITY-001',
-        checks: rows.map((row) => ({ script_id: row.scriptId, content_hash: row.contentHash, defect: false })),
+        checks: rows.filter((row) => row.initialSample).map((row) => ({
+          script_id: row.scriptId,
+          content_hash: row.contentHash,
+          defect: false,
+        })),
       },
       headers: { 'idempotency-key': `quality-owner-${importBatchId}` },
       timeoutMs: 5_000,

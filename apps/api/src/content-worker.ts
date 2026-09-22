@@ -21,10 +21,25 @@ export type ContentWorkerOptions = Readonly<{
   leaseSeconds?: number;
   reviewCommitment?: Readonly<{
     leadSubject: string;
-    managerSubject: string;
+    managerSubject?: string;
     evidenceId: string;
   }>;
 }>;
+
+/** A repeated subject cannot satisfy dual review, so it is not hashed in as the manager. */
+export function reviewCommitmentHashes(commitment: {
+  leadSubject: string;
+  managerSubject?: string;
+  evidenceId: string;
+}): { leadHash: string; managerHash?: string; evidence: string } {
+  const leadHash = sha256(commitment.leadSubject);
+  const managerHash = commitment.managerSubject === undefined ? undefined : sha256(commitment.managerSubject);
+  return {
+    leadHash,
+    ...(managerHash !== undefined && managerHash !== leadHash ? { managerHash } : {}),
+    evidence: commitment.evidenceId,
+  };
+}
 
 interface ClaimRow extends QueryResultRow {
   claimed_job_id: string;
@@ -57,7 +72,8 @@ function retryCode(error: unknown): string {
     : 'VALIDATION_FAILED';
   const code = message.split(':')[0] ?? 'VALIDATION_FAILED';
   if (RETRY_CODES.has(code)) return code;
-  if (code === 'CONTENT_CONTRACT_INVALID' || code === 'ROW_LIMIT_EXCEEDED' || code === 'CONTENT_TOO_LARGE') {
+  if (code === 'CONTENT_CONTRACT_INVALID' || code === 'ROW_LIMIT_EXCEEDED' || code === 'CONTENT_TOO_LARGE'
+    || code === 'SECOND_REVIEWER_REQUIRED') {
     return 'VALIDATION_FAILED';
   }
   return 'VALIDATION_FAILED';
@@ -89,11 +105,7 @@ export function createContentWorker(
   });
   const leaseOwner = options.leaseOwner ?? `worker_${randomBytes(8).toString('hex')}`;
   const leaseSeconds = options.leaseSeconds ?? 60;
-  const review = options.reviewCommitment === undefined ? undefined : {
-    leadHash: sha256(options.reviewCommitment.leadSubject),
-    managerHash: sha256(options.reviewCommitment.managerSubject),
-    evidence: options.reviewCommitment.evidenceId,
-  };
+  const review = options.reviewCommitment === undefined ? undefined : reviewCommitmentHashes(options.reviewCommitment);
   let closed = false;
 
   async function withRole<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {

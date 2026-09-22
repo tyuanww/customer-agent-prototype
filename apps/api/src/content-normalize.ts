@@ -418,7 +418,7 @@ export function parseImportFile(
     intentId: string;
     review?: Readonly<{
       leadHash: string;
-      managerHash: string;
+      managerHash?: string;
       evidence: string;
     }>;
   }>,
@@ -451,6 +451,10 @@ export function parseImportFile(
     const due = utcTimestampText(new Date(now.getTime() + 365 * 24 * 3600 * 1000));
     const window = readEffectiveWindow(record, category, now);
     const dual = riskLevel === 'high' || hasConflict;
+    const managerHash = defaults.review?.managerHash;
+    if (dual && (!managerHash || managerHash === defaults.review?.leadHash)) {
+      throw new Error('SECOND_REVIEWER_REQUIRED');
+    }
     const questionBase = {
       question_id: `q_${scriptId}`,
       question_version: 1,
@@ -487,8 +491,8 @@ export function parseImportFile(
       primary_reviewer_id: defaults.review?.leadHash ?? null,
       primary_reviewer_role: defaults.review ? 'ROLE-CONTENT-LEAD' : null,
       primary_review_evd: defaults.review?.evidence ?? null,
-      secondary_reviewer_id: dual ? defaults.review?.managerHash ?? null : null,
-      secondary_reviewer_role: dual ? (defaults.review ? 'ROLE-CS-MANAGER' : null) : null,
+      secondary_reviewer_id: dual ? managerHash ?? null : null,
+      secondary_reviewer_role: dual ? 'ROLE-CS-MANAGER' : null,
       secondary_review_evd: dual ? defaults.review?.evidence ?? null : null,
       placeholder_keys: placeholderKeys,
       questions: [question],
