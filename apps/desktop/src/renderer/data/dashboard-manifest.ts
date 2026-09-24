@@ -193,7 +193,7 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'overview', label: '管理概览', blurb: '风险、责任与处理进度', group: '经营总览' },
   { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
   { id: 'sop', label: 'SOP', blurb: '当前产品会话 SOP 树', group: '话术运营' },
-  { id: 'content', label: '内容管理', blurb: '草稿 · 审核 · 发布', group: '治理与架构' },
+  { id: 'content', label: '内容管理', blurb: '导入 · 发布', group: '治理与架构' },
   { id: 'announce', label: '系统同步', blurb: '话术版本 / 软件版本更新', group: '治理与架构' },
 ]);
 

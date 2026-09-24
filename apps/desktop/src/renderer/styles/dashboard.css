@@ -3068,7 +3068,7 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .content-pipeline-steps {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 0 0 20px;
   padding: 0;
@@ -3087,6 +3087,8 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   color: var(--dash-muted);
   font-size: 13px;
   font-weight: 600;
+  pointer-events: none;
+  user-select: none;
 }
 
 .content-pipeline-steps li[data-step-status='active'] {

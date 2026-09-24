@@ -39,12 +39,14 @@ function pipelineStepStatus(
   step: 'import' | 'publish',
   upload: UploadView,
   submitting: boolean,
+  publishAllowed: boolean,
 ): PipelineStepStatus {
   if (step === 'import') {
     if (upload.status === 'idle' || upload.status === 'error' || upload.status === 'reading') return 'active';
     return 'done';
   }
-  if (upload.status === 'ready') return 'active';
+  if (upload.status !== 'ready') return 'pending';
+  if (submitting || publishAllowed) return 'active';
   return 'pending';
 }
 
@@ -118,6 +120,8 @@ export function ContentModule() {
     sourceBindings,
   });
   const publishDisabled = !gate.allowed || submitting || upload.status !== 'ready';
+  const importStep = pipelineStepStatus('import', upload, submitting, gate.allowed);
+  const publishStep = pipelineStepStatus('publish', upload, submitting, gate.allowed);
   const gateBlocksHard = !gate.allowed && gate.code !== 'VALIDATION';
   const publishReason = submitting
     ? CONTENT_PUBLISH_COPY.submitting
@@ -236,10 +240,10 @@ export function ContentModule() {
       </header>
 
       <ol className="content-pipeline-steps" aria-label="发布流程" data-testid="content-pipeline-steps">
-        <li data-step-status={pipelineStepStatus('import', upload, submitting)}>
+        <li data-step-status={importStep} aria-current={importStep === 'active' ? 'step' : undefined}>
           <span aria-hidden="true">1</span>导入
         </li>
-        <li data-step-status={pipelineStepStatus('publish', upload, submitting)}>
+        <li data-step-status={publishStep} aria-current={publishStep === 'active' ? 'step' : undefined}>
           <span aria-hidden="true">2</span>发布
         </li>
       </ol>
