@@ -80,6 +80,7 @@ export function ContentModule() {
   const [submitting, setSubmitting] = useState(false);
   const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
   const ingestGeneration = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasDomain = upload.status === 'ready' && upload.rows.some((row) => row.domain);
   const statusMessage = upload.status === 'ready'
     ? `待发布 · ${upload.rows.length} 行 · ${upload.sourceName} · 不是已发布`
@@ -263,17 +264,31 @@ export function ContentModule() {
         </div>
 
         <div className="dash-filter-toolbar compact content-upload-controls" aria-label="内容导入">
-          <label className="is-grow" htmlFor="content-upload-file">
-            <span>选择 CSV 或 xlsx</span>
-            <input
-              id="content-upload-file"
-              type="file"
-              accept={UPLOAD_COPY.accept}
-              data-testid="content-upload-input"
-              disabled={upload.status === 'reading' || submitting}
-              onChange={onFileChange}
-            />
-          </label>
+          <input
+            ref={fileInputRef}
+            id="content-upload-file"
+            type="file"
+            accept={UPLOAD_COPY.accept}
+            data-testid="content-upload-input"
+            hidden
+            disabled={upload.status === 'reading' || submitting}
+            onChange={onFileChange}
+          />
+          <button
+            type="button"
+            className="dash-reset"
+            data-testid="content-upload-pick"
+            aria-label="选择 CSV 或 xlsx"
+            disabled={upload.status === 'reading' || submitting}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            选择 CSV 或 xlsx
+          </button>
+          {upload.status === 'ready' || upload.status === 'reading' ? (
+            <span data-testid="content-upload-filename">
+              {upload.status === 'reading' ? upload.sourceName : uploadSourceName(upload)}
+            </span>
+          ) : null}
           <button
             type="button"
             className="dash-reset"
