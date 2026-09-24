@@ -200,43 +200,6 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
     });
     expect(imported.statusCode).toBe(202);
     const batchId = imported.json().import_batch_id as string;
-    expect(await worker.runOnce()).toBe('parked');
-    const lead = await productToken('synthetic_lead');
-    const manager = await productToken('synthetic_manager');
-    const quality = await productToken('synthetic_quality');
-    const listed = await app.inject({ url: '/v1/admin/content/reviews', headers: { authorization: `Bearer ${lead}` } });
-    const summary = (listed.json().items as { batch_id: string; review_revision: string }[])
-      .find((item) => item.batch_id === batchId);
-    expect(summary).toBeTruthy();
-    const revision = summary!.review_revision;
-    const page = await app.inject({
-      url: `/v1/admin/content/reviews/${batchId}?review_revision=${revision}`,
-      headers: { authorization: `Bearer ${lead}` },
-    });
-    const item = page.json().items[0] as { script_id: string; content_hash: string };
-    const decide = async (token: string, key: string) => app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/decisions`,
-      headers: { authorization: `Bearer ${token}`, 'idempotency-key': key, 'content-type': 'application/json' },
-      payload: {
-        review_revision: revision, script_id: item.script_id, content_hash: item.content_hash,
-        decision: 'approved', evidence_id: REVIEW.evidenceId,
-      },
-    });
-    expect((await decide(lead, `dec-lead-${idempotencyKey}`)).statusCode).toBe(200);
-    expect((await decide(manager, `dec-manager-${idempotencyKey}`)).statusCode).toBe(200);
-    expect((await app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/quality-evidence`,
-      headers: { authorization: `Bearer ${quality}`, 'idempotency-key': `qual-${idempotencyKey}`, 'content-type': 'application/json' },
-      payload: {
-        review_revision: revision, phase: 'initial', evidence_id: 'EVD-T5-QUALITY-001',
-        checks: [{ script_id: item.script_id, content_hash: item.content_hash, defect: false }],
-      },
-    })).statusCode).toBe(200);
-    expect((await app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/resume`,
-      headers: { authorization: `Bearer ${quality}`, 'content-type': 'application/json' },
-      payload: { review_revision: revision },
-    })).statusCode).toBe(200);
     expect(await worker.runOnce()).toBe('finished');
     return batchId;
   }

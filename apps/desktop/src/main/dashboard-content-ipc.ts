@@ -10,8 +10,8 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import {
   dashboardContentImport,
   dashboardContentParseUpload,
-  completeSignedInReview,
   dashboardContentPublish,
+  dashboardContentCancelInFlight,
   dashboardContentSession,
   type DashboardContentAfterPublish,
   type DashboardContentSessionClient,
@@ -73,14 +73,20 @@ export function registerDashboardContentIpc(
       if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
       if (args.length !== 1) return dashboardContentFailure('VALIDATION');
       try {
-        const parkedReview = session
-          ? (importBatchId: string) => completeSignedInReview(
-            session,
-            session.view().sessionEpoch,
-            importBatchId,
-          )
-          : undefined;
-        return await dashboardContentPublish(session, args[0], afterPublish, parkedReview);
+        return await dashboardContentPublish(session, args[0], afterPublish);
+      } catch {
+        return dashboardContentFailure('UNAVAILABLE');
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DASHBOARD_CONTENT_CANCEL_IN_FLIGHT,
+    async (event, ...args: unknown[]) => {
+      if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
+      if (args.length !== 0) return dashboardContentFailure('VALIDATION');
+      try {
+        return await dashboardContentCancelInFlight(session);
       } catch {
         return dashboardContentFailure('UNAVAILABLE');
       }

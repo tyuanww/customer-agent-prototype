@@ -109,13 +109,13 @@ describe('content publish role gate', () => {
 
   it('accepts the dashboard content session projection without credentials', () => {
     expect(isDashboardContentSessionResult({
-      ok: true, enabled: true, signedIn: true, role: 'coach',
+      ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师',
     })).toBe(true);
     expect(isDashboardContentSessionResult({
-      ok: true, enabled: false, signedIn: false, role: null,
+      ok: true, enabled: false, signedIn: false, role: null, displayName: null,
     })).toBe(true);
     expect(isDashboardContentSessionResult({
-      ok: true, enabled: true, signedIn: true, role: 'coach', access_token: 'secret',
+      ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师', access_token: 'secret',
     })).toBe(false);
   });
 

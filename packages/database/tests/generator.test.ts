@@ -81,11 +81,11 @@ function prepareExistingPublication(root: string): void {
 }
 
 describe('database migration generator', () => {
-  it('preserves all fourteen immutable migrations and appends the ops-loop suffix', () => {
+  it('preserves all fourteen immutable migrations and appends the ops-loop plus office overlay', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());
 
-    expect(first.migrations).toHaveLength(15);
+    expect(first.migrations).toHaveLength(16);
     expect(first.migrations.map(({ id }) => id)).toEqual([
       '0001_extensions',
       '0002_identity_and_content',
@@ -102,6 +102,7 @@ describe('database migration generator', () => {
       '0013_backend_identity_content_v1_16',
       '0014_release_deferred_guard_v1_17',
       '0015_ops_loop_v1_18',
+      '0016_office_owner_publish',
     ]);
     expect([...first.outputs]).toEqual([...second.outputs]);
     expect(first.migrations.slice(0, 9).map(({ sha256 }) => sha256)).toEqual([

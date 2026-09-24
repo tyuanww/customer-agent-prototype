@@ -552,7 +552,7 @@ describe('dashboard layout contract', () => {
   });
 
   it('keeps coach content preview local and publishes only through dashboardContent', () => {
-    expect(content).toContain('待审核草稿');
+    expect(content).toContain('待发布');
     expect(content).toContain('标准话术');
     expect(content).toContain('readCoachUploadFile');
     expect(content).toContain('dashboardContent');

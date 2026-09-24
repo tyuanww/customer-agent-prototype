@@ -20,6 +20,7 @@ export const CONTENT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 export const CONTENT_UPLOAD_TIMEOUT_MS = 30_000;
 export const CONTENT_OBJECT_ID_PATTERN = /^obj_[0-9a-f]{64}$/;
 export const CONTENT_IMPORT_BATCH_ID_PATTERN = /^imp_[A-Za-z0-9_-]{16,128}$/;
+export const ACTOR_IN_FLIGHT_IMPORT_ID = 'imp_actor_in_flight_01';
 
 export type ContentSourceType = 'csv' | 'excel';
 

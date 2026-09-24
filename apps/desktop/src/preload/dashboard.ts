@@ -8,6 +8,7 @@ const CONTENT_SESSION = 'dashboard:content-session';
 const CONTENT_PARSE = 'dashboard:content-parse';
 const CONTENT_IMPORT = 'dashboard:content-import';
 const CONTENT_PUBLISH = 'dashboard:content-publish';
+const CONTENT_CANCEL_IN_FLIGHT = 'dashboard:content-cancel-in-flight';
 const ITERATION_LIST = 'dashboard:iteration-list';
 const ITERATION_START = 'dashboard:iteration-start';
 const ITERATION_CLOSE = 'dashboard:iteration-close';
@@ -70,13 +71,16 @@ function isContentSession(value: unknown): boolean {
   if (isContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role'])) return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role', 'displayName'])) return false;
   if (typeof record.enabled !== 'boolean' || typeof record.signedIn !== 'boolean') return false;
+  if (record.displayName !== null && (typeof record.displayName !== 'string'
+    || record.displayName.length < 1 || record.displayName.length > 64)) return false;
   if (record.signedIn) {
     return record.enabled === true
-      && (record.role === 'agent' || record.role === 'coach' || record.role === 'owner');
+      && (record.role === 'agent' || record.role === 'coach' || record.role === 'owner')
+      && typeof record.displayName === 'string';
   }
-  return record.role === null;
+  return record.role === null && record.displayName === null;
 }
 
 function isContentImport(value: unknown): boolean {
@@ -94,13 +98,17 @@ function isContentPublish(value: unknown): boolean {
   if (isContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq'])
+  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'publisherDisplayName'])
     && record.ok === true
     && typeof record.releaseId === 'string'
     && record.releaseId.length > 0
     && record.releaseId.length <= 128
     && Number.isSafeInteger(record.releaseSeq)
-    && (record.releaseSeq as number) >= 1;
+    && (record.releaseSeq as number) >= 1
+    && (record.publisherDisplayName === null
+      || (typeof record.publisherDisplayName === 'string'
+        && record.publisherDisplayName.length > 0
+        && record.publisherDisplayName.length <= 64));
 }
 
 const ITERATION_CAUSES = ['content_gap', 'ranking', 'stale', 'mixed'] as const;
@@ -230,6 +238,18 @@ contextBridge.exposeInMainWorld('dashboardContent', {
     try {
       const value: unknown = await ipcRenderer.invoke(CONTENT_PUBLISH, request);
       return isContentPublish(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async cancelInFlight() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(CONTENT_CANCEL_IN_FLIGHT);
+      if (isContentFailure(value)) return value;
+      if (value && typeof value === 'object' && (value as { ok?: unknown }).ok === true) {
+        return { ok: true as const };
+      }
+      return unavailable;
     } catch {
       return unavailable;
     }

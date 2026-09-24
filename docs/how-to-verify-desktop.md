@@ -314,7 +314,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 内容管理草稿（Dashboard 切片 1）
 
-「内容管理」本地解析 CSV 或 xlsx 成待审核草稿。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；parked 后走 dual-review，再 `POST /v1/content/publish`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库走 ops-loop，见下方 Dashboard SOP。
+「内容管理」本地解析 CSV 或 xlsx 成待发布预览。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；校验通过 staged 后 `POST /v1/content/publish`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库走 ops-loop，见下方 Dashboard SOP。
 
 | 你想证明 | 命令 |
 | --- | --- |

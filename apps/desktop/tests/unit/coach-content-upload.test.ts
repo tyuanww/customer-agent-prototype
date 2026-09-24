@@ -247,7 +247,7 @@ describe('coach content upload parser', () => {
       );
 
       window.dashboardContent = {
-        session: async () => ({ ok: true, enabled: true, signedIn: true, role: 'coach' }),
+        session: async () => ({ ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师' }),
         parseUpload: async () => ({
           ok: true,
           sourceName: 'faq.xlsx',
@@ -256,6 +256,7 @@ describe('coach content upload parser', () => {
         }),
         importDraft: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
         publishDraft: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
+        cancelInFlight: async () => ({ ok: true as const }),
       };
       const ok = await readCoachUploadFile(zipFile());
       expect(ok).toMatchObject({

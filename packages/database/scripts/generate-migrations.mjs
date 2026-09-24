@@ -235,6 +235,36 @@ function loadPriorReviewedUpgrade(projectRoot, provenance) {
     source_git_sha: sourceGitSha, source_schema_sha256: sourceSchemaSha256, sql });
 }
 
+function loadOfficeOwnerPublishOverlay(projectRoot, snapshot) {
+  const relative = 'packages/database/overlays/0016_office_owner_publish.sql';
+  const overlayPath = path.join(projectRoot, relative);
+  if (!existsSync(overlayPath) || !lstatSync(overlayPath).isFile()) {
+    throw new Error('Office owner publish overlay migration is missing');
+  }
+  const body = readFileSync(overlayPath, 'utf8');
+  const sql = [
+    `-- ${GENERATED_HEADER}`,
+    '-- 0016_office_owner_publish; product overlay (not a frozen contract snapshot slice)',
+    `-- contract_set_id=${snapshot.contract_set_id}`,
+    `-- source_git_sha=${snapshot.source_git_sha}`,
+    `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
+    body.trimEnd(),
+    '',
+  ].join('\n');
+  return Object.freeze({
+    position: 16,
+    id: '0016_office_owner_publish',
+    file: '0016_office_owner_publish.sql',
+    sha256: sha256(sql),
+    bytes: Buffer.byteLength(sql),
+    contract_set_id: snapshot.contract_set_id,
+    source_git_sha: snapshot.source_git_sha,
+    source_schema_sha256: snapshot.manifest.database.sha256,
+    source_ranges: Object.freeze([]),
+    sql,
+  });
+}
+
 function renderUpgradeMigration(sourceBody, ranges, snapshot) {
   const descriptor = { position: 15, id: '0015_ops_loop_v1_18', file: '0015_ops_loop_v1_18.sql', source_ranges: ranges };
   const sql = [
@@ -275,10 +305,12 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const { lines, ranges } = opsLoopUpgradeRanges(snapshot.database_source, projectRoot);
   const upgradeSourceBody = linesForRanges(lines, ranges);
   const upgrade = renderUpgradeMigration(upgradeSourceBody, ranges, snapshot);
+  const overlay = loadOfficeOwnerPublishOverlay(projectRoot, snapshot);
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
     ...REVIEWED_UPGRADES.map((p) => loadPriorReviewedUpgrade(projectRoot, p)),
     upgrade,
+    overlay,
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
