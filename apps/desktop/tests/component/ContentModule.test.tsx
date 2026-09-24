@@ -46,6 +46,7 @@ describe('ContentModule publish gate', () => {
     render(<ContentModule />);
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.noProduct);
+    expect(screen.getByTestId('cancel-in-flight')).toBeDisabled();
   });
 
   it('keeps Publish off for agent even with labeled product drafts', async () => {
