@@ -9,7 +9,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-  type ReactElement,
 } from 'react';
 import {
   DASHBOARD_MANIFEST,
@@ -62,15 +61,6 @@ import {
 } from './lib/dashboard-appearance';
 import './styles/dashboard.css';
 
-type DashboardLeafModuleId = Exclude<DashboardModuleId, 'overview'>;
-
-const MODULES: Record<DashboardLeafModuleId, () => ReactElement> = {
-  wording: WordingLibraryModule,
-  sop: SopLibraryModule,
-  content: ContentModule,
-  announce: AnnounceModule,
-};
-
 type NavTooltipState = {
   key: string;
   label: string;
@@ -81,6 +71,7 @@ type NavTooltipState = {
 
 export function DashboardApp() {
   const [active, setActive] = useState<DashboardModuleId>('overview');
+  const [keepContent, setKeepContent] = useState(false);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
   const [navWidth, setNavWidth] = useState(DASHBOARD_NAV_DEFAULT_WIDTH);
   const [navResizing, setNavResizing] = useState(false);
@@ -116,7 +107,6 @@ export function DashboardApp() {
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
-  const ActiveModule = active === 'overview' ? null : MODULES[active];
   const navMaxWidth = getDashboardNavMaxWidth(viewportWidth);
   const resolvedTheme = resolveDashboardTheme(themeMode, systemDark);
   const navCollapsed = isDashboardNavRailPhase(navPhase);
@@ -138,6 +128,10 @@ export function DashboardApp() {
 
   useLayoutEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [active]);
+
+  useEffect(() => {
+    if (active === 'content') setKeepContent(true);
   }, [active]);
 
   useEffect(() => {
@@ -1195,7 +1189,15 @@ export function DashboardApp() {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {ActiveModule ? <ActiveModule /> : <OverviewModule onNavigate={setActive} />}
+          {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
+          {active === 'wording' ? <WordingLibraryModule /> : null}
+          {active === 'sop' ? <SopLibraryModule /> : null}
+          {active === 'announce' ? <AnnounceModule /> : null}
+          {keepContent || active === 'content' ? (
+            <div hidden={active !== 'content'}>
+              <ContentModule />
+            </div>
+          ) : null}
         </main>
       </div>
     </div>
