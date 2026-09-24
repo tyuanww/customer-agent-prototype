@@ -54,7 +54,7 @@ export const CONTENT_PUBLISH_COPY = Object.freeze({
   ownerPublish: '一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。',
   sourceIneligible: '来源未登记或已停用，不能导入或发布。',
   missingBindings: '缺少来源绑定，无法导入',
-  submitting: '正在提交发布',
+  submitting: '正在校验并发布，请稍候，不要离开本页',
   readyToPublish: '校验通过后可由管理员发布',
 });
 

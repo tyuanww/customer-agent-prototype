@@ -1707,6 +1707,26 @@ describe('DashboardApp', () => {
     expect(window.customerAgent).toBeUndefined();
   });
 
+  it('keeps the staged preview after leaving content and coming back', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-content'));
+    const csv = new File(
+      ['scene,script\n洁面用量确认,先确认产品版本\n'],
+      'coach-draft.csv',
+      { type: 'text/csv' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), csv);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
+    await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByTestId('nav-content'));
+    expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
+    expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent('请先导入草稿');
+  });
+
   it('clears the coach preview back to idle without leaving released state behind', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
