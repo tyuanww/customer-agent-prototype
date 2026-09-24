@@ -12,6 +12,7 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
       enabled: true,
       signedIn,
       role: signedIn ? role : null,
+      displayName: signedIn ? '合成管理员' : null,
     })),
     parseUpload: vi.fn(async () => ({
       ok: false as const,
@@ -28,6 +29,7 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
       code: 'UNAVAILABLE' as const,
       message: '服务暂不可用，请重试',
     })),
+    cancelInFlight: vi.fn(async () => ({ ok: true as const })),
   };
 }
 

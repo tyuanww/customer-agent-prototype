@@ -81,12 +81,10 @@ function retryCode(error: unknown): string {
 
 /**
  * Independent import worker. It claims one job, never holds a DB transaction
- * across parse I/O, and only freeze/park/finish through fenced SQL.
+ * across parse I/O, and freeze / org-reviewed evidence / finalize through fenced SQL.
  *
- * Parked content_hash is the frozen join key and must equal finalize's
- * post-review governance snapshot. Reviewer hashes are therefore a synthetic
- * pre-commitment: they are hashed into content_hash but never written into
- * parked JSON (REVIEW_EVIDENCE_TRUST_BOUNDARY).
+ * Production office publish does not park dual-review. Reviewer hashes remain a
+ * synthetic pre-commitment hashed into content_hash (REVIEW_EVIDENCE_TRUST_BOUNDARY).
  */
 export function createContentWorker(
   config: ApiDatabaseBootstrapConfig,
@@ -105,7 +103,6 @@ export function createContentWorker(
   });
   const leaseOwner = options.leaseOwner ?? `worker_${randomBytes(8).toString('hex')}`;
   const leaseSeconds = options.leaseSeconds ?? 60;
-  const review = options.reviewCommitment === undefined ? undefined : reviewCommitmentHashes(options.reviewCommitment);
   let closed = false;
 
   async function withRole<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -190,7 +187,7 @@ export function createContentWorker(
         const rows = parseImportFile(bytes, sourceType, {
           intentTaxonomyVersion: options.intentTaxonomyVersion,
           intentId: options.intentId,
-          ...(review === undefined ? {} : { review }),
+          orgReviewedBatchId: batchId,
         }).map((row) => ({
           ...row,
           // Staging IDs are globally unique; retries of this batch retain the same identity.
@@ -202,7 +199,6 @@ export function createContentWorker(
         const seed = sha256(`seed:${batchId}:${claimed.claimed_job_id}`);
         const planId = `qplan_${randomBytes(12).toString('hex')}`;
         const cutoff = new Date(Date.now() - 1_000).toISOString();
-        const objectKey = `review/${objectId}`;
         const rowsJson = JSON.stringify(rows.map(parkedRowPayload));
         const selectionHash = selectionManifestHash(rows, seed, targets.initial, targets.expanded);
         await withRole(async (client) => {
@@ -220,15 +216,19 @@ export function createContentWorker(
             ],
           );
           await client.query(
-            'SELECT backend_review.park($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)',
+            'SELECT public.record_org_reviewed_quality_evidence($1,$2,$3,$4,$5,$6::jsonb)',
             [
-              claimed.claimed_job_id, leaseOwner, claimed.claimed_lease_version, batchId, planId,
-              objectKey, createHash('sha256').update(bytes).digest('hex'), bytes.length,
-              rowsJson,
+              claimed.claimed_job_id, leaseOwner, claimed.claimed_lease_version, batchId, planId, rowsJson,
+            ],
+          );
+          await client.query(
+            'SELECT public.finalize_org_reviewed_import_validation($1,$2,$3,$4,$5::jsonb)',
+            [
+              claimed.claimed_job_id, leaseOwner, claimed.claimed_lease_version, batchId, rowsJson,
             ],
           );
         });
-        return 'parked';
+        return 'finished';
       } catch (error) {
         await failJob(claimed.claimed_job_id, claimed.claimed_lease_version, retryCode(error)).catch(() => undefined);
         return 'failed';

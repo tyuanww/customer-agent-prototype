@@ -9,7 +9,10 @@ it('pages a string review revision and sends quality checks only for the initial
   const calls: string[] = [];
   let qualityChecks = 0;
   const client = {
-    view: () => ({ ok: true as const, enabled: true, signedIn: true, role: 'owner' as const, sessionEpoch: 1 }),
+    view: () => ({
+      ok: true as const, enabled: true, signedIn: true, role: 'owner' as const, sessionEpoch: 1,
+      userId: 'usr_owner', authMode: 'mock' as const, expiresAt: '2099-01-01T00:00:00.000Z', displayName: 'owner',
+    }),
     request: async (_epoch: number, path: string, options?: { body?: { checks?: unknown[] } }) => {
       calls.push(path);
       if (path.startsWith('/v1/admin/content/reviews?')) {
@@ -51,7 +54,10 @@ it('pages a string review revision and sends quality checks only for the initial
 
 it('does not treat a numeric review revision as ready', async () => {
   const client = {
-    view: () => ({ ok: true as const, enabled: true, signedIn: true, role: 'owner' as const, sessionEpoch: 1 }),
+    view: () => ({
+      ok: true as const, enabled: true, signedIn: true, role: 'owner' as const, sessionEpoch: 1,
+      userId: 'usr_owner', authMode: 'mock' as const, expiresAt: '2099-01-01T00:00:00.000Z', displayName: 'owner',
+    }),
     request: async () => ({ status: 200, value: { items: [{ batch_id: batchId, review_revision: 3 }] } }),
   };
   expect(await completeSignedInReview(client, 1, batchId)).toBe(false);

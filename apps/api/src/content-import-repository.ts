@@ -10,6 +10,7 @@ import {
   type ApiRuntimeDiagnosticSink,
 } from './runtime-diagnostics.js';
 import type { ContentSourceType } from './content-object-store.js';
+import { ACTOR_IN_FLIGHT_IMPORT_ID } from './content-object-store.js';
 
 type ImportAcceptedResponse = components['schemas']['ImportAcceptedResponse'];
 type ImportStatusResponse = components['schemas']['ImportStatusResponse'];
@@ -295,6 +296,13 @@ export function createContentImportRepository(
           broken = !rolledBack;
           return failure(claim.code, commitCertaintyAfterError(rolledBack));
         }
+        await client.query('SELECT public.assert_no_in_flight_content_import($1)', [request.actor.user_id]);
+        if (request.actor.role === 'owner') {
+          await client.query(
+            'SELECT public.advance_source_snapshots($1::jsonb, $2, $3, $4)',
+            [JSON.stringify(request.sourceBindings), request.sourceSha256, request.actor.role, request.importBatchId],
+          );
+        }
         const result = await client.query<EnqueueRow>(
           `SELECT * FROM public.enqueue_content_import($1, $2, $3, $4, $5, $6::jsonb, $7, $8)`,
           [
@@ -410,10 +418,17 @@ export function createContentImportRepository(
           broken = !(await rollback(client));
           return failure(claim.code, commitCertaintyAfterError(!broken));
         }
-        await client.query(
-          'SELECT public.cancel_content_import($1, $2, $3, $4)',
-          [importBatchId, reason, actor.user_id, actor.role],
-        );
+        if (importBatchId === ACTOR_IN_FLIGHT_IMPORT_ID) {
+          await client.query(
+            'SELECT public.cancel_actor_in_flight_imports($1, $2)',
+            [actor.user_id, actor.role],
+          );
+        } else {
+          await client.query(
+            'SELECT public.cancel_content_import($1, $2, $3, $4)',
+            [importBatchId, reason, actor.user_id, actor.role],
+          );
+        }
         const response = parseContractSchema('CancelImportResponse', {
           ok: true,
           import_batch_id: importBatchId,
