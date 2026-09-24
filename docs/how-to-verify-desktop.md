@@ -380,11 +380,11 @@ Query 的「登录」打开独立受控登录窗（窗标题「登录」）。�
 
 ### D5 合成整链验证
 
-`CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api test:e2e:backend` 在同一 SHA 上跑导入→worker→审核→发布→桌面 adapter 查询复制→回退后旧候选 STALE→退出清空会话。桌面 adapter 经 loopback 调用已启动的 API 进程，不经 Dashboard，不等于人工观察、Windows 实机或真实飞书。
+`CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api test:e2e:backend` 在同一 SHA 上跑导入→worker→staged→发布→桌面 adapter 查询复制→回退后旧候选 STALE→退出清空会话。组织审核在飞书文档，产品内不再 park 双人复核。桌面 adapter 经 loopback 调用已启动的 API 进程，不经 Dashboard，不等于人工观察、Windows 实机或真实飞书。
 
 ## 本机合成栈（M1）
 
-`scripts/synthetic-stack/stack.ts` 启动一套属于本任务的本机合成环境：私有 PostgreSQL 15 cluster（仅 Unix socket，无 TCP 监听）、合成身份提供方、API、worker，并把合成话术通过真实的导入→worker→审核→发布链写入。
+`scripts/synthetic-stack/stack.ts` 启动一套属于本任务的本机合成环境：私有 PostgreSQL 15 cluster（仅 Unix socket，无 TCP 监听）、合成身份提供方、API、worker，并把合成话术通过真实的导入→worker→staged→发布链写入。组织审核在飞书；产品内不再 park 双人复核。
 
 **`start` 会播种。** 当前本机若已经发布 `rel_6` MENOKIN 话术，不要再 `start`：它会写成合成种子 `rel_7`，桌面 hydrate 对不上就会「内容已变化」。已有栈只 `status` / `stop`；检索开发见 [How to 启动检索浮窗](how-to-run-macos-semantic-query.md)。API 进程必须是 `apps/api/dist/main.js`。
 

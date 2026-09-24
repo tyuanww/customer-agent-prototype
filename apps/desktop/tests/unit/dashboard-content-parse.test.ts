@@ -58,7 +58,7 @@ describe('dashboardContentParseUpload', () => {
     })).toMatchObject({
       ok: false,
       code: 'too-large',
-      message: '文件超过 10MiB。',
+      message: '文件超过 10MiB。请缩小表格后重新选择。',
     });
     expect(dashboardContentParseUpload({
       sourceName: 'faq.xlsx',
