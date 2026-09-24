@@ -177,6 +177,8 @@ describe('coach content upload parser', () => {
 
     const other = await readCoachUploadFile(new File(['scene,step\nA,B\n'], 'notes.txt'));
     expect(other).toMatchObject({ ok: false, code: 'unsupported-type' });
+    if (other.ok) return;
+    expect(other.message).toContain('请重新选择表格文件');
   });
 
   it('maps 活动/产品 filenames, chinese domain cells, 分类 fallback, and product=shortcut', () => {

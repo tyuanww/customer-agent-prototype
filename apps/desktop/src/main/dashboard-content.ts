@@ -247,7 +247,7 @@ export function dashboardContentParseUpload(payload: unknown): ReturnType<typeof
   }
   const sourceName = record.sourceName.trim() || 'upload.xlsx';
   if (bytes.length > CONTENT_IMPORT_MAX_BYTES) {
-    return { ok: false, code: 'too-large', message: `文件超过 ${String(CONTENT_IMPORT_MAX_BYTES / (1024 * 1024))}MiB。` };
+    return { ok: false, code: 'too-large', message: `文件超过 ${String(CONTENT_IMPORT_MAX_BYTES / (1024 * 1024))}MiB。请缩小表格后重新选择。` };
   }
   try {
     const table = parseXlsxFirstSheet(bytes);
