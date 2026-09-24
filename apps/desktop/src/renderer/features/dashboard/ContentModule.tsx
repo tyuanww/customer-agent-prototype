@@ -166,9 +166,15 @@ export function ContentModule() {
     );
   };
 
+  const cancelDisabled = submitting || sessionView?.signedIn !== true;
+
   const onCancelInFlight = () => {
+    if (cancelDisabled) return;
     const api = window.dashboardContent;
-    if (!api?.cancelInFlight) return;
+    if (!api?.cancelInFlight) {
+      setPublishFeedback('当前没有产品会话，无法取消导入');
+      return;
+    }
     void api.cancelInFlight().then((result) => {
       setPublishFeedback(result.ok ? '已取消未完成的导入，可以重新导入' : result.message);
     });
@@ -222,6 +228,7 @@ export function ContentModule() {
             className="dash-publish"
             disabled={publishDisabled}
             data-testid="publish-action"
+            aria-describedby="content-publish-note"
             onClick={onPublish}
           >
             发布
@@ -230,13 +237,17 @@ export function ContentModule() {
             type="button"
             className="dash-reset"
             data-testid="cancel-in-flight"
-            disabled={submitting}
+            disabled={cancelDisabled}
             onClick={onCancelInFlight}
           >
             取消未完成导入
           </button>
-          <span data-testid="publish-disabled-reason">{publishReason}</span>
-          {publishFeedback ? <span data-testid="publish-feedback">{publishFeedback}</span> : null}
+          <span id="content-publish-note">
+            <span data-testid="publish-disabled-reason">{publishReason}</span>
+            {publishFeedback ? (
+              <span role="status" aria-live="polite" data-testid="publish-feedback">{publishFeedback}</span>
+            ) : null}
+          </span>
         </div>
       </header>
 
