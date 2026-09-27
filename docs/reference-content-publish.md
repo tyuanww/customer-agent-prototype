@@ -40,15 +40,17 @@ content_current 切换 → 坐席 announce / hydrate 读到新目录
 
 ## 3. HTTP 接口
 
-这些是**产品侧**端点（不在冻结的上游 OpenAPI 1.14.0 文件里）。全部要求产品会话、`Cache-Control: no-store`。
+端点属于冻结合同集 `cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534`。全部要求产品会话、`Cache-Control: no-store`。
 
-| 方法 | 路径 | 成功码 | 角色 |
-| --- | --- | --- | --- |
-| POST | `/v1/content/import` | 202 | owner / coach |
-| GET | `/v1/content/import/:import_batch_id` | 200 | 批次 owner |
-| POST | `/v1/content/import/:import_batch_id/cancel` | 200 | owner / coach |
-| POST | `/v1/content/publish` | 200 | **owner** |
-| POST | `/v1/content/rollback` | 200 | owner |
+| 方法 | 路径 | 合同角色 | 成功码 | 合同声明的错误码 |
+| --- | --- | --- | --- | --- |
+| POST | `/v1/content/import` | coach, owner | 202 | 400, 401, 403, 409, 429, 500, 503 |
+| GET | `/v1/content/import/:import_batch_id` | coach, owner | 200 | 401, 403, 404, 429, 500, 503 |
+| POST | `/v1/content/import/:import_batch_id/cancel` | coach, owner | 200 | 400, 401, 403, **404**, 409, 429, 500, 503 |
+| POST | `/v1/content/publish` | **owner** | 200 | 400, 401, 403, 404, 409, 429, 500, 503 |
+| POST | `/v1/content/rollback` | **owner** | 200 | 400, 401, 403, 404, 409, 429, 500, 503 |
+
+取消路径**没有 410**：合同只声明 404。§5 的空扫就是靠这个 404 表达的。
 
 导入与发布都要 `Idempotency-Key` 头（1–128 字符）；缺头即 400。
 
@@ -65,7 +67,7 @@ content_current 切换 → 坐席 announce / hydrate 读到新目录
 { reason: string | null }        // 桌面固定送 'in-flight-self'
 ```
 
-`publish` 由 `content-release-service.ts` 在进库前再挡一次：`actor.role !== 'owner'` 直接 `FORBIDDEN`。
+`publish` 由 `content-release-service.ts` 在进库前再挡一次：`actor.role !== 'owner'` 直接 `FORBIDDEN`。合同角色与实现一致，都是 owner-only。
 
 ### 每进程速率窗（60 秒）
 
