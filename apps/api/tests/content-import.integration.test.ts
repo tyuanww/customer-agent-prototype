@@ -53,11 +53,13 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
   let app: FastifyInstance;
   let storeRoot: string;
   let runtimeUrl: string;
+  let dbConfig: Parameters<Pg15Harness['connect']>[0];
 
   beforeEach(async () => {
     harness = new Pg15Harness();
     harness.start();
     const db = harness.createDatabase('import');
+    dbConfig = db.config;
     admin = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
     await admin.query('CREATE ROLE t2_runtime LOGIN; GRANT app_runtime TO t2_runtime');
@@ -281,6 +283,32 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
       payload: multipart(CSV, 'text/csv'),
     });
     expect(accepted.statusCode).toBe(202);
+  });
+
+  it('waits on the enqueue lock so a concurrent enqueue cannot slip past the sweep', async () => {
+    const auth = await login('owner');
+    // Hold the exact key assert_no_in_flight_content_import / enqueue take.
+    const holder = await harness.connect(dbConfig);
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT pg_catalog.pg_advisory_xact_lock(724019, 19)');
+      const pending = app.inject({
+        method: 'POST',
+        url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+        headers: { ...auth, 'idempotency-key': 'idem-t2-lock-sweep', 'content-type': 'application/json' },
+        payload: { reason: 'synthetic-revise' },
+      });
+      // An unserialized sweep would answer immediately; a correct one blocks on the key.
+      const raced = await Promise.race([
+        pending.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => { resolve('blocked'); }, 500)),
+      ]);
+      expect(raced).toBe('blocked');
+      await holder.query('ROLLBACK');
+      expect((await pending).statusCode).toBe(404);
+    } finally {
+      await holder.end();
+    }
   });
 
   it('refuses the sweep for an actor with nothing in flight without touching another actor batch', async () => {
