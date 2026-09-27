@@ -192,7 +192,10 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
   it('stages a 501-row import without dual-review parking', async () => {
     const file = Buffer.from([
       CSV.toString().split('\n')[0],
-      ...Array.from({ length: 501 }, (_, i) => `scale-${i},presale,合成标题${i},合成回答${i},srcv_t3_presale_scale,SRC-T3-PRESALE,合成问题${i},low,false`),
+      // staging script ids also become question ids (`q_<id>`); the frozen
+      // `content_questions_are_valid` regex needs at least 8 characters after
+      // `q_`, so pad the synthetic ids rather than using `scale-0`.
+      ...Array.from({ length: 501 }, (_, i) => `scale-${String(i).padStart(4, '0')},presale,合成标题${i},合成回答${i},srcv_t3_presale_scale,SRC-T3-PRESALE,合成问题${i},low,false`),
       '',
     ].join('\n'));
     const bindings = BINDINGS.map((b) => ({ ...b, source_version_id: b.source_version_id.replace('_v1', '_scale') }));
