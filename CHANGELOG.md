@@ -8,6 +8,14 @@ All notable changes to this customer-agent product implementation repository are
 
 - 取消未完成导入 no longer reports a cancel it did not make. When nothing is actually in flight the workbench now says 当前没有未完成的导入，登录还在，不必重新登录。 instead of a false success, so an operator is not told the queue is clear while a staged import still blocks the next one.
 
+### Documentation
+
+- 新增 [内容导入与发布合同](docs/reference-content-publish.md)：IPC 通道、HTTP 接口与合同角色/错误码、限额、每进程速率窗、哨兵批号与「取消全部」的两条必要条件、失败码中文映射、发布闸门。
+- 新增 [打包与签名](docs/reference-packaging-and-signing.md)：macOS 签名 + 公证的 fail-closed 前置检查与三验，以及 Windows / Linux 只能出未签名包这条边界。
+- 新增 [组织已审证据的边界](docs/explanation-org-review-evidence.md)：说清库里那条质检证据是 worker 写的声明，不是独立控制，以及拿它对账时不能做什么。
+- 新增 [docs/plans 索引](docs/plans/README.md)：分开历史计划与现行计划。按仓规只增不删，未删任何文件。
+- 删减已确认过期的说法：DEVELOPMENT_BRIEF 的 owner 发布「走 dual-review」、README 的「合成导入/审核/发布」与 v0.3.16 / v0.3.18、AGENTS 的 0.3.18 本机包。话术库**单条** pending_review 的 dual-review 说法仍然成立，保留。
+
 ## [0.3.20] - 2026-09-27
 
 ### Added

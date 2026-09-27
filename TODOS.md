@@ -1,6 +1,8 @@
 # TODOS
 
-> **复核：** 2026-09-16。四项 P3 窄分支已由产品 PR #69 合并。登录残留红字已由 PR #68 修复。BACKEND-CI-503 已由 PR #91 修复并关闭。它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。macOS M5 人工勾选见 `docs/how-to-verify-macos-m5.md`，清单进仓不等于验收通过。
+> **复核：** 2026-09-27（产品 0.3.21）。P1 打包态配置失败、P2 首轮范围、P3 离线 profile 三项已收口，从 Open 移入 Completed。Open 现在只剩真正未闭的交付债。
+>
+> **历史结论（2026-09-16）：** 四项 P3 窄分支已由产品 PR #69 合并。登录残留红字已由 PR #68 修复。BACKEND-CI-503 已由 PR #91 修复并关闭。它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。macOS M5 人工勾选见 `docs/how-to-verify-macos-m5.md`，清单进仓不等于验收通过。
 >
 > **Open 段的来源：** 2026-09-16 的交付形态评审（对 Windows 打包态在办公机上的可用性做只读复核）。该评审推翻了若干先前判断，结论见下。
 >
@@ -9,51 +11,6 @@
 > **方法论警告（2026-09-17）：** 验证期间曾把「对话框几秒后自行消失」判成缺陷，随后证伪——这台机器上**有人在操作**，观测窗口内 `HIDIdleTime` 从未超过 3.5 秒，且返回值是按钮下标而非模态中止码。**在本机做任何「对话框会不会自己关掉」的自动化观测都不可信**，除非同时记录 HID 输入空闲时间。
 
 ## Open
-
-### P1 · 打包态配置失败没有可见反馈
-
-**What:** 打包构建在 userData 缺 `synthetic-stack.json`、其中 origin 非法、或该文件不可读时，`product-runtime-config.ts` 抛错，`main.ts` 的 catch 后 `app.quit()`。双击 exe 时看不到 stdout，使用者只看到「闪一下」。
-
-**Why:** 拒绝业务运行是合理设计；**无可见解释地退出是另一项可用性问题**。当前办公机场景必然命中这条路径。
-
-**Context:** `apps/desktop/src/main/product-runtime-config.ts`（`PackagedProfileError`，kind 为 `missing` / `invalid` / `unreadable`）、`apps/desktop/src/main/startup-failure-notice.ts`（可见提示）、`apps/desktop/src/main/main.ts:168`（调用点）、`apps/desktop/src/main/main.ts:230`（退出路径）。fail-closed 必须保留，不得退回 S0 静默降级。
-
-**Status:** 已实现（`d419016`），**打包态实机验证通过**。
-
-在真实 `.app`（`pnpm package:mac:local` 产物，asar 内含新代码）上确认：
-
-- `missing` 与 `invalid` 两类都弹出了文案与按钮正确的原生对话框。按窗口 ID 截图可见标题、正文与两个按钮；直接运行二进制时进程阻塞在 `-[NSAlert runModal]`，`sample` 采样 1645/1645 帧全在主模态循环内，对话框不会自行关闭。
-- `invalid` 正确拒绝了 `apiOrigin` 指向非 loopback 的配置（`kind: 'invalid'`），fail-closed 保留，未退回 S0。
-- **「重试」入口被真实点击验证过**：`missing` 场景下按默认按钮（下标 0 = 重试）后，进程树出现 `app.relaunch()` 特征——原进程派生一个子进程后退出，0.5 秒后新实例起来并重新弹窗。重试链路端到端成立。
-- 单按钮场景（`invalid`）按下按钮后不重试、直接 fail-closed 退出，与设计一致。
-
-**未覆盖**：`unreadable` 无法在真产物上复现（触发它需要 profile 目录本身不可穿越，那会连带破坏 Electron 其余的 userData 处理），仍只有单测覆盖；「重试」按钮的**合成点击**无法在本机做（进程无辅助功能权限，`AXIsProcessTrusted=false`），上面的重试证据来自真实人工点击。
-
-### P2 · 首轮 Windows 验收范围未定
-
-**What:** 需要用户明确：办公机首轮只验安装/启动/浮窗/快捷键/卸载，还是要验完整产品会话链（登录、查询、复制、STALE）。
-
-**Why:** 这个决定直接选择实现路径，比「Windows 四项确认」更根本。只验前者用离线 synthetic profile 即可；验后者必须先补后端鉴权与访问准入。
-
-**Context:** 见 `docs/plans/2026-09-10-windows-package-and-device-verification.md`。约束澄清要点：办公机是**只是不能单独安装开发工具**，还是**也禁止包内辅助进程、本地监听、数据库进程**？Electron 本身内置 Node.js，"不装 Node/pnpm" 不等于"应用内不能用 Node 运行时"。
-
-**Effort:** — （决定项）
-**Priority:** P1
-**Depends on:** None
-**Status:** 已拍板（2026-09-17）。首轮只验安装 / 启动 / 浮窗 / 快捷键 / 卸载；办公机只禁单独安装开发工具，不禁 Electron 自带运行时；首轮必须断网可用。路径锁 **P3 显式离线 profile**，不走 P4 / P10。
-
-### P3 · 显式离线 synthetic profile
-
-**What:** 给应用加一个离线演示运行模式，使用安装包内自带的合成 fixture，完全不连后端。
-
-**Why:** 满足办公机约束的最短路径。可验安装、启动、浮窗、快捷键、卸载；不可验登录/查询/复制/STALE。
-
-**Context:** 仅在 P2 判定为「只验安装与交互」时实施。不得把它当作产品主链验收。
-
-**Effort:** M
-**Priority:** P2
-**Depends on:** P2
-**Status:** 三刀代码已合入。本机 UNSIGNED mac seed 与 `pnpm package:win` 后验已记录。办公机实机勾选清单：`docs/how-to-office-machine-first-round.md`（人填，开发机不代填）。
 
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 
@@ -176,6 +133,49 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Status:** 本轮不做 native · IME 级隐身仍待产品明确
 
 ## Completed
+
+### P3 · 显式离线 synthetic profile
+
+**What:** 给应用加一个离线演示运行模式，使用安装包内自带的合成 fixture，完全不连后端。
+
+**Why:** 满足办公机约束的最短路径。可验安装、启动、浮窗、快捷键、卸载；不可验登录/查询/复制/STALE。
+
+**Context:** 仅在 P2 判定为「只验安装与交互」时实施。不得把它当作产品主链验收。
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** P2
+**Status:** 已合入 main。本机 UNSIGNED mac seed 与 `pnpm package:win` 后验已记录。办公机实机勾选清单：`docs/how-to-office-machine-first-round.md`（人填，开发机不代填）。
+
+### P2 · 首轮 Windows 验收范围未定
+
+**What:** 需要用户明确：办公机首轮只验安装/启动/浮窗/快捷键/卸载，还是要验完整产品会话链（登录、查询、复制、STALE）。
+
+**Why:** 这个决定直接选择实现路径，比「Windows 四项确认」更根本。只验前者用离线 synthetic profile 即可；验后者必须先补后端鉴权与访问准入。
+
+**Context:** 见 `docs/plans/2026-09-10-windows-package-and-device-verification.md`。约束澄清要点：办公机是**只是不能单独安装开发工具**，还是**也禁止包内辅助进程、本地监听、数据库进程**？Electron 本身内置 Node.js，"不装 Node/pnpm" 不等于"应用内不能用 Node 运行时"。
+
+**Status:** 已拍板（2026-09-17）。首轮只验安装 / 启动 / 浮窗 / 快捷键 / 卸载；办公机只禁单独安装开发工具，不禁 Electron 自带运行时；首轮必须断网可用。路径锁 P3 显式离线 profile，不走 P4 / P10。
+
+### P1 · 打包态配置失败没有可见反馈
+
+**What:** 打包构建在 userData 缺 `synthetic-stack.json`、其中 origin 非法、或该文件不可读时，`product-runtime-config.ts` 抛错，`main.ts` 的 catch 后 `app.quit()`。双击 exe 时看不到 stdout，使用者只看到「闪一下」。
+
+**Why:** 拒绝业务运行是合理设计；**无可见解释地退出是另一项可用性问题**。当前办公机场景必然命中这条路径。
+
+**Context:** `apps/desktop/src/main/product-runtime-config.ts`（`PackagedProfileError`，kind 为 `missing` / `invalid` / `unreadable`）、`apps/desktop/src/main/startup-failure-notice.ts`（可见提示）、`apps/desktop/src/main/main.ts:168`（调用点）、`apps/desktop/src/main/main.ts:230`（退出路径）。fail-closed 必须保留，不得退回 S0 静默降级。
+
+**Status:** 已实现（`d419016`），**打包态实机验证通过**。
+
+在真实 `.app`（`pnpm package:mac:local` 产物，asar 内含新代码）上确认：
+
+- `missing` 与 `invalid` 两类都弹出了文案与按钮正确的原生对话框。按窗口 ID 截图可见标题、正文与两个按钮；直接运行二进制时进程阻塞在 `-[NSAlert runModal]`，`sample` 采样 1645/1645 帧全在主模态循环内，对话框不会自行关闭。
+- `invalid` 正确拒绝了 `apiOrigin` 指向非 loopback 的配置（`kind: 'invalid'`），fail-closed 保留，未退回 S0。
+- **「重试」入口被真实点击验证过**：`missing` 场景下按默认按钮（下标 0 = 重试）后，进程树出现 `app.relaunch()` 特征——原进程派生一个子进程后退出，0.5 秒后新实例起来并重新弹窗。重试链路端到端成立。
+- 单按钮场景（`invalid`）按下按钮后不重试、直接 fail-closed 退出，与设计一致。
+
+**未覆盖**：`unreadable` 无法在真产物上复现（触发它需要 profile 目录本身不可穿越，那会连带破坏 Electron 其余的 userData 处理），仍只有单测覆盖；「重试」按钮的**合成点击**无法在本机做（进程无辅助功能权限，`AXISProcessTrusted=false`），上面的重试证据来自真实人工点击。
+
 
 ### P1 · 待办页按稿展示「话术不准」次数
 
