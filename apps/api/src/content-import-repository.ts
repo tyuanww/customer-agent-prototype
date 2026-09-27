@@ -419,10 +419,22 @@ export function createContentImportRepository(
           return failure(claim.code, commitCertaintyAfterError(!broken));
         }
         if (importBatchId === ACTOR_IN_FLIGHT_IMPORT_ID) {
-          await client.query(
+          const cancelled = await client.query<{ cancel_actor_in_flight_imports: number }>(
             'SELECT public.cancel_actor_in_flight_imports($1, $2)',
             [actor.user_id, actor.role],
           );
+          // The actor-in-flight sentinel names no single batch, so an empty sweep is
+          // "that resource does not exist", not a successful cancel. Reporting 200 here
+          // would tell an operator the queue is clear while a staged batch still blocks
+          // the next import. 404 is the frozen contract's code for this (desktop maps it
+          // to GONE, whose copy is already CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT).
+          // Fail closed on anything that is not a positive count: an absent row or a
+          // non-numeric shape must never read as "something was cancelled".
+          const swept = cancelled.rows[0]?.cancel_actor_in_flight_imports;
+          if (typeof swept !== 'number' || !Number.isFinite(swept) || swept <= 0) {
+            broken = !(await rollback(client));
+            return failure('NOT_FOUND', commitCertaintyAfterError(!broken));
+          }
         } else {
           await client.query(
             'SELECT public.cancel_content_import($1, $2, $3, $4)',
