@@ -4,6 +4,7 @@ import {
   bindingsForRows,
   contentPublishGate,
   CONTENT_PUBLISH_COPY,
+  type DashboardContentDomain,
   type DashboardContentSessionView,
 } from '@shared/dashboard-content';
 import {
@@ -55,6 +56,18 @@ function domainLabel(domain: DomainId | undefined): string {
   return DOMAIN_LABELS[domain];
 }
 
+const DOMAIN_OPTIONS: readonly { value: DashboardContentDomain; label: string }[] = [
+  { value: 'product', label: '产品' },
+  { value: 'campaign', label: '活动' },
+  { value: 'presale', label: '售前' },
+  { value: 'aftersale', label: '售后' },
+];
+
+/** Same rows, relabelled to one chosen domain. Used when the file name guesses wrong. */
+function withDomain(rows: readonly CoachUploadRow[], domain: DashboardContentDomain): readonly CoachUploadRow[] {
+  return rows.map((row) => ({ scene: row.scene, script: row.script, domain }));
+}
+
 function applyUploadResult(result: CoachUploadResult): UploadView {
   if (result.ok) {
     return { status: 'ready', sourceName: result.sourceName, rows: result.rows, csvText: result.csvText };
@@ -79,15 +92,19 @@ export function ContentModule() {
   const [sessionView, setSessionView] = useState<DashboardContentSessionView | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
+  const [domainOverride, setDomainOverride] = useState<DashboardContentDomain | ''>('');
   const ingestGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const hasDomain = upload.status === 'ready' && upload.rows.some((row) => row.domain);
-  const statusMessage = upload.status === 'ready'
-    ? `待发布 · ${upload.rows.length} 行 · ${upload.sourceName} · 不是已发布`
-    : upload.status === 'reading'
-      ? `正在读取 ${upload.sourceName} · 只在本页预览，不会发布`
-      : upload.status === 'error'
-        ? upload.message
+  const effectiveUpload: UploadView = domainOverride !== '' && upload.status === 'ready'
+    ? { ...upload, rows: withDomain(upload.rows, domainOverride) }
+    : upload;
+  const hasDomain = effectiveUpload.status === 'ready' && effectiveUpload.rows.some((row) => row.domain);
+  const statusMessage = effectiveUpload.status === 'ready'
+    ? `待发布 · ${effectiveUpload.rows.length} 行 · ${effectiveUpload.sourceName} · 不是已发布`
+    : effectiveUpload.status === 'reading'
+      ? `正在读取 ${effectiveUpload.sourceName} · 只在本页预览，不会发布`
+      : effectiveUpload.status === 'error'
+        ? effectiveUpload.message
         : '尚未导入。选择 CSV 或 xlsx；中文表头（快捷短语/产品话术）会映射到场景与标准话术。空白行会跳过。';
 
   useEffect(() => {
@@ -111,7 +128,7 @@ export function ContentModule() {
     };
   }, []);
 
-  const rows = uploadRows(upload);
+  const rows = uploadRows(effectiveUpload);
   const sourceBindings = bindingsForRows(rows);
   const gate = contentPublishGate({
     productAvailable: Boolean(window.dashboardContent) && sessionView?.enabled !== false,
@@ -139,6 +156,7 @@ export function ContentModule() {
   const clearUpload = () => {
     ingestGeneration.current += 1;
     setPublishFeedback(null);
+    setDomainOverride('');
     setUpload({ status: 'idle' });
   };
 
@@ -150,6 +168,7 @@ export function ContentModule() {
     const generation = ingestGeneration.current + 1;
     ingestGeneration.current = generation;
     setPublishFeedback(null);
+    setDomainOverride('');
     setUpload({ status: 'reading', sourceName: file.name.trim() || 'untitled.csv' });
     void readCoachUploadFile(file).then(
       (result) => {
@@ -331,6 +350,31 @@ export function ContentModule() {
         </div>
 
         {upload.status === 'ready' ? (
+          <div className="dash-filter-toolbar compact content-domain-picker" aria-label="归属话术库">
+            <label htmlFor="content-domain-override">归属话术库</label>
+            <span data-testid="content-domain-detected">
+              {hasDomain ? `表里识别到：${[...new Set(rows.map((row) => row.domain))].map(domainLabel).join('、')}` : '表里没有域列'}
+            </span>
+            <select
+              id="content-domain-override"
+              data-testid="content-domain-override"
+              value={domainOverride}
+              onChange={(event) => {
+                setDomainOverride(event.currentTarget.value as DashboardContentDomain | '');
+              }}
+            >
+              <option value="">按表里的域</option>
+              {DOMAIN_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <span className="dash-scope">
+              选错库不会报错但会传错区。这张表实际属于哪个话术库，就在这里确认。
+            </span>
+          </div>
+        ) : null}
+
+        {upload.status === 'ready' ? (
           <div className="dash-table-wrap content-staged-preview" data-testid="content-staged-preview">
             <table className="dash-table">
               <caption>待发布预览 · 场景 / 标准话术</caption>
@@ -342,7 +386,7 @@ export function ContentModule() {
                 </tr>
               </thead>
               <tbody>
-                {upload.rows.map((row, index) => (
+                {rows.map((row, index) => (
                   <tr key={`${row.scene}-${index}`}>
                     {hasDomain ? <td>{domainLabel(row.domain)}</td> : null}
                     <td>{row.scene}</td>

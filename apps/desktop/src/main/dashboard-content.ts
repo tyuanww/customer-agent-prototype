@@ -36,8 +36,14 @@ function asFailure(error: unknown): DashboardContentFailure {
       : 'VALIDATION';
     return dashboardContentFailure(code, message);
   }
+  // A bare CONFLICT with no reason is the enqueue single-flight gate (assert_no_in_flight_content_import,
+  // DETAIL='CONFLICT'). Only that case is an in-flight import; every other conflict keeps the generic
+  // copy rather than claiming a draft is queued when none is.
   if (error.code === 'CONFLICT') {
-    return dashboardContentFailure('CONFLICT', CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
+    return dashboardContentFailure(
+      'CONFLICT',
+      error.reason === 'CONFLICT' ? CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT : undefined,
+    );
   }
   if (error.code === 'GONE') {
     return dashboardContentFailure('GONE', CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
@@ -238,15 +244,16 @@ export async function dashboardContentPublish(
     if (!view.signedIn || view.role === null) {
       return dashboardContentFailure('UNAUTHORIZED', CONTENT_PUBLISH_COPY.noSession);
     }
-    const parsed = parseCoachUploadCsv(payload.csvText, payload.sourceName);
-    if (!parsed.ok) return dashboardContentFailure('VALIDATION', parsed.message);
-    const frozen = importCsvText(parsed.rows, parsed.csvText, payload.sourceBindings);
+    // The renderer sends the rows it actually resolved (including any domain override the
+    // operator set). Re-parsing csvText here would silently discard that, so the effective
+    // rows are the source of truth; the request validator already proved their shape.
+    const frozen = importCsvText(payload.rows, payload.csvText, payload.sourceBindings);
     if (!frozen) return dashboardContentFailure('VALIDATION', CONTENT_PUBLISH_COPY.missingBindings);
     const gate = contentPublishGate({
       productAvailable: true,
       signedIn: true,
       role: view.role,
-      rows: parsed.rows,
+      rows: payload.rows,
       sourceBindings: payload.sourceBindings,
     });
     if (!gate.allowed) return dashboardContentFailure(gate.code, gate.message);

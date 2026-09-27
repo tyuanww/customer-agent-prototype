@@ -239,6 +239,37 @@ it('shows the source denial instead of the owner-only sentence', async () => {
   });
 });
 
+it('names a question identity conflict as its own problem instead of an in-flight draft', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('VALIDATION', 'QUESTION_IDENTITY_CONFLICT'));
+  const result = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
+  expect(result).toMatchObject({
+    ok: false,
+    code: 'VALIDATION',
+    message: CONTENT_IMPORT_FAILURE_COPY.QUESTION_IDENTITY_CONFLICT,
+  });
+  expect((result as Readonly<{ message: string }>).message)
+    .not.toBe(CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
+});
+
+it('keeps the in-flight copy only for the enqueue single-flight conflict', async () => {
+  const inFlight = fakeSession('owner');
+  vi.mocked(inFlight.request).mockRejectedValueOnce(new ProductHttpError('CONFLICT', 'CONFLICT'));
+  expect(await dashboardContentPublish(inFlight, publishPayload(csv, [productBinding]))).toMatchObject({
+    ok: false,
+    code: 'CONFLICT',
+    message: CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT,
+  });
+
+  // A reasonless conflict is not proof that this actor has a draft queued; do not claim one.
+  const other = fakeSession('owner');
+  vi.mocked(other.request).mockRejectedValueOnce(new ProductHttpError('CONFLICT'));
+  const generic = await dashboardContentPublish(other, publishPayload(csv, [productBinding]));
+  expect(generic).toMatchObject({ ok: false, code: 'CONFLICT' });
+  expect((generic as Readonly<{ message: string }>).message)
+    .not.toBe(CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
+});
+
 function zipLocal(name: string, payload: Buffer): Buffer {
   const nameBytes = Buffer.from(name, 'utf8');
   const compressed = deflateRawSync(payload);
@@ -330,7 +361,7 @@ it('posts frozen contract csv and rewrites xlsx filenames when stack bindings ma
   expect(file.name).toBe('【FAQ】MENOKIN话术.csv');
   const text = await file.text();
   expect(text).toContain('script_id,category,title,answer_text,source_version_id,source_ref,question_text');
-  expect(text).toContain('upl00001,product,');
+  expect(text).toMatch(/upl[0-9a-f]{16},product,/u);
   expect(text).toContain('srcv_stack_product_v1,SRC-STACK-PRODUCT');
   expect(text).not.toMatch(/^scene,script,domain/u);
 });
