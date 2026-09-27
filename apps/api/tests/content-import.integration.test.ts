@@ -269,10 +269,13 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     expect(missing.statusCode).toBe(403);
     expect(missing.json().error.details.reason).toBe('SOURCE_NOT_ELIGIBLE');
     await seedSources('d'.repeat(64));
+    // A coach cannot advance the registered snapshot, so a mismatched table still
+    // fails closed and leaves the enqueue rolled back.
+    const coach = await login('coach');
     const mismatch = await app.inject({
       method: 'POST',
       url: '/v1/content/import',
-      headers: importHeaders(auth, '----t2boundary', 'idem-mismatch'),
+      headers: importHeaders(coach, '----t2boundary', 'idem-mismatch'),
       payload: multipart(CSV, 'text/csv'),
     });
     expect(mismatch.statusCode).toBe(400);
@@ -284,6 +287,19 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     ]);
     expect(audits.rows.every((row: { operation: string }) => row.operation === 'content_import')).toBe(true);
     expect((await admin.query('SELECT count(*)::int AS n FROM public.import_batches')).rows[0].n).toBe(0);
+    // An owner import registers the uploaded table as the new snapshot instead of
+    // rejecting it, so the next owner import of the same file matches.
+    const ownerImport = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import',
+      headers: importHeaders(auth, '----t2boundary', 'idem-mismatch-owner'),
+      payload: multipart(CSV, 'text/csv'),
+    });
+    expect(ownerImport.statusCode).toBe(202);
+    const registered = await admin.query(
+      "SELECT DISTINCT snapshot_sha256 FROM public.authoritative_source_versions WHERE use_class = 'canonical'",
+    );
+    expect(registered.rows.map((row: { snapshot_sha256: string }) => row.snapshot_sha256)).toEqual([sha256(CSV)]);
   });
 
   it('reclaims the object after a known database enqueue failure', async () => {
