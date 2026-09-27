@@ -19,6 +19,32 @@ CREATE TABLE IF NOT EXISTS public.source_snapshot_revisions (
 DROP FUNCTION IF EXISTS public.advance_source_snapshots(JSONB, TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.assert_no_in_flight_content_import();
 
+-- `authoritative_source_versions` carries an unconditional immutability trigger
+-- from 0006. Org-reviewed publish has to move one column on that table, so the
+-- trigger stays strict for every other caller: a row may change only when a
+-- definer function has opened the advance window for this transaction, and even
+-- then only `snapshot_sha256` may differ. The previous value is recorded in
+-- `source_snapshot_revisions` before the update, so nothing is lost.
+CREATE OR REPLACE FUNCTION public.trg_source_history_immutable()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND pg_catalog.current_setting('customer_agent.source_snapshot_advance', TRUE) = 'on'
+     AND pg_catalog.to_jsonb(NEW) - 'snapshot_sha256'
+         = pg_catalog.to_jsonb(OLD) - 'snapshot_sha256'
+  THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION USING
+    ERRCODE = 'ZA005',
+    MESSAGE = pg_catalog.format('%I source/audit history is immutable', TG_TABLE_NAME),
+    DETAIL = 'SOURCE_HISTORY_IMMUTABLE';
+END;
+$$;
+
+
 CREATE OR REPLACE FUNCTION public.record_org_reviewed_quality_evidence(
   p_job TEXT,
   p_owner TEXT,
@@ -347,6 +373,7 @@ BEGIN
   SELECT pg_catalog.count(*)::INTEGER INTO v_count
   FROM pg_catalog.jsonb_to_recordset(p_source_bindings) requested(domain TEXT, source_version_id TEXT);
 
+  PERFORM pg_catalog.set_config('customer_agent.source_snapshot_advance', 'on', TRUE);
   UPDATE public.authoritative_source_versions AS asv
   SET snapshot_sha256 = p_snapshot_sha256
   FROM pg_catalog.jsonb_to_recordset(p_source_bindings) AS requested(domain TEXT, source_version_id TEXT)
@@ -354,6 +381,7 @@ BEGIN
     AND asv.domain = requested.domain
     AND asv.use_class = 'canonical';
   GET DIAGNOSTICS n = ROW_COUNT;
+  PERFORM pg_catalog.set_config('customer_agent.source_snapshot_advance', 'off', TRUE);
   IF n IS DISTINCT FROM v_count THEN
     RAISE EXCEPTION USING ERRCODE = 'ZA004', MESSAGE = 'source version is not registered for runtime use', DETAIL = 'SOURCE_NOT_ELIGIBLE';
   END IF;
@@ -366,6 +394,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
+  PERFORM pg_catalog.set_config('customer_agent.source_snapshot_advance', 'on', TRUE);
   UPDATE public.authoritative_source_versions AS asv
   SET snapshot_sha256 = rev.previous_sha256
   FROM public.source_snapshot_revisions AS rev
@@ -373,6 +402,7 @@ BEGIN
     AND asv.source_version_id = rev.source_version_id
     AND asv.domain = rev.domain
     AND asv.snapshot_sha256 = rev.new_sha256;
+  PERFORM pg_catalog.set_config('customer_agent.source_snapshot_advance', 'off', TRUE);
   DELETE FROM public.source_snapshot_revisions WHERE import_batch_id = p_import_batch_id;
 END;
 $$;
