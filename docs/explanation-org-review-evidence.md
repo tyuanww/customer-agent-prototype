@@ -39,12 +39,19 @@ sha256('org-reviewed:feishu-doc:qa:'   || batch_id)
 `REVIEW_EVIDENCE_TRUST_BOUNDARY` 检查存在，也确实有用，但它的作用域很窄：
 
 ```sql
--- 0016, record_org_reviewed_quality_evidence 内
-IF (payload ? ANY review/quality 字段) THEN
+-- 0016, finalize_org_reviewed_import_validation 内
+IF EXISTS (
+  SELECT 1 FROM pg_catalog.jsonb_array_elements(p_rows) AS item(value)
+  WHERE item.value ?| ARRAY[
+    'review_mode','primary_reviewer_id','primary_reviewer_role','primary_review_evd',
+    'secondary_reviewer_id','secondary_reviewer_role','secondary_review_evd','quality_gate_passed'
+  ]) THEN
   RAISE EXCEPTION ... DETAIL = 'REVIEW_EVIDENCE_TRUST_BOUNDARY';
 ```
 
-它做的是：**拒绝 worker 在 payload 里夹带审核字段**。也就是不允许 worker 把「我认为这条过了」塞进输入。
+它做的是：**拒绝 worker 在 payload 里夹带这 8 个审核 / 质量字段**。也就是不允许 worker 把「我认为这条过了」塞进输入。
+
+注意位置：这道检查在 **finalize**，不在 record。同一个 finalize 还会确认 record 写下的那条证据确实存在（不存在即 `QUALITY_GATE_NOT_PASSED`）。
 
 它**不**做的是：阻止这两个 definer 函数自己往 `content_quality_review_evidence` 落一行 `passed`。落库这件事本身，就是被授权的。
 
