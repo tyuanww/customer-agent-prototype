@@ -252,56 +252,57 @@ Community 3/10 不挡内部发版。Error 7/10：新合同码要补进映射表�
 DX IMPLEMENTATION CHECKLIST
 ============================
 [ ] Time to hello world < 2 min（办公机秒表）
-[ ] 选表后发布可点（无审核确认）
-[ ] 成功面板：releaseId + displayName
-[ ] 每个导入失败：问题 + 原因 + 怎么修（码在日志）
-[ ] 一次一份进行中导入，原因可见，staged 可取消
-[ ] how-to / tutorial / README / DESIGN / AGENTS 与 4A 一致
+[x] 选表后发布可点（无审核确认）
+[x] 成功面板：releaseId + displayName
+[x] 每个导入失败：问题 + 原因 + 怎么修（码在日志）
+[x] 一次一份进行中导入，原因可见，staged 可取消
+[x] how-to / tutorial / README / DESIGN / AGENTS 与 4A 一致
 [ ] 新 Windows 桌面包装到办公机
-[ ] 6A 测试含桌面断言，dual-review 回归改断言不跳过
-[ ] Health stack 绿
+[x] 6A 测试含桌面断言，dual-review 回归改断言不跳过
+[x] Health stack 绿
 ```
 
 ## Implementation Tasks
 
 Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~4h / CC: ~30min)** — desktop — 生产发布去掉 completeSignedInReview，并停用 43112 合成三连
+- [x] **T1 (P1, human: ~4h / CC: ~30min)** — desktop — 生产发布去掉 completeSignedInReview，并停用 43112 合成三连
+  - 完成（0.3.20 切生产路径；0.3.21 后由 `chore/remove-dormant-dual-review-code` 删除残留死代码）
   - Surfaced by: Outside voice #1 / D14 — ipc.ts:76-83 才是办公机路径
   - Files: `apps/desktop/src/main/dashboard-content-ipc.ts`, `apps/desktop/src/main/dashboard-content.ts`, `apps/desktop/src/main/dashboard-content-review.ts`
   - Verify: `pnpm test` 中 dashboard-content-signed-in-review 与 dashboard-content-review 改断言
 
-- [ ] **T2 (P1, human: ~1d / CC: ~2h)** — database — 新 migration：组织已审证据过质检门
+- [x] **T2 (P1, human: ~1d / CC: ~2h)** — database — 新 migration：组织已审证据过质检门
   - Surfaced by: Outside voice #3 / D15 — QUALITY_GATE_NOT_PASSED
   - Files: 新 migration（禁止改 `packages/database/migrations/0012_owner_acceptance_v1_15.sql`）
   - Verify: `pnpm test:db` publish owner+staged 无三票
 
-- [ ] **T3 (P1, human: ~1d / CC: ~2h)** — api/desktop — 导入登记上传字节为新 snapshot
+- [x] **T3 (P1, human: ~1d / CC: ~2h)** — api/desktop — 导入登记上传字节为新 snapshot
   - Surfaced by: Outside voice #4 / D16 — SOURCE_SNAPSHOT_MISMATCH
   - Files: enqueue/import 路径、`apps/desktop/src/renderer/features/dashboard/ContentModule.tsx` 绑定来源（不编造四域）
   - Verify: 飞书导出表可入队；错误哈希仍中文失败
 
-- [ ] **T4 (P1, human: ~4h / CC: ~30min)** — worker — validate 成功 staged，不 park
+- [x] **T4 (P1, human: ~4h / CC: ~30min)** — worker — validate 成功 staged，不 park
   - Surfaced by: 4A
   - Files: content worker validate
   - Verify: 成功无 `backend_review.waits`
 
-- [ ] **T5 (P1, human: ~0.5d / CC: ~45min)** — desktop — 去掉审核确认；待发布文案；成功面板
+- [x] **T5 (P1, human: ~0.5d / CC: ~45min)** — desktop — 去掉审核确认；待发布文案；成功面板
   - Surfaced by: D9 / D10 / 0D — ContentModule.tsx:136-151, :273, :314
   - Files: `ContentModule.tsx`, `dashboard-content.ts` CONTENT_PUBLISH_COPY, session displayName
   - Verify: ContentModule / DashboardApp / dashboard-manifest 测试改断言
 
-- [ ] **T6 (P1, human: ~0.5d / CC: ~1h)** — desktop — asFailure 映射 reason 中文
+- [x] **T6 (P1, human: ~0.5d / CC: ~1h)** — desktop — asFailure 映射 reason 中文
   - Surfaced by: D7 — dashboard-content.ts:26-38 丢掉 reason
   - Files: `apps/desktop/src/main/dashboard-content.ts`, `apps/desktop/src/shared/dashboard-content.ts`
   - Verify: 失败文案表三例
 
-- [ ] **T7 (P1, human: ~0.5d / CC: ~30min)** — api — 2A 服务端拒绝第二份 in-flight；staged 可取消
+- [x] **T7 (P1, human: ~0.5d / CC: ~30min)** — api — 2A 服务端拒绝第二份 in-flight；staged 可取消
   - Surfaced by: 2A / Outside voice #5
   - Files: enqueue SQL/API、工作台取消
   - Verify: 第二份原因可见；failed 释放
 
-- [ ] **T8 (P2, human: ~0.5d / CC: ~30min)** — docs — D11 发版路径文档
+- [x] **T8 (P2, human: ~0.5d / CC: ~30min)** — docs — D11 发版路径文档
   - Surfaced by: Pass 4 / D11
   - Files: `DESIGN.md`, `README.md`, `docs/how-to-verify-desktop.md`, `docs/tutorial-first-run.md`, `docs/tutorial-menokin-content-publish.md`, `AGENTS.md`
   - Verify: 上述文件不再教办公机 dual-review
@@ -310,6 +311,15 @@ Synthesized from this review's findings. Each task derives from a specific findi
   - Surfaced by: D12 / D13
   - Files: 现有 package:win / local-unsigned
   - Verify: 办公机选表到版本号+谁发的 < 2 min；坐席 announce 新 release_id
+
+**T1–T8 完成复核（2026-09-27，0.3.21 main）：**
+- T1 生产路径已切：`dashboard-content-ipc` 不再走 `completeSignedInReview`；43112 合成三连停用，残留死代码已在本分支删除。
+- T2/T3/T4：`0016_office_owner_publish.sql` 的 `record_org_reviewed_quality_evidence` / `advance_source_snapshots` / `finalize_org_reviewed_import_validation` 已接线（worker 与 enqueue 路径均调用）。
+- T5/T6：`ContentModule` 文案已是「待发布」（「待审核草稿」0 处）；`CONTENT_IMPORT_FAILURE_COPY` 已接进 `asFailure`。
+- T7：`assert_no_in_flight_content_import` 与 `cancel_actor_in_flight_imports` 已接线，含哨兵分支与共锁。
+- T8：README / DESIGN / AGENTS 不再教办公机 dual-review（DESIGN 仅保留「产品内不再 park 双人复核」这句正确表述）。
+
+**T9 仍 OPEN：** 唯一未闭合项。需要人在办公机 Windows 上装新包、点「取消未完成导入」、选表发布并掐表 < 2 分钟。开发机不能代填。
 
 _No new tasks from Pass 6 tooling beyond T9. No new tasks from Pass 7 community._
 
