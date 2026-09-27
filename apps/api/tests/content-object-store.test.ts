@@ -5,6 +5,8 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  ACTOR_IN_FLIGHT_IMPORT_ID,
+  CONTENT_IMPORT_BATCH_ID_PATTERN,
   CONTENT_UPLOAD_MAX_BYTES,
   createContentObjectStore,
 } from '../src/content-object-store.js';
@@ -87,5 +89,16 @@ describe('content object store', () => {
     const pending = objects.persist(stalled, 'csv', { timeoutMs: 20 });
     await expect(pending).rejects.toThrow('CONTENT_UPLOAD_TIMEOUT');
     stalled.destroy();
+  });
+});
+
+describe('actor-in-flight cancel sentinel', () => {
+  it('stays a batch id the cancel route would accept', () => {
+    // The sentinel travels the same request path as a real batch id, so the route's
+    // validation must let it through. Shortening it (e.g. 'imp_inflight_01') would
+    // turn "cancel everything" into a 400 before the sweep ever runs, and the value
+    // is coupled to CONTENT_IMPORT_BATCH_ID_PATTERN rather than obviously derived
+    // from it, so pin the pair here.
+    expect(CONTENT_IMPORT_BATCH_ID_PATTERN.test(ACTOR_IN_FLIGHT_IMPORT_ID)).toBe(true);
   });
 });
