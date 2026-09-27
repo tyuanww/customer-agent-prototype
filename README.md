@@ -19,6 +19,9 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 按统一流程开发、审查、提交 PR、合并、验收和发布，处理授权与证据复用 | [工程工作流程](docs/reference-engineering-workflow.md) |
 | 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP 窗、话术不准、内容管理草稿、概览待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
 | 管理员导入仓外 MENOKIN FAQ、校验通过后发布，再查「面膜紫适用人群」 | [docs/tutorial-menokin-content-publish.md](docs/tutorial-menokin-content-publish.md) |
+| 查阅内容导入 / 取消未完成导入 / 发布的 IPC、HTTP、限额、失败码与发布闸门 | [docs/reference-content-publish.md](docs/reference-content-publish.md) |
+| 理解为什么库里那条「组织已审」质检证据只是一条声明，不是独立控制 | [docs/explanation-org-review-evidence.md](docs/explanation-org-review-evidence.md) |
+| 核对 macOS 签名 + 公证门禁，以及 Windows / Linux 为何只能出未签名包 | [docs/reference-packaging-and-signing.md](docs/reference-packaging-and-signing.md) |
 | 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
 | 在办公机 Windows 上勾首轮离线安装 / 浮窗 / 快捷键 / 卸载（人填，开发机不代填） | [docs/how-to-office-machine-first-round.md](docs/how-to-office-machine-first-round.md) |
 | 查阅 Fox / Query / Dashboard / 登录 / SOP 窗口、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
@@ -49,8 +52,8 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 | 核对登录窗飞书改系统浏览器、账号仍本窗（how-to D1；已合入 v0.3.4） | [如何验证 · D1](docs/how-to-verify-desktop.md#合成产品会话接入d1) · [2026-09-18 规格](docs/plans/2026-09-18-login-environment-and-ui.md) |
 | 核对 Mac 开发机 NSPanel / P7 / P9 收口（不引入 native、索引不进包、离线 S0 不验 M5 主链） | [docs/plans/2026-09-18-mac-dev-remainder.md](docs/plans/2026-09-18-mac-dev-remainder.md) |
 | 已合入 main 的分支合入记录（两条 P7 只留 origin 隔离线） | [docs/plans/2026-09-19-local-unpushed-merge-order.md](docs/plans/2026-09-19-local-unpushed-merge-order.md) |
-| 办公机产品主链（远端；Windows 实机仍未观察，用当前 main v0.3.16 的 UNSIGNED.exe） | [docs/how-to-office-machine-product-remote.md](docs/how-to-office-machine-product-remote.md) |
-| macOS 打包态产品主链（远端；0.3.18 上线切面，须重打 UNSIGNED 再勾；账号与断网未观察） | [docs/how-to-macos-packaged-product-remote.md](docs/how-to-macos-packaged-product-remote.md) |
+| 办公机产品主链（远端；Windows 实机仍未观察，用当前 main v0.3.21 的 UNSIGNED.exe） | [docs/how-to-office-machine-product-remote.md](docs/how-to-office-machine-product-remote.md) |
+| macOS 打包态产品主链（远端；须重打 UNSIGNED 再勾；账号与断网未观察） | [docs/how-to-macos-packaged-product-remote.md](docs/how-to-macos-packaged-product-remote.md) |
 | Linux 打包态产品主链（远端，全部未观察；`package:linux` 须在 Linux 上跑） | [docs/how-to-linux-packaged-product-remote.md](docs/how-to-linux-packaged-product-remote.md) |
 | 方案 C：飞书 OAuth + 产品自管账号口令（不用 Logto） | [docs/plans/2026-09-18-identity-c-password-and-feishu.md](docs/plans/2026-09-18-identity-c-password-and-feishu.md) · [how-to](docs/how-to-feishu-and-password-mac.md) |
 | P4 远端：桌面连受控 HTTPS，API 仍 loopback | [docs/plans/2026-09-19-p4-remote-https-profile.md](docs/plans/2026-09-19-p4-remote-https-profile.md) · [how-to](docs/how-to-p4-remote-mac.md) |
@@ -105,7 +108,7 @@ curl --fail --silent http://127.0.0.1:3100/health
 curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/审核/发布、announce 读取、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop（不准落库、SOP 树、话术 pending_review 草稿、检索账、软件目录）；部署型 profile 和 Feishu auth 在监听前拒启。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter 与 Dashboard `dashboardOps`。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
+`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/发布、announce 读取、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop（不准落库、SOP 树、话术 pending_review 草稿、检索账、软件目录）；部署型 profile 和 Feishu auth 在监听前拒启。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter 与 Dashboard `dashboardOps`。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 W4 数据库包只接受调用方提供的已连接 migration-owner `pg.Client`；下面的命令只生成/核验不可变 catalogue，并在隔离临时 PostgreSQL 15 cluster 中测试，不会访问共享本机或生产数据库：
 
