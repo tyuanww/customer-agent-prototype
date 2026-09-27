@@ -312,15 +312,16 @@ _No new tasks from Pass 6 tooling beyond T9. No new tasks from Pass 7 community.
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
-| Outside Review | Codex timeout → Claude subagent | Independent 2nd opinion | 1 native | unavailable (Codex) / issues_found (native) | 生产路径是 completeSignedInReview 不是 43112；QUALITY_GATE_NOT_PASSED；snapshot 哈希会杀飞书表。D14/D15/D16 已采纳 |
-| Eng Review | `/plan-eng-review` | Architecture & tests | 1 | AMENDED | 原 4A/2A/5A/6A 保留；5A 对准 signed-in 三票；补 migration 与 snapshot 登记 |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | ContentModule 门闩与文案已在 DX D9/D10 锁定 |
-| DX Review | `/plan-devex-review` | Developer experience | 1 | CLEAR | POLISH；冠军 <2 min；D7–D13；D14–D16 吸收外部 P0 |
+| Outside Review | Codex timeout → Claude subagent | Independent 2nd opinion | 1 native | unavailable (Codex) / issues_found (native) | 生产路径是 completeSignedInReview 不是 43112。D14–D16 已采纳 |
+| Eng Review | `/plan-eng-review` | Architecture & tests | 1 | AMENDED | 5A 对准 signed-in 三票；补 migration 与 snapshot 登记 |
+| Design Review | `/design-review` | Live UI | 1 | DONE_WITH_CONCERNS | C+→B-；修 001/003/004；说明书墙未动 |
+| DX Review | `/plan-devex-review` + `/devex-review` | Plan POLISH then live | 1+1 | LIVE 6/10 | 待发布 1.1s TESTED；发布未测；how-to/CHANGELOG 仍 dual-review |
 
-**VERDICT:** DX CLEARED — 办公机一人发布方案已锁（含生产路径纠错、质检门 migration、导入登记快照、新 Windows 包）。可实施。
+**OUTSIDE COVERAGE:** plan Codex unavailable；live `/devex-review` 无独立外审。
 
-**OUTSIDE COVERAGE:** unavailable（Codex 5 分钟超时）。Native subagent 发现已通过 D14–D16 写入计划，不计入外部覆盖。
+**VERDICT:** 方案已实施可继续打磨。冠军 TTHW 未在办公机发布上闭合。eng review required for ship。
 
-**CROSS-MODEL:** 原 5A=删 43112。外部=停 completeSignedInReview。用户选 A，计划已改。
-
-NO UNRESOLVED DECISIONS
+**UNRESOLVED DECISIONS:**
+- 后端未部署：0016 overlay 只在本地分支，`main` 里没有；办公机连的 API 仍是旧链路
+- Windows 包仍是 9月22 打的，早于本分支全部提交；T9 秒表未跑
+- CHANGELOG 0.3.19 仍写 dual-review（历史发版说明，按 D11 不改）
