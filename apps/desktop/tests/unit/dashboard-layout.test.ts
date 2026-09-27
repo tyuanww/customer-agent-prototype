@@ -530,7 +530,7 @@ describe('dashboard layout contract', () => {
   });
 
   it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
-    expect(app).toContain('sop: SopLibraryModule');
+    expect(app).toContain('<SopLibraryModule />');
     expect(app).toContain("sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3']");
     expect(sopLibrary).not.toContain('allergySopTree()');
     expect(sopLibrary).toContain('data-testid="module-sop"');
