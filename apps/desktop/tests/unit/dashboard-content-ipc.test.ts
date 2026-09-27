@@ -110,6 +110,36 @@ it('does not call a missing in-flight import a login expiry', async () => {
   });
 });
 
+it('sweeps in-flight imports through the pinned sentinel id and reports the cancel once the API accepts it', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockResolvedValueOnce({
+    status: 200,
+    value: { ok: true, import_batch_id: 'imp_actor_in_flight_01', status: 'failed' },
+  });
+  expect(await dashboardContentCancelInFlight(owner)).toEqual({ ok: true });
+  expect(vi.mocked(owner.request)).toHaveBeenCalledTimes(1);
+  const call = vi.mocked(owner.request).mock.calls[0];
+  expect(call?.[0]).toBe(1);
+  expect(call?.[1]).toBe('/v1/content/import/imp_actor_in_flight_01/cancel');
+  expect(call?.[2]?.body).toEqual({ reason: 'in-flight-self' });
+  expect(typeof call?.[2]?.headers?.['idempotency-key']).toBe('string');
+});
+
+it('fail-closes the cancel sweep without a product session instead of reporting a cancel', async () => {
+  expect(await dashboardContentCancelInFlight(null)).toMatchObject({
+    ok: false,
+    code: 'UNAVAILABLE',
+    message: CONTENT_PUBLISH_COPY.noProduct,
+  });
+  const unsigned = fakeSession('owner', false);
+  expect(await dashboardContentCancelInFlight(unsigned)).toMatchObject({
+    ok: false,
+    code: 'UNAUTHORIZED',
+    message: CONTENT_PUBLISH_COPY.noSession,
+  });
+  expect(unsigned.request).not.toHaveBeenCalled();
+});
+
 it('does not invent source bindings and never returns a fake success', async () => {
   const owner = fakeSession('owner');
   expect(dashboardContentSession(null)).toEqual({
