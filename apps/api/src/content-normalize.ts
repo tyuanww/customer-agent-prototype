@@ -416,6 +416,7 @@ export function parseImportFile(
   defaults: Readonly<{
     intentTaxonomyVersion: string;
     intentId: string;
+    orgReviewedBatchId?: string;
     review?: Readonly<{
       leadHash: string;
       managerHash?: string;
@@ -451,10 +452,16 @@ export function parseImportFile(
     const due = utcTimestampText(new Date(now.getTime() + 365 * 24 * 3600 * 1000));
     const window = readEffectiveWindow(record, category, now);
     const dual = riskLevel === 'high' || hasConflict;
-    const managerHash = defaults.review?.managerHash;
-    if (dual && (!managerHash || managerHash === defaults.review?.leadHash)) {
+    const orgLead = defaults.orgReviewedBatchId
+      ? sha256(`org-reviewed:feishu-doc:lead:${defaults.orgReviewedBatchId}`)
+      : defaults.review?.leadHash;
+    const orgQa = defaults.orgReviewedBatchId
+      ? sha256(`org-reviewed:feishu-doc:qa:${defaults.orgReviewedBatchId}`)
+      : defaults.review?.managerHash;
+    if (dual && !defaults.orgReviewedBatchId && (!orgQa || orgQa === orgLead)) {
       throw new Error('SECOND_REVIEWER_REQUIRED');
     }
+    const orgEvidence = defaults.orgReviewedBatchId ? 'org-reviewed:feishu-doc' : defaults.review?.evidence;
     const questionBase = {
       question_id: `q_${scriptId}`,
       question_version: 1,
@@ -488,12 +495,12 @@ export function parseImportFile(
       risk_categories: riskLevel === 'high' ? ['legal_commitment'] : [],
       has_conflict: hasConflict,
       review_mode: dual ? 'dual' : 'single',
-      primary_reviewer_id: defaults.review?.leadHash ?? null,
-      primary_reviewer_role: defaults.review ? 'ROLE-CONTENT-LEAD' : null,
-      primary_review_evd: defaults.review?.evidence ?? null,
-      secondary_reviewer_id: dual ? managerHash ?? null : null,
+      primary_reviewer_id: orgLead ?? null,
+      primary_reviewer_role: orgLead ? 'ROLE-CONTENT-LEAD' : null,
+      primary_review_evd: orgEvidence ?? null,
+      secondary_reviewer_id: dual ? orgQa ?? null : null,
       secondary_reviewer_role: dual ? 'ROLE-CS-MANAGER' : null,
-      secondary_review_evd: dual ? defaults.review?.evidence ?? null : null,
+      secondary_review_evd: dual ? orgEvidence ?? null : null,
       placeholder_keys: placeholderKeys,
       questions: [question],
     });

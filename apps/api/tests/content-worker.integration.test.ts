@@ -189,10 +189,13 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
     return imported.json().import_batch_id as string;
   }
 
-  it('validates 501-row pagination, expansion and revision_required without staging defects', async () => {
+  it('stages a 501-row import without dual-review parking', async () => {
     const file = Buffer.from([
       CSV.toString().split('\n')[0],
-      ...Array.from({ length: 501 }, (_, i) => `scale-${i},presale,合成标题${i},合成回答${i},srcv_t3_presale_scale,SRC-T3-PRESALE,合成问题${i},low,false`),
+      // staging script ids also become question ids (`q_<id>`); the frozen
+      // `content_questions_are_valid` regex needs at least 8 characters after
+      // `q_`, so pad the synthetic ids rather than using `scale-0`.
+      ...Array.from({ length: 501 }, (_, i) => `scale-${String(i).padStart(4, '0')},presale,合成标题${i},合成回答${i},srcv_t3_presale_scale,SRC-T3-PRESALE,合成问题${i},low,false`),
       '',
     ].join('\n'));
     const bindings = BINDINGS.map((b) => ({ ...b, source_version_id: b.source_version_id.replace('_v1', '_scale') }));
@@ -204,162 +207,52 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
         'EVD-SCALE-SOURCE','synthetic-owner',clock_timestamp(),clock_timestamp()+interval '365 days')
     `, [b.source_version_id,b.source_ref,b.domain,sha('sha256').update(file).digest('hex')]);
     const lead = await productToken('synthetic_lead');
-    const quality = await productToken('synthetic_quality');
     const uploaded = await app.inject({ method: 'POST', url: '/v1/content/import',
       headers: { authorization: `Bearer ${lead}`, 'idempotency-key': 'scale-import',
         'content-type': 'multipart/form-data; boundary=----t3boundary' }, payload: multipart(file, bindings) });
     expect(uploaded.statusCode, uploaded.body).toBe(202);
     const batchId = uploaded.json().import_batch_id as string;
-    expect(await worker.runOnce()).toBe('parked');
+    expect(await worker.runOnce()).toBe('finished');
+    const status = await app.inject({ url: `/v1/content/import/${batchId}`, headers: { authorization: `Bearer ${lead}` } });
+    expect(status.json().status).toBe('staged');
+    expect((await admin.query('SELECT count(*)::int AS n FROM public.staging_scripts WHERE import_batch_id=$1', [batchId])).rows[0].n).toBe(501);
     const listed = await app.inject({ url: '/v1/admin/content/reviews', headers: { authorization: `Bearer ${lead}` } });
-    const revision = listed.json().items[0].review_revision as string;
-    type Item = { script_id: string; content_hash: string; initial_sample: boolean; expanded_sample: boolean };
-    const items: Item[] = [];
-    let after: number | null = 0;
-    do {
-      const page = await app.inject({ url: `/v1/admin/content/reviews/${batchId}?review_revision=${revision}&after=${after}&limit=100`,
-        headers: { authorization: `Bearer ${lead}` } });
-      expect(page.statusCode, page.body).toBe(200);
-      expect(page.json().total).toBe(501);
-      items.push(...page.json().items as Item[]);
-      after = page.json().next_after as number | null;
-    } while (after !== null);
-    expect(items).toHaveLength(501);
-    expect(new Set(items.map(x => x.script_id)).size).toBe(501);
-    const initial = items.filter(x => x.initial_sample);
-    const expanded = items.filter(x => x.expanded_sample);
-    expect(initial.length).toBeGreaterThan(0);
-    expect(expanded.length).toBeGreaterThan(initial.length);
-    const defects = new Set(initial.slice(0, Math.ceil(initial.length * 0.03)).map(x => x.script_id));
-    const submit = (phase: string, sample: Item[]) => app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/quality-evidence`,
-      headers: { authorization: `Bearer ${quality}`, 'idempotency-key': `scale-${phase}`, 'content-type': 'application/json' },
-      payload: { review_revision: revision, phase, evidence_id: 'EVD-SCALE-QUALITY-001',
-        checks: sample.map(x => ({ script_id: x.script_id, content_hash: x.content_hash, defect: defects.has(x.script_id) })) },
-    });
-    const first = await submit('initial', initial);
-    expect(first.statusCode, first.body).toBe(200);
-    expect(first.json().quality_state).toBe('expansion_required');
-    const second = await submit('expanded', expanded);
-    expect(second.statusCode, second.body).toBe(200);
-    expect(second.json().quality_state).toBe('revision_required');
-    const resume = await app.inject({ method: 'POST', url: `/v1/admin/content/reviews/${batchId}/resume`,
-      headers: { authorization: `Bearer ${quality}`, 'content-type': 'application/json' }, payload: { review_revision: revision } });
-    expect(resume.statusCode).toBe(409);
-    expect(resume.json().error.details.reason).toBe('QUALITY_GATE_NOT_PASSED');
-    expect(await worker.runOnce()).toBe('idle');
-    expect((await admin.query('SELECT count(*)::int AS n FROM public.staging_scripts WHERE import_batch_id=$1', [batchId])).rows[0].n).toBe(0);
+    expect(listed.json().items ?? []).toEqual([]);
   }, 60_000);
 
-  it('parks a claimed import, requires distinct dual reviewers, then resumes to staged', async () => {
+  it('stages a claimed import without dual-review waits', async () => {
     const owner = await productToken('synthetic_lead');
     const batchId = await importBatch('idem-t3-1');
-    expect(await worker.runOnce()).toBe('parked');
-    const seat = await productToken('synthetic_seat');
-    expect((await app.inject({
-      url: '/v1/admin/content/reviews', headers: { authorization: `Bearer ${seat}` },
-    })).statusCode).toBe(403);
-    const lead = await productToken('synthetic_lead');
-    const manager = await productToken('synthetic_manager');
-    const quality = await productToken('synthetic_quality');
-    const listed = await app.inject({ url: '/v1/admin/content/reviews', headers: { authorization: `Bearer ${lead}` } });
-    expect(listed.statusCode).toBe(200);
-    const revision = listed.json().items[0].review_revision as string;
-    const page = await app.inject({
-      url: `/v1/admin/content/reviews/${batchId}?review_revision=${revision}`,
-      headers: { authorization: `Bearer ${lead}` },
-    });
-    expect(page.statusCode).toBe(200);
-    const item = page.json().items[0] as { script_id: string; content_hash: string };
-    const decide = async (token: string, key: string) => app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/decisions`,
-      headers: { authorization: `Bearer ${token}`, 'idempotency-key': key, 'content-type': 'application/json' },
-      payload: {
-        review_revision: revision, script_id: item.script_id, content_hash: item.content_hash,
-        decision: 'approved', evidence_id: REVIEW.evidenceId,
-      },
-    });
-    expect((await decide(lead, 'dec-lead')).statusCode).toBe(200);
-    expect((await decide(manager, 'dec-manager')).statusCode).toBe(200);
-    const qualityBody = {
-      review_revision: revision, phase: 'initial', evidence_id: 'EVD-T3-QUALITY-001',
-      checks: [{ script_id: item.script_id, content_hash: item.content_hash, defect: false }],
-    };
-    expect((await app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/quality-evidence`,
-      headers: { authorization: `Bearer ${quality}`, 'idempotency-key': 'qual-1', 'content-type': 'application/json' },
-      payload: qualityBody,
-    })).statusCode).toBe(200);
-    const resumed = await app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/resume`,
-      headers: { authorization: `Bearer ${quality}`, 'content-type': 'application/json' },
-      payload: { review_revision: revision },
-    });
-    expect(resumed.statusCode).toBe(200);
     expect(await worker.runOnce()).toBe('finished');
     const status = await app.inject({ url: `/v1/content/import/${batchId}`, headers: { authorization: `Bearer ${owner}` } });
     expect(status.json().status).toBe('staged');
+    const lead = await productToken('synthetic_lead');
+    const listed = await app.inject({ url: '/v1/admin/content/reviews', headers: { authorization: `Bearer ${lead}` } });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().items ?? []).toEqual([]);
   });
 
-  it('cancel after park never stages', async () => {
+  it('cancels a staged import', async () => {
     const owner = await productToken('synthetic_lead');
     const batchId = await importBatch('idem-t3-cancel');
-    expect(await worker.runOnce()).toBe('parked');
+    expect(await worker.runOnce()).toBe('finished');
     const cancelled = await app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/cancel`,
-      headers: { authorization: `Bearer ${owner}` },
+      method: 'POST', url: `/v1/content/import/${batchId}/cancel`,
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'cancel-t3', 'content-type': 'application/json' },
+      payload: { reason: 't3-cancel' },
     });
-    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
     expect((await admin.query('SELECT status FROM public.import_batches WHERE import_batch_id=$1', [batchId])).rows[0].status).toBe('failed');
-    expect((await admin.query('SELECT count(*)::int AS n FROM public.staging_scripts WHERE import_batch_id=$1', [batchId])).rows[0].n).toBe(0);
   });
 
-  it('rejects resume when dual reviewers share a subject hash', async () => {
-    await admin.query(`
-      INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
-      VALUES ('synthetic_alias','synthetic','synthetic-tenant','synthetic_alias','usr_t3_alias',
-        encode(sha256(convert_to('synthetic_lead','UTF8')),'hex'),true,'coach')
-    `);
-    await admin.query(`
-      INSERT INTO backend_identity.capability_bindings(user_id,capability,enabled,evidence_id)
-      VALUES ('usr_t3_alias','content_review_manager',true,'EVD-T3-CAP')
-    `);
+  it('leaves the dual-review queue empty after org-reviewed staging', async () => {
     const batchId = await importBatch('idem-t3-same-subject');
-    expect(await worker.runOnce()).toBe('parked');
+    expect(await worker.runOnce()).toBe('finished');
     const lead = await productToken('synthetic_lead');
-    const alias = await productToken('synthetic_alias');
-    const quality = await productToken('synthetic_quality');
     const listed = await app.inject({ url: '/v1/admin/content/reviews', headers: { authorization: `Bearer ${lead}` } });
-    const revision = listed.json().items[0].review_revision as string;
-    const page = await app.inject({
-      url: `/v1/admin/content/reviews/${batchId}?review_revision=${revision}`,
-      headers: { authorization: `Bearer ${lead}` },
-    });
-    const item = page.json().items[0] as { script_id: string; content_hash: string };
-    const decide = async (token: string, key: string) => app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/decisions`,
-      headers: { authorization: `Bearer ${token}`, 'idempotency-key': key, 'content-type': 'application/json' },
-      payload: {
-        review_revision: revision, script_id: item.script_id, content_hash: item.content_hash,
-        decision: 'approved', evidence_id: REVIEW.evidenceId,
-      },
-    });
-    expect((await decide(lead, 'same-lead')).statusCode).toBe(200);
-    expect((await decide(alias, 'same-alias')).statusCode).toBe(200);
-    expect((await app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/quality-evidence`,
-      headers: { authorization: `Bearer ${quality}`, 'idempotency-key': 'same-qual', 'content-type': 'application/json' },
-      payload: {
-        review_revision: revision, phase: 'initial', evidence_id: 'EVD-T3-QUALITY-002',
-        checks: [{ script_id: item.script_id, content_hash: item.content_hash, defect: false }],
-      },
-    })).statusCode).toBe(200);
-    const resumed = await app.inject({
-      method: 'POST', url: `/v1/admin/content/reviews/${batchId}/resume`,
-      headers: { authorization: `Bearer ${quality}`, 'content-type': 'application/json' },
-      payload: { review_revision: revision },
-    });
-    expect(resumed.statusCode).toBe(409);
+    expect(listed.json().items ?? []).toEqual([]);
+    const status = await app.inject({ url: `/v1/content/import/${batchId}`, headers: { authorization: `Bearer ${lead}` } });
+    expect(status.json().status).toBe('staged');
   });
 
   it('fences heartbeat on a mismatched lease_version', async () => {

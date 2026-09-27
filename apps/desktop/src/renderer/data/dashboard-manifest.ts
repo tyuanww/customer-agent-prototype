@@ -193,7 +193,7 @@ export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
   { id: 'overview', label: '管理概览', blurb: '风险、责任与处理进度', group: '经营总览' },
   { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
   { id: 'sop', label: 'SOP', blurb: '当前产品会话 SOP 树', group: '话术运营' },
-  { id: 'content', label: '内容管理', blurb: '草稿 · 审核 · 发布', group: '治理与架构' },
+  { id: 'content', label: '内容管理', blurb: '导入 · 发布', group: '治理与架构' },
   { id: 'announce', label: '系统同步', blurb: '话术版本 / 软件版本更新', group: '治理与架构' },
 ]);
 
@@ -742,7 +742,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
       title: '话术师上传',
       roleNote:
         '话术师（coach）可导入已标注的产品与活动草稿。一期发布仅管理员（owner）。冻结合同 POST /v1/content/publish。售后、过敏或赔付需管理员。坐席（agent）不能发布。没有第四角色。',
-      draftOnlyCopy: '上传只进入待审核草稿，不是已发布。',
+      draftOnlyCopy: '上传只进入待发布，点发布后坐席才能搜到。',
       boundaryCopy: '支持 CSV 与 xlsx。中文表头会映射到场景/标准话术；不连接飞书或 Wiki。',
       aftersaleNote: '售后流程仍为合成样例，本页不展开 SOP 树。',
       accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

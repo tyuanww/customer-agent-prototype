@@ -42,19 +42,30 @@ export const CONTENT_SOURCE_VERSION_ID = /^srcv_[A-Za-z0-9][A-Za-z0-9._-]{0,126}
 export const CONTENT_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
 export const CONTENT_IMPORT_MAX_ROWS = 5_000;
 export const CONTENT_IMPORT_TIMEOUT_MS = 30_000;
+export const ACTOR_IN_FLIGHT_IMPORT_ID = 'imp_actor_in_flight_01';
 
 export const CONTENT_PUBLISH_COPY = Object.freeze({
   noProduct: '当前没有产品会话，无法发布',
   noSession: '请先登录后再发布',
-  noDraft: '请先导入待审核草稿后再发布',
+  noDraft: '请先导入并通过校验后再发布',
   agent: '坐席不能发布内容',
   sensitive: '售后、过敏或赔付内容需管理员发布',
   coachScope: '话术师只能发布已标注的产品或活动内容',
   ownerPublish: '一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。',
   sourceIneligible: '来源未登记或已停用，不能导入或发布。',
   missingBindings: '缺少来源绑定，无法导入',
-  submitting: '正在提交发布',
-  awaitingReview: '导入已进入双人复核。当前会话无法单独完成话术师、管理员和质检。',
+  submitting: '正在校验并发布，请稍候，不要离开本页',
+  readyToPublish: '校验通过后可由管理员发布',
+});
+
+/** Import/publish API reason → Chinese problem + next step. Codes stay in logs. */
+export const CONTENT_IMPORT_FAILURE_COPY = Object.freeze({
+  SOURCE_SNAPSHOT_MISMATCH: '文件和当前登记的来源对不上。请确认这是要发的那份表后重新导入。',
+  CONTENT_CONTRACT_INVALID: '表格式或花括号不合法。请按模板改表后重新导入。',
+  SOURCE_BASE_RELEASE_STALE: '上一份还在处理。请等它发布或点取消后再导下一份。',
+  IMPORT_IN_FLIGHT: '上一份还在处理。请等它发布或点取消后再导下一份。',
+  QUALITY_GATE_NOT_PASSED: '质检证明没写上，不能发布。请联系管理员，不要重复点发布。',
+  NO_IN_FLIGHT: '当前没有未完成的导入。登录还在，不必重新登录。',
 });
 
 const CONTENT_FAILURE_CODES = [
@@ -83,6 +94,7 @@ export type DashboardContentSessionView = Readonly<{
   enabled: boolean;
   signedIn: boolean;
   role: DashboardContentRole | null;
+  displayName: string | null;
 }>;
 
 export type DashboardContentSessionResult = DashboardContentSessionView | DashboardContentFailure;
@@ -113,6 +125,7 @@ export type DashboardContentPublishView = Readonly<{
   ok: true;
   releaseId: string;
   releaseSeq: number;
+  publisherDisplayName: string | null;
 }>;
 
 export type DashboardContentPublishResult = DashboardContentPublishView | DashboardContentFailure;
@@ -132,6 +145,7 @@ export type DashboardContentApi = {
   parseUpload(request: DashboardContentParseRequest): Promise<DashboardContentParseResult>;
   importDraft(request: DashboardContentImportRequest): Promise<DashboardContentImportResult>;
   publishDraft(request: DashboardContentPublishRequest): Promise<DashboardContentPublishResult>;
+  cancelInFlight(): Promise<DashboardContentFailure | { ok: true }>;
 };
 
 export type ContentPublishGateInput = Readonly<{
@@ -217,10 +231,14 @@ export function isDashboardContentSessionResult(value: unknown): value is Dashbo
   if (isDashboardContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role'])) return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role', 'displayName'])) return false;
   if (typeof record.enabled !== 'boolean' || typeof record.signedIn !== 'boolean') return false;
-  if (record.signedIn) return record.enabled === true && isContentRole(record.role);
-  return record.role === null;
+  if (record.displayName !== null && (typeof record.displayName !== 'string'
+    || record.displayName.length < 1 || record.displayName.length > 64)) return false;
+  if (record.signedIn) {
+    return record.enabled === true && isContentRole(record.role) && typeof record.displayName === 'string';
+  }
+  return record.role === null && record.displayName === null;
 }
 
 export function isDashboardContentRow(value: unknown): value is DashboardContentRow {
@@ -299,11 +317,15 @@ export function isDashboardContentPublishResult(value: unknown): value is Dashbo
   if (isDashboardContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq'])
+  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'publisherDisplayName'])
     && record.ok === true
     && typeof record.releaseId === 'string'
     && record.releaseId.length > 0
     && record.releaseId.length <= 128
     && Number.isSafeInteger(record.releaseSeq)
-    && (record.releaseSeq as number) >= 1;
+    && (record.releaseSeq as number) >= 1
+    && (record.publisherDisplayName === null
+      || (typeof record.publisherDisplayName === 'string'
+        && record.publisherDisplayName.length > 0
+        && record.publisherDisplayName.length <= 64));
 }
