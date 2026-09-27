@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.21] - 2026-09-27
+
+### Fixed
+
+- 取消未完成导入 no longer reports a cancel it did not make. When nothing is actually in flight the workbench now says 当前没有未完成的导入，登录还在，不必重新登录。 instead of a false success, so an operator is not told the queue is clear while a staged import still blocks the next one.
+
 ## [0.3.20] - 2026-09-27
 
 ### Added
