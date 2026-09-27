@@ -419,6 +419,12 @@ export function createContentImportRepository(
           return failure(claim.code, commitCertaintyAfterError(!broken));
         }
         if (importBatchId === ACTOR_IN_FLIGHT_IMPORT_ID) {
+          // Serialize the sweep with enqueue's single-flight gate. The sweep reads the
+          // in-flight set, but only assert_no_in_flight_content_import takes the advisory
+          // key; without it a concurrent enqueue can commit between this scan and our
+          // commit, so the sweep would report "nothing in flight" while a fresh batch is
+          // already blocking the next import. Same key as 0016's gate (724019, 19).
+          await client.query('SELECT pg_catalog.pg_advisory_xact_lock(724019, 19)');
           const cancelled = await client.query<{ cancel_actor_in_flight_imports: number }>(
             'SELECT public.cancel_actor_in_flight_imports($1, $2)',
             [actor.user_id, actor.role],
