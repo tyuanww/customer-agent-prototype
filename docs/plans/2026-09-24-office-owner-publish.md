@@ -322,6 +322,5 @@ _No new tasks from Pass 6 tooling beyond T9. No new tasks from Pass 7 community.
 **VERDICT:** 方案已实施可继续打磨。冠军 TTHW 未在办公机发布上闭合。eng review required for ship。
 
 **UNRESOLVED DECISIONS:**
-- 后端未部署：0016 overlay 只在本地分支，`main` 里没有；办公机连的 API 仍是旧链路
-- Windows 包仍是 9月22 打的，早于本分支全部提交；T9 秒表未跑
-- CHANGELOG 0.3.19 仍写 dual-review（历史发版说明，按 D11 不改）
+- 本分支未合 main；0.3.20 的包是开发机打的，正式发版仍要合并后重打
+- T9 办公机秒表未跑：需要人在那台 Windows 上装新包、清掉孤儿导入、走完一次发布
