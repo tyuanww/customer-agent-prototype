@@ -65,6 +65,7 @@ export const CONTENT_IMPORT_FAILURE_COPY = Object.freeze({
   SOURCE_BASE_RELEASE_STALE: '上一份还在处理。请等它发布或点取消后再导下一份。',
   IMPORT_IN_FLIGHT: '上一份还在处理。请等它发布或点取消后再导下一份。',
   QUALITY_GATE_NOT_PASSED: '质检证明没写上，不能发布。请联系管理员，不要重复点发布。',
+  NO_IN_FLIGHT: '当前没有未完成的导入。登录还在，不必重新登录。',
 });
 
 const CONTENT_FAILURE_CODES = [
