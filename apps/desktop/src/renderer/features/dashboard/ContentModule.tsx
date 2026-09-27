@@ -209,7 +209,7 @@ export function ContentModule() {
         : `已发布 ${result.releaseId}`);
     }).catch(() => {
       if (generation !== ingestGeneration.current) return;
-      setPublishFeedback('未接入');
+      setPublishFeedback('服务暂不可用，请重试');
     }).finally(() => {
       if (generation === ingestGeneration.current) setSubmitting(false);
     });
