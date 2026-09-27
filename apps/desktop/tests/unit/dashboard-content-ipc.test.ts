@@ -252,22 +252,15 @@ it('names a question identity conflict as its own problem instead of an in-fligh
     .not.toBe(CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
 });
 
-it('keeps the in-flight copy only for the enqueue single-flight conflict', async () => {
+it('keeps the in-flight copy for the reasonless enqueue single-flight conflict', async () => {
+  // sendConflict() sends no details, so the gate reaches the desktop as a bare CONFLICT.
   const inFlight = fakeSession('owner');
-  vi.mocked(inFlight.request).mockRejectedValueOnce(new ProductHttpError('CONFLICT', 'CONFLICT'));
+  vi.mocked(inFlight.request).mockRejectedValueOnce(new ProductHttpError('CONFLICT'));
   expect(await dashboardContentPublish(inFlight, publishPayload(csv, [productBinding]))).toMatchObject({
     ok: false,
     code: 'CONFLICT',
     message: CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT,
   });
-
-  // A reasonless conflict is not proof that this actor has a draft queued; do not claim one.
-  const other = fakeSession('owner');
-  vi.mocked(other.request).mockRejectedValueOnce(new ProductHttpError('CONFLICT'));
-  const generic = await dashboardContentPublish(other, publishPayload(csv, [productBinding]));
-  expect(generic).toMatchObject({ ok: false, code: 'CONFLICT' });
-  expect((generic as Readonly<{ message: string }>).message)
-    .not.toBe(CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
 });
 
 function zipLocal(name: string, payload: Buffer): Buffer {

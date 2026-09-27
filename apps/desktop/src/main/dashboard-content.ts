@@ -36,14 +36,13 @@ function asFailure(error: unknown): DashboardContentFailure {
       : 'VALIDATION';
     return dashboardContentFailure(code, message);
   }
-  // A bare CONFLICT with no reason is the enqueue single-flight gate (assert_no_in_flight_content_import,
-  // DETAIL='CONFLICT'). Only that case is an in-flight import; every other conflict keeps the generic
-  // copy rather than claiming a draft is queued when none is.
+  // After the release path was fixed to report QUESTION_IDENTITY_CONFLICT as VALIDATION, the
+  // only operator-facing CONFLICT left on this path is the enqueue single-flight gate
+  // (assert_no_in_flight_content_import). That gate reaches us as a *reasonless* CONFLICT:
+  // sendConflict() sends no details, and ConflictErrorEnvelope.details is optional. So the
+  // in-flight sentence is keyed on the code, not on a reason that never crosses the wire.
   if (error.code === 'CONFLICT') {
-    return dashboardContentFailure(
-      'CONFLICT',
-      error.reason === 'CONFLICT' ? CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT : undefined,
-    );
+    return dashboardContentFailure('CONFLICT', CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
   }
   if (error.code === 'GONE') {
     return dashboardContentFailure('GONE', CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
