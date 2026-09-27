@@ -184,7 +184,7 @@ describe('content cancel sentinel', () => {
     // use site too: an inline literal there would leave the sentinel unused without
     // failing the declaration assertion above.
     const repository = readApiSource('../../../api/src/content-import-repository.ts');
-    expect(repository).toContain('if (importBatchId === ACTOR_IN_FLIGHT_IMPORT_ID) {');
-    expect(repository).not.toMatch(/importBatchId === ['"]imp_/);
+    expect(repository).toMatch(/importBatchId\s*===\s*ACTOR_IN_FLIGHT_IMPORT_ID/);
+    expect(repository).not.toMatch(/importBatchId\s*===\s*['"]imp_/);
   });
 });
