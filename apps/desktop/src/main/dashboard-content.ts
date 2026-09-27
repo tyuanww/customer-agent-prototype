@@ -39,6 +39,9 @@ function asFailure(error: unknown): DashboardContentFailure {
   if (error.code === 'CONFLICT') {
     return dashboardContentFailure('CONFLICT', CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
   }
+  if (error.code === 'GONE') {
+    return dashboardContentFailure('GONE', CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
+  }
   if (error.code === 'FORBIDDEN') {
     if (error.reason === 'SOURCE_NOT_ELIGIBLE' || error.reason === 'SOURCE_SUSPENDED') {
       return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.sourceIneligible);

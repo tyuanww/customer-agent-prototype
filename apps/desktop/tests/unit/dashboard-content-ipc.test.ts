@@ -4,11 +4,12 @@ import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import { deflateRawSync } from 'node:zlib';
 import { registerDashboardContentIpc } from '../../src/main/dashboard-content-ipc';
 import {
+  dashboardContentCancelInFlight,
   dashboardContentImport,
   dashboardContentPublish,
   dashboardContentSession,
 } from '../../src/main/dashboard-content';
-import { CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
+import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
 import { IPC_CHANNELS } from '../../src/shared/ipc-channels';
 import { ProductHttpError } from '../../src/main/product-http';
 import type { ProductSession } from '../../src/main/product-session';
@@ -96,6 +97,16 @@ it('blocks agent publish and coach aftersale before any product HTTP', async () 
     ok: false,
     code: 'UNAVAILABLE',
     message: CONTENT_PUBLISH_COPY.noProduct,
+  });
+});
+
+it('does not call a missing in-flight import a login expiry', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('GONE', 'NOT_FOUND'));
+  expect(await dashboardContentCancelInFlight(owner)).toMatchObject({
+    ok: false,
+    code: 'GONE',
+    message: CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT,
   });
 });
 
