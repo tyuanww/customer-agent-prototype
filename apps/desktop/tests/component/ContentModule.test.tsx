@@ -2,8 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentModule } from '../../src/renderer/features/dashboard/ContentModule';
-import { CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
-import type { DashboardContentApi } from '../../src/shared/dashboard-content';
+import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
+import type { DashboardContentApi, DashboardContentFailure } from '../../src/shared/dashboard-content';
 
 function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): DashboardContentApi {
   return {
@@ -138,5 +138,47 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(api.publishDraft).not.toHaveBeenCalled();
+  });
+
+  it('shows the no-in-flight copy when the cancel sweep finds nothing and the cancelled copy when it stops one', async () => {
+    const api = mockSession('owner');
+    let result: DashboardContentFailure | { ok: true } = {
+      ok: false,
+      code: 'GONE',
+      message: CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT,
+    };
+    const cancelInFlight = vi.fn(async () => result);
+    api.cancelInFlight = cancelInFlight;
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(screen.getByTestId('cancel-in-flight')).toBeEnabled());
+    await user.click(screen.getByTestId('cancel-in-flight'));
+    await waitFor(() => {
+      expect(screen.getByTestId('publish-feedback')).toHaveTextContent(CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
+    });
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    result = { ok: true };
+    await user.click(screen.getByTestId('cancel-in-flight'));
+    await waitFor(() => {
+      expect(screen.getByTestId('publish-feedback')).toHaveTextContent('已取消未完成的导入，可以重新导入');
+    });
+    expect(cancelInFlight).toHaveBeenCalledTimes(2);
+  });
+
+  it('fail-closes the cancel button when the preload has no cancel channel', async () => {
+    const api = mockSession('owner');
+    window.dashboardContent = {
+      ...api,
+      cancelInFlight: undefined,
+    } as unknown as DashboardContentApi;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(screen.getByTestId('cancel-in-flight')).toBeEnabled());
+    await user.click(screen.getByTestId('cancel-in-flight'));
+    await waitFor(() => {
+      expect(screen.getByTestId('publish-feedback')).toHaveTextContent('当前没有产品会话，无法取消导入');
+    });
+    expect(api.cancelInFlight).not.toHaveBeenCalled();
   });
 });

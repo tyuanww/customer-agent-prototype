@@ -85,6 +85,12 @@ function retryCode(error: unknown): string {
  *
  * Production office publish does not park dual-review. Reviewer hashes remain a
  * synthetic pre-commitment hashed into content_hash (REVIEW_EVIDENCE_TRUST_BOUNDARY).
+ *
+ * This worker also issues the "org review passed" evidence row itself, keyed to a
+ * deterministic reviewer identity derived from the batch id. The stored review is an
+ * assertion, not an independent control: the Feishu document is the system of record
+ * for who reviewed a batch, and this process is trusted to the same degree as that
+ * review. See docs/plans/2026-09-24-office-owner-publish.md ("审核证据边界").
  */
 export function createContentWorker(
   config: ApiDatabaseBootstrapConfig,

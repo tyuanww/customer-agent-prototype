@@ -53,11 +53,13 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
   let app: FastifyInstance;
   let storeRoot: string;
   let runtimeUrl: string;
+  let dbConfig: Parameters<Pg15Harness['connect']>[0];
 
   beforeEach(async () => {
     harness = new Pg15Harness();
     harness.start();
     const db = harness.createDatabase('import');
+    dbConfig = db.config;
     admin = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
     await admin.query('CREATE ROLE t2_runtime LOGIN; GRANT app_runtime TO t2_runtime');
@@ -197,6 +199,160 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     );
     expect(failed.rows[0].status).toBe('failed');
     expect(failed.rows[0].error_report).toMatchObject({ code: 'CANCELLED' });
+  });
+
+  it('refuses a cancel sweep with nothing in flight instead of reporting a phantom success', async () => {
+    const auth = await login('owner');
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+      headers: { ...auth, 'idempotency-key': 'idem-t2-cancel-empty', 'content-type': 'application/json' },
+      payload: { reason: 'synthetic-revise' },
+    });
+    expect(cancelled.statusCode).toBe(404);
+    expect(cancelled.json().error.code).toBe('NOT_FOUND');
+    const audits = await admin.query(
+      "SELECT pg_catalog.count(*)::int AS n FROM public.change_audits WHERE action = 'content_import_cancel'",
+    );
+    expect(audits.rows[0].n).toBe(0);
+  });
+
+  it('still cancels a real in-flight batch through the sentinel and audits it once', async () => {
+    await seedSources(sha256(CSV));
+    const auth = await login('owner');
+    const accepted = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import',
+      headers: importHeaders(auth, '----t2boundary', 'idem-t2-sweep'),
+      payload: multipart(CSV, 'text/csv'),
+    });
+    expect(accepted.statusCode).toBe(202);
+    const batchId: string = accepted.json().import_batch_id;
+    const swept = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+      headers: { ...auth, 'idempotency-key': 'idem-t2-sweep-cancel', 'content-type': 'application/json' },
+      payload: { reason: 'synthetic-revise' },
+    });
+    expect(swept.statusCode).toBe(200);
+    expect(swept.json()).toEqual({
+      ok: true,
+      import_batch_id: 'imp_actor_in_flight_01',
+      status: 'failed',
+    });
+    const stopped = await admin.query(
+      'SELECT status, error_report FROM public.import_batches WHERE import_batch_id = $1',
+      [batchId],
+    );
+    expect(stopped.rows[0].status).toBe('failed');
+    expect(stopped.rows[0].error_report).toMatchObject({ code: 'CANCELLED' });
+    const audits = await admin.query(
+      "SELECT metadata FROM public.change_audits WHERE action = 'content_import_cancel'",
+    );
+    expect(audits.rows).toHaveLength(1);
+    expect(audits.rows[0].metadata).toMatchObject({ import_batch_id: batchId });
+  });
+
+  it('rolls the idempotency claim back with the empty sweep instead of leasing the key', async () => {
+    await seedSources(sha256(CSV));
+    const auth = await login('owner');
+    const headers = {
+      ...auth,
+      'idempotency-key': 'idem-t2-cancel-empty-retry',
+      'content-type': 'application/json',
+    };
+    const request = () => app.inject({
+      method: 'POST',
+      url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+      headers,
+      payload: { reason: 'synthetic-revise' },
+    });
+    expect((await request()).statusCode).toBe(404);
+    const retry = await request();
+    expect(retry.statusCode).toBe(404);
+    expect(retry.json().error.code).toBe('NOT_FOUND');
+    const leased = await admin.query(
+      "SELECT pg_catalog.count(*)::int AS n FROM public.idempotency_keys WHERE scope = '/v1/content/import/cancel'",
+    );
+    expect(leased.rows[0].n).toBe(0);
+    // A refused sweep must not wedge the pooled connection the request used.
+    const accepted = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import',
+      headers: importHeaders(auth, '----t2boundary', 'idem-t2-after-empty-sweep'),
+      payload: multipart(CSV, 'text/csv'),
+    });
+    expect(accepted.statusCode).toBe(202);
+  });
+
+  it('waits on the enqueue lock so a concurrent enqueue cannot slip past the sweep', async () => {
+    const auth = await login('owner');
+    // Hold the exact key assert_no_in_flight_content_import / enqueue take.
+    const holder = await harness.connect(dbConfig);
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT pg_catalog.pg_advisory_xact_lock(724019, 19)');
+      const pending = app.inject({
+        method: 'POST',
+        url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+        headers: { ...auth, 'idempotency-key': 'idem-t2-lock-sweep', 'content-type': 'application/json' },
+        payload: { reason: 'synthetic-revise' },
+      });
+      // An unserialized sweep would answer immediately; a correct one blocks on the key.
+      const raced = await Promise.race([
+        pending.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => { resolve('blocked'); }, 500)),
+      ]);
+      expect(raced).toBe('blocked');
+      await holder.query('ROLLBACK');
+      expect((await pending).statusCode).toBe(404);
+    } finally {
+      await holder.end();
+    }
+  });
+
+  it('refuses the sweep for an actor with nothing in flight without touching another actor batch', async () => {
+    await seedSources(sha256(CSV));
+    const coach = await login('coach');
+    const owner = await login('owner');
+    const accepted = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import',
+      headers: importHeaders(coach, '----t2boundary', 'idem-t2-coach-in-flight'),
+      payload: multipart(CSV, 'text/csv'),
+    });
+    expect(accepted.statusCode).toBe(202);
+    const batchId: string = accepted.json().import_batch_id;
+    const swept = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+      headers: { ...owner, 'idempotency-key': 'idem-t2-owner-empty-sweep', 'content-type': 'application/json' },
+      payload: { reason: 'synthetic-revise' },
+    });
+    expect(swept.statusCode).toBe(404);
+    const untouched = await admin.query(
+      'SELECT status FROM public.import_batches WHERE import_batch_id = $1',
+      [batchId],
+    );
+    expect(untouched.rows[0].status).toBe('validating');
+    expect((await admin.query(
+      "SELECT pg_catalog.count(*)::int AS n FROM public.change_audits WHERE action = 'content_import_cancel'",
+    )).rows[0].n).toBe(0);
+  });
+
+  it('refuses the cancel sweep for an agent instead of reporting an empty sweep', async () => {
+    const auth = await login('agent');
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+      headers: { ...auth, 'idempotency-key': 'idem-t2-agent-sweep', 'content-type': 'application/json' },
+      payload: { reason: 'synthetic-revise' },
+    });
+    expect(refused.statusCode).toBe(403);
+    expect(refused.json().error.code).toBe('FORBIDDEN');
+    expect((await admin.query(
+      "SELECT pg_catalog.count(*)::int AS n FROM public.change_audits WHERE action = 'content_import_cancel'",
+    )).rows[0].n).toBe(0);
   });
 
   it('accepts a declared XLSX payload after persist and digest verification', async () => {

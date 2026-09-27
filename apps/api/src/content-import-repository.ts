@@ -419,10 +419,30 @@ export function createContentImportRepository(
           return failure(claim.code, commitCertaintyAfterError(!broken));
         }
         if (importBatchId === ACTOR_IN_FLIGHT_IMPORT_ID) {
-          await client.query(
+          // Serialize the sweep with enqueue's single-flight gate. The sweep reads the
+          // in-flight set, but only assert_no_in_flight_content_import takes the advisory
+          // key; without it a concurrent enqueue can commit between this scan and our
+          // commit, so the sweep would report "nothing in flight" while a fresh batch is
+          // already blocking the next import. Same key as 0016's gate (724019, 19).
+          await client.query('SELECT pg_catalog.pg_advisory_xact_lock(724019, 19)');
+          const cancelled = await client.query<{ cancel_actor_in_flight_imports: number }>(
             'SELECT public.cancel_actor_in_flight_imports($1, $2)',
             [actor.user_id, actor.role],
           );
+          // The actor-in-flight sentinel names no single batch, so an empty sweep is
+          // "that resource does not exist", not a successful cancel. Reporting 200 here
+          // would tell an operator the queue is clear while a staged batch still blocks
+          // the next import. 404 is the frozen contract's code for this (desktop maps it
+          // to GONE, whose copy is already CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT).
+          // Fail closed on anything that is not a positive count: an absent row, NaN,
+          // or a non-numeric shape must never read as "something was cancelled". Coerce
+          // rather than demand a JS number so a future change to the function's integer
+          // width cannot silently brick the sweep while still refusing phantom success.
+          const swept = Number(cancelled.rows[0]?.cancel_actor_in_flight_imports);
+          if (!Number.isInteger(swept) || swept <= 0) {
+            broken = !(await rollback(client));
+            return failure('NOT_FOUND', commitCertaintyAfterError(!broken));
+          }
         } else {
           await client.query(
             'SELECT public.cancel_content_import($1, $2, $3, $4)',
