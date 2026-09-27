@@ -9,7 +9,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-  type ReactElement,
 } from 'react';
 import {
   DASHBOARD_MANIFEST,
@@ -62,15 +61,6 @@ import {
 } from './lib/dashboard-appearance';
 import './styles/dashboard.css';
 
-type DashboardLeafModuleId = Exclude<DashboardModuleId, 'overview'>;
-
-const MODULES: Record<DashboardLeafModuleId, () => ReactElement> = {
-  wording: WordingLibraryModule,
-  sop: SopLibraryModule,
-  content: ContentModule,
-  announce: AnnounceModule,
-};
-
 type NavTooltipState = {
   key: string;
   label: string;
@@ -81,6 +71,8 @@ type NavTooltipState = {
 
 export function DashboardApp() {
   const [active, setActive] = useState<DashboardModuleId>('overview');
+  const [keepContent, setKeepContent] = useState(false);
+  const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
   const [navWidth, setNavWidth] = useState(DASHBOARD_NAV_DEFAULT_WIDTH);
   const [navResizing, setNavResizing] = useState(false);
@@ -116,7 +108,6 @@ export function DashboardApp() {
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
-  const ActiveModule = active === 'overview' ? null : MODULES[active];
   const navMaxWidth = getDashboardNavMaxWidth(viewportWidth);
   const resolvedTheme = resolveDashboardTheme(themeMode, systemDark);
   const navCollapsed = isDashboardNavRailPhase(navPhase);
@@ -139,6 +130,35 @@ export function DashboardApp() {
   useLayoutEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [active]);
+
+  useEffect(() => {
+    if (active === 'content') setKeepContent(true);
+  }, [active]);
+
+  useEffect(() => {
+    const api = window.dashboardContent;
+    if (!api) return undefined;
+    let live = true;
+    const load = () => {
+      void api.session().then((result) => {
+        if (!live) return;
+        setRefreshLabel(
+          result.ok && result.signedIn && result.displayName
+            ? result.displayName
+            : DASHBOARD_MANIFEST.banners.refreshLabel,
+        );
+      }).catch(() => {
+        if (!live) return;
+        setRefreshLabel(DASHBOARD_MANIFEST.banners.refreshLabel);
+      });
+    };
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      live = false;
+      window.removeEventListener('focus', load);
+    };
+  }, []);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -1179,7 +1199,7 @@ export function DashboardApp() {
           <div className="dashboard-page-context">
             <strong>{activeItem.label}</strong>
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
-              {DASHBOARD_MANIFEST.banners.refreshLabel}
+              {refreshLabel}
             </p>
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
@@ -1195,7 +1215,15 @@ export function DashboardApp() {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {ActiveModule ? <ActiveModule /> : <OverviewModule onNavigate={setActive} />}
+          {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
+          {active === 'wording' ? <WordingLibraryModule /> : null}
+          {active === 'sop' ? <SopLibraryModule /> : null}
+          {active === 'announce' ? <AnnounceModule /> : null}
+          {keepContent || active === 'content' ? (
+            <div hidden={active !== 'content'}>
+              <ContentModule />
+            </div>
+          ) : null}
         </main>
       </div>
     </div>

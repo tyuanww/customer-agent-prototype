@@ -275,55 +275,6 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     throw new Error(`timed out waiting for ${status}`);
   }
 
-  async function reviewToStaged(batchId: string): Promise<void> {
-    const lead = await productToken('synthetic_lead');
-    const manager = await productToken('synthetic_manager');
-    const quality = await productToken('synthetic_quality');
-    const listed = await fetch(`${address}/v1/admin/content/reviews`, { headers: { authorization: `Bearer ${lead}` } });
-    const summary = ((await listed.json() as { items: { batch_id: string; review_revision: string }[] }).items)
-      .find((item) => item.batch_id === batchId);
-    expect(summary).toBeTruthy();
-    const revision = summary!.review_revision;
-    const page = await fetch(
-      `${address}/v1/admin/content/reviews/${batchId}?review_revision=${revision}`,
-      { headers: { authorization: `Bearer ${lead}` } },
-    );
-    const items = (await page.json() as { items: { script_id: string; content_hash: string }[] }).items;
-    expect(items.length).toBeGreaterThan(0);
-    for (const [index, item] of items.entries()) {
-      const decide = async (token: string, key: string) => fetch(
-        `${address}/v1/admin/content/reviews/${batchId}/decisions`,
-        {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${token}`, 'idempotency-key': key, 'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            review_revision: revision, script_id: item.script_id, content_hash: item.content_hash,
-            decision: 'approved', evidence_id: 'EVD-T6-REVIEW-001',
-          }),
-        },
-      );
-      expect((await decide(lead, `dec-lead-${batchId}-${index}`)).status).toBe(200);
-      expect((await decide(manager, `dec-manager-${batchId}-${index}`)).status).toBe(200);
-    }
-    expect((await fetch(`${address}/v1/admin/content/reviews/${batchId}/quality-evidence`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${quality}`, 'idempotency-key': `qual-t6-${batchId}`, 'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        review_revision: revision, phase: 'initial', evidence_id: 'EVD-T6-QUALITY-001',
-        checks: items.map((item) => ({ script_id: item.script_id, content_hash: item.content_hash, defect: false })),
-      }),
-    })).status).toBe(200);
-    expect((await fetch(`${address}/v1/admin/content/reviews/${batchId}/resume`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${quality}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ review_revision: revision }),
-    })).status).toBe(200);
-  }
-
   it('runs import-review-publish-read from dist processes, recovers a killed worker, and cancel does not stage', async () => {
     const owner = await productToken('synthetic_owner');
     const ready = await fetch(`${address}/ready`);
@@ -340,41 +291,6 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     await waitStatus(owner, cancelledId, 'failed');
 
     const batchId = await importCsv(owner, 'idem-t6-main');
-    const leadForWait = await productToken('synthetic_lead');
-    const parkedDeadline = Date.now() + 20_000;
-    let parked = false;
-    while (Date.now() < parkedDeadline) {
-      const listed = await fetch(`${address}/v1/admin/content/reviews`, {
-        headers: { authorization: `Bearer ${leadForWait}` },
-      });
-      const items = (await listed.json() as { items?: { batch_id: string }[] }).items ?? [];
-      if (items.some((item) => item.batch_id === batchId)) {
-        parked = true;
-        break;
-      }
-      await sleep(200);
-    }
-    if (!parked) {
-      const status = await fetch(`${address}/v1/content/import/${batchId}`, {
-        headers: { authorization: `Bearer ${owner}` },
-      });
-      const reviews = await fetch(`${address}/v1/admin/content/reviews`, {
-        headers: { authorization: `Bearer ${leadForWait}` },
-      });
-      const jobs = await admin.query('SELECT job_type, status, last_error FROM public.outbox_jobs');
-      expect.fail(JSON.stringify({
-        import: { status: status.status, body: await status.json() },
-        reviews: { status: reviews.status, body: await reviews.json() },
-        jobs: jobs.rows,
-        worker: workerOutput,
-        apiErr: output.stderr,
-      }));
-    }
-    worker?.kill('SIGKILL');
-    await sleep(400);
-    const conn = (user: string) => String(env.DATABASE_URL).replace('t6_runtime@', `${user}@`);
-    worker = spawnWorker(conn);
-    await reviewToStaged(batchId);
     await waitStatus(owner, batchId, 'staged');
 
     const published = await fetch(`${address}/v1/content/publish`, {
@@ -405,12 +321,6 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     expect(desktop.clipboard.at(-1)).toContain('付款后发出');
     expect(JSON.stringify(desktop.session.view())).not.toContain('access_token');
     const repeated = await importCsv(owner, 'idem-t6-repeat');
-    await expect.poll(async () => {
-      const listed = await fetch(`${address}/v1/admin/content/reviews`, { headers: { authorization: `Bearer ${leadForWait}` } });
-      const body = await listed.json() as { items: { batch_id: string }[] };
-      return body.items.some(item => item.batch_id === repeated);
-    }, { timeout: 20_000, interval: 200 }).toBe(true);
-    await reviewToStaged(repeated);
     await waitStatus(owner, repeated, 'staged');
     const republished = await fetch(`${address}/v1/content/publish`, {
       method: 'POST', headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'pub-t6-repeat', 'content-type': 'application/json' },

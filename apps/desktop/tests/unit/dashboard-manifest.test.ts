@@ -79,7 +79,7 @@ describe('dashboard manifest', () => {
 
   it('keeps coach upload as staged drafts without implying Feishu, Wiki, or published content', () => {
     const upload = DASHBOARD_MANIFEST.content.upload;
-    expect(upload.draftOnlyCopy).toBe('上传只进入待审核草稿，不是已发布。');
+    expect(upload.draftOnlyCopy).toBe('上传只进入待发布，点发布后坐席才能搜到。');
     expect(upload.roleNote).toContain('coach');
     expect(upload.roleNote).toContain('管理员（owner）');
     expect(upload.roleNote).toContain('agent');

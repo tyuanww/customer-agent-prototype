@@ -111,18 +111,18 @@ Dashboard 主标题只使用「客服运营工作台 / 运营管理端」，不�
 1. 管理概览：统计范围、KPI 条、话术优化待办；有产品会话时 KPI 读检索账无命中率 / 复制完成率
 2. 话术库：产品话术、活动话术、售前流程、售后流程分域浏览当前发布
 3. SOP：有产品会话时读/导入/更新当前会话树，删除仅 Owner；没有会话保持未接入，不把合成过敏树当运营目录
-4. 内容管理：本地 CSV / xlsx 导入；Owner 发布走 dual-review 再 publish
+4. 内容管理：本地 CSV / xlsx 导入；Owner 校验通过后 staged 并发布。组织审核在飞书文档，产品内不再 park 双人复核
 5. 系统同步：话术版本读当前发布；Owner 软件目录列出 signed/unsigned，禁止 `latest.yml`
 
 侧栏业务导航图标由单一 `--dash-nav-icon-size: 20px` 同时驱动 `.dashboard-nav-icon` wrapper 与 SVG `width/height`，保留 24 viewBox / path / stroke。导航文字用静态 `--dash-nav-label-shift: calc(var(--dash-brand-copy-shift) - 4px)` 再靠近约 4px，expanded 态 icon-to-label 间隙约 14px。不改 PanelLeft toggle、品牌狐狸 40px、icon slot、macOS `nav.left+60` / native `+36` 锚点、8px inset、42px hit row、selected `::before inset:0`，也不给 icon transform。
 
 一期导航不再包含 VOC / 工单垃圾桶 / 离线抽样 / 架构图。复制不能推断发送、采纳、未修改或回答正确。
 
-话术库与内容发布必须分开：前者浏览当前发布（可导出 CSV；上传走内容导入），后者是导入 / 审核 / 发布。话术库读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），不复制。Owner 单条更新/删除进入 `pending_review` 草稿，不能跳过 dual-review，发布后才离开当前目录。没有产品会话或没有冻结合同的数字写「未接入」，不得因为话术库挂上当前发布就宣称工作台已接正式后端。
+话术库与内容发布必须分开：前者浏览当前发布（可导出 CSV；上传走内容导入），后者是导入 / 发布。话术库读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），不复制。Owner 单条更新/删除进入 `pending_review` 草稿，不能跳过 dual-review，发布后才离开当前目录。没有产品会话或没有冻结合同的数字写「未接入」，不得因为话术库挂上当前发布就宣称工作台已接正式后端。
 
 不读取 Float 真实输入，不写磁盘，不用 localStorage / IndexedDB。
 
-Owner 发布必须走冻结合同：导入 parked 后 dual-review，再 `POST /v1/content/publish`。没有会话或角色不够时按钮保持未接入 / 禁用，禁止合成成功。
+Owner 发布必须走冻结合同：导入校验通过后 staged，再 `POST /v1/content/publish`。组织审核在飞书文档。没有会话或角色不够时按钮保持未接入 / 禁用，禁止合成成功。
 
 ### 状态与反馈
 

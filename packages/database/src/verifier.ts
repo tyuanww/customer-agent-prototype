@@ -56,6 +56,7 @@ const REQUIRED_TABLES = Object.freeze([
   'source_denial_audits', 'client_sync_state', 'policy_flags', 'idempotency_keys',
   'rate_limit_buckets', 'outbox_jobs', 'rewrite_logs',
   'owner_acceptance_records', 'owner_acceptance_revocations',
+  'source_snapshot_revisions',
 ]);
 const REQUIRED_VIEWS = Object.freeze(['v_release_source_gate', 'v_scripts_recommendable']);
 const REQUIRED_FUNCTION_SIGNATURES = Object.freeze([
@@ -75,6 +76,13 @@ const REQUIRED_FUNCTION_SIGNATURES = Object.freeze([
   'record_content_quality_review_evidence(text,integer,integer,integer,integer,integer,integer,integer,integer,text,text,text)',
   'finalize_content_import_validation(text,text,bigint,text,text,jsonb,jsonb)',
   'finalize_work_order_import_validation(text,text,bigint,text,text,jsonb,integer,jsonb)',
+  'record_org_reviewed_quality_evidence(text,text,bigint,text,text,jsonb)',
+  'finalize_org_reviewed_import_validation(text,text,bigint,text,jsonb)',
+  'advance_source_snapshots(jsonb,text,text,text)',
+  'restore_source_snapshots(text)',
+  'assert_no_in_flight_content_import(text)',
+  'cancel_actor_in_flight_imports(text,text)',
+  'trg_restore_snapshots_on_import_failed()',
 ]);
 const REQUIRED_FUNCTIONS = Object.freeze(
   REQUIRED_FUNCTION_SIGNATURES.map((signature) => signature.slice(0, signature.indexOf('('))),
@@ -91,14 +99,14 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
   'metrics_experimental_kpi',
   'rewrite',
 ]);
-const EXPECTED_ACL_MANIFEST_ENTRIES = 194;
-const EXPECTED_ACL_MANIFEST_SHA256 = '6361f468e98053f5c82abff72a51f1284a0680d6701f3f0947f5807ac721332a';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1772;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = 'f7cb10b5b48c73d5d0f02c85037b4ae9362884b7f9d554db490c463abf354b4e';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 181;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '7df3a3f48f8e00876dfa9f4cb52f995ce1f22aef857f3ad2f816c70981f4fcd5';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 35;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = '237047c1c7b4512b7ae7647caeaad7bb3cc84b0ab10c383ada6f504426978669';
+const EXPECTED_ACL_MANIFEST_ENTRIES = 203;
+const EXPECTED_ACL_MANIFEST_SHA256 = '3cd5353700fa023d94287710188821ea1af8fe94808d9ebb093609098eb3ef45';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1793;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = 'bfc3d7c4ecb31ad8006d49a8e798a5b7ee955ee594129ae494c8c9d486ed2d9b';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 188;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '661d87de6fbbf74fbfa130b611ee4ee370f693466a57582a9ecf225ba0ad933b';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 36;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = '84ed46ea07f6a45cc396a18a58b3dcedd8562baf03338b6e922184fd6a5916c6';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -668,7 +676,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 49 || inventory.views !== 2 || inventory.functions !== 181 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 50 || inventory.views !== 2 || inventory.functions !== 188 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 9 || roles.safe !== 9 || roles.memberships !== 0) {

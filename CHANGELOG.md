@@ -2,6 +2,20 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.20] - 2026-09-27
+
+### Added
+
+- One office owner imports a local CSV or xlsx and publishes it. 组织审核 stays in the Feishu document; the workbench no longer parks a three-identity review. The import registers the uploaded table as the new source snapshot, so a real office file stops failing with 来源对不上. 取消未完成导入 clears an import that is still validating or staged.
+
+### Changed
+
+- 内容管理 keeps its staged preview when you switch to another module and come back. The workbench top bar shows the signed-in operator instead of a fixed 未接入. Publish progress reads 正在校验并发布，请稍候，不要离开本页.
+
+### Fixed
+
+- 选择 CSV 或 xlsx replaces the system English file control, and a wrong or oversized file says what to do next. 取消未完成导入 stays disabled without a session and no longer reports a missing import as 登录请求已过期.
+
 ## [0.3.19] - 2026-09-22
 
 ### Fixed

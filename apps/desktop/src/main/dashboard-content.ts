@@ -3,9 +3,11 @@ import { parseCoachUploadCsv, parseCoachUploadTable } from '../shared/coach-cont
 import { frozenImportCsv } from '../shared/content-frozen-import';
 import { parseXlsxFirstSheet } from './xlsx-first-sheet';
 import {
+  CONTENT_IMPORT_FAILURE_COPY,
   CONTENT_IMPORT_MAX_BYTES,
   CONTENT_IMPORT_TIMEOUT_MS,
   CONTENT_PUBLISH_COPY,
+  ACTOR_IN_FLIGHT_IMPORT_ID,
   contentPublishGate,
   dashboardContentFailure,
   isDashboardContentImportRequest,
@@ -21,12 +23,24 @@ import type { ProductSession } from './product-session';
 
 export type DashboardContentSessionClient = Pick<ProductSession, 'view' | 'request'>;
 export type DashboardContentAfterPublish = (sessionEpoch: number) => Promise<void>;
-export type DashboardContentParkedReview = (importBatchId: string) => Promise<boolean>;
 
 function asFailure(error: unknown): DashboardContentFailure {
   if (!(error instanceof ProductHttpError)) return dashboardContentFailure('UNAVAILABLE');
   if (error.code === 'SOURCE_GATE_NOT_READY' || error.code === 'CLIPBOARD_FAILED') {
     return dashboardContentFailure('UNAVAILABLE');
+  }
+  if (error.reason && Object.hasOwn(CONTENT_IMPORT_FAILURE_COPY, error.reason)) {
+    const message = CONTENT_IMPORT_FAILURE_COPY[error.reason as keyof typeof CONTENT_IMPORT_FAILURE_COPY];
+    const code = error.code === 'FORBIDDEN' || error.code === 'CONFLICT' || error.code === 'VALIDATION'
+      ? error.code
+      : 'VALIDATION';
+    return dashboardContentFailure(code, message);
+  }
+  if (error.code === 'CONFLICT') {
+    return dashboardContentFailure('CONFLICT', CONTENT_IMPORT_FAILURE_COPY.IMPORT_IN_FLIGHT);
+  }
+  if (error.code === 'GONE') {
+    return dashboardContentFailure('GONE', CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
   }
   if (error.code === 'FORBIDDEN') {
     if (error.reason === 'SOURCE_NOT_ELIGIBLE' || error.reason === 'SOURCE_SUSPENDED') {
@@ -70,7 +84,6 @@ const IMPORT_READY = new Set(['staged', 'publishing', 'published']);
 const IMPORT_DEAD = new Set(['failed', 'rolled_back']);
 const IMPORT_POLL_MS = 1_500;
 const IMPORT_POLL_BUDGET_MS = CONTENT_IMPORT_TIMEOUT_MS;
-const IMPORT_REVIEW_BUDGET_MS = 90_000;
 
 function parseImportBatchId(value: unknown): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -84,25 +97,6 @@ function parseImportStatus(value: unknown): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const status = (value as Record<string, unknown>).status;
   return typeof status === 'string' ? status : null;
-}
-
-async function batchInReviewQueue(
-  client: DashboardContentSessionClient,
-  epoch: number,
-  importBatchId: string,
-): Promise<boolean> {
-  try {
-    const listed = await client.request(epoch, '/v1/admin/content/reviews?limit=100', { timeoutMs: 5_000 });
-    if (!listed.value || typeof listed.value !== 'object' || Array.isArray(listed.value)) return false;
-    const items = Reflect.get(listed.value, 'items');
-    if (!Array.isArray(items)) return false;
-    return items.some((item) => item && typeof item === 'object' && Reflect.get(item, 'batch_id') === importBatchId);
-  } catch (error) {
-    if (error instanceof ProductHttpError && (error.code === 'FORBIDDEN' || error.code === 'UNAUTHORIZED')) {
-      return false;
-    }
-    throw error;
-  }
 }
 
 function reviewRevision(value: unknown): string | undefined {
@@ -204,14 +198,10 @@ async function waitUntilImportStaged(
   client: DashboardContentSessionClient,
   epoch: number,
   importBatchId: string,
-  parkedReview?: DashboardContentParkedReview,
 ): Promise<true | DashboardContentFailure> {
   if (!IMPORT_BATCH_ID.test(importBatchId)) return dashboardContentFailure('VALIDATION');
   const path = `/v1/content/import/${importBatchId}`;
-  const deadline = Date.now() + (parkedReview ? IMPORT_REVIEW_BUDGET_MS : IMPORT_POLL_BUDGET_MS);
-  let reviewAttempted = false;
-  let sawReviewQueue = false;
-  let validatingPolls = 0;
+  const deadline = Date.now() + IMPORT_POLL_BUDGET_MS;
   while (Date.now() <= deadline) {
     let result: Awaited<ReturnType<DashboardContentSessionClient['request']>>;
     try {
@@ -228,24 +218,10 @@ async function waitUntilImportStaged(
     if (status && IMPORT_READY.has(status)) return true;
     if (status && IMPORT_DEAD.has(status)) return dashboardContentFailure('CONFLICT');
     if (status !== 'validating') return dashboardContentFailure('UNAVAILABLE');
-    validatingPolls += 1;
-    if (parkedReview) {
-      if (await batchInReviewQueue(client, epoch, importBatchId)) sawReviewQueue = true;
-      if (!reviewAttempted && (sawReviewQueue || validatingPolls >= 2)) {
-        reviewAttempted = true;
-        if (await parkedReview(importBatchId)) continue;
-      }
-      if (sawReviewQueue && reviewAttempted) {
-        return dashboardContentFailure('UNAVAILABLE', CONTENT_PUBLISH_COPY.awaitingReview);
-      }
-    }
     if (Date.now() + IMPORT_POLL_MS > deadline) break;
     await new Promise((resolve) => setTimeout(resolve, IMPORT_POLL_MS));
   }
-  return dashboardContentFailure(
-    'UNAVAILABLE',
-    sawReviewQueue ? CONTENT_PUBLISH_COPY.awaitingReview : undefined,
-  );
+  return dashboardContentFailure('UNAVAILABLE');
 }
 
 function parsePublishRelease(value: unknown): { releaseId: string; releaseSeq: number } | null {
@@ -274,7 +250,7 @@ export function dashboardContentParseUpload(payload: unknown): ReturnType<typeof
   }
   const sourceName = record.sourceName.trim() || 'upload.xlsx';
   if (bytes.length > CONTENT_IMPORT_MAX_BYTES) {
-    return { ok: false, code: 'too-large', message: `文件超过 ${String(CONTENT_IMPORT_MAX_BYTES / (1024 * 1024))}MiB。` };
+    return { ok: false, code: 'too-large', message: `文件超过 ${String(CONTENT_IMPORT_MAX_BYTES / (1024 * 1024))}MiB。请缩小表格后重新选择。` };
   }
   try {
     const table = parseXlsxFirstSheet(bytes);
@@ -288,7 +264,7 @@ export function dashboardContentSession(
   session: DashboardContentSessionClient | null,
 ): DashboardContentSessionResult {
   if (!session) {
-    return Object.freeze({ ok: true, enabled: false, signedIn: false, role: null });
+    return Object.freeze({ ok: true, enabled: false, signedIn: false, role: null, displayName: null });
   }
   const view = session.view();
   return Object.freeze({
@@ -296,6 +272,7 @@ export function dashboardContentSession(
     enabled: view.enabled,
     signedIn: view.signedIn,
     role: view.signedIn ? view.role : null,
+    displayName: view.signedIn ? view.displayName : null,
   });
 }
 
@@ -349,7 +326,6 @@ export async function dashboardContentPublish(
   session: DashboardContentSessionClient | null,
   payload: unknown,
   afterPublish?: DashboardContentAfterPublish,
-  parkedReview?: DashboardContentParkedReview,
 ): Promise<DashboardContentPublishResult> {
   if (!isDashboardContentPublishRequest(payload)) return dashboardContentFailure('VALIDATION');
   return withSession(session, async (client, epoch) => {
@@ -376,7 +352,7 @@ export async function dashboardContentPublish(
     });
     const importBatchId = parseImportBatchId(imported.value);
     if (!importBatchId) return dashboardContentFailure('UNAVAILABLE');
-    const ready = await waitUntilImportStaged(client, epoch, importBatchId, parkedReview);
+    const ready = await waitUntilImportStaged(client, epoch, importBatchId);
     if (ready !== true) return ready;
     const published = await client.request(epoch, '/v1/content/publish', {
       body: {
@@ -395,6 +371,23 @@ export async function dashboardContentPublish(
         // Publish already committed. Next product search still refreshAnnounce.
       }
     }
-    return Object.freeze({ ok: true, releaseId: release.releaseId, releaseSeq: release.releaseSeq });
+    return Object.freeze({
+      ok: true,
+      releaseId: release.releaseId,
+      releaseSeq: release.releaseSeq,
+      publisherDisplayName: view.displayName,
+    });
+  });
+}
+
+export async function dashboardContentCancelInFlight(
+  session: DashboardContentSessionClient | null,
+): Promise<DashboardContentFailure | { ok: true }> {
+  return withSession(session, async (client, epoch) => {
+    await client.request(epoch, `/v1/content/import/${ACTOR_IN_FLIGHT_IMPORT_ID}/cancel`, {
+      body: { reason: 'in-flight-self' },
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    return Object.freeze({ ok: true as const });
   });
 }

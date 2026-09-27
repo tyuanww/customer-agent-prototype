@@ -1626,7 +1626,7 @@ describe('DashboardApp', () => {
 
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('content-upload-draft-copy')).toHaveTextContent(
-      '上传只进入待审核草稿，不是已发布',
+      '上传只进入待发布，点发布后坐席才能搜到',
     );
     expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('管理员（owner）');
     expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
@@ -1654,8 +1654,9 @@ describe('DashboardApp', () => {
     expect(demoPreview).not.toHaveTextContent('步骤');
     expect(demoPreview).toHaveTextContent('洁面用量确认');
     expect(demoPreview).toHaveTextContent('售后质量升级');
-    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('导入草稿');
-    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('审核确认');
+    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('导入');
+    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('发布');
+    expect(screen.getByTestId('content-pipeline-steps')).not.toHaveTextContent('审核确认');
     expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(window.customerAgent).toBeUndefined();
@@ -1704,6 +1705,26 @@ describe('DashboardApp', () => {
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(window.customerAgent).toBeUndefined();
+  });
+
+  it('keeps the staged preview after leaving content and coming back', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-content'));
+    const csv = new File(
+      ['scene,script\n洁面用量确认,先确认产品版本\n'],
+      'coach-draft.csv',
+      { type: 'text/csv' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), csv);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
+    await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByTestId('nav-content'));
+    expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
+    expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent('请先导入草稿');
   });
 
   it('clears the coach preview back to idle without leaving released state behind', async () => {
@@ -1765,7 +1786,7 @@ describe('DashboardApp', () => {
       await waitFor(() => {
         expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
       });
-      expect(screen.getByTestId('content-upload-status')).toHaveTextContent('未进入草稿');
+      expect(screen.getByTestId('content-upload-status')).toHaveTextContent('未进入待发布');
       expect(screen.getByTestId('content-upload-status')).toHaveTextContent(item.copy);
       expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
       expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();

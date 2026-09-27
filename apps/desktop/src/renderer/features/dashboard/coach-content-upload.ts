@@ -45,10 +45,13 @@ export async function readCoachUploadFile(file: File): Promise<CoachUploadResult
   const sourceName = file.name.trim() || 'untitled.csv';
   const lower = sourceName.toLowerCase();
   if (!lower.endsWith('.csv') && !lower.endsWith('.xlsx')) {
-    return fail('unsupported-type', '仅接受 .csv 或 .xlsx。');
+    return fail('unsupported-type', '仅接受 .csv 或 .xlsx。请重新选择表格文件。');
   }
   if (file.size > COACH_UPLOAD_MAX_BYTES) {
-    return fail('too-large', `文件超过 ${COACH_UPLOAD_MAX_BYTES / (1024 * 1024)}MiB。`);
+    return fail(
+      'too-large',
+      `文件超过 ${COACH_UPLOAD_MAX_BYTES / (1024 * 1024)}MiB。请缩小表格后重新选择。`,
+    );
   }
   const bytes = await readFileBytes(file);
   if (isZipSignature(bytes) || lower.endsWith('.xlsx') && bytes.includes(0)) {

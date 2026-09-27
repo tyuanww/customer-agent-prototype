@@ -143,7 +143,7 @@ Query Top 3 每张卡有发丝「话术不准」。点后该卡显示「已记�
 
 没有产品会话时，侧栏说明写「未接入」，不堆 MOCK 徽标。
 
-「内容管理」可选择本地 CSV 或 xlsx，解析成待审核草稿。xlsx 只读第一张表。中文表头会映射到场景与标准话术，空白或不完整行会跳过。上限 10MiB / 5000 行。Owner 点发布后：导入 parked 时走 dual-review，再 publish；状态大约每 1.5 秒问一次，429 再等一轮。一期发布仅管理员；话术师可导入产品或活动草稿。Owner 在话术库单条更新/删除进入 pending_review，不能跳过 dual-review。
+「内容管理」可选择本地 CSV 或 xlsx，解析成待发布预览。xlsx 只读第一张表。中文表头会映射到场景与标准话术，空白或不完整行会跳过。上限 10MiB / 5000 行。Owner 点发布后：导入校验通过则 staged，再 publish；状态大约每 1.5 秒问一次，429 再等一轮。一期发布仅管理员；话术师可导入产品或活动草稿。Owner 在话术库单条更新/删除进入 pending_review，不能跳过 dual-review。
 
 管理概览里的待办在有产品会话且角色为 coach / owner 时，走冻结 `GET /v1/metrics/iteration-tasks` 与 `POST .../start|close`。空列表合法。没有产品会话时写「未接入」，不会回落到 DEMO 5 条。有产品会话时 KPI 显示无命中率 / 复制完成率。Query「话术不准」Live UUID 会落库；待办页仍不展示按稿次数。
 

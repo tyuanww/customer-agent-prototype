@@ -203,10 +203,11 @@ describe('dashboard live actions', () => {
       status: 'validating' as const,
     }));
     window.dashboardContent = {
-      session: vi.fn(async () => ({ ok: true as const, enabled: true, signedIn: true, role: 'coach' as const })),
+      session: vi.fn(async () => ({ ok: true as const, enabled: true, signedIn: true, role: 'coach' as const, displayName: '话术师' })),
       parseUpload: vi.fn(),
       importDraft,
       publishDraft: vi.fn(),
+      cancelInFlight: vi.fn(async () => ({ ok: true as const })),
     };
     window.dashboardWording = {
       list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),

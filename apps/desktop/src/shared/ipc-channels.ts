@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
   DASHBOARD_CONTENT_PARSE: 'dashboard:content-parse',
   DASHBOARD_CONTENT_IMPORT: 'dashboard:content-import',
   DASHBOARD_CONTENT_PUBLISH: 'dashboard:content-publish',
+  DASHBOARD_CONTENT_CANCEL_IN_FLIGHT: 'dashboard:content-cancel-in-flight',
   DASHBOARD_ITERATION_LIST: 'dashboard:iteration-list',
   DASHBOARD_ITERATION_START: 'dashboard:iteration-start',
   DASHBOARD_ITERATION_CLOSE: 'dashboard:iteration-close',
