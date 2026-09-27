@@ -72,6 +72,7 @@ type NavTooltipState = {
 export function DashboardApp() {
   const [active, setActive] = useState<DashboardModuleId>('overview');
   const [keepContent, setKeepContent] = useState(false);
+  const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
   const [navWidth, setNavWidth] = useState(DASHBOARD_NAV_DEFAULT_WIDTH);
   const [navResizing, setNavResizing] = useState(false);
@@ -133,6 +134,31 @@ export function DashboardApp() {
   useEffect(() => {
     if (active === 'content') setKeepContent(true);
   }, [active]);
+
+  useEffect(() => {
+    const api = window.dashboardContent;
+    if (!api) return undefined;
+    let live = true;
+    const load = () => {
+      void api.session().then((result) => {
+        if (!live) return;
+        setRefreshLabel(
+          result.ok && result.signedIn && result.displayName
+            ? result.displayName
+            : DASHBOARD_MANIFEST.banners.refreshLabel,
+        );
+      }).catch(() => {
+        if (!live) return;
+        setRefreshLabel(DASHBOARD_MANIFEST.banners.refreshLabel);
+      });
+    };
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      live = false;
+      window.removeEventListener('focus', load);
+    };
+  }, []);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -1173,7 +1199,7 @@ export function DashboardApp() {
           <div className="dashboard-page-context">
             <strong>{activeItem.label}</strong>
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
-              {DASHBOARD_MANIFEST.banners.refreshLabel}
+              {refreshLabel}
             </p>
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
