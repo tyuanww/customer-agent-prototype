@@ -76,9 +76,84 @@ xcrun stapler validate <app>
 
 这个门的边界要说清：**它只证明离线包的文件结构与资源副本，不检查 PE 可执行文件内部的图标资源，也不检查 Authenticode 状态。** 真实的 Windows 安装、任务栏图标、系统签名仍需在 Windows 设备上验收。
 
-未签名包的后果：经外部渠道下载后通常触发 SmartScreen 警告或拦截。办公机一期交付面就是 Windows，**这个警告目前是已知且未解决的。**
+### 内部工具的口径：签名是可选，不是必需
 
-要正式分发 Windows，必须另走独立的 `release/distribution/` 与公司代码签名证书门禁，不能复用本机 `UNSIGNED` 产物。这不在当前实现范围内。
+一期交付面是**内部办公机**，不是陌生终端用户下载。签名解决的三件事里，只有一件可能变成硬性条件：
+
+| 签名的作用 | 对内部办公机 |
+| --- | --- |
+| SmartScreen「未知发布者」提示 | 基本不触发——见下 |
+| 篡改可检测 | 弱收益（只证明来自发布方） |
+| 企业策略强制（AppLocker / WDAC） | **唯一可能变成必需的一条** |
+
+**为什么走内部渠道分发就不弹 SmartScreen**：SmartScreen 跟 Mark-of-the-Web（MOTW，即 `Zone.Identifier`）走。浏览器下载会写入 MOTW，`scp` / U 盘 / 网络共享**不会**。
+
+**实测（2026-09-27，办公机 `desktop-faejk8s`，Windows 10 家庭中文版 19045）**：
+
+| 检查 | 结果 |
+| --- | --- |
+| WDAC 策略（`CiPolicies\Active`） | 空；`CiTool` 不存在 |
+| AppLocker（`Get-AppLockerPolicy`） | cmdlet 不存在（家庭版不支持） |
+| `EnableSmartScreen` 策略 | `0`（未启用策略级拦截） |
+| 已安装应用 Authenticode | `NotSigned`，`SignerCertificate` 为空 |
+| 已安装版本 | 0.3.21，**能装能跑** |
+| scp 过去的安装包 MOTW | **无**（`installer_motw: false`） |
+
+结论：**在这台办公机上，未签名包不触发任何策略阻断。** 内部工具不需要为此买代码签名证书。
+
+### 什么时候必须签
+
+只有两种情况：
+
+1. **办公机被 IT 用 AppLocker 或 WDAC 强制模式管起来。** 那是**拒绝执行**，不是弹警告，自签也不够，必须走企业 CA 或 Azure Trusted Signing。上面的实测已确认当前没有。
+2. **将来要对外分发**（外包、客户、公开下载）。那时 MOTW 会出现，SmartScreen 会拦，按 §3.2 清单办。
+
+### 3.1 如果你确实要签（自签，零成本）
+
+内部固定几台机器，自签是甜点：无「未知发布者」、有篡改检测、发布方显示成你设的组织名。成本是**每台目标机器导一次根证书**。
+
+```powershell
+# 1) 生成自签代码签名证书（有效期内放你需要的年限）
+$cert = New-SelfSignedCertificate -Type CodeSigningCert `
+  -Subject "CN=Menokin Internal, O=Menokin" `
+  -KeyUsage DigitalSignature -FriendlyName "Menokin Internal Code Signing" `
+  -CertStoreLocation "Cert:\CurrentUser\My" `
+  -NotAfter (Get-Date).AddYears(3)
+
+# 2) 导出公钥证书（分发用，不含私钥）
+Export-Certificate -Cert $cert -FilePath MenokinInternal.cer
+
+# 3) 签名（signtool 随 Windows SDK 提供）
+signtool sign /fd SHA256 /a /n "Menokin Internal Code Signing" `
+  /tr http://timestamp.digicert.com /td SHA256 `
+  "客服话术浮窗 Demo-0.3.21-win-x64-UNSIGNED.exe"
+```
+
+拿到 `.cer` 的机器上，导入到**受信任的根证书颁发机构**（管理员）：
+
+```powershell
+Import-Certificate -FilePath MenokinInternal.cer `
+  -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+要接进本仓的打包链，得加 `distribution` 模式与签名后验（当前 `package-windows.mjs` 只支持 `local`）——那是另一轮代码改动，**当前未做**。
+
+诚实边界：自签能消掉「未知发布者」，但 **SmartScreen 云端信誉是另一套**（按证书信誉算），自签证书没有信誉。所以自签只对**不带 MOTW** 的文件有效；对外分发仍要正规链。
+
+### 3.2 对外分发才需要（正规链）
+
+| 路线 | 年费 | CI 可行性 | SmartScreen |
+| --- | --- | --- | --- |
+| Azure Trusted Signing | ~$10/月 | 云端签，无需硬件 token；electron-builder 26 原生支持 `azureSignOptions` | 立即有信誉 |
+| OV 证书 | $200–400 | **2023-06 起必须硬件 token / 云 KMS**，CI 要自托管 runner | 要攒下载量 |
+| EV 证书 | $400–600 | 同上 | 立即有信誉 |
+
+**Azure Trusted Signing 最省事**，但需要 Azure 组织身份验证。本仓 `package-windows.mjs` 与 `verify-windows-package.mjs` 目前都没有对应分支；接入前先确认真有必要。
+
+未签名包的后果：**带 MOTW 时**（即经浏览器下载）通常触发 SmartScreen 警告或拦截。走 scp / U 盘不受影响。
+
+要正式分发 Windows，必须另走独立的 `release/distribution/` 与签名门禁，不能复用本机 `UNSIGNED` 产物。
+
 
 ## 4. Linux：只有未签名
 
