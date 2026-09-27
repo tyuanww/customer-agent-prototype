@@ -285,6 +285,61 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     expect(accepted.statusCode).toBe(202);
   });
 
+  it('keeps the sweep honest when a different actor enqueues while this actor sweeps', async () => {
+    await seedSources(sha256(CSV));
+    const owner = await login('owner');
+    const coach = await login('coach');
+
+    // Coach holds the in-flight slot before the owner even looks.
+    const coachBatch = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import',
+      headers: importHeaders(coach, '----t2boundary', 'idem-t2-coach-holds'),
+      payload: multipart(CSV, 'text/csv'),
+    });
+    expect(coachBatch.statusCode).toBe(202);
+
+    // Owner's sweep must not report someone else's queue as its own success, and must
+    // not touch the coach's batch.
+    const emptySweep = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+      headers: { ...owner, 'idempotency-key': 'idem-t2-owner-vs-coach', 'content-type': 'application/json' },
+      payload: { reason: 'synthetic-revise' },
+    });
+    expect(emptySweep.statusCode).toBe(404);
+    const coachStill = await admin.query(
+      'SELECT status FROM public.import_batches WHERE import_batch_id = $1',
+      [coachBatch.json().import_batch_id],
+    );
+    expect(coachStill.rows[0].status).toBe('validating');
+
+    // Now the owner has its own in-flight batch behind the coach's. Both are live at once.
+    const ownerBatch = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import',
+      headers: importHeaders(owner, '----t2boundary', 'idem-t2-owner-holds'),
+      payload: multipart(CSV, 'text/csv'),
+    });
+    expect(ownerBatch.statusCode).toBe(202);
+
+    // The owner's sweep must retire exactly its own batch and leave the coach's alone.
+    const ownerSweep = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+      headers: { ...owner, 'idempotency-key': 'idem-t2-owner-sweep-own', 'content-type': 'application/json' },
+      payload: { reason: 'synthetic-revise' },
+    });
+    expect(ownerSweep.statusCode).toBe(200);
+    const after = await admin.query(
+      'SELECT import_batch_id, status FROM public.import_batches WHERE import_batch_id = ANY($1::text[])',
+      [[coachBatch.json().import_batch_id, ownerBatch.json().import_batch_id]],
+    );
+    const byId = new Map(after.rows.map((row: { import_batch_id: string; status: string }) => [row.import_batch_id, row.status]));
+    expect(byId.get(ownerBatch.json().import_batch_id)).toBe('failed');
+    expect(byId.get(coachBatch.json().import_batch_id)).toBe('validating');
+  });
+
   it('waits on the enqueue lock so a concurrent enqueue cannot slip past the sweep', async () => {
     const auth = await login('owner');
     // Hold the exact key assert_no_in_flight_content_import / enqueue take.
