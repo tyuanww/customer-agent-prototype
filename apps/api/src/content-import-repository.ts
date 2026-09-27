@@ -434,10 +434,12 @@ export function createContentImportRepository(
           // would tell an operator the queue is clear while a staged batch still blocks
           // the next import. 404 is the frozen contract's code for this (desktop maps it
           // to GONE, whose copy is already CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT).
-          // Fail closed on anything that is not a positive count: an absent row or a
-          // non-numeric shape must never read as "something was cancelled".
-          const swept = cancelled.rows[0]?.cancel_actor_in_flight_imports;
-          if (typeof swept !== 'number' || !Number.isFinite(swept) || swept <= 0) {
+          // Fail closed on anything that is not a positive count: an absent row, NaN,
+          // or a non-numeric shape must never read as "something was cancelled". Coerce
+          // rather than demand a JS number so a future change to the function's integer
+          // width cannot silently brick the sweep while still refusing phantom success.
+          const swept = Number(cancelled.rows[0]?.cancel_actor_in_flight_imports);
+          if (!Number.isInteger(swept) || swept <= 0) {
             broken = !(await rollback(client));
             return failure('NOT_FOUND', commitCertaintyAfterError(!broken));
           }
