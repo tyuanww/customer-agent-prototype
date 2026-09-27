@@ -62,10 +62,13 @@ export const CONTENT_PUBLISH_COPY = Object.freeze({
 export const CONTENT_IMPORT_FAILURE_COPY = Object.freeze({
   SOURCE_SNAPSHOT_MISMATCH: '文件和当前登记的来源对不上。请确认这是要发的那份表后重新导入。',
   CONTENT_CONTRACT_INVALID: '表格式或花括号不合法。请按模板改表后重新导入。',
-  SOURCE_BASE_RELEASE_STALE: '上一份还在处理。请等它发布或点取消后再导下一份。',
-  IMPORT_IN_FLIGHT: '上一份还在处理。请等它发布或点取消后再导下一份。',
+  SOURCE_BASE_RELEASE_STALE: '你自己的上一份草稿还在队列里（还没发布）。请等它发布，或点「取消未完成导入」后再导下一份。',
+  IMPORT_IN_FLIGHT: '你自己的上一份草稿还在队列里（还没发布）。请等它发布，或点「取消未完成导入」后再导下一份。',
   QUALITY_GATE_NOT_PASSED: '质检证明没写上，不能发布。请联系管理员，不要重复点发布。',
   NO_IN_FLIGHT: '当前没有未完成的导入。登录还在，不必重新登录。',
+  // The table's content collides with what is already published under the same stable identity.
+  // Not an in-flight problem: retrying or cancelling will not clear it, only editing the table will.
+  QUESTION_IDENTITY_CONFLICT: '表里有内容和线上已有版本冲突（同一问法被改成了不同话术）。请挑出这些行：要么改用线上版本的说法，要么把改动并进原条目后重新导入。',
 });
 
 const CONTENT_FAILURE_CODES = [
