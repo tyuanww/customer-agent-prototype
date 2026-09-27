@@ -21,6 +21,14 @@ const overlayPreload = readFileSync(
   'utf8',
 );
 import { ALLOWED_HELP_STATUS, FORBIDDEN_HELP_PHRASES } from '../../src/shared/product-help';
+import { ACTOR_IN_FLIGHT_IMPORT_ID } from '../../src/shared/dashboard-content';
+
+function readApiSource(relative: string): string {
+  return readFileSync(
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), relative),
+    'utf8',
+  );
+}
 
 describe('IPC whitelist', () => {
   it('only allows the typed overlay and clipboard channels', () => {
@@ -155,5 +163,28 @@ describe('IPC whitelist', () => {
     for (const phrase of FORBIDDEN_HELP_PHRASES) {
       expect(ALLOWED_HELP_STATUS.join('\n')).not.toContain(phrase);
     }
+  });
+});
+
+describe('content cancel sentinel', () => {
+  it('pins the actor-in-flight batch id to the API definition and its comparison site', () => {
+    // The desktop asks the API to sweep every in-flight import for this actor by
+    // sending this synthetic batch id. The two copies live in different packages,
+    // so nothing else catches drift: whichever side changes alone turns "cancel
+    // all" into a 404 for a batch that never existed.
+    const objectStore = readApiSource('../../../api/src/content-object-store.ts');
+    expect(ACTOR_IN_FLIGHT_IMPORT_ID).toBe('imp_actor_in_flight_01');
+    // Match the literal inside the declaration without pinning its exact quoting or
+    // any type annotation, so a reformat is not reported as a value drift.
+    const declared = new RegExp(
+      `ACTOR_IN_FLIGHT_IMPORT_ID\\s*(?::[^=]+)?=\\s*['"]${ACTOR_IN_FLIGHT_IMPORT_ID}['"]`,
+    );
+    expect(objectStore).toMatch(declared);
+    // The declaration only matters because the repository branches on it. Pin the
+    // use site too: an inline literal there would leave the sentinel unused without
+    // failing the declaration assertion above.
+    const repository = readApiSource('../../../api/src/content-import-repository.ts');
+    expect(repository).toMatch(/importBatchId\s*===\s*ACTOR_IN_FLIGHT_IMPORT_ID/);
+    expect(repository).not.toMatch(/importBatchId\s*===\s*['"]imp_/);
   });
 });

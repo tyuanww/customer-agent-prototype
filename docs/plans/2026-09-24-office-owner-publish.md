@@ -38,6 +38,12 @@
 
 飞书文档审核是组织前置，产品不读取飞书文档。
 
+### 审核证据边界（实话，交接必读）
+
+`content_quality_review_evidence` 里那条 `org-reviewed:feishu-doc` 证据是 worker 自己写的：审核人 ID 取 `sha256('org-reviewed:feishu-doc:lead:' || 批号)` 与 `:qa:` 的确定值，不是真人账号；`conclusion='passed'` 也由 `record_org_reviewed_quality_evidence` 落库。SQL 里的 `REVIEW_EVIDENCE_TRUST_BOUNDARY` 只挡「worker 在 payload 里夹带审核字段」，挡不住这两个 definer 函数自己写证据。
+
+结论：库里记的是**一条声明**，不是一道独立控制；worker（API 进程）的信任级就等于审核的信任级。谁审的以飞书文档为准，库里的角色字段只用于对账，不能拿来举证。改这条链路前先读 `packages/database/overlays/0016_office_owner_publish.sql` 的两个函数，别在 API 层加"校验"。迁移文件已落库并带内容哈希，**不要改** `0016`（overlay 或 generated），改了会让正式库的 `/ready` 对不上。
+
 ## 目标数据流
 
 ```
