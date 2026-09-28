@@ -333,7 +333,7 @@ export function ContentModule() {
         }}
       >
         <summary title={summary.title}>{summary.text}</summary>
-        <div className="content-upload" data-testid="content-upload-panel">
+        <div className="content-upload" data-testid="content-upload-panel" role="group" aria-labelledby="content-upload-title">
 
           <div className="dash-filter-toolbar compact content-upload-controls" aria-label="内容导入">
             <input
@@ -442,7 +442,7 @@ export function ContentModule() {
           ) : null}
 
           <div className="content-upload-copy">
-            <span className="dash-card-label">{UPLOAD_COPY.title}</span>
+            <span className="content-upload-label">{UPLOAD_COPY.title}</span>
             <h2 id="content-upload-title">本地导入进入待发布</h2>
             <p data-testid="content-upload-draft-copy">{UPLOAD_COPY.draftOnlyCopy}</p>
             <p data-testid="content-upload-role-note">{UPLOAD_COPY.roleNote}</p>

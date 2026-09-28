@@ -1735,7 +1735,10 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   flex-shrink: 0;
 }
 
-.content-action-row .dash-reset {
+/* Match the 40px primary CTA beside it. The shell's base rule for
+   `.dashboard-shell button.dash-reset` is more specific than a bare
+   `.content-action-row .dash-reset`, so this rule keeps the shell prefix to win. */
+.dashboard-shell .content-action-row .dash-reset {
   min-height: 40px;
 }
 
@@ -3173,6 +3176,15 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 }
 
 .content-upload-copy h2 { margin-top: 3px; }
+
+/* Same treatment as .dash-card-label, but owned by the collapsed import block
+   that no longer sits inside a .dash-card. */
+.content-upload-label {
+  display: block;
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 12px;
+}
 
 .content-upload-copy p {
   max-width: 760px;

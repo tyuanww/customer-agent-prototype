@@ -596,6 +596,17 @@ describe('dashboard layout contract', () => {
     expect(previewRule).toContain('overflow: auto');
     expect(previewRule).toContain('margin: 0');
 
+    // The shell's base rule is `.dashboard-shell button.dash-reset` (0,2,1). A bare
+    // `.content-action-row .dash-reset` (0,2,0) loses to it, silently leaving the
+    // cancel button at 38px. Keep the shell prefix so the 40px CTA height holds.
+    expect(css).toContain('.dashboard-shell .content-action-row .dash-reset');
+    expect(css).not.toMatch(/^\.content-action-row \.dash-reset\s*\{/m);
+
+    // The import block left .dash-card, so its label must not reuse the card name.
+    expect(content).toContain('content-upload-label');
+    expect(content).not.toContain('className="dash-card-label"');
+    expect(content).toContain('role="group" aria-labelledby="content-upload-title"');
+
     // The decorative two-step wizard is gone, markup and CSS both.
     expect(css).not.toContain('.content-pipeline-steps');
     expect(content).not.toContain('content-pipeline-steps');
