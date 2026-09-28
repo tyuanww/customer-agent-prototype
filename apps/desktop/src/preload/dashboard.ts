@@ -18,6 +18,7 @@ const OPS_SOP_PATCH = 'dashboard:ops-sop-patch';
 const OPS_SOP_DELETE = 'dashboard:ops-sop-delete';
 const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
 const OPS_SOFTWARE = 'dashboard:ops-software';
+const OPS_SOFTWARE_OPEN = 'dashboard:ops-software-open';
 const ANNOUNCE_CURRENT = 'dashboard:announce-current';
 const ANNOUNCE_MARK_READ = 'dashboard:announce-mark-read';
 const ANNOUNCE_CONTENT_UPDATED = 'product:announce-content-updated';
@@ -334,6 +335,9 @@ contextBridge.exposeInMainWorld('dashboardOps', {
   },
   softwareCatalog() {
     return invokeOps(OPS_SOFTWARE);
+  },
+  softwareOpenDownload() {
+    return invokeOps(OPS_SOFTWARE_OPEN);
   },
 });
 

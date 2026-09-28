@@ -8,6 +8,7 @@ All notable changes to this customer-agent product implementation repository are
 
 - 内容管理发布前必须手选「将替换」库。表里识别到的域和将替换不一致时，点发布先确认。发布成功留在本页，回执下给「去系统同步」「去话术库」。
 - 话术库下架改为两步确认。成功仍走 `DELETE` 进入 `pending_review`，下次发布才离开当前目录。屏幕写明坐席要等下次发布才搜不到。
+- 系统同步「软件版本更新」增加「打开下载页」：管理员打开当前建议版本的 https 下载地址（系统浏览器）。目录仍只读 `/v1/software/releases`，不跑 `latest.yml`。
 
 ### Changed
 

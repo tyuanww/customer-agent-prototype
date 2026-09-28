@@ -111,13 +111,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps` / `dashboardAnnounce`） | 五项工作台；话术库只读当前发布 hydrate（`list().matchesLease`）；管理员下架 DELETE → pending_review；SOP 读/导入/更新当前会话树（删除仅管理员）；待办 live list/start/close；KPI 走 retrieval metrics；CSV/xlsx 经 `dashboard:content-parse`；管理员发布走 import-then-publish（无独立 import IPC）；软件目录禁止 latest.yml |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps` / `dashboardAnnounce`） | 五项工作台；话术库只读当前发布 hydrate（`list().matchesLease`）；管理员下架 DELETE → pending_review；SOP 读/导入/更新当前会话树（删除仅管理员）；待办 live list/start/close；KPI 走 retrieval metrics；CSV/xlsx 经 `dashboard:content-parse`；管理员发布走 import-then-publish（无独立 import IPC）；软件目录禁止 latest.yml；打开下载页走 `ops-software-open` |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 
-Dashboard 没有 overlay 的 `customerAgent`（search / login / copy / inaccuracy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/发布、话术优化待办 list/start/close、系统同步投影，以及 `dashboardOps`（检索账 / SOP / 话术下架 / 软件目录）。这是有意收窄，不是「完全无 preload」。ops-loop HTTP 已由 Main `dashboard-ops-loop.ts` 消费冻结合同；不要把通用 IPC 或 Node 权限塞进当前窗口。
+Dashboard 没有 overlay 的 `customerAgent`（search / login / copy / inaccuracy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/发布、话术优化待办 list/start/close、系统同步投影，以及 `dashboardOps`（检索账 / SOP / 话术下架 / 软件目录 / 打开下载页）。这是有意收窄，不是「完全无 preload」。ops-loop HTTP 已由 Main `dashboard-ops-loop.ts` 消费冻结合同；不要把通用 IPC 或 Node 权限塞进当前窗口。
 
 ## 4. 数据边界
 

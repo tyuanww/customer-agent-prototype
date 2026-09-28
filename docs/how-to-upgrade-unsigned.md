@@ -16,7 +16,7 @@
 
 3. Windows：把 `客服话术浮窗 Demo-<VERSION>-win-x64-UNSIGNED.exe` 拷到 ASCII 路径后静默安装 `/S /currentuser`。步骤与路径见办公机 how-to。
 
-4. 启动后看查询胶囊或工作台关于版本的软件目录行。文件名仍可含 `UNSIGNED`；界面徽章写「未签名」。
+4. 启动后打开工作台 → 系统同步 → **软件版本更新**。管理员点「打开下载页」会用系统浏览器打开目录里当前建议版本的 https 地址（例如 GitHub Release 资产页）。文件名仍可含 `UNSIGNED`；界面徽章写「未签名」。没有当前建议版本时按钮禁用，状态写「目录为空，没有当前建议版本。」
 
 ## Verification
 
