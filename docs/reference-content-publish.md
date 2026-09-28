@@ -6,9 +6,11 @@
 
 ## 1. 链路概览
 
+工作台「内容管理」的顶栏是**产品会话徽章 + 一对动作**：徽章只说会话接没接上（`未接入` / `正在确认会话` / `已接入`），右侧同一行是「取消未完成导入」（左）和「发布」（右），原因与发布反馈写在动作行下方。「内容导入 / 本地导入」整块默认折在「待开发」，读文件时才展开。
+
 ```
-工作台 内容管理：选 CSV / xlsx
-    │  本地解析第一张表，中文表头映射场景 / 标准话术
+工作台 内容管理：展开待开发，选 CSV / xlsx
+    │  本地解析第一张表，中文表头映射场景 / 标准话术；只进本页预览，不打 import
     ▼
 POST /v1/content/import        →  202 ImportAcceptedResponse（validating）
     │  worker 校验：冻结质检计划 + 写组织已审证据 + finalize
@@ -22,7 +24,7 @@ POST /v1/content/publish       →  200 PublishResponse（release_id / release_s
 content_current 切换 → 坐席 announce / hydrate 读到新目录
 ```
 
-一期发布**仅 owner**。导入可由 owner 或 coach 发起；坐席不能发布。
+一期发布**仅 owner**。导入可由 owner 或 coach 发起；坐席不能发布。选文件只在本页预览，不触发 import——import 由发布动作带起。
 
 ## 2. 桌面 IPC 通道
 
@@ -144,7 +146,8 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 | `NO_IN_FLIGHT`（桌面本地码） | 当前没有未完成的导入。登录还在，不必重新登录。 |
 | 非 owner 发 `FORBIDDEN` | 一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。 |
 | 坐席 | 坐席不能发布内容。 |
-| 无会话 | 请先登录后再发布。 |
+| 无会话 | 当前没有产品会话，无法发布。 |
+| 本地文件读不出来 | 无法读取该文件。请确认文件未打开且仍是 CSV/xlsx 后重试。 |
 
 映射在 `apps/desktop/src/main/dashboard-content.ts` 的 `asFailure`，文案表在 `apps/desktop/src/shared/dashboard-content.ts`。
 
@@ -154,7 +157,9 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 ## 7. 发布前后的桌面闸门
 
-`contentPublishGate` 按序判：无产品会话 → `UNAVAILABLE`；未登录 → `UNAUTHORIZED`；坐席 → `FORBIDDEN`；无行 → `请先导入并通过校验后再发布`；owner 无来源绑定 → `缺少来源绑定，无法导入`；coach → 403 文案。
+`contentPublishGate` 按序判：无产品会话 → `UNAVAILABLE`；未登录 → `UNAUTHORIZED`；坐席 → `FORBIDDEN`；无行 → `请先导入并通过校验后再发布`；owner 无来源绑定 → `缺少来源绑定，无法导入`；coach → 一期仅管理员文案（`ownerPublish`，不是 HTTP 403）。
+
+顶栏徽章**不是** `gate.allowed`。徽章读产品会话：无会话或未登录写「未接入」，`enabled === false` 也写「未接入」，首次 `session()` 未返回写「正在确认会话」，已登录（含 coach / agent）写「已接入」。所以话术师看到的是「已接入 + 发布禁用」，禁用原因走 `CONTENT_PUBLISH_COPY.ownerPublish`，不冒充连接失败。
 
 `rowRequiresOwner` / `rowCoachPublishable` 决定内容级限制：`aftersale` 域或场景/话术含「过敏」「赔付」的行需 owner；coach 只能发 `product` / `campaign`。
 

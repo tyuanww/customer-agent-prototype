@@ -1639,6 +1639,17 @@ describe('DashboardApp', () => {
     expect(screen.getByLabelText('选择 CSV 或 xlsx')).toBeInTheDocument();
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('选择 CSV 或 xlsx');
 
+    // The import workspace ships collapsed; the header carries the session state.
+    expect(screen.getByTestId('content-pending-dev')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+    const actionRow = document.querySelector('.content-action-row');
+    expect(actionRow).toContainElement(screen.getByTestId('publish-action'));
+    expect(actionRow).toContainElement(screen.getByTestId('cancel-in-flight'));
+    expect(screen.getByTestId('formal-source-warning').closest('.dash-module-head')).not.toBeNull();
+    expect(screen.getByTestId('formal-source-warning')).toHaveClass('content-session-banner');
+    expect(screen.queryByTestId('content-pipeline-steps')).not.toBeInTheDocument();
+    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
+
     const demoCsv = new File(
       ['scene,script\n洁面用量确认,先确认产品版本，再说明用量与不可承诺边界\n满赠规则说明,展示门槛与结算条件，不承诺库存\n售后质量升级,记录必要证据，禁止原因承诺\n'],
       'coach-draft.csv',
@@ -1648,15 +1659,15 @@ describe('DashboardApp', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
+    // Reading a file transitions the disclosure open so the preview is never hidden.
+    expect(screen.getByTestId('content-pending-dev')).toHaveAttribute('open');
+    expect(screen.getByTestId('content-staged-preview')).toBeVisible();
     const demoPreview = screen.getByTestId('content-staged-preview');
     expect(demoPreview).toHaveTextContent('场景');
     expect(demoPreview).toHaveTextContent('标准话术');
     expect(demoPreview).not.toHaveTextContent('步骤');
     expect(demoPreview).toHaveTextContent('洁面用量确认');
     expect(demoPreview).toHaveTextContent('售后质量升级');
-    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('导入');
-    expect(screen.getByTestId('content-pipeline-steps')).toHaveTextContent('发布');
-    expect(screen.getByTestId('content-pipeline-steps')).not.toHaveTextContent('审核确认');
     expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(window.customerAgent).toBeUndefined();
