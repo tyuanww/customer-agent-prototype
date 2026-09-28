@@ -225,6 +225,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
         </div>
         ) : null}
 
+        {live ? (
         <div className="dash-filterbar" aria-label="话术筛选">
         <label>
           <span>关键词</span>
@@ -262,6 +263,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
           导出 CSV
         </button>
         </div>
+        ) : null}
 
         {live ? (
         <div className="dash-selection-status" aria-live="polite" data-testid="wording-filter-status">
@@ -319,6 +321,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
           ) : null}
         </div>
 
+        {live ? (
         <aside className="dash-card wording-detail" data-testid="wording-detail">
           {selected ? (
             <>
@@ -372,6 +375,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
             <p className="dash-empty">选择一条话术查看正文</p>
           )}
         </aside>
+        ) : null}
         </div>
       </section>
     </div>

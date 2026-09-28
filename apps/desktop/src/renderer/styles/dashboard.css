@@ -2235,6 +2235,7 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 .dash-filterbar input:focus-visible, .dash-filterbar select:focus-visible, .dash-inline-filter select:focus-visible { outline: 2px solid var(--dash-purple); outline-offset: 1px; }
 
 .wording-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr); gap: 12px; }
+.wording-layout:not(:has(.wording-detail)) { grid-template-columns: 1fr; }
 .wording-list { display: grid; align-content: start; gap: 6px; }
 .sop-library-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .sop-library-node {
