@@ -43,7 +43,6 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
   const [busyId, setBusyId] = useState<string | null>(null);
   const [retrieval, setRetrieval] = useState<DashboardRetrievalMetrics | null>(null);
   const [signedIn, setSignedIn] = useState(false);
-  const [leaseReleaseId, setLeaseReleaseId] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -52,7 +51,8 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
     const opsApi = window.dashboardOps;
     const sessionApi = window.dashboardContent;
     const announceApi = window.dashboardAnnounce;
-    if (sessionApi) {
+    const loadSession = () => {
+      if (!sessionApi) return;
       void sessionApi.session().then((result) => {
         if (!live) return;
         setSignedIn(result.ok === true && result.signedIn === true);
@@ -60,17 +60,10 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         if (!live) return;
         setSignedIn(false);
       });
-    }
-    if (announceApi) {
-      void announceApi.current().then((result) => {
-        if (!live) return;
-        setLeaseReleaseId(result.ok ? result.releaseId : null);
-      }).catch(() => {
-        if (!live) return;
-        setLeaseReleaseId(null);
-      });
-    }
-    if (opsApi) {
+    };
+    loadSession();
+    const loadRetrieval = () => {
+      if (!opsApi) return;
       void opsApi.retrieval('current_release').then((result) => {
         if (!live) return;
         setRetrieval(result.ok ? result : null);
@@ -78,7 +71,8 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         if (!live) return;
         setRetrieval(null);
       });
-    }
+    };
+    loadRetrieval();
     const loadWording = () => {
       if (!wordingApi) {
         setWordingReady(false);
@@ -97,19 +91,18 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
     loadWording();
     const stopCatalog = announceApi?.onCatalogUpdated?.(() => {
       loadWording();
-      void announceApi.current().then((result) => {
-        if (!live) return;
-        setLeaseReleaseId(result.ok ? result.releaseId : null);
-      }).catch(() => {
-        if (!live) return;
-        setLeaseReleaseId(null);
-      });
+    });
+    const stopSession = sessionApi?.onSessionChanged?.(() => {
+      loadSession();
+      loadWording();
+      loadRetrieval();
     });
     if (!iterationApi) {
       setTaskMessage('未接入');
       return () => {
         live = false;
         stopCatalog?.();
+        stopSession?.();
       };
     }
     void iterationApi.list().then((result) => {
@@ -129,11 +122,12 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
     return () => {
       live = false;
       stopCatalog?.();
+      stopSession?.();
     };
   }, []);
 
   const wordingConnected = Boolean(window.dashboardWording);
-  const matchesLease = Boolean(signedIn && leaseReleaseId && wording?.releaseId === leaseReleaseId);
+  const matchesLease = Boolean(signedIn && wording?.matchesLease);
   const openTasks = (tasks ?? []).filter((task) => task.status === 'open' || task.status === 'in_progress');
   const inaccuracyCounts = tasks === null ? [] : aggregateInaccuracyTodoCounts(tasks);
   const wordingTitleById = new Map((wording?.entries ?? []).map((entry) => [entry.scriptId, entry.title]));

@@ -95,3 +95,16 @@ it('fail-closes dashboardOps invoke throws and non-string SOP import args', asyn
   });
   expect(invoke).toHaveBeenCalledWith('dashboard:ops-sop-import', '');
 });
+
+it('notifies dashboardContent.onSessionChanged from product:session-changed', async () => {
+  const electron = await import('electron');
+  const sessionCall = vi.mocked(electron.ipcRenderer.on).mock.calls.find((entry) => entry[0] === 'product:session-changed');
+  expect(sessionCall?.[1]).toEqual(expect.any(Function));
+  const listener = vi.fn();
+  const stop = contentApi().onSessionChanged!(listener);
+  (sessionCall?.[1] as () => void)();
+  expect(listener).toHaveBeenCalledOnce();
+  stop();
+  (sessionCall?.[1] as () => void)();
+  expect(listener).toHaveBeenCalledOnce();
+});

@@ -4,6 +4,41 @@ import { registerProductIpc } from '../../src/main/product-ipc';
 import { IPC_CHANNELS } from '../../src/shared/ipc-channels';
 const handlers = vi.hoisted(() => new Map<string, (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>>());
 vi.mock('electron', () => ({ ipcMain: { handle: (name: string, callback: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>) => handlers.set(name, callback) } }));
+it('fans session changes to query and dashboard, not fox', () => {
+  const frame = { parent: null };
+  const query = {
+    id: 1,
+    isDestroyed: () => false,
+    getURL: () => 'http://127.0.0.1:5173/?role=query',
+    mainFrame: frame,
+    send: vi.fn(),
+  } as unknown as WebContents;
+  const fox = { ...query, id: 2, send: vi.fn() } as unknown as WebContents;
+  const dashboard = { ...query, id: 10, send: vi.fn() } as unknown as WebContents;
+  const listeners = new Set<(value: unknown) => void>();
+  const session = {
+    subscribe: (listener: (value: unknown) => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    status: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+  };
+  registerProductIpc(
+    session as never,
+    () => [query, fox],
+    (wc) => (wc.id === 1 ? 'query' : 'fox'),
+    () => 'http://127.0.0.1:5173/',
+    () => [dashboard],
+  );
+  const payload = { ok: true, signedIn: true };
+  for (const listener of listeners) listener(payload);
+  expect(query.send).toHaveBeenCalledWith(IPC_CHANNELS.PRODUCT_SESSION_CHANGED, payload);
+  expect(dashboard.send).toHaveBeenCalledWith(IPC_CHANNELS.PRODUCT_SESSION_CHANGED, payload);
+  expect(fox.send).not.toHaveBeenCalled();
+});
+
 it('admits only known main frames; fox can read status but cannot login', async () => {
   const frame = { parent: null };
   const query = { id: 1, isDestroyed: () => false, getURL: () => 'http://127.0.0.1:5173/?role=query', mainFrame: frame } as unknown as WebContents;

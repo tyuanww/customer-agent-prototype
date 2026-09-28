@@ -65,7 +65,6 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   const [writeMessage, setWriteMessage] = useState<string | null>(null);
   const [retireConfirm, setRetireConfirm] = useState(false);
   const [retiring, setRetiring] = useState(false);
-  const [leaseReleaseId, setLeaseReleaseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialDomain) return;
@@ -89,17 +88,6 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
       }).catch(() => {
         if (!live) return;
         setCatalog(null);
-      });
-      if (!announce) {
-        setLeaseReleaseId(null);
-        return;
-      }
-      void announce.current().then((result) => {
-        if (!live) return;
-        setLeaseReleaseId(result.ok ? result.releaseId : null);
-      }).catch(() => {
-        if (!live) return;
-        setLeaseReleaseId(null);
       });
     };
     load();
@@ -157,16 +145,14 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   };
 
   const releaseLabel = catalog?.releaseId ?? '未标明发布号';
-  const matchesLease = Boolean(live && leaseReleaseId && catalog?.releaseId === leaseReleaseId);
+  const matchesLease = Boolean(live && catalog?.matchesLease);
   let readinessLabel = '当前发布无此域';
   if (!live) readinessLabel = '当前发布未挂载';
   else if (!matchesLease) readinessLabel = '本机目录';
   else if (domainCount > 0) readinessLabel = '当前发布已挂载';
   let sourceSummary = `${releaseLabel}。当前域没有条目。`;
   if (!live) sourceSummary = '未读到当前发布目录。';
-  else if (!matchesLease && leaseReleaseId) {
-    sourceSummary = `本机目录 ${releaseLabel} · 检索租约 ${leaseReleaseId}。`;
-  } else if (!matchesLease) {
+  else if (!matchesLease) {
     sourceSummary = `${domainCount} 条 · 本机目录 ${releaseLabel}。登录后才跟坐席检索对齐。`;
   } else if (domainCount > 0) {
     sourceSummary = `${domainCount} 条 · ${releaseLabel}。这是坐席现在能搜到的目录。`;
@@ -363,7 +349,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
               <dl className="dash-dl dash-dl-grid">
                 <div><dt>script_id</dt><dd>{selected.scriptId}</dd></div>
                 <div><dt>适用平台</dt><dd>{selected.platform}</dd></div>
-                <div><dt>有效窗</dt><dd>{selected.effectiveWindow}</dd></div>
+                <div className="wording-detail-window"><dt>有效窗</dt><dd>{selected.effectiveWindow}</dd></div>
                 <div><dt>来源</dt><dd>{selected.ownerRole}</dd></div>
               </dl>
               {retireConfirm ? (

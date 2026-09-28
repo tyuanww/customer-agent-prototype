@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { type DomainId } from '../../data/dashboard-manifest';
+import { type DashboardModuleId, type DomainId } from '../../data/dashboard-manifest';
 import {
   bindingsForRows,
   contentPublishGate,
@@ -31,6 +31,24 @@ const UPLOAD_COPY = {
 const SESSION_BANNER_FULL = '导入与发布走产品会话。没有会话时按钮保持未接入，不会写入假发布。';
 const REPLACE_HINT = '必须手选要换的库。发布会整库替换这一库，其它库沿用。';
 const CANCEL_ARIA_LABEL = '取消服务器上未完成的导入，不影响本页预览';
+
+function uniqueRowDomains(rows: readonly CoachUploadRow[]): DashboardContentDomain[] {
+  const seen: DashboardContentDomain[] = [];
+  for (const row of rows) {
+    if (!row.domain || seen.includes(row.domain)) continue;
+    seen.push(row.domain);
+  }
+  return seen;
+}
+
+/** Table domain vs 将替换. Empty table domain is not a mismatch. */
+function replaceMismatchesPick(
+  detected: readonly DashboardContentDomain[],
+  pick: DashboardContentDomain | '',
+): boolean {
+  if (pick === '' || detected.length === 0) return false;
+  return detected.length !== 1 || detected[0] !== pick;
+}
 
 type UploadView =
   | { status: 'idle' }
@@ -122,26 +140,33 @@ function sessionBadgeOf(state: SessionState): { label: string; tone: 'neutral' |
   return { label: '未接入', tone: 'warn' };
 }
 
-/** `待开发` summary: the only status source once the body is collapsed. */
+/** Fold summary: the only status source once the body is collapsed. */
 function summarizeUpload(upload: UploadView): { text: string; title: string } {
   if (upload.status === 'reading') {
-    return { text: `待开发 · 正在读取 ${upload.sourceName}`, title: `待开发 · 正在读取 ${upload.sourceName}` };
+    return { text: `正在读取 ${upload.sourceName}`, title: `正在读取 ${upload.sourceName}` };
   }
   if (upload.status === 'ready') {
-    const text = `待开发 · ${upload.sourceName} · 待发布 ${upload.rows.length} 行`;
+    const text = `${upload.sourceName} · 待发布 ${upload.rows.length} 行`;
     return { text, title: text };
   }
   if (upload.status === 'error') {
     const text = upload.sourceName
-      ? `待开发 · 未进入待发布 · ${upload.sourceName}`
-      : '待开发 · 未进入待发布';
+      ? `未进入待发布 · ${upload.sourceName}`
+      : '未进入待发布';
     return { text, title: upload.message };
   }
-  return { text: '待开发 · 内容导入', title: '待开发 · 内容导入' };
+  return { text: '内容导入', title: '内容导入' };
 }
 
-export function ContentModule() {
+export function ContentModule({
+  onNavigate,
+  onOpenWordingDomain,
+}: {
+  onNavigate?: (target: Extract<DashboardModuleId, 'announce' | 'wording'>) => void;
+  onOpenWordingDomain?: (domain: DomainId) => void;
+} = {}) {
   const [upload, setUpload] = useState<UploadView>({ status: 'idle' });
+  const [replaceConfirm, setReplaceConfirm] = useState(false);
   const [sessionView, setSessionView] = useState<DashboardContentSessionView | null>(null);
   const [sessionSettled, setSessionSettled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -178,9 +203,11 @@ export function ContentModule() {
     load();
     // Focus refresh keeps the last painted view until the new result lands.
     window.addEventListener('focus', load);
+    const stopSession = api.onSessionChanged?.(load);
     return () => {
       live = false;
       window.removeEventListener('focus', load);
+      stopSession?.();
     };
   }, []);
 
@@ -205,14 +232,18 @@ export function ContentModule() {
     sourceBindings,
   });
   const needsLibraryPick = domainOverride === '';
-  const publishDisabled = !gate.allowed || submitting || upload.status !== 'ready'
+  const detectedDomains = uniqueRowDomains(uploadRows(upload));
+  const mismatchReplace = replaceMismatchesPick(detectedDomains, domainOverride);
+  const gateBlocked = !gate.allowed || submitting || upload.status !== 'ready'
     || publishSucceededThisRound || needsLibraryPick;
+  const publishDisabled = gateBlocked || replaceConfirm;
   let publishReason = '';
   if (submitting) publishReason = CONTENT_PUBLISH_COPY.submitting;
   else if (!gate.allowed) publishReason = gate.message;
   else if (upload.status === 'idle' || upload.status === 'error') publishReason = '请先导入草稿';
   else if (upload.status === 'reading') publishReason = '正在读取文件';
   else if (needsLibraryPick) publishReason = '请选择将替换哪一库';
+  else if (replaceConfirm) publishReason = '';
 
   const sessionState = sessionStateOf(hasProductApi, sessionSettled, sessionView);
   const sessionBadge = sessionBadgeOf(sessionState);
@@ -223,6 +254,7 @@ export function ContentModule() {
     setPublishFeedback(null);
     setPublishSucceededThisRound(false);
     setDomainOverride('');
+    setReplaceConfirm(false);
     setPendingDevOpen(false);
     setUpload({ status: 'idle' });
   };
@@ -238,6 +270,7 @@ export function ContentModule() {
     setPublishFeedback(null);
     setPublishSucceededThisRound(false);
     setDomainOverride('');
+    setReplaceConfirm(false);
     setUpload({ status: 'reading', sourceName });
     void readCoachUploadFile(file).then(
       (result) => {
@@ -266,12 +299,13 @@ export function ContentModule() {
     });
   };
 
-  const onPublish = () => {
-    if (publishDisabled || upload.status !== 'ready' || submitting) return;
+  const submitPublish = () => {
+    if (gateBlocked || upload.status !== 'ready' || submitting) return;
     const api = window.dashboardContent;
     if (!api) return;
     const generation = ingestGeneration.current;
     setSubmitting(true);
+    setReplaceConfirm(false);
     setPublishFeedback(null);
     const sourceName = uploadSourceName(upload);
     const csvText = uploadCsvText(upload);
@@ -306,6 +340,15 @@ export function ContentModule() {
     }).finally(() => {
       if (generation === ingestGeneration.current) setSubmitting(false);
     });
+  };
+
+  const onPublish = () => {
+    if (gateBlocked || upload.status !== 'ready' || submitting) return;
+    if (mismatchReplace && !replaceConfirm) {
+      setReplaceConfirm(true);
+      return;
+    }
+    submitPublish();
   };
 
   return (
@@ -358,6 +401,28 @@ export function ContentModule() {
                     </span>
                   ))
                   : publishFeedback}
+                {publishSucceededThisRound ? (
+                  <span className="content-publish-links" data-testid="publish-feedback-links">
+                    <button
+                      type="button"
+                      className="dash-linkish"
+                      data-testid="publish-goto-announce"
+                      onClick={() => onNavigate?.('announce')}
+                    >
+                      去系统同步
+                    </button>
+                    <button
+                      type="button"
+                      className="dash-linkish"
+                      data-testid="publish-goto-wording"
+                      onClick={() => {
+                        if (domainOverride) onOpenWordingDomain?.(domainOverride);
+                      }}
+                    >
+                      去话术库
+                    </button>
+                  </span>
+                ) : null}
               </span>
             ) : (
               <span data-testid="publish-disabled-reason">{publishReason}</span>
@@ -374,6 +439,7 @@ export function ContentModule() {
           value={domainOverride}
           disabled={submitting}
           onChange={(event) => {
+            setReplaceConfirm(false);
             setDomainOverride(event.currentTarget.value as DashboardContentDomain | '');
           }}
         >
@@ -387,6 +453,32 @@ export function ContentModule() {
         ) : null}
         <span className="dash-scope">{REPLACE_HINT}</span>
       </div>
+      {replaceConfirm ? (
+        <div className="content-replace-confirm" data-testid="content-replace-confirm" role="status">
+          <span>
+            {`表里识别到${detectedDomains.map(domainLabel).join('、')}，将整库替换「${domainLabel(domainOverride || undefined)}」。确认后才发布。`}
+          </span>
+          <span className="content-action-row">
+            <button
+              type="button"
+              className="dash-reset"
+              data-testid="content-replace-confirm-cancel"
+              onClick={() => setReplaceConfirm(false)}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="dash-publish"
+              data-testid="content-replace-confirm-action"
+              disabled={submitting}
+              onClick={submitPublish}
+            >
+              确认发布
+            </button>
+          </span>
+        </div>
+      ) : null}
 
       <details
         className="dash-contract-details"

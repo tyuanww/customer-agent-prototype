@@ -10,24 +10,17 @@ import {
 import { QUERY_WIDTH } from '@shared/overlay-geometry';
 import type { FoxVisualTransform, QueryAnchor } from '@shared/overlay-events';
 import type { OverlayPhase } from '@shared/overlay-machine';
-import type { ProductSessionResult, ProductSessionView } from '@shared/product-session';
-
-const ROLE_ENTRY_LABEL = { owner: '管理员', coach: '话术师', agent: '坐席' } as const;
-
-function openIdLabel(value: string | null | undefined): boolean {
-  return typeof value === 'string' && (value.startsWith('ou_') || value.startsWith('usr_ou_'));
-}
+import {
+  sessionDisplayName,
+  type ProductSessionResult,
+  type ProductSessionView,
+} from '@shared/product-session';
 
 export function sessionEntryLabel(state: ProductSessionView): string {
-  const named = state.displayName?.trim() ?? '';
-  if (named.length > 0 && !openIdLabel(named)) return named;
-  if (openIdLabel(named) || openIdLabel(state.userId)) {
-    return (state.role && ROLE_ENTRY_LABEL[state.role]) || '已登录';
-  }
-  const userId = state.userId;
-  if (userId && userId.startsWith('usr_') && userId.length > 4) return userId.slice(4);
-  if (userId && userId.length > 0) return userId;
-  return state.role ?? '';
+  return sessionDisplayName({
+    role: state.role,
+    mappedName: state.displayName,
+  }) ?? '';
 }
 
 export type QueryFoxVisualState = 'SEARCHING' | 'RESULTS' | 'EMPTY' | 'COPIED' | 'IDLE';

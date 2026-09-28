@@ -107,16 +107,18 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
 
   if (loading) {
     return (
-      <div className="announce-empty" data-testid="announce-wording-loading">
+      <div className="dash-empty-state announce-empty" data-testid="announce-wording-loading">
         <strong>加载中…</strong>
+        <span>正在读取当前发布。</span>
       </div>
     );
   }
 
   if (!view) {
     return (
-      <div className="announce-empty" data-testid="announce-wording-empty">
+      <div className="dash-empty-state announce-empty" data-testid="announce-wording-empty">
         <strong>未接入当前发布</strong>
+        <span>登录后才能看到本版四卡。</span>
       </div>
     );
   }
@@ -201,8 +203,8 @@ function SoftwareTab() {
         setMessage('目录为空，没有当前建议版本。');
         return;
       }
-      const signedLabel = current.signed ? '已签名' : 'UNSIGNED';
-      setMessage(`${current.version} · ${signedLabel} · 不跑 latest.yml`);
+      const signedLabel = current.signed ? '已签名' : '未签名';
+      setMessage(`${current.version} · ${signedLabel}`);
     }).catch(() => {
       if (!liveRef.current) return;
       setCatalog(null);
@@ -231,7 +233,7 @@ function SoftwareTab() {
         {catalog?.current ? (
           <dl className="dash-dl">
             <div><dt>平台</dt><dd>{catalog.current.platform}</dd></div>
-            <div><dt>签名</dt><dd>{catalog.current.signed ? '已签名' : 'UNSIGNED'}</dd></div>
+            <div><dt>签名</dt><dd>{catalog.current.signed ? '已签名' : '未签名'}</dd></div>
           </dl>
         ) : null}
         <button

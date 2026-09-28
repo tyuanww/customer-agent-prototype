@@ -1293,6 +1293,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 2,
         entries: [
           {
@@ -1366,6 +1367,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_25',
         catalogRefreshedAt: null,
+        matchesLease: true,
         total: 1,
         entries: [
           {
@@ -1414,6 +1416,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [
           {
@@ -1467,6 +1470,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 25,
         entries: Array.from({ length: 25 }, (_, index) => ({
           scriptId: `mn-${index + 1}`,
@@ -1543,6 +1547,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 26,
         entries: [
           ...Array.from({ length: 25 }, (_, index) => ({

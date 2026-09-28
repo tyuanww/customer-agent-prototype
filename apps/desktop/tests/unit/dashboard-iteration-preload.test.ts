@@ -7,7 +7,7 @@ const invoke = vi.hoisted(() => vi.fn());
 
 vi.mock('electron', () => ({
   contextBridge: { exposeInMainWorld: expose },
-  ipcRenderer: { invoke },
+  ipcRenderer: { invoke, on: vi.fn() },
 }));
 
 const task = Object.freeze({

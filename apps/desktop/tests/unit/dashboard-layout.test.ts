@@ -589,6 +589,10 @@ describe('dashboard layout contract', () => {
 
     const replaceRowRule = css.match(/\.content-replace-row\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(replaceRowRule).toContain('margin: 0 0 14px');
+    expect(replaceRowRule).toContain('align-items: center');
+    expect(css).toContain('.dash-filter-toolbar.content-replace-row label');
+    expect(css).toContain('.content-replace-row .dash-scope');
+    expect(css).toMatch(/\.content-replace-row \.dash-scope\s*\{[^}]*margin:\s*0;/);
     expect(css).toContain('.dashboard-shell .content-replace-row select');
     expect(css).toContain('min-height: 40px');
 

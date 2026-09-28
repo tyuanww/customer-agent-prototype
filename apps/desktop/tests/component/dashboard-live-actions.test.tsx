@@ -72,7 +72,7 @@ describe('dashboard live actions', () => {
       close: vi.fn(),
     };
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null, matchesLease: false })),
     };
     render(<OverviewModule />);
     await waitFor(() => expect(list).toHaveBeenCalled());
@@ -109,6 +109,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_21',
         catalogRefreshedAt: '2026-09-21T12:00:00.000Z',
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -166,6 +167,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -251,7 +253,6 @@ describe('dashboard live actions', () => {
       sopImport,
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
@@ -270,19 +271,6 @@ describe('dashboard live actions', () => {
   });
 
   it('patches wording into pending_review and shows retrieval plus GONE software current', async () => {
-    const scriptPatch = vi.fn(async (_request: {
-      scriptId: string;
-      expectedVersion: number;
-      title: string;
-      answerText: string;
-      effectiveFrom: string;
-      effectiveTo?: string | null;
-    }) => ({
-      ok: true as const,
-      scriptId: 'script-1',
-      mutationId: 'smut_1',
-      reviewStatus: 'pending_review' as const,
-    }));
     const retrieval = vi.fn(async () => ({
       ok: true as const,
       noHitRate: 0.125,
@@ -310,7 +298,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch,
       scriptDelete: vi.fn(),
       softwareCatalog,
     };
@@ -319,6 +306,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -350,7 +338,6 @@ describe('dashboard live actions', () => {
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
     expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机目录');
     expect(screen.queryByTestId('wording-update')).not.toBeInTheDocument();
-    expect(scriptPatch).not.toHaveBeenCalled();
     unmount();
 
     render(<OverviewModule />);
@@ -384,7 +371,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete,
       softwareCatalog: vi.fn(),
     };
@@ -393,6 +379,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -435,7 +422,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: hangingDelete,
       softwareCatalog: vi.fn(),
     };
@@ -444,6 +430,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -485,7 +472,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete,
       softwareCatalog: vi.fn(),
     };
@@ -494,6 +480,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -542,12 +529,11 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null, matchesLease: false })),
     };
     window.dashboardIteration = {
       list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
@@ -573,7 +559,6 @@ describe('dashboard live actions', () => {
   });
 
   it('refuses wording writes without a scriptVersion and shows UNSIGNED software current', async () => {
-    const scriptPatch = vi.fn();
     const scriptDelete = vi.fn();
     window.dashboardOps = {
       retrieval: vi.fn(async () => ({
@@ -583,7 +568,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch,
       scriptDelete,
       softwareCatalog: vi.fn(async () => ({
         ok: true as const,
@@ -603,6 +587,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -635,7 +620,6 @@ describe('dashboard live actions', () => {
     await user.click(screen.getByTestId('wording-retire'));
     await user.click(screen.getByTestId('wording-retire-confirm-action'));
     expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.noVersion);
-    expect(scriptPatch).not.toHaveBeenCalled();
     expect(scriptDelete).not.toHaveBeenCalled();
     unmount();
 
@@ -649,7 +633,7 @@ describe('dashboard live actions', () => {
     await waitFor(() => {
       expect(screen.getByTestId('software-update-status')).toHaveTextContent('0.3.18');
     });
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('UNSIGNED');
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('不跑 latest.yml');
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('未签名');
+    expect(screen.getByTestId('software-update-status')).not.toHaveTextContent('latest.yml');
   });
 });
