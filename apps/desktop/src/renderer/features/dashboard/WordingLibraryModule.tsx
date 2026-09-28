@@ -19,7 +19,9 @@ const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
 ];
 
 function riskTone(risk: WordingEntry['risk']): 'ok' | 'warn' | 'danger' {
-  return risk === 'low' ? 'ok' : risk === 'medium' ? 'warn' : 'danger';
+  if (risk === 'low') return 'ok';
+  if (risk === 'medium') return 'warn';
+  return 'danger';
 }
 
 function downloadTextFile(filename: string, body: string): void {
@@ -139,17 +141,15 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
     });
   };
 
-  const readinessLabel = !live
-    ? '当前发布未挂载'
-    : domainCount > 0
-      ? '当前发布已挂载'
-      : '当前发布无此域';
   const releaseLabel = catalog?.releaseId ?? '未标明发布号';
-  const sourceSummary = !live
-    ? '未读到当前发布目录。'
-    : domainCount > 0
-      ? `${domainCount} 条 · ${releaseLabel}。这是坐席现在能搜到的目录。`
-      : `${releaseLabel}。当前域没有条目。`;
+  let readinessLabel = '当前发布无此域';
+  if (!live) readinessLabel = '当前发布未挂载';
+  else if (domainCount > 0) readinessLabel = '当前发布已挂载';
+  let sourceSummary = `${releaseLabel}。当前域没有条目。`;
+  if (!live) sourceSummary = '未读到当前发布目录。';
+  else if (domainCount > 0) {
+    sourceSummary = `${domainCount} 条 · ${releaseLabel}。这是坐席现在能搜到的目录。`;
+  }
 
   const onRetire = () => {
     if (retiring) return;

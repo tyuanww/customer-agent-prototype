@@ -86,11 +86,41 @@ function detectedDomainCopy(upload: UploadView): string | null {
   return `表里识别到：${labels.join('、')}`;
 }
 
+type SessionState = 'pending' | 'signed-in' | 'disconnected';
+
 function uploadStatusHeadline(status: UploadView['status']): string {
   if (status === 'ready') return '待发布';
   if (status === 'reading') return '正在读取';
   if (status === 'error') return '未进入待发布';
   return '等待导入';
+}
+
+function uploadStatusDetail(upload: UploadView): string {
+  if (upload.status === 'ready') {
+    return `待发布 · ${upload.rows.length} 行 · ${upload.sourceName} · 不是已发布`;
+  }
+  if (upload.status === 'reading') {
+    return `正在读取 ${upload.sourceName} · 只在本页预览，不会发布`;
+  }
+  if (upload.status === 'error') return upload.message;
+  return '选择 CSV 或 xlsx';
+}
+
+function sessionStateOf(
+  hasProductApi: boolean,
+  sessionSettled: boolean,
+  sessionView: DashboardContentSessionView | null,
+): SessionState {
+  if (!hasProductApi) return 'disconnected';
+  if (!sessionSettled) return 'pending';
+  if (sessionView?.enabled !== false && sessionView?.signedIn === true) return 'signed-in';
+  return 'disconnected';
+}
+
+function sessionBadgeOf(state: SessionState): { label: string; tone: 'neutral' | 'ok' | 'warn' } {
+  if (state === 'pending') return { label: '正在确认会话', tone: 'neutral' };
+  if (state === 'signed-in') return { label: '已接入', tone: 'ok' };
+  return { label: '未接入', tone: 'warn' };
 }
 
 function summarizeUpload(upload: UploadView): { text: string; title: string } {
@@ -110,8 +140,6 @@ function summarizeUpload(upload: UploadView): { text: string; title: string } {
   return { text: '待开发 · 内容导入', title: '待开发 · 内容导入' };
 }
 
-type SessionState = 'pending' | 'signed-in' | 'disconnected';
-
 export function ContentModule() {
   const [upload, setUpload] = useState<UploadView>({ status: 'idle' });
   const [sessionView, setSessionView] = useState<DashboardContentSessionView | null>(null);
@@ -129,13 +157,7 @@ export function ContentModule() {
     ? { ...upload, rows: withDomain(upload.rows, domainOverride) }
     : upload;
   const hasDomain = effectiveUpload.status === 'ready' && effectiveUpload.rows.some((row) => row.domain);
-  const statusMessage = effectiveUpload.status === 'ready'
-    ? `待发布 · ${effectiveUpload.rows.length} 行 · ${effectiveUpload.sourceName} · 不是已发布`
-    : effectiveUpload.status === 'reading'
-      ? `正在读取 ${effectiveUpload.sourceName} · 只在本页预览，不会发布`
-      : effectiveUpload.status === 'error'
-        ? effectiveUpload.message
-        : '选择 CSV 或 xlsx';
+  const statusMessage = uploadStatusDetail(effectiveUpload);
   const summary = summarizeUpload(upload);
 
   useEffect(() => {
@@ -184,30 +206,15 @@ export function ContentModule() {
   });
   const publishDisabled = !gate.allowed || submitting || upload.status !== 'ready' || publishSucceededThisRound;
   const gateBlocksHard = !gate.allowed && gate.code !== 'VALIDATION';
-  const publishReason = submitting
-    ? CONTENT_PUBLISH_COPY.submitting
-    : gateBlocksHard
-      ? gate.message
-      : upload.status === 'idle' || upload.status === 'error'
-        ? '请先导入草稿'
-        : upload.status === 'reading'
-          ? '正在读取文件'
-          : gate.allowed
-            ? ''
-            : gate.message;
+  let publishReason = gate.message;
+  if (submitting) publishReason = CONTENT_PUBLISH_COPY.submitting;
+  else if (gateBlocksHard) publishReason = gate.message;
+  else if (upload.status === 'idle' || upload.status === 'error') publishReason = '请先导入草稿';
+  else if (upload.status === 'reading') publishReason = '正在读取文件';
+  else if (gate.allowed) publishReason = '';
 
-  const sessionState: SessionState = !hasProductApi
-    ? 'disconnected'
-    : !sessionSettled
-      ? 'pending'
-      : sessionView?.enabled !== false && sessionView?.signedIn === true
-        ? 'signed-in'
-        : 'disconnected';
-  const sessionBadge = sessionState === 'pending'
-    ? { label: '正在确认会话', tone: 'neutral' as const }
-    : sessionState === 'signed-in'
-      ? { label: '已接入', tone: 'ok' as const }
-      : { label: '未接入', tone: 'warn' as const };
+  const sessionState = sessionStateOf(hasProductApi, sessionSettled, sessionView);
+  const sessionBadge = sessionBadgeOf(sessionState);
   const replaceDetected = detectedDomainCopy(upload);
 
   const clearUpload = () => {
