@@ -129,6 +129,8 @@ export type DashboardContentPublishView = Readonly<{
   releaseId: string;
   releaseSeq: number;
   publisherDisplayName: string | null;
+  /** 与请求同句的四库 delta，已写入 Announcement.summary；空/缺省表示这次没有 delta。 */
+  summary: string | null;
 }>;
 
 export type DashboardContentPublishResult = DashboardContentPublishView | DashboardContentFailure;
@@ -320,7 +322,7 @@ export function isDashboardContentPublishResult(value: unknown): value is Dashbo
   if (isDashboardContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'publisherDisplayName'])
+  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'publisherDisplayName', 'summary'])
     && record.ok === true
     && typeof record.releaseId === 'string'
     && record.releaseId.length > 0
@@ -330,5 +332,7 @@ export function isDashboardContentPublishResult(value: unknown): value is Dashbo
     && (record.publisherDisplayName === null
       || (typeof record.publisherDisplayName === 'string'
         && record.publisherDisplayName.length > 0
-        && record.publisherDisplayName.length <= 64));
+        && record.publisherDisplayName.length <= 64))
+    && (record.summary === null
+      || (typeof record.summary === 'string' && record.summary.length > 0 && record.summary.length <= 500));
 }

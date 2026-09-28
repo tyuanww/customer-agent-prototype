@@ -7,6 +7,7 @@ import { registerProductIpc } from './product-ipc';
 import { readProductClientId } from './product-client-id';
 import { ProductAnnounce } from './product-announce';
 import { registerProductAnnounceIpc } from './product-announce-ipc';
+import { createLastSeenStore } from './product-last-seen';
 import { openSyntheticHelp } from './product-help-open';
 import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
@@ -233,6 +234,7 @@ if (!gotLock) {
         Date.now,
         persistHydrateFromEnv,
         (_releaseId, items) => { scheduleRetrievalEmbeddingsFromEnv(items); },
+        createLastSeenStore(userDataDirectory, productProfile.apiOrigin),
       );
       await productSession.restore();
     }
@@ -240,7 +242,8 @@ if (!gotLock) {
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
-      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
+      () => controller?.dashboardWebContents() ?? null);
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
@@ -255,8 +258,9 @@ if (!gotLock) {
       () => controller?.rendererDevServerUrl,
       async (sessionEpoch) => {
         const announce = productAnnounce;
-        if (!announce) return;
+        if (!announce) return null;
         await announce.refresh({ sessionEpoch, generation: 0 });
+        return announce.currentDomainCounts();
       },
     );
     registerDashboardIterationIpc(

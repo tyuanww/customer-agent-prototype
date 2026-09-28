@@ -1,59 +1,177 @@
-import { useEffect, useState } from 'react';
-import type { DashboardWordingView } from '@shared/dashboard-wording';
+import { useEffect, useMemo, useState } from 'react';
 import type { DashboardSoftwareCatalog } from '@shared/dashboard-ops-loop';
+import type { DashboardAnnounceResult, DashboardAnnounceView } from '@shared/dashboard-announce';
+import {
+  LIBRARY_DOMAINS,
+  LIBRARY_DOMAIN_LABELS,
+  LIBRARY_DELTA_UNREADABLE,
+  parseLibraryDelta,
+  type LibraryDomain,
+  type LibraryDelta,
+  type LibraryStatus,
+} from '@shared/library-delta';
+import type { DomainId } from '../../data/dashboard-manifest';
 import { StatusBadge } from './StatusBadge';
 
 type ActiveTab = 'wording' | 'software';
 
-function WordingTab() {
-  const [catalog, setCatalog] = useState<DashboardWordingView | null>(null);
-  const [message, setMessage] = useState('加载中…');
+const LIBRARY_DOMAIN_IDS: Readonly<Record<LibraryDomain, DomainId>> = Object.freeze({
+  product: 'product',
+  campaign: 'campaign',
+  presale: 'presale',
+  aftersale: 'aftersale',
+});
+
+/**
+ * Card-state source is the published `Announcement.summary` delta on this session's
+ * `/v1/announce/current`. Never hydrate hashes or local sourceBindings. When the
+ * summary is missing/garbled every card shows the honest 「无法标出…」 line.
+ */
+function libraryCardStatus(delta: LibraryDelta | null, domain: LibraryDomain): LibraryStatus | 'unknown' {
+  if (!delta) return 'unknown';
+  return delta[domain];
+}
+
+/** 卡上的一句话状态。无法解析 delta 时诚实写「无法标出」，不冒充已更新/沿用。 */
+function libraryCardBadgeLabel(status: LibraryStatus | 'unknown'): string {
+  if (status === 'updated') return '本版已更新';
+  if (status === 'carried') return '本版沿用';
+  return '无法标出';
+}
+
+function libraryCardDataStatus(status: LibraryStatus | 'unknown'): 'updated' | 'carried' | 'unknown' {
+  if (status === 'updated' || status === 'carried') return status;
+  return 'unknown';
+}
+
+function libraryCardCountCopy(status: LibraryStatus | 'unknown', countLabel: string): string {
+  if (status === 'updated') return `本版已更新 · ${countLabel}`;
+  if (status === 'carried') return `本版沿用 · 内容仍是当前可用 · ${countLabel}`;
+  return countLabel;
+}
+
+function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => void }) {
+  const [state, setState] = useState<DashboardAnnounceResult | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const api = window.dashboardWording;
+    const api = window.dashboardAnnounce;
     if (!api) {
-      setMessage('未接入：没有话术库通道。');
+      setState({ ok: false, code: 'UNAVAILABLE', signedIn: false });
+      setLoading(false);
       return undefined;
     }
     let live = true;
-    void api.list().then((result) => {
-      if (!live) return;
-      if (!result.ok) {
-        setCatalog(null);
-        setMessage('未接入当前发布。');
-        return;
-      }
-      setCatalog(result);
-      setMessage('');
-    }).catch(() => {
-      if (!live) return;
-      setCatalog(null);
-      setMessage('未接入当前发布。');
-    });
+    const load = () => {
+      void api.current().then((result) => {
+        if (!live) return;
+        setState(result);
+        setLoading(false);
+      }).catch(() => {
+        if (!live) return;
+        setState({ ok: false, code: 'UNAVAILABLE', signedIn: false });
+        setLoading(false);
+      });
+    };
+    load();
+    // dashboard preload 不挂 push，也无渲染侧定时器：窗口聚焦/重新可见时重取，
+    // 加一个 10s poll 对齐坐席运输层节奏——窗口可见时另一台机器发布后四卡能自动跟上。
+    const onVisible = () => { if (!document.hidden) load(); };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    const interval = window.setInterval(() => { if (!document.hidden) load(); }, 10_000);
     return () => {
       live = false;
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(interval);
     };
   }, []);
+
+  const view: DashboardAnnounceView | null = state?.ok ? state : null;
+  const delta = useMemo(
+    () => (view ? parseLibraryDelta(view.announcement?.summary ?? null) : null),
+    [view],
+  );
+  const unreadDomains = useMemo(
+    () => new Set(view?.unreadDomains ?? []),
+    [view],
+  );
+
+  // 「话术版本更新」tab 实际可见时才清当前 userId 的未读。
+  // document.hidden 不在 deps 里，所以必须自己听 visibilitychange，否则后台打开会卡住。
+  useEffect(() => {
+    if (!view?.unread || !unreadDomains.size) return undefined;
+    const maybeRead = () => {
+      if (document.hidden) return;
+      void window.dashboardAnnounce?.markRead([...unreadDomains]);
+    };
+    maybeRead();
+    document.addEventListener('visibilitychange', maybeRead);
+    return () => document.removeEventListener('visibilitychange', maybeRead);
+  }, [view, unreadDomains]);
+
+  if (loading) {
+    return (
+      <div className="dash-empty-state" data-testid="announce-wording-loading">
+        <strong>加载中…</strong>
+      </div>
+    );
+  }
+
+  if (!view) {
+    // 无 current_release：整页「未接入当前发布」。
+    return (
+      <div className="dash-empty-state" data-testid="announce-wording-empty">
+        <strong>未接入当前发布。</strong>
+      </div>
+    );
+  }
+
+  const title = view.announcement?.title ?? null;
 
   return (
     <>
       <p className="dash-scope">话术版本来自当前发布，不是合成演练。</p>
-      {catalog ? (
-        <div className="dash-card" data-testid="announce-wording-live">
-          <div className="dash-card-row">
-            <span className="dash-card-label">当前话术发布</span>
-            <StatusBadge label={catalog.releaseId ? '已挂载' : '空发布'} tone={catalog.releaseId ? 'ok' : 'warn'} />
-          </div>
-          <dl className="dash-dl">
-            <div><dt>目标版本</dt><dd data-testid="announce-release-id">{catalog.releaseId ?? '未挂载'}</dd></div>
-            <div><dt>条目数</dt><dd>{catalog.total}</dd></div>
-          </dl>
-        </div>
-      ) : (
-        <div className="dash-empty-state" data-testid="announce-wording-empty">
-          <strong>{message}</strong>
-        </div>
-      )}
+      {!delta ? (
+        <p className="dash-scope dash-scope-important" data-testid="announce-delta-unknown">
+          {LIBRARY_DELTA_UNREADABLE}
+        </p>
+      ) : null}
+      <div className="announce-library-grid" data-testid="announce-library-grid">
+        {LIBRARY_DOMAINS.map((domain) => {
+          const status = libraryCardStatus(delta, domain);
+          const count = view.counts ? view.counts[domain] : null;
+          const countLabel = count === null ? '—' : `${count} 条`;
+          return (
+            <button
+              key={domain}
+              type="button"
+              className="dash-card announce-library-card"
+              data-testid={`announce-library-${domain}`}
+              data-library-status={libraryCardDataStatus(status)}
+              onClick={() => onOpenDomain?.(LIBRARY_DOMAIN_IDS[domain])}
+            >
+              <div className="dash-card-row">
+                <span className="dash-card-label">{LIBRARY_DOMAIN_LABELS[domain]}</span>
+                <StatusBadge label={libraryCardBadgeLabel(status)} tone="neutral" />
+                {unreadDomains.has(domain) ? (
+                  <span className="announce-unread-dot" aria-label="有话术更新" role="img" />
+                ) : null}
+              </div>
+              {status === 'updated' && title ? (
+                <p className="announce-library-title" data-testid={`announce-library-title-${domain}`}>{title}</p>
+              ) : null}
+              <p className="announce-library-count" data-testid={`announce-library-count-${domain}`}>
+                {libraryCardCountCopy(status, countLabel)}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+      <p className="dash-footnote" data-testid="announce-release-footnote">
+        检索租约 {view.releaseId}
+      </p>
     </>
   );
 }
@@ -117,7 +235,7 @@ function SoftwareTab() {
   );
 }
 
-export function AnnounceModule() {
+export function AnnounceModule({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => void } = {}) {
   const [tab, setTab] = useState<ActiveTab>('wording');
 
   return (
@@ -151,7 +269,7 @@ export function AnnounceModule() {
       </div>
 
       <div role="tabpanel" aria-label={tab === 'wording' ? '话术版本更新' : '软件版本更新'}>
-        {tab === 'wording' ? <WordingTab /> : <SoftwareTab />}
+        {tab === 'wording' ? <WordingTab onOpenDomain={onOpenDomain} /> : <SoftwareTab />}
       </div>
     </div>
   );

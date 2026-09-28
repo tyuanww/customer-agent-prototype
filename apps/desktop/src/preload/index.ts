@@ -1,5 +1,6 @@
 import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductInaccuracyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity, type ProductInaccuracyResult } from '../shared/product-search';
-import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isProductAnnounceInvalidation, type ProductAnnounceInvalidation } from '../shared/product-announce';
+import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isProductAnnounceInvalidation, isProductAnnounceContentUpdate, isProductAnnounceUnread, type ProductAnnounceInvalidation, type ProductAnnounceContentUpdate } from '../shared/product-announce';
+import { LIBRARY_DOMAINS, isLibraryDomain, type LibraryDomain } from '../shared/library-delta';
 import { helpFailure, isProductEscalateRequest, isProductEscalateResult, isProductTerminalRequest, isProductTerminalResult } from '../shared/product-help';
 import { catalogFailure, isProductCatalogResult } from '../shared/product-catalog';
 import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
@@ -52,6 +53,10 @@ ipcRenderer.on(IPC_CHANNELS.PRODUCT_SESSION_CHANGED, (_event, value: unknown) =>
 const announceListeners = new Set<(value: ProductAnnounceInvalidation) => void>();
 ipcRenderer.on(IPC_CHANNELS.PRODUCT_ANNOUNCE_INVALIDATED, (_event, value: unknown) => {
   if (isProductAnnounceInvalidation(value)) for (const listener of announceListeners) listener(value);
+});
+const contentUpdatedListeners = new Set<(value: ProductAnnounceContentUpdate) => void>();
+ipcRenderer.on(IPC_CHANNELS.PRODUCT_ANNOUNCE_CONTENT_UPDATED, (_event, value: unknown) => {
+  if (isProductAnnounceContentUpdate(value)) for (const listener of contentUpdatedListeners) listener(value);
 });
 const sessionInvoke = async (channel: string): Promise<ProductSessionResult> => {
   try {
@@ -165,6 +170,23 @@ const api: CustomerAgentApi = {
       } catch { return announceFailure('UNAVAILABLE', request); }
     },
     onInvalidated(listener) { announceListeners.add(listener); return () => { announceListeners.delete(listener); }; },
+    onContentUpdated(listener) { contentUpdatedListeners.add(listener); return () => { contentUpdatedListeners.delete(listener); }; },
+    async unread() {
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_ANNOUNCE_UNREAD);
+        return isProductAnnounceUnread(value) ? value : { ok: false as const, signedIn: false as const, unread: false as const, domains: [] as const };
+      } catch {
+        return { ok: false as const, signedIn: false as const, unread: false as const, domains: [] as const };
+      }
+    },
+    async markRead(domains) {
+      const requested = Array.isArray(domains) && domains.length <= 4 && domains.every((domain: unknown) => isLibraryDomain(domain))
+        && new Set(domains).size === domains.length
+        ? LIBRARY_DOMAINS.filter((domain) => (domains as readonly LibraryDomain[]).includes(domain))
+        : [];
+      if (requested.length === 0) return;
+      try { await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_ANNOUNCE_MARK_READ, requested); } catch { /* best effort */ }
+    },
   },
   productHelp: {
     async escalate(request) {

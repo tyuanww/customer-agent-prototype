@@ -85,8 +85,17 @@ function readFoxVisualTransform(element: HTMLElement | null): FoxVisualTransform
   }
 }
 
+/** 打开查询的可访问名。未读加「有话术更新」；与故障黄点同时存在时故障文案也要在。 */
+function foxAriaLabel(shortcutFailed: boolean, unread: boolean, hint: string): string {
+  const parts = ['打开话术查询。'];
+  if (shortcutFailed) parts.push(hint);
+  if (unread) parts.push('有话术更新。');
+  return parts.join(' ');
+}
+
 export function FoxApp() {
   const [shortcutFailed, setShortcutFailed] = useState(false);
+  const [unread, setUnread] = useState(false);
   const [hint, setHint] = useState('点击打开查询，可拖拽移动');
   const [dockEdge, setDockEdge] = useState<FoxDockEdge>('none');
   const [snapping, setSnapping] = useState(false);
@@ -419,6 +428,34 @@ export function FoxApp() {
     resetFollow();
     wake();
   }, [clearAnnoyedDragTimer, clearSettleWatchdog, publishTransient, resetDragVars, resetFollow, wake]);
+
+  // 未读投影：只读，不 refresh announce、不 mark-read、不起渲染侧定时器。
+  // 运输层是已登录 Query 现有的约 10s refreshAnnounce → content-updated 扇出；
+  // Fox 在挂载、窗口重新可见、以及扇出时各读一次。单击狐狸仍只开查询。
+  useEffect(() => {
+    const api = window.customerAgent?.productAnnounce;
+    if (!api?.unread) return undefined;
+    let live = true;
+    const poll = () => {
+      void api.unread!().then((projection) => {
+        if (live) setUnread(Boolean(projection.ok && projection.unread));
+      }).catch(() => {
+        // 无会话不画紫点。
+        if (live) setUnread(false);
+      });
+    };
+    poll();
+    const onVisible = () => { if (!document.hidden) poll(); };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    const unsubscribe = api.onContentUpdated?.(() => poll());
+    return () => {
+      live = false;
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+      unsubscribe?.();
+    };
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -946,7 +983,7 @@ export function FoxApp() {
         type="button"
         className="fox-button"
         data-testid="fox-button"
-        aria-label={shortcutFailed ? `打开话术查询。${hint}` : '打开话术查询'}
+        aria-label={foxAriaLabel(shortcutFailed, unread, hint)}
         title={hint}
         onPointerEnter={() => {
           hoverReleaseRef.current = false;
@@ -1036,6 +1073,9 @@ export function FoxApp() {
         </span>
         {shortcutFailed ? (
           <span className="fox-warning-dot" data-testid="shortcut-fallback-dot" />
+        ) : null}
+        {unread ? (
+          <span className="fox-unread-dot" data-testid="fox-unread-dot" aria-hidden="true" />
         ) : null}
       </button>
     </div>

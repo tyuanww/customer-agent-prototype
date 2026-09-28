@@ -214,6 +214,7 @@ describe('ContentModule publish gate', () => {
       releaseId: 'rel_override',
       releaseSeq: 5,
       publisherDisplayName: '合成管理员',
+      summary: '产品已更新（1 条）· 活动沿用 · 售前沿用 · 售后沿用',
     }));
     window.dashboardContent = api;
     const user = userEvent.setup();
@@ -240,6 +241,67 @@ describe('ContentModule publish gate', () => {
     // The override must reach the publish payload; the frozen CSV is built from these rows.
     expect(request?.rows).toEqual([{ scene: '面膜紫适用人群', script: '亲亲这是话术', domain: 'campaign' }]);
     expect(request?.sourceBindings).toEqual([{ domain: 'campaign', source_version_id: 'srcv_stack_campaign_v1' }]);
+  });
+
+  it('draws the two-line receipt with the four-library delta only after an ok publish', async () => {
+    const api = mockSession('owner');
+    api.parseUpload = vi.fn(async () => ({
+      ok: true as const,
+      sourceName: 'presale.xlsx',
+      rows: [{ scene: '发货时效', script: '亲亲这是话术', domain: 'presale' as const }],
+      csvText: 'scene,script,domain\n发货时效,亲亲这是话术,presale\n',
+    }));
+    api.publishDraft = vi.fn(async () => ({
+      ok: true as const,
+      releaseId: 'rel_25',
+      releaseSeq: 25,
+      publisherDisplayName: '合成管理员',
+      summary: '产品沿用 · 活动沿用 · 售前已更新（75 条）· 售后沿用',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const xlsx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'presale.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    await user.click(screen.getByTestId('publish-action'));
+    await waitFor(() => expect(screen.getByTestId('publish-feedback-delta')).toBeInTheDocument());
+    expect(screen.getByTestId('publish-feedback-headline')).toHaveTextContent('已发布 rel_25 · 合成管理员');
+    expect(screen.getByTestId('publish-feedback-delta')).toHaveTextContent('售前已更新（75 条）');
+    // 发布请求带上同一句 delta 作为 summary。
+    const request = vi.mocked(api.publishDraft).mock.calls[0]?.[0];
+    expect(request?.summary).toBe('产品沿用 · 活动沿用 · 售前已更新 · 售后沿用');
+  });
+
+  it('does not draw a delta line when the publish fails', async () => {
+    const api = mockSession('owner');
+    api.parseUpload = vi.fn(async () => ({
+      ok: true as const,
+      sourceName: 'presale.xlsx',
+      rows: [{ scene: '发货时效', script: '亲亲这是话术', domain: 'presale' as const }],
+      csvText: 'scene,script,domain\n发货时效,亲亲这是话术,presale\n',
+    }));
+    api.publishDraft = vi.fn(async () => ({
+      ok: false as const,
+      code: 'UNAVAILABLE' as const,
+      message: '服务暂不可用，请重试',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const xlsx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'presale.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    await user.click(screen.getByTestId('publish-action'));
+    await waitFor(() => expect(screen.getByTestId('publish-feedback')).toHaveTextContent('服务暂不可用'));
+    expect(screen.queryByTestId('publish-feedback-delta')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('publish-feedback-headline')).not.toBeInTheDocument();
   });
 
   it('fail-closes the cancel button when the preload has no cancel channel', async () => {
@@ -489,6 +551,7 @@ describe('ContentModule pending dev disclosure', () => {
       releaseId: 'rel_menokin_2026',
       releaseSeq: 7,
       publisherDisplayName: '合成管理员',
+      summary: null,
     }));
     window.dashboardContent = api;
     const user = userEvent.setup();
