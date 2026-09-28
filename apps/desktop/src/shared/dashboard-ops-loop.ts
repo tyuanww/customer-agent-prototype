@@ -6,6 +6,8 @@ export const OPS_LOOP_COPY = Object.freeze({
   forbidden: '当前角色不能执行这个操作。',
   unavailable: '服务暂不可用，请重试',
   pendingReview: '已进入待审核草稿，发布后才离开当前目录。',
+  retireHint: '提交下架审核。坐席要等下一次发布才搜不到这条。',
+  retirePending: '已提交下架审核，发布后才离开当前目录。',
   noVersion: '未接入：没有当前话术版本号。',
   selectWording: '请先选中话术。',
   selectSop: '请先选中节点。',

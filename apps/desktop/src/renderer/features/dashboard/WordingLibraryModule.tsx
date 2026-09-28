@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import {
   type DomainId,
   type WordingEntry,
   type WordingLifecycle,
 } from '../../data/dashboard-manifest';
 import type { DashboardWordingView } from '@shared/dashboard-wording';
-import { bindingsForRows } from '@shared/dashboard-content';
 import {
   paginateWording,
   wordingPublishedCsv,
 } from '@shared/wording-library-browse';
 import { OPS_LOOP_COPY } from '@shared/dashboard-ops-loop';
-import { readCoachUploadFile } from './coach-content-upload';
 import { StatusBadge } from './StatusBadge';
 
 const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
@@ -65,7 +63,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [writeMessage, setWriteMessage] = useState<string | null>(null);
-  const uploadRef = useRef<HTMLInputElement>(null);
+  const [retireConfirm, setRetireConfirm] = useState(false);
 
   useEffect(() => {
     if (!initialDomain) return;
@@ -73,6 +71,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
     setQuery('');
     setLifecycle('all');
     setPage(1);
+    setRetireConfirm(false);
     onDomainConsumed?.();
     // 只认一次外部域；再点卡由调用方重新给 initialDomain。
   }, [initialDomain, onDomainConsumed]);
@@ -124,6 +123,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
     setLifecycle('all');
     setPage(1);
     setSelectedId(entries.find((entry) => entry.domain === next)?.scriptId ?? null);
+    setRetireConfirm(false);
   };
 
   const handleDomainKeyDown = (event: KeyboardEvent<HTMLButtonElement>, current: DomainId) => {
@@ -149,121 +149,46 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
       : '当前发布无此域';
   const releaseLabel = catalog?.releaseId ?? '未标明发布号';
   const sourceSummary = !live
-    ? '未读到本机话术目录。'
+    ? '未读到当前发布目录。'
     : domainCount > 0
-      ? `${domainCount} 条 · 本机目录 ${releaseLabel}。查询以登录后拉到的发布为准。`
-      : `本机目录 ${releaseLabel}。当前域没有条目。`;
+      ? `${domainCount} 条 · ${releaseLabel}。这是坐席现在能搜到的目录。`
+      : `${releaseLabel}。当前域没有条目。`;
+
+  const onRetire = () => {
+    const api = window.dashboardOps;
+    const row = selected
+      ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
+      : undefined;
+    if (!row) {
+      setWriteMessage(OPS_LOOP_COPY.selectWording);
+      setRetireConfirm(false);
+      return;
+    }
+    if (!api || row.scriptVersion === null) {
+      setWriteMessage(api ? OPS_LOOP_COPY.noVersion : OPS_LOOP_COPY.noProduct);
+      setRetireConfirm(false);
+      return;
+    }
+    void api.scriptDelete({
+      scriptId: row.scriptId,
+      expectedVersion: row.scriptVersion,
+    }).then((result) => {
+      setRetireConfirm(false);
+      setWriteMessage(result.ok ? `${OPS_LOOP_COPY.retirePending} ${result.mutationId}` : result.message);
+    });
+  };
 
   return (
     <div className="dash-module" data-testid="module-wording">
       <header className="dash-module-head">
         <div>
           <h1>话术库</h1>
-          <p className="dash-kicker">列表读当前发布 · 上传走内容导入 · 单条改删进待审核草稿</p>
+          <p className="dash-kicker">坐席现在能搜到的当前发布 · 下架要等下次发布</p>
         </div>
       </header>
       <p className="dash-scope dash-scope-important">
-        浏览与导出当前发布。上传走内容导入。单条更新/删除只进入待审核草稿，不能绕过 dual-review。
+        这是已发布目录。写新表去内容管理。下架提交审核后，坐席要等下一次发布才搜不到。
       </p>
-      <div className="dash-filter-toolbar" aria-label="话术写操作">
-        <input
-          ref={uploadRef}
-          data-testid="wording-upload-input"
-          type="file"
-          accept=".csv,.xlsx"
-          hidden
-          onChange={(event: ChangeEvent<HTMLInputElement>) => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (!file) return;
-            const api = window.dashboardContent;
-            if (!api) {
-              setWriteMessage('未接入：没有内容导入通道。');
-              return;
-            }
-            void readCoachUploadFile(file).then(async (parsed) => {
-              if (!parsed.ok) {
-                setWriteMessage(parsed.message);
-                return;
-              }
-              const result = await api.importDraft({
-                csvText: parsed.csvText,
-                sourceName: parsed.sourceName,
-                sourceBindings: bindingsForRows(parsed.rows),
-              });
-              setWriteMessage(result.ok ? `已导入草稿 ${result.importBatchId}` : result.message);
-            }).catch(() => {
-              setWriteMessage('未接入');
-            });
-          }}
-        />
-        <button
-          type="button"
-          className="dash-reset"
-          data-testid="wording-upload"
-          onClick={() => uploadRef.current?.click()}
-        >
-          上传
-        </button>
-        <button
-          type="button"
-          className="dash-reset"
-          data-testid="wording-update"
-          onClick={() => {
-            const api = window.dashboardOps;
-            const row = selected
-              ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
-              : undefined;
-            if (!row) {
-              setWriteMessage(OPS_LOOP_COPY.selectWording);
-              return;
-            }
-            if (!api || row.scriptVersion === null) {
-              setWriteMessage(api ? OPS_LOOP_COPY.noVersion : OPS_LOOP_COPY.noProduct);
-              return;
-            }
-            void api.scriptPatch({
-              scriptId: row.scriptId,
-              expectedVersion: row.scriptVersion,
-              title: row.title,
-              answerText: row.answerPreview,
-              effectiveFrom: row.effectiveFrom ?? new Date().toISOString(),
-              effectiveTo: row.effectiveTo,
-            }).then((result) => {
-              setWriteMessage(result.ok ? `${OPS_LOOP_COPY.pendingReview} ${result.mutationId}` : result.message);
-            });
-          }}
-        >
-          更新
-        </button>
-        <button
-          type="button"
-          className="dash-reset"
-          data-testid="wording-delete"
-          onClick={() => {
-            const api = window.dashboardOps;
-            const row = selected
-              ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
-              : undefined;
-            if (!row) {
-              setWriteMessage(OPS_LOOP_COPY.selectWording);
-              return;
-            }
-            if (!api || row.scriptVersion === null) {
-              setWriteMessage(api ? OPS_LOOP_COPY.noVersion : OPS_LOOP_COPY.noProduct);
-              return;
-            }
-            void api.scriptDelete({
-              scriptId: row.scriptId,
-              expectedVersion: row.scriptVersion,
-            }).then((result) => {
-              setWriteMessage(result.ok ? `${OPS_LOOP_COPY.pendingReview} ${result.mutationId}` : result.message);
-            });
-          }}
-        >
-          删除
-        </button>
-      </div>
       {writeMessage ? <p className="dash-scope" data-testid="wording-write-status">{writeMessage}</p> : null}
 
       <div className="wording-domain-tabs" role="tablist" aria-label="话术域">
@@ -370,7 +295,10 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
               type="button"
               className={selected?.scriptId === entry.scriptId ? 'is-selected' : ''}
               aria-pressed={selected?.scriptId === entry.scriptId}
-              onClick={() => setSelectedId(entry.scriptId)}
+              onClick={() => {
+                setSelectedId(entry.scriptId);
+                setRetireConfirm(false);
+              }}
             >
               <span>
                 <strong>{entry.title}</strong>
@@ -424,7 +352,39 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
                 <div><dt>有效窗</dt><dd>{selected.effectiveWindow}</dd></div>
                 <div><dt>来源</dt><dd>{selected.ownerRole}</dd></div>
               </dl>
-              <p className="dash-footnote">列表来自当前发布。单条更新/删除进入待审核草稿，不能绕过 dual-review。</p>
+              {retireConfirm ? (
+                <div className="wording-retire" data-testid="wording-retire-confirm">
+                  <p className="dash-footnote">{OPS_LOOP_COPY.retireHint}</p>
+                  <div className="content-action-row">
+                    <button
+                      type="button"
+                      className="dash-reset"
+                      data-testid="wording-retire-cancel"
+                      onClick={() => setRetireConfirm(false)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="dash-publish"
+                      data-testid="wording-retire-confirm-action"
+                      onClick={onRetire}
+                    >
+                      确认下架
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="dash-reset"
+                  data-testid="wording-retire"
+                  onClick={() => setRetireConfirm(true)}
+                >
+                  下架
+                </button>
+              )}
+              <p className="dash-footnote">列表来自当前发布。下架进入待审核草稿，发布后才离开当前目录。</p>
             </>
           ) : (
             <p className="dash-empty">选择一条话术查看正文</p>

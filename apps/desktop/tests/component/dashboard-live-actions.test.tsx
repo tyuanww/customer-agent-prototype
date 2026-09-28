@@ -196,40 +196,8 @@ describe('dashboard live actions', () => {
     expect(screen.queryByTestId('overview-inaccuracy-empty')).not.toBeInTheDocument();
   });
 
-  it('uploads wording drafts through dashboardContent.importDraft', async () => {
-    const importDraft = vi.fn(async () => ({
-      ok: true as const,
-      importBatchId: 'imp_live',
-      status: 'validating' as const,
-    }));
-    window.dashboardContent = {
-      session: vi.fn(async () => ({ ok: true as const, enabled: true, signedIn: true, role: 'coach' as const, displayName: '话术师' })),
-      parseUpload: vi.fn(),
-      importDraft,
-      publishDraft: vi.fn(),
-      cancelInFlight: vi.fn(async () => ({ ok: true as const })),
-    };
-    window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
-    };
+  it('fail-closes SOP writes instead of mock success', async () => {
     const user = userEvent.setup();
-    render(<WordingLibraryModule />);
-    const csv = new File(['scene,script,domain\n用量,说明,product\n'], 'live.csv', { type: 'text/csv' });
-    await user.upload(screen.getByTestId('wording-upload-input'), csv);
-    await waitFor(() => expect(importDraft).toHaveBeenCalled());
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('imp_live');
-  });
-
-  it('fail-closes wording update/delete and SOP writes instead of mock success', async () => {
-    const user = userEvent.setup();
-    window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: null, total: 0, entries: [], catalogRefreshedAt: null })),
-    };
-    render(<WordingLibraryModule />);
-    await user.click(screen.getByTestId('wording-update'));
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('请先选中话术');
-    await user.click(screen.getByTestId('wording-delete'));
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('请先选中话术');
 
     render(<SopLibraryModule />);
     await user.click(screen.getByTestId('sop-update'));
@@ -379,12 +347,8 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
     const { unmount } = render(<WordingLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
-    await user.click(screen.getByTestId('wording-update'));
-    await waitFor(() => expect(scriptPatch).toHaveBeenCalled());
-    expect(scriptPatch.mock.calls[0]?.[0]).toMatchObject({
-      scriptId: 'script-1', expectedVersion: 1, title: '用量',
-    });
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.pendingReview} smut_1`);
+    expect(screen.queryByTestId('wording-update')).not.toBeInTheDocument();
+    expect(scriptPatch).not.toHaveBeenCalled();
     unmount();
 
     render(<OverviewModule />);
@@ -449,12 +413,14 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
     render(<WordingLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
-    await user.click(screen.getByTestId('wording-delete'));
+    await user.click(screen.getByTestId('wording-retire'));
+    expect(screen.getByTestId('wording-retire-confirm')).toHaveTextContent(OPS_LOOP_COPY.retireHint);
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
     await waitFor(() => expect(scriptDelete).toHaveBeenCalled());
     expect(scriptDelete.mock.calls[0]?.[0]).toEqual({
       scriptId: 'script-1', expectedVersion: 2,
     });
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.pendingReview} smut_del`);
+    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.retirePending} smut_del`);
   });
 
   it('labels last_7d retrieval as 近 7 天', async () => {
@@ -563,9 +529,8 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
     const { unmount } = render(<WordingLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
-    await user.click(screen.getByTestId('wording-update'));
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.noVersion);
-    await user.click(screen.getByTestId('wording-delete'));
+    await user.click(screen.getByTestId('wording-retire'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
     expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.noVersion);
     expect(scriptPatch).not.toHaveBeenCalled();
     expect(scriptDelete).not.toHaveBeenCalled();
