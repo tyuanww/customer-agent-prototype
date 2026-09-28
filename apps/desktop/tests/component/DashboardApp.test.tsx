@@ -83,6 +83,7 @@ describe('DashboardApp', () => {
     delete window.dashboardWording;
     delete window.dashboardContent;
     delete window.dashboardIteration;
+    delete window.dashboardAnnounce;
     Object.defineProperty(window, 'PointerEvent', {
       configurable: true,
       writable: true,
@@ -101,6 +102,7 @@ describe('DashboardApp', () => {
     delete window.dashboardWording;
     delete window.dashboardContent;
     delete window.dashboardIteration;
+    delete window.dashboardAnnounce;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -1291,6 +1293,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 2,
         entries: [
           {
@@ -1350,11 +1353,60 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('wording-list')).toHaveTextContent('满赠规则');
 
     await user.click(screen.getByTestId('wording-domain-presale'));
-    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('当前发布无此域');
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机目录');
     expect(screen.getByTestId('wording-source-readiness')).not.toHaveTextContent('NOT_CREATED');
     expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配的话术');
     expect(screen.queryByTestId('wording-pager')).not.toBeInTheDocument();
     expect(screen.getByTestId('wording-export')).toBeDisabled();
+  });
+
+  it('labels the wording library as 当前发布 when the announce lease matches the catalog', async () => {
+    const user = userEvent.setup();
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_25',
+        catalogRefreshedAt: null,
+        matchesLease: true,
+        total: 1,
+        entries: [
+          {
+            scriptId: 'mn-1',
+            domain: 'product',
+            title: '洁面用法',
+            scene: '怎么用',
+            answerPreview: '先打湿再打圈',
+            platform: '千牛 / 抖音',
+            version: 'rel_25',
+            scriptVersion: 1,
+            effectiveFrom: '2026-01-01T00:00:00Z',
+            effectiveTo: null,
+            effectiveWindow: '当前发布',
+            risk: 'low',
+            lifecycle: 'published',
+            lifecycleLabel: '已发布',
+            ownerRole: '当前发布',
+            dataClass: 'local-catalog',
+          },
+        ],
+      }),
+    };
+    window.dashboardAnnounce = {
+      current: async () => ({
+        ok: true as const,
+        signedIn: true,
+        releaseId: 'rel_25',
+        announcement: null,
+        counts: { product: 1, campaign: 0, presale: 0, aftersale: 0 },
+        unread: false,
+        unreadDomains: [],
+      }),
+      markRead: async () => undefined,
+    };
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-wording'));
+    expect(await screen.findByTestId('wording-source-readiness')).toHaveTextContent('当前发布已挂载');
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('这是坐席现在能搜到的目录');
   });
 
   it('labels the wording detail card with the entry ownerRole', async () => {
@@ -1364,6 +1416,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [
           {
@@ -1417,6 +1470,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 25,
         entries: Array.from({ length: 25 }, (_, index) => ({
           scriptId: `mn-${index + 1}`,
@@ -1493,6 +1547,7 @@ describe('DashboardApp', () => {
         ok: true as const,
         releaseId: 'rel_18',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 26,
         entries: [
           ...Array.from({ length: 25 }, (_, index) => ({
@@ -1548,10 +1603,6 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
     expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
     expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 21');
-
-    await user.click(screen.getByTestId('wording-page-next'));
-    await user.selectOptions(screen.getByTestId('wording-lifecycle'), 'published');
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
 
     await user.click(screen.getByTestId('wording-page-next'));
     await user.type(screen.getByTestId('wording-search'), '正文 25');
@@ -1625,13 +1676,14 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-content'));
 
     expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('content-replace-row')).toHaveTextContent('将替换');
     expect(screen.getByTestId('content-upload-draft-copy')).toHaveTextContent(
-      '上传只进入待发布，点发布后坐席才能搜到',
+      '选表只预览，点发布后坐席才能搜到',
     );
-    expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('管理员（owner）');
-    expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
-    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('产品会话');
-    expect(screen.getByTestId('content-aftersale-note')).toHaveTextContent('SOP 写库未接入');
+    expect(screen.queryByTestId('content-upload-role-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-upload-boundary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-aftersale-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('formal-source-warning')).not.toBeInTheDocument();
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
     expect(screen.getByTestId('content-upload-input')).toHaveAttribute('accept', '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1645,8 +1697,11 @@ describe('DashboardApp', () => {
     const actionRow = document.querySelector('.content-action-row');
     expect(actionRow).toContainElement(screen.getByTestId('publish-action'));
     expect(actionRow).toContainElement(screen.getByTestId('cancel-in-flight'));
-    expect(screen.getByTestId('formal-source-warning').closest('.dash-module-head')).not.toBeNull();
-    expect(screen.getByTestId('formal-source-warning')).toHaveClass('content-session-banner');
+    expect(screen.getByTestId('content-replace-row').closest('[data-testid="content-pending-dev"]')).toBeNull();
+    expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
+      'title',
+      expect.stringContaining('产品会话'),
+    );
     expect(screen.queryByTestId('content-pipeline-steps')).not.toBeInTheDocument();
     expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
 

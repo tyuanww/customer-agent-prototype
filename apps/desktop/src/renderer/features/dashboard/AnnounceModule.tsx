@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardSoftwareCatalog } from '@shared/dashboard-ops-loop';
 import type { DashboardAnnounceResult, DashboardAnnounceView } from '@shared/dashboard-announce';
 import {
@@ -42,12 +42,6 @@ function libraryCardBadgeLabel(status: LibraryStatus | 'unknown'): string {
 function libraryCardDataStatus(status: LibraryStatus | 'unknown'): 'updated' | 'carried' | 'unknown' {
   if (status === 'updated' || status === 'carried') return status;
   return 'unknown';
-}
-
-function libraryCardCountCopy(status: LibraryStatus | 'unknown', countLabel: string): string {
-  if (status === 'updated') return `本版已更新 · ${countLabel}`;
-  if (status === 'carried') return `本版沿用 · 内容仍是当前可用 · ${countLabel}`;
-  return countLabel;
 }
 
 function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => void }) {
@@ -113,17 +107,18 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
 
   if (loading) {
     return (
-      <div className="dash-empty-state" data-testid="announce-wording-loading">
+      <div className="dash-empty-state announce-empty" data-testid="announce-wording-loading">
         <strong>加载中…</strong>
+        <span>正在读取当前发布。</span>
       </div>
     );
   }
 
   if (!view) {
-    // 无 current_release：整页「未接入当前发布」。
     return (
-      <div className="dash-empty-state" data-testid="announce-wording-empty">
-        <strong>未接入当前发布。</strong>
+      <div className="dash-empty-state announce-empty" data-testid="announce-wording-empty">
+        <strong>未接入当前发布</strong>
+        <span>登录后才能看到本版四卡。</span>
       </div>
     );
   }
@@ -132,7 +127,6 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
 
   return (
     <>
-      <p className="dash-scope">话术版本来自当前发布，不是合成演练。</p>
       {!delta ? (
         <p className="dash-scope dash-scope-important" data-testid="announce-delta-unknown">
           {LIBRARY_DELTA_UNREADABLE}
@@ -153,41 +147,51 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
               onClick={() => onOpenDomain?.(LIBRARY_DOMAIN_IDS[domain])}
             >
               <div className="dash-card-row">
-                <span className="dash-card-label">{LIBRARY_DOMAIN_LABELS[domain]}</span>
+                <span className="dash-card-label">
+                  {LIBRARY_DOMAIN_LABELS[domain]}
+                  {unreadDomains.has(domain) ? (
+                    <span className="announce-unread-dot" aria-label="有话术更新" role="img" />
+                  ) : null}
+                </span>
                 <StatusBadge label={libraryCardBadgeLabel(status)} tone="neutral" />
-                {unreadDomains.has(domain) ? (
-                  <span className="announce-unread-dot" aria-label="有话术更新" role="img" />
-                ) : null}
               </div>
               {status === 'updated' && title ? (
                 <p className="announce-library-title" data-testid={`announce-library-title-${domain}`}>{title}</p>
               ) : null}
               <p className="announce-library-count" data-testid={`announce-library-count-${domain}`}>
-                {libraryCardCountCopy(status, countLabel)}
+                {countLabel}
               </p>
             </button>
           );
         })}
       </div>
       <p className="dash-footnote" data-testid="announce-release-footnote">
-        检索租约 {view.releaseId}
+        当前发布 {view.releaseId}
       </p>
     </>
   );
 }
 
+function softwareBadgeTone(catalog: DashboardSoftwareCatalog | null): 'ok' | 'warn' {
+  if (catalog?.current?.signed) return 'ok';
+  return 'warn';
+}
+
 function SoftwareTab() {
   const [catalog, setCatalog] = useState<DashboardSoftwareCatalog | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const liveRef = useRef(true);
 
   const load = () => {
     const api = window.dashboardOps;
     if (!api) {
+      if (!liveRef.current) return;
       setCatalog(null);
-      setMessage('未接入：没有安装包目录接口，UNSIGNED 禁止 latest.yml。');
+      setMessage('未接入：没有安装包目录。');
       return;
     }
     void api.softwareCatalog().then((result) => {
+      if (!liveRef.current) return;
       if (!result.ok) {
         setCatalog(null);
         setMessage(result.message);
@@ -195,30 +199,41 @@ function SoftwareTab() {
       }
       setCatalog(result);
       const current = result.current;
-      setMessage(current
-        ? `${current.version} · ${current.signed ? '已签名' : 'UNSIGNED'} · 不跑 latest.yml`
-        : '目录为空，没有当前建议版本。');
+      if (!current) {
+        setMessage('目录为空，没有当前建议版本。');
+        return;
+      }
+      const signedLabel = current.signed ? '已签名' : '未签名';
+      setMessage(`${current.version} · ${signedLabel}`);
     }).catch(() => {
+      if (!liveRef.current) return;
       setCatalog(null);
-      setMessage('未接入：没有安装包目录接口，UNSIGNED 禁止 latest.yml。');
+      setMessage('未接入：没有安装包目录。');
     });
   };
 
+  useEffect(() => {
+    liveRef.current = true;
+    load();
+    return () => {
+      liveRef.current = false;
+    };
+  }, []);
+
   return (
     <>
-      <p className="dash-scope">软件目录只展示 https 下载地址。UNSIGNED 必须 signed=false。禁止 latest.yml。</p>
-      <div className="dash-card" data-testid="software-version-card">
+      <div className="dash-card software-version-card" data-testid="software-version-card">
         <div className="dash-card-row">
           <span className="dash-card-label">软件版本</span>
           <StatusBadge
             label={catalog?.current ? catalog.current.version : '未接入'}
-            tone={catalog?.current ? (catalog.current.signed ? 'ok' : 'warn') : 'warn'}
+            tone={softwareBadgeTone(catalog)}
           />
         </div>
         {catalog?.current ? (
           <dl className="dash-dl">
             <div><dt>平台</dt><dd>{catalog.current.platform}</dd></div>
-            <div><dt>签名</dt><dd>{catalog.current.signed ? '已签名' : 'UNSIGNED'}</dd></div>
+            <div><dt>签名</dt><dd>{catalog.current.signed ? '已签名' : '未签名'}</dd></div>
           </dl>
         ) : null}
         <button
@@ -241,10 +256,7 @@ export function AnnounceModule({ onOpenDomain }: { onOpenDomain?: (domain: Domai
   return (
     <div className="dash-module" data-testid="module-announce">
       <header className="dash-module-head">
-        <div>
-          <h1>系统同步</h1>
-          <p className="dash-kicker">话术版本读当前发布 · 软件目录只展示不自动更新</p>
-        </div>
+        <h1>系统同步</h1>
       </header>
 
       <div className="system-sync-tabs" role="tablist" aria-label="系统同步选项">

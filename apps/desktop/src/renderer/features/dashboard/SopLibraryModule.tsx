@@ -70,11 +70,11 @@ export function SopLibraryModule() {
       <header className="dash-module-head">
         <div>
           <h1>SOP</h1>
-          <p className="dash-kicker">读当前产品会话 · 导入覆盖整树 · 删除仅 owner</p>
+          <p className="dash-kicker">读当前产品会话 · 导入覆盖整树 · 删除仅管理员</p>
         </div>
       </header>
       <p className="dash-scope dash-scope-important">
-        上传 CSV 会覆盖当前产品会话 SOP 树。更新/删除针对选中节点。坐席 overlay 仍是只读预览。
+        上传 CSV 会覆盖当前产品会话 SOP 树。更新/删除针对选中节点。坐席过敏窗仍是只读预览。
       </p>
       <div className="dash-filter-toolbar" aria-label="SOP 写操作">
         <input

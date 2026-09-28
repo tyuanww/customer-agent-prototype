@@ -5,7 +5,13 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import type { OverlayRole } from '../shared/overlay-events';
 import type { ProductSession } from './product-session';
 
-export function registerProductIpc(session: ProductSession | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined) {
+export function registerProductIpc(
+  session: ProductSession | null,
+  trusted: () => WebContents[],
+  role: (sender: WebContents) => OverlayRole | null,
+  devUrl: () => string | undefined,
+  sessionFanout: () => Array<WebContents | null> = () => [],
+) {
   const disabled: ProductSessionView = { ok: true, enabled: false, signedIn: false, sessionEpoch: 0, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
   for (const [channel, method] of [
     [IPC_CHANNELS.PRODUCT_SESSION_STATUS, 'status'], [IPC_CHANNELS.PRODUCT_LOGIN, 'login'], [IPC_CHANNELS.PRODUCT_LOGOUT, 'logout'],
@@ -19,6 +25,15 @@ export function registerProductIpc(session: ProductSession | null, trusted: () =
     });
   }
   return session?.subscribe(value => {
-    for (const target of trusted()) if (!target.isDestroyed() && role(target) === 'query') target.send(IPC_CHANNELS.PRODUCT_SESSION_CHANGED, value);
+    const sent = new Set<number>();
+    const send = (target: WebContents | null) => {
+      if (!target || target.isDestroyed() || sent.has(target.id)) return;
+      sent.add(target.id);
+      target.send(IPC_CHANNELS.PRODUCT_SESSION_CHANGED, value);
+    };
+    for (const target of trusted()) {
+      if (role(target) === 'query') send(target);
+    }
+    for (const target of sessionFanout()) send(target);
   });
 }

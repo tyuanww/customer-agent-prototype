@@ -15,6 +15,7 @@ import {
   DASHBOARD_MACOS_TITLEBAR_STYLE,
   DASHBOARD_MACOS_TRAFFIC_LIGHT_POSITION,
   DASHBOARD_STRUCTURE_DISCLAIMER,
+  DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED,
   DASHBOARD_TRAFFIC_LIGHT_SAFE,
   DASHBOARD_WINDOW_CHROME,
   DASHBOARD_WINDOW_SECURITY,
@@ -143,5 +144,6 @@ describe('dashboard window contract', () => {
     expect(DASHBOARD_STRUCTURE_DISCLAIMER).toBe(
       '未接入产品会话时不展示数字。话术库读当前发布；没有冻结合同命令的写操作保持未接入。',
     );
+    expect(DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED).toBe('话术库读当前发布。写操作走冻结合同。');
   });
 });

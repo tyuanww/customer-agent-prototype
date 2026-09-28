@@ -47,3 +47,27 @@ export type ProductSessionApi = {
   logout(): Promise<ProductSessionResult>;
   onSessionChanged(listener: (value: ProductSessionResult) => void): () => void;
 };
+
+export const SESSION_ROLE_LABEL = {
+  owner: '管理员',
+  coach: '话术师',
+  agent: '坐席',
+} as const;
+
+export function isSessionAccountId(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.startsWith('ou_')
+    || trimmed.startsWith('usr_')
+    || trimmed.startsWith('synthetic_');
+}
+
+/** Operator-facing name. Account ids and synthetic subjects fall back to the role label. */
+export function sessionDisplayName(input: {
+  role: 'agent' | 'coach' | 'owner' | null;
+  mappedName?: string | null;
+}): string | null {
+  const mapped = input.mappedName?.trim() ?? '';
+  if (mapped.length > 0 && !isSessionAccountId(mapped)) return mapped.slice(0, 64);
+  if (input.role && SESSION_ROLE_LABEL[input.role]) return SESSION_ROLE_LABEL[input.role];
+  return null;
+}

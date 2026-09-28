@@ -47,7 +47,7 @@ export type WordingEntry = {
   lifecycle: WordingLifecycle;
   lifecycleLabel: string;
   ownerRole: string;
-  dataClass: 'synthetic' | 'local-catalog';
+  dataClass: 'synthetic' | 'local-catalog' | 'current-release';
 };
 
 export type ManagerDecision = {

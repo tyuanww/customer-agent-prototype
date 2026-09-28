@@ -14,6 +14,7 @@ describe('dashboard live actions', () => {
     delete window.dashboardContent;
     delete window.dashboardIteration;
     delete window.dashboardOps;
+    delete window.dashboardAnnounce;
   });
 
   it('does not render the frozen-snapshot caption on overview', () => {
@@ -71,7 +72,7 @@ describe('dashboard live actions', () => {
       close: vi.fn(),
     };
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null, matchesLease: false })),
     };
     render(<OverviewModule />);
     await waitFor(() => expect(list).toHaveBeenCalled());
@@ -108,6 +109,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_21',
         catalogRefreshedAt: '2026-09-21T12:00:00.000Z',
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -165,6 +167,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -196,40 +199,8 @@ describe('dashboard live actions', () => {
     expect(screen.queryByTestId('overview-inaccuracy-empty')).not.toBeInTheDocument();
   });
 
-  it('uploads wording drafts through dashboardContent.importDraft', async () => {
-    const importDraft = vi.fn(async () => ({
-      ok: true as const,
-      importBatchId: 'imp_live',
-      status: 'validating' as const,
-    }));
-    window.dashboardContent = {
-      session: vi.fn(async () => ({ ok: true as const, enabled: true, signedIn: true, role: 'coach' as const, displayName: '话术师' })),
-      parseUpload: vi.fn(),
-      importDraft,
-      publishDraft: vi.fn(),
-      cancelInFlight: vi.fn(async () => ({ ok: true as const })),
-    };
-    window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
-    };
+  it('fail-closes SOP writes instead of mock success', async () => {
     const user = userEvent.setup();
-    render(<WordingLibraryModule />);
-    const csv = new File(['scene,script,domain\n用量,说明,product\n'], 'live.csv', { type: 'text/csv' });
-    await user.upload(screen.getByTestId('wording-upload-input'), csv);
-    await waitFor(() => expect(importDraft).toHaveBeenCalled());
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('imp_live');
-  });
-
-  it('fail-closes wording update/delete and SOP writes instead of mock success', async () => {
-    const user = userEvent.setup();
-    window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: null, total: 0, entries: [], catalogRefreshedAt: null })),
-    };
-    render(<WordingLibraryModule />);
-    await user.click(screen.getByTestId('wording-update'));
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('请先选中话术');
-    await user.click(screen.getByTestId('wording-delete'));
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent('请先选中话术');
 
     render(<SopLibraryModule />);
     await user.click(screen.getByTestId('sop-update'));
@@ -282,7 +253,6 @@ describe('dashboard live actions', () => {
       sopImport,
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
@@ -301,19 +271,6 @@ describe('dashboard live actions', () => {
   });
 
   it('patches wording into pending_review and shows retrieval plus GONE software current', async () => {
-    const scriptPatch = vi.fn(async (_request: {
-      scriptId: string;
-      expectedVersion: number;
-      title: string;
-      answerText: string;
-      effectiveFrom: string;
-      effectiveTo?: string | null;
-    }) => ({
-      ok: true as const,
-      scriptId: 'script-1',
-      mutationId: 'smut_1',
-      reviewStatus: 'pending_review' as const,
-    }));
     const retrieval = vi.fn(async () => ({
       ok: true as const,
       noHitRate: 0.125,
@@ -341,7 +298,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch,
       scriptDelete: vi.fn(),
       softwareCatalog,
     };
@@ -350,6 +306,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -379,17 +336,15 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
     const { unmount } = render(<WordingLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
-    await user.click(screen.getByTestId('wording-update'));
-    await waitFor(() => expect(scriptPatch).toHaveBeenCalled());
-    expect(scriptPatch.mock.calls[0]?.[0]).toMatchObject({
-      scriptId: 'script-1', expectedVersion: 1, title: '用量',
-    });
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.pendingReview} smut_1`);
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机目录');
+    expect(screen.queryByTestId('wording-update')).not.toBeInTheDocument();
     unmount();
 
     render(<OverviewModule />);
     await waitFor(() => expect(retrieval).toHaveBeenCalledWith('current_release'));
     expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('12.5%');
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('未接入产品会话');
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('本机目录');
     expect(screen.getByTestId('overview-scope')).toHaveTextContent('当前发布');
 
     render(<AnnounceModule />);
@@ -416,7 +371,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete,
       softwareCatalog: vi.fn(),
     };
@@ -425,6 +379,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -449,12 +404,113 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
     render(<WordingLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
-    await user.click(screen.getByTestId('wording-delete'));
+    await user.click(screen.getByTestId('wording-retire'));
+    expect(screen.getByTestId('wording-retire-confirm')).toHaveTextContent(OPS_LOOP_COPY.retireHint);
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
     await waitFor(() => expect(scriptDelete).toHaveBeenCalled());
     expect(scriptDelete.mock.calls[0]?.[0]).toEqual({
       scriptId: 'script-1', expectedVersion: 2,
     });
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.pendingReview} smut_del`);
+    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.retirePending} smut_del`);
+  });
+
+  it('disables 确认下架 while the delete is in flight', async () => {
+    const hangingDelete = vi.fn(() => new Promise<never>(() => undefined));
+    window.dashboardOps = {
+      retrieval: vi.fn(),
+      sopCatalog: vi.fn(),
+      sopImport: vi.fn(),
+      sopPatch: vi.fn(),
+      sopDelete: vi.fn(),
+      scriptDelete: hangingDelete,
+      softwareCatalog: vi.fn(),
+    };
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_20',
+        catalogRefreshedAt: null,
+        matchesLease: false,
+        total: 1,
+        entries: [{
+          scriptId: 'script-1',
+          domain: 'product',
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_20',
+          scriptVersion: 2,
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low',
+          lifecycle: 'published',
+          lifecycleLabel: '已发布',
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog',
+        }],
+      }),
+    };
+    const user = userEvent.setup();
+    render(<WordingLibraryModule />);
+    await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
+    await user.click(screen.getByTestId('wording-retire'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
+    expect(hangingDelete).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('wording-retire-confirm-action')).toBeDisabled();
+  });
+
+  it('closes 下架 confirm and shows unavailable when scriptDelete rejects', async () => {
+    const scriptDelete = vi.fn(async () => {
+      throw new Error('ipc down');
+    });
+    window.dashboardOps = {
+      retrieval: vi.fn(),
+      sopCatalog: vi.fn(),
+      sopImport: vi.fn(),
+      sopPatch: vi.fn(),
+      sopDelete: vi.fn(),
+      scriptDelete,
+      softwareCatalog: vi.fn(),
+    };
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_20',
+        catalogRefreshedAt: null,
+        matchesLease: false,
+        total: 1,
+        entries: [{
+          scriptId: 'script-1',
+          domain: 'product',
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_20',
+          scriptVersion: 2,
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low',
+          lifecycle: 'published',
+          lifecycleLabel: '已发布',
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog',
+        }],
+      }),
+    };
+    const user = userEvent.setup();
+    render(<WordingLibraryModule />);
+    await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
+    await user.click(screen.getByTestId('wording-retire'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
+    await waitFor(() => {
+      expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.unavailable);
+    });
+    expect(screen.queryByTestId('wording-retire-confirm')).not.toBeInTheDocument();
   });
 
   it('labels last_7d retrieval as 近 7 天', async () => {
@@ -473,12 +529,11 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
     window.dashboardWording = {
-      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null })),
+      list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null, matchesLease: false })),
     };
     window.dashboardIteration = {
       list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
@@ -499,12 +554,11 @@ describe('dashboard live actions', () => {
     };
     render(<WordingLibraryModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('wording-empty')).toHaveTextContent('本机话术库未挂载');
+      expect(screen.getByTestId('wording-empty')).toHaveTextContent('当前发布未挂载');
     });
   });
 
   it('refuses wording writes without a scriptVersion and shows UNSIGNED software current', async () => {
-    const scriptPatch = vi.fn();
     const scriptDelete = vi.fn();
     window.dashboardOps = {
       retrieval: vi.fn(async () => ({
@@ -514,7 +568,6 @@ describe('dashboard live actions', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch,
       scriptDelete,
       softwareCatalog: vi.fn(async () => ({
         ok: true as const,
@@ -534,6 +587,7 @@ describe('dashboard live actions', () => {
         ok: true as const,
         releaseId: 'rel_20',
         catalogRefreshedAt: null,
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-1',
@@ -563,11 +617,9 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
     const { unmount } = render(<WordingLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
-    await user.click(screen.getByTestId('wording-update'));
+    await user.click(screen.getByTestId('wording-retire'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
     expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.noVersion);
-    await user.click(screen.getByTestId('wording-delete'));
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.noVersion);
-    expect(scriptPatch).not.toHaveBeenCalled();
     expect(scriptDelete).not.toHaveBeenCalled();
     unmount();
 
@@ -581,7 +633,7 @@ describe('dashboard live actions', () => {
     await waitFor(() => {
       expect(screen.getByTestId('software-update-status')).toHaveTextContent('0.3.18');
     });
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('UNSIGNED');
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('不跑 latest.yml');
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('未签名');
+    expect(screen.getByTestId('software-update-status')).not.toHaveTextContent('latest.yml');
   });
 });

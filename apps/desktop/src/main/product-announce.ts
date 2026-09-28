@@ -34,6 +34,7 @@ export class ProductAnnounce implements AnnounceGate {
   /** 最近一次完整 snapshot 的域哈希与条数。卡与未读都必须用当次内存值，不信磁盘 hydrate。 */
   private domainHashes: LibraryDomainHashes | null = null;
   private domainCounts: LibraryDomainCounts | null = null;
+  private snapshotItems: readonly HydrateSnapshotItem[] | null = null;
   private refreshTail: Promise<void> = Promise.resolve();
   constructor(
     private readonly session: ProductSession,
@@ -72,6 +73,11 @@ export class ProductAnnounce implements AnnounceGate {
   /** 当次 snapshot 内存里的域条数（发布回执/四卡用）。未刷新到过则为 null。 */
   currentDomainCounts(): LibraryDomainCounts | null {
     return this.domainCounts;
+  }
+  /** 话术库跟检索租约同一份内存 snapshot；没有租约时回落磁盘 hydrate。 */
+  snapshotCatalog(): { releaseId: string; items: readonly HydrateSnapshotItem[] } | null {
+    if (!this.lease || !this.snapshotItems || this.snapshotItems.length < 1) return null;
+    return Object.freeze({ releaseId: this.lease.releaseId, items: this.snapshotItems });
   }
   /** Fox-only read projection. Never refreshes announce, never marks read. */
   unread(): ProductAnnounceUnread {
@@ -139,6 +145,7 @@ export class ProductAnnounce implements AnnounceGate {
     const hadLease = this.lease !== null;
     this.lease = null; this.announcement = null; this.snapshot = null;
     this.domainHashes = null; this.domainCounts = null;
+    this.snapshotItems = null;
     if (this.timer) clearTimeout(this.timer); this.timer = null;
     for (const listener of this.listeners) listener();
     if (reason === 'signed_out' && !hadLease) return;
@@ -222,6 +229,7 @@ export class ProductAnnounce implements AnnounceGate {
       const hashes = libraryDomainHashes(items);
       this.domainHashes = hashes;
       this.domainCounts = libraryDomainCounts(items);
+      this.snapshotItems = Object.freeze(items.slice());
       const userId = this.session.view().userId;
       if (userId) {
         // 第一次四域 snapshot 完整成功后才建基线；不点亮、不写时间。

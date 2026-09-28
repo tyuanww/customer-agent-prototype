@@ -8,7 +8,6 @@ import { registerDashboardOpsLoopIpc } from '../../src/main/dashboard-ops-loop-i
 import {
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
-  dashboardScriptPatch,
   dashboardSoftwareCatalog,
   dashboardSopCatalog,
   dashboardSopDelete,
@@ -265,7 +264,7 @@ it('maps software list 404 to NOT_FOUND for the whole catalog', async () => {
   expect(JSON.stringify(catalog)).not.toContain('latest.yml');
 });
 
-it('deletes SOP and patches scripts, mapping session and HTTP failures without leaking product copy', async () => {
+it('deletes SOP and maps session and HTTP failures without leaking product copy', async () => {
   expect(isDashboardOpsFailure({ ok: false, code: 'VALIDATION', message: '请求内容无效' })).toBe(true);
   expect(isDashboardOpsFailure({ ok: false, code: 'VALIDATION', message: '' })).toBe(false);
   expect(isDashboardOpsFailure({ ok: true, nodeId: 'n1' })).toBe(false);
@@ -283,9 +282,6 @@ it('deletes SOP and patches scripts, mapping session and HTTP failures without l
   expect(disabled.request).not.toHaveBeenCalled();
 
   expect(await dashboardSopDelete(fakeSession('owner'), null)).toMatchObject({ ok: false, code: 'VALIDATION' });
-  expect(await dashboardScriptPatch(fakeSession('owner'), {
-    scriptId: 'script-1', expectedVersion: 1, answerText: '正文', effectiveFrom: '2026-01-01T00:00:00.000Z',
-  })).toMatchObject({ ok: false, code: 'VALIDATION' });
   expect(await dashboardSopImport(fakeSession('owner'), 'n'.repeat(SOP_UPLOAD_MAX_BYTES + 1)))
     .toMatchObject({ ok: false, code: 'VALIDATION' });
 
@@ -294,12 +290,6 @@ it('deletes SOP and patches scripts, mapping session and HTTP failures without l
     .mockResolvedValueOnce({
       status: 200,
       value: { ...sopNode, version: 2, lifecycle: 'deleted' },
-    })
-    .mockResolvedValueOnce({
-      status: 200,
-      value: {
-        ok: true, script_id: 'script-1', mutation_id: 'smut_p', review_status: 'pending_review',
-      },
     })
     .mockRejectedValueOnce(new ProductHttpError('STALE'))
     .mockRejectedValueOnce(new ProductHttpError('RATE_LIMITED'))
@@ -315,19 +305,6 @@ it('deletes SOP and patches scripts, mapping session and HTTP failures without l
   });
   expect(vi.mocked(owner.request).mock.calls[0]?.[1]).toBe('/v1/sop/nodes/n1');
   expect(vi.mocked(owner.request).mock.calls[0]?.[2]?.method).toBe('DELETE');
-
-  expect(await dashboardScriptPatch(owner, {
-    scriptId: 'script-1',
-    expectedVersion: 4,
-    title: '用量',
-    answerText: '先打湿',
-    effectiveFrom: '2026-01-01T00:00:00.000Z',
-    effectiveTo: null,
-  })).toEqual({
-    ok: true, scriptId: 'script-1', mutationId: 'smut_p', reviewStatus: 'pending_review',
-  });
-  expect(vi.mocked(owner.request).mock.calls[1]?.[1]).toBe('/v1/content/scripts/script-1');
-  expect(vi.mocked(owner.request).mock.calls[1]?.[2]?.method).toBe('PATCH');
 
   expect(await dashboardSopCatalog(owner)).toMatchObject({
     ok: false, code: 'UNAVAILABLE', message: OPS_LOOP_COPY.unavailable,
@@ -350,12 +327,6 @@ it('invokes remaining ops IPC channels and keeps a present software current with
       value: { ok: true, product_session_id: 'default', node_count: 1 },
     })
     .mockResolvedValueOnce({ status: 200, value: { ...sopNode, lifecycle: 'deleted', version: 3 } })
-    .mockResolvedValueOnce({
-      status: 200,
-      value: {
-        ok: true, script_id: 'script-1', mutation_id: 'smut_p', review_status: 'pending_review',
-      },
-    })
     .mockResolvedValueOnce({ status: 200, value: { items: [release] } })
     .mockResolvedValueOnce({ status: 200, value: release });
 
@@ -369,19 +340,6 @@ it('invokes remaining ops IPC channels and keeps a present software current with
     event(dashboard),
     { nodeId: 'n1', expectedVersion: 1 },
   )).toMatchObject({ nodeId: 'n1', lifecycle: 'deleted', version: 3 });
-
-  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_PATCH)!(
-    event(dashboard),
-    {
-      scriptId: 'script-1',
-      expectedVersion: 1,
-      title: '用量',
-      answerText: '先打湿',
-      effectiveFrom: '2026-01-01T00:00:00.000Z',
-    },
-  )).toEqual({
-    ok: true, scriptId: 'script-1', mutationId: 'smut_p', reviewStatus: 'pending_review',
-  });
 
   const catalog = await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE)!(event(dashboard));
   expect(catalog).toMatchObject({

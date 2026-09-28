@@ -26,11 +26,13 @@ import { OverviewModule } from './features/dashboard/OverviewModule';
 import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
 import {
+  DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED,
   DASHBOARD_WINDOW_TITLE,
   dashboardChromeCssVars,
   dashboardChromeModeFor,
   inferDashboardHostPlatform,
 } from '@shared/dashboard-window';
+import { sessionDisplayName } from '@shared/product-session';
 import {
   clampDashboardNavPreviewWidth,
   clampDashboardNavWidth,
@@ -74,6 +76,7 @@ export function DashboardApp() {
   const [active, setActive] = useState<DashboardModuleId>('overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
+  const [signedIn, setSignedIn] = useState(false);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
   const [navWidth, setNavWidth] = useState(DASHBOARD_NAV_DEFAULT_WIDTH);
   const [navResizing, setNavResizing] = useState(false);
@@ -149,21 +152,29 @@ export function DashboardApp() {
     const load = () => {
       void api.session().then((result) => {
         if (!live) return;
+        const nextSignedIn = result.ok === true && result.signedIn === true;
+        setSignedIn(nextSignedIn);
         setRefreshLabel(
-          result.ok && result.signedIn && result.displayName
-            ? result.displayName
+          nextSignedIn
+            ? (sessionDisplayName({
+              role: result.role,
+              mappedName: result.displayName,
+            }) ?? DASHBOARD_MANIFEST.banners.refreshLabel)
             : DASHBOARD_MANIFEST.banners.refreshLabel,
         );
       }).catch(() => {
         if (!live) return;
+        setSignedIn(false);
         setRefreshLabel(DASHBOARD_MANIFEST.banners.refreshLabel);
       });
     };
     load();
     window.addEventListener('focus', load);
+    const stopSession = api.onSessionChanged?.(load);
     return () => {
       live = false;
       window.removeEventListener('focus', load);
+      stopSession?.();
     };
   }, []);
 
@@ -1150,7 +1161,9 @@ export function DashboardApp() {
           })}
         </div>
         <p className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
-          <span data-testid="dashboard-boundary-disclaimer">{DASHBOARD_MANIFEST.banners.disclaimer}</span>
+          <span data-testid="dashboard-boundary-disclaimer">
+            {signedIn ? DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED : DASHBOARD_MANIFEST.banners.disclaimer}
+          </span>
         </p>
         <div
           ref={navResizeHandleRef}
@@ -1233,7 +1246,7 @@ export function DashboardApp() {
           {active === 'announce' ? <AnnounceModule onOpenDomain={openWordingDomain} /> : null}
           {keepContent || active === 'content' ? (
             <div hidden={active !== 'content'}>
-              <ContentModule />
+              <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
             </div>
           ) : null}
         </main>

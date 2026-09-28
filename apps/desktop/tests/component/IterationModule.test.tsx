@@ -188,6 +188,7 @@ describe('IterationModule live list', () => {
         ok: true as const,
         releaseId: 'rel_21',
         catalogRefreshedAt: '2026-09-21T12:00:00.000Z',
+        matchesLease: false,
         total: 1,
         entries: [{
           scriptId: 'script-a',

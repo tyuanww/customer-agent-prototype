@@ -245,12 +245,14 @@ if (!gotLock) {
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => controller?.dashboardWebContents() ?? null);
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
-      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
+      () => [controller?.dashboardWebContents() ?? null]);
     registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerDashboardWordingIpc(
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
+      () => productAnnounce?.snapshotCatalog() ?? null,
     );
     registerDashboardContentIpc(
       productSession,

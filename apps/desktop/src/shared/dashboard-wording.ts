@@ -18,7 +18,7 @@ export type DashboardWordingEntry = Readonly<{
   lifecycle: 'published';
   lifecycleLabel: '已发布';
   ownerRole: string;
-  dataClass: 'local-catalog';
+  dataClass: 'local-catalog' | 'current-release';
 }>;
 
 export type DashboardWordingView = Readonly<{
@@ -27,6 +27,8 @@ export type DashboardWordingView = Readonly<{
   total: number;
   entries: readonly DashboardWordingEntry[];
   catalogRefreshedAt: string | null;
+  /** True only when entries came from the in-memory announce snapshot. */
+  matchesLease: boolean;
 }>;
 
 export type DashboardWordingFailure = Readonly<{
@@ -53,8 +55,9 @@ export function isDashboardWordingResult(value: unknown): value is DashboardWord
     return exactKeys(record, ['ok', 'code'])
       && (record.code === 'FORBIDDEN' || record.code === 'VALIDATION' || record.code === 'UNAVAILABLE');
   }
-  if (record.ok !== true || !exactKeys(record, ['ok', 'releaseId', 'total', 'entries', 'catalogRefreshedAt'])) return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'releaseId', 'total', 'entries', 'catalogRefreshedAt', 'matchesLease'])) return false;
   if (!(record.catalogRefreshedAt === null || typeof record.catalogRefreshedAt === 'string')) return false;
+  if (typeof record.matchesLease !== 'boolean') return false;
   if (!(record.releaseId === null || typeof record.releaseId === 'string')) return false;
   if (!Number.isSafeInteger(record.total) || (record.total as number) < 0) return false;
   return Array.isArray(record.entries) && record.entries.length === record.total;

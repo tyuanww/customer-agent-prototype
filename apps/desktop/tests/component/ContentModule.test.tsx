@@ -24,11 +24,6 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
       code: 'UNAVAILABLE' as const,
       message: '服务暂不可用，请重试',
     })),
-    importDraft: vi.fn(async () => ({
-      ok: false as const,
-      code: 'UNAVAILABLE' as const,
-      message: '服务暂不可用，请重试',
-    })),
     publishDraft: vi.fn(async () => ({
       ok: false as const,
       code: 'UNAVAILABLE' as const,
@@ -231,11 +226,13 @@ describe('ContentModule publish gate', () => {
     });
     expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('产品');
     await user.selectOptions(screen.getByTestId('content-domain-override'), 'campaign');
-    await waitFor(() => {
-      expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('活动');
-    });
+    expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('产品');
+    expect(screen.getByTestId('content-domain-detected')).not.toHaveTextContent('活动');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('活动');
     await user.click(screen.getByTestId('publish-action'));
+    expect(api.publishDraft).not.toHaveBeenCalled();
+    expect(screen.getByTestId('content-replace-confirm')).toHaveTextContent('将整库替换「活动」');
+    await user.click(screen.getByTestId('content-replace-confirm-action'));
     await waitFor(() => expect(api.publishDraft).toHaveBeenCalled());
     const request = vi.mocked(api.publishDraft).mock.calls[0]?.[0];
     // The override must reach the publish payload; the frozen CSV is built from these rows.
@@ -267,6 +264,9 @@ describe('ContentModule publish gate', () => {
     });
     await user.upload(screen.getByTestId('content-upload-input'), xlsx);
     await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('请选择将替换哪一库');
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'presale');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('publish-feedback-delta')).toBeInTheDocument());
     expect(screen.getByTestId('publish-feedback-headline')).toHaveTextContent('已发布 rel_25 · 合成管理员');
@@ -274,6 +274,53 @@ describe('ContentModule publish gate', () => {
     // 发布请求带上同一句 delta 作为 summary。
     const request = vi.mocked(api.publishDraft).mock.calls[0]?.[0];
     expect(request?.summary).toBe('产品沿用 · 活动沿用 · 售前已更新 · 售后沿用');
+    expect(screen.getByTestId('publish-goto-announce')).toHaveTextContent('去系统同步');
+    expect(screen.getByTestId('publish-goto-wording')).toHaveTextContent('去话术库');
+  });
+
+  it('asks to confirm when 将替换 disagrees with the table domain, then publishes', async () => {
+    const api = mockSession('owner');
+    api.parseUpload = vi.fn(async () => ({
+      ok: true as const,
+      sourceName: 'campaign.xlsx',
+      rows: [{ scene: '活动赠品', script: '亲亲这是话术', domain: 'campaign' as const }],
+      csvText: 'scene,script,domain\n活动赠品,亲亲这是话术,campaign\n',
+    }));
+    api.publishDraft = vi.fn(async () => ({
+      ok: true as const,
+      releaseId: 'rel_27',
+      releaseSeq: 27,
+      publisherDisplayName: '合成管理员',
+      summary: '产品已更新 · 活动沿用 · 售前沿用 · 售后沿用',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    const onOpenWordingDomain = vi.fn();
+    render(<ContentModule onNavigate={onNavigate} onOpenWordingDomain={onOpenWordingDomain} />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const xlsx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'campaign.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
+    await user.click(screen.getByTestId('publish-action'));
+    expect(api.publishDraft).not.toHaveBeenCalled();
+    expect(screen.getByTestId('content-replace-confirm')).toHaveTextContent('将整库替换「产品」');
+    await user.click(screen.getByTestId('content-replace-confirm-cancel'));
+    expect(screen.queryByTestId('content-replace-confirm')).not.toBeInTheDocument();
+    expect(api.publishDraft).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId('publish-action'));
+    await user.click(screen.getByTestId('content-replace-confirm-action'));
+    await waitFor(() => expect(api.publishDraft).toHaveBeenCalledOnce());
+    const request = vi.mocked(api.publishDraft).mock.calls[0]?.[0];
+    expect(request?.rows).toEqual([{ scene: '活动赠品', script: '亲亲这是话术', domain: 'product' }]);
+    await waitFor(() => expect(screen.getByTestId('publish-feedback-headline')).toHaveTextContent('已发布 rel_27'));
+    await user.click(screen.getByTestId('publish-goto-announce'));
+    await user.click(screen.getByTestId('publish-goto-wording'));
+    expect(onNavigate).toHaveBeenCalledWith('announce');
+    expect(onOpenWordingDomain).toHaveBeenCalledWith('product');
   });
 
   it('does not draw a delta line when the publish fails', async () => {
@@ -298,6 +345,7 @@ describe('ContentModule publish gate', () => {
     });
     await user.upload(screen.getByTestId('content-upload-input'), xlsx);
     await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'presale');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('publish-feedback')).toHaveTextContent('服务暂不可用'));
     expect(screen.queryByTestId('publish-feedback-delta')).not.toBeInTheDocument();
@@ -385,16 +433,19 @@ describe('ContentModule header layout', () => {
     delete window.dashboardContent;
   });
 
-  it('keeps the session banner in the module header, not as a full-width strip', () => {
+  it('keeps 将替换 outside 内容导入 so the operator names the library before opening the fold', () => {
     render(<ContentModule />);
-    const banner = screen.getByTestId('formal-source-warning');
-    expect(banner.closest('.dash-module-head')).not.toBeNull();
-    expect(banner.closest('[data-testid="content-upload-panel"]')).toBeNull();
-    expect(banner).toHaveClass('content-session-banner');
-    expect(banner).not.toHaveClass('dash-scope');
-    expect(banner).not.toHaveClass('dash-scope-important');
-    // Full sentence survives in the collapsed-width tooltip.
-    expect(banner).toHaveAttribute('title', expect.stringContaining('不会写入假发布'));
+    const replace = screen.getByTestId('content-replace-row');
+    expect(replace).toHaveTextContent('将替换');
+    expect(replace.querySelector('label')).toHaveAttribute('for', 'content-domain-override');
+    expect(screen.getByTestId('content-domain-override')).toBeInTheDocument();
+    expect(replace.closest('[data-testid="content-pending-dev"]')).toBeNull();
+    expect(screen.queryByTestId('content-domain-detected')).not.toBeInTheDocument();
+    expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
+      'title',
+      expect.stringContaining('不会写入假发布'),
+    );
+    expect(screen.queryByTestId('formal-source-warning')).not.toBeInTheDocument();
   });
 
   it('puts cancel and publish in one nowrap action row', () => {
@@ -403,16 +454,6 @@ describe('ContentModule header layout', () => {
     expect(row).not.toBeNull();
     expect(row).toContainElement(screen.getByTestId('publish-action'));
     expect(row).toContainElement(screen.getByTestId('cancel-in-flight'));
-  });
-
-  it('shortens the banner once the session is signed in', async () => {
-    const api = mockSession('owner');
-    window.dashboardContent = api;
-    render(<ContentModule />);
-    await waitFor(() => {
-      expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('导入与发布走产品会话');
-    });
-    expect(screen.getByTestId('formal-source-warning')).not.toHaveTextContent('不会写入假发布');
   });
 
   it('names the cancel action so it is not confused with clearing the local preview', () => {
@@ -432,7 +473,7 @@ describe('ContentModule pending dev disclosure', () => {
     render(<ContentModule />);
     expect(pendingDevOpen()).toBe(false);
     expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
-      .toHaveTextContent('待开发 · 内容导入');
+      .toHaveTextContent('内容导入');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('选择 CSV 或 xlsx');
   });
 
@@ -454,7 +495,7 @@ describe('ContentModule pending dev disclosure', () => {
     ));
     await waitFor(() => expect(pendingDevOpen()).toBe(true));
     const summary = screen.getByTestId('content-pending-dev').querySelector('summary');
-    expect(summary).toHaveTextContent('待开发 · coach-draft.csv · 待发布 2 行');
+    expect(summary).toHaveTextContent('coach-draft.csv · 待发布 2 行');
 
     toggleSummary();
     await waitFor(() => expect(pendingDevOpen()).toBe(false));
@@ -463,7 +504,7 @@ describe('ContentModule pending dev disclosure', () => {
     await waitFor(() => expect(api.session).toHaveBeenCalledTimes(2));
     expect(pendingDevOpen()).toBe(false);
     expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
-      .toHaveTextContent('待开发 · coach-draft.csv · 待发布 2 行');
+      .toHaveTextContent('coach-draft.csv · 待发布 2 行');
   });
 
   it('auto-opens on a parse error and shows the parser message in the body', async () => {
@@ -477,7 +518,7 @@ describe('ContentModule pending dev disclosure', () => {
     });
     expect(pendingDevOpen()).toBe(true);
     const summary = screen.getByTestId('content-pending-dev').querySelector('summary');
-    expect(summary).toHaveTextContent('待开发 · 未进入待发布');
+    expect(summary).toHaveTextContent('未进入待发布');
     expect(summary).toHaveTextContent('bad.csv');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('表头必须能映射');
   });
@@ -518,7 +559,7 @@ describe('ContentModule pending dev disclosure', () => {
     await user.click(screen.getByTestId('content-upload-clear'));
     await waitFor(() => expect(pendingDevOpen()).toBe(false));
     expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
-      .toHaveTextContent('待开发 · 内容导入');
+      .toHaveTextContent('内容导入');
   });
 
   it('keeps the picker disabled and the file name in the summary while publishing', async () => {
@@ -534,12 +575,13 @@ describe('ContentModule pending dev disclosure', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('content-upload-pick')).toBeDisabled());
     expect(screen.getByTestId('content-upload-clear')).toBeDisabled();
     expect(screen.getByTestId('content-domain-override')).toBeDisabled();
     expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
-      .toHaveTextContent('待开发 · coach-draft.csv · 待发布 1 行');
+      .toHaveTextContent('coach-draft.csv · 待发布 1 行');
     // Cancel is the in-flight escape hatch and must stay live.
     expect(screen.getByTestId('cancel-in-flight')).toBeEnabled();
   });
@@ -563,13 +605,14 @@ describe('ContentModule pending dev disclosure', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => {
       expect(screen.getByTestId('publish-feedback')).toHaveTextContent('rel_menokin_2026');
     });
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
-      .toHaveTextContent('待开发 · coach-draft.csv · 待发布 1 行');
+      .toHaveTextContent('coach-draft.csv · 待发布 1 行');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
     // Correcting the domain must not re-enable publish for the same round.

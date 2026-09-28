@@ -5,7 +5,6 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import {
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
-  dashboardScriptPatch,
   dashboardSoftwareCatalog,
   dashboardSopCatalog,
   dashboardSopDelete,
@@ -55,8 +54,6 @@ export function registerDashboardOpsLoopIpc(
     wrap(event, args, 1, () => dashboardSopPatch(session, args[0])));
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_SOP_DELETE, (event, ...args: unknown[]) =>
     wrap(event, args, 1, () => dashboardSopDelete(session, args[0])));
-  ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_PATCH, (event, ...args: unknown[]) =>
-    wrap(event, args, 1, () => dashboardScriptPatch(session, args[0])));
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_DELETE, (event, ...args: unknown[]) =>
     wrap(event, args, 1, () => dashboardScriptDelete(session, args[0])));
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE, (event, ...args: unknown[]) =>

@@ -148,9 +148,9 @@ export type DashboardContentParseResult =
 export type DashboardContentApi = {
   session(): Promise<DashboardContentSessionResult>;
   parseUpload(request: DashboardContentParseRequest): Promise<DashboardContentParseResult>;
-  importDraft(request: DashboardContentImportRequest): Promise<DashboardContentImportResult>;
   publishDraft(request: DashboardContentPublishRequest): Promise<DashboardContentPublishResult>;
   cancelInFlight(): Promise<DashboardContentFailure | { ok: true }>;
+  onSessionChanged?(listener: () => void): () => void;
 };
 
 export type ContentPublishGateInput = Readonly<{
