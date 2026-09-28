@@ -2,7 +2,7 @@
 
 本页按「要证明什么 → 跑哪条命令 → 它实际证明了什么」组织。命令都可以复制。先看本机静态 / 自动化结果，再单独列出只有真实设备才能证明的门禁。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [桌面语义检索](reference-desktop-retrieval.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) · [macOS M5 人工核验](how-to-verify-macos-m5.md) · [macOS 打包态远端](how-to-macos-packaged-product-remote.md) · [办公机远端](how-to-office-machine-product-remote.md) · [Linux 打包态远端](how-to-linux-packaged-product-remote.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [桌面语义检索](reference-desktop-retrieval.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [How to 用一张表替换四库之一](how-to-replace-one-library.md) · [How to 下架一条已发布话术](how-to-retire-a-script.md) · [本机目录与当前发布](explanation-catalog-lease.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) · [macOS M5 人工核验](how-to-verify-macos-m5.md) · [macOS 打包态远端](how-to-macos-packaged-product-remote.md) · [办公机远端](how-to-office-machine-product-remote.md) · [Linux 打包态远端](how-to-linux-packaged-product-remote.md)
 
 > 本 Demo 是合成数据、不代发。默认狐狸路径可以不接 API；显式 loopback 合成栈才接通本机 API。验证通过不等于可以正式发包，也不等于真实 OS 焦点 / 台前调度已被证明。
 
@@ -314,7 +314,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 内容管理草稿（Dashboard 切片 1）
 
-「内容管理」顶栏是会话徽章加同一行取消 / 发布；导入折进「待开发」。本地解析 CSV 或 xlsx 成待发布预览。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；校验通过 staged 后 `POST /v1/content/publish`，回执两行并把四库 delta 写入 `Announcement.summary`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库走 ops-loop，见下方 Dashboard SOP。
+「内容管理」顶栏是会话徽章加同一行取消 / 发布；「将替换」在折叠外；导入折成「内容导入」。本地解析 CSV 或 xlsx 成待发布预览。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。发布前必须手选将替换。管理员发布：`publishDraft` 内部 `POST /v1/content/import` 后 `GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；校验通过 staged 后 `POST /v1/content/publish`，回执两行并把四库 delta 写入 `Announcement.summary`。一期发布仅管理员。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库走 ops-loop，见下方 Dashboard SOP。
 
 | 你想证明 | 命令 |
 | --- | --- |
@@ -334,7 +334,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## Dashboard SOP
 
-侧栏「SOP」是五个一期模块之一，不是 Query 的独立 SOP 窗。有产品会话且存在 `dashboardOps` 时：上传 CSV（≤256KB）覆盖当前会话树，更新针对选中节点，删除仅 Owner，导出是本机 CSV。没有会话时保持未接入，不把合成过敏树当运营目录。过敏停手文案尚未校验。
+侧栏「SOP」是五个一期模块之一，不是 Query 的独立 SOP 窗。有产品会话且存在 `dashboardOps` 时：上传 CSV（≤256KB）覆盖当前会话树，更新针对选中节点，删除仅管理员，导出是本机 CSV。没有会话时保持未接入，不把合成过敏树当运营目录。过敏停手文案尚未校验。
 
 | 你想证明 | 命令 |
 | --- | --- |

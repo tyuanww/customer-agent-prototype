@@ -7,14 +7,20 @@ All notable changes to this customer-agent product implementation repository are
 ### Added
 
 - 内容管理发布前必须手选「将替换」库。表里识别到的域和将替换不一致时，点发布先确认。发布成功留在本页，回执下给「去系统同步」「去话术库」。
-- 话术库下架走 `DELETE` 进入 `pending_review`，下次发布才离开当前目录。屏幕写明坐席要等下次发布才搜不到。
+- 话术库下架改为两步确认。成功仍走 `DELETE` 进入 `pending_review`，下次发布才离开当前目录。屏幕写明坐席要等下次发布才搜不到。
 
 ### Changed
 
-- 话术库只读当前发布，不再上传或改正文。概览和话术库用 `list().matchesLease` 区分本机目录与当前发布。
+- 话术库不再上传或改正文。概览和话术库用 `list().matchesLease` 区分本机目录与当前发布。
 - 查询胶囊登录后，dashboard 立刻刷新会话（`product:session-changed` 扇出到 dashboard 窗）。
 - 操作员芯片不再显示 `synthetic_owner` 这类账号 id，改显示管理员 / 话术师 / 坐席。
 - 内容导入折叠去掉「待开发」。SOP 说明改为「删除仅管理员」。登录后侧栏脚注改为「话术库读当前发布。写操作走冻结合同。」
+
+### Documentation
+
+- [How to 用一张表替换四库之一](docs/how-to-replace-one-library.md)：手选将替换、表域不一致先确认、发布后留在本页。
+- [How to 下架一条已发布话术](docs/how-to-retire-a-script.md)：两步确认，坐席要等下次发布才搜不到。
+- [本机目录与当前发布](docs/explanation-catalog-lease.md)：`list().matchesLease` 与 kept-larger 磁盘 hydrate 为何会分叉。
 
 ## [0.3.22] - 2026-09-28
 

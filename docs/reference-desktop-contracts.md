@@ -1,8 +1,8 @@
 # 桌面合同参考
 
-本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated/announce-unread/announce-content-updated/announce-mark-read`、`product:escalate/record-terminal`、`product:inaccuracy-report`、`dashboard:wording-list`、`dashboard:content-session/parse/import/publish`、`dashboard:iteration-list/start/close`、`dashboard:ops-retrieval` / `ops-sop-*` / `ops-script-*` / `ops-software`、`dashboard:announce-current` / `dashboard:announce-mark-read`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 没有 `customerAgent`。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
+本页是当前源码里的桌面合同，不是产品愿景。数值与通道名以 `apps/desktop/src/` 与 `apps/desktop/package.json` 为准；仓库根 `package.json` 只提供稳定 workspace 命令。显式 loopback 接入 profile 已实现 `product:session-status/login/logout/session-changed`、`product:search/cancel-search/copy-adopt`、`product:announce-refresh/announce-invalidated/announce-unread/announce-content-updated/announce-mark-read`、`product:escalate/record-terminal`、`product:inaccuracy-report`、`dashboard:wording-list`、`dashboard:content-session/parse/publish/cancel-in-flight`、`dashboard:iteration-list/start/close`、`dashboard:ops-retrieval` / `ops-sop-*` / `ops-script-delete` / `ops-software`、`dashboard:announce-current` / `dashboard:announce-mark-read`。没有独立 `dashboard:content-import`，也没有 `scriptPatch`。会话状态无 token；query-only 登录/退出；fox/query 可读状态；Dashboard 没有 `customerAgent`。默认未设置 loopback 时仍走 S0 fixture。设计真源见 [桌面接入准备](plans/2026-09-09-desktop-integration-preparation.md)；当前动作见[执行清单](plans/2026-09-06-execution-goal.md#当前执行清单)。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [抽取叶子模块合同](reference-extracted-module-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [How to 用一张表替换四库之一](how-to-replace-one-library.md) · [How to 下架一条已发布话术](how-to-retire-a-script.md) · [本机目录与当前发布](explanation-catalog-lease.md)
 
 ---
 
@@ -47,11 +47,11 @@ CSP（`apps/desktop/src/main/main.ts`）至少 `default-src 'self'`。开发态�
 
 - `createDashboardBrowserWindow` 使用 `DASHBOARD_WINDOW_SECURITY` 加专用 `dashboard.cjs`。
 - `readDashboardWindowSnapshot().hasPreload` 为 true。preload 暴露 `dashboardWording.list()`、`dashboardContent`、`dashboardIteration` 与 `dashboardOps`；sender 必须是 Dashboard 主框，不进 overlay `trustedContents()`。
-- 话术库优先读仓外当前发布 hydrate，hydrate 为空才回退检索索引（仓内路径拒绝），只读、不复制、不发布。无 `effectiveFrom` 的条目生效窗口标「当前发布」。详情卡左上标签与「来源」同为 `selected.ownerRole`（`当前发布` 或 `本机话术库`），不写死「本机话术库」。VOC / 工单仍是架构模拟。
+- 话术库 `list()` 优先读 announce 内存 snapshot（`matchesLease: true`）；没有 snapshot 才读磁盘 hydrate，再空才回退检索索引（后两路 `matchesLease: false`；仓内路径拒绝）。只读、不复制、不发布。无 `effectiveFrom` 的条目生效窗口标「当前发布」或「本机目录」。详情卡左上标签与「来源」同为 `selected.ownerRole`（`当前发布` 或 `本机话术库`）。VOC / 工单仍是架构模拟。
 - 「话术优化待办」走 `dashboard:iteration-list` / `dashboard:iteration-start` / `dashboard:iteration-close`。Main 用产品会话调冻结 `GET /v1/metrics/iteration-tasks` 与 `POST /v1/events/iteration-tasks/{task_id}/start|close`。仅 coach / owner；空列表 `{ ok: true, items: [], nextCursor: null }` 合法。坐席 403。没有产品会话时返回「当前没有产品会话，无法加载待办」。有该 API 时 renderer 不得回落 DEMO 5 条。CAS 冲突文案「待办已更新，请刷新后再处理」。关闭不等于已发布。Query「话术不准」已 persist；待办页仍不展示按 `script_id` 聚合次数。
 - 侧栏「SOP」（`SopLibraryModule`）有产品会话时走 `dashboardOps.sopCatalog/import/patch/delete` → `GET /v1/sop/catalog`、`POST /v1/sop/import`（multipart CSV，≤256KB，覆盖整树）、`PATCH /v1/sop/nodes/{id}`（coach/owner）、`DELETE` 仅 owner。没有 `dashboardOps` 或没有产品会话时「未接入：没有 SOP 写库通道」。导出是本机 CSV，不另打 HTTP。这与 Query 的独立 `role=sop` 窗不是同一表面。
-- 管理概览 KPI 走 `dashboardOps.retrieval('current_release'|'last_7d')` → `GET /v1/metrics/retrieval`。话术库 Owner 单条更新/删除走 `dashboardOps.scriptPatch/scriptDelete` → `PATCH|DELETE /v1/content/scripts/{id}`，成功 `reviewStatus=pending_review`。系统同步软件目录走 `dashboardOps.softwareCatalog` → `GET /v1/software/releases` 与 `/current`；Owner only；UNSIGNED 必须 `signed=false`；禁止 `latest.yml`。系统同步四卡走 `dashboardAnnounce.current` / `markRead`（`dashboard:announce-current` / `dashboard:announce-mark-read`），卡状态解析 `announcement.summary`；未读走 origin-keyed last_seen，不走 ACK。
-- 「内容与发布」本地解析 CSV 或 xlsx。zip xlsx 走 `dashboard:content-parse`（`dashboardContent.parseUpload`），payload 为 `{ sourceName, bytes }`；Main 只读第一张表并映射中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）。缺 parse 通道时 renderer 仍 fail-close 二进制工作簿。上限 10MiB / 5000 行，不再使用 64KiB / 50 行。xlsx 匹配 sheet relationship id 前会转义正则元字符；`&#...;` / `&#x...;` 超出 Unicode 或落在代理区则跳过该实体，不 `fromCodePoint` 抛错。import 把预览转成 CSV 再 POST。Publish 在 `POST /v1/content/import` 之后轮询 `GET /v1/content/import/{import_batch_id}`：间隔 1.5s（`IMPORT_POLL_MS`），预算 30s（`CONTENT_IMPORT_TIMEOUT_MS`），`RATE_LIMITED` / 429 再退避 1.5s，避免打满状态接口每分钟 120 次。一期发布仅 Owner。
+- 管理概览 KPI 走 `dashboardOps.retrieval('current_release'|'last_7d')` → `GET /v1/metrics/retrieval`。话术库只读；`list().matchesLease` 为 true 才写「当前发布」，否则写「本机目录」。管理员下架走 `dashboardOps.scriptDelete` → `DELETE /v1/content/scripts/{id}`，成功 `reviewStatus=pending_review`，下次发布才离开目录。没有 `scriptPatch`。系统同步软件目录走 `dashboardOps.softwareCatalog` → `GET /v1/software/releases` 与 `/current`；仅 owner；UNSIGNED 必须 `signed=false`；禁止 `latest.yml`。系统同步四卡走 `dashboardAnnounce.current` / `markRead`（`dashboard:announce-current` / `dashboard:announce-mark-read`），卡状态解析 `announcement.summary`；未读走 origin-keyed last_seen，不走 ACK。`product:session-changed` 同时发给 query 与 dashboard。操作员芯片走 `sessionDisplayName`：真实姓名保留，账号 id / `synthetic_*` 回落到 管理员 / 话术师 / 坐席。
+- 「内容管理」本地解析 CSV 或 xlsx。zip xlsx 走 `dashboard:content-parse`（`dashboardContent.parseUpload`），payload 为 `{ sourceName, bytes }`；Main 只读第一张表并映射中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）。缺 parse 通道时 renderer 仍 fail-close 二进制工作簿。上限 10MiB / 5000 行，不再使用 64KiB / 50 行。xlsx 匹配 sheet relationship id 前会转义正则元字符；`&#...;` / `&#x...;` 超出 Unicode 或落在代理区则跳过该实体，不 `fromCodePoint` 抛错。发布前必须手选将替换；表域不一致时先确认。`publishDraft` 把预览转成 CSV 再 POST import，轮询 `GET /v1/content/import/{import_batch_id}`：间隔 1.5s（`IMPORT_POLL_MS`），预算 30s（`CONTENT_IMPORT_TIMEOUT_MS`），`RATE_LIMITED` / 429 再退避 1.5s。一期发布仅管理员。
 - Dashboard renderer 拿不到 `window.customerAgent`，也调不了 search / login / copy。
 - 打开通道只有无参数 `dashboard:open`。Main 要求 `isTrustedSender` 且 `role === 'query'`（`canOpenDashboard`）。Fox / 未受信 sender fail-closed，返回 `OpenDashboardResult` `{ ok: false, message }`。
 - 原生菜单 / Tray / Dock **不走**该 IPC：它们直接调 `OverlayController.openDashboard()`，失败用 `runDashboardOpenAttempt` + `notifyDashboardOpenFailure`（原生对话框），查询窗保持可用。
@@ -76,7 +76,7 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | --- | --- | --- |
 | `product:session-status` | invoke | trusted main-frame，fox/query，无参数；脱敏会话投影 |
 | `product:login` / `product:logout` | invoke | trusted main-frame，query-only，无参数 |
-| `product:session-changed` | Main → query | preload 精确校验，renderer 按 main epoch 拒绝旧状态 |
+| `product:session-changed` | Main → query + dashboard | overlay preload 精确校验；dashboard preload 只当刷新信号，再 `session()` |
 | `product:search` / `product:cancel-search` / `product:copy-adopt` | invoke | trusted Query 主框；绑定 sessionEpoch/generation；复制不接受 renderer 正文 |
 | `product:inaccuracy-report` | invoke | trusted Query 主框；Live UUID `queryId` 才 POST `/v1/inaccuracy-reports`；须 `Idempotency-Key`；`collection_disabled` 不发 HTTP |
 | `product:retrieval-preference-get` / `product:retrieval-preference-set` | invoke | trusted Query 主框；`{ smartEnabled: boolean }`；非法 payload 不写盘 |
@@ -87,7 +87,7 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `overlay:open-search` | invoke | 若带 transform：必须 `role === 'fox'` 且 `isFoxVisualTransform` |
 | `dashboard:open` | invoke | `trusted && role === 'query'` |
 | `dashboard:wording-list` | invoke | Dashboard 主框；无参数 |
-| `dashboard:content-session` / `dashboard:content-parse` / `dashboard:content-import` / `dashboard:content-publish` | invoke | Dashboard 主框；parse 为 `{ sourceName, bytes }`；import/publish 各一精确 payload |
+| `dashboard:content-session` / `dashboard:content-parse` / `dashboard:content-publish` / `dashboard:content-cancel-in-flight` | invoke | Dashboard 主框；parse 为 `{ sourceName, bytes }`；publish 一次动作内部 import；没有独立 `content-import` 通道 |
 | `dashboard:iteration-list` | invoke | Dashboard 主框；无参数。成功 `{ ok, items, nextCursor }`，空 `items` 合法 |
 | `dashboard:iteration-start` | invoke | Dashboard 主框；精确 `{ taskId, expectedVersion }` |
 | `dashboard:iteration-close` | invoke | Dashboard 主框；精确 `{ taskId, expectedVersion, status, resolutionNote }`；`status` 仅 `resolved \| wont_fix` |
@@ -96,9 +96,10 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `dashboard:ops-sop-import` | invoke | Dashboard 主框；CSV 字符串，≤256KB；覆盖当前产品会话树 |
 | `dashboard:ops-sop-patch` | invoke | Dashboard 主框；`{ nodeId, expectedVersion, title?, body?, sortKey? }` |
 | `dashboard:ops-sop-delete` | invoke | Dashboard 主框；`{ nodeId, expectedVersion }`；仅 owner |
-| `dashboard:ops-script-patch` | invoke | Dashboard 主框；Owner；成功 `pending_review` |
-| `dashboard:ops-script-delete` | invoke | Dashboard 主框；Owner；成功 `pending_review` |
+| `dashboard:ops-script-delete` | invoke | Dashboard 主框；Owner 下架；成功 `pending_review` |
 | `dashboard:ops-software` | invoke | Dashboard 主框；仅 owner；禁止 latest.yml |
+| `dashboard:announce-current` / `dashboard:announce-mark-read` | invoke | Dashboard 主框；四卡投影 / 已读 |
+| `product:announce-content-updated` | Main → fox + query + dashboard | dashboard preload 暴露 `onCatalogUpdated`；话术库 / 概览立刻 `list()`；四卡仍 10s poll |
 | `overlay:dismiss` | invoke | trusted overlay |
 | `overlay:report-ui-phase` | invoke | query-only；`isReportablePhase`；`resultCount ∈ {0,1,2,3}` |
 | `overlay:report-handoff-milestone` | invoke | `role === 'query'`；正整数 `handoffId`；枚举 `open-armed \| open-finished \| close-finished` |
