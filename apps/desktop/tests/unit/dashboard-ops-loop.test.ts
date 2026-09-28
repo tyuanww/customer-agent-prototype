@@ -9,6 +9,7 @@ import {
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
   dashboardSoftwareCatalog,
+  dashboardSoftwareOpenDownload,
   dashboardSopCatalog,
   dashboardSopDelete,
   dashboardSopImport,
@@ -16,6 +17,7 @@ import {
 } from '../../src/main/dashboard-ops-loop';
 import {
   isDashboardOpsFailure,
+  isSoftwareDownloadUrl,
   OPS_LOOP_COPY,
   SOP_UPLOAD_MAX_BYTES,
 } from '../../src/shared/dashboard-ops-loop';
@@ -30,6 +32,7 @@ vi.mock('electron', () => ({
       handlers.set(name, callback);
     },
   },
+  shell: { openExternal: vi.fn(async () => undefined) },
 }));
 
 const sourcePath = path.resolve(
@@ -360,4 +363,51 @@ it('invokes remaining ops IPC channels and keeps a present software current with
   expect(await dashboardSoftwareCatalog(rateLimited)).toMatchObject({
     ok: false, code: 'RATE_LIMITED', message: '操作过于频繁，请稍后重试',
   });
+});
+
+it('opens the current https download_url in the system browser and refuses a non-https catalog url', async () => {
+  const userinfo = new URL('https://example.com/app.dmg');
+  userinfo.username = 'user';
+  userinfo.password = 'pass';
+  expect(isSoftwareDownloadUrl('https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.23/app.dmg')).toBe(true);
+  expect(isSoftwareDownloadUrl('http://example.com/app.dmg')).toBe(false);
+  expect(isSoftwareDownloadUrl(userinfo.href)).toBe(false);
+
+  const owner = fakeSession('owner');
+  const openExternal = vi.fn(async () => undefined);
+  vi.mocked(owner.request).mockResolvedValueOnce({ status: 200, value: release });
+  expect(await dashboardSoftwareOpenDownload(owner, openExternal)).toEqual({
+    ok: true, opened: true, version: '0.3.17',
+  });
+  expect(openExternal).toHaveBeenCalledWith('https://example.com/app.dmg');
+  expect(vi.mocked(owner.request).mock.calls[0]?.[1]).toBe('/v1/software/releases/current');
+
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('GONE'));
+  expect(await dashboardSoftwareOpenDownload(owner, openExternal)).toMatchObject({
+    ok: false, code: 'NOT_FOUND', message: OPS_LOOP_COPY.noSoftwareCurrent,
+  });
+
+  const credentialed = Object.freeze({ ...release, download_url: userinfo.href });
+  vi.mocked(owner.request).mockResolvedValueOnce({ status: 200, value: credentialed });
+  const blocked = vi.fn(async () => undefined);
+  expect(await dashboardSoftwareOpenDownload(owner, blocked)).toMatchObject({
+    ok: false, code: 'VALIDATION', message: OPS_LOOP_COPY.softwareDownloadNotHttps,
+  });
+  expect(blocked).not.toHaveBeenCalled();
+
+  const { dashboard, event } = trustedDashboard();
+  const ipcSession = fakeSession('owner');
+  const ipcOpen = vi.fn(async () => undefined);
+  vi.mocked(ipcSession.request).mockResolvedValueOnce({ status: 200, value: release });
+  registerDashboardOpsLoopIpc(
+    ipcSession as ProductSession,
+    () => dashboard,
+    () => 'http://127.0.0.1:5173/',
+    ipcOpen,
+  );
+  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE_OPEN)!(event(dashboard))).toEqual({
+    ok: true, opened: true, version: '0.3.17',
+  });
+  expect(ipcOpen).toHaveBeenCalledWith('https://example.com/app.dmg');
+  expect(JSON.stringify(release)).not.toContain('latest.yml');
 });

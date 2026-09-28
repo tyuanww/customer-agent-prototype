@@ -83,6 +83,7 @@ describe('SopLibraryModule', () => {
       sopDelete,
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     const user = userEvent.setup();
     render(<SopLibraryModule />);
@@ -119,6 +120,7 @@ describe('SopLibraryModule', () => {
       sopDelete: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     const user = userEvent.setup();
     render(<SopLibraryModule />);
@@ -154,6 +156,7 @@ describe('SopLibraryModule', () => {
       sopDelete: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     const user = userEvent.setup();
     render(<SopLibraryModule />);
@@ -183,6 +186,7 @@ describe('SopLibraryModule', () => {
       sopDelete: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     const { unmount } = render(<SopLibraryModule />);
     await waitFor(() => {
@@ -201,6 +205,7 @@ describe('SopLibraryModule', () => {
       sopDelete: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     render(<SopLibraryModule />);
     await waitFor(() => {

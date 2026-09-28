@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnnounceModule } from '../../src/renderer/features/dashboard/AnnounceModule';
@@ -161,11 +161,84 @@ describe('AnnounceModule four library cards', () => {
     window.dashboardAnnounce = announceApi(view());
     window.dashboardOps = {
       softwareCatalog: vi.fn(async () => ({ ok: true as const, current: null })),
+      softwareOpenDownload: vi.fn(),
     } as unknown as typeof window.dashboardOps;
     const user = userEvent.setup();
     render(<AnnounceModule />);
     await user.click(screen.getByTestId('system-sync-tab-software'));
     expect(screen.getByTestId('software-version-card')).toBeInTheDocument();
+    expect(screen.getByTestId('software-open-download')).toBeDisabled();
     expect(screen.queryByTestId('announce-library-grid')).not.toBeInTheDocument();
+  });
+
+  it('opens the current catalog download page through softwareOpenDownload, not a renderer URL', async () => {
+    const softwareOpenDownload = vi.fn(async () => ({
+      ok: true as const, opened: true as const, version: '0.3.23',
+    }));
+    window.dashboardAnnounce = announceApi(view());
+    window.dashboardOps = {
+      softwareCatalog: vi.fn(async () => ({
+        ok: true as const,
+        items: [],
+        current: {
+          version: '0.3.23',
+          platform: 'mac-universal' as const,
+          sha256: 'a'.repeat(64),
+          downloadUrl: 'https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.23/app.dmg',
+          createdAt: '2026-09-28T00:00:00.000Z',
+          signed: false,
+        },
+      })),
+      softwareOpenDownload,
+    } as unknown as typeof window.dashboardOps;
+    const user = userEvent.setup();
+    render(<AnnounceModule />);
+    await user.click(screen.getByTestId('system-sync-tab-software'));
+    await waitFor(() => expect(screen.getByTestId('software-open-download')).toBeEnabled());
+    await user.click(screen.getByTestId('software-open-download'));
+    await waitFor(() => expect(softwareOpenDownload).toHaveBeenCalledTimes(1));
+    expect(softwareOpenDownload.mock.calls[0]).toEqual([]);
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('已在系统浏览器打开下载页');
+    expect(screen.getByTestId('software-update-status')).not.toHaveTextContent('latest.yml');
+  });
+
+  it('ignores a second 打开下载页 click while the first open is in flight', async () => {
+    let finish: ((value: { ok: true; opened: true; version: string }) => void) | undefined;
+    const softwareOpenDownload = vi.fn(() => new Promise<{
+      ok: true;
+      opened: true;
+      version: string;
+    }>((resolve) => {
+      finish = resolve;
+    }));
+    window.dashboardAnnounce = announceApi(view());
+    window.dashboardOps = {
+      softwareCatalog: vi.fn(async () => ({
+        ok: true as const,
+        items: [],
+        current: {
+          version: '0.3.23',
+          platform: 'mac-universal' as const,
+          sha256: 'a'.repeat(64),
+          downloadUrl: 'https://example.com/app.dmg',
+          createdAt: '2026-09-28T00:00:00.000Z',
+          signed: false,
+        },
+      })),
+      softwareOpenDownload,
+    } as unknown as typeof window.dashboardOps;
+    const user = userEvent.setup();
+    render(<AnnounceModule />);
+    await user.click(screen.getByTestId('system-sync-tab-software'));
+    await waitFor(() => expect(screen.getByTestId('software-open-download')).toBeEnabled());
+    const open = screen.getByTestId('software-open-download');
+    fireEvent.click(open);
+    fireEvent.click(open);
+    expect(softwareOpenDownload).toHaveBeenCalledTimes(1);
+    expect(open).toBeDisabled();
+    finish?.({ ok: true, opened: true, version: '0.3.23' });
+    await waitFor(() => {
+      expect(screen.getByTestId('software-update-status')).toHaveTextContent('已在系统浏览器打开下载页');
+    });
   });
 });

@@ -13,7 +13,25 @@ export const OPS_LOOP_COPY = Object.freeze({
   sopChannel: '未接入：没有 SOP 写库通道。',
   sopTooLarge: 'SOP 文件超过 256KB。',
   allergyStop: '过敏步骤没有停手文案，不能发。',
+  noSoftwareCurrent: '目录为空，没有当前建议版本。',
+  softwareDownloadNotHttps: '下载地址不是 https，不能打开。',
+  softwareOpened: '已在系统浏览器打开下载页',
+  softwareChannel: '未接入：没有安装包目录。',
 });
+
+/** Catalog download_url before shell.openExternal. https only, no userinfo. */
+export function isSoftwareDownloadUrl(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === 'https:'
+    && parsed.username === ''
+    && parsed.password === ''
+    && parsed.hostname.length > 0;
+}
 
 export function sopAllergyStepNeedsStopCopy(title: string, body: string): boolean {
   if (!title.includes('过敏') && !body.includes('过敏')) return false;
@@ -139,6 +157,12 @@ export type DashboardSoftwareCatalog = Readonly<{
   current: DashboardSoftwareRelease | null;
 }>;
 
+export type DashboardSoftwareOpenDownload = Readonly<{
+  ok: true;
+  opened: true;
+  version: string;
+}>;
+
 export type DashboardOpsApi = {
   retrieval(window: RetrievalWindow): Promise<DashboardRetrievalMetrics | DashboardOpsFailure>;
   sopCatalog(): Promise<DashboardSopCatalog | DashboardOpsFailure>;
@@ -159,6 +183,7 @@ export type DashboardOpsApi = {
     expectedVersion: number;
   }): Promise<DashboardScriptMutation | DashboardOpsFailure>;
   softwareCatalog(): Promise<DashboardSoftwareCatalog | DashboardOpsFailure>;
+  softwareOpenDownload(): Promise<DashboardSoftwareOpenDownload | DashboardOpsFailure>;
 };
 
 export function dashboardOpsFailure(

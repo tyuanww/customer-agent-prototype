@@ -1,4 +1,4 @@
-import { ipcMain, type WebContents } from 'electron';
+import { ipcMain, shell, type WebContents } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import { dashboardOpsFailure, type DashboardOpsFailure } from '../shared/dashboard-ops-loop';
 import { isTrustedMainFrameSender } from './sender-guard';
@@ -6,6 +6,7 @@ import {
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
   dashboardSoftwareCatalog,
+  dashboardSoftwareOpenDownload,
   dashboardSopCatalog,
   dashboardSopDelete,
   dashboardSopImport,
@@ -17,6 +18,9 @@ export function registerDashboardOpsLoopIpc(
   session: DashboardOpsSessionClient | null,
   dashboardContents: () => WebContents | null,
   devUrl: () => string | undefined,
+  openExternal: (url: string) => Promise<void> = async (url) => {
+    await shell.openExternal(url);
+  },
 ): void {
   const guard = (event: Parameters<Parameters<typeof ipcMain.handle>[1]>[0]): boolean => {
     const contents = dashboardContents();
@@ -58,4 +62,6 @@ export function registerDashboardOpsLoopIpc(
     wrap(event, args, 1, () => dashboardScriptDelete(session, args[0])));
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE, (event, ...args: unknown[]) =>
     wrap(event, args, 0, () => dashboardSoftwareCatalog(session)));
+  ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE_OPEN, (event, ...args: unknown[]) =>
+    wrap(event, args, 0, () => dashboardSoftwareOpenDownload(session, openExternal)));
 }

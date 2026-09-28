@@ -82,6 +82,11 @@ it('fail-closes dashboardOps invoke throws and non-string SOP import args', asyn
 
   invoke.mockResolvedValueOnce({ ok: false, code: 'FORBIDDEN', message: '当前身份不能执行此操作' });
   await expect(api.softwareCatalog()).resolves.toMatchObject({ ok: false, code: 'FORBIDDEN' });
+  expect(invoke).toHaveBeenCalledWith('dashboard:ops-software');
+
+  invoke.mockResolvedValueOnce({ ok: true, opened: true, version: '0.3.23' });
+  await expect(api.softwareOpenDownload()).resolves.toMatchObject({ ok: true, opened: true, version: '0.3.23' });
+  expect(invoke).toHaveBeenCalledWith('dashboard:ops-software-open');
 
   invoke.mockResolvedValueOnce(null);
   await expect(api.sopCatalog()).resolves.toEqual(unavailable);
