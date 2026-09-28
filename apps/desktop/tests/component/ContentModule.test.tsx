@@ -266,6 +266,9 @@ describe('ContentModule publish gate', () => {
     });
     await user.upload(screen.getByTestId('content-upload-input'), xlsx);
     await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('请选择将替换哪一库');
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'presale');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('publish-feedback-delta')).toBeInTheDocument());
     expect(screen.getByTestId('publish-feedback-headline')).toHaveTextContent('已发布 rel_25 · 合成管理员');
@@ -297,6 +300,7 @@ describe('ContentModule publish gate', () => {
     });
     await user.upload(screen.getByTestId('content-upload-input'), xlsx);
     await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'presale');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('publish-feedback')).toHaveTextContent('服务暂不可用'));
     expect(screen.queryByTestId('publish-feedback-delta')).not.toBeInTheDocument();
@@ -526,6 +530,7 @@ describe('ContentModule pending dev disclosure', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('content-upload-pick')).toBeDisabled());
     expect(screen.getByTestId('content-upload-clear')).toBeDisabled();
@@ -555,6 +560,7 @@ describe('ContentModule pending dev disclosure', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => {
       expect(screen.getByTestId('publish-feedback')).toHaveTextContent('rel_menokin_2026');

@@ -29,7 +29,7 @@ const UPLOAD_COPY = {
 } as const;
 
 const SESSION_BANNER_FULL = '导入与发布走产品会话。没有会话时按钮保持未接入，不会写入假发布。';
-const REPLACE_HINT = '发布会整库替换这一库，其它库沿用。选错会发到别的库，页面不拦。';
+const REPLACE_HINT = '必须手选要换的库。发布会整库替换这一库，其它库沿用。';
 const CANCEL_ARIA_LABEL = '取消服务器上未完成的导入，不影响本页预览';
 
 type UploadView =
@@ -74,7 +74,6 @@ function uploadSourceName(upload: UploadView): string {
   return upload.status === 'ready' ? upload.sourceName : '';
 }
 
-/** `待开发` summary: the only status source once the body is collapsed. */
 function detectedDomainCopy(upload: UploadView): string | null {
   if (upload.status !== 'ready') return null;
   const labels = [...new Set(
@@ -123,6 +122,7 @@ function sessionBadgeOf(state: SessionState): { label: string; tone: 'neutral' |
   return { label: '未接入', tone: 'warn' };
 }
 
+/** `待开发` summary: the only status source once the body is collapsed. */
 function summarizeUpload(upload: UploadView): { text: string; title: string } {
   if (upload.status === 'reading') {
     return { text: `待开发 · 正在读取 ${upload.sourceName}`, title: `待开发 · 正在读取 ${upload.sourceName}` };
@@ -204,12 +204,15 @@ export function ContentModule() {
     rows,
     sourceBindings,
   });
-  const publishDisabled = !gate.allowed || submitting || upload.status !== 'ready' || publishSucceededThisRound;
+  const needsLibraryPick = domainOverride === '';
+  const publishDisabled = !gate.allowed || submitting || upload.status !== 'ready'
+    || publishSucceededThisRound || needsLibraryPick;
   let publishReason = '';
   if (submitting) publishReason = CONTENT_PUBLISH_COPY.submitting;
   else if (!gate.allowed) publishReason = gate.message;
   else if (upload.status === 'idle' || upload.status === 'error') publishReason = '请先导入草稿';
   else if (upload.status === 'reading') publishReason = '正在读取文件';
+  else if (needsLibraryPick) publishReason = '请选择将替换哪一库';
 
   const sessionState = sessionStateOf(hasProductApi, sessionSettled, sessionView);
   const sessionBadge = sessionBadgeOf(sessionState);
@@ -374,7 +377,7 @@ export function ContentModule() {
             setDomainOverride(event.currentTarget.value as DashboardContentDomain | '');
           }}
         >
-          <option value="">按导入表</option>
+          <option value="">选择话术库</option>
           {DOMAIN_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
