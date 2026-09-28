@@ -62,6 +62,13 @@ import { useWindowDrag } from './lib/use-window-drag';
 import { ALLERGY_SOP_SCENE_ID, isAllergySopEntry } from '@shared/sop-entry';
 import { compactQueryText } from '@shared/query-analyze';
 import { SOP_OPEN_FAILURE_MESSAGE } from '@shared/sop-window';
+import { LIBRARY_DOMAINS, LIBRARY_DOMAIN_LABELS, type LibraryDomain } from '@shared/library-delta';
+
+/** 多域固定顺序 产品→活动→售前→售后，一句指名更新了哪几库。 */
+function contentUpdatedBannerCopy(domains: readonly LibraryDomain[]): string {
+  const ordered = LIBRARY_DOMAINS.filter((domain) => domains.includes(domain));
+  return `${ordered.map((domain) => `${LIBRARY_DOMAIN_LABELS[domain]}话术`).join('、')}已更新`;
+}
 
 export function QueryApp() {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
@@ -99,6 +106,7 @@ export function QueryApp() {
   const resultContentRef = useRef<HTMLDivElement>(null);
   const shortcutBannerRef = useRef<HTMLParagraphElement>(null);
   const statusBannerRef = useRef<HTMLDivElement>(null);
+  const contentUpdatedBannerRef = useRef<HTMLParagraphElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const layoutSequenceRef = useRef(0);
   const lastAppliedLayoutSequenceRef = useRef(0);
@@ -125,6 +133,8 @@ export function QueryApp() {
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
   const [, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
   const [announceInvalid, setAnnounceInvalid] = useState(false);
+  const [contentUpdatedDomains, setContentUpdatedDomains] = useState<readonly LibraryDomain[]>([]);
+  const contentUpdatedReadTimerRef = useRef<number | null>(null);
   const announceGenerationRef = useRef(0);
   const announceReleaseRef = useRef<string | null>(null);
   const [helpStatus, setHelpStatus] = useState<HelpStatus>('待核实');
@@ -308,6 +318,7 @@ export function QueryApp() {
     const content = resultContentRef.current;
     const shortcutBanner = shortcutBannerRef.current;
     const statusBanner = statusBannerRef.current;
+    const contentBanner = contentUpdatedBannerRef.current;
     const capsule = shell?.querySelector<HTMLElement>('.query-capsule');
     const lastCard = pane?.querySelector<HTMLElement>('.script-card:last-of-type');
     const lastCopy = lastCard?.querySelector<HTMLElement>('.copy-btn');
@@ -316,6 +327,7 @@ export function QueryApp() {
       lastCopy,
       shortcutBanner,
       statusBanner,
+      contentBanner,
       content?.lastElementChild ?? null,
     ]);
     const panePad = pane
@@ -326,7 +338,7 @@ export function QueryApp() {
       : 0;
     const intrinsic = composeQueryDesiredHeight({
       capsuleHeight: capsule?.offsetHeight ?? QUERY_INPUT_HEIGHT,
-      bannerHeight: (shortcutBanner?.offsetHeight ?? 0) + (statusBanner?.offsetHeight ?? 0),
+      bannerHeight: (shortcutBanner?.offsetHeight ?? 0) + (statusBanner?.offsetHeight ?? 0) + (contentBanner?.offsetHeight ?? 0),
       contentScrollHeight: content?.scrollHeight ?? 0,
       chromeExtra: paneBorder + QUERY_CONTENT_BLANK_TOLERANCE_PX,
     });
@@ -772,11 +784,14 @@ export function QueryApp() {
       setErrorMessage(result.message); reportPhase('ERROR'); return result;
     }
     if (announceReleaseRef.current && announceReleaseRef.current !== result.releaseId) {
-      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
+      // 软更新：换 rel_N 只换租约。**禁止** setResults([]) / cancelPendingSearch——
+      // 坐席正在接待，Top 3 必须留在屏幕上。真失效走 onInvalidated 才抽空。
+      announceReleaseRef.current = result.releaseId;
+      setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
     }
     announceReleaseRef.current = result.releaseId;
     setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
-  }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
+  }, [reportPhase]);
 
   const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
     if (value.sessionEpoch < productEpochRef.current) return;
@@ -857,6 +872,55 @@ export function QueryApp() {
       setErrorMessage('当前版本已失效，请重新核验'); reportPhase('ERROR');
     });
   }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
+
+  // 软更新横幅：独立 content-updated，不走 onInvalidated，不清结果。
+  useEffect(() => {
+    const api = window.customerAgent?.productAnnounce;
+    if (!api?.onContentUpdated) return undefined;
+    return api.onContentUpdated((value) => {
+      if (value.sessionEpoch !== productEpochRef.current) return;
+      announceReleaseRef.current = value.releaseId;
+      setContentUpdatedDomains([...value.unreadDomains]);
+    });
+  }, []);
+
+  // 已读：Query 窗可见（非 FOX_IDLE、未收起、非 document.hidden）且横幅停留 ≥1s。
+  // 计时器随可见性变化重排：事件到达时窗口若不可见，展开/回到前台后会补排，不会卡住。
+  useEffect(() => {
+    if (contentUpdatedDomains.length === 0) return undefined;
+    const visible = phase !== 'FOX_IDLE' && !parked && !document.hidden;
+    if (!visible) return undefined;
+    const domains = [...contentUpdatedDomains];
+    const timer = window.setTimeout(() => {
+      contentUpdatedReadTimerRef.current = null;
+      void window.customerAgent?.productAnnounce?.markRead(domains);
+      setContentUpdatedDomains((current) => current.filter((domain) => !domains.includes(domain)));
+    }, 1_000);
+    contentUpdatedReadTimerRef.current = timer;
+    return () => {
+      window.clearTimeout(timer);
+      if (contentUpdatedReadTimerRef.current === timer) contentUpdatedReadTimerRef.current = null;
+    };
+  }, [contentUpdatedDomains, parked, phase]);
+
+  // 卸载时清掉在途的已读计时器，避免挂载期排的计时器在卸载后触发 markRead / setState。
+  useEffect(() => () => {
+    if (contentUpdatedReadTimerRef.current !== null) {
+      window.clearTimeout(contentUpdatedReadTimerRef.current);
+      contentUpdatedReadTimerRef.current = null;
+    }
+  }, []);
+
+  const dismissContentUpdated = useCallback(() => {
+    if (contentUpdatedDomains.length === 0) return;
+    const domains = [...contentUpdatedDomains];
+    if (contentUpdatedReadTimerRef.current !== null) {
+      window.clearTimeout(contentUpdatedReadTimerRef.current);
+      contentUpdatedReadTimerRef.current = null;
+    }
+    void window.customerAgent?.productAnnounce?.markRead(domains);
+    setContentUpdatedDomains([]);
+  }, [contentUpdatedDomains]);
 
   useEffect(() => {
     const product = window.customerAgent?.product;
@@ -1622,6 +1686,25 @@ export function QueryApp() {
         {announceInvalid ? (
           <p className="product-announce-banner is-invalid" data-testid="announce-banner" role="status">
             当前版本已失效，请重新核验
+          </p>
+        ) : contentUpdatedDomains.length > 0 ? (
+          <p
+            ref={contentUpdatedBannerRef}
+            className="product-announce-banner is-muted"
+            data-testid="announce-content-updated-banner"
+            role="status"
+            data-domains={contentUpdatedDomains.join(',')}
+          >
+            <span>{contentUpdatedBannerCopy(contentUpdatedDomains)}</span>
+            <button
+              type="button"
+              className="product-announce-dismiss"
+              data-testid="announce-content-updated-dismiss"
+              aria-label="关掉话术更新提示"
+              onClick={dismissContentUpdated}
+            >
+              知道了
+            </button>
           </p>
         ) : null}
 

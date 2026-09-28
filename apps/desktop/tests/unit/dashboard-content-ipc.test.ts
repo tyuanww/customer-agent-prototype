@@ -179,7 +179,10 @@ it('imports and publishes with the product token when the role gate and bindings
       value: { release_id: 'rel_1', release_seq: 2, announcement_id: 'ann_1', source_binding_hash: 'a'.repeat(64) },
     });
   const published = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
-  expect(published).toEqual({ ok: true, releaseId: 'rel_1', releaseSeq: 2, publisherDisplayName: 'synthetic' });
+  expect(published).toEqual({
+    ok: true, releaseId: 'rel_1', releaseSeq: 2, publisherDisplayName: 'synthetic',
+    summary: '产品已更新 · 活动沿用 · 售前沿用 · 售后沿用',
+  });
   expect(owner.request).toHaveBeenCalledTimes(3);
   expect(vi.mocked(owner.request).mock.calls[0]?.[1]).toBe('/v1/content/import');
   expect(vi.mocked(owner.request).mock.calls[0]?.[2]).toMatchObject({ timeoutMs: 30_000 });
@@ -189,7 +192,7 @@ it('imports and publishes with the product token when the role gate and bindings
   expect(vi.mocked(owner.request).mock.calls[2]?.[2]?.body).toMatchObject({
     import_batch_id: 'imp_owner_1',
     title: '工作台草稿',
-    summary: null,
+    summary: '产品已更新 · 活动沿用 · 售前沿用 · 售后沿用',
   });
   expect(JSON.stringify(published)).not.toContain('Bearer');
 });
@@ -213,7 +216,10 @@ it('still returns the release when post-publish hydrate refresh throws', async (
     throw new Error('announce down');
   });
   const published = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]), afterPublish);
-  expect(published).toEqual({ ok: true, releaseId: 'rel_2', releaseSeq: 3, publisherDisplayName: 'synthetic' });
+  expect(published).toEqual({
+    ok: true, releaseId: 'rel_2', releaseSeq: 3, publisherDisplayName: 'synthetic',
+    summary: '产品已更新 · 活动沿用 · 售前沿用 · 售后沿用',
+  });
   expect(afterPublish).toHaveBeenCalledWith(1);
 });
 
@@ -392,7 +398,10 @@ it('publishes after import becomes staged', async () => {
       value: { release_id: 'rel_review', release_seq: 4, announcement_id: 'ann_r', source_binding_hash: 'a'.repeat(64) },
     });
   const published = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
-  expect(published).toEqual({ ok: true, releaseId: 'rel_review', releaseSeq: 4, publisherDisplayName: 'synthetic' });
+  expect(published).toEqual({
+    ok: true, releaseId: 'rel_review', releaseSeq: 4, publisherDisplayName: 'synthetic',
+    summary: '产品已更新 · 活动沿用 · 售前沿用 · 售后沿用',
+  });
   expect(vi.mocked(owner.request).mock.calls.map((call) => call[1])).toEqual([
     '/v1/content/import',
     '/v1/content/import/imp_review_1',

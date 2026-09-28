@@ -6,7 +6,7 @@
 
 ## 1. 链路概览
 
-工作台「内容管理」的顶栏是**产品会话徽章 + 一对动作**：徽章只说会话接没接上（`未接入` / `正在确认会话` / `已接入`），右侧同一行是「取消未完成导入」（左）和「发布」（右），原因与发布反馈写在动作行下方。「内容导入 / 本地导入」整块默认折在「待开发」，读文件时才展开。
+工作台「内容管理」的顶栏是**产品会话徽章 + 一对动作**：徽章只说会话接没接上（`未接入` / `正在确认会话` / `已接入`），右侧同一行是「取消未完成导入」（左）和「发布」（右），原因与发布反馈写在动作行下方。发布成功后回执两行：主句 `已发布 rel_N · 姓名`，下一行四库 delta（与写入 `Announcement.summary` 的同一句）；失败不画 delta。「内容导入 / 本地导入」整块默认折在「待开发」，读文件时才展开。
 
 ```
 工作台 内容管理：展开待开发，选 CSV / xlsx
@@ -165,7 +165,49 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 **归属话术库（域）决定这次替换哪一区。** 发布时当前发布里「被这次绑定的域」的所有行先归档，再用你上传的整张表填回去；没被这次碰到的域照旧继承。所以归属不只是标签：把一张产品表传成活动，你换掉的是活动区，而真正的产品区没动。桌面在选表后显示识别到的域并允许下拉覆盖，识别来源是文件名（`售前` / `活动` / `售后` / `faq` 或 `产品`）与表内 `域` / `分类` 列。
 
-## 8. 相关
+## 8. 系统同步：合成 rel vs 本版是否更新该域
+
+合成发布仍是**唯一** `current_release_id`。检索与 hydrate 只认这一个租约；系统同步不拆四条平行主干，也不做部分快照。
+
+工作台「系统同步 · 话术版本更新」第一屏是**四张卡**，固定顺序 产品 → 活动 → 售前 → 售后：
+
+```
+[产品 沿用 N条] [活动 沿用 N条]
+[售前 已更新 + 发布标题一次] [售后 沿用 N条]
+脚注：检索租约 rel_N
+```
+
+- **卡状态唯一源** = 发布成功时写入 `Announcement.summary` 的那一句四库 delta，所有机器从 `GET /v1/announce/current` 的 `announcement.summary` 解析。写的是「本版已更新 / 本版沿用」，不写「已替换 / 未替换」，也不写 `rel_N`。
+- **禁止**用 hydrate 哈希、本机 `sourceBindings`、或「相对上一份快照的域差」填卡。`summary` 为空或解析失败：四卡显示「无法标出本版更新了哪一库」，仍保留库名 + 条数 + 脚注。
+- 条数与域哈希一律取**当次 snapshot 内存**，不信 `kept-larger` 磁盘 hydrate（磁盘可能留着比当前发布更大的旧目录）。list 失败时条数降级为「—」，不拆第一屏。
+- 「本版已更新」只来自本次发布绑定的域（`source_bindings`）。继承域的文案是「本版沿用 · 内容仍是当前可用」，`StatusBadge` 用 `neutral`，**禁止** warn/danger——沿用不是故障。
+
+对外用词锁死「本版已更新 / 本版沿用」；计划文件里 CEO 块的「已替换 / 未替换」是历史记录，UI 与测试以本节为准。
+
+## 9. ACK ≠ 已读
+
+`POST /v1/announce/ack` 写的 `client_sync_state` 只是**内容游标**（这台机器同步到了哪个 release），不是「人已读」。
+
+坐席的未读是另一件事：
+
+- 未读 = 该 session `userId` 相对本地 `last_seen` 的**域内容哈希差**（category + 排序后的 `scriptId+content_hash`，**不含** `releaseId`）。某域内容没动，换 `rel_N` 也不点亮该域。
+- `last_seen` 存在 **main** 进程 origin-keyed userData（文件名对齐 `product-session.${id}.enc`），键 `{userId, domain}`，文件 `0o600`。读写 IPC **不得**带 userId，只用 `ProductSession.view().userId`；未登录 no-op。发布者的 userId 不清坐席的未读。
+- 无基线时**不点亮、不写时间**；第一次四域 snapshot 完整成功后才建基线。
+- ACK 与 `client_sync_state` **禁止**写 `last_seen`。已读只有两条路径：Query 窗可见（非 `FOX_IDLE`、非收起、非 `document.hidden`）且横幅停留 ≥1s 或点「知道了」关掉；或者工作台「话术版本更新」tab 实际可见（非 `document.hidden`）时。
+
+## 10. 软更新 ≠ 版本失效
+
+内容发布是一个**软信号**，不是失效：
+
+- `ProductAnnounce.refresh` 发现 `releaseId` 变了，向 fox + query 扇出独立的 `content-updated` 事件（`{releaseId, summary, domainHashes, unreadDomains}`）。**禁止**走 `PRODUCT_ANNOUNCE_INVALIDATED`。工作台（dashboard）preload 禁止 `ipcRenderer.on`，所以它不订阅推送，而是靠窗口聚焦/可见 + 10s poll 重取 `dashboard:announce-current`。
+- Query 收到软更新：换租约、出 `--muted` 墨色横幅（「售前话术已更新」，多域固定顺序 产品→活动→售前→售后，带「知道了」可关），**禁止** `setResults([])` / `cancelPendingSearch`——坐席正在接待，Top 3 必须留在屏幕上。横幅高度计入窗口 hug。窗口不可见时到达的横幅会被记住，等 Query 重新可见后才开始 1s 已读计时（不会卡住或永不清）。
+- 真正的 `expired` / `source_gate` / `unavailable` 才走 `onInvalidated`，语义保持：抽空结果 + `is-invalid`。
+
+## 11. 坐席未读最多约 10s
+
+一期**没有**跨机 push、没有 websocket。运输层是已登录 Query 现有的 `sessionStatus`（约 10s）触发 `refreshAnnounce`，以及发布者 `afterPublish` 的 refresh。所以坐席从发布到看到紫点，最多约 10s。Fox 只读未读投影，不发 `PRODUCT_ANNOUNCE_REFRESH`、不 mark-read。
+
+## 12. 相关
 
 - [组织已审证据的边界](explanation-org-review-evidence.md) — 库里那条审核声明到底是什么
 - [How to：办公机产品主链](how-to-office-machine-product-remote.md) — 在办公机上勾选取消与发布

@@ -175,10 +175,14 @@ describe('QueryApp', () => {
       setRetrievalPreference: vi.fn(async (next) => next),
     };
     const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' | 'replaced' | 'signed_out' | 'unavailable' | 'source_gate' }) => void> = [];
+    const contentUpdated: Array<(value: import('../../src/shared/product-announce').ProductAnnounceContentUpdate) => void> = [];
     window.customerAgent!.productAnnounce = {
       refresh: vi.fn(async r => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, releaseId: 'rel-synthetic', releaseSeq: 13,
         leaseExpiresAt: new Date(Date.now() + 600_000).toISOString(), announcement: { title: '合成公告', summary: '只读', createdAt: '2026-09-09T00:00:00.000Z' } })),
       onInvalidated(listener) { invalidate.push(listener); return () => {}; },
+      onContentUpdated(listener) { contentUpdated.push(listener); return () => {}; },
+      unread: vi.fn(async () => ({ ok: true as const, signedIn: true as const, unread: false, domains: [] as const })),
+      markRead: vi.fn(async () => {}),
     };
     const escalate = vi.fn(async (r: import('../../src/shared/product-help').ProductEscalateRequest) => ({
       ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, escalateId: 'esc_synthetic',
@@ -191,7 +195,7 @@ describe('QueryApp', () => {
     window.customerAgent!.productCatalog = {
       list: vi.fn().mockResolvedValue({ ok: true as const, entries: productCatalogEntries() }),
     };
-    return { search, copyAdopt, invalidate, escalate, recordTerminal };
+    return { search, copyAdopt, invalidate, contentUpdated, escalate, recordTerminal };
   }
   async function prepareProductQuery() {
     render(<QueryApp />); await screen.findByRole('button', { name: /· 退出$/ });
@@ -306,6 +310,95 @@ describe('QueryApp', () => {
     expect(screen.queryByText('查询未完成')).not.toBeInTheDocument();
     expect(screen.queryByTestId('retry-button')).not.toBeInTheDocument();
   });
+  it('keeps Top 3 and shows a muted banner when the release changes mid-conversation', async () => {
+    const f = connectProduct();
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('copy-button-1');
+    const before = screen.getByTestId('answer-text-1').textContent;
+    act(() => {
+      f.contentUpdated.forEach(listener => listener({
+        sessionEpoch: 10,
+        releaseId: 'rel_25',
+        summary: '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用',
+        domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
+        unreadDomains: ['presale'],
+      }));
+    });
+    // 软更新不得抽空 Top 3。
+    expect(screen.getByTestId('copy-button-1')).toBeInTheDocument();
+    expect(screen.getByTestId('answer-text-1').textContent).toBe(before);
+    const banner = screen.getByTestId('announce-content-updated-banner');
+    expect(banner).toHaveTextContent('售前话术已更新');
+    expect(banner).toHaveClass('is-muted');
+    expect(banner).not.toHaveClass('is-invalid');
+    expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
+    // 横幅可关：点「知道了」即已读并清掉。
+    const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
+    markRead.mockClear();
+    fireEvent.click(screen.getByTestId('announce-content-updated-dismiss'));
+    expect(markRead).toHaveBeenCalledWith(['presale']);
+    expect(screen.queryByTestId('announce-content-updated-banner')).not.toBeInTheDocument();
+    // 关掉后 Top 3 仍在。
+    expect(screen.getByTestId('copy-button-1')).toBeInTheDocument();
+  });
+
+  it('does not mark read while the window is hidden, then marks read after it becomes visible', async () => {
+    const f = connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
+    const fire = (domains: readonly string[]) => act(() => {
+      f.contentUpdated.forEach(listener => listener({
+        sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+        domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
+        unreadDomains: domains as import('../../src/shared/library-delta').LibraryDomain[],
+      }));
+    });
+
+    vi.useFakeTimers();
+    markRead.mockClear();
+    // 收起（隐藏）状态下到达：横幅被记住，但不排已读计时。
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+      }
+    });
+    fire(['presale']);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_200); });
+    expect(markRead).not.toHaveBeenCalled();
+
+    // 展开后 1s 内自动清点（补排计时器，不卡住）。
+    vi.useRealTimers();
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', anchor: 'left', animate: false });
+      }
+    });
+    await waitFor(() => expect(markRead).toHaveBeenCalledWith(['presale']), { timeout: 2_000 });
+    expect(screen.queryByTestId('announce-content-updated-banner')).not.toBeInTheDocument();
+  });
+
+  it('still clears results and shows is-invalid on an expired announcement, never on content-updated', async () => {
+    const f = connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    act(() => {
+      f.contentUpdated.forEach(listener => listener({
+        sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+        domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
+        unreadDomains: ['presale'],
+      }));
+    });
+    // content-updated 是软信号：不抽空、以 muted 展示。
+    expect(screen.getByTestId('announce-content-updated-banner')).toHaveClass('is-muted');
+    expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
+    await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'expired' })); });
+    expect(screen.getByTestId('announce-banner')).toHaveTextContent('当前版本已失效，请重新核验');
+    expect(screen.getByTestId('announce-banner')).toHaveClass('is-invalid');
+    expect(screen.queryByTestId('announce-content-updated-banner')).not.toBeInTheDocument();
+  });
+
   it('reports a product network failure without using a matching S0 fixture', async () => {
     const f = connectProduct(); await prepareProductQuery();
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '澄芽氨基酸洁面怎么用' } });
@@ -445,6 +538,9 @@ describe('QueryApp', () => {
         invalidate.push(listener);
         return () => {};
       },
+      onContentUpdated() { return () => {}; },
+      unread: vi.fn(async () => ({ ok: true as const, signedIn: true as const, unread: false, domains: [] as const })),
+      markRead: vi.fn(async () => {}),
     };
     render(<QueryApp />);
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
