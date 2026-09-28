@@ -138,7 +138,8 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 | --- | --- |
 | `SOURCE_SNAPSHOT_MISMATCH` | 文件和当前登记的来源对不上。请确认这是要发的那份表后重新导入。 |
 | `CONTENT_CONTRACT_INVALID` | 表格式或花括号不合法。请按模板改表后重新导入。 |
-| `SOURCE_BASE_RELEASE_STALE` / `IMPORT_IN_FLIGHT` | 上一份还在处理。请等它发布或点取消后再导下一份。 |
+| `SOURCE_BASE_RELEASE_STALE` / `IMPORT_IN_FLIGHT` | 你自己的上一份草稿还在队列里（还没发布）。请等它发布，或点「取消未完成导入」后再导下一份。 |
+| `QUESTION_IDENTITY_CONFLICT` | 表里有内容和线上已有版本冲突（同一问法被改成了不同话术）。请挑出这些行：要么改用线上版本的说法，要么把改动并进原条目后重新导入。 |
 | `QUALITY_GATE_NOT_PASSED` | 质检证明没写上，不能发布。请联系管理员，不要重复点发布。 |
 | `NO_IN_FLIGHT`（桌面本地码） | 当前没有未完成的导入。登录还在，不必重新登录。 |
 | 非 owner 发 `FORBIDDEN` | 一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。 |
@@ -147,11 +148,17 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 映射在 `apps/desktop/src/main/dashboard-content.ts` 的 `asFailure`，文案表在 `apps/desktop/src/shared/dashboard-content.ts`。
 
+**只有哨兵闸门才算「在途」。** `assert_no_in_flight_content_import` 抛 `DETAIL='CONFLICT'`，桌面把 `reason === 'CONFLICT'` 的 CONFLICT 显示成「你的上一份草稿还在队列里」。没有 reason 的 CONFLICT 走通用文案，不再冒充在途导入——否则操作员会去点「取消未完成导入」而这个动作永远清不掉一个内容冲突。
+
+**内容身份是永久的。** 桌面导入时按 `域 + 场景 + 正文` 规范化后取 16 位十六进制摘要生成 `script_id`（`upl<16hex>`），worker 再派生 `question_id = 'q_' + script_id`、版本恒为 1。同一份内容永远同一身份，所以重复导入同一张表是幂等的、不会撞车；而把同一个 `script_id` 的正文改成另一段话，会被 `0012` 的守卫挡下并报 `QUESTION_IDENTITY_CONFLICT`——这类必须改表，重试或取消都没用。（`content-frozen-import.ts` 曾按行号生成 `upl00001`，任何第二张表都与第一张表第 1 行同名同版本，那正是这个错误的原因。）
+
 ## 7. 发布前后的桌面闸门
 
 `contentPublishGate` 按序判：无产品会话 → `UNAVAILABLE`；未登录 → `UNAUTHORIZED`；坐席 → `FORBIDDEN`；无行 → `请先导入并通过校验后再发布`；owner 无来源绑定 → `缺少来源绑定，无法导入`；coach → 403 文案。
 
 `rowRequiresOwner` / `rowCoachPublishable` 决定内容级限制：`aftersale` 域或场景/话术含「过敏」「赔付」的行需 owner；coach 只能发 `product` / `campaign`。
+
+**归属话术库（域）决定这次替换哪一区。** 发布时当前发布里「被这次绑定的域」的所有行先归档，再用你上传的整张表填回去；没被这次碰到的域照旧继承。所以归属不只是标签：把一张产品表传成活动，你换掉的是活动区，而真正的产品区没动。桌面在选表后显示识别到的域并允许下拉覆盖，识别来源是文件名（`售前` / `活动` / `售后` / `faq` 或 `产品`）与表内 `域` / `分类` 列。
 
 ## 8. 相关
 

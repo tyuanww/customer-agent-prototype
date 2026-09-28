@@ -104,7 +104,16 @@ function releaseFailure(error: unknown, commit: CommitCertainty): ContentRelease
   if (detail === 'SOURCE_BASE_RELEASE_STALE' || detail === 'SOURCE_BINDING_HASH_MISMATCH') {
     return failure('CONFLICT', commit, detail);
   }
-  if (AUDITED.has(detail) || detail === 'GOVERNANCE_HASH_MISMATCH' || detail === 'QUALITY_GATE_NOT_PASSED') {
+  // QUESTION_IDENTITY_CONFLICT arrives as SQLSTATE ZA003, which mapDatabaseContractError
+  // collapses to a bare CONFLICT. That classification is wrong twice over: the caller must
+  // change the table, not retry, and the CONFLICT branch of the frozen route drops the reason.
+  // Keep it as VALIDATION with the reason so the desktop can name the real problem.
+  if (
+    AUDITED.has(detail)
+    || detail === 'GOVERNANCE_HASH_MISMATCH'
+    || detail === 'QUALITY_GATE_NOT_PASSED'
+    || detail === 'QUESTION_IDENTITY_CONFLICT'
+  ) {
     return failure('VALIDATION', commit, detail as SourceContractReason);
   }
   return failure(mapDatabaseContractError(error), commit);
