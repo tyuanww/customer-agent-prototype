@@ -314,11 +314,12 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## 内容管理草稿（Dashboard 切片 1）
 
-「内容管理」本地解析 CSV 或 xlsx 成待发布预览。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；校验通过 staged 后 `POST /v1/content/publish`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库走 ops-loop，见下方 Dashboard SOP。
+「内容管理」顶栏是会话徽章加同一行取消 / 发布；导入折进「待开发」。本地解析 CSV 或 xlsx 成待发布预览。xlsx 只读第一张表。中文表头（快捷短语 / 产品话术 / 业务填写问题 / 客满话术）映射到场景与话术；空白或不完整行跳过。zip xlsx 经 `dashboard:content-parse` 由 Main 解析，不再按二进制 fail-close，也不再使用 50 行 / 64KiB 上限。sheet relationship id 会转义后再匹配；越界或代理区 XML 实体跳过，不抛错。Owner 发布：`GET /v1/content/import/{id}` 每 1.5 秒一次，429 再等 1.5 秒；校验通过 staged 后 `POST /v1/content/publish`，回执两行并把四库 delta 写入 `Announcement.summary`。一期发布仅 Owner。选文件先显示「正在读取」。上限与后端对齐：10MiB / 5000 行。SOP 写库走 ops-loop，见下方 Dashboard SOP。
 
 | 你想证明 | 命令 |
 | --- | --- |
 | 草稿解析、xlsx 第一张表与正式来源文案 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/coach-content-upload.test.ts tests/unit/xlsx-first-sheet.test.ts tests/unit/dashboard-content-parse.test.ts tests/unit/dashboard-content-preload.test.ts tests/unit/dashboard-content-ipc.test.ts tests/unit/content-frozen-import.test.ts tests/component/ContentModule.test.tsx tests/component/DashboardApp.test.tsx tests/unit/query-visual.test.ts` |
+| 四库卡、发布回执、狐狸紫点、content-updated 不清 Top 3 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/AnnounceModule.test.tsx tests/component/ContentModule.test.tsx tests/component/FoxApp.test.tsx tests/component/QueryApp.test.tsx tests/unit/library-delta.test.ts tests/unit/product-last-seen.test.ts tests/unit/product-announce.test.ts tests/unit/dashboard-layout.test.ts` |
 
 ## 话术优化待办（Dashboard live list/start/close）
 

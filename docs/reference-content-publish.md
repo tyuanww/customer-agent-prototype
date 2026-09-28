@@ -6,7 +6,7 @@
 
 ## 1. 链路概览
 
-工作台「内容管理」的顶栏是**产品会话徽章 + 一对动作**：徽章只说会话接没接上（`未接入` / `正在确认会话` / `已接入`），右侧同一行是「取消未完成导入」（左）和「发布」（右），原因与发布反馈写在动作行下方。发布成功后回执两行：主句 `已发布 rel_N · 姓名`，下一行四库 delta（与写入 `Announcement.summary` 的同一句）；失败不画 delta。「内容导入 / 本地导入」整块默认折在「待开发」，读文件时才展开。
+工作台「内容管理」的顶栏是**产品会话徽章 + 一对动作**：徽章只说会话接没接上（`未接入` / `正在确认会话` / `已接入`），右侧同一行是「取消未完成导入」（左）和「发布」（右），原因与发布反馈写在动作行下方。发布成功后主句 `已发布 rel_N · 姓名`；服务端回显了 `summary` 才画第二行四库 delta，失败不画 delta。成功后「发布」保持禁用，直到清除预览或重选文件。发布进行中「取消未完成导入」仍可用。「内容导入 / 本地导入」整块默认折在「待开发」，**先展开再选文件**；读文件进入 reading / ready / error 后会保持展开。
 
 ```
 工作台 内容管理：展开待开发，选 CSV / xlsx
@@ -169,7 +169,7 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 合成发布仍是**唯一** `current_release_id`。检索与 hydrate 只认这一个租约；系统同步不拆四条平行主干，也不做部分快照。
 
-工作台「系统同步 · 话术版本更新」第一屏是**四张卡**，固定顺序 产品 → 活动 → 售前 → 售后：
+工作台「系统同步 · 话术版本更新」第一屏是**四张卡**，固定顺序 产品 → 活动 → 售前 → 售后。点卡会切到话术库对应域。有未读时卡上另有品牌紫点（`announce-unread-dot`）。
 
 ```
 [产品 沿用 N条] [活动 沿用 N条]
@@ -191,7 +191,7 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 坐席的未读是另一件事：
 
 - 未读 = 该 session `userId` 相对本地 `last_seen` 的**域内容哈希差**（category + 排序后的 `scriptId+content_hash`，**不含** `releaseId`）。某域内容没动，换 `rel_N` 也不点亮该域。
-- `last_seen` 存在 **main** 进程 origin-keyed userData（文件名对齐 `product-session.${id}.enc`），键 `{userId, domain}`，文件 `0o600`。读写 IPC **不得**带 userId，只用 `ProductSession.view().userId`；未登录 no-op。发布者的 userId 不清坐席的未读。
+- `last_seen` 存在 **main** 进程 origin-keyed userData，文件名 `product-last-seen.<id>.json`（`<id>` 算法对齐 `product-session.${id}.enc`），键 `{userId, domain}`，文件 `0o600`。读写 IPC **不得**带 userId，只用 `ProductSession.view().userId`；未登录 no-op。发布者的 userId 不清坐席的未读。
 - 无基线时**不点亮、不写时间**；第一次四域 snapshot 完整成功后才建基线。
 - ACK 与 `client_sync_state` **禁止**写 `last_seen`。已读只有两条路径：Query 窗可见（非 `FOX_IDLE`、非收起、非 `document.hidden`）且横幅停留 ≥1s 或点「知道了」关掉；或者工作台「话术版本更新」tab 实际可见（非 `document.hidden`）时。
 
