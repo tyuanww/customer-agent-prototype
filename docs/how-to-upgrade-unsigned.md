@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-1. 当前仓库 `VERSION`（现在是 0.3.23）对应的 UNSIGNED 产物，在 gitignored 的 `release/local-unsigned/`。
+1. 当前仓库 `VERSION`（现在是 0.3.24）对应的 UNSIGNED 产物，在 gitignored 的 `release/local-unsigned/`。
 2. 先退出正在跑的「客服话术浮窗 Demo」。
 3. Windows 办公机勾选仍由人在那台机器上做，见 [办公机产品主链](how-to-office-machine-product-remote.md)。
 
