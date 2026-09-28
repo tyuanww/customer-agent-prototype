@@ -39,6 +39,17 @@ function libraryCardBadgeLabel(status: LibraryStatus | 'unknown'): string {
   return '无法标出';
 }
 
+function libraryCardDataStatus(status: LibraryStatus | 'unknown'): 'updated' | 'carried' | 'unknown' {
+  if (status === 'updated' || status === 'carried') return status;
+  return 'unknown';
+}
+
+function libraryCardCountCopy(status: LibraryStatus | 'unknown', countLabel: string): string {
+  if (status === 'updated') return `本版已更新 · ${countLabel}`;
+  if (status === 'carried') return `本版沿用 · 内容仍是当前可用 · ${countLabel}`;
+  return countLabel;
+}
+
 function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => void }) {
   const [state, setState] = useState<DashboardAnnounceResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,12 +99,16 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
   );
 
   // 「话术版本更新」tab 实际可见时才清当前 userId 的未读。
+  // document.hidden 不在 deps 里，所以必须自己听 visibilitychange，否则后台打开会卡住。
   useEffect(() => {
-    if (!view?.unread || !unreadDomains.size) return;
-    // Tab is in the wording panel (this component only mounts there), but a hidden or
-    // backgrounded window must not count as "seen".
-    if (document.hidden) return;
-    void window.dashboardAnnounce?.markRead([...unreadDomains]);
+    if (!view?.unread || !unreadDomains.size) return undefined;
+    const maybeRead = () => {
+      if (document.hidden) return;
+      void window.dashboardAnnounce?.markRead([...unreadDomains]);
+    };
+    maybeRead();
+    document.addEventListener('visibilitychange', maybeRead);
+    return () => document.removeEventListener('visibilitychange', maybeRead);
   }, [view, unreadDomains]);
 
   if (loading) {
@@ -126,7 +141,6 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
       <div className="announce-library-grid" data-testid="announce-library-grid">
         {LIBRARY_DOMAINS.map((domain) => {
           const status = libraryCardStatus(delta, domain);
-          const updated = status === 'updated';
           const count = view.counts ? view.counts[domain] : null;
           const countLabel = count === null ? '—' : `${count} 条`;
           return (
@@ -135,7 +149,7 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
               type="button"
               className="dash-card announce-library-card"
               data-testid={`announce-library-${domain}`}
-              data-library-status={updated ? 'updated' : 'carried'}
+              data-library-status={libraryCardDataStatus(status)}
               onClick={() => onOpenDomain?.(LIBRARY_DOMAIN_IDS[domain])}
             >
               <div className="dash-card-row">
@@ -145,11 +159,11 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
                   <span className="announce-unread-dot" aria-label="有话术更新" role="img" />
                 ) : null}
               </div>
-              {updated && title ? (
+              {status === 'updated' && title ? (
                 <p className="announce-library-title" data-testid={`announce-library-title-${domain}`}>{title}</p>
               ) : null}
               <p className="announce-library-count" data-testid={`announce-library-count-${domain}`}>
-                {updated ? `本版已更新 · ${countLabel}` : `本版沿用 · 内容仍是当前可用 · ${countLabel}`}
+                {libraryCardCountCopy(status, countLabel)}
               </p>
             </button>
           );

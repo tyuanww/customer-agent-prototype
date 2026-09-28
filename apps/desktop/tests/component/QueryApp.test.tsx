@@ -379,6 +379,40 @@ describe('QueryApp', () => {
     expect(screen.queryByTestId('announce-content-updated-banner')).not.toBeInTheDocument();
   });
 
+  it('does not mark read while document.hidden, then arms the 1s timer after visibilitychange', async () => {
+    const f = connectProduct();
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'activate-search', anchor: 'left', animate: false });
+      }
+    });
+    const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
+    let hidden = true;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    try {
+      vi.useFakeTimers();
+      markRead.mockClear();
+      act(() => {
+        f.contentUpdated.forEach((listener) => listener({
+          sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+          domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
+          unreadDomains: ['presale'],
+        }));
+      });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_200); });
+      expect(markRead).not.toHaveBeenCalled();
+      hidden = false;
+      act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_200); });
+      expect(markRead).toHaveBeenCalledWith(['presale']);
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    }
+  });
+
   it('still clears results and shows is-invalid on an expired announcement, never on content-updated', async () => {
     const f = connectProduct();
     render(<QueryApp />);

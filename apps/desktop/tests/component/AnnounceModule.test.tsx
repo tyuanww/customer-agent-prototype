@@ -55,11 +55,13 @@ describe('AnnounceModule four library cards', () => {
     render(<AnnounceModule />);
     await screen.findByTestId('announce-library-grid');
     expect(screen.getByTestId('announce-delta-unknown')).toHaveTextContent('无法标出本版更新了哪一库');
-    // 四卡仍在，条数仍在。
+    // 四卡仍在，条数仍在；卡面不得冒充已更新/沿用。
     for (const domain of ['product', 'campaign', 'presale', 'aftersale'] as const) {
-      expect(screen.getByTestId(`announce-library-${domain}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`announce-library-${domain}`)).toHaveAttribute('data-library-status', 'unknown');
     }
     expect(screen.getByTestId('announce-library-count-presale')).toHaveTextContent('75 条');
+    expect(screen.getByTestId('announce-library-count-presale')).not.toHaveTextContent('本版沿用');
+    expect(screen.getByTestId('announce-library-count-presale')).not.toHaveTextContent('本版已更新');
   });
 
   it('downgrades counts to — when the snapshot counts are unavailable but keeps the cards', async () => {
@@ -90,13 +92,17 @@ describe('AnnounceModule four library cards', () => {
   it('does not clear unread while the dashboard window is hidden', async () => {
     const api = announceApi(view({ unread: true, unreadDomains: ['presale'] }));
     window.dashboardAnnounce = api;
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    let hidden = true;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
     try {
       render(<AnnounceModule />);
       await screen.findByTestId('announce-library-grid');
       // 给 microtask 一个落点再断言未清。
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(api.markRead).not.toHaveBeenCalled();
+      hidden = false;
+      document.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => expect(api.markRead).toHaveBeenCalledWith(['presale']));
     } finally {
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     }

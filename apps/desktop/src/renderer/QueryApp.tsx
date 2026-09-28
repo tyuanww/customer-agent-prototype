@@ -888,18 +888,30 @@ export function QueryApp() {
   // 计时器随可见性变化重排：事件到达时窗口若不可见，展开/回到前台后会补排，不会卡住。
   useEffect(() => {
     if (contentUpdatedDomains.length === 0) return undefined;
-    const visible = phase !== 'FOX_IDLE' && !parked && !document.hidden;
-    if (!visible) return undefined;
-    const domains = [...contentUpdatedDomains];
-    const timer = window.setTimeout(() => {
-      contentUpdatedReadTimerRef.current = null;
-      void window.customerAgent?.productAnnounce?.markRead(domains);
-      setContentUpdatedDomains((current) => current.filter((domain) => !domains.includes(domain)));
-    }, 1_000);
-    contentUpdatedReadTimerRef.current = timer;
-    return () => {
+    let timer: number | null = null;
+    const clearTimer = () => {
+      if (timer === null) return;
       window.clearTimeout(timer);
       if (contentUpdatedReadTimerRef.current === timer) contentUpdatedReadTimerRef.current = null;
+      timer = null;
+    };
+    const arm = () => {
+      clearTimer();
+      if (phase === 'FOX_IDLE' || parked || document.hidden) return;
+      const domains = [...contentUpdatedDomains];
+      timer = window.setTimeout(() => {
+        contentUpdatedReadTimerRef.current = null;
+        timer = null;
+        void window.customerAgent?.productAnnounce?.markRead(domains);
+        setContentUpdatedDomains((current) => current.filter((domain) => !domains.includes(domain)));
+      }, 1_000);
+      contentUpdatedReadTimerRef.current = timer;
+    };
+    arm();
+    document.addEventListener('visibilitychange', arm);
+    return () => {
+      document.removeEventListener('visibilitychange', arm);
+      clearTimer();
     };
   }, [contentUpdatedDomains, parked, phase]);
 
