@@ -10,7 +10,7 @@ xlsx 原文、订单、图片不进 Git。文件放在仓外（例如本机 `Des
 
 ## 你需要
 
-1. 当前 main **0.3.23** 打的 UNSIGNED `.app`（`pnpm package:mac:local`）。更早的包没有五项工作台、将替换手选、下架待发布才离开目录、两行发布回执。
+1. 当前 main **0.3.24** 打的 UNSIGNED `.app`（`pnpm package:mac:local`）。更早的包没有五项工作台、将替换手选、下架待发布才离开目录、两行发布回执、打开下载页。
 2. `~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json` 指向 `agent-auth` / `agent-pass`。
 3. 本机合成栈和命名隧道健康：`https://agent-auth.jianghua.site/health` 为 200。
 4. **管理员**会话（`synthetic_owner`）。话术师可以导入、可以预览，但发布禁用，原因写「一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。」——不是 HTTP 403。

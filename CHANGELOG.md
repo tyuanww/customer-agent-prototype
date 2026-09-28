@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.24] - 2026-09-29
+
+### Added
+
+- 未签名 Mac / Windows 包带上系统同步「打开下载页」：管理员打开当前建议版本的 https 下载地址。源码已随 #24 合入；本版才打进 UNSIGNED。不跑 `latest.yml`。
+
 ## [0.3.23] - 2026-09-28
 
 ### Added
