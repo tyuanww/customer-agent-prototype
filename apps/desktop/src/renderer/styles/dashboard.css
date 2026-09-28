@@ -3621,8 +3621,7 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   font-weight: 600;
 }
 
-.dashboard-shell .software-version-card .dash-reset,
-.dashboard-shell [data-testid='software-check-update'] {
+.dashboard-shell .software-version-card .dash-reset {
   min-height: 40px;
 }
 

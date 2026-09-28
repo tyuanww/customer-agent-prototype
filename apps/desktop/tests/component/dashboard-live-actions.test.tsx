@@ -423,6 +423,105 @@ describe('dashboard live actions', () => {
     expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.retirePending} smut_del`);
   });
 
+  it('disables 确认下架 while the delete is in flight', async () => {
+    const hangingDelete = vi.fn(() => new Promise(() => undefined));
+    window.dashboardOps = {
+      retrieval: vi.fn(),
+      sopCatalog: vi.fn(),
+      sopImport: vi.fn(),
+      sopPatch: vi.fn(),
+      sopDelete: vi.fn(),
+      scriptPatch: vi.fn(),
+      scriptDelete: hangingDelete,
+      softwareCatalog: vi.fn(),
+    };
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_20',
+        catalogRefreshedAt: null,
+        total: 1,
+        entries: [{
+          scriptId: 'script-1',
+          domain: 'product',
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_20',
+          scriptVersion: 2,
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low',
+          lifecycle: 'published',
+          lifecycleLabel: '已发布',
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog',
+        }],
+      }),
+    };
+    const user = userEvent.setup();
+    render(<WordingLibraryModule />);
+    await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
+    await user.click(screen.getByTestId('wording-retire'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
+    expect(hangingDelete).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('wording-retire-confirm-action')).toBeDisabled();
+  });
+
+  it('closes 下架 confirm and shows unavailable when scriptDelete rejects', async () => {
+    const scriptDelete = vi.fn(async () => {
+      throw new Error('ipc down');
+    });
+    window.dashboardOps = {
+      retrieval: vi.fn(),
+      sopCatalog: vi.fn(),
+      sopImport: vi.fn(),
+      sopPatch: vi.fn(),
+      sopDelete: vi.fn(),
+      scriptPatch: vi.fn(),
+      scriptDelete,
+      softwareCatalog: vi.fn(),
+    };
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_20',
+        catalogRefreshedAt: null,
+        total: 1,
+        entries: [{
+          scriptId: 'script-1',
+          domain: 'product',
+          title: '用量',
+          scene: '怎么用',
+          answerPreview: '先打湿',
+          platform: '千牛',
+          version: 'rel_20',
+          scriptVersion: 2,
+          effectiveFrom: '2026-01-01T00:00:00.000Z',
+          effectiveTo: null,
+          effectiveWindow: '当前发布',
+          risk: 'low',
+          lifecycle: 'published',
+          lifecycleLabel: '已发布',
+          ownerRole: '当前发布',
+          dataClass: 'local-catalog',
+        }],
+      }),
+    };
+    const user = userEvent.setup();
+    render(<WordingLibraryModule />);
+    await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
+    await user.click(screen.getByTestId('wording-retire'));
+    await user.click(screen.getByTestId('wording-retire-confirm-action'));
+    await waitFor(() => {
+      expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.unavailable);
+    });
+    expect(screen.queryByTestId('wording-retire-confirm')).not.toBeInTheDocument();
+  });
+
   it('labels last_7d retrieval as 近 7 天', async () => {
     const retrieval = vi.fn(async () => ({
       ok: true as const,

@@ -75,6 +75,24 @@ function uploadSourceName(upload: UploadView): string {
 }
 
 /** `待开发` summary: the only status source once the body is collapsed. */
+function detectedDomainCopy(upload: UploadView): string | null {
+  if (upload.status !== 'ready') return null;
+  const labels = [...new Set(
+    upload.rows
+      .map((row) => row.domain)
+      .filter((domain): domain is DashboardContentDomain => Boolean(domain)),
+  )].map(domainLabel);
+  if (labels.length === 0) return '表里没有域列';
+  return `表里识别到：${labels.join('、')}`;
+}
+
+function uploadStatusHeadline(status: UploadView['status']): string {
+  if (status === 'ready') return '待发布';
+  if (status === 'reading') return '正在读取';
+  if (status === 'error') return '未进入待发布';
+  return '等待导入';
+}
+
 function summarizeUpload(upload: UploadView): { text: string; title: string } {
   if (upload.status === 'reading') {
     return { text: `待开发 · 正在读取 ${upload.sourceName}`, title: `待开发 · 正在读取 ${upload.sourceName}` };
@@ -190,11 +208,7 @@ export function ContentModule() {
     : sessionState === 'signed-in'
       ? { label: '已接入', tone: 'ok' as const }
       : { label: '未接入', tone: 'warn' as const };
-  const replaceDetected = upload.status === 'ready'
-    ? (hasDomain
-      ? `表里识别到：${[...new Set(rows.map((row) => row.domain))].map(domainLabel).join('、')}`
-      : '表里没有域列')
-    : null;
+  const replaceDetected = detectedDomainCopy(upload);
 
   const clearUpload = () => {
     ingestGeneration.current += 1;
@@ -422,15 +436,7 @@ export function ContentModule() {
             data-state={upload.status}
             data-testid="content-upload-status"
           >
-            <strong>{
-              upload.status === 'ready'
-                ? '待发布'
-                : upload.status === 'reading'
-                  ? '正在读取'
-                  : upload.status === 'error'
-                    ? '未进入待发布'
-                    : '等待导入'
-            }</strong>
+            <strong>{uploadStatusHeadline(upload.status)}</strong>
             <span>{statusMessage}</span>
           </div>
 

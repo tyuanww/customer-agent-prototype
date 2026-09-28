@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardSoftwareCatalog } from '@shared/dashboard-ops-loop';
 import type { DashboardAnnounceResult, DashboardAnnounceView } from '@shared/dashboard-announce';
 import {
@@ -170,18 +170,26 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
   );
 }
 
+function softwareBadgeTone(catalog: DashboardSoftwareCatalog | null): 'ok' | 'warn' {
+  if (catalog?.current?.signed) return 'ok';
+  return 'warn';
+}
+
 function SoftwareTab() {
   const [catalog, setCatalog] = useState<DashboardSoftwareCatalog | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const liveRef = useRef(true);
 
   const load = () => {
     const api = window.dashboardOps;
     if (!api) {
+      if (!liveRef.current) return;
       setCatalog(null);
       setMessage('未接入：没有安装包目录。');
       return;
     }
     void api.softwareCatalog().then((result) => {
+      if (!liveRef.current) return;
       if (!result.ok) {
         setCatalog(null);
         setMessage(result.message);
@@ -189,17 +197,25 @@ function SoftwareTab() {
       }
       setCatalog(result);
       const current = result.current;
-      setMessage(current
-        ? `${current.version} · ${current.signed ? '已签名' : 'UNSIGNED'} · 不跑 latest.yml`
-        : '目录为空，没有当前建议版本。');
+      if (!current) {
+        setMessage('目录为空，没有当前建议版本。');
+        return;
+      }
+      const signedLabel = current.signed ? '已签名' : 'UNSIGNED';
+      setMessage(`${current.version} · ${signedLabel} · 不跑 latest.yml`);
     }).catch(() => {
+      if (!liveRef.current) return;
       setCatalog(null);
       setMessage('未接入：没有安装包目录。');
     });
   };
 
   useEffect(() => {
+    liveRef.current = true;
     load();
+    return () => {
+      liveRef.current = false;
+    };
   }, []);
 
   return (
@@ -209,7 +225,7 @@ function SoftwareTab() {
           <span className="dash-card-label">软件版本</span>
           <StatusBadge
             label={catalog?.current ? catalog.current.version : '未接入'}
-            tone={catalog?.current ? (catalog.current.signed ? 'ok' : 'warn') : 'warn'}
+            tone={softwareBadgeTone(catalog)}
           />
         </div>
         {catalog?.current ? (

@@ -125,6 +125,38 @@ describe('AnnounceModule four library cards', () => {
     expect(onOpenDomain).toHaveBeenCalledWith('campaign');
   });
 
+  it('drops a late software catalog result after leaving the tab', async () => {
+    let finish: ((value: { ok: true; items: []; current: { version: string; platform: 'mac-universal'; sha256: string; downloadUrl: string; createdAt: string; signed: boolean } }) => void) | undefined;
+    const softwareCatalog = vi.fn(() => new Promise<{
+      ok: true;
+      items: [];
+      current: { version: string; platform: 'mac-universal'; sha256: string; downloadUrl: string; createdAt: string; signed: boolean };
+    }>((resolve) => {
+      finish = resolve;
+    }));
+    window.dashboardAnnounce = announceApi(view());
+    window.dashboardOps = { softwareCatalog } as unknown as typeof window.dashboardOps;
+    const user = userEvent.setup();
+    render(<AnnounceModule />);
+    await user.click(screen.getByTestId('system-sync-tab-software'));
+    await waitFor(() => expect(softwareCatalog).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByTestId('system-sync-tab-wording'));
+    finish?.({
+      ok: true,
+      items: [],
+      current: {
+        version: '9.9.9',
+        platform: 'mac-universal',
+        sha256: 'abc',
+        downloadUrl: 'https://example.invalid/app',
+        createdAt: '2026-09-28T00:00:00.000Z',
+        signed: false,
+      },
+    });
+    await waitFor(() => expect(screen.getByTestId('announce-library-grid')).toBeInTheDocument());
+    expect(screen.queryByText('9.9.9')).not.toBeInTheDocument();
+  });
+
   it('keeps the software tab unchanged and free of library cards', async () => {
     window.dashboardAnnounce = announceApi(view());
     window.dashboardOps = {

@@ -62,6 +62,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   const [page, setPage] = useState(1);
   const [writeMessage, setWriteMessage] = useState<string | null>(null);
   const [retireConfirm, setRetireConfirm] = useState(false);
+  const [retiring, setRetiring] = useState(false);
 
   useEffect(() => {
     if (!initialDomain) return;
@@ -151,6 +152,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
       : `${releaseLabel}。当前域没有条目。`;
 
   const onRetire = () => {
+    if (retiring) return;
     const api = window.dashboardOps;
     const row = selected
       ? catalog?.entries.find((item) => item.scriptId === selected.scriptId)
@@ -165,12 +167,18 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
       setRetireConfirm(false);
       return;
     }
+    setRetiring(true);
     void api.scriptDelete({
       scriptId: row.scriptId,
       expectedVersion: row.scriptVersion,
     }).then((result) => {
       setRetireConfirm(false);
       setWriteMessage(result.ok ? `${OPS_LOOP_COPY.retirePending} ${result.mutationId}` : result.message);
+    }).catch(() => {
+      setRetireConfirm(false);
+      setWriteMessage(OPS_LOOP_COPY.unavailable);
+    }).finally(() => {
+      setRetiring(false);
     });
   };
 
@@ -353,6 +361,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
                       type="button"
                       className="dash-publish"
                       data-testid="wording-retire-confirm-action"
+                      disabled={retiring}
                       onClick={onRetire}
                     >
                       确认下架

@@ -231,9 +231,8 @@ describe('ContentModule publish gate', () => {
     });
     expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('产品');
     await user.selectOptions(screen.getByTestId('content-domain-override'), 'campaign');
-    await waitFor(() => {
-      expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('活动');
-    });
+    expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('产品');
+    expect(screen.getByTestId('content-domain-detected')).not.toHaveTextContent('活动');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('活动');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(api.publishDraft).toHaveBeenCalled());
