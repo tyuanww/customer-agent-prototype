@@ -22,6 +22,7 @@ const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
 const OPS_SOFTWARE = 'dashboard:ops-software';
 const ANNOUNCE_CURRENT = 'dashboard:announce-current';
 const ANNOUNCE_MARK_READ = 'dashboard:announce-mark-read';
+const ANNOUNCE_CONTENT_UPDATED = 'product:announce-content-updated';
 
 const LIBRARY_DOMAINS = ['product', 'campaign', 'presale', 'aftersale'] as const;
 type LibraryDomain = (typeof LIBRARY_DOMAINS)[number];
@@ -354,6 +355,11 @@ contextBridge.exposeInMainWorld('dashboardOps', {
   },
 });
 
+const catalogUpdatedListeners = new Set<() => void>();
+ipcRenderer.on(ANNOUNCE_CONTENT_UPDATED, () => {
+  for (const listener of catalogUpdatedListeners) listener();
+});
+
 contextBridge.exposeInMainWorld('dashboardAnnounce', {
   async current() {
     try {
@@ -367,6 +373,10 @@ contextBridge.exposeInMainWorld('dashboardAnnounce', {
     const domains = parseDomainList(request);
     if (domains.length === 0) return;
     try { await ipcRenderer.invoke(ANNOUNCE_MARK_READ, domains); } catch { /* best effort */ }
+  },
+  onCatalogUpdated(listener: () => void) {
+    catalogUpdatedListeners.add(listener);
+    return () => { catalogUpdatedListeners.delete(listener); };
   },
 });
 

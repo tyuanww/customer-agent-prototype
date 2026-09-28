@@ -83,6 +83,7 @@ describe('DashboardApp', () => {
     delete window.dashboardWording;
     delete window.dashboardContent;
     delete window.dashboardIteration;
+    delete window.dashboardAnnounce;
     Object.defineProperty(window, 'PointerEvent', {
       configurable: true,
       writable: true,
@@ -101,6 +102,7 @@ describe('DashboardApp', () => {
     delete window.dashboardWording;
     delete window.dashboardContent;
     delete window.dashboardIteration;
+    delete window.dashboardAnnounce;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -1350,11 +1352,59 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('wording-list')).toHaveTextContent('满赠规则');
 
     await user.click(screen.getByTestId('wording-domain-presale'));
-    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('当前发布无此域');
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机目录');
     expect(screen.getByTestId('wording-source-readiness')).not.toHaveTextContent('NOT_CREATED');
     expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配的话术');
     expect(screen.queryByTestId('wording-pager')).not.toBeInTheDocument();
     expect(screen.getByTestId('wording-export')).toBeDisabled();
+  });
+
+  it('labels the wording library as 当前发布 when the announce lease matches the catalog', async () => {
+    const user = userEvent.setup();
+    window.dashboardWording = {
+      list: async () => ({
+        ok: true as const,
+        releaseId: 'rel_25',
+        catalogRefreshedAt: null,
+        total: 1,
+        entries: [
+          {
+            scriptId: 'mn-1',
+            domain: 'product',
+            title: '洁面用法',
+            scene: '怎么用',
+            answerPreview: '先打湿再打圈',
+            platform: '千牛 / 抖音',
+            version: 'rel_25',
+            scriptVersion: 1,
+            effectiveFrom: '2026-01-01T00:00:00Z',
+            effectiveTo: null,
+            effectiveWindow: '当前发布',
+            risk: 'low',
+            lifecycle: 'published',
+            lifecycleLabel: '已发布',
+            ownerRole: '当前发布',
+            dataClass: 'local-catalog',
+          },
+        ],
+      }),
+    };
+    window.dashboardAnnounce = {
+      current: async () => ({
+        ok: true as const,
+        signedIn: true,
+        releaseId: 'rel_25',
+        announcement: null,
+        counts: { product: 1, campaign: 0, presale: 0, aftersale: 0 },
+        unread: false,
+        unreadDomains: [],
+      }),
+      markRead: async () => undefined,
+    };
+    render(<DashboardApp />);
+    await user.click(screen.getByTestId('nav-wording'));
+    expect(await screen.findByTestId('wording-source-readiness')).toHaveTextContent('当前发布已挂载');
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('这是坐席现在能搜到的目录');
   });
 
   it('labels the wording detail card with the entry ownerRole', async () => {

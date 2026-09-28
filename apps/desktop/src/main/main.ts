@@ -251,6 +251,7 @@ if (!gotLock) {
     registerDashboardWordingIpc(
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
+      () => productAnnounce?.snapshotCatalog() ?? null,
     );
     registerDashboardContentIpc(
       productSession,

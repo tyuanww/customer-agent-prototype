@@ -205,13 +205,11 @@ export function ContentModule() {
     sourceBindings,
   });
   const publishDisabled = !gate.allowed || submitting || upload.status !== 'ready' || publishSucceededThisRound;
-  const gateBlocksHard = !gate.allowed && gate.code !== 'VALIDATION';
-  let publishReason = gate.message;
+  let publishReason = '';
   if (submitting) publishReason = CONTENT_PUBLISH_COPY.submitting;
-  else if (gateBlocksHard) publishReason = gate.message;
+  else if (!gate.allowed) publishReason = gate.message;
   else if (upload.status === 'idle' || upload.status === 'error') publishReason = '请先导入草稿';
   else if (upload.status === 'reading') publishReason = '正在读取文件';
-  else if (gate.allowed) publishReason = '';
 
   const sessionState = sessionStateOf(hasProductApi, sessionSettled, sessionView);
   const sessionBadge = sessionBadgeOf(sessionState);

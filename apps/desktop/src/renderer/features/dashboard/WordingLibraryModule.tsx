@@ -65,6 +65,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   const [writeMessage, setWriteMessage] = useState<string | null>(null);
   const [retireConfirm, setRetireConfirm] = useState(false);
   const [retiring, setRetiring] = useState(false);
+  const [leaseReleaseId, setLeaseReleaseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialDomain) return;
@@ -79,6 +80,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   useEffect(() => {
     let live = true;
     const api = window.dashboardWording;
+    const announce = window.dashboardAnnounce;
     if (!api) return undefined;
     const load = () => {
       void api.list().then((result) => {
@@ -88,12 +90,25 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
         if (!live) return;
         setCatalog(null);
       });
+      if (!announce) {
+        setLeaseReleaseId(null);
+        return;
+      }
+      void announce.current().then((result) => {
+        if (!live) return;
+        setLeaseReleaseId(result.ok ? result.releaseId : null);
+      }).catch(() => {
+        if (!live) return;
+        setLeaseReleaseId(null);
+      });
     };
     load();
     window.addEventListener('focus', load);
+    const stopCatalog = announce?.onCatalogUpdated?.(load);
     return () => {
       live = false;
       window.removeEventListener('focus', load);
+      stopCatalog?.();
     };
   }, []);
 
@@ -142,12 +157,18 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   };
 
   const releaseLabel = catalog?.releaseId ?? '未标明发布号';
+  const matchesLease = Boolean(live && leaseReleaseId && catalog?.releaseId === leaseReleaseId);
   let readinessLabel = '当前发布无此域';
   if (!live) readinessLabel = '当前发布未挂载';
+  else if (!matchesLease) readinessLabel = '本机目录';
   else if (domainCount > 0) readinessLabel = '当前发布已挂载';
   let sourceSummary = `${releaseLabel}。当前域没有条目。`;
   if (!live) sourceSummary = '未读到当前发布目录。';
-  else if (domainCount > 0) {
+  else if (!matchesLease && leaseReleaseId) {
+    sourceSummary = `本机目录 ${releaseLabel} · 检索租约 ${leaseReleaseId}。`;
+  } else if (!matchesLease) {
+    sourceSummary = `${domainCount} 条 · 本机目录 ${releaseLabel}。登录后才跟坐席检索对齐。`;
+  } else if (domainCount > 0) {
     sourceSummary = `${domainCount} 条 · ${releaseLabel}。这是坐席现在能搜到的目录。`;
   }
 
@@ -187,7 +208,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
       <header className="dash-module-head">
         <div>
           <h1>话术库</h1>
-          <p className="dash-kicker">坐席现在能搜到的当前发布</p>
+          <p className="dash-kicker">{matchesLease ? '坐席现在能搜到的当前发布' : '本机目录，不是当前检索租约'}</p>
         </div>
       </header>
       {writeMessage ? <p className="dash-scope" data-testid="wording-write-status">{writeMessage}</p> : null}
@@ -222,12 +243,12 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
         {live ? (
         <div className="source-readiness" data-testid="wording-source-readiness">
           <div>
-            <span className="dash-card-label">当前发布</span>
+            <span className="dash-card-label">{matchesLease ? '当前发布' : '本机目录'}</span>
             <strong>{source.label}</strong>
           </div>
           <StatusBadge
             label={readinessLabel}
-            tone={domainCount === 0 ? 'warn' : 'ok'}
+            tone={matchesLease && domainCount > 0 ? 'ok' : 'warn'}
           />
           <p>{sourceSummary}</p>
         </div>

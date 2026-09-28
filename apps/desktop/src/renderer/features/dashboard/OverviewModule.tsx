@@ -42,12 +42,34 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
   const [taskMessage, setTaskMessage] = useState('加载中…');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [retrieval, setRetrieval] = useState<DashboardRetrievalMetrics | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [leaseReleaseId, setLeaseReleaseId] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
     const wordingApi = window.dashboardWording;
     const iterationApi = window.dashboardIteration;
     const opsApi = window.dashboardOps;
+    const sessionApi = window.dashboardContent;
+    const announceApi = window.dashboardAnnounce;
+    if (sessionApi) {
+      void sessionApi.session().then((result) => {
+        if (!live) return;
+        setSignedIn(result.ok === true && result.signedIn === true);
+      }).catch(() => {
+        if (!live) return;
+        setSignedIn(false);
+      });
+    }
+    if (announceApi) {
+      void announceApi.current().then((result) => {
+        if (!live) return;
+        setLeaseReleaseId(result.ok ? result.releaseId : null);
+      }).catch(() => {
+        if (!live) return;
+        setLeaseReleaseId(null);
+      });
+    }
     if (opsApi) {
       void opsApi.retrieval('current_release').then((result) => {
         if (!live) return;
@@ -57,7 +79,11 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         setRetrieval(null);
       });
     }
-    if (wordingApi) {
+    const loadWording = () => {
+      if (!wordingApi) {
+        setWordingReady(false);
+        return;
+      }
       void wordingApi.list().then((result) => {
         if (!live) return;
         setWordingReady(true);
@@ -67,13 +93,23 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         setWordingReady(true);
         setWording(null);
       });
-    } else {
-      setWordingReady(false);
-    }
+    };
+    loadWording();
+    const stopCatalog = announceApi?.onCatalogUpdated?.(() => {
+      loadWording();
+      void announceApi.current().then((result) => {
+        if (!live) return;
+        setLeaseReleaseId(result.ok ? result.releaseId : null);
+      }).catch(() => {
+        if (!live) return;
+        setLeaseReleaseId(null);
+      });
+    });
     if (!iterationApi) {
       setTaskMessage('未接入');
       return () => {
         live = false;
+        stopCatalog?.();
       };
     }
     void iterationApi.list().then((result) => {
@@ -92,11 +128,12 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
     });
     return () => {
       live = false;
+      stopCatalog?.();
     };
   }, []);
 
   const wordingConnected = Boolean(window.dashboardWording);
-  const iterationConnected = Boolean(window.dashboardIteration);
+  const matchesLease = Boolean(signedIn && leaseReleaseId && wording?.releaseId === leaseReleaseId);
   const openTasks = (tasks ?? []).filter((task) => task.status === 'open' || task.status === 'in_progress');
   const inaccuracyCounts = tasks === null ? [] : aggregateInaccuracyTodoCounts(tasks);
   const wordingTitleById = new Map((wording?.entries ?? []).map((entry) => [entry.scriptId, entry.title]));
@@ -108,7 +145,12 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
       : wording
         ? String(catalogCount)
         : '未接入';
-  const connected = wordingConnected && iterationConnected;
+  const catalogCaption = matchesLease
+    ? (wording?.releaseId ?? '当前发布')
+    : wording?.releaseId
+      ? `本机目录 ${wording.releaseId}`
+      : '与查询胶囊同一份目录';
+  const connected = signedIn;
 
   return (
     <div className="dash-module" data-testid="module-overview">
@@ -126,11 +168,11 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
         </div>
         <div>
           <dt>待办</dt>
-          <dd>{iterationConnected ? '话术优化待办' : '未接入'}</dd>
+          <dd>{tasks !== null ? '话术优化待办' : '未接入'}</dd>
         </div>
         <div>
           <dt>话术条数</dt>
-          <dd>{wordingConnected ? '当前发布' : '未接入'}</dd>
+          <dd>{matchesLease ? '当前发布' : wording?.releaseId ? '本机目录' : '未接入'}</dd>
         </div>
         <div>
           <dt>检索账</dt>
@@ -160,9 +202,9 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
             <p>话术优化待办</p>
           </div>
           <div className="health-kpi" role="listitem" data-testid="overview-alert-catalog">
-            <dt>当前发布条数</dt>
+            <dt>{matchesLease ? '当前发布条数' : '目录条数'}</dt>
             <dd>{catalogDisplay}</dd>
-            <p>{wording?.releaseId ? wording.releaseId : '与查询胶囊同一份目录'}</p>
+            <p>{catalogCaption}</p>
           </div>
         </dl>
       </section>

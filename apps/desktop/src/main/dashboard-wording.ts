@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { runtimeStackReadPath } from './packaged-retrieval-paths';
 import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
+import type { HydrateSnapshotItem } from './hydrate-catalog.ts';
 import type { DashboardWordingDomain, DashboardWordingEntry, DashboardWordingView } from '../shared/dashboard-wording';
 
 function desktopRepoRoot(): string {
@@ -89,8 +90,36 @@ function entryFromHydrate(item: object, releaseId: string): DashboardWordingEntr
       : null,
     effectiveFrom: typeof record.effectiveFrom === 'string' ? record.effectiveFrom : null,
     effectiveTo: typeof record.effectiveTo === 'string' ? record.effectiveTo : null,
-    effectiveWindow: windowLabel(record.effectiveFrom, record.effectiveTo, '当前发布'),
+    effectiveWindow: windowLabel(record.effectiveFrom, record.effectiveTo, '本机目录'),
     risk: riskOf(record.riskLevel),
+    lifecycle: 'published',
+    lifecycleLabel: '已发布',
+    ownerRole: '本机话术库',
+    dataClass: 'local-catalog',
+  });
+}
+
+function entryFromSnapshotItem(item: HydrateSnapshotItem, releaseId: string): DashboardWordingEntry | null {
+  const scriptId = item.script_id;
+  const title = item.title.trim();
+  const answer = item.answer_text.trim();
+  if (scriptId.length < 1 || title.length < 1 || answer.length < 1) return null;
+  const questionText = item.questions?.[0]?.question_text?.trim() ?? '';
+  return Object.freeze({
+    scriptId,
+    domain: domainOf(item.category),
+    title,
+    scene: questionText.length > 0 ? questionText : title,
+    answerPreview: item.answer_text,
+    platform: platformLabel(item.platform_scope),
+    version: releaseId,
+    scriptVersion: Number.isInteger(item.script_version) && item.script_version >= 1
+      ? item.script_version
+      : null,
+    effectiveFrom: item.effective_from.length > 0 ? item.effective_from : null,
+    effectiveTo: item.effective_to,
+    effectiveWindow: windowLabel(item.effective_from, item.effective_to, '当前发布'),
+    risk: riskOf(item.risk_level),
     lifecycle: 'published',
     lifecycleLabel: '已发布',
     ownerRole: '当前发布',
@@ -124,7 +153,26 @@ function entryFromIndex(
   });
 }
 
-export function listDashboardWording(): DashboardWordingView {
+export function listDashboardWording(
+  liveCatalog?: { releaseId: string; items: readonly HydrateSnapshotItem[] } | null,
+): DashboardWordingView {
+  if (liveCatalog && liveCatalog.releaseId.length > 0 && liveCatalog.items.length > 0) {
+    const entries: DashboardWordingEntry[] = [];
+    for (const item of liveCatalog.items) {
+      const entry = entryFromSnapshotItem(item, liveCatalog.releaseId);
+      if (entry) entries.push(entry);
+    }
+    if (entries.length > 0) {
+      return Object.freeze({
+        ok: true,
+        releaseId: liveCatalog.releaseId,
+        total: entries.length,
+        entries: Object.freeze(entries),
+        catalogRefreshedAt: null,
+      });
+    }
+  }
+
   const hydrateFile = hydratePath();
   const hydrateRaw = hydrateFile ? asRecord(readJson(hydrateFile)) : null;
   const hydrateRelease = hydrateRaw && typeof hydrateRaw.releaseId === 'string' ? hydrateRaw.releaseId : null;

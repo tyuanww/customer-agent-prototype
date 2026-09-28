@@ -62,7 +62,7 @@ describe('dashboard wording catalog', () => {
     expect(result.entries[0]).toMatchObject({
       domain: 'presale',
       lifecycle: 'published',
-      ownerRole: '当前发布',
+      ownerRole: '本机话术库',
       dataClass: 'local-catalog',
       scriptVersion: 1,
       effectiveFrom: '2026-01-01T00:00:00Z',
@@ -111,7 +111,7 @@ describe('dashboard wording catalog', () => {
     });
   });
 
-  it('labels hydrate rows without an effective-from as 当前发布', () => {
+  it('labels hydrate rows without an effective-from as 本机目录', () => {
     const root = mkdtempSync(join(tmpdir(), 'dash-wording-'));
     const hydrate = join(root, 'retrieval-hydrate.json');
     writeFileSync(hydrate, `${JSON.stringify({
@@ -121,13 +121,56 @@ describe('dashboard wording catalog', () => {
     process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydrate;
     process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = join(root, 'missing-index.json');
     const result = listDashboardWording();
-    expect(result.entries[0]).toMatchObject({ ownerRole: '当前发布', effectiveWindow: '当前发布' });
+    expect(result.entries[0]).toMatchObject({ ownerRole: '本机话术库', effectiveWindow: '本机目录' });
   });
 
   it('returns an empty catalog when both off-repo files are missing', () => {
     process.env.CUSTOMER_AGENT_HYDRATE_INDEX = join(tmpdir(), 'missing-hydrate.json');
     process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = join(tmpdir(), 'missing-index.json');
     expect(listDashboardWording()).toMatchObject({ ok: true, total: 0, entries: [] });
+  });
+
+  it('prefers the in-memory announce snapshot over a stale hydrate file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dash-wording-'));
+    const hydrate = join(root, 'retrieval-hydrate.json');
+    writeFileSync(hydrate, `${JSON.stringify({
+      releaseId: 'rel_old',
+      scripts: [{ scriptId: 'old-1', title: '旧稿', questionText: '旧问', answerText: '旧答', category: 'product' }],
+    })}\n`);
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = hydrate;
+    process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = join(root, 'missing-index.json');
+    const result = listDashboardWording({
+      releaseId: 'rel_25',
+      items: [{
+        script_id: 'live-1',
+        script_version: 3,
+        content_hash: 'b'.repeat(64),
+        title: '新稿',
+        category: 'campaign',
+        answer_text: '新答',
+        platform_scope: ['qianniu'],
+        product_scope_type: 'storewide',
+        product_scope_refs: [],
+        effective_from: '2026-09-28T00:00:00Z',
+        effective_to: null,
+        intent_taxonomy_version: 'itax',
+        intent_id: 'intent',
+        risk_level: 'low',
+        risk_categories: [],
+        has_conflict: false,
+        placeholder_keys: [],
+        questions: [{ question_text: '新问' }],
+      }],
+    });
+    expect(result.releaseId).toBe('rel_25');
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]).toMatchObject({
+      scriptId: 'live-1',
+      domain: 'campaign',
+      scene: '新问',
+      ownerRole: '当前发布',
+      scriptVersion: 3,
+    });
   });
 
   it('ignores catalog files inside the git worktree', () => {

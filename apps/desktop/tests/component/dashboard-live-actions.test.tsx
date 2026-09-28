@@ -14,6 +14,7 @@ describe('dashboard live actions', () => {
     delete window.dashboardContent;
     delete window.dashboardIteration;
     delete window.dashboardOps;
+    delete window.dashboardAnnounce;
   });
 
   it('does not render the frozen-snapshot caption on overview', () => {
@@ -347,6 +348,7 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
     const { unmount } = render(<WordingLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('wording-list')).toHaveTextContent('用量'));
+    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机目录');
     expect(screen.queryByTestId('wording-update')).not.toBeInTheDocument();
     expect(scriptPatch).not.toHaveBeenCalled();
     unmount();
@@ -354,6 +356,8 @@ describe('dashboard live actions', () => {
     render(<OverviewModule />);
     await waitFor(() => expect(retrieval).toHaveBeenCalledWith('current_release'));
     expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('12.5%');
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('未接入产品会话');
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('本机目录');
     expect(screen.getByTestId('overview-scope')).toHaveTextContent('当前发布');
 
     render(<AnnounceModule />);
@@ -424,7 +428,7 @@ describe('dashboard live actions', () => {
   });
 
   it('disables 确认下架 while the delete is in flight', async () => {
-    const hangingDelete = vi.fn(() => new Promise(() => undefined));
+    const hangingDelete = vi.fn(() => new Promise<never>(() => undefined));
     window.dashboardOps = {
       retrieval: vi.fn(),
       sopCatalog: vi.fn(),
