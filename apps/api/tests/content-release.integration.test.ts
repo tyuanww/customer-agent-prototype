@@ -164,17 +164,17 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     return exchanged.json().access_token as string;
   }
 
-  function multipart(): Buffer {
+  function multipart(csv: Buffer = CSV): Buffer {
     const boundary = '----t4boundary';
     const json = JSON.stringify(BINDINGS.map(({ domain, source_version_id }) => ({ domain, source_version_id })));
     return Buffer.concat([
       Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="a.csv"\r\nContent-Type: text/csv\r\n\r\n`),
-      CSV,
+      csv,
       Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="source_bindings"\r\n\r\n${json}\r\n--${boundary}--\r\n`),
     ]);
   }
 
-  async function stageBatch(idempotencyKey: string): Promise<string> {
+  async function stageBatch(idempotencyKey: string, csv: Buffer = CSV): Promise<string> {
     const owner = await productToken('synthetic_owner');
     const imported = await app.inject({
       method: 'POST', url: '/v1/content/import',
@@ -183,7 +183,7 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
         'idempotency-key': idempotencyKey,
         'content-type': 'multipart/form-data; boundary=----t4boundary',
       },
-      payload: multipart(),
+      payload: multipart(csv),
     });
     expect(imported.statusCode).toBe(202);
     const batchId = imported.json().import_batch_id as string;
@@ -262,5 +262,33 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     expect(rollback.json().release_seq).toBeGreaterThan(second.json().release_seq);
     expect(rollback.json().release_id).not.toBe(first.release_id);
 
+  });
+
+  it('reports a stable-identity collision as a reason, not as an in-flight draft', async () => {
+    const firstBatch = await stageBatch('idem-t4-id-a');
+    const owner = await productToken('synthetic_owner');
+    const first = await app.inject({
+      method: 'POST', url: '/v1/content/publish',
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'pub-id-first', 'content-type': 'application/json' },
+      payload: { import_batch_id: firstBatch, title: '首版', summary: 'synthetic first' },
+    });
+    expect(first.statusCode, first.body).toBe(200);
+    // Same script_id and question_version, different question_text: the published lineage owns
+    // this stable identity, so the database refuses the replacement.
+    const reworded = Buffer.from([
+      'script_id,category,title,answer_text,source_version_id,source_ref,question_text,risk_level,has_conflict',
+      'shipping-001,presale,发货时效,您好订单将在付款后发出,srcv_t4_presale_v1,SRC-T4-PRESALE,请问何时发货,high,false',
+      '',
+    ].join('\n'));
+    const secondBatch = await stageBatch('idem-t4-id-b', reworded);
+    const conflict = await app.inject({
+      method: 'POST', url: '/v1/content/publish',
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': 'pub-id-second', 'content-type': 'application/json' },
+      payload: { import_batch_id: secondBatch, title: '改名版', summary: 'synthetic reword' },
+    });
+    expect(conflict.statusCode, conflict.body).toBe(400);
+    // The operator has to edit the table; telling them "a draft is in flight" would send them to
+    // the wrong button. The reason must survive the CONFLICT collapse of ZA003.
+    expect(conflict.json()).toMatchObject({ error: { code: 'VALIDATION', details: { reason: 'QUESTION_IDENTITY_CONFLICT' } } });
   });
 });

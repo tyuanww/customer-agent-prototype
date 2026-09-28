@@ -7,9 +7,14 @@ All notable changes to this customer-agent product implementation repository are
 ### Fixed
 
 - 取消未完成导入 no longer reports a cancel it did not make. When nothing is actually in flight the workbench now says 当前没有未完成的导入，登录还在，不必重新登录。 instead of a false success, so an operator is not told the queue is clear while a staged import still blocks the next one.
+- 导入第二张表不再撞车。桌面曾按**行号**生成 `script_id`（`upl00001`…），而 worker 把它当作永久身份（`question_id = 'q_' + script_id`，版本恒为 1），于是任何第二张表的第 1 行都与第一张表已发布的行同名同版本、不同正文，被 `0012` 守卫合法拒绝。现在按 `域 + 场景 + 正文` 的摘要生成 `script_id`：同一份内容永远同一身份，重复导入幂等。
+- 这条冲突不再被说成「上一份还在处理」。`QUESTION_IDENTITY_CONFLICT` 曾在 API 层被折叠成裸 `CONFLICT`、再在桌面被译成在途导入，把操作员送去点一个永远清不掉它的按钮。现在 API 以 `VALIDATION` + `reason` 返回，桌面为它显示可照做的中文；只有哨兵闸门（`DETAIL='CONFLICT'`）才读作在途。
+- 内容管理新增「归属话术库」：选表后显示识别到的域，并可用下拉覆盖。归属不再只靠文件名猜——选错库不报错，只会静默传错区。
 
 ### Documentation
 
+- [内容导入与发布合同](docs/reference-content-publish.md) 补上 `QUESTION_IDENTITY_CONFLICT` 文案、内容身份为何是永久的，以及「只有在途闸门才读作在途」这条判据。
+- [管理员导入 MENOKIN FAQ 并发布](docs/tutorial-menokin-content-publish.md) 的失败表补上「内容和线上已有版本冲突」一行，并把「上一份还在处理」改成实际屏幕文案。
 - 新增 [内容导入与发布合同](docs/reference-content-publish.md)：IPC 通道、HTTP 接口与合同角色/错误码、限额、每进程速率窗、哨兵批号与「取消全部」的两条必要条件、失败码中文映射、发布闸门。
 - 新增 [打包与签名](docs/reference-packaging-and-signing.md)：macOS 签名 + 公证的 fail-closed 前置检查与三验，以及 Windows / Linux 只能出未签名包这条边界。
 - 新增 [组织已审证据的边界](docs/explanation-org-review-evidence.md)：说清库里那条质检证据是 worker 写的声明，不是独立控制，以及拿它对账时不能做什么。
