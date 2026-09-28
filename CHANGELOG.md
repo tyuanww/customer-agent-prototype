@@ -2,6 +2,23 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.22] - 2026-09-28
+
+### Added
+
+- 系统同步「话术版本更新」现在是四张卡：产品 / 活动 / 售前 / 售后，各写「本版已更新」或「本版沿用」。点卡会打开话术库对应域。有未读时卡上另有品牌紫点。卡状态来自发布时写入 `Announcement.summary` 的那句 delta。合成 `rel_N` 仍是唯一检索租约，没有四条平行主干。summary 读不出来时卡面写「无法标出本版更新了哪一库」，不冒充沿用。
+- 狐狸头内侧出现品牌紫点，表示有话术更新。打开查询胶囊会看到「售前话术已更新」这类横幅（多域固定顺序 产品→活动→售前→售后）。正在接待时 Top 3 留在屏幕上。ACK 仍是内容游标，不是已读；已读走 origin-keyed `last_seen`。
+- 发布成功后主句 `已发布 rel_N · 姓名`；有 summary 才画第二行四库 delta。失败不画 delta。发布钮保持禁用，直到清除预览或重选文件。
+
+### Changed
+
+- 内容管理顶栏：会话徽章三态（未接入 / 正在确认会话 / 已接入），取消和发布同一行，导入折进「待开发」（装饰性两步向导已去掉）。徽章只说会话接没接上，不是发布权。发布进行中「取消未完成导入」仍可用。
+
+### Documentation
+
+- [内容导入与发布合同](docs/reference-content-publish.md) 写清顶栏、两行回执、四库 delta、`last_seen` 与 `content-updated`。
+- [管理员导入 MENOKIN FAQ 并发布](docs/tutorial-menokin-content-publish.md) 对齐屏幕顶栏与两行回执。
+
 ## [0.3.21] - 2026-09-27
 
 ### Fixed
