@@ -132,6 +132,19 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Depends on:** 本轮 macOS 交还先用 Electron 公共 API 验证是否够用
 **Status:** 本轮不做 native · IME 级隐身仍待产品明确
 
+### 内容管理 · 飞书 / Wiki 导入
+
+**What:** 让「内容管理」直接连接飞书文档或 Wiki 做内容导入，而不是只认本地 CSV / xlsx。
+
+**Why:** 组织审核在飞书文档完成，但导入目前要人把表导出到本地再选文件。真正接通会省掉一次导出。
+
+**Context:** 一期明确**不连接**：折叠体「内容导入」里仍然写「不连接飞书或 Wiki」，用户可见文案不得提前改成已接入。接通需要新的冻结合同（`contracts:intake`，新增来源类型与凭证通道），不是渲染层改动；本切片零新 HTTP。在合同放行前，任何「飞书导入已在做」的说法都属假发布。相关代码：`apps/desktop/src/renderer/features/dashboard/ContentModule.tsx`、`apps/desktop/src/renderer/features/dashboard/coach-content-upload.ts`。
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** `contracts:intake`（OpenAPI 1.15.0 及以上）+ 凭证通道设计评审
+**Status:** OPEN · 一期不连接 · 折叠体内文案保持「不连接飞书或 Wiki」
+
 ## Completed
 
 ### P3 · 显式离线 synthetic profile

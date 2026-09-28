@@ -66,7 +66,7 @@ describe('dashboard layout contract', () => {
     expect(css).not.toContain('#000000');
     expect(css).not.toContain('#111014');
     expect(css).toContain('.health-kpi dt');
-    expect(css).toContain('.content-pipeline-steps');
+    expect(css).toContain('.content-action-row');
     expect(css).toContain('.system-sync-tabs');
     expect(css).toContain('.dash-publish:disabled');
     expect(css).toContain('background: var(--dash-purple)');
@@ -562,6 +562,47 @@ describe('dashboard layout contract', () => {
     expect(content).not.toMatch(
       /fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|ipcRenderer|preload/,
     );
+  });
+
+  it('keeps the content header actions on one row and the import block collapsed', () => {
+    const actionRowRule = css.match(/\.content-action-row\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(actionRowRule).toContain('display: flex');
+    expect(actionRowRule).toContain('flex-wrap: nowrap');
+    expect(actionRowRule).toContain('flex-shrink: 0');
+    expect(actionRowRule).toContain('gap: 8px');
+
+    const publishBoxRule = css.match(/\.dash-publish-box\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(publishBoxRule).toContain('flex: 0 1 auto');
+    expect(publishBoxRule).toContain('max-width: 42%');
+    expect(publishBoxRule).toContain('min-width: min-content');
+    // The reason/feedback line wraps instead of widening the header.
+    const publishNoteRule = css.match(/\.content-publish-note\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(publishNoteRule).toContain('overflow-wrap: anywhere');
+    expect(publishNoteRule).toContain('max-width: 100%');
+
+    const bannerRule = css.match(/\.content-session-banner\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(bannerRule).toContain('min-width: 0');
+    expect(bannerRule).toContain('text-overflow: ellipsis');
+    expect(bannerRule).toContain('white-space: nowrap');
+    expect(bannerRule).toContain('font-size: 12px');
+    expect(bannerRule).toContain('color: var(--dash-muted)');
+
+    const titleClusterRule = css.match(/\.content-title-cluster\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(titleClusterRule).toContain('min-width: 0');
+    expect(titleClusterRule).toContain('flex: 1 1 auto');
+
+    const previewRule = css.match(/\.content-staged-preview\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(previewRule).toContain('max-height: 240px');
+    expect(previewRule).toContain('overflow: auto');
+    expect(previewRule).toContain('margin: 0');
+
+    // The decorative two-step wizard is gone, markup and CSS both.
+    expect(css).not.toContain('.content-pipeline-steps');
+    expect(content).not.toContain('content-pipeline-steps');
+    expect(content).not.toContain('pipelineStepStatus');
+    expect(content).not.toContain('dash-scope dashboard-scope-important');
+    expect(content).toContain('data-testid="content-pending-dev"');
+    expect(content).toContain('data-testid="content-session-badge"');
   });
 
   it('fail-closes transition-all via direct values, var fallbacks, and earlier scoped custom properties', () => {
