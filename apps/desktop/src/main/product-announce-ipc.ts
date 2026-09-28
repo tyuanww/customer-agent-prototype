@@ -66,11 +66,15 @@ export function registerProductAnnounceIpc(
     for (const target of trusted()) if (!target.isDestroyed() && role(target) === 'query') target.send(IPC_CHANNELS.PRODUCT_ANNOUNCE_INVALIDATED, value);
   });
   const unregisterContentUpdated = announce?.onContentUpdated(value => {
-    // 软更新扇出 fox + query，独立于 PRODUCT_ANNOUNCE_INVALIDATED。
+    // 软更新扇出 fox + query + dashboard，独立于 PRODUCT_ANNOUNCE_INVALIDATED。
     for (const target of trusted()) {
       if (target.isDestroyed()) continue;
       const senderRole = role(target);
       if (senderRole === 'fox' || senderRole === 'query') target.send(IPC_CHANNELS.PRODUCT_ANNOUNCE_CONTENT_UPDATED, value);
+    }
+    const dashboard = dashboardContents();
+    if (dashboard && !dashboard.isDestroyed()) {
+      dashboard.send(IPC_CHANNELS.PRODUCT_ANNOUNCE_CONTENT_UPDATED, value);
     }
   });
   return () => { unregisterInvalidated?.(); unregisterContentUpdated?.(); };

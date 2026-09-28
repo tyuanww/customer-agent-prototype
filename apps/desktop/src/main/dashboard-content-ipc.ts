@@ -2,13 +2,11 @@ import { ipcMain, type WebContents } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import {
   dashboardContentFailure,
-  type DashboardContentImportResult,
   type DashboardContentPublishResult,
   type DashboardContentSessionResult,
 } from '../shared/dashboard-content';
 import { isTrustedMainFrameSender } from './sender-guard';
 import {
-  dashboardContentImport,
   dashboardContentParseUpload,
   dashboardContentPublish,
   dashboardContentCancelInFlight,
@@ -48,19 +46,6 @@ export function registerDashboardContentIpc(
       if (args.length !== 1) return dashboardContentFailure('VALIDATION');
       try {
         return dashboardContentParseUpload(args[0]);
-      } catch {
-        return dashboardContentFailure('UNAVAILABLE');
-      }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT,
-    async (event, ...args: unknown[]): Promise<DashboardContentImportResult> => {
-      if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
-      if (args.length !== 1) return dashboardContentFailure('VALIDATION');
-      try {
-        return await dashboardContentImport(session, args[0]);
       } catch {
         return dashboardContentFailure('UNAVAILABLE');
       }

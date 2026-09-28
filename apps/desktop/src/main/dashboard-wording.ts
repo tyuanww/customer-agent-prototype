@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { runtimeStackReadPath } from './packaged-retrieval-paths';
 import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
+import type { HydrateSnapshotItem } from './hydrate-catalog.ts';
 import type { DashboardWordingDomain, DashboardWordingEntry, DashboardWordingView } from '../shared/dashboard-wording';
 
 function desktopRepoRoot(): string {
@@ -65,66 +66,145 @@ function windowLabel(from: unknown, to: unknown, empty = '本机目录'): string
   return `${start} → ${end}`;
 }
 
-function entryFromHydrate(item: object, releaseId: string): DashboardWordingEntry | null {
-  const record = asRecord(item);
-  if (!record) return null;
-  const scriptId = record.scriptId;
-  const title = record.title;
-  const answer = record.answerText;
-  if (typeof scriptId !== 'string' || scriptId.length < 1) return null;
-  if (typeof title !== 'string' || title.trim().length < 1) return null;
-  if (typeof answer !== 'string' || answer.trim().length < 1) return null;
-  const questionText = typeof record.questionText === 'string' ? record.questionText.trim() : '';
-  const scriptVersion = record.scriptVersion;
+type CatalogDraft = Readonly<{
+  scriptId: string;
+  category: unknown;
+  title: string;
+  questionText: string;
+  answerText: string;
+  platformScope: unknown;
+  scriptVersion: unknown;
+  effectiveFrom: unknown;
+  effectiveTo: unknown;
+  windowEmpty: string;
+  ownerRole: string;
+  dataClass: DashboardWordingEntry['dataClass'];
+  risk: unknown;
+}>;
+
+function entryFromDraft(draft: CatalogDraft, releaseId: string): DashboardWordingEntry | null {
+  const title = draft.title.trim();
+  const answer = draft.answerText.trim();
+  if (draft.scriptId.length < 1 || title.length < 1 || answer.length < 1) return null;
+  const scene = draft.questionText.trim().length > 0 ? draft.questionText.trim() : title;
+  const scriptVersion = typeof draft.scriptVersion === 'number' && Number.isInteger(draft.scriptVersion) && draft.scriptVersion >= 1
+    ? draft.scriptVersion
+    : null;
+  const effectiveFrom = typeof draft.effectiveFrom === 'string' && draft.effectiveFrom.length > 0
+    ? draft.effectiveFrom
+    : null;
+  const effectiveTo = typeof draft.effectiveTo === 'string' ? draft.effectiveTo : null;
   return Object.freeze({
-    scriptId,
-    domain: domainOf(record.category),
-    title: title.trim(),
-    scene: questionText.length > 0 ? questionText : title.trim(),
+    scriptId: draft.scriptId,
+    domain: domainOf(draft.category),
+    title,
+    scene,
     answerPreview: answer,
-    platform: platformLabel(record.platformScope),
+    platform: platformLabel(draft.platformScope),
     version: releaseId,
-    scriptVersion: typeof scriptVersion === 'number' && Number.isInteger(scriptVersion) && scriptVersion >= 1
-      ? scriptVersion
-      : null,
-    effectiveFrom: typeof record.effectiveFrom === 'string' ? record.effectiveFrom : null,
-    effectiveTo: typeof record.effectiveTo === 'string' ? record.effectiveTo : null,
-    effectiveWindow: windowLabel(record.effectiveFrom, record.effectiveTo, '当前发布'),
-    risk: riskOf(record.riskLevel),
+    scriptVersion,
+    effectiveFrom,
+    effectiveTo,
+    effectiveWindow: windowLabel(effectiveFrom, effectiveTo, draft.windowEmpty),
+    risk: riskOf(draft.risk),
     lifecycle: 'published',
     lifecycleLabel: '已发布',
-    ownerRole: '当前发布',
-    dataClass: 'local-catalog',
+    ownerRole: draft.ownerRole,
+    dataClass: draft.dataClass,
   });
+}
+
+function entryFromHydrate(item: object, releaseId: string): DashboardWordingEntry | null {
+  const record = asRecord(item);
+  if (!record || typeof record.scriptId !== 'string' || typeof record.title !== 'string' || typeof record.answerText !== 'string') {
+    return null;
+  }
+  return entryFromDraft({
+    scriptId: record.scriptId,
+    category: record.category,
+    title: record.title,
+    questionText: typeof record.questionText === 'string' ? record.questionText : '',
+    answerText: record.answerText,
+    platformScope: record.platformScope,
+    scriptVersion: record.scriptVersion,
+    effectiveFrom: record.effectiveFrom,
+    effectiveTo: record.effectiveTo,
+    windowEmpty: '本机目录',
+    ownerRole: '本机话术库',
+    dataClass: 'local-catalog',
+    risk: record.riskLevel,
+  }, releaseId);
+}
+
+function entryFromSnapshotItem(item: HydrateSnapshotItem, releaseId: string): DashboardWordingEntry | null {
+  return entryFromDraft({
+    scriptId: item.script_id,
+    category: item.category,
+    title: item.title,
+    questionText: item.questions?.[0]?.question_text ?? '',
+    answerText: item.answer_text,
+    platformScope: item.platform_scope,
+    scriptVersion: item.script_version,
+    effectiveFrom: item.effective_from,
+    effectiveTo: item.effective_to,
+    windowEmpty: '当前发布',
+    ownerRole: '当前发布',
+    dataClass: 'current-release',
+    risk: item.risk_level,
+  }, releaseId);
 }
 
 function entryFromIndex(
   script: Readonly<{ scriptId: string; title: string; questionText: string; answerText: string; category?: string }>,
   releaseId: string | null,
 ): DashboardWordingEntry | null {
-  if (script.answerText.trim().length < 1) return null;
-  const scene = script.questionText.trim().length > 0 ? script.questionText.trim() : script.title;
-  return Object.freeze({
+  return entryFromDraft({
     scriptId: script.scriptId,
-    domain: domainOf(script.category),
+    category: script.category,
     title: script.title,
-    scene,
-    answerPreview: script.answerText,
-    platform: '千牛 / 抖音',
-    version: releaseId ?? 'local-index',
+    questionText: script.questionText,
+    answerText: script.answerText,
+    platformScope: null,
     scriptVersion: null,
     effectiveFrom: null,
     effectiveTo: null,
-    effectiveWindow: releaseId ? '当前发布' : '本机目录',
-    risk: 'low',
-    lifecycle: 'published',
-    lifecycleLabel: '已发布',
+    windowEmpty: releaseId ? '当前发布' : '本机目录',
     ownerRole: releaseId ? '当前发布' : '本机话术库',
     dataClass: 'local-catalog',
+    risk: 'low',
+  }, releaseId ?? 'local-index');
+}
+
+function wordingView(
+  releaseId: string | null,
+  entries: readonly DashboardWordingEntry[],
+  catalogRefreshedAt: string | null,
+  matchesLease: boolean,
+): DashboardWordingView {
+  return Object.freeze({
+    ok: true as const,
+    releaseId,
+    total: entries.length,
+    entries: Object.freeze(entries),
+    catalogRefreshedAt,
+    matchesLease,
   });
 }
 
-export function listDashboardWording(): DashboardWordingView {
+export function listDashboardWording(
+  liveCatalog?: { releaseId: string; items: readonly HydrateSnapshotItem[] } | null,
+): DashboardWordingView {
+  if (liveCatalog && liveCatalog.releaseId.length > 0 && liveCatalog.items.length > 0) {
+    const entries: DashboardWordingEntry[] = [];
+    for (const item of liveCatalog.items) {
+      const entry = entryFromSnapshotItem(item, liveCatalog.releaseId);
+      if (entry) entries.push(entry);
+    }
+    if (entries.length > 0) {
+      return wordingView(liveCatalog.releaseId, entries, null, true);
+    }
+  }
+
   const hydrateFile = hydratePath();
   const hydrateRaw = hydrateFile ? asRecord(readJson(hydrateFile)) : null;
   const hydrateRelease = hydrateRaw && typeof hydrateRaw.releaseId === 'string' ? hydrateRaw.releaseId : null;
@@ -160,11 +240,5 @@ export function listDashboardWording(): DashboardWordingView {
       catalogRefreshedAt = null;
     }
   }
-  return Object.freeze({
-    ok: true,
-    releaseId: hydrateRelease,
-    total: entries.length,
-    entries: Object.freeze(entries),
-    catalogRefreshedAt,
-  });
+  return wordingView(hydrateRelease, entries, catalogRefreshedAt, false);
 }

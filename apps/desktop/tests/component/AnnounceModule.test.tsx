@@ -45,8 +45,13 @@ describe('AnnounceModule four library cards', () => {
     expect(screen.queryByTestId('announce-library-title-product')).not.toBeInTheDocument();
     // 已更新卡可显示一次标题。
     expect(screen.getByTestId('announce-library-title-presale')).toHaveTextContent('九月活动上新');
-    // rel_N 只在脚注出现一次。
-    expect(screen.getByTestId('announce-release-footnote')).toHaveTextContent('rel_25');
+    expect(screen.getByTestId('announce-library-count-presale')).toHaveTextContent('75 条');
+    expect(screen.getByTestId('announce-library-count-presale')).not.toHaveTextContent('本版已更新');
+    expect(screen.getByTestId('announce-library-count-product')).toHaveTextContent('106 条');
+    expect(screen.getByTestId('announce-library-count-product')).not.toHaveTextContent('本版沿用');
+    expect(screen.getByTestId('announce-release-footnote')).toHaveTextContent('当前发布 rel_25');
+    expect(screen.getByTestId('announce-release-footnote')).not.toHaveTextContent('检索租约');
+    expect(screen.queryByText('不是合成演练')).not.toBeInTheDocument();
   });
 
   it('shows 无法标出本版更新了哪一库 when the summary is missing or garbled, keeping cards and counts', async () => {
@@ -118,6 +123,38 @@ describe('AnnounceModule four library cards', () => {
     await screen.findByTestId('announce-library-grid');
     await user.click(screen.getByTestId('announce-library-campaign'));
     expect(onOpenDomain).toHaveBeenCalledWith('campaign');
+  });
+
+  it('drops a late software catalog result after leaving the tab', async () => {
+    let finish: ((value: { ok: true; items: []; current: { version: string; platform: 'mac-universal'; sha256: string; downloadUrl: string; createdAt: string; signed: boolean } }) => void) | undefined;
+    const softwareCatalog = vi.fn(() => new Promise<{
+      ok: true;
+      items: [];
+      current: { version: string; platform: 'mac-universal'; sha256: string; downloadUrl: string; createdAt: string; signed: boolean };
+    }>((resolve) => {
+      finish = resolve;
+    }));
+    window.dashboardAnnounce = announceApi(view());
+    window.dashboardOps = { softwareCatalog } as unknown as typeof window.dashboardOps;
+    const user = userEvent.setup();
+    render(<AnnounceModule />);
+    await user.click(screen.getByTestId('system-sync-tab-software'));
+    await waitFor(() => expect(softwareCatalog).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByTestId('system-sync-tab-wording'));
+    finish?.({
+      ok: true,
+      items: [],
+      current: {
+        version: '9.9.9',
+        platform: 'mac-universal',
+        sha256: 'abc',
+        downloadUrl: 'https://example.invalid/app',
+        createdAt: '2026-09-28T00:00:00.000Z',
+        signed: false,
+      },
+    });
+    await waitFor(() => expect(screen.getByTestId('announce-library-grid')).toBeInTheDocument());
+    expect(screen.queryByText('9.9.9')).not.toBeInTheDocument();
   });
 
   it('keeps the software tab unchanged and free of library cards', async () => {

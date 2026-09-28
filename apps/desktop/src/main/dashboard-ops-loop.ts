@@ -188,48 +188,6 @@ export async function dashboardSopDelete(
   });
 }
 
-export async function dashboardScriptPatch(
-  session: DashboardOpsSessionClient | null,
-  payload: unknown,
-): Promise<DashboardScriptMutation | DashboardOpsFailure> {
-  if (!payload || typeof payload !== 'object') return dashboardOpsFailure('VALIDATION');
-  const record = payload as Record<string, unknown>;
-  const scriptId = record.scriptId;
-  const expectedVersion = record.expectedVersion;
-  const title = record.title;
-  const answerText = record.answerText;
-  const effectiveFrom = record.effectiveFrom;
-  if (typeof scriptId !== 'string' || !Number.isInteger(expectedVersion)
-    || typeof title !== 'string' || typeof answerText !== 'string'
-    || typeof effectiveFrom !== 'string') {
-    return dashboardOpsFailure('VALIDATION');
-  }
-  return withSession(session, ['owner'], async (client, epoch) => {
-    const result = await client.request(
-      epoch,
-      `/v1/content/scripts/${encodeURIComponent(scriptId)}`,
-      {
-        method: 'PATCH',
-        headers: { 'idempotency-key': randomUUID() },
-        body: {
-          expected_version: expectedVersion,
-          title,
-          answer_text: answerText,
-          effective_from: effectiveFrom,
-          effective_to: record.effectiveTo ?? null,
-        },
-      },
-    );
-    const parsed = parseContractSchema('ScriptMutationResponse', result.value);
-    return Object.freeze({
-      ok: true as const,
-      scriptId: parsed.script_id,
-      mutationId: parsed.mutation_id,
-      reviewStatus: 'pending_review' as const,
-    });
-  });
-}
-
 export async function dashboardScriptDelete(
   session: DashboardOpsSessionClient | null,
   payload: unknown,

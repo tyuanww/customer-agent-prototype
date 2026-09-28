@@ -3,10 +3,12 @@ import { IPC_CHANNELS } from '../shared/ipc-channels';
 import { dashboardWordingFailure, type DashboardWordingResult } from '../shared/dashboard-wording';
 import { isTrustedMainFrameSender } from './sender-guard';
 import { listDashboardWording } from './dashboard-wording';
+import type { HydrateSnapshotItem } from './hydrate-catalog.ts';
 
 export function registerDashboardWordingIpc(
   dashboardContents: () => WebContents | null,
   devUrl: () => string | undefined,
+  liveCatalog: () => { releaseId: string; items: readonly HydrateSnapshotItem[] } | null = () => null,
 ): void {
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_WORDING_LIST, (event, ...args: unknown[]): DashboardWordingResult => {
     const contents = dashboardContents();
@@ -15,7 +17,7 @@ export function registerDashboardWordingIpc(
     }
     if (args.length !== 0) return dashboardWordingFailure('VALIDATION');
     try {
-      return listDashboardWording();
+      return listDashboardWording(liveCatalog());
     } catch {
       return dashboardWordingFailure('UNAVAILABLE');
     }

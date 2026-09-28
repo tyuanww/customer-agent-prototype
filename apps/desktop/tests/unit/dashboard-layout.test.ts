@@ -587,12 +587,14 @@ describe('dashboard layout contract', () => {
     const publishFeedbackRule = css.match(/\.content-publish-feedback\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(publishFeedbackRule).toContain('flex-direction: column');
 
-    const bannerRule = css.match(/\.content-session-banner\s*\{([^}]*)\}/)?.[1] ?? '';
-    expect(bannerRule).toContain('min-width: 0');
-    expect(bannerRule).toContain('text-overflow: ellipsis');
-    expect(bannerRule).toContain('white-space: nowrap');
-    expect(bannerRule).toContain('font-size: 12px');
-    expect(bannerRule).toContain('color: var(--dash-muted)');
+    const replaceRowRule = css.match(/\.content-replace-row\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(replaceRowRule).toContain('margin: 0 0 14px');
+    expect(replaceRowRule).toContain('align-items: center');
+    expect(css).toContain('.dash-filter-toolbar.content-replace-row label');
+    expect(css).toContain('.content-replace-row .dash-scope');
+    expect(css).toMatch(/\.content-replace-row \.dash-scope\s*\{[^}]*margin:\s*0;/);
+    expect(css).toContain('.dashboard-shell .content-replace-row select');
+    expect(css).toContain('min-height: 40px');
 
     const titleClusterRule = css.match(/\.content-title-cluster\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(titleClusterRule).toContain('min-width: 0');
@@ -607,12 +609,13 @@ describe('dashboard layout contract', () => {
     // `.content-action-row .dash-reset` (0,2,0) loses to it, silently leaving the
     // cancel button at 38px. Keep the shell prefix so the 40px CTA height holds.
     expect(css).toContain('.dashboard-shell .content-action-row .dash-reset');
+    expect(css).toContain('.dashboard-shell .content-upload-controls .dash-reset');
     expect(css).not.toMatch(/^\.content-action-row \.dash-reset\s*\{/m);
 
-    // The import block left .dash-card, so its label must not reuse the card name.
-    expect(content).toContain('content-upload-label');
     expect(content).not.toContain('className="dash-card-label"');
-    expect(content).toContain('role="group" aria-labelledby="content-upload-title"');
+    expect(content).toContain('aria-label="内容导入"');
+    expect(content).toContain('data-testid="content-replace-row"');
+    expect(content).toContain('将替换');
 
     // The decorative two-step wizard is gone, markup and CSS both.
     expect(css).not.toContain('.content-pipeline-steps');

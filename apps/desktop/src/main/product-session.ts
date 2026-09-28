@@ -1,8 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { exactKeys, productFailure, type ProductSessionResult, type ProductSessionView } from '../shared/product-session';
+import {
+  exactKeys,
+  productFailure,
+  sessionDisplayName,
+  type ProductSessionResult,
+  type ProductSessionView,
+} from '../shared/product-session';
 import { ProductHttp, ProductHttpError } from './product-http';
-import { humanizeUserId, readOperatorDisplayName } from './operator-display-names';
+import { readOperatorDisplayName } from './operator-display-names';
 
 type StoredSession = { access_token: string; expires_at: string };
 export type SessionStore = { read(): unknown; write(value: StoredSession): void; clear(): void };
@@ -32,9 +38,10 @@ export class ProductSession {
   view(): ProductSessionView {
     if (this.token && Date.parse(this.token.expires_at) <= Date.now()) this.invalidate();
     const userId = this.user?.userId ?? null;
-    const displayName = userId
-      ? (readOperatorDisplayName(userId) ?? humanizeUserId(userId)).slice(0, 64)
-      : null;
+    const displayName = sessionDisplayName({
+      role: this.user?.role ?? null,
+      mappedName: userId ? readOperatorDisplayName(userId) : null,
+    });
     return { ok: true, enabled: true, signedIn: !!this.token && !!this.user, sessionEpoch: this.epoch,
       userId, role: this.user?.role ?? null, authMode: this.user?.authMode ?? null,
       expiresAt: this.token?.expires_at ?? null, displayName };

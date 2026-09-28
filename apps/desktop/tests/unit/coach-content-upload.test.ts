@@ -256,7 +256,6 @@ describe('coach content upload parser', () => {
           rows: [{ scene: '面膜紫适用人群', script: '亲亲这是话术', domain: 'product' as const }],
           csvText: 'scene,script,domain\n面膜紫适用人群,亲亲这是话术,product',
         }),
-        importDraft: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
         publishDraft: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
         cancelInFlight: async () => ({ ok: true as const }),
       };

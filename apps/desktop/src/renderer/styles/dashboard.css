@@ -1716,15 +1716,32 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   display: inline-flex;
 }
 
-.content-session-banner {
+.content-replace-row {
+  margin: 0 0 14px;
+  align-items: center;
+}
+
+.dash-filter-toolbar.content-replace-row label {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--dash-ink);
+}
+
+.dashboard-shell .content-replace-row select {
+  min-height: 40px;
+}
+
+.content-replace-row .dash-scope {
+  flex: 1 1 220px;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   color: var(--dash-muted);
   font-size: 12px;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .content-action-row {
@@ -1738,7 +1755,8 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 /* Match the 40px primary CTA beside it. The shell's base rule for
    `.dashboard-shell button.dash-reset` is more specific than a bare
    `.content-action-row .dash-reset`, so this rule keeps the shell prefix to win. */
-.dashboard-shell .content-action-row .dash-reset {
+.dashboard-shell .content-action-row .dash-reset,
+.dashboard-shell .content-upload-controls .dash-reset {
   min-height: 40px;
 }
 
@@ -1756,6 +1774,21 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .content-publish-delta {
   color: var(--dash-muted);
+}
+
+.content-publish-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.content-replace-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 14px;
 }
 
 .dash-publish {
@@ -2177,6 +2210,7 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 .dash-metric-grid.compact { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
 
 .dash-scope-important {
+  margin: 0 0 14px;
   padding: 10px 12px;
   border: 1px solid var(--dash-line);
   border-radius: var(--dash-radius);
@@ -2234,7 +2268,8 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 .dash-filterbar input:hover, .dash-filterbar select:hover, .dash-inline-filter select:hover { background-color: var(--dash-chrome-hover); }
 .dash-filterbar input:focus-visible, .dash-filterbar select:focus-visible, .dash-inline-filter select:focus-visible { outline: 2px solid var(--dash-purple); outline-offset: 1px; }
 
-.wording-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr); gap: 12px; }
+.wording-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr); gap: 12px; }
+.wording-layout:not(:has(.wording-detail)) { grid-template-columns: 1fr; }
 .wording-list { display: grid; align-content: start; gap: 6px; }
 .sop-library-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .sop-library-node {
@@ -2265,6 +2300,9 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 .wording-detail h2 { margin: 9px 0; }
 .wording-preview { padding: 10px 11px; border-radius: 8px; background: var(--dash-surface-subtle); line-height: 20px; }
 .dash-dl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.wording-detail .dash-dl dt { white-space: nowrap; }
+.wording-detail .dash-dl dd { overflow-wrap: break-word; word-break: keep-all; }
+.wording-detail .wording-detail-window { grid-column: 1 / -1; }
 .dash-empty-state { display: grid; gap: 4px; padding: 24px; border: 1px dashed var(--dash-line); border-radius: 8px; background: var(--dash-surface); text-align: center; }
 .dash-empty-state span { color: var(--dash-muted); font-size: 12px; }
 
@@ -2871,6 +2909,10 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 .voc-heat-legend i:nth-of-type(4) { background: var(--dash-heat-4); }
 
 .wording-domain-panel { min-width: 0; }
+.wording-domain-panel .dash-filterbar input,
+.wording-domain-panel .dash-filterbar .dash-reset {
+  min-height: 40px;
+}
 
 .iteration-reminder {
   margin: 0 0 16px;
@@ -3186,23 +3228,11 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   margin-bottom: 16px;
 }
 
-.content-upload-copy h2 { margin-top: 3px; }
-
-/* Same treatment as .dash-card-label, but owned by the collapsed import block
-   that no longer sits inside a .dash-card. */
-.content-upload-label {
-  display: block;
+.content-upload-draft {
   margin: 0;
   color: var(--dash-muted);
   font-size: 12px;
-}
-
-.content-upload-copy p {
-  max-width: 760px;
-  margin: 6px 0 0;
-  color: var(--dash-muted);
-  font-size: 12px;
-  line-height: 19px;
+  line-height: 18px;
 }
 
 .content-upload-controls {
@@ -3244,6 +3274,11 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   margin: 0;
 }
 .content-staged-preview .dash-table { min-width: 420px; }
+.content-staged-preview .dash-table th:first-child,
+.content-staged-preview .dash-table td:first-child {
+  white-space: nowrap;
+  width: 3em;
+}
 .content-staged-preview caption {
   caption-side: top;
   padding: 8px 12px 0;
@@ -3596,6 +3631,27 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .announce-library-card:hover {
   background: var(--dash-chrome-hover);
+}
+
+.announce-library-card .dash-card-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.announce-empty {
+  margin: 8px 0 0;
+}
+
+.announce-empty strong {
+  color: var(--dash-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dashboard-shell .software-version-card .dash-reset {
+  min-height: 40px;
 }
 
 .announce-library-title {

@@ -81,7 +81,6 @@ describe('SopLibraryModule', () => {
       sopImport: vi.fn(),
       sopPatch,
       sopDelete,
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
@@ -118,7 +117,6 @@ describe('SopLibraryModule', () => {
       sopImport: vi.fn(),
       sopPatch,
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
@@ -154,7 +152,6 @@ describe('SopLibraryModule', () => {
       sopImport,
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
@@ -184,7 +181,6 @@ describe('SopLibraryModule', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };
@@ -203,7 +199,6 @@ describe('SopLibraryModule', () => {
       sopImport: vi.fn(),
       sopPatch: vi.fn(),
       sopDelete: vi.fn(),
-      scriptPatch: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
     };

@@ -6,7 +6,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 const LIST = 'dashboard:wording-list';
 const CONTENT_SESSION = 'dashboard:content-session';
 const CONTENT_PARSE = 'dashboard:content-parse';
-const CONTENT_IMPORT = 'dashboard:content-import';
 const CONTENT_PUBLISH = 'dashboard:content-publish';
 const CONTENT_CANCEL_IN_FLIGHT = 'dashboard:content-cancel-in-flight';
 const ITERATION_LIST = 'dashboard:iteration-list';
@@ -17,11 +16,12 @@ const OPS_SOP_CATALOG = 'dashboard:ops-sop-catalog';
 const OPS_SOP_IMPORT = 'dashboard:ops-sop-import';
 const OPS_SOP_PATCH = 'dashboard:ops-sop-patch';
 const OPS_SOP_DELETE = 'dashboard:ops-sop-delete';
-const OPS_SCRIPT_PATCH = 'dashboard:ops-script-patch';
 const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
 const OPS_SOFTWARE = 'dashboard:ops-software';
 const ANNOUNCE_CURRENT = 'dashboard:announce-current';
 const ANNOUNCE_MARK_READ = 'dashboard:announce-mark-read';
+const ANNOUNCE_CONTENT_UPDATED = 'product:announce-content-updated';
+const PRODUCT_SESSION_CHANGED = 'product:session-changed';
 
 const LIBRARY_DOMAINS = ['product', 'campaign', 'presale', 'aftersale'] as const;
 type LibraryDomain = (typeof LIBRARY_DOMAINS)[number];
@@ -105,9 +105,10 @@ function isWordingList(value: unknown): boolean {
       && (record.code === 'FORBIDDEN' || record.code === 'VALIDATION' || record.code === 'UNAVAILABLE');
   }
   return record.ok === true
-    && Object.keys(record).length === 5
+    && Object.keys(record).length === 6
     && (record.releaseId === null || typeof record.releaseId === 'string')
     && (record.catalogRefreshedAt === null || typeof record.catalogRefreshedAt === 'string')
+    && typeof record.matchesLease === 'boolean'
     && Number.isSafeInteger(record.total)
     && (record.total as number) >= 0
     && Array.isArray(record.entries)
@@ -140,17 +141,6 @@ function isContentSession(value: unknown): boolean {
       && typeof record.displayName === 'string';
   }
   return record.role === null && record.displayName === null;
-}
-
-function isContentImport(value: unknown): boolean {
-  if (isContentFailure(value)) return true;
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  return exactKeys(record, ['ok', 'importBatchId'])
-    && record.ok === true
-    && typeof record.importBatchId === 'string'
-    && record.importBatchId.length > 0
-    && record.importBatchId.length <= 128;
 }
 
 function isContentPublish(value: unknown): boolean {
@@ -287,14 +277,6 @@ contextBridge.exposeInMainWorld('dashboardContent', {
       return unavailable;
     }
   },
-  async importDraft(request: unknown) {
-    try {
-      const value: unknown = await ipcRenderer.invoke(CONTENT_IMPORT, request);
-      return isContentImport(value) ? value : unavailable;
-    } catch {
-      return unavailable;
-    }
-  },
   async publishDraft(request: unknown) {
     try {
       const value: unknown = await ipcRenderer.invoke(CONTENT_PUBLISH, request);
@@ -314,6 +296,10 @@ contextBridge.exposeInMainWorld('dashboardContent', {
     } catch {
       return unavailable;
     }
+  },
+  onSessionChanged(listener: () => void) {
+    sessionChangedListeners.add(listener);
+    return () => { sessionChangedListeners.delete(listener); };
   },
 });
 
@@ -343,15 +329,21 @@ contextBridge.exposeInMainWorld('dashboardOps', {
   sopDelete(request: unknown) {
     return invokeOps(OPS_SOP_DELETE, request);
   },
-  scriptPatch(request: unknown) {
-    return invokeOps(OPS_SCRIPT_PATCH, request);
-  },
   scriptDelete(request: unknown) {
     return invokeOps(OPS_SCRIPT_DELETE, request);
   },
   softwareCatalog() {
     return invokeOps(OPS_SOFTWARE);
   },
+});
+
+const catalogUpdatedListeners = new Set<() => void>();
+const sessionChangedListeners = new Set<() => void>();
+ipcRenderer.on(ANNOUNCE_CONTENT_UPDATED, () => {
+  for (const listener of catalogUpdatedListeners) listener();
+});
+ipcRenderer.on(PRODUCT_SESSION_CHANGED, () => {
+  for (const listener of sessionChangedListeners) listener();
 });
 
 contextBridge.exposeInMainWorld('dashboardAnnounce', {
@@ -367,6 +359,10 @@ contextBridge.exposeInMainWorld('dashboardAnnounce', {
     const domains = parseDomainList(request);
     if (domains.length === 0) return;
     try { await ipcRenderer.invoke(ANNOUNCE_MARK_READ, domains); } catch { /* best effort */ }
+  },
+  onCatalogUpdated(listener: () => void) {
+    catalogUpdatedListeners.add(listener);
+    return () => { catalogUpdatedListeners.delete(listener); };
   },
 });
 

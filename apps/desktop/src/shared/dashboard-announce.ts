@@ -37,6 +37,8 @@ export type DashboardAnnounceApi = {
   current(): Promise<DashboardAnnounceResult>;
   /** 仅「话术版本更新」tab 实际可见时调用；只传域，不传 userId。 */
   markRead(domains: readonly LibraryDomain[]): Promise<void>;
+  /** 发布刷新 snapshot 后，Dashboard 重拉话术库 / 概览条数。 */
+  onCatalogUpdated?(listener: () => void): () => void;
 };
 
 export function dashboardAnnounceUnavailable(

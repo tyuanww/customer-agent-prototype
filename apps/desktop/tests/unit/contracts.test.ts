@@ -58,7 +58,6 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.DASHBOARD_WORDING_LIST,
       IPC_CHANNELS.DASHBOARD_CONTENT_SESSION,
       IPC_CHANNELS.DASHBOARD_CONTENT_PARSE,
-      IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT,
       IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH,
       IPC_CHANNELS.DASHBOARD_CONTENT_CANCEL_IN_FLIGHT,
       IPC_CHANNELS.DASHBOARD_ITERATION_LIST,
@@ -69,7 +68,6 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT,
       IPC_CHANNELS.DASHBOARD_OPS_SOP_PATCH,
       IPC_CHANNELS.DASHBOARD_OPS_SOP_DELETE,
-      IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_PATCH,
       IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_DELETE,
       IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE,
       IPC_CHANNELS.DASHBOARD_ANNOUNCE_CURRENT,
@@ -128,7 +126,6 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_WORDING_LIST}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_SESSION}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PARSE}'`);
-    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_IMPORT}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_LIST}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_START}'`);
@@ -142,7 +139,8 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).not.toContain('product:login');
     expect(dashboardPreload).not.toContain("from '../shared/product-session'");
     expect(dashboardPreload).not.toContain('ipcRenderer.send(');
-    expect(dashboardPreload).not.toContain('ipcRenderer.on(');
+    expect(dashboardPreload).toContain('ipcRenderer.on(ANNOUNCE_CONTENT_UPDATED');
+    expect(dashboardPreload).toContain('ipcRenderer.on(PRODUCT_SESSION_CHANGED');
   });
 
   it('keeps the SOP preload free of shared overlay modules', () => {
