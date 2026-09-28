@@ -1550,10 +1550,6 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 21');
 
     await user.click(screen.getByTestId('wording-page-next'));
-    await user.selectOptions(screen.getByTestId('wording-lifecycle'), 'published');
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-
-    await user.click(screen.getByTestId('wording-page-next'));
     await user.type(screen.getByTestId('wording-search'), '正文 25');
     expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 1 页');
     expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 25');

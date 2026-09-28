@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import {
   type DomainId,
   type WordingEntry,
-  type WordingLifecycle,
 } from '../../data/dashboard-manifest';
 import type { DashboardWordingView } from '@shared/dashboard-wording';
 import {
@@ -58,7 +57,6 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
 } = {}) {
   const [catalog, setCatalog] = useState<DashboardWordingView | null>(null);
   const [query, setQuery] = useState('');
-  const [lifecycle, setLifecycle] = useState<WordingLifecycle | 'all'>('all');
   const [domain, setDomain] = useState<DomainId>('product');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -69,7 +67,6 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
     if (!initialDomain) return;
     setDomain(initialDomain);
     setQuery('');
-    setLifecycle('all');
     setPage(1);
     setRetireConfirm(false);
     onDomainConsumed?.();
@@ -108,19 +105,18 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('zh-CN');
     return entries.filter((entry) => {
-      if (entry.domain !== domain || (lifecycle !== 'all' && entry.lifecycle !== lifecycle)) {
+      if (entry.domain !== domain) {
         return false;
       }
       return !needle || `${entry.title} ${entry.scene} ${entry.answerPreview}`.toLocaleLowerCase('zh-CN').includes(needle);
     });
-  }, [domain, entries, lifecycle, query]);
+  }, [domain, entries, query]);
   const paged = useMemo(() => paginateWording(visible, page), [page, visible]);
   const selected = paged.slice.find((entry) => entry.scriptId === selectedId) ?? paged.slice[0];
 
   const chooseDomain = (next: DomainId) => {
     setDomain(next);
     setQuery('');
-    setLifecycle('all');
     setPage(1);
     setSelectedId(entries.find((entry) => entry.domain === next)?.scriptId ?? null);
     setRetireConfirm(false);
@@ -183,12 +179,9 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
       <header className="dash-module-head">
         <div>
           <h1>话术库</h1>
-          <p className="dash-kicker">坐席现在能搜到的当前发布 · 下架要等下次发布</p>
+          <p className="dash-kicker">坐席现在能搜到的当前发布</p>
         </div>
       </header>
-      <p className="dash-scope dash-scope-important">
-        这是已发布目录。写新表去内容管理。下架提交审核后，坐席要等下一次发布才搜不到。
-      </p>
       {writeMessage ? <p className="dash-scope" data-testid="wording-write-status">{writeMessage}</p> : null}
 
       <div className="wording-domain-tabs" role="tablist" aria-label="话术域">
@@ -207,7 +200,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
             onKeyDown={(event) => handleDomainKeyDown(event, item.id)}
           >
             <strong>{item.label}</strong>
-            <span>{live ? `${entries.filter((entry) => entry.domain === item.id).length} 条` : '未挂载'}</span>
+            <span>{live ? `${entries.filter((entry) => entry.domain === item.id).length} 条` : '—'}</span>
           </button>
         ))}
       </div>
@@ -218,6 +211,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
         aria-labelledby={`wording-tab-${domain}`}
         className="wording-domain-panel"
       >
+        {live ? (
         <div className="source-readiness" data-testid="wording-source-readiness">
           <div>
             <span className="dash-card-label">当前发布</span>
@@ -225,10 +219,11 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
           </div>
           <StatusBadge
             label={readinessLabel}
-            tone={!live || domainCount === 0 ? 'warn' : 'ok'}
+            tone={domainCount === 0 ? 'warn' : 'ok'}
           />
           <p>{sourceSummary}</p>
         </div>
+        ) : null}
 
         <div className="dash-filterbar" aria-label="话术筛选">
         <label>
@@ -243,26 +238,11 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
             }}
           />
         </label>
-        <label>
-          <span>生命周期</span>
-          <select
-            data-testid="wording-lifecycle"
-            value={lifecycle}
-            onChange={(event) => {
-              setLifecycle(event.target.value as WordingLifecycle | 'all');
-              setPage(1);
-            }}
-          >
-            <option value="all">全部</option>
-            <option value="published">已发布</option>
-          </select>
-        </label>
         <button
           type="button"
           className="dash-reset"
           onClick={() => {
             setQuery('');
-            setLifecycle('all');
             setPage(1);
             setSelectedId(entries.find((entry) => entry.domain === domain)?.scriptId ?? null);
           }}
@@ -283,9 +263,11 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
         </button>
         </div>
 
+        {live ? (
         <div className="dash-selection-status" aria-live="polite" data-testid="wording-filter-status">
           <span>当前域</span><strong>{source.label} · {visible.length} 条</strong><em>{readinessLabel}</em>
         </div>
+        ) : null}
 
         <div className="wording-layout">
         <div className="wording-list" data-testid="wording-list">
@@ -308,8 +290,8 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
             </button>
           )) : (
             <div className="dash-empty-state" data-testid="wording-empty">
-              <strong>{live ? '没有匹配的话术' : '本机话术库未挂载'}</strong>
-              <span>{live ? '换一个域或清空筛选后再看。' : '未接入当前发布，不回退本地样例。'}</span>
+              <strong>{live ? '没有匹配的话术' : '当前发布未挂载'}</strong>
+              <span>{live ? '换一个域或清空筛选后再看。' : '登录后才能看到坐席能搜到的目录。'}</span>
             </div>
           )}
           {visible.length > 0 ? (

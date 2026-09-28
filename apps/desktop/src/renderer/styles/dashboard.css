@@ -2871,6 +2871,10 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 .voc-heat-legend i:nth-of-type(4) { background: var(--dash-heat-4); }
 
 .wording-domain-panel { min-width: 0; }
+.wording-domain-panel .dash-filterbar input,
+.wording-domain-panel .dash-filterbar .dash-reset {
+  min-height: 40px;
+}
 
 .iteration-reminder {
   margin: 0 0 16px;

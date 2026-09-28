@@ -465,7 +465,7 @@ describe('dashboard live actions', () => {
     };
     render(<WordingLibraryModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('wording-empty')).toHaveTextContent('本机话术库未挂载');
+      expect(screen.getByTestId('wording-empty')).toHaveTextContent('当前发布未挂载');
     });
   });
 
