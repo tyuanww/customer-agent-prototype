@@ -1621,13 +1621,14 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-content'));
 
     expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('content-replace-row')).toHaveTextContent('将替换');
     expect(screen.getByTestId('content-upload-draft-copy')).toHaveTextContent(
-      '上传只进入待发布，点发布后坐席才能搜到',
+      '选表只预览，点发布后坐席才能搜到',
     );
-    expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('管理员（owner）');
-    expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
-    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('产品会话');
-    expect(screen.getByTestId('content-aftersale-note')).toHaveTextContent('SOP 写库未接入');
+    expect(screen.queryByTestId('content-upload-role-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-upload-boundary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-aftersale-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('formal-source-warning')).not.toBeInTheDocument();
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
     expect(screen.getByTestId('content-upload-input')).toHaveAttribute('accept', '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1641,8 +1642,11 @@ describe('DashboardApp', () => {
     const actionRow = document.querySelector('.content-action-row');
     expect(actionRow).toContainElement(screen.getByTestId('publish-action'));
     expect(actionRow).toContainElement(screen.getByTestId('cancel-in-flight'));
-    expect(screen.getByTestId('formal-source-warning').closest('.dash-module-head')).not.toBeNull();
-    expect(screen.getByTestId('formal-source-warning')).toHaveClass('content-session-banner');
+    expect(screen.getByTestId('content-replace-row').closest('[data-testid="content-pending-dev"]')).toBeNull();
+    expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
+      'title',
+      expect.stringContaining('产品会话'),
+    );
     expect(screen.queryByTestId('content-pipeline-steps')).not.toBeInTheDocument();
     expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
 

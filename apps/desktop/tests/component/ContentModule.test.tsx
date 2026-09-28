@@ -385,16 +385,19 @@ describe('ContentModule header layout', () => {
     delete window.dashboardContent;
   });
 
-  it('keeps the session banner in the module header, not as a full-width strip', () => {
+  it('keeps 将替换 outside 待开发 so the operator names the library before opening the fold', () => {
     render(<ContentModule />);
-    const banner = screen.getByTestId('formal-source-warning');
-    expect(banner.closest('.dash-module-head')).not.toBeNull();
-    expect(banner.closest('[data-testid="content-upload-panel"]')).toBeNull();
-    expect(banner).toHaveClass('content-session-banner');
-    expect(banner).not.toHaveClass('dash-scope');
-    expect(banner).not.toHaveClass('dash-scope-important');
-    // Full sentence survives in the collapsed-width tooltip.
-    expect(banner).toHaveAttribute('title', expect.stringContaining('不会写入假发布'));
+    const replace = screen.getByTestId('content-replace-row');
+    expect(replace).toHaveTextContent('将替换');
+    expect(replace.querySelector('label')).toHaveAttribute('for', 'content-domain-override');
+    expect(screen.getByTestId('content-domain-override')).toBeInTheDocument();
+    expect(replace.closest('[data-testid="content-pending-dev"]')).toBeNull();
+    expect(screen.queryByTestId('content-domain-detected')).not.toBeInTheDocument();
+    expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
+      'title',
+      expect.stringContaining('不会写入假发布'),
+    );
+    expect(screen.queryByTestId('formal-source-warning')).not.toBeInTheDocument();
   });
 
   it('puts cancel and publish in one nowrap action row', () => {
@@ -403,16 +406,6 @@ describe('ContentModule header layout', () => {
     expect(row).not.toBeNull();
     expect(row).toContainElement(screen.getByTestId('publish-action'));
     expect(row).toContainElement(screen.getByTestId('cancel-in-flight'));
-  });
-
-  it('shortens the banner once the session is signed in', async () => {
-    const api = mockSession('owner');
-    window.dashboardContent = api;
-    render(<ContentModule />);
-    await waitFor(() => {
-      expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('导入与发布走产品会话');
-    });
-    expect(screen.getByTestId('formal-source-warning')).not.toHaveTextContent('不会写入假发布');
   });
 
   it('names the cancel action so it is not confused with clearing the local preview', () => {

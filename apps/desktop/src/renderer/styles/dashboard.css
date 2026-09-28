@@ -1716,15 +1716,27 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   display: inline-flex;
 }
 
-.content-session-banner {
+.content-replace-row {
+  margin: 0 0 14px;
+  align-items: center;
+}
+
+.content-replace-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dash-ink);
+}
+
+.dashboard-shell .content-replace-row select {
+  min-height: 40px;
+}
+
+.content-replace-row .dash-scope {
+  flex: 1 1 220px;
   min-width: 0;
-  margin: 0;
-  overflow: hidden;
   color: var(--dash-muted);
   font-size: 12px;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .content-action-row {
@@ -1738,7 +1750,8 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 /* Match the 40px primary CTA beside it. The shell's base rule for
    `.dashboard-shell button.dash-reset` is more specific than a bare
    `.content-action-row .dash-reset`, so this rule keeps the shell prefix to win. */
-.dashboard-shell .content-action-row .dash-reset {
+.dashboard-shell .content-action-row .dash-reset,
+.dashboard-shell .content-upload-controls .dash-reset {
   min-height: 40px;
 }
 
@@ -3191,23 +3204,11 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   margin-bottom: 16px;
 }
 
-.content-upload-copy h2 { margin-top: 3px; }
-
-/* Same treatment as .dash-card-label, but owned by the collapsed import block
-   that no longer sits inside a .dash-card. */
-.content-upload-label {
-  display: block;
+.content-upload-draft {
   margin: 0;
   color: var(--dash-muted);
   font-size: 12px;
-}
-
-.content-upload-copy p {
-  max-width: 760px;
-  margin: 6px 0 0;
-  color: var(--dash-muted);
-  font-size: 12px;
-  line-height: 19px;
+  line-height: 18px;
 }
 
 .content-upload-controls {

@@ -23,16 +23,13 @@ const DOMAIN_LABELS: Readonly<Record<DomainId, string>> = {
 };
 
 const UPLOAD_COPY = {
-  title: '内容导入',
-  draftOnlyCopy: '上传只进入待发布，点发布后坐席才能搜到。',
-  roleNote: '话术师（coach）可导入已标注的产品与活动草稿。一期发布仅管理员（owner）。售后、过敏或赔付需管理员。坐席（agent）不能发布。没有第四角色。',
-  boundaryCopy: '支持 CSV 与 xlsx。中文表头会映射到场景/标准话术。不连接飞书或 Wiki。组织审核在飞书文档完成后再导入。',
+  draftOnlyCopy: '选表只预览，点发布后坐席才能搜到。',
   accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   readFailure: '无法读取该文件。请确认文件未打开且仍是 CSV/xlsx 后重试。',
 } as const;
 
 const SESSION_BANNER_FULL = '导入与发布走产品会话。没有会话时按钮保持未接入，不会写入假发布。';
-const SESSION_BANNER_SHORT = '导入与发布走产品会话';
+const REPLACE_HINT = '发布会整库替换这一库，其它库沿用。选错会发到别的库，页面不拦。';
 const CANCEL_ARIA_LABEL = '取消服务器上未完成的导入，不影响本页预览';
 
 type UploadView =
@@ -120,7 +117,7 @@ export function ContentModule() {
       ? `正在读取 ${effectiveUpload.sourceName} · 只在本页预览，不会发布`
       : effectiveUpload.status === 'error'
         ? effectiveUpload.message
-        : '尚未导入。选择 CSV 或 xlsx；中文表头（快捷短语/产品话术）会映射到场景与标准话术。空白行会跳过。';
+        : '选择 CSV 或 xlsx';
   const summary = summarizeUpload(upload);
 
   useEffect(() => {
@@ -193,7 +190,11 @@ export function ContentModule() {
     : sessionState === 'signed-in'
       ? { label: '已接入', tone: 'ok' as const }
       : { label: '未接入', tone: 'warn' as const };
-  const bannerText = sessionState === 'signed-in' ? SESSION_BANNER_SHORT : SESSION_BANNER_FULL;
+  const replaceDetected = upload.status === 'ready'
+    ? (hasDomain
+      ? `表里识别到：${[...new Set(rows.map((row) => row.domain))].map(domainLabel).join('、')}`
+      : '表里没有域列')
+    : null;
 
   const clearUpload = () => {
     ingestGeneration.current += 1;
@@ -290,12 +291,13 @@ export function ContentModule() {
       <header className="dash-module-head">
         <div className="content-title-cluster">
           <h1>内容管理</h1>
-          <span className="content-session-badge" data-testid="content-session-badge">
+          <span
+            className="content-session-badge"
+            data-testid="content-session-badge"
+            title={SESSION_BANNER_FULL}
+          >
             <StatusBadge label={sessionBadge.label} tone={sessionBadge.tone} />
           </span>
-          <p className="content-session-banner" data-testid="formal-source-warning" title={SESSION_BANNER_FULL}>
-            {bannerText}
-          </p>
         </div>
         <div className="dash-publish-box">
           <div className="content-action-row">
@@ -342,6 +344,28 @@ export function ContentModule() {
         </div>
       </header>
 
+      <div className="dash-filter-toolbar compact content-replace-row" data-testid="content-replace-row">
+        <label htmlFor="content-domain-override">将替换</label>
+        <select
+          id="content-domain-override"
+          data-testid="content-domain-override"
+          value={domainOverride}
+          disabled={submitting}
+          onChange={(event) => {
+            setDomainOverride(event.currentTarget.value as DashboardContentDomain | '');
+          }}
+        >
+          <option value="">按导入表</option>
+          {DOMAIN_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        {replaceDetected ? (
+          <span data-testid="content-domain-detected">{replaceDetected}</span>
+        ) : null}
+        <span className="dash-scope">{REPLACE_HINT}</span>
+      </div>
+
       <details
         className="dash-contract-details"
         data-testid="content-pending-dev"
@@ -352,7 +376,7 @@ export function ContentModule() {
         }}
       >
         <summary title={summary.title}>{summary.text}</summary>
-        <div className="content-upload" data-testid="content-upload-panel" role="group" aria-labelledby="content-upload-title">
+        <div className="content-upload" data-testid="content-upload-panel" role="group" aria-label="内容导入">
 
           <div className="dash-filter-toolbar compact content-upload-controls" aria-label="内容导入">
             <input
@@ -411,32 +435,6 @@ export function ContentModule() {
           </div>
 
           {upload.status === 'ready' ? (
-            <div className="dash-filter-toolbar compact content-domain-picker" aria-label="归属话术库">
-              <label htmlFor="content-domain-override">归属话术库</label>
-              <span data-testid="content-domain-detected">
-                {hasDomain ? `表里识别到：${[...new Set(rows.map((row) => row.domain))].map(domainLabel).join('、')}` : '表里没有域列'}
-              </span>
-              <select
-                id="content-domain-override"
-                data-testid="content-domain-override"
-                value={domainOverride}
-                disabled={submitting}
-                onChange={(event) => {
-                  setDomainOverride(event.currentTarget.value as DashboardContentDomain | '');
-                }}
-              >
-                <option value="">按表里的域</option>
-                {DOMAIN_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <span className="dash-scope">
-                选错库不会报错但会传错区。这张表实际属于哪个话术库，就在这里确认。
-              </span>
-            </div>
-          ) : null}
-
-          {upload.status === 'ready' ? (
             <div className="dash-table-wrap content-staged-preview" data-testid="content-staged-preview">
               <table className="dash-table">
                 <caption>待发布预览 · 场景 / 标准话术</caption>
@@ -460,14 +458,9 @@ export function ContentModule() {
             </div>
           ) : null}
 
-          <div className="content-upload-copy">
-            <span className="content-upload-label">{UPLOAD_COPY.title}</span>
-            <h2 id="content-upload-title">本地导入进入待发布</h2>
-            <p data-testid="content-upload-draft-copy">{UPLOAD_COPY.draftOnlyCopy}</p>
-            <p data-testid="content-upload-role-note">{UPLOAD_COPY.roleNote}</p>
-            <p data-testid="content-upload-boundary">{UPLOAD_COPY.boundaryCopy}</p>
-            <p data-testid="content-aftersale-note">售后 SOP 写库未接入，本页不展开合成树。</p>
-          </div>
+          <p data-testid="content-upload-draft-copy" className="content-upload-draft">
+            {UPLOAD_COPY.draftOnlyCopy}
+          </p>
         </div>
       </details>
     </div>
