@@ -111,7 +111,7 @@ Dashboard 主标题只使用「客服运营工作台 / 运营管理端」，不�
 1. 管理概览：统计范围、KPI 条、话术优化待办；有产品会话时 KPI 读检索账无命中率 / 复制完成率
 2. 话术库：产品话术、活动话术、售前流程、售后流程分域浏览当前发布
 3. SOP：有产品会话时读/导入/更新当前会话树，删除仅 Owner；没有会话保持未接入，不把合成过敏树当运营目录
-4. 内容管理：本地 CSV / xlsx 导入；Owner 校验通过后 staged 并发布。组织审核在飞书文档，产品内不再 park 双人复核
+4. 内容管理：顶栏右侧「取消未完成导入」与「发布」同一行（取消在左、主 CTA 在右），原因与发布反馈在动作行下方。标题旁是产品会话徽章，不是发布权徽章：`StatusBadge` 只表示产品会话是否已登录——无会话或未登录写「未接入」（warn），首次 `session()` 未返回写「正在确认会话」（neutral），已登录写「已接入」（ok），即使该角色当前不能发布也仍是「已接入」，原因只走 `CONTENT_PUBLISH_COPY`。「内容导入 / 本地导入」整块默认折在「待开发」，选表/状态/归属/预览在折叠体内，读文件进入 reading / ready / error 自动展开。本地 CSV / xlsx 导入；Owner 校验通过后 staged 并发布。组织审核在飞书文档，产品内不再 park 双人复核
 5. 系统同步：话术版本读当前发布；Owner 软件目录列出 signed/unsigned，禁止 `latest.yml`
 
 侧栏业务导航图标由单一 `--dash-nav-icon-size: 20px` 同时驱动 `.dashboard-nav-icon` wrapper 与 SVG `width/height`，保留 24 viewBox / path / stroke。导航文字用静态 `--dash-nav-label-shift: calc(var(--dash-brand-copy-shift) - 4px)` 再靠近约 4px，expanded 态 icon-to-label 间隙约 14px。不改 PanelLeft toggle、品牌狐狸 40px、icon slot、macOS `nav.left+60` / native `+36` 锚点、8px inset、42px hit row、selected `::before inset:0`，也不给 icon transform。
@@ -122,7 +122,7 @@ Dashboard 主标题只使用「客服运营工作台 / 运营管理端」，不�
 
 不读取 Float 真实输入，不写磁盘，不用 localStorage / IndexedDB。
 
-Owner 发布必须走冻结合同：导入校验通过后 staged，再 `POST /v1/content/publish`。组织审核在飞书文档。没有会话或角色不够时按钮保持未接入 / 禁用，禁止合成成功。
+Owner 发布必须走冻结合同：导入校验通过后 staged，再 `POST /v1/content/publish`。组织审核在飞书文档。没有会话时按钮保持未接入 / 禁用，禁止合成成功。角色不够不等于「未接入」：会话已登录就写「已接入」，发布禁用原因只走 `CONTENT_PUBLISH_COPY`（话术师走 `ownerPublish`，坐席走 `agent`），不把权限不足写成连接失败。
 
 ### 状态与反馈
 

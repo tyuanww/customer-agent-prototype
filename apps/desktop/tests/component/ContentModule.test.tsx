@@ -1,9 +1,14 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentModule } from '../../src/renderer/features/dashboard/ContentModule';
 import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
-import type { DashboardContentApi, DashboardContentFailure } from '../../src/shared/dashboard-content';
+import type {
+  DashboardContentApi,
+  DashboardContentFailure,
+  DashboardContentPublishResult,
+  DashboardContentSessionResult,
+} from '../../src/shared/dashboard-content';
 
 function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): DashboardContentApi {
   return {
@@ -33,6 +38,21 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
   };
 }
 
+/** jsdom keeps the children of a closed `<details>` in the DOM, so `open` is the real check. */
+function pendingDevOpen(): boolean {
+  return (screen.getByTestId('content-pending-dev') as HTMLDetailsElement).open;
+}
+
+function toggleSummary(): void {
+  const summary = screen.getByTestId('content-pending-dev').querySelector('summary');
+  if (!summary) throw new Error('summary missing');
+  fireEvent.click(summary);
+}
+
+function uploadFile(name: string, body: string): File {
+  return new File([body], name, { type: 'text/csv' });
+}
+
 describe('ContentModule publish gate', () => {
   beforeEach(() => {
     delete window.dashboardContent;
@@ -47,6 +67,15 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.noProduct);
     expect(screen.getByTestId('cancel-in-flight')).toBeDisabled();
+    // No API at all settles immediately as 未接入 — never as "still checking".
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+  });
+
+  it('does not call publishDraft when there is no session', async () => {
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await user.click(screen.getByTestId('publish-action'));
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
   });
 
   it('keeps Publish off for agent even with labeled product drafts', async () => {
@@ -67,6 +96,8 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.agent);
     expect(api.publishDraft).not.toHaveBeenCalled();
+    // The badge reports the product session, not the publish permission.
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
   });
 
   it('keeps Publish off for coach when any row is aftersale', async () => {
@@ -87,6 +118,7 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
     expect(api.publishDraft).not.toHaveBeenCalled();
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
   });
 
   it('keeps Publish off for coach product drafts while the API is owner-only', async () => {
@@ -133,6 +165,7 @@ describe('ContentModule publish gate', () => {
     expect(api.parseUpload).toHaveBeenCalledWith(expect.objectContaining({
       sourceName: '【FAQ】MENOKIN话术.xlsx',
     }));
+    expect(pendingDevOpen()).toBe(true);
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('面膜紫适用人群');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('产品');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
@@ -157,6 +190,8 @@ describe('ContentModule publish gate', () => {
     await waitFor(() => {
       expect(screen.getByTestId('publish-feedback')).toHaveTextContent(CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
     });
+    // Feedback owns the slot: the idle "请先导入草稿" reason gives way to it.
+    expect(screen.queryByTestId('publish-disabled-reason')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     result = { ok: true };
     await user.click(screen.getByTestId('cancel-in-flight'));
@@ -221,5 +256,261 @@ describe('ContentModule publish gate', () => {
       expect(screen.getByTestId('publish-feedback')).toHaveTextContent('当前没有产品会话，无法取消导入');
     });
     expect(api.cancelInFlight).not.toHaveBeenCalled();
+  });
+});
+
+describe('ContentModule session badge', () => {
+  afterEach(() => {
+    delete window.dashboardContent;
+  });
+
+  it('says 正在确认会话 while the first session() is still in flight', async () => {
+    const api = mockSession('owner');
+    api.session = vi.fn((): Promise<DashboardContentSessionResult> => new Promise(() => undefined));
+    window.dashboardContent = api;
+    render(<ContentModule />);
+    const badge = screen.getByTestId('content-session-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('正在确认会话');
+    expect(badge).not.toHaveTextContent('未接入');
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('cancel-in-flight')).toBeDisabled();
+  });
+
+  it('settles to 已接入 for a signed-in owner', async () => {
+    const api = mockSession('owner');
+    window.dashboardContent = api;
+    render(<ContentModule />);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
+    });
+  });
+
+  it('settles to 未接入 when the session says not enabled', async () => {
+    const api = mockSession('owner');
+    api.session = vi.fn(async () => ({
+      ok: true as const,
+      enabled: false,
+      signedIn: true,
+      role: 'owner' as const,
+      displayName: '合成管理员',
+    }));
+    window.dashboardContent = api;
+    render(<ContentModule />);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+    });
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+  });
+
+  it('settles to 未接入 on a failed session payload', async () => {
+    const api = mockSession('owner');
+    api.session = vi.fn(async () => ({
+      ok: false as const,
+      code: 'UNAVAILABLE' as const,
+      message: '服务暂不可用，请重试',
+    }));
+    window.dashboardContent = api;
+    render(<ContentModule />);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+    });
+  });
+});
+
+describe('ContentModule header layout', () => {
+  afterEach(() => {
+    delete window.dashboardContent;
+  });
+
+  it('keeps the session banner in the module header, not as a full-width strip', () => {
+    render(<ContentModule />);
+    const banner = screen.getByTestId('formal-source-warning');
+    expect(banner.closest('.dash-module-head')).not.toBeNull();
+    expect(banner.closest('[data-testid="content-upload-panel"]')).toBeNull();
+    expect(banner).toHaveClass('content-session-banner');
+    expect(banner).not.toHaveClass('dash-scope');
+    expect(banner).not.toHaveClass('dash-scope-important');
+    // Full sentence survives in the collapsed-width tooltip.
+    expect(banner).toHaveAttribute('title', expect.stringContaining('不会写入假发布'));
+  });
+
+  it('puts cancel and publish in one nowrap action row', () => {
+    render(<ContentModule />);
+    const row = document.querySelector('.content-action-row');
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(screen.getByTestId('publish-action'));
+    expect(row).toContainElement(screen.getByTestId('cancel-in-flight'));
+  });
+
+  it('shortens the banner once the session is signed in', async () => {
+    const api = mockSession('owner');
+    window.dashboardContent = api;
+    render(<ContentModule />);
+    await waitFor(() => {
+      expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('导入与发布走产品会话');
+    });
+    expect(screen.getByTestId('formal-source-warning')).not.toHaveTextContent('不会写入假发布');
+  });
+
+  it('names the cancel action so it is not confused with clearing the local preview', () => {
+    render(<ContentModule />);
+    expect(screen.getByTestId('cancel-in-flight')).toHaveAccessibleName(
+      '取消服务器上未完成的导入，不影响本页预览',
+    );
+  });
+});
+
+describe('ContentModule pending dev disclosure', () => {
+  afterEach(() => {
+    delete window.dashboardContent;
+  });
+
+  it('starts collapsed and still shows the idle help sentence', () => {
+    render(<ContentModule />);
+    expect(pendingDevOpen()).toBe(false);
+    expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
+      .toHaveTextContent('待开发 · 内容导入');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('选择 CSV 或 xlsx');
+  });
+
+  it('opens on summary click so the file picker is reachable', async () => {
+    render(<ContentModule />);
+    toggleSummary();
+    await waitFor(() => expect(pendingDevOpen()).toBe(true));
+    expect(screen.getByLabelText('选择 CSV 或 xlsx')).toBeVisible();
+  });
+
+  it('auto-opens on upload and lets the operator collapse a ready preview for good', async () => {
+    const api = mockSession('owner');
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await user.upload(screen.getByTestId('content-upload-input'), uploadFile(
+      'coach-draft.csv',
+      'scene,script\n洁面用量确认,先确认产品版本\n满赠规则说明,不承诺库存\n',
+    ));
+    await waitFor(() => expect(pendingDevOpen()).toBe(true));
+    const summary = screen.getByTestId('content-pending-dev').querySelector('summary');
+    expect(summary).toHaveTextContent('待开发 · coach-draft.csv · 待发布 2 行');
+
+    toggleSummary();
+    await waitFor(() => expect(pendingDevOpen()).toBe(false));
+    // A later re-render (focus refresh) must not spring it open again.
+    fireEvent.focus(window);
+    await waitFor(() => expect(api.session).toHaveBeenCalledTimes(2));
+    expect(pendingDevOpen()).toBe(false);
+    expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
+      .toHaveTextContent('待开发 · coach-draft.csv · 待发布 2 行');
+  });
+
+  it('auto-opens on a parse error and shows the parser message in the body', async () => {
+    const api = mockSession('owner');
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await user.upload(screen.getByTestId('content-upload-input'), uploadFile('bad.csv', 'title,body\nA,B\n'));
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
+    });
+    expect(pendingDevOpen()).toBe(true);
+    const summary = screen.getByTestId('content-pending-dev').querySelector('summary');
+    expect(summary).toHaveTextContent('待开发 · 未进入待发布');
+    expect(summary).toHaveTextContent('bad.csv');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('表头必须能映射');
+  });
+
+  it('reports an unreadable file with the local copy and keeps the file name', async () => {
+    const api = mockSession('owner');
+    api.parseUpload = vi.fn(async () => { throw new Error('reader blew up'); });
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    const xlsx = new File(
+      [new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00])],
+      'broken.xlsx',
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    );
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
+    });
+    expect(screen.getByTestId('content-upload-status'))
+      .toHaveTextContent('无法读取该文件。请确认文件未打开且仍是 CSV/xlsx 后重试。');
+    expect(screen.getByTestId('content-upload-status')).not.toHaveTextContent('飞书');
+    expect(pendingDevOpen()).toBe(true);
+    expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
+      .toHaveTextContent('broken.xlsx');
+  });
+
+  it('closes and resets the summary after clearing the preview', async () => {
+    const api = mockSession('owner');
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await user.upload(screen.getByTestId('content-upload-input'), uploadFile(
+      'coach-draft.csv',
+      'scene,script\n洁面用量确认,先确认产品版本\n',
+    ));
+    await waitFor(() => expect(pendingDevOpen()).toBe(true));
+    await user.click(screen.getByTestId('content-upload-clear'));
+    await waitFor(() => expect(pendingDevOpen()).toBe(false));
+    expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
+      .toHaveTextContent('待开发 · 内容导入');
+  });
+
+  it('keeps the picker disabled and the file name in the summary while publishing', async () => {
+    const api = mockSession('owner');
+    api.publishDraft = vi.fn((): Promise<DashboardContentPublishResult> => new Promise(() => undefined));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await user.upload(screen.getByTestId('content-upload-input'), uploadFile(
+      'coach-draft.csv',
+      'scene,script,domain\n洁面用量确认,先确认产品版本,product\n',
+    ));
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
+    await user.click(screen.getByTestId('publish-action'));
+    await waitFor(() => expect(screen.getByTestId('content-upload-pick')).toBeDisabled());
+    expect(screen.getByTestId('content-upload-clear')).toBeDisabled();
+    expect(screen.getByTestId('content-domain-override')).toBeDisabled();
+    expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
+      .toHaveTextContent('待开发 · coach-draft.csv · 待发布 1 行');
+    // Cancel is the in-flight escape hatch and must stay live.
+    expect(screen.getByTestId('cancel-in-flight')).toBeEnabled();
+  });
+
+  it('disables publish after a successful release without touching the staged preview', async () => {
+    const api = mockSession('owner');
+    api.publishDraft = vi.fn(async () => ({
+      ok: true as const,
+      releaseId: 'rel_menokin_2026',
+      releaseSeq: 7,
+      publisherDisplayName: '合成管理员',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await user.upload(screen.getByTestId('content-upload-input'), uploadFile(
+      'coach-draft.csv',
+      'scene,script,domain\n洁面用量确认,先确认产品版本,product\n',
+    ));
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
+    await user.click(screen.getByTestId('publish-action'));
+    await waitFor(() => {
+      expect(screen.getByTestId('publish-feedback')).toHaveTextContent('rel_menokin_2026');
+    });
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
+      .toHaveTextContent('待开发 · coach-draft.csv · 待发布 1 行');
+    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
+    // Correcting the domain must not re-enable publish for the same round.
+    await user.selectOptions(screen.getByTestId('content-domain-override'), 'campaign');
+    expect(screen.getByTestId('publish-action')).toBeDisabled();
   });
 });
