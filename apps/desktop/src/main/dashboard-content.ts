@@ -20,9 +20,11 @@ import {
 } from '../shared/dashboard-content';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
+import { LIBRARY_DOMAINS, composeLibraryDelta, type LibraryDomainCounts } from '../shared/library-delta';
 
 export type DashboardContentSessionClient = Pick<ProductSession, 'view' | 'request'>;
-export type DashboardContentAfterPublish = (sessionEpoch: number) => Promise<void>;
+/** Runs after publish; returns the post-refresh per-domain counts when available (for the receipt deltas). */
+export type DashboardContentAfterPublish = (sessionEpoch: number) => Promise<LibraryDomainCounts | null>;
 
 function asFailure(error: unknown): DashboardContentFailure {
   if (!(error instanceof ProductHttpError)) return dashboardContentFailure('UNAVAILABLE');
@@ -265,28 +267,43 @@ export async function dashboardContentPublish(
     if (!importBatchId) return dashboardContentFailure('UNAVAILABLE');
     const ready = await waitUntilImportStaged(client, epoch, importBatchId);
     if (ready !== true) return ready;
+    // 四库 delta：本批绑定的域 = 本版已更新；其余 = 本版沿用。条数在 refresh 后用当次 snapshot
+    // 内存补拿，拿不到就省略括号数字（不编造）。同一句既进 Announcement.summary，也进回执。
+    const boundDomains = new Set(payload.sourceBindings.map((binding) => binding.domain));
+    const delta = composeLibraryDelta(
+      LIBRARY_DOMAINS.filter((domain) => boundDomains.has(domain)).map((domain) => ({ domain, count: null })),
+    );
     const published = await client.request(epoch, '/v1/content/publish', {
       body: {
         import_batch_id: importBatchId,
         title: payload.title.trim(),
-        summary: payload.summary,
+        summary: delta,
       },
       headers: { 'idempotency-key': randomUUID() },
     });
     const release = parsePublishRelease(published.value);
     if (!release) return dashboardContentFailure('UNAVAILABLE');
+    let counts: LibraryDomainCounts | null = null;
     if (afterPublish) {
       try {
-        await afterPublish(epoch);
+        // afterPublish 让 ProductAnnounce.refresh 跑一次并回报当次 snapshot 的域计数。
+        counts = await afterPublish(epoch);
       } catch {
         // Publish already committed. Next product search still refreshAnnounce.
       }
     }
+    // 用 refresh 后的域条数补进回执 delta；拿不到就省略括号数字（不编造）。
+    // Announcement.summary 在发布时已写入同一句（不含条数），发布后不再改。
+    const summary = counts
+      ? composeLibraryDelta(LIBRARY_DOMAINS.filter((domain) => boundDomains.has(domain))
+        .map((domain) => ({ domain, count: counts?.[domain] ?? null })))
+      : delta;
     return Object.freeze({
       ok: true,
       releaseId: release.releaseId,
       releaseSeq: release.releaseSeq,
       publisherDisplayName: view.displayName,
+      summary,
     });
   });
 }

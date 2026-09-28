@@ -1747,6 +1747,17 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   overflow-wrap: anywhere;
 }
 
+.content-publish-feedback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.content-publish-delta {
+  color: var(--dash-muted);
+}
+
 .dash-publish {
   min-height: 40px;
   padding: 0 14px;
@@ -3558,4 +3569,52 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
     right: -10px;
     width: 20px;
   }
+}
+
+/* 系统同步 · 话术版本更新：四卡（产品 → 活动 → 售前 → 售后）。
+   ≥1180 宽 2×2；小于 1180（含 980–1179）一列。 */
+.announce-library-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+@media (min-width: 1180px) {
+  .announce-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.announce-library-card {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  color: var(--dash-ink);
+  cursor: pointer;
+}
+
+.announce-library-card:hover {
+  background: var(--dash-chrome-hover);
+}
+
+.announce-library-title {
+  margin: 0;
+  color: var(--dash-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.announce-library-count {
+  margin: 0;
+  color: var(--dash-muted);
+  font-size: 12px;
+}
+
+/* 卡上的未读投影：品牌紫，非故障红。 */
+.announce-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--dash-radius-dot);
+  background: var(--fox);
 }

@@ -13,6 +13,7 @@ import {
   type CoachUploadResult,
   type CoachUploadRow,
 } from './coach-content-upload';
+import { LIBRARY_DOMAINS, composeLibraryDelta } from '@shared/library-delta';
 
 const DOMAIN_LABELS: Readonly<Record<DomainId, string>> = {
   product: '产品',
@@ -252,24 +253,30 @@ export function ContentModule() {
     const sourceName = uploadSourceName(upload);
     const csvText = uploadCsvText(upload);
     const title = sourceName.trim().slice(0, 200) || '工作台草稿';
+    // 四库 delta：本批绑定的域 = 本版已更新；其余 = 本版沿用。与 service 写入
+    // Announcement.summary 的是同一句，回执第二行直接显示它。
+    const bindingDomains = new Set(sourceBindings.map((binding) => binding.domain));
+    const delta = composeLibraryDelta(
+      LIBRARY_DOMAINS.filter((domain) => bindingDomains.has(domain)).map((domain) => ({ domain, count: null })),
+    );
     void api.publishDraft({
       sourceName,
       csvText,
       rows,
       title,
-      summary: null,
+      summary: delta,
       sourceBindings,
     }).then((result) => {
       if (generation !== ingestGeneration.current) return;
       if (!result.ok) {
+        // 失败不说替换，也不画 delta。
         setPublishFeedback(result.message);
         return;
       }
       setPublishSucceededThisRound(true);
       const who = result.publisherDisplayName ?? sessionView?.displayName;
-      setPublishFeedback(who
-        ? `已发布 ${result.releaseId} · ${who}`
-        : `已发布 ${result.releaseId}`);
+      const headline = who ? `已发布 ${result.releaseId} · ${who}` : `已发布 ${result.releaseId}`;
+      setPublishFeedback(result.summary ? `${headline}\n${result.summary}` : headline);
     }).catch(() => {
       if (generation !== ingestGeneration.current) return;
       setPublishFeedback('服务暂不可用，请重试');
@@ -315,7 +322,19 @@ export function ContentModule() {
           </div>
           <span id="content-publish-note" className="content-publish-note">
             {publishFeedback ? (
-              <span role="status" aria-live="polite" data-testid="publish-feedback">{publishFeedback}</span>
+              <span role="status" aria-live="polite" className="content-publish-feedback" data-testid="publish-feedback">
+                {publishFeedback.includes('\n')
+                  ? publishFeedback.split('\n').map((line, index) => (
+                    <span
+                      key={`${line}-${index}`}
+                      className={index === 0 ? 'content-publish-headline' : 'content-publish-delta'}
+                      data-testid={index === 0 ? 'publish-feedback-headline' : 'publish-feedback-delta'}
+                    >
+                      {line}
+                    </span>
+                  ))
+                  : publishFeedback}
+              </span>
             ) : (
               <span data-testid="publish-disabled-reason">{publishReason}</span>
             )}

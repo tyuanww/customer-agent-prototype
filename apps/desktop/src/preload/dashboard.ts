@@ -20,6 +20,65 @@ const OPS_SOP_DELETE = 'dashboard:ops-sop-delete';
 const OPS_SCRIPT_PATCH = 'dashboard:ops-script-patch';
 const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
 const OPS_SOFTWARE = 'dashboard:ops-software';
+const ANNOUNCE_CURRENT = 'dashboard:announce-current';
+const ANNOUNCE_MARK_READ = 'dashboard:announce-mark-read';
+
+const LIBRARY_DOMAINS = ['product', 'campaign', 'presale', 'aftersale'] as const;
+type LibraryDomain = (typeof LIBRARY_DOMAINS)[number];
+
+function isLibraryDomain(value: unknown): value is LibraryDomain {
+  return typeof value === 'string' && (LIBRARY_DOMAINS as readonly string[]).includes(value);
+}
+
+function isDomainCounts(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return Object.keys(record).length === LIBRARY_DOMAINS.length
+    && LIBRARY_DOMAINS.every((domain) => Number.isSafeInteger(record[domain]) && (record[domain] as number) >= 0);
+}
+
+function isAnnouncement(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return exactKeys(record, ['title', 'summary', 'createdAt'])
+    && typeof record.title === 'string'
+    && (record.summary === null || typeof record.summary === 'string')
+    && typeof record.createdAt === 'string';
+}
+
+function isAnnounceCurrent(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  if (record.ok === false) {
+    return exactKeys(record, ['ok', 'code', 'signedIn'])
+      && (record.code === 'NO_CURRENT' || record.code === 'FORBIDDEN' || record.code === 'UNAVAILABLE')
+      && typeof record.signedIn === 'boolean';
+  }
+  if (record.ok !== true
+    || !exactKeys(record, ['ok', 'signedIn', 'releaseId', 'announcement', 'counts', 'unread', 'unreadDomains'])) {
+    return false;
+  }
+  return typeof record.signedIn === 'boolean'
+    && typeof record.releaseId === 'string'
+    && record.releaseId.length > 0
+    && (record.announcement === null || isAnnouncement(record.announcement))
+    && (record.counts === null || isDomainCounts(record.counts))
+    && typeof record.unread === 'boolean'
+    && Array.isArray(record.unreadDomains)
+    && record.unreadDomains.length <= 4
+    && record.unreadDomains.every(isLibraryDomain);
+}
+
+function parseDomainList(request: unknown): readonly LibraryDomain[] {
+  if (!Array.isArray(request) || request.length > 4) return [];
+  const seen = new Set<string>();
+  for (const item of request) {
+    if (!isLibraryDomain(item) || seen.has(item)) return [];
+    seen.add(item);
+  }
+  return LIBRARY_DOMAINS.filter((domain) => seen.has(domain));
+}
+
 
 const CONTENT_FAILURE_CODES = [
   'UNAUTHORIZED',
@@ -98,7 +157,7 @@ function isContentPublish(value: unknown): boolean {
   if (isContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'publisherDisplayName'])
+  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'publisherDisplayName', 'summary'])
     && record.ok === true
     && typeof record.releaseId === 'string'
     && record.releaseId.length > 0
@@ -108,7 +167,9 @@ function isContentPublish(value: unknown): boolean {
     && (record.publisherDisplayName === null
       || (typeof record.publisherDisplayName === 'string'
         && record.publisherDisplayName.length > 0
-        && record.publisherDisplayName.length <= 64));
+        && record.publisherDisplayName.length <= 64))
+    && (record.summary === null
+      || (typeof record.summary === 'string' && record.summary.length > 0 && record.summary.length <= 500));
 }
 
 const ITERATION_CAUSES = ['content_gap', 'ranking', 'stale', 'mixed'] as const;
@@ -290,6 +351,22 @@ contextBridge.exposeInMainWorld('dashboardOps', {
   },
   softwareCatalog() {
     return invokeOps(OPS_SOFTWARE);
+  },
+});
+
+contextBridge.exposeInMainWorld('dashboardAnnounce', {
+  async current() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(ANNOUNCE_CURRENT);
+      return isAnnounceCurrent(value) ? value : { ok: false, code: 'UNAVAILABLE', signedIn: false };
+    } catch {
+      return { ok: false, code: 'UNAVAILABLE', signedIn: false };
+    }
+  },
+  async markRead(request: unknown) {
+    const domains = parseDomainList(request);
+    if (domains.length === 0) return;
+    try { await ipcRenderer.invoke(ANNOUNCE_MARK_READ, domains); } catch { /* best effort */ }
   },
 });
 

@@ -378,6 +378,33 @@
   background: var(--warning);
 }
 
+/* 未读紫点（品牌 --fox）。按 data-dock-edge 锚在**可见内侧**上角：
+   右贴边 → 视觉左上；左贴边/未贴边 → 视觉右上（黄点下方）。
+   黄故障点固定在 top:10px; right:10px；未读点在左贴边时下移到 top:28px，
+   保证与黄点边缘间距 ≥10px。prefers-reduced-motion：静态点，不闪。 */
+.fox-unread-dot {
+  position: absolute;
+  top: 28px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fox);
+  pointer-events: none;
+}
+
+.fox-idle[data-dock-edge='right'] .fox-unread-dot {
+  top: 10px;
+  right: auto;
+  left: 10px;
+}
+
+.fox-idle[data-dock-edge='left'] .fox-unread-dot {
+  top: 28px;
+  right: 10px;
+  left: auto;
+}
+
 @keyframes fox-idle-motion {
   0%,
   100% {
@@ -2223,6 +2250,32 @@ html[data-role='fox'] #root {
 }
 .product-announce-banner { margin: 0 0 6px; font-size: 12px; color: var(--muted); }
 .product-announce-banner.is-invalid { color: var(--danger); }
+/* 软更新横幅：墨色 --muted，不是 is-invalid（真失效才红）。 */
+.product-announce-banner.is-muted {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border: 1px solid var(--hairline, rgba(0, 0, 0, 0.08));
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.product-announce-dismiss {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.product-announce-dismiss:hover {
+  color: var(--ink);
+}
 .product-query-context label { display: flex; align-items: center; gap: 6px; }
 .product-query-context input, .product-query-context select { max-width: 220px; min-height: 32px; color: inherit; background: var(--query-glass-solid); border: 1px solid var(--hairline); border-radius: 6px; }
 .catalog-scope-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; line-height: 16px; }

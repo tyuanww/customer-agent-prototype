@@ -1,4 +1,5 @@
 import type { CustomerAgentApi } from '../shared/contracts';
+import type { DashboardAnnounceApi } from '../shared/dashboard-announce';
 import type { DashboardContentApi } from '../shared/dashboard-content';
 import type { DashboardIterationApi } from '../shared/dashboard-iteration';
 import type { DashboardOpsApi } from '../shared/dashboard-ops-loop';
@@ -10,6 +11,7 @@ declare global {
   interface Window {
     customerAgent?: CustomerAgentApi;
     dashboardWording?: DashboardWordingApi;
+    dashboardAnnounce?: DashboardAnnounceApi;
     dashboardContent?: DashboardContentApi;
     dashboardIteration?: DashboardIterationApi;
     dashboardOps?: DashboardOpsApi;

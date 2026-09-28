@@ -15,6 +15,7 @@ import {
   DASHBOARD_NAV,
   nextDashboardNavId,
   type DashboardModuleId,
+  type DomainId,
 } from './data/dashboard-manifest';
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DashboardBrandFox } from './components/DashboardBrandFox';
@@ -80,6 +81,12 @@ export function DashboardApp() {
   const [themeMode, setThemeMode] = useState<DashboardThemeMode>('system');
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [navTooltip, setNavTooltip] = useState<NavTooltipState | null>(null);
+  // 系统同步四卡点进来时要落到的域；消费一次后清空，避免再次切到话术库时串域。
+  const [wordingDomain, setWordingDomain] = useState<DomainId | undefined>(undefined);
+  const openWordingDomain = useCallback((domain: DomainId) => {
+    setWordingDomain(domain);
+    setActive('wording');
+  }, []);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const navToggleRef = useRef<HTMLButtonElement | null>(null);
   const pendingNavFocusRef = useRef(false);
@@ -1216,9 +1223,14 @@ export function DashboardApp() {
           data-active-module={active}
         >
           {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
-          {active === 'wording' ? <WordingLibraryModule /> : null}
+          {active === 'wording' ? (
+            <WordingLibraryModule
+              initialDomain={wordingDomain}
+              onDomainConsumed={() => setWordingDomain(undefined)}
+            />
+          ) : null}
           {active === 'sop' ? <SopLibraryModule /> : null}
-          {active === 'announce' ? <AnnounceModule /> : null}
+          {active === 'announce' ? <AnnounceModule onOpenDomain={openWordingDomain} /> : null}
           {keepContent || active === 'content' ? (
             <div hidden={active !== 'content'}>
               <ContentModule />

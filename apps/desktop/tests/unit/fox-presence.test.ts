@@ -672,7 +672,10 @@ describe('presence CSS and source contracts', () => {
     expect(css).toContain('fox-headset-wave 680ms cubic-bezier(0.22, 1, 0.36, 1) 2 both');
     expect(css).not.toMatch(/fox-headset-wave[^;]*infinite/);
     expect(foxApp).not.toContain('eye tracking');
-    expect(foxApp).toContain("aria-label={shortcutFailed ? `打开话术查询。${hint}` : '打开话术查询'}");
+    // 未读时 aria-label 加「有话术更新」；与故障黄点同时存在时两句都要在。
+    expect(foxApp).toContain('打开话术查询');
+    expect(foxApp).toContain('有话术更新');
+    expect(foxApp).toContain('foxAriaLabel(shortcutFailed, unread, hint)');
     expect(foxApp).not.toContain('aria-live');
   });
 

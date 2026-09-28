@@ -3,10 +3,16 @@ import { announceClientId } from './product-client-id';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 import {
-  announceFailure, type AnnounceGate, type ProductAnnounceInvalidation, type ProductAnnounceResult,
-  type ProductAnnouncement,
+  announceFailure, type AnnounceGate, type ProductAnnounceContentUpdate,
+  type ProductAnnounceInvalidation, type ProductAnnounceResult,
+  type ProductAnnouncement, type ProductAnnounceUnread,
 } from '../shared/product-announce';
 import type { QueryIdentity } from '../shared/product-search';
+import {
+  libraryDomainCounts, libraryDomainHashes, unreadDomains,
+  type LibraryDomain, type LibraryDomainCounts, type LibraryDomainHashes,
+} from '../shared/library-delta';
+import { NO_LAST_SEEN, type LastSeenStore } from './product-last-seen';
 import {
   persistHydrateFromEnv,
   type HydrateSnapshotItem,
@@ -24,6 +30,10 @@ export class ProductAnnounce implements AnnounceGate {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
   private invalidationListeners = new Set<(value: ProductAnnounceInvalidation) => void>();
+  private contentUpdateListeners = new Set<(value: ProductAnnounceContentUpdate) => void>();
+  /** 最近一次完整 snapshot 的域哈希与条数。卡与未读都必须用当次内存值，不信磁盘 hydrate。 */
+  private domainHashes: LibraryDomainHashes | null = null;
+  private domainCounts: LibraryDomainCounts | null = null;
   private refreshTail: Promise<void> = Promise.resolve();
   constructor(
     private readonly session: ProductSession,
@@ -37,6 +47,7 @@ export class ProductAnnounce implements AnnounceGate {
       releaseId: string,
       items: readonly HydrateSnapshotItem[],
     ) => void = () => {},
+    private readonly lastSeen: LastSeenStore = NO_LAST_SEEN,
   ) {
     session.subscribe(state => {
       if (!state.ok || !state.signedIn) this.drop('signed_out');
@@ -47,6 +58,9 @@ export class ProductAnnounce implements AnnounceGate {
   onInvalidated(listener: (value: ProductAnnounceInvalidation) => void) {
     this.invalidationListeners.add(listener); return () => { this.invalidationListeners.delete(listener); };
   }
+  onContentUpdated(listener: (value: ProductAnnounceContentUpdate) => void) {
+    this.contentUpdateListeners.add(listener); return () => { this.contentUpdateListeners.delete(listener); };
+  }
   allows(releaseId: string) {
     const view = this.session.view();
     return !!this.lease && view.signedIn && view.sessionEpoch === this.lease.epoch
@@ -54,6 +68,66 @@ export class ProductAnnounce implements AnnounceGate {
   }
   currentReleaseId() {
     return this.lease?.releaseId ?? null;
+  }
+  /** 当次 snapshot 内存里的域条数（发布回执/四卡用）。未刷新到过则为 null。 */
+  currentDomainCounts(): LibraryDomainCounts | null {
+    return this.domainCounts;
+  }
+  /** Fox-only read projection. Never refreshes announce, never marks read. */
+  unread(): ProductAnnounceUnread {
+    const view = this.session.view();
+    const userId = view.ok && view.signedIn ? view.userId : null;
+    // No signed-in user, or no completed snapshot yet (no baseline source) — nothing to light.
+    if (!userId || !this.domainHashes) return Object.freeze({ ok: false, signedIn: false, unread: false, domains: [] as const });
+    const baseline = this.lastSeen.baseline(userId);
+    const domains = unreadDomains(this.domainHashes, baseline);
+    return Object.freeze({ ok: true, signedIn: true, unread: domains.length > 0, domains: Object.freeze([...domains]) });
+  }
+  /**
+   * Mark the listed domains read for the **session** userId. Callers pass the domains they
+   * actually showed; userId is never accepted from the renderer.
+   */
+  markRead(domains: readonly LibraryDomain[]): void {
+    const view = this.session.view();
+    const userId = view.ok && view.signedIn ? view.userId : null;
+    if (!userId || !this.domainHashes || domains.length === 0) return;
+    this.lastSeen.markRead(userId, domains, this.domainHashes);
+  }
+  /** Dashboard four-card projection. Card counts come from the in-memory snapshot (else null → 「—」). */
+  dashboardProjection(): {
+    ok: true;
+    signedIn: boolean;
+    releaseId: string;
+    announcement: ProductAnnouncement | null;
+    counts: LibraryDomainCounts | null;
+    unread: boolean;
+    unreadDomains: readonly LibraryDomain[];
+  } | null {
+    if (!this.lease) return null;
+    const view = this.session.view();
+    const userId = view.ok && view.signedIn ? view.userId : null;
+    const domains = userId ? this.unread().domains : [];
+    return Object.freeze({
+      ok: true,
+      signedIn: Boolean(userId),
+      releaseId: this.lease.releaseId,
+      announcement: this.announcement,
+      counts: this.domainCounts,
+      unread: domains.length > 0,
+      unreadDomains: Object.freeze([...domains]),
+    });
+  }
+  private emitContentUpdated() {
+    if (!this.domainHashes || !this.lease) return;
+    const domains = this.unread().domains;
+    const value: ProductAnnounceContentUpdate = Object.freeze({
+      sessionEpoch: this.lease.epoch,
+      releaseId: this.lease.releaseId,
+      summary: this.announcement?.summary ?? null,
+      domainHashes: this.domainHashes,
+      unreadDomains: Object.freeze([...domains]),
+    });
+    for (const listener of this.contentUpdateListeners) listener(value);
   }
   private projection(identity: QueryIdentity): ProductAnnounceResult {
     if (!this.lease) return announceFailure('SOURCE_GATE_NOT_READY', identity);
@@ -64,6 +138,7 @@ export class ProductAnnounce implements AnnounceGate {
     const epoch = this.session.view().sessionEpoch;
     const hadLease = this.lease !== null;
     this.lease = null; this.announcement = null; this.snapshot = null;
+    this.domainHashes = null; this.domainCounts = null;
     if (this.timer) clearTimeout(this.timer); this.timer = null;
     for (const listener of this.listeners) listener();
     if (reason === 'signed_out' && !hadLease) return;
@@ -118,7 +193,7 @@ export class ProductAnnounce implements AnnounceGate {
       }
       const response = parseContractSchema('CurrentAnnouncementResponse', current.value);
       if (!LEASE.test(response.offline_lease.token) || response.offline_lease.release_id !== response.current_release_id) throw new ProductHttpError('VALIDATION');
-      const replaced = this.lease && this.lease.releaseId !== response.current_release_id;
+      const replacedRelease = this.lease !== null && this.lease.releaseId !== response.current_release_id;
       const priorExpiry = Date.parse(response.offline_lease.expires_at);
       this.lease = {
         token: response.offline_lease.token, expiresAt: response.offline_lease.expires_at, epoch: identity.sessionEpoch,
@@ -143,8 +218,20 @@ export class ProductAnnounce implements AnnounceGate {
       if (Date.parse(this.lease.expiresAt) !== priorExpiry) throw new ProductHttpError('VALIDATION');
       const items: HydrateSnapshotItem[] = [];
       await this.page(identity.sessionEpoch, null, 0, items);
+      // 条数/哈希一律用当次 snapshot 内存，不信 kept-larger 磁盘 hydrate。
+      const hashes = libraryDomainHashes(items);
+      this.domainHashes = hashes;
+      this.domainCounts = libraryDomainCounts(items);
+      const userId = this.session.view().userId;
+      if (userId) {
+        // 第一次四域 snapshot 完整成功后才建基线；不点亮、不写时间。
+        if (!this.lastSeen.baseline(userId)) this.lastSeen.establish(userId, hashes);
+      }
       const persisted = this.persistHydrate(response.current_release_id, items);
-      if (replaced || persisted?.wrote) for (const listener of this.listeners) listener();
+      if (replacedRelease || persisted?.wrote) {
+        for (const listener of this.listeners) listener();
+        this.emitContentUpdated();
+      }
       try {
         if (persisted?.reason === 'wrote' || persisted?.reason === 'aligned') {
           this.afterSnapshotPersist(response.current_release_id, items);

@@ -53,7 +53,11 @@ function asWordingEntry(entry: DashboardWordingView['entries'][number]): Wording
   };
 }
 
-export function WordingLibraryModule() {
+export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
+  /** 从系统同步四卡点进来时要落到的域（DOMAIN_LABELS 的 id 语义）。 */
+  initialDomain?: DomainId;
+  onDomainConsumed?: () => void;
+} = {}) {
   const [catalog, setCatalog] = useState<DashboardWordingView | null>(null);
   const [query, setQuery] = useState('');
   const [lifecycle, setLifecycle] = useState<WordingLifecycle | 'all'>('all');
@@ -62,6 +66,16 @@ export function WordingLibraryModule() {
   const [page, setPage] = useState(1);
   const [writeMessage, setWriteMessage] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!initialDomain) return;
+    setDomain(initialDomain);
+    setQuery('');
+    setLifecycle('all');
+    setPage(1);
+    onDomainConsumed?.();
+    // 只认一次外部域；再点卡由调用方重新给 initialDomain。
+  }, [initialDomain, onDomainConsumed]);
 
   useEffect(() => {
     let live = true;

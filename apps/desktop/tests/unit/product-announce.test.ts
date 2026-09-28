@@ -9,7 +9,8 @@ import { ProductAnnounce } from '../../src/main/product-announce';
 import { ProductSession } from '../../src/main/product-session';
 import { ProductHttp } from '../../src/main/product-http';
 import { announceClientId, readProductClientId } from '../../src/main/product-client-id';
-import { isProductAnnounceResult, isProductAnnounceInvalidation } from '../../src/shared/product-announce';
+import { isProductAnnounceResult, isProductAnnounceInvalidation, isProductAnnounceContentUpdate } from '../../src/shared/product-announce';
+import { createLastSeenStore, NO_LAST_SEEN } from '../../src/main/product-last-seen';
 
 const token = 't'.repeat(43);
 const leaseToken = `osl_${'c'.repeat(64)}`;
@@ -18,20 +19,21 @@ const boundClientId = announceClientId(installId, 'usr_synthetic_agent');
 const releaseId = 'rel-synthetic-001';
 const hash = 'b'.repeat(64);
 const expiresAt = () => new Date(Date.now() + 600_000).toISOString();
-function currentBody(expiry = expiresAt(), seq = 13) {
+function currentBody(expiry = expiresAt(), seq = 13, summary: string | null = '只读', release = releaseId) {
+  const bindingHash = hash;
   return {
-    current_release_id: releaseId, release_seq: seq, source_binding_hash: hash,
-    offline_lease: { token: leaseToken, expires_at: expiry, release_id: releaseId, source_binding_hash: hash },
-    announcement: { title: '合成公告', summary: '只读', created_at: '2026-09-09T00:00:00.000Z' },
+    current_release_id: release, release_seq: seq, source_binding_hash: bindingHash,
+    offline_lease: { token: leaseToken, expires_at: expiry, release_id: release, source_binding_hash: bindingHash },
+    announcement: { title: '合成公告', summary, created_at: '2026-09-09T00:00:00.000Z' },
   };
 }
-function snapshotItem(id = 'script-synthetic-001') {
+function snapshotItem(id = 'script-synthetic-001', category = 'presale', hash = 'a'.repeat(64)) {
   return {
     script_id: id,
     script_version: 1,
-    content_hash: 'a'.repeat(64),
+    content_hash: hash,
     title: '合成发货',
-    category: 'presale',
+    category,
     answer_text: '合成订单 {订单号}',
     platform_scope: ['qianniu'],
     product_scope_type: 'storewide',
@@ -64,6 +66,7 @@ async function setup(
   handler: (url: URL, init?: RequestInit) => Response | Promise<Response>,
   persistHydrate?: ConstructorParameters<typeof ProductAnnounce>[3],
   afterSnapshotPersist?: ConstructorParameters<typeof ProductAnnounce>[4],
+  lastSeen?: ConstructorParameters<typeof ProductAnnounce>[5],
 ) {
   const transport = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -81,6 +84,7 @@ async function setup(
     Date.now,
     persistHydrate,
     afterSnapshotPersist,
+    lastSeen,
   );
   const identity = { sessionEpoch: session.view().sessionEpoch, generation: 1 };
   return { session, announce, identity, transport };
@@ -359,8 +363,144 @@ describe('product announce lease and snapshot', () => {
   });
 });
 
-describe('install-stable client id', () => {
-  it('binds a distinct announce client id per signed-in user', () => {
+describe('content-updated fan-out and unread', () => {
+  const userId = 'usr_synthetic_agent';
+  const dir = () => mkdtempSync(path.join(tmpdir(), 'announce-last-seen-'));
+
+  function withSnapshot(store: ConstructorParameters<typeof ProductAnnounce>[5]) {
+    return setup(async _url => new Response(null, { status: 404 }), undefined, undefined, store);
+  }
+
+  async function snapshotWith(
+    f: Awaited<ReturnType<typeof setup>>,
+    release: string,
+    summary: string | null,
+    items: unknown[],
+  ) {
+    f.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: userId, role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') return Response.json(currentBody(expiresAt(), 13, summary, release), { headers: { etag: `W/"${release}"` } });
+      if (url.pathname === '/v1/announce/ack') return Response.json({ ok: true });
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody(null, release, 13, items));
+      return new Response(null, { status: 404 });
+    });
+  }
+
+  it('emits content-updated without an invalidation and keeps the first snapshot unread-free', async () => {
+    const store = createLastSeenStore(dir(), 'http://127.0.0.1:4100');
+    const f = await withSnapshot(store);
+    await snapshotWith(f, 'rel_24', '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用', [snapshotItem()]);
+    const updated: unknown[] = [];
+    const invalidated: unknown[] = [];
+    f.announce.onContentUpdated(value => updated.push(value));
+    f.announce.onInvalidated(value => invalidated.push(value));
+    expect(await f.announce.refresh(f.identity)).toMatchObject({ ok: true, releaseId: 'rel_24' });
+    // 第一次完整 snapshot 只建基线：不点亮。
+    expect(f.announce.unread()).toMatchObject({ ok: true, unread: false, domains: [] });
+    await f.session.logout();
+  });
+
+  it('flags only the domains whose content moved, and mark-read clears exactly those', async () => {
+    const store = createLastSeenStore(dir(), 'http://127.0.0.1:4100');
+    const f = await withSnapshot(store);
+    const H1 = '1'.repeat(64);
+    const H2 = '2'.repeat(64);
+    await snapshotWith(f, 'rel_24', null, [
+      snapshotItem('s1', 'presale', H1),
+      snapshotItem('s2', 'campaign', H1),
+    ]);
+    await f.announce.refresh(f.identity); // baseline: presale+campaign h1
+    const updatedEvents: unknown[] = [];
+    f.announce.onContentUpdated(value => updatedEvents.push(value));
+    // rel_25: presale content changed; campaign unchanged.
+    await snapshotWith(f, 'rel_25', '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用', [
+      snapshotItem('s1', 'presale', H2),
+      snapshotItem('s2', 'campaign', H1),
+    ]);
+    expect(await f.announce.refresh(f.identity)).toMatchObject({ ok: true, releaseId: 'rel_25' });
+    expect(updatedEvents).toHaveLength(1);
+    expect(isProductAnnounceContentUpdate(updatedEvents[0])).toBe(true);
+    expect(updatedEvents[0]).toMatchObject({ releaseId: 'rel_25', summary: '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用' });
+    const unread = f.announce.unread();
+    expect(unread.ok && unread.domains).toEqual(['presale']);
+    f.announce.markRead(['presale']);
+    expect(f.announce.unread()).toMatchObject({ ok: true, unread: false, domains: [] });
+    expect(store.baseline(userId)?.presale).toBe(
+      (updatedEvents[0] as { domainHashes: { presale: string } }).domainHashes.presale,
+    );
+    await f.session.logout();
+  });
+
+  it('uses in-memory snapshot counts for the dashboard projection even when hydrate keeps a larger file', async () => {
+    const store = createLastSeenStore(dir(), 'http://127.0.0.1:4100');
+    // persistHydrate reports kept-larger: disk has an older, bigger catalog. Counts must still
+    // come from the in-flight snapshot, not the disk hydrate.
+    const f = await setup(async _url => new Response(null, { status: 404 }), () => ({
+      path: '/tmp/hydrate.json', releaseId: 'rel_old', previousReleaseId: 'rel_old',
+      total: 500, wrote: false, skipped: true, reason: 'kept-larger',
+    }), undefined, store);
+    await snapshotWith(f, 'rel_25', null, [
+      snapshotItem('s1', 'presale', '1'.repeat(64)),
+      snapshotItem('s2', 'campaign', '2'.repeat(64)),
+    ]);
+    await f.announce.refresh(f.identity);
+    const projection = f.announce.dashboardProjection();
+    expect(projection?.counts).toEqual({ product: 0, campaign: 1, presale: 1, aftersale: 0 });
+    // summary is still parsed from the announcement; here it is null (no delta).
+    expect(projection?.announcement?.summary ?? null).toBeNull();
+    await f.session.logout();
+  });
+
+  it('never writes last_seen on ACK, snapshot, or a FORBIDDEN ack', async () => {
+    const store = createLastSeenStore(dir(), 'http://127.0.0.1:4100');
+    const f = await withSnapshot(store);
+    let ackForbidden = false;
+    f.transport.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/me')) return Response.json({ user_id: userId, role: 'agent', auth_mode: 'mock' });
+      if (url.pathname === '/v1/announce/current') return Response.json(currentBody(expiresAt(), 13, null, 'rel_24'));
+      if (url.pathname === '/v1/announce/ack') {
+        if (ackForbidden) return Response.json({ error: { code: 'FORBIDDEN', message: 'forbidden' } }, { status: 403 });
+        return Response.json({ ok: true });
+      }
+      if (url.pathname === '/v1/announce/snapshot') return Response.json(snapshotBody(null, 'rel_24', 13, [snapshotItem('s1', 'presale', '1'.repeat(64))]));
+      return new Response(null, { status: 404 });
+    });
+    const baselineBefore = store.baseline(userId);
+    await f.announce.refresh(f.identity);
+    // ACK 成功不写 last_seen：基线要么不存在（第一次只 establish），要么不变。
+    const afterOk = store.baseline(userId);
+    expect(afterOk).not.toBeNull(); // establish 是允许的（第一次完整 snapshot）
+    // 第二次带新内容 + FORBIDDEN ack：不得因 ack 写 last_seen。
+    ackForbidden = true;
+    await snapshotWith(f, 'rel_25', null, [snapshotItem('s1', 'presale', '9'.repeat(64))]);
+    await f.announce.refresh(f.identity);
+    // 内容变了 → 相对基线未读；ACK 没把它当已读清掉。
+    const unread = f.announce.unread();
+    expect(unread.ok && unread.domains).toEqual(['presale']);
+    expect(f.announce.unread().ok && f.announce.unread().unread).toBe(true);
+    expect(baselineBefore).toBeNull();
+    await f.session.logout();
+  });
+
+  it('exposes unread as false with no signed-in session', async () => {    const f = await withSnapshot(NO_LAST_SEEN);
+    await snapshotWith(f, 'rel_24', null, [snapshotItem()]);
+    await f.announce.refresh(f.identity);
+    await f.session.logout();
+    const unread = f.announce.unread();
+    expect(unread).toMatchObject({ ok: false, unread: false, domains: [] });
+    expect(isProductAnnounceUnreadValue(unread)).toBe(true);
+  });
+});
+
+function isProductAnnounceUnreadValue(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.ok === 'boolean' && typeof record.unread === 'boolean' && Array.isArray(record.domains);
+}
+
+describe('install-stable client id', () => {  it('binds a distinct announce client id per signed-in user', () => {
     const feishu = announceClientId(installId, 'usr_ou_5a6b7c7a3ae19edc72676dbfff328f75');
     expect(boundClientId).toMatch(/^desk_[0-9a-f]{32}$/);
     expect(feishu).toMatch(/^desk_[0-9a-f]{32}$/);

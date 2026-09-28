@@ -947,6 +947,69 @@ describe('FoxApp', () => {
     expect(screen.getByTestId('fox-button')).toHaveAccessibleName(/全局快捷键注册失败|打开话术查询/);
   });
 
+  it('shows a purple unread dot for an inner-edge corner without setting the warning state', async () => {
+    const unread = vi.fn(async () => ({ ok: true as const, signedIn: true as const, unread: true, domains: ['presale'] as const }));
+    window.customerAgent = {
+      ...window.customerAgent!,
+      productAnnounce: {
+        refresh: vi.fn(), onInvalidated: () => () => {}, onContentUpdated: () => () => {},
+        unread, markRead: vi.fn(),
+      } as unknown as NonNullable<typeof window.customerAgent>['productAnnounce'],
+    };
+    render(<FoxApp />);
+    expect(await screen.findByTestId('fox-unread-dot')).toBeInTheDocument();
+    // 未读不得触发 FoxHead.warning：data-fox-warning 仍为 false。
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-warning', 'false');
+    expect(screen.queryByTestId('shortcut-fallback-dot')).not.toBeInTheDocument();
+    // aria 含「有话术更新」。
+    expect(screen.getByTestId('fox-button')).toHaveAccessibleName(/有话术更新/);
+    // 右贴边时紫点锚在可见内侧（CSS 负责左右翻转，DOM 上两点独立存在）。
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'right', epoch: 5 });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', 'right');
+    expect(screen.getByTestId('fox-unread-dot')).toBeInTheDocument();
+  });
+
+  it('keeps both the unread dot and the warning dot, with both phrases in the aria label', async () => {
+    getWindowContext.mockResolvedValue({
+      role: 'fox', phase: 'FOX_IDLE', platform: 'darwin',
+      shortcut: { registered: false, accelerator: 'CommandOrControl+Shift+Space', message: '全局快捷键注册失败' },
+      testHarness: false,
+    });
+    window.customerAgent = {
+      ...window.customerAgent!,
+      productAnnounce: {
+        refresh: vi.fn(), onInvalidated: () => () => {}, onContentUpdated: () => () => {},
+        unread: vi.fn(async () => ({ ok: true as const, signedIn: true as const, unread: true, domains: ['presale'] as const })),
+        markRead: vi.fn(),
+      } as unknown as NonNullable<typeof window.customerAgent>['productAnnounce'],
+    };
+    render(<FoxApp />);
+    expect(await screen.findByTestId('fox-unread-dot')).toBeInTheDocument();
+    expect(screen.getByTestId('shortcut-fallback-dot')).toBeInTheDocument();
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-warning', 'true');
+    const label = screen.getByTestId('fox-button').getAttribute('aria-label') ?? '';
+    expect(label).toContain('有话术更新');
+    expect(label).toContain('打开话术查询');
+  });
+
+  it('does not paint an unread dot without a session', async () => {
+    window.customerAgent = {
+      ...window.customerAgent!,
+      productAnnounce: {
+        refresh: vi.fn(), onInvalidated: () => () => {}, onContentUpdated: () => () => {},
+        unread: vi.fn(async () => ({ ok: false as const, signedIn: false as const, unread: false, domains: [] as const })),
+        markRead: vi.fn(),
+      } as unknown as NonNullable<typeof window.customerAgent>['productAnnounce'],
+    };
+    render(<FoxApp />);
+    await waitFor(() => expect(screen.getByTestId('fox-idle')).toBeInTheDocument());
+    expect(screen.queryByTestId('fox-unread-dot')).not.toBeInTheDocument();
+  });
+
   it('peeks on the first intentional edge entry and retracts after its exit motion', async () => {
     vi.useFakeTimers();
     try {

@@ -523,10 +523,15 @@ describe('dashboard layout contract', () => {
   });
 
   it('keeps announce simulation local, transient, and timer-cleaned', () => {
-    expect(announce).toContain('dashboardWording');
-    expect(announce).not.toContain('window.setTimeout');
+    // 四卡只读 announce 投影；条数/状态来自发布 summary，不读 hydrate 目录。
+    expect(announce).toContain('dashboardAnnounce');
+    expect(announce).not.toContain('dashboardWording');
     expect(announce).not.toContain('MOCK_SOFTWARE_VERSIONS');
     expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
+    // 窗口可见时的 10s poll 必须自清，不能泄漏。
+    if (announce.includes('window.setInterval')) {
+      expect(announce).toContain('window.clearInterval');
+    }
   });
 
   it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
@@ -579,6 +584,8 @@ describe('dashboard layout contract', () => {
     const publishNoteRule = css.match(/\.content-publish-note\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(publishNoteRule).toContain('overflow-wrap: anywhere');
     expect(publishNoteRule).toContain('max-width: 100%');
+    const publishFeedbackRule = css.match(/\.content-publish-feedback\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(publishFeedbackRule).toContain('flex-direction: column');
 
     const bannerRule = css.match(/\.content-session-banner\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(bannerRule).toContain('min-width: 0');
