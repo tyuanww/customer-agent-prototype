@@ -2,7 +2,7 @@
 
 本页按「要证明什么 → 跑哪条命令 → 它实际证明了什么」组织。命令都可以复制。先看本机静态 / 自动化结果，再单独列出只有真实设备才能证明的门禁。
 
-相关文档：[第一次运行](tutorial-first-run.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [桌面语义检索](reference-desktop-retrieval.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [How to 用一张表替换四库之一](how-to-replace-one-library.md) · [How to 下架一条已发布话术](how-to-retire-a-script.md) · [本机目录与当前发布](explanation-catalog-lease.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) · [macOS M5 人工核验](how-to-verify-macos-m5.md) · [macOS 打包态远端](how-to-macos-packaged-product-remote.md) · [办公机远端](how-to-office-machine-product-remote.md) · [Linux 打包态远端](how-to-linux-packaged-product-remote.md)
+相关文档：[第一次运行](tutorial-first-run.md) · [CONTRIBUTING](../CONTRIBUTING.md) · [换成这一版未签名包](how-to-upgrade-unsigned.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [桌面语义检索](reference-desktop-retrieval.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [How to 用一张表替换四库之一](how-to-replace-one-library.md) · [How to 下架一条已发布话术](how-to-retire-a-script.md) · [本机目录与当前发布](explanation-catalog-lease.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md) · [执行清单](plans/2026-09-06-execution-goal.md) · [Windows 安装包 DRAFT](plans/2026-09-10-windows-package-and-device-verification.md) · [macOS M5 人工核验](how-to-verify-macos-m5.md) · [macOS 打包态远端](how-to-macos-packaged-product-remote.md) · [办公机远端](how-to-office-machine-product-remote.md) · [Linux 打包态远端](how-to-linux-packaged-product-remote.md)
 
 > 本 Demo 是合成数据、不代发。默认狐狸路径可以不接 API；显式 loopback 合成栈才接通本机 API。验证通过不等于可以正式发包，也不等于真实 OS 焦点 / 台前调度已被证明。
 
@@ -19,6 +19,8 @@ pnpm -v    # 项目锁定 11.19.0
 ```
 
 企业 CA 只适用于当前这台需要系统根证书的开发机，不是通用验证前置。不要关闭 TLS 验证。
+
+`pnpm` 报未知脚本时跑 `pnpm help:dev`（打印黄金路径和下一步），再用 `pnpm run` 看仓根脚本。日常入口也可用 `pnpm start`。
 
 本页**不**要求你现在执行 Electron E2E 或打包。下列命令按需使用；文档任务的范围选择见文末「选择检查范围」。
 

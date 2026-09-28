@@ -21,6 +21,7 @@ All notable changes to this customer-agent product implementation repository are
 - [How to 用一张表替换四库之一](docs/how-to-replace-one-library.md)：手选将替换、表域不一致先确认、发布后留在本页。
 - [How to 下架一条已发布话术](docs/how-to-retire-a-script.md)：两步确认，坐席要等下次发布才搜不到。
 - [本机目录与当前发布](docs/explanation-catalog-lease.md)：`list().matchesLease` 与 kept-larger 磁盘 hydrate 为何会分叉。
+- README 把「第一次跑起来」放到文档表前面；历史计划改从 [docs/plans 索引](docs/plans/README.md) 进入。新增 [CONTRIBUTING.md](CONTRIBUTING.md)、`pnpm start` / `pnpm help:dev`、GitHub 缺陷/文档 Issue 模板，以及 [How to 换成这一版未签名包](docs/how-to-upgrade-unsigned.md)。
 
 ## [0.3.22] - 2026-09-28
 

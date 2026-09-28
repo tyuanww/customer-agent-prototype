@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rootDocs = new Set(['README.md', 'PROJECT_CHARTER.md', 'CHANGELOG.md', 'TODOS.md', 'DESIGN.md', 'DEVELOPMENT_BRIEF.md']);
-export const RULE_DOCUMENTS = new Set(['AGENTS.md', 'docs/reference-engineering-workflow.md', 'docs/reference-document-lifecycle.md', 'docs/how-to-verify-desktop.md']);
+export const RULE_DOCUMENTS = new Set(['AGENTS.md', 'CONTRIBUTING.md', 'docs/reference-engineering-workflow.md', 'docs/reference-document-lifecycle.md', 'docs/how-to-verify-desktop.md']);
 
 /** Unknown files, empty diffs and build metadata fail closed to the full lanes. */
 export function verificationPlan(files) {

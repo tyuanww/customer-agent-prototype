@@ -12,7 +12,7 @@
 - 本仓是客服 Agent 的**产品实施仓**，目标覆盖正式开发、测试、打包与上线；`customer-agent-prototype` 只是历史目录名。Menokin 是当前唯一试点，桌面 v3 合成内容属于同一试点的 `PILOT-S0 · SYNTHETIC`，不是平行 Demo 项目。桌面合成验证不代表正式能力、真实数据接入或上线获准；也不能据此推断独立 API / 合同 / 数据库模块尚未开发。
 - 首次处理本仓任务、上下文缺失或生命周期发生变化时，完整阅读 `PROJECT_CHARTER.md`；同一上下文已读且未变化时无需重复。以其作为仓库身份、仓间关系与生命周期模式的 SSOT。`ai-赋能立项` 只负责项目进度、批准范围和阶段门记录；两仓保持独立工作区与 Git 历史，不做跨仓运行时依赖。
 - 首次修改桌面代码、交互或架构前，完整阅读 `DESIGN.md` 与 `DEVELOPMENT_BRIEF.md`；已读且未变化时复核受影响章节即可。纯解释、诊断、文档维护只读相关规则；API / 合同 / 数据库工作读取对应 `APPROVED` 计划与架构边界，涉及桌面交互或接入时再读桌面文档。不全面扫描无关文件。
-- `DESIGN.md` 是产品、视觉和交互不变量的 SSOT；`DEVELOPMENT_BRIEF.md` 是桌面 v3 合成基线工程与验收边界的 SSOT；`docs/reference-project-architecture.md` 记录当前模块归属；`docs/how-to-verify-desktop.md` 记录分层验证方法。
+- `DESIGN.md` 是产品、视觉和交互不变量的 SSOT；`DEVELOPMENT_BRIEF.md` 是桌面 v3 合成基线工程与验收边界的 SSOT；`docs/reference-project-architecture.md` 记录当前模块归属；`docs/how-to-verify-desktop.md` 记录分层验证方法。人类贡献入口是 [CONTRIBUTING.md](CONTRIBUTING.md)；未知 pnpm 脚本跑 `pnpm help:dev`。
 - 发现用户要求、实现与上述文档冲突时，说明具体来源与影响。若当前授权足以明确解决，按授权推进并在范围内更新对应规则；若涉及未获批正式能力、安全门或实质歧义，只暂停依赖该决定的部分，继续独立且已授权的工作。不得用实现结果替代阶段批准。
 
 ### 1.1 任务范围、自主执行与完成标准

@@ -9,7 +9,7 @@
 > 复制成功只表示剪贴板写入成功，不表示已发送、已采纳或回答正确。
 > Dashboard 是运营工作台。没有产品会话或没有冻结合同时写「未接入」，不是生产系统。
 
-相关文档：[如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
+相关文档：[如何验证](how-to-verify-desktop.md) · [CONTRIBUTING](../CONTRIBUTING.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
 
 ---
 
@@ -69,8 +69,10 @@ pnpm electron:install
 ## 3. 启动 Demo
 
 ```bash
-pnpm dev
+pnpm start    # 与 pnpm dev 相同
 ```
+
+若终端写 `ERR_PNPM_NO_SCRIPT` / `Missing script`，跑 `pnpm help:dev` 再 `pnpm run`。根脚本没有 serve 这种名字。
 
 如果你在 macOS Finder 中双击启动，可以直接运行仓根目录的 [`启动客服Agent.command`](../启动客服Agent.command)。它只检查 Node 24、pnpm 和本地 Electron 运行时，不会偷偷安装依赖或访问业务网络；终端窗口保持打开，便于看到启动错误。
 
