@@ -113,7 +113,7 @@ Dashboard 主标题只使用「客服运营工作台 / 运营管理端」，不�
 2. 话术库：已发布目录管理员。分域浏览坐席现在能搜到的当前发布；详情可下架（Owner DELETE → pending_review，坐席要等下次发布才搜不到）。不在这页上传或改正文。
 3. SOP：有产品会话时读/导入/更新当前会话树，删除仅 Owner；没有会话保持未接入，不把合成过敏树当运营目录
 4. 内容管理：顶栏右侧「取消未完成导入」与「发布」同一行（取消在左、主 CTA 在右），原因与发布反馈在动作行下方。发布成功主句 `已发布 rel_N · 姓名`；有 `summary` 才画第二行四库 delta，失败不画 delta。成功后发布钮保持禁用，直到清除预览或重选文件；发布进行中取消钮仍可用。标题旁是产品会话徽章，不是发布权徽章：`StatusBadge` 只表示产品会话是否已登录——无会话或未登录写「未接入」（warn），首次 `session()` 未返回写「正在确认会话」（neutral），已登录写「已接入」（ok），即使该角色当前不能发布也仍是「已接入」，原因只走 `CONTENT_PUBLISH_COPY`。会话说明书只放在徽章 `title`，标题行不再跟一句「导入与发布走产品会话」。标题下方是常驻「将替换」下拉（产品 / 活动 / 售前 / 售后，默认按导入表），在「待开发」外；选错会整库替换到选中域，页面不拦。「内容导入」默认折在「待开发」，选表 / 状态 / 预览在折叠体内，读文件进入 reading / ready / error 自动展开。本地 CSV / xlsx 导入；Owner 校验通过后 staged 并发布。组织审核在飞书文档，产品内不再 park 双人复核
-5. 系统同步：话术版本更新第一屏是四张卡（产品 → 活动 → 售前 → 售后），各写「本版已更新」或「本版沿用」；点卡切到话术库对应域；未读时卡上另有品牌紫点。卡状态只解析 `Announcement.summary`，summary 读不出时写「无法标出本版更新了哪一库」，不冒充沿用。合成 `rel_N` 仍是唯一检索租约。Owner 软件目录列出 signed/unsigned，禁止 `latest.yml`。ACK 不是已读。
+5. 系统同步：本版 changelog。话术版本更新第一屏是四张卡（产品 → 活动 → 售前 → 售后），徽章写「本版已更新」或「本版沿用」，卡面只跟条数，不把徽章句子再写一遍；点卡切到话术库对应域；未读紫点跟在库名后面。卡状态只解析 `Announcement.summary`，summary 读不出时写「无法标出本版更新了哪一库」，不冒充沿用。脚注写「当前发布 rel_N」。Owner 软件目录列出 signed/unsigned，禁止 `latest.yml`，目录进页即读、不把 latest.yml 写进说明书。ACK 不是已读。
 
 侧栏业务导航图标由单一 `--dash-nav-icon-size: 20px` 同时驱动 `.dashboard-nav-icon` wrapper 与 SVG `width/height`，保留 24 viewBox / path / stroke。导航文字用静态 `--dash-nav-label-shift: calc(var(--dash-brand-copy-shift) - 4px)` 再靠近约 4px，expanded 态 icon-to-label 间隙约 14px。不改 PanelLeft toggle、品牌狐狸 40px、icon slot、macOS `nav.left+60` / native `+36` 锚点、8px inset、42px hit row、selected `::before inset:0`，也不给 icon transform。
 

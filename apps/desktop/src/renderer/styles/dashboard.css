@@ -3604,6 +3604,28 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   background: var(--dash-chrome-hover);
 }
 
+.announce-library-card .dash-card-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.announce-empty {
+  margin: 8px 0 0;
+}
+
+.announce-empty strong {
+  color: var(--dash-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dashboard-shell .software-version-card .dash-reset,
+.dashboard-shell [data-testid='software-check-update'] {
+  min-height: 40px;
+}
+
 .announce-library-title {
   margin: 0;
   color: var(--dash-ink);

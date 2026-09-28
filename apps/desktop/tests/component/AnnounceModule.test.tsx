@@ -45,8 +45,13 @@ describe('AnnounceModule four library cards', () => {
     expect(screen.queryByTestId('announce-library-title-product')).not.toBeInTheDocument();
     // 已更新卡可显示一次标题。
     expect(screen.getByTestId('announce-library-title-presale')).toHaveTextContent('九月活动上新');
-    // rel_N 只在脚注出现一次。
-    expect(screen.getByTestId('announce-release-footnote')).toHaveTextContent('rel_25');
+    expect(screen.getByTestId('announce-library-count-presale')).toHaveTextContent('75 条');
+    expect(screen.getByTestId('announce-library-count-presale')).not.toHaveTextContent('本版已更新');
+    expect(screen.getByTestId('announce-library-count-product')).toHaveTextContent('106 条');
+    expect(screen.getByTestId('announce-library-count-product')).not.toHaveTextContent('本版沿用');
+    expect(screen.getByTestId('announce-release-footnote')).toHaveTextContent('当前发布 rel_25');
+    expect(screen.getByTestId('announce-release-footnote')).not.toHaveTextContent('检索租约');
+    expect(screen.queryByText('不是合成演练')).not.toBeInTheDocument();
   });
 
   it('shows 无法标出本版更新了哪一库 when the summary is missing or garbled, keeping cards and counts', async () => {
