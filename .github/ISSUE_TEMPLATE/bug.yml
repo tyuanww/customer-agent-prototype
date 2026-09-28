@@ -1,0 +1,43 @@
+name: 缺陷
+description: 狐狸头、查询胶囊、工作台或安装包和预期不符
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: 发生了什么
+      description: 你看见的窗口、文案、日志。不要贴 token 或真实客户原文。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 怎么复现
+      placeholder: |
+        1. pnpm start
+        2. 点狐狸头
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: VERSION 或包名
+      placeholder: 0.3.23 或 客服话术浮窗 Demo-0.3.23-mac-universal-UNSIGNED.dmg
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 表面
+      options:
+        - 狐狸 / 查询胶囊
+        - 运营工作台
+        - 登录
+        - 安装包
+        - 其它

@@ -2,14 +2,14 @@
 
 > 本文是**当前实现**的参考。它描述桌面工作台「内容管理」到 API 的导入 / 取消 / 发布链路，字段、状态、限额与失败码均可从源码核对。
 >
-> 组织审核在**飞书文档**完成，产品不读飞书。库里的审核证据是 worker 自己写的一条声明，不是独立控制——见[组织已审证据的边界](explanation-org-review-evidence.md)。
+> 组织审核在**飞书文档**完成，产品不读飞书。库里的审核证据是 worker 自己写的一条声明，不是独立控制——见[组织已审证据的边界](explanation-org-review-evidence.md)。操作步骤见 [How to 用一张表替换四库之一](how-to-replace-one-library.md)。
 
 ## 1. 链路概览
 
-工作台「内容管理」的顶栏是**产品会话徽章 + 一对动作**：徽章只说会话接没接上（`未接入` / `正在确认会话` / `已接入`），右侧同一行是「取消未完成导入」（左）和「发布」（右），原因与发布反馈写在动作行下方。发布成功后主句 `已发布 rel_N · 姓名`；服务端回显了 `summary` 才画第二行四库 delta，失败不画 delta。成功后「发布」保持禁用，直到清除预览或重选文件。发布进行中「取消未完成导入」仍可用。「内容导入 / 本地导入」整块默认折在「待开发」，**先展开再选文件**；读文件进入 reading / ready / error 后会保持展开。
+工作台「内容管理」的顶栏是**产品会话徽章 + 一对动作**：徽章只说会话接没接上（`未接入` / `正在确认会话` / `已接入`），右侧同一行是「取消未完成导入」（左）和「发布」（右），原因与发布反馈写在动作行下方。发布成功后主句 `已发布 rel_N · 姓名`；服务端回显了 `summary` 才画第二行四库 delta，失败不画 delta。回执下有「去系统同步」「去话术库」。成功后「发布」保持禁用，直到清除预览或重选文件。发布进行中「取消未完成导入」仍可用。标题下方常驻「将替换」下拉，发布前必须手选四库之一。表里识别到的域和将替换不一致时，点发布先确认。「内容导入」默认折起，**先展开再选文件**；读文件进入 reading / ready / error 后会保持展开。
 
 ```
-工作台 内容管理：展开待开发，选 CSV / xlsx
+工作台 内容管理：手选将替换 → 展开内容导入，选 CSV / xlsx
     │  本地解析第一张表，中文表头映射场景 / 标准话术；只进本页预览，不打 import
     ▼
 POST /v1/content/import        →  202 ImportAcceptedResponse（validating）
@@ -32,10 +32,9 @@ content_current 切换 → 坐席 announce / hydrate 读到新目录
 
 | 通道 | 作用 | 参数要点 |
 | --- | --- | --- |
-| `dashboard:content-session` | 读当前产品会话（是否 enabled / signedIn / role / displayName） | 无 |
+| `dashboard:content-session` | 读当前产品会话（是否 enabled / signedIn / role / displayName） | 无；preload 另有 `onSessionChanged` 听 `product:session-changed` |
 | `dashboard:content-parse` | 解析本地字节，只在本页预览 | `sourceName` + `bytes`；**只读 xlsx 第一张表** |
-| `dashboard:content-import` | 提交导入，进入 `validating` | `sourceName` / `csvText` / `sourceBindings` |
-| `dashboard:content-publish` | 发布已 staged 的批次 | 另有 `rows` / `title` / `summary` |
+| `dashboard:content-publish` | 一次动作：内部 POST import → 等到 staged → POST publish | `sourceName` / `csvText` / `rows` / `title` / `summary` / `sourceBindings` |
 | `dashboard:content-cancel-in-flight` | 取消本 actor 全部进行中导入 | 无（内部发哨兵批号，见 §5） |
 
 来源：`apps/desktop/src/shared/ipc-channels.ts`、`apps/desktop/src/shared/dashboard-content.ts`。
@@ -163,7 +162,7 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 `rowRequiresOwner` / `rowCoachPublishable` 决定内容级限制：`aftersale` 域或场景/话术含「过敏」「赔付」的行需 owner；coach 只能发 `product` / `campaign`。
 
-**归属话术库（域）决定这次替换哪一区。** 发布时当前发布里「被这次绑定的域」的所有行先归档，再用你上传的整张表填回去；没被这次碰到的域照旧继承。所以归属不只是标签：把一张产品表传成活动，你换掉的是活动区，而真正的产品区没动。桌面在选表后显示识别到的域并允许下拉覆盖，识别来源是文件名（`售前` / `活动` / `售后` / `faq` 或 `产品`）与表内 `域` / `分类` 列。
+**将替换（手选域）决定这次替换哪一区。** 发布时当前发布里「被这次绑定的域」的所有行先归档，再用你上传的整张表填回去；没被这次碰到的域照旧继承。所以将替换不只是标签：把一张产品表选成活动，你换掉的是活动区，而真正的产品区没动。桌面在折叠外必选手选四库之一；「表里识别到」只展示文件原域（文件名 `售前` / `活动` / `售后` / `faq` 或 `产品`，以及表内 `域` / `分类` 列），不跟下拉。表域和将替换不一致时，点发布先确认再 POST。
 
 ## 8. 系统同步：合成 rel vs 本版是否更新该域
 
@@ -174,7 +173,7 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 ```
 [产品 沿用 N条] [活动 沿用 N条]
 [售前 已更新 + 发布标题一次] [售后 沿用 N条]
-脚注：检索租约 rel_N
+脚注：当前发布 rel_N
 ```
 
 - **卡状态唯一源** = 发布成功时写入 `Announcement.summary` 的那一句四库 delta，所有机器从 `GET /v1/announce/current` 的 `announcement.summary` 解析。写的是「本版已更新 / 本版沿用」，不写「已替换 / 未替换」，也不写 `rel_N`。
@@ -199,7 +198,7 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 内容发布是一个**软信号**，不是失效：
 
-- `ProductAnnounce.refresh` 发现 `releaseId` 变了，向 fox + query 扇出独立的 `content-updated` 事件（`{releaseId, summary, domainHashes, unreadDomains}`）。**禁止**走 `PRODUCT_ANNOUNCE_INVALIDATED`。工作台（dashboard）preload 禁止 `ipcRenderer.on`，所以它不订阅推送，而是靠窗口聚焦/可见 + 10s poll 重取 `dashboard:announce-current`。
+- `ProductAnnounce.refresh` 发现 `releaseId` 变了，向 fox + query **和 dashboard** 扇出独立的 `content-updated` 事件（`{releaseId, summary, domainHashes, unreadDomains}`）。**禁止**走 `PRODUCT_ANNOUNCE_INVALIDATED`。dashboard preload 暴露 `dashboardAnnounce.onCatalogUpdated`（听 `product:announce-content-updated`）。话术库 / 概览订阅后立刻 `list()`。系统同步四卡仍靠窗口聚焦/可见 + 10s poll 重取 `dashboard:announce-current`。
 - Query 收到软更新：换租约、出 `--muted` 墨色横幅（「售前话术已更新」，多域固定顺序 产品→活动→售前→售后，带「知道了」可关），**禁止** `setResults([])` / `cancelPendingSearch`——坐席正在接待，Top 3 必须留在屏幕上。横幅高度计入窗口 hug。窗口不可见时到达的横幅会被记住，等 Query 重新可见后才开始 1s 已读计时（不会卡住或永不清）。
 - 真正的 `expired` / `source_gate` / `unavailable` 才走 `onInvalidated`，语义保持：抽空结果 + `is-invalid`。
 
@@ -210,6 +209,9 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 ## 12. 相关
 
 - [组织已审证据的边界](explanation-org-review-evidence.md) — 库里那条审核声明到底是什么
+- [How to 用一张表替换四库之一](how-to-replace-one-library.md) — 手选将替换与 mismatch 确认
+- [How to 下架一条已发布话术](how-to-retire-a-script.md) — 两步确认，下次发布才离开目录
+- [本机目录与当前发布](explanation-catalog-lease.md) — `matchesLease` 与 kept-larger
 - [How to：办公机产品主链](how-to-office-machine-product-remote.md) — 在办公机上勾选取消与发布
 - [Tutorial：管理员导入 MENOKIN FAQ 并发布](tutorial-menokin-content-publish.md) — 端到端走一遍
 - [打包与签名](reference-packaging-and-signing.md) — 包怎么出、签不签

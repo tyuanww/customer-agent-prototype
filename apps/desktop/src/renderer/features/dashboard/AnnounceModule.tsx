@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { DashboardSoftwareCatalog } from '@shared/dashboard-ops-loop';
+import { OPS_LOOP_COPY, type DashboardSoftwareCatalog } from '@shared/dashboard-ops-loop';
 import type { DashboardAnnounceResult, DashboardAnnounceView } from '@shared/dashboard-announce';
 import {
   LIBRARY_DOMAINS,
@@ -180,14 +180,16 @@ function softwareBadgeTone(catalog: DashboardSoftwareCatalog | null): 'ok' | 'wa
 function SoftwareTab() {
   const [catalog, setCatalog] = useState<DashboardSoftwareCatalog | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
   const liveRef = useRef(true);
+  const openingRef = useRef(false);
 
   const load = () => {
     const api = window.dashboardOps;
     if (!api) {
       if (!liveRef.current) return;
       setCatalog(null);
-      setMessage('未接入：没有安装包目录。');
+      setMessage(OPS_LOOP_COPY.softwareChannel);
       return;
     }
     void api.softwareCatalog().then((result) => {
@@ -200,7 +202,7 @@ function SoftwareTab() {
       setCatalog(result);
       const current = result.current;
       if (!current) {
-        setMessage('目录为空，没有当前建议版本。');
+        setMessage(OPS_LOOP_COPY.noSoftwareCurrent);
         return;
       }
       const signedLabel = current.signed ? '已签名' : '未签名';
@@ -208,7 +210,37 @@ function SoftwareTab() {
     }).catch(() => {
       if (!liveRef.current) return;
       setCatalog(null);
-      setMessage('未接入：没有安装包目录。');
+      setMessage(OPS_LOOP_COPY.softwareChannel);
+    });
+  };
+
+  const onOpenDownload = () => {
+    const api = window.dashboardOps;
+    if (openingRef.current) return;
+    if (!api?.softwareOpenDownload) {
+      setMessage(OPS_LOOP_COPY.softwareChannel);
+      return;
+    }
+    if (!catalog?.current) {
+      setMessage(OPS_LOOP_COPY.noSoftwareCurrent);
+      return;
+    }
+    openingRef.current = true;
+    setOpening(true);
+    void api.softwareOpenDownload().then((result) => {
+      openingRef.current = false;
+      if (!liveRef.current) return;
+      setOpening(false);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setMessage(OPS_LOOP_COPY.softwareOpened);
+    }).catch(() => {
+      openingRef.current = false;
+      if (!liveRef.current) return;
+      setOpening(false);
+      setMessage(OPS_LOOP_COPY.unavailable);
     });
   };
 
@@ -219,6 +251,8 @@ function SoftwareTab() {
       liveRef.current = false;
     };
   }, []);
+
+  const canOpen = Boolean(catalog?.current) && !opening;
 
   return (
     <>
@@ -236,14 +270,25 @@ function SoftwareTab() {
             <div><dt>签名</dt><dd>{catalog.current.signed ? '已签名' : '未签名'}</dd></div>
           </dl>
         ) : null}
-        <button
-          type="button"
-          className="dash-reset"
-          data-testid="software-check-update"
-          onClick={load}
-        >
-          检查更新
-        </button>
+        <div className="content-action-row">
+          <button
+            type="button"
+            className="dash-reset"
+            data-testid="software-check-update"
+            onClick={load}
+          >
+            检查更新
+          </button>
+          <button
+            type="button"
+            className="dash-publish"
+            data-testid="software-open-download"
+            disabled={!canOpen}
+            onClick={onOpenDownload}
+          >
+            打开下载页
+          </button>
+        </div>
         {message ? <p data-testid="software-update-status">{message}</p> : null}
       </div>
     </>

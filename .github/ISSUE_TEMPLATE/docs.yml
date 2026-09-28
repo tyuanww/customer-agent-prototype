@@ -1,0 +1,29 @@
+name: 文档
+description: README、教程、how-to、CHANGELOG 或 CONTRIBUTING 与代码不一致
+title: "[docs] "
+labels: ["documentation"]
+body:
+  - type: input
+    id: path
+    attributes:
+      label: 文档路径
+      placeholder: docs/tutorial-first-run.md 或 README.md
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: 文档怎么写
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 代码或屏幕实际是什么
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: VERSION
+      placeholder: 0.3.23

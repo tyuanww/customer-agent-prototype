@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 先看现行文档
+    url: https://github.com/tyuanww/customer-agent-prototype#文档
+    about: README 文档表、第一次运行教程、CONTRIBUTING
+  - name: 命令名不对
+    url: https://github.com/tyuanww/customer-agent-prototype/blob/main/CONTRIBUTING.md#命令找不到时
+    about: ERR_PNPM_NO_SCRIPT 时先跑 pnpm help:dev

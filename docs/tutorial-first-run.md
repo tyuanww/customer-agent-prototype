@@ -9,7 +9,7 @@
 > 复制成功只表示剪贴板写入成功，不表示已发送、已采纳或回答正确。
 > Dashboard 是运营工作台。没有产品会话或没有冻结合同时写「未接入」，不是生产系统。
 
-相关文档：[如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
+相关文档：[如何验证](how-to-verify-desktop.md) · [CONTRIBUTING](../CONTRIBUTING.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
 
 ---
 
@@ -69,8 +69,10 @@ pnpm electron:install
 ## 3. 启动 Demo
 
 ```bash
-pnpm dev
+pnpm start    # 与 pnpm dev 相同
 ```
+
+若终端写 `ERR_PNPM_NO_SCRIPT` / `Missing script`，跑 `pnpm help:dev` 再 `pnpm run`。根脚本没有 serve 这种名字。
 
 如果你在 macOS Finder 中双击启动，可以直接运行仓根目录的 [`启动客服Agent.command`](../启动客服Agent.command)。它只检查 Node 24、pnpm 和本地 Electron 运行时，不会偷偷安装依赖或访问业务网络；终端窗口保持打开，便于看到启动错误。
 
@@ -135,7 +137,7 @@ Query Top 3 每张卡有发丝「话术不准」。点后该卡显示「已记�
 | --- | --- |
 | 出现运营工作台标准窗，约 1180×760，可缩放、非置顶、出现在任务栏 | 浮窗自己变成 520×760 工作台 |
 | 标题为「客服运营工作台」；没有「演示数据 / 无后端 · 不保存」徽标墙 | 工作台内出现真实客户工单号或发明的 KPI |
-| 「话术库」在产品远端列出当前发布 hydrate（空才回退本机索引）；S0 离线才是本机索引 | 话术库单条更新/删除直接改当前发布（只允许进入 pending_review） |
+| 「话术库」优先列出当前发布（`list().matchesLease`）；对不上写本机目录 | 话术库改正文或立刻从目录抽掉一行（下架只进 pending_review，下次发布才离开） |
 | 打开成功后，浮窗收起为狐狸头；关掉 Dashboard 后狐狸仍在 | Dashboard 关闭导致整应用退出 |
 | 左侧能切到管理概览、话术库、SOP、内容管理、系统同步 | VOC / 工单垃圾桶 / 离线抽样 / 架构图重新出现 |
 
@@ -143,11 +145,11 @@ Query Top 3 每张卡有发丝「话术不准」。点后该卡显示「已记�
 
 没有产品会话时，侧栏说明写「未接入」，不堆 MOCK 徽标。
 
-「内容管理」顶栏是会话徽章加同一行取消 / 发布；导入默认折在「待开发」。可选择本地 CSV 或 xlsx，解析成待发布预览。xlsx 只读第一张表。中文表头会映射到场景与标准话术，空白或不完整行会跳过。上限 10MiB / 5000 行。Owner 点发布后：导入校验通过则 staged，再 publish；成功两行回执（`已发布 rel_N · 姓名` + 四库 delta）；状态大约每 1.5 秒问一次，429 再等一轮。一期发布仅管理员；话术师可导入产品或活动草稿。Owner 在话术库单条更新/删除进入 pending_review，不能跳过 dual-review。
+「内容管理」顶栏是会话徽章加同一行取消 / 发布；「将替换」常驻在折叠外；导入默认折成「内容导入」。可选择本地 CSV 或 xlsx，解析成待发布预览。xlsx 只读第一张表。中文表头会映射到场景与标准话术，空白或不完整行会跳过。上限 10MiB / 5000 行。发布前必须手选将替换。管理员点发布后：导入校验通过则 staged，再 publish；成功两行回执（`已发布 rel_N · 姓名` + 四库 delta）加跳转；状态大约每 1.5 秒问一次，429 再等一轮。一期发布仅管理员；话术师可导入产品或活动草稿。管理员在话术库下架进入 pending_review，下次发布才离开目录。步骤见 [How to 用一张表替换四库之一](how-to-replace-one-library.md) 与 [How to 下架一条已发布话术](how-to-retire-a-script.md)。
 
 管理概览里的待办在有产品会话且角色为 coach / owner 时，走冻结 `GET /v1/metrics/iteration-tasks` 与 `POST .../start|close`。空列表合法。没有产品会话时写「未接入」，不会回落到 DEMO 5 条。有产品会话时 KPI 显示无命中率 / 复制完成率。Query「话术不准」Live UUID 会落库；待办页仍不展示按稿次数。
 
-「SOP」在话术库下面。有产品会话时上传 CSV 覆盖当前会话树，更新选中节点，删除仅 Owner。没有会话时点了显示未接入，不把合成过敏树当运营目录。这不是 Query 里那扇独立 SOP 窗。系统同步「话术版本更新」是四张卡（产品 / 活动 / 售前 / 售后）；软件目录列出 signed/unsigned，禁止 latest.yml。狐狸内侧紫点表示有话术更新，ACK 不是已读。
+「SOP」在话术库下面。有产品会话时上传 CSV 覆盖当前会话树，更新选中节点，删除仅管理员。没有会话时点了显示未接入，不把合成过敏树当运营目录。这不是 Query 里那扇独立 SOP 窗。系统同步「话术版本更新」是四张卡（产品 / 活动 / 售前 / 售后）；「软件版本更新」列出 signed/unsigned，管理员可「打开下载页」（系统浏览器打开当前建议版本的 https 地址），禁止 latest.yml。狐狸内侧紫点表示有话术更新，ACK 不是已读。
 
 ---
 

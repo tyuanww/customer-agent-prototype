@@ -12,56 +12,48 @@ Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
+## 第一次跑起来
+
+```bash
+cd /path/to/customer-agent-prototype
+export PATH="$HOME/homebrew/opt/node@24/bin:$HOME/homebrew/bin:$PATH"
+hash -r
+node -v && pnpm -v          # v24.x · 11.19.x
+pnpm install --frozen-lockfile
+pnpm electron:install
+pnpm start                  # 与 pnpm dev 相同
+```
+
+成功：桌面出现约 88px 透明狐狸头。点它 → 查询 → Top 3 →「复制话术」显示「已复制」。逐步核验走 [第一次运行](docs/tutorial-first-run.md)。依赖已经装好时，macOS 可双击 [`启动客服Agent.command`](启动客服Agent.command)。
+
+`pnpm` 报 `Missing script` / `ERR_PNPM_NO_SCRIPT` 时跑 `pnpm help:dev`，不要猜 `serve` / `desktop`。贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 文档
 
 | 你现在要做什么 | 打开 |
 | --- | --- |
-| 按统一流程开发、审查、提交 PR、合并、验收和发布，处理授权与证据复用 | [工程工作流程](docs/reference-engineering-workflow.md) |
-| 第一次把 Demo 跑起来，并走完狐狸头 → 查询 → Top 3 → 复制 → Dashboard；可选过敏 SOP 窗、话术不准、内容管理草稿、概览待办 | [docs/tutorial-first-run.md](docs/tutorial-first-run.md) |
-| 管理员导入仓外 MENOKIN FAQ、校验通过后发布，再查「面膜紫适用人群」 | [docs/tutorial-menokin-content-publish.md](docs/tutorial-menokin-content-publish.md) |
-| 查阅内容导入 / 取消未完成导入 / 发布的 IPC、HTTP、限额、失败码与发布闸门 | [docs/reference-content-publish.md](docs/reference-content-publish.md) |
-| 理解为什么库里那条「组织已审」质检证据只是一条声明，不是独立控制 | [docs/explanation-org-review-evidence.md](docs/explanation-org-review-evidence.md) |
-| 核对 macOS 签名 + 公证门禁，以及 Windows / Linux 为何只能出未签名包 | [docs/reference-packaging-and-signing.md](docs/reference-packaging-and-signing.md) |
-| 按目标选择 lint / 测试 / E2E / 打包命令，并分清能证明什么 | [docs/how-to-verify-desktop.md](docs/how-to-verify-desktop.md) |
-| 在办公机 Windows 上勾首轮离线安装 / 浮窗 / 快捷键 / 卸载（人填，开发机不代填） | [docs/how-to-office-machine-first-round.md](docs/how-to-office-machine-first-round.md) |
-| 查阅 Fox / Query / Dashboard / 登录 / SOP 窗口、IPC、layout ACK、handoff、图标与脚本合同 | [docs/reference-desktop-contracts.md](docs/reference-desktop-contracts.md) |
-| 了解 main / preload / renderer / shared 的职责和清理边界 | [docs/reference-project-architecture.md](docs/reference-project-architecture.md) |
-| 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
-| 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
-| 核对已接收的正式机器合同、双哈希和未激活边界 | [contracts/upstream/customer-agent/README.md](contracts/upstream/customer-agent/README.md) |
-| 生成并验证正式 OpenAPI 类型与 component runtime schema | [packages/contracts/README.md](packages/contracts/README.md) |
-| 启动并验证 W3～W5 的本机 `/health`、runtime pool 与 `/ready` | [apps/api/README.md](apps/api/README.md) |
-| 生成、核验并在隔离 PostgreSQL 15 中测试 W4 migration | [packages/database/README.md](packages/database/README.md) |
-| 核对 API 命名 profile、变量与失败关闭矩阵 | [docs/reference-api-runtime-config.md](docs/reference-api-runtime-config.md) |
-| 恢复当前一期任务、核对证据与下一动作 | [当前执行清单](docs/plans/2026-09-06-execution-goal.md) |
-| 审阅 Windows 安装包与实机方案（DRAFT，未批准开工） | [docs/plans/2026-09-10-windows-package-and-device-verification.md](docs/plans/2026-09-10-windows-package-and-device-verification.md) |
-| 准备真实 MENOKIN SKU 替换的输入格式与回退（准备件，未实施） | [docs/plans/2026-09-16-real-sku-replacement-input-contract.md](docs/plans/2026-09-16-real-sku-replacement-input-contract.md) |
-| 查看 BACKEND-CI-503 的根因定位与修复（已关闭） | [docs/plans/2026-09-16-backend-ci-503-readonly-diagnosis.md](docs/plans/2026-09-16-backend-ci-503-readonly-diagnosis.md) |
-| 核对关键词与自然语言搜索的候选展示规则（规则仍有效；桌面检索见下行） | [候选展示规则](docs/plans/2026-09-07-natural-language-search.md) |
-| 查阅当前桌面 BM25 + embedding + 可选 MiniMax 检索、仓外索引与禁止 `stack start` | [桌面语义检索](docs/reference-desktop-retrieval.md) · [How to 启动检索浮窗](docs/how-to-run-macos-semantic-query.md) · [为什么检索在桌面](docs/explanation-desktop-retrieval.md) · [冻结点](docs/plans/2026-09-10-macos-semantic-query-freeze.md) |
-| 运行合成搜索判定实验、完整 N 验收及报告证明 | [实验工具说明](apps/api/experiments/search-decision/README.md) |
-| 已暂停的探索备忘：教师辅助选句与合成材料（不是上线前置条件） | [docs/plans/2026-09-05-script-selection-preparation.md](docs/plans/2026-09-05-script-selection-preparation.md) |
-| 追溯 DEV-M0 历史切片与基线证据 | [docs/plans/2026-08-31-dev-m0-execution.md](docs/plans/2026-08-31-dev-m0-execution.md) |
-| 查看 W2 合同 codegen / runtime validation 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md](docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md) |
-| 查看 W3 API/config bootstrap 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md](docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md) |
-| 查看 W4 PostgreSQL migration 控制面的实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md](docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md) |
-| 查看 W5 runtime pool / service readiness 的实施边界与证据 | [docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md](docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md) |
-| 查看 W6 CI、Windows smoke 与正式服务候选产物的退出收口 | [docs/plans/2026-09-03-dev-m0-w6-exit-closure.md](docs/plans/2026-09-03-dev-m0-w6-exit-closure.md) |
-| 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
-| 核对合成飞书 / 账号登录窗与打包 file:// 收口（已合入，不含真实飞书凭据） | [docs/plans/2026-09-17-synthetic-dual-login.md](docs/plans/2026-09-17-synthetic-dual-login.md) |
-| 核对登录窗飞书改系统浏览器、账号仍本窗（how-to D1；已合入 v0.3.4） | [如何验证 · D1](docs/how-to-verify-desktop.md#合成产品会话接入d1) · [2026-09-18 规格](docs/plans/2026-09-18-login-environment-and-ui.md) |
-| 核对 Mac 开发机 NSPanel / P7 / P9 收口（不引入 native、索引不进包、离线 S0 不验 M5 主链） | [docs/plans/2026-09-18-mac-dev-remainder.md](docs/plans/2026-09-18-mac-dev-remainder.md) |
-| 已合入 main 的分支合入记录（两条 P7 只留 origin 隔离线） | [docs/plans/2026-09-19-local-unpushed-merge-order.md](docs/plans/2026-09-19-local-unpushed-merge-order.md) |
-| 办公机产品主链（远端；Windows 实机仍未观察，用当前 main v0.3.22 的 UNSIGNED.exe） | [docs/how-to-office-machine-product-remote.md](docs/how-to-office-machine-product-remote.md) |
-| macOS 打包态产品主链（远端；须重打 UNSIGNED 再勾；账号与断网未观察） | [docs/how-to-macos-packaged-product-remote.md](docs/how-to-macos-packaged-product-remote.md) |
-| Linux 打包态产品主链（远端，全部未观察；`package:linux` 须在 Linux 上跑） | [docs/how-to-linux-packaged-product-remote.md](docs/how-to-linux-packaged-product-remote.md) |
-| 方案 C：飞书 OAuth + 产品自管账号口令（不用 Logto） | [docs/plans/2026-09-18-identity-c-password-and-feishu.md](docs/plans/2026-09-18-identity-c-password-and-feishu.md) · [how-to](docs/how-to-feishu-and-password-mac.md) |
-| P4 远端：桌面连受控 HTTPS，API 仍 loopback | [docs/plans/2026-09-19-p4-remote-https-profile.md](docs/plans/2026-09-19-p4-remote-https-profile.md) · [how-to](docs/how-to-p4-remote-mac.md) |
-| 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
-| 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
-| 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |
-| 查看已明确延后的验证债务 | [TODOS.md](TODOS.md) |
-| 查阅打包携带的第三方软件许可声明 | [apps/desktop/THIRD_PARTY_NOTICES.md](apps/desktop/THIRD_PARTY_NOTICES.md) |
+| 第一次把狐狸头跑起来，走完查询 → 复制 → 工作台 | [第一次运行](docs/tutorial-first-run.md) |
+| 按仓库约定改代码、跑检查、提问 | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 管理员导入 MENOKIN FAQ 并发布，再查「面膜紫适用人群」 | [tutorial-menokin-content-publish](docs/tutorial-menokin-content-publish.md) |
+| 用一张表整库替换四库之一（手选将替换） | [how-to-replace-one-library](docs/how-to-replace-one-library.md) |
+| 在话术库下架一条已发布话术 | [how-to-retire-a-script](docs/how-to-retire-a-script.md) |
+| 换成这一版未签名包 | [how-to-upgrade-unsigned](docs/how-to-upgrade-unsigned.md) |
+| 查阅导入 / 发布 IPC、限额与失败码 | [reference-content-publish](docs/reference-content-publish.md) |
+| 理解本机目录与当前发布为何会分叉 | [explanation-catalog-lease](docs/explanation-catalog-lease.md) |
+| 按目标选择 lint / 测试 / E2E / 打包 | [how-to-verify-desktop](docs/how-to-verify-desktop.md) |
+| 办公机 Windows 首轮 / 产品主链（人填） | [first-round](docs/how-to-office-machine-first-round.md) · [product-remote](docs/how-to-office-machine-product-remote.md) |
+| macOS / Linux 打包态远端 | [macos](docs/how-to-macos-packaged-product-remote.md) · [linux](docs/how-to-linux-packaged-product-remote.md) |
+| Fox / Query / Dashboard IPC 与窗口合同 | [reference-desktop-contracts](docs/reference-desktop-contracts.md) |
+| 模块归属与清理边界 | [reference-project-architecture](docs/reference-project-architecture.md) |
+| 桌面 BM25 + 仓外索引 | [检索参考](docs/reference-desktop-retrieval.md) · [How to](docs/how-to-run-macos-semantic-query.md) · [为什么](docs/explanation-desktop-retrieval.md) |
+| 飞书 + 账号 how-to、P4 远端 how-to | [feishu](docs/how-to-feishu-and-password-mac.md) · [p4](docs/how-to-p4-remote-mac.md) |
+| 工程流程、打包签名、文档生命周期 | [workflow](docs/reference-engineering-workflow.md) · [signing](docs/reference-packaging-and-signing.md) · [lifecycle](docs/reference-document-lifecycle.md) |
+| 当前一期任务与延后债 | [执行清单](docs/plans/2026-09-06-execution-goal.md) · [TODOS](TODOS.md) · [CHANGELOG](CHANGELOG.md) |
+| 合同 / API / 数据库包 README | [contracts](packages/contracts/README.md) · [api](apps/api/README.md) · [database](packages/database/README.md) |
+| 其它现行参考 | [组织已审证据](docs/explanation-org-review-evidence.md) · [adapter 衔接](docs/reference-api-adapter-handoff.md) · [抽出模块](docs/reference-extracted-module-contracts.md) · [API 配置](docs/reference-api-runtime-config.md) · [上游合同](contracts/upstream/customer-agent/README.md) · [失败安全](docs/explanation-failure-safe-lifecycle.md) · [M5 勾选](docs/how-to-verify-macos-m5.md) · [搜索实验](apps/api/experiments/search-decision/README.md) · [第三方许可](apps/desktop/THIRD_PARTY_NOTICES.md) |
+| 历史计划（只增不删，不从本表逐条链） | [docs/plans 索引](docs/plans/README.md) |
+
+文档或命令与代码不一致时，用 GitHub Issue 模板 [文档](.github/ISSUE_TEMPLATE/docs.yml) 或 [缺陷](.github/ISSUE_TEMPLATE/bug.yml)。不要在 issue 里贴 token 或真实客户原文。
 
 项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除根、API、database 与桌面包依赖，适合归档或从 `pnpm install --frozen-lockfile` 重建。清理脚本不会触碰 `.git`、`.codegraph`、各包源码/测试、`apps/desktop/assets`、`evidence`、`docs` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
 
@@ -89,7 +81,7 @@ export NODE_OPTIONS=--use-system-ca
 export NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem
 pnpm install --frozen-lockfile
 pnpm electron:install
-pnpm dev
+pnpm start    # 与 pnpm dev 相同；命令名不对时跑 pnpm help:dev
 ```
 
 Application API 与桌面合成模式分开启动；它提供本机 liveness、基础设施 readiness 及 mock auth / policy / synthetic-only Search + Events。先按[配置真源](docs/reference-api-runtime-config.md#2-当前变量)在当前终端设置两套独立数据库登录与私有密钥；以下命令检查必填项后启动：
@@ -155,7 +147,7 @@ FOX_IDLE → SEARCH_INPUT → RESULTS | EMPTY | ERROR → COPIED → FOX_IDLE
 
 闲置时显示约 88px 的透明狐狸窗（狐狸视觉约 64px），待机动效约 3 秒一轮：4px 浮动、2° 摆动、轮廓呼吸。指针只在这只 88px 窗内时，整只狐狸会做非常克制的局部跟随，这不是全局眼球追踪。片刻无操作后会打盹、再睡着；窗口隐藏时睡眠钟暂停，重新可见后从头计时。任何局部活动或打开查询都会唤醒。点按有短促的戳感，拖过 4px 后会顺着方向被提起，拖太久会有一次很克制的烦躁反应。拖到当前屏左/右边缘 18px 内会自动吸附：原生窗口始终完整留在工作区，由 renderer 平移裁出等效 44px 窗区，对应 64px 狐狸视觉各露一半（32px），并重播一次方向性吸附。稳定半露时会做左右镜像的 inward-ready 动效：峰值向屏内探 3px、上抬 2px、内倾 5°并轻微放大，呈现“跃跃欲试”，但仍保持半露裁切和共享元素姿态连续。悬停或键盘聚焦时，狐狸用 420ms 镜像探头动效过渡到等效 80px 裁切；移开后用 300ms 反向动效缩回。这套贴边半露就是本项目的 mini mode，不是桌宠自由漫游。这样不会让 macOS WindowServer 与屏外透明窗反复争抢位置。打开采用两阶段共享元素交接：隐藏查询窗先按点击瞬间狐狸的真实位置、同尺寸 64px 和当前 2D 位移 / 旋转 / 缩放矩阵准备首帧，renderer 回执后才交换窗口并用约 260ms 的 `clip-path` 展开；贴边查询窗从物理屏幕边缘起步，保持 32px 半露轮廓连续。关闭约 200ms，抵达末帧后再反向换窗。玻璃只淡入淡出，不缩放模糊层；正常完成由动画回执驱动，定时器仅兜底。每个状态只一次性提交最终窗口 bounds，不逐帧 resize、不先弹出整颗贴边狐狸，也不让狐狸和查询同时消失。正常结果路径的高度是 Query 对 DOM 的实测 hug（capsule + banner + `result-content` + chrome + 容差），经 typed query-only layout / 纵向 resize IPC 上报后，Main 钳制到 `240..min(620, availableHeight)`（`availableHeight` 为当前 workArea 高减去 16px 边距），一次 `setBounds` 并 ACK，然后才展示内容。旧分档 `600×240 / 340 / 430 / 620` **只属于**测量缺失、过期或被拒绝时的异常 fallback，不是正常 Top 3 的固定窗高。查询中的狐狸会来回寻找，命中会弹跳，空态会歪头，复制后会点头；业务状态优先于待机动效。首击立即打开查询，不为识别双击增加延迟。
 
-Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。窗口标题是「客服运营工作台」。顶栏不再放「演示数据」或「无后端 · 不保存」；没有产品会话或没有冻结合同时用空态 / 「未接入」，不发明数字。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作。五个一期模块：管理概览、话术库、SOP、内容管理、系统同步。管理概览是统计范围 + 连续 KPI 条 + 待办决策表；待办走冻结 `GET /v1/metrics/iteration-tasks` 与 start/close；有产品会话时 KPI 走 `GET /v1/metrics/retrieval`（`current_release` / `last_7d`）显示无命中率与复制完成率，没有会话仍写「未接入」。话术库读当前发布 hydrate（与查询胶囊同一份目录），可导出 CSV；上传走内容导入；Owner 单条更新/删除走 `PATCH|DELETE /v1/content/scripts/{id}`，进入 `pending_review` 草稿，不能跳过 dual-review。SOP 在有产品会话时读/导入/更新当前会话树（`GET /v1/sop/catalog`、`POST /v1/sop/import`、`PATCH /v1/sop/nodes/{id}`），删除仅 Owner；没有会话保持「未接入」，不把合成过敏树当运营目录。「内容管理」顶栏是会话徽章（未接入 / 正在确认会话 / 已接入）加同一行取消 / 发布；导入折进「待开发」。接受本地 CSV 或 xlsx（只读第一张表）；中文表头映射到场景与标准话术。Owner 点发布后：导入校验通过则 staged，再 `POST /v1/content/publish`。成功回执两行：`已发布 rel_N · 姓名` + 四库 delta。组织审核在飞书文档。一期发布仅 Owner。系统同步「话术版本更新」是四张卡（产品 / 活动 / 售前 / 售后），写「本版已更新」或「本版沿用」；点卡打开话术库对应域；summary 读不出时写「无法标出本版更新了哪一库」。软件版本 Owner 读 `GET /v1/software/releases` 列出 signed/unsigned 行，禁止 `latest.yml`。狐狸内侧紫点表示有话术更新；查询胶囊 muted 横幅不清 Top 3。ACK 不是已读。adopted 只等于复制成功。
+Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。窗口标题是「客服运营工作台」。顶栏不再放「演示数据」或「无后端 · 不保存」；没有产品会话或没有冻结合同时用空态 / 「未接入」，不发明数字。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作。五个一期模块：管理概览、话术库、SOP、内容管理、系统同步。管理概览是统计范围 + 连续 KPI 条 + 待办决策表；待办走冻结 `GET /v1/metrics/iteration-tasks` 与 start/close；有产品会话时 KPI 走 `GET /v1/metrics/retrieval`（`current_release` / `last_7d`）显示无命中率与复制完成率，没有会话仍写「未接入」。话术库优先读 announce 内存 snapshot（`list().matchesLease`）；对不上时写「本机目录」，可导出 CSV，不在这页上传；管理员下架走 `DELETE /v1/content/scripts/{id}`，进入 `pending_review`，下次发布才离开目录。SOP 在有产品会话时读/导入/更新当前会话树（`GET /v1/sop/catalog`、`POST /v1/sop/import`、`PATCH /v1/sop/nodes/{id}`），删除仅管理员；没有会话保持「未接入」，不把合成过敏树当运营目录。「内容管理」顶栏是会话徽章加同一行取消 / 发布；「将替换」常驻折叠外；导入折成「内容导入」。接受本地 CSV 或 xlsx（只读第一张表）；中文表头映射到场景与标准话术。管理员点发布后：`publishDraft` 内部导入校验通过则 staged，再 `POST /v1/content/publish`。成功回执两行：`已发布 rel_N · 姓名` + 四库 delta，并可去系统同步 / 话术库。组织审核在飞书文档。一期发布仅管理员。系统同步「话术版本更新」是四张卡（产品 / 活动 / 售前 / 售后），写「本版已更新」或「本版沿用」；点卡打开话术库对应域；summary 读不出时写「无法标出本版更新了哪一库」。软件版本管理员读 `GET /v1/software/releases` 列出 signed/unsigned 行，禁止 `latest.yml`。狐狸内侧紫点表示有话术更新；查询胶囊 muted 横幅不清 Top 3。ACK 不是已读。adopted 只等于复制成功。
 
 Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色切换为白 / 浅灰耳麦以提高对比，狐狸本体保持原紫色。侧栏业务导航图标为 20px，文字比图标再靠近约 4px；折叠时图标中心仍固定在 macOS `nav.left+60` / Windows·Linux `nav.left+36`。
 
@@ -172,7 +164,7 @@ Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色�
 - 不使用 Menokin 名义、真实产品事实或真实客户原文；正式 Menokin 数据只可在 G0 / Ddev 与数据门通过后由受控 adapter 接入。
 - 不复制或迁移旧 `dafuyan-wording` 项目的代码、词典、权重、数据或配置；查询能力是在本仓按合成合同独立实现。
 - 过期与未生效话术永不返回；卡片不展示匹配分。
-- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 独立 `dashboard.ts` preload（话术库只读、内容会话/解析/导入/发布、话术优化待办 list/start/close、`dashboardOps` 检索账 / SOP / 话术单条写 / 软件目录），没有 `customerAgent`。话术库读仓外 hydrate / 索引，与查询胶囊同一份目录。
+- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 独立 `dashboard.ts` preload（话术库只读、内容会话/解析/发布/取消、话术优化待办 list/start/close、`dashboardOps` 检索账 / SOP / 话术下架 / 软件目录），没有 `customerAgent`。话术库读仓外 hydrate / 索引，与查询胶囊同一份目录。
 - 复制成功只显示「已复制」，不表示已发送、已采纳或回答正确。
 - Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。API host 已有合成范围的 `search/adoption/escalate` 事务端口、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 ops-loop（不准、SOP、话术草稿、检索账、软件目录）；默认 S0 不连接，显式 loopback 已接线 D1–D5、待办与 `dashboardOps` adapter，hydrate 检索不打 leftover `/v1/search`。合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*` / `iteration_tasks`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
 - 「智能检索」默认 ON：MiniMax 只规划检索式并重排已有 `scriptId`，不生成、不改写、不发送。失败 fail-open 到 BM25。未登录的 S0 fixture 路径仍不调用模型。

@@ -36,6 +36,7 @@ export const IPC_CHANNELS = {
   DASHBOARD_OPS_SOP_DELETE: 'dashboard:ops-sop-delete',
   DASHBOARD_OPS_SCRIPT_DELETE: 'dashboard:ops-script-delete',
   DASHBOARD_OPS_SOFTWARE: 'dashboard:ops-software',
+  DASHBOARD_OPS_SOFTWARE_OPEN: 'dashboard:ops-software-open',
   DASHBOARD_ANNOUNCE_CURRENT: 'dashboard:announce-current',
   DASHBOARD_ANNOUNCE_MARK_READ: 'dashboard:announce-mark-read',
   DISMISS: 'overlay:dismiss',

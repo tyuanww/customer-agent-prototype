@@ -255,6 +255,7 @@ describe('dashboard live actions', () => {
       sopDelete: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     const user = userEvent.setup();
     render(<SopLibraryModule />);
@@ -300,6 +301,7 @@ describe('dashboard live actions', () => {
       sopDelete: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog,
+      softwareOpenDownload: vi.fn(),
     };
     window.dashboardWording = {
       list: async () => ({
@@ -373,6 +375,7 @@ describe('dashboard live actions', () => {
       sopDelete: vi.fn(),
       scriptDelete,
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     window.dashboardWording = {
       list: async () => ({
@@ -424,6 +427,7 @@ describe('dashboard live actions', () => {
       sopDelete: vi.fn(),
       scriptDelete: hangingDelete,
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     window.dashboardWording = {
       list: async () => ({
@@ -474,6 +478,7 @@ describe('dashboard live actions', () => {
       sopDelete: vi.fn(),
       scriptDelete,
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     window.dashboardWording = {
       list: async () => ({
@@ -531,6 +536,7 @@ describe('dashboard live actions', () => {
       sopDelete: vi.fn(),
       scriptDelete: vi.fn(),
       softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
     };
     window.dashboardWording = {
       list: vi.fn(async () => ({ ok: true as const, releaseId: 'rel_20', total: 0, entries: [], catalogRefreshedAt: null, matchesLease: false })),
@@ -581,6 +587,7 @@ describe('dashboard live actions', () => {
           signed: false,
         },
       })),
+      softwareOpenDownload: vi.fn(),
     };
     window.dashboardWording = {
       list: async () => ({

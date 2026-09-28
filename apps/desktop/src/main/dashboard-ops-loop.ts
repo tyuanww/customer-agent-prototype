@@ -9,7 +9,9 @@ import {
   type DashboardOpsFailure,
   type DashboardRetrievalMetrics,
   type DashboardScriptMutation,
+  isSoftwareDownloadUrl,
   type DashboardSoftwareCatalog,
+  type DashboardSoftwareOpenDownload,
   type DashboardSopCatalog,
   type DashboardSopImport,
   type DashboardSopNode,
@@ -251,6 +253,36 @@ export async function dashboardSoftwareCatalog(
         signed: item.signed,
       }))),
       current,
+    });
+  });
+}
+
+export async function dashboardSoftwareOpenDownload(
+  session: DashboardOpsSessionClient | null,
+  openExternal: (url: string) => Promise<void>,
+): Promise<DashboardSoftwareOpenDownload | DashboardOpsFailure> {
+  return withSession(session, ['owner'], async (client, epoch) => {
+    let downloadUrl = '';
+    let version = '';
+    try {
+      const current = await client.request(epoch, '/v1/software/releases/current');
+      const parsed = parseContractSchema('SoftwareRelease', current.value);
+      downloadUrl = parsed.download_url;
+      version = parsed.version;
+    } catch (error) {
+      if (error instanceof ProductHttpError && error.code === 'GONE') {
+        return dashboardOpsFailure('NOT_FOUND', OPS_LOOP_COPY.noSoftwareCurrent);
+      }
+      throw error;
+    }
+    if (!isSoftwareDownloadUrl(downloadUrl)) {
+      return dashboardOpsFailure('VALIDATION', OPS_LOOP_COPY.softwareDownloadNotHttps);
+    }
+    await openExternal(downloadUrl);
+    return Object.freeze({
+      ok: true as const,
+      opened: true as const,
+      version,
     });
   });
 }
