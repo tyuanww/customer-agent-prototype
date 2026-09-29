@@ -190,165 +190,81 @@
       color: var(--muted);
     }
 
-    .how {
-      padding: 12px 0 8px;
-    }
-    .showcase {
-      display: grid;
-      grid-template-columns: minmax(240px, 0.4fr) minmax(0, 1fr);
-      gap: 28px 36px;
-      align-items: start;
-      padding: 28px 0 8px;
-      border-top: 1px solid var(--line);
-    }
-    .show-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .show-list button {
-      appearance: none;
-      text-align: left;
-      background: transparent;
-      border: 0;
-      border-radius: 12px;
-      padding: 12px 14px;
-      min-height: 44px;
-      cursor: pointer;
-      font: inherit;
-      color: var(--muted);
-    }
-    .show-list button:hover { background: #fff; }
-    .show-list button[aria-selected="true"] {
-      background: var(--accent-soft);
-      color: var(--fg);
-      box-shadow: inset 3px 0 0 var(--accent);
-    }
-    .show-list strong {
-      display: block;
-      font-size: 15px;
-      font-weight: 650;
-      color: var(--fg);
-    }
-    .show-list span {
-      display: none;
-      margin-top: 6px;
-      font-size: 0.92rem;
-      line-height: 1.55;
-      font-weight: 400;
-    }
-    .show-list button[aria-selected="true"] span { display: block; }
-    .show-stage { min-width: 0; padding: 0 36px 0 0; }
-    .show-stack {
-      position: relative;
-      height: clamp(280px, 46vw, 520px);
-      margin-bottom: 36px;
-    }
-    .show-card {
-      position: absolute;
-      inset: 0;
-      margin: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 18px;
+    .overview-sec { padding: 40px 0 8px; }
+    .overview-sec .section-title { margin-bottom: 16px; }
+    .ov-card {
       background: var(--card);
       border: 1px solid var(--line);
       border-radius: 16px;
-      transition: transform 0.35s ease, box-shadow 0.35s ease;
+      box-shadow: var(--shadow);
+      overflow: hidden;
     }
-    .show-card img {
+    .ov-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      border-bottom: 1px solid var(--line);
+    }
+    .ov-tabs button {
+      appearance: none;
+      min-height: 48px;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      font-weight: 650;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .ov-tabs button:hover { color: var(--fg); }
+    .ov-tabs button[aria-selected="true"] {
+      color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: inset 0 -2px 0 var(--accent);
+    }
+    .ov-view {
+      height: clamp(260px, 48vw, 520px);
+      overflow: hidden;
+      touch-action: pan-y;
+      cursor: grab;
+      user-select: none;
+    }
+    .ov-view.is-drag {
+      cursor: grabbing;
+      touch-action: none;
+    }
+    .ov-track {
+      display: flex;
+      height: 100%;
+      will-change: transform;
+    }
+    .ov-slide {
+      flex: 0 0 100%;
+      margin: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 24px;
+    }
+    .ov-slide img {
       max-width: 100%;
       max-height: 100%;
       width: auto;
       height: auto;
       object-fit: contain;
       border-radius: 12px;
+      pointer-events: none;
+      -webkit-user-drag: none;
     }
-    .show-card.is-capsule img {
-      width: 100%;
+    .ov-slide.is-capsule img {
+      width: 92%;
       max-height: 168px;
-      height: auto;
       border-radius: 20px;
     }
-    .show-card[data-depth="0"] {
-      z-index: 3;
-      transform: translate(0, 0);
-      box-shadow: 0 14px 32px -12px rgba(27, 28, 34, 0.28);
-      cursor: default;
-    }
-    .show-card[data-depth="1"] {
-      z-index: 2;
-      transform: translate(16px, 16px) scale(0.985);
-      box-shadow: 0 8px 20px -12px rgba(27, 28, 34, 0.2);
-      cursor: pointer;
-    }
-    .show-card[data-depth="2"] {
-      z-index: 1;
-      transform: translate(32px, 32px) scale(0.97);
-      box-shadow: 0 4px 14px -10px rgba(27, 28, 34, 0.16);
-      cursor: pointer;
-    }
-    .show-pager {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      margin-top: 4px;
-    }
-    .show-nav {
-      width: 44px;
-      height: 44px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: #fff;
-      color: var(--fg);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .show-nav:hover { background: var(--accent-soft); }
-    .show-copy {
-      display: none;
+    .ov-cap {
       margin: 12px 2px 0;
+      font-size: 14px;
       color: var(--muted);
-      font-size: 0.95rem;
-    }
-    .show-cap {
-      margin: 12px 2px 0;
-      font-size: 13px;
-      color: var(--muted);
-      min-height: 1.4em;
-    }
-    .show-dots {
-      display: flex;
-      justify-content: center;
-      gap: 4px;
-      margin-top: 8px;
-    }
-    .show-dots button {
-      appearance: none;
-      width: 44px;
-      height: 44px;
-      border: 0;
-      background: transparent;
-      cursor: pointer;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .show-dots button i {
-      display: block;
-      width: 8px;
-      height: 8px;
-      border-radius: 99px;
-      background: #c9ced8;
-    }
-    .show-dots button[aria-current="true"] i {
-      width: 18px;
-      background: var(--accent);
+      min-height: 1.5em;
     }
 
     section { padding: 48px 0; }
@@ -468,19 +384,10 @@
       .brand-full { display: none; }
       .brand-short { display: inline; }
       .hero { padding: 32px 0 20px; }
-      .hero-grid, .showcase, .foot-grid { grid-template-columns: 1fr; }
+      .hero-grid, .foot-grid { grid-template-columns: 1fr; }
       .hero-actions .btn { width: 100%; }
-      .show-list { flex-direction: row; }
-      .show-list button { flex: 1; text-align: center; padding: 10px 8px; }
-      .show-list span { display: none !important; }
-      .show-stage { padding: 0 22px 0 0; }
-      .show-stack { height: clamp(220px, 68vw, 360px); margin-bottom: 24px; }
-      .show-card { padding: 12px; }
-      .show-card[data-depth="1"] { transform: translate(10px, 10px) scale(0.985); }
-      .show-card[data-depth="2"] { transform: translate(20px, 20px) scale(0.97); }
-      .show-list button[aria-selected="true"] { box-shadow: none; }
-      .show-copy { display: block; }
-      .show-cap { display: none; }
+      .ov-view { height: clamp(220px, 72vw, 380px); }
+      .ov-slide { padding: 14px; }
       .row { flex-direction: column; align-items: stretch; }
       .row .btn, .row .chip { width: 100%; }
       .legal { flex-direction: column; }
@@ -488,7 +395,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .show-card { transition: none; }
+      .ov-track { transition: none !important; }
     }
   </style>
 </head>
@@ -502,7 +409,7 @@
         <span class="brand-short">话术浮窗</span>
       </a>
       <nav class="nav-links" aria-label="页面">
-        <a href="#how">用法</a>
+        <a href="#overview">总览</a>
         <a href="#install">安装</a>
         <a href="https://github.com/tyuanww/customer-agent-prototype">源码</a>
       </nav>
@@ -532,52 +439,30 @@
       </div>
     </section>
 
-    <section class="how" id="how">
+    <section class="overview-sec" id="overview">
       <div class="wrap">
-        <div class="showcase" id="showcase">
-          <div class="show-list" id="show-tabs" role="tablist" aria-label="用法">
-            <button type="button" role="tab" id="show-login" aria-controls="show-panel" aria-selected="true" data-show="0">
-              <strong>登录</strong>
-              <span>用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</span>
-            </button>
-            <button type="button" role="tab" id="show-query" aria-controls="show-panel" aria-selected="false" data-show="1">
-              <strong>查询</strong>
-              <span>点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</span>
-            </button>
-            <button type="button" role="tab" id="show-publish" aria-controls="show-panel" aria-selected="false" data-show="2">
-              <strong>发布</strong>
-              <span>话术师导表，管理员发布后，坐席才能搜到。</span>
-            </button>
+        <h2 class="section-title">总览</h2>
+        <div class="ov-card">
+          <div class="ov-tabs" id="ov-tabs" role="tablist" aria-label="总览">
+            <button type="button" role="tab" id="ov-login" aria-controls="ov-view" aria-selected="true" data-show="0">登录</button>
+            <button type="button" role="tab" id="ov-query" aria-controls="ov-view" aria-selected="false" data-show="1">查询</button>
+            <button type="button" role="tab" id="ov-publish" aria-controls="ov-view" aria-selected="false" data-show="2">发布</button>
           </div>
-          <div class="show-stage" id="show-panel" role="tabpanel" aria-labelledby="show-login">
-            <div class="show-stack" id="show-stack">
-              <figure class="show-card is-capsule" data-show="0" data-depth="0">
-                <img src="./shot-capsule.png" width="1200" height="176" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。">
+          <div class="ov-view" id="ov-view" role="tabpanel" aria-labelledby="ov-login" aria-roledescription="轮播" tabindex="0">
+            <div class="ov-track" id="ov-track">
+              <figure class="ov-slide is-capsule">
+                <img src="./shot-capsule.png" width="1200" height="176" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。" draggable="false">
               </figure>
-              <figure class="show-card" data-show="1" data-depth="1">
-                <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。">
+              <figure class="ov-slide">
+                <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。" draggable="false">
               </figure>
-              <figure class="show-card" data-show="2" data-depth="2">
-                <img src="./shot-dashboard.jpg" width="1933" height="1245" alt="客服运营工作台的话术库，当前发布已挂载。">
+              <figure class="ov-slide">
+                <img src="./shot-dashboard.jpg" width="1933" height="1245" alt="客服运营工作台的话术库，当前发布已挂载。" draggable="false">
               </figure>
-            </div>
-            <p class="show-copy" id="show-copy">用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
-            <p class="show-cap" id="show-cap" aria-live="polite">未登录时只能看到「登录后查询话术」。</p>
-            <div class="show-pager">
-              <button type="button" class="show-nav show-prev" aria-label="上一张界面">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
-              </button>
-              <div class="show-dots">
-                <button type="button" aria-label="登录" aria-current="true" data-show="0"><i></i></button>
-                <button type="button" aria-label="查询" aria-current="false" data-show="1"><i></i></button>
-                <button type="button" aria-label="发布" aria-current="false" data-show="2"><i></i></button>
-              </div>
-              <button type="button" class="show-nav show-next" aria-label="下一张界面">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-              </button>
             </div>
           </div>
         </div>
+        <p class="ov-cap" id="ov-cap" aria-live="polite">用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
       </div>
     </section>
 
@@ -648,7 +533,7 @@
         </div>
         <div>
           <h3>本页</h3>
-          <a href="#how">用法</a>
+          <a href="#overview">总览</a>
           <a href="#download">下载</a>
           <a href="#install">安装</a>
         </div>
@@ -668,101 +553,103 @@
   </footer>
 
   <script>
-    const slides = [
-      {
-        labelledby: 'show-login',
-        cap: '未登录时只能看到「登录后查询话术」。',
-      },
-      {
-        labelledby: 'show-query',
-        cap: '登录后查询，点「复制话术」或按 1 / 2 / 3。',
-      },
-      {
-        labelledby: 'show-publish',
-        cap: '话术师导表，管理员发布后，坐席才能搜到。',
-      },
+    const ovSlides = [
+      { id: 'ov-login', cap: '用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。' },
+      { id: 'ov-query', cap: '点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。' },
+      { id: 'ov-publish', cap: '话术师导表，管理员发布后，坐席才能搜到。' },
     ];
+    const ovTabs = [...document.querySelectorAll('#ov-tabs [role="tab"]')];
+    const ovView = document.getElementById('ov-view');
+    const ovTrack = document.getElementById('ov-track');
+    const ovCap = document.getElementById('ov-cap');
+    const ovReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let ovIndex = 0;
+    let ovDrag = null;
 
-    const showTabs = [...document.querySelectorAll('#show-tabs [role="tab"]')];
-    const showDots = [...document.querySelectorAll('.show-dots button')];
-    const showCards = [...document.querySelectorAll('.show-card')];
-    const showCap = document.getElementById('show-cap');
-    const showCopy = document.getElementById('show-copy');
-    const showPanel = document.getElementById('show-panel');
-    const showcase = document.getElementById('showcase');
-    let showIndex = 0;
-    let showTimer = 0;
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    function renderShow(index) {
-      showIndex = (index + slides.length) % slides.length;
-      const slide = slides[showIndex];
-      showCap.textContent = slide.cap;
-      showCopy.textContent = showTabs[showIndex].querySelector('span').textContent;
-      showPanel.setAttribute('aria-labelledby', slide.labelledby);
-      showCards.forEach((card) => {
-        const i = Number(card.dataset.show);
-        const depth = (i - showIndex + slides.length) % slides.length;
-        card.dataset.depth = String(depth);
-        card.setAttribute('aria-hidden', depth === 0 ? 'false' : 'true');
-      });
-      showTabs.forEach((tab, i) => {
-        const on = i === showIndex;
+    function ovWidth() { return ovView.getBoundingClientRect().width; }
+    function ovSet(index, offset, animate) {
+      ovIndex = Math.max(0, Math.min(ovSlides.length - 1, index));
+      const x = -ovIndex * ovWidth() + offset;
+      ovTrack.style.transition = animate && !ovReduce ? 'transform 0.32s ease' : 'none';
+      ovTrack.style.transform = 'translate3d(' + x + 'px,0,0)';
+      const slide = ovSlides[ovIndex];
+      ovCap.textContent = slide.cap;
+      ovView.setAttribute('aria-labelledby', slide.id);
+      ovTabs.forEach((tab, i) => {
+        const on = i === ovIndex;
         tab.setAttribute('aria-selected', on ? 'true' : 'false');
         tab.tabIndex = on ? 0 : -1;
       });
-      showDots.forEach((dot, i) => {
-        dot.setAttribute('aria-current', i === showIndex ? 'true' : 'false');
-      });
     }
+    function ovGo(index) { ovSet(index, 0, true); }
 
-    function stopShowTimer() {
-      window.clearInterval(showTimer);
-      showTimer = 0;
-    }
-    function startShowTimer() {
-      stopShowTimer();
-      if (reduceMotion) return;
-      showTimer = window.setInterval(() => renderShow(showIndex + 1), 7000);
-    }
-
-    function pickShow(index, fromUser) {
-      renderShow(index);
-      if (fromUser) startShowTimer();
-    }
-
-    showTabs.forEach((tab) => {
-      tab.addEventListener('click', () => pickShow(Number(tab.dataset.show), true));
+    ovTabs.forEach((tab) => {
+      tab.addEventListener('click', () => ovGo(Number(tab.dataset.show)));
       tab.addEventListener('keydown', (event) => {
         if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
         event.preventDefault();
-        const next = event.key === 'ArrowRight' ? showIndex + 1 : showIndex - 1;
-        pickShow(next, true);
-        showTabs[showIndex].focus();
+        ovGo(ovIndex + (event.key === 'ArrowRight' ? 1 : -1));
+        ovTabs[ovIndex].focus();
       });
     });
-    showDots.forEach((dot) => {
-      dot.addEventListener('click', () => pickShow(Number(dot.dataset.show), true));
+    ovView.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      event.preventDefault();
+      ovGo(ovIndex + (event.key === 'ArrowRight' ? 1 : -1));
     });
-    showCards.forEach((card) => {
-      card.addEventListener('click', () => {
-        const i = Number(card.dataset.show);
-        if (i !== showIndex) pickShow(i, true);
-      });
+
+    ovView.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      ovDrag = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        lastX: event.clientX,
+        lastT: event.timeStamp,
+        vx: 0,
+        axis: null,
+        dx: 0,
+      };
+      ovView.setPointerCapture(event.pointerId);
+      ovSet(ovIndex, 0, false);
     });
-    document.querySelector('.show-prev').addEventListener('click', () => pickShow(showIndex - 1, true));
-    document.querySelector('.show-next').addEventListener('click', () => pickShow(showIndex + 1, true));
-    showcase.addEventListener('mouseenter', stopShowTimer);
-    showcase.addEventListener('mouseleave', startShowTimer);
-    showcase.addEventListener('focusin', stopShowTimer);
-    showcase.addEventListener('focusout', (event) => {
-      if (!showcase.contains(event.relatedTarget)) startShowTimer();
+    ovView.addEventListener('pointermove', (event) => {
+      if (!ovDrag || event.pointerId !== ovDrag.id) return;
+      const dx = event.clientX - ovDrag.x;
+      const dy = event.clientY - ovDrag.y;
+      const dt = event.timeStamp - ovDrag.lastT || 16;
+      ovDrag.vx = (event.clientX - ovDrag.lastX) / dt;
+      ovDrag.lastX = event.clientX;
+      ovDrag.lastT = event.timeStamp;
+      if (ovDrag.axis === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        ovDrag.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        if (ovDrag.axis === 'x') ovView.classList.add('is-drag');
+      }
+      if (ovDrag.axis !== 'x') return;
+      event.preventDefault();
+      ovDrag.dx = dx;
+      let ox = dx;
+      if ((ovIndex === 0 && dx > 0) || (ovIndex === ovSlides.length - 1 && dx < 0)) ox = dx * 0.32;
+      ovSet(ovIndex, ox, false);
     });
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) stopShowTimer();
-      else startShowTimer();
-    });
-    startShowTimer();
+    function ovEndDrag(event) {
+      if (!ovDrag || event.pointerId !== ovDrag.id) return;
+      ovView.classList.remove('is-drag');
+      const w = ovWidth();
+      let next = ovIndex;
+      if (ovDrag.axis === 'x') {
+        const dx = ovDrag.dx;
+        const flick = ovDrag.vx * 1000;
+        if (dx < -Math.max(48, w * 0.18) || flick < -500) next += 1;
+        else if (dx > Math.max(48, w * 0.18) || flick > 500) next -= 1;
+      }
+      ovDrag = null;
+      ovGo(next);
+    }
+    ovView.addEventListener('pointerup', ovEndDrag);
+    ovView.addEventListener('pointercancel', ovEndDrag);
+    window.addEventListener('resize', () => ovSet(ovIndex, 0, false));
+    ovSet(0, 0, false);
 
     const osTabs = [...document.querySelectorAll('#os-tabs [role="tab"]')];
     const osPanels = {
