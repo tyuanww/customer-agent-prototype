@@ -21,6 +21,7 @@ export const STACK_ROOT = process.env.CUSTOMER_AGENT_STACK_ROOT
 
 export const PROFILE_FILE = path.join(STACK_ROOT, 'profile.json');
 export const FEISHU_ENV_FILE = path.join(STACK_ROOT, 'feishu.env');
+export const CONTENT_ENV_FILE = path.join(STACK_ROOT, 'content.env');
 
 export type FeishuBindingRole = 'agent' | 'coach' | 'owner';
 export type FeishuStackBinding = Readonly<{ openId: string; role: FeishuBindingRole }>;
@@ -35,18 +36,30 @@ const FEISHU_APP_ID_PATTERN = /^cli_[a-z0-9]{8,32}$/;
 const FEISHU_OPEN_ID_PATTERN = /^ou_[A-Za-z0-9]{6,64}$/;
 const FEISHU_ROLES = new Set<FeishuBindingRole>(['agent', 'coach', 'owner']);
 
-export function parseFeishuEnvFile(contents: string): FeishuStackConfig {
+/**
+ * Parse a `key=value` env file. Every loader of a stack-root env file goes
+ * through here — `feishu.env`, `content.env`, and `formal-dev-up.mjs` — so a
+ * malformed line or a duplicate key fails the same way in each, naming the file
+ * it came from. Duplicates are an error rather than last-one-wins: a stack that
+ * silently picked one of two review leads would be very hard to explain later.
+ */
+export function parseEnvFile(contents: string, label: string): Map<string, string> {
   const values = new Map<string, string>();
-  for (const line of contents.split(/\r?\n/)) {
+  for (const line of contents.split(/\r?\n/u)) {
     const trimmed = line.trim();
     if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
     const separator = trimmed.indexOf('=');
-    if (separator < 1) throw new Error('feishu.env: invalid line');
+    if (separator < 1) throw new Error(`${label}: invalid line`);
     const key = trimmed.slice(0, separator).trim();
     const value = trimmed.slice(separator + 1).trim();
-    if (values.has(key)) throw new Error(`feishu.env: duplicate ${key}`);
+    if (values.has(key)) throw new Error(`${label}: duplicate ${key}`);
     values.set(key, value);
   }
+  return values;
+}
+
+export function parseFeishuEnvFile(contents: string): FeishuStackConfig {
+  const values = parseEnvFile(contents, 'feishu.env');
   if (values.get('AUTH_MODE') !== 'feishu') throw new Error('feishu.env: AUTH_MODE must be feishu');
   const clientId = values.get('FEISHU_APP_ID') ?? '';
   const clientSecret = values.get('FEISHU_APP_SECRET') ?? '';
@@ -78,6 +91,57 @@ export function parseFeishuEnvFile(contents: string): FeishuStackConfig {
 export function loadFeishuStackConfig(file = FEISHU_ENV_FILE): FeishuStackConfig | undefined {
   if (!existsSync(file)) return undefined;
   return parseFeishuEnvFile(readFileSync(file, 'utf8'));
+}
+
+/**
+ * The content-side values a real deployment has to supply. The synthetic stack
+ * hard-codes them; a stack that answers real office machines must not, because
+ * a review record filed under `synthetic_coach` looks plausible and fails
+ * silently. Absent file means "use the synthetic defaults"; a present but
+ * malformed file is an error, never a quiet fallback.
+ */
+export type ContentStackConfig = Readonly<{
+  databaseName?: string;
+  intentTaxonomyVersion?: string;
+  intentId?: string;
+  reviewLeadSubject?: string;
+  reviewManagerSubject?: string;
+  reviewEvidenceId?: string;
+}>;
+
+const CONTENT_ENV_KEYS: Readonly<Record<string, keyof ContentStackConfig>> = Object.freeze({
+  DATABASE_NAME: 'databaseName',
+  CONTENT_INTENT_TAXONOMY_VERSION: 'intentTaxonomyVersion',
+  CONTENT_INTENT_ID: 'intentId',
+  CONTENT_REVIEW_LEAD_SUBJECT: 'reviewLeadSubject',
+  CONTENT_REVIEW_MANAGER_SUBJECT: 'reviewManagerSubject',
+  CONTENT_REVIEW_EVIDENCE_ID: 'reviewEvidenceId',
+});
+
+export function parseContentEnvFile(contents: string): ContentStackConfig {
+  const values = parseEnvFile(contents, 'content.env');
+  const unknown = [...values.keys()].filter((key) => !(key in CONTENT_ENV_KEYS)).sort();
+  // A misspelled key would otherwise be ignored and the stack would quietly keep
+  // the synthetic value the caller was trying to replace.
+  if (unknown.length > 0) throw new Error(`content.env: unknown key ${unknown.join(', ')}`);
+
+  type MutableContentStackConfig = { -readonly [K in keyof ContentStackConfig]: ContentStackConfig[K] };
+  const config: MutableContentStackConfig = {};
+  for (const [key, field] of Object.entries(CONTENT_ENV_KEYS)) {
+    const value = values.get(key);
+    if (value === undefined) continue;
+    if (value.length === 0) throw new Error(`content.env: ${key} must not be empty`);
+    config[field] = value;
+  }
+  if (config.databaseName !== undefined && !/^[a-z_][a-z0-9_]*$/u.test(config.databaseName)) {
+    throw new Error('content.env: DATABASE_NAME must be a lower-case SQL identifier');
+  }
+  return Object.freeze(config);
+}
+
+export function loadContentStackConfig(file = CONTENT_ENV_FILE): ContentStackConfig | undefined {
+  if (!existsSync(file)) return undefined;
+  return parseContentEnvFile(readFileSync(file, 'utf8'));
 }
 export const PID_DIRECTORY = path.join(STACK_ROOT, 'pids');
 export const LOG_DIRECTORY = path.join(STACK_ROOT, 'logs');

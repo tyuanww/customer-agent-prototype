@@ -163,16 +163,19 @@ export class SyntheticCluster {
 }
 
 /**
- * Create the synthetic database when missing. Called before migrations, which
- * create the NOLOGIN capability roles.
+ * Create the stack database when missing. Called before migrations, which
+ * create the NOLOGIN capability roles. The name comes from the resolved profile
+ * so a deployment can keep its own database name: the API's five DSNs are built
+ * from the same value, and creating one name while connecting to another would
+ * surface only later, as "database does not exist".
  */
-export async function ensureDatabase(cluster: SyntheticCluster): Promise<string> {
+export async function ensureDatabase(cluster: SyntheticCluster, database = DATABASE_NAME): Promise<string> {
   const admin = cluster.connect('postgres');
   await admin.connect();
   try {
-    const database = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [DATABASE_NAME]);
-    if (database.rowCount === 0) await admin.query(`CREATE DATABASE ${DATABASE_NAME}`);
-    return `database: ${DATABASE_NAME} present`;
+    const existing = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [database]);
+    if (existing.rowCount === 0) await admin.query(`CREATE DATABASE ${database}`);
+    return `database: ${database} present`;
   } finally {
     await admin.end();
   }

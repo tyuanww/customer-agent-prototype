@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
@@ -9,7 +10,7 @@ import {
   DESKTOP_APP_NAME,
   defaultDesktopUserDataDirectory,
   desktopPackagedProfilePath,
-  PID_DIRECTORY, apiEnvironment, parseFeishuEnvFile, readProfile,
+  PID_DIRECTORY, apiEnvironment, loadContentStackConfig, parseContentEnvFile, parseFeishuEnvFile, readProfile,
 } from './profile.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
@@ -302,5 +303,53 @@ describe('synthetic identity password', () => {
     } finally {
       await provider.close();
     }
+  });
+});
+
+describe('stack content env', () => {
+  it('reads a real deployment database name and content constants', () => {
+    const config = parseContentEnvFile([
+      'DATABASE_NAME=customer_agent_formal',
+      'CONTENT_INTENT_TAXONOMY_VERSION=itax_prod_v1',
+      'CONTENT_INTENT_ID=intent_prod_shipping',
+      'CONTENT_REVIEW_EVIDENCE_ID=EVD-PROD-001',
+    ].join('\n'));
+    assert.equal(config.databaseName, 'customer_agent_formal');
+    assert.equal(config.intentTaxonomyVersion, 'itax_prod_v1');
+    assert.equal(config.intentId, 'intent_prod_shipping');
+    assert.equal(config.reviewEvidenceId, 'EVD-PROD-001');
+  });
+
+  it('treats an absent file as "use the synthetic defaults"', () => {
+    assert.equal(loadContentStackConfig(path.join(tmpdir(), 'no-such-stack-content.env')), undefined);
+  });
+
+  it('fails closed on a present but invalid file rather than falling back', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'stack-content-env-'));
+    const file = path.join(directory, 'content.env');
+    writeFileSync(file, 'DATABASE_NAME=customer_agent_formal\nCONTENT_INTENT_TAXONOMY_VERSION=\n');
+    // A quiet fallback would leave the stack filing reviews under `synthetic_coach`.
+    assert.throws(
+      () => loadContentStackConfig(file),
+      /content\.env: CONTENT_INTENT_TAXONOMY_VERSION must not be empty/u,
+    );
+  });
+
+  it('rejects a misspelled key instead of ignoring it', () => {
+    assert.throws(
+      () => parseContentEnvFile('DATABASE_NAM=customer_agent_formal'),
+      /content\.env: unknown key DATABASE_NAM/u,
+    );
+  });
+
+  it('rejects duplicate keys and a non-identifier database name', () => {
+    assert.throws(
+      () => parseContentEnvFile('CONTENT_INTENT_ID=a\nCONTENT_INTENT_ID=b'),
+      /content\.env: duplicate CONTENT_INTENT_ID/u,
+    );
+    assert.throws(
+      () => parseContentEnvFile('DATABASE_NAME=Customer-Agent'),
+      /content\.env: DATABASE_NAME must be a lower-case SQL identifier/u,
+    );
   });
 });

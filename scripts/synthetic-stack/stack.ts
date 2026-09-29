@@ -31,8 +31,9 @@ import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   PREFERRED_PORTS, PROFILE_FILE, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
-  loadFeishuStackConfig, readProfile, writeDesktopPackagedProfile, writeProfile,
+  loadContentStackConfig, loadFeishuStackConfig, readProfile, writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
+import type { FeishuStackConfig } from './profile.ts';
 import {
   SyntheticCluster, clusterVersionText, ensureDatabase, ensureLoginRoles, writeClusterMarker,
 } from './postgres.ts';
@@ -105,6 +106,7 @@ async function resolveProfile({ reuse }: { reuse: boolean }): Promise<StackProfi
   if (reuse && existing) return existing;
   const apiPort = await resolvePort('api');
   const identityPort = await resolvePort('identity');
+  const content = loadContentStackConfig();
   return Object.freeze({
     version: 1,
     createdAt: new Date().toISOString(),
@@ -113,7 +115,7 @@ async function resolveProfile({ reuse }: { reuse: boolean }): Promise<StackProfi
     identityOrigin: `http://127.0.0.1:${String(identityPort)}`,
     apiPort,
     identityPort,
-    databaseName: DATABASE_NAME,
+    databaseName: content?.databaseName ?? DATABASE_NAME,
     pgPort: PG_PORT,
     pgSocketDirectory: PG_SOCKET_DIRECTORY,
     objectStoreDirectory: OBJECT_STORE_DIRECTORY,
@@ -126,6 +128,32 @@ function liveProcessNames(): readonly string[] {
     const record = readProcess(name);
     return record !== undefined && isOwnedProcessLive(record);
   });
+}
+
+/**
+ * The content-side API environment. With no `content.env` and no Feishu config
+ * these are exactly the constants the synthetic stack has always used, so the
+ * synthetic path is byte-for-byte unchanged.
+ *
+ * The review lead comes from the Feishu owner binding rather than from the file,
+ * matching `formal-dev-up.mjs`: the binding is the authority on who owns review,
+ * and a second source could disagree with it. Our own synthetic identities are
+ * not dual reviewers either, so when one real subject covers both sides the
+ * manager is left unset instead of naming the same person twice.
+ */
+function contentOverrides(feishu: FeishuStackConfig | undefined): Readonly<Record<string, string>> {
+  const content = loadContentStackConfig();
+  const owner = feishu?.bindings.find((binding) => binding.role === 'owner')?.openId;
+  const lead = content?.reviewLeadSubject ?? owner ?? 'synthetic_coach';
+  const manager = content?.reviewManagerSubject ?? owner ?? 'synthetic_owner';
+  const overrides: Record<string, string> = {
+    CONTENT_INTENT_TAXONOMY_VERSION: content?.intentTaxonomyVersion ?? 'itax_synthetic_stack_v1',
+    CONTENT_INTENT_ID: content?.intentId ?? 'intent_synthetic_stack_shipping',
+    CONTENT_REVIEW_LEAD_SUBJECT: lead,
+    CONTENT_REVIEW_EVIDENCE_ID: content?.reviewEvidenceId ?? 'EVD-STACK-REVIEW-001',
+  };
+  if (manager !== lead) overrides.CONTENT_REVIEW_MANAGER_SUBJECT = manager;
+  return overrides;
 }
 
 async function startProcesses(profile: StackProfile): Promise<string[]> {
@@ -154,13 +182,7 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
     await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
     if (feishu) started.push(`feishu: ${feishu.clientId} → ${feishu.redirectUri}`);
 
-    const environment = apiEnvironment(profile, {
-      CONTENT_INTENT_TAXONOMY_VERSION: 'itax_synthetic_stack_v1',
-      CONTENT_INTENT_ID: 'intent_synthetic_stack_shipping',
-      CONTENT_REVIEW_LEAD_SUBJECT: 'synthetic_coach',
-      CONTENT_REVIEW_MANAGER_SUBJECT: 'synthetic_owner',
-      CONTENT_REVIEW_EVIDENCE_ID: 'EVD-STACK-REVIEW-001',
-    }, feishu);
+    const environment = apiEnvironment(profile, contentOverrides(feishu), feishu);
 
     if (!live.has('api')) {
       const pid = spawnLogged('api', process.execPath, [API_ENTRY], environment);
@@ -256,7 +278,7 @@ async function commandStart(): Promise<void> {
 
   const admin = cluster.connect('postgres');
   await admin.connect();
-  try { log(await ensureDatabase(cluster)); } finally { await admin.end(); }
+  try { log(await ensureDatabase(cluster, profile.databaseName)); } finally { await admin.end(); }
 
   const database = cluster.connect();
   await database.connect();
