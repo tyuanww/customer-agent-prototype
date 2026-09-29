@@ -4,45 +4,48 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>客服话术浮窗 Demo · 官方下载</title>
-  <meta name="description" content="客服话术浮窗 Demo 官方下载。坐席用狐狸头查当前发布，运营工作台管四库发布。当前公开包 0.3.24，Windows x64，MIT 开源。">
+  <meta name="description" content="客服话术浮窗 Demo 官方下载。Windows x64，v0.3.24。坐席查询并复制当前已发布话术。下载安装包不会开通账号。">
   <link rel="canonical" href="https://download.jianghua.site/">
   <link rel="icon" type="image/png" href="./favicon.png">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <meta property="og:title" content="客服话术浮窗 Demo · 官方下载">
-  <meta property="og:description" content="坐席查当前发布，运营管四库。当前公开包 0.3.24，Windows x64。下载安装包不等于开通账号。">
+  <meta property="og:description" content="Windows 官方安装包 v0.3.24。登录用公司飞书。下载不等于开通账号。">
   <meta property="og:url" content="https://download.jianghua.site/">
   <meta property="og:image" content="https://download.jianghua.site/shot-query.png">
-  <meta name="theme-color" content="#e8dfd2">
+  <meta name="theme-color" content="#f4f5f8">
   <style>
     :root {
-      --primary: 15 65% 45%;
-      --primary-foreground: 40 30% 96%;
-      --background: 38 28% 91%;
-      --foreground: 30 15% 15%;
-      --card: 35 22% 85%;
-      --muted: 35 20% 87%;
-      --muted-foreground: 30 12% 38%;
-      --border: 35 18% 80%;
-      --accent-warm: 15 60% 38%;
-      --radius: 0.75rem;
-      --shadow: 0 24px 60px -24px hsl(30 20% 10% / 0.28);
-      --max: 1120px;
+      --bg: #f4f5f8;
+      --fg: #16181d;
+      --muted: #5c6370;
+      --line: #e2e4ea;
+      --card: #fff;
+      --accent: #5b4fcf;
+      --accent-fg: #fff;
+      --accent-hover: #4a40b8;
+      --warn: #9a3b1a;
+      --max: 1080px;
+      --shadow: 0 8px 24px -12px rgba(22, 24, 29, 0.18);
     }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; color-scheme: light; }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-      color: hsl(var(--foreground));
-      background: hsl(var(--background));
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
-    a { color: inherit; }
+    a { color: var(--accent); }
+    a:visited { color: #4338a5; }
+    .nav a, .btn, footer a { color: inherit; }
+    .nav a:visited, .btn:visited, footer a:visited { color: inherit; }
     a:focus-visible, button:focus-visible {
-      outline: 2px solid hsl(var(--primary));
+      outline: 2px solid var(--accent);
       outline-offset: 2px;
     }
+    ::selection { background: #ddd8ff; }
     img { max-width: 100%; height: auto; display: block; }
     .skip {
       position: absolute;
@@ -64,9 +67,9 @@
       position: sticky;
       top: 0;
       z-index: 40;
-      backdrop-filter: blur(18px);
-      background: hsl(var(--background) / 0.82);
-      border-bottom: 1px solid hsl(var(--border) / 0.7);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
     }
     .nav-inner {
       display: flex;
@@ -81,103 +84,26 @@
       gap: 10px;
       text-decoration: none;
       font-weight: 650;
-      letter-spacing: -0.02em;
       white-space: nowrap;
     }
     .brand img { width: 28px; height: 28px; }
     .brand-short { display: none; }
     .nav-links {
       display: flex;
-      gap: 22px;
+      gap: 8px;
       font-size: 14px;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted);
     }
     .nav-links a {
       text-decoration: none;
       display: inline-flex;
       align-items: center;
       min-height: 44px;
-      padding: 0 4px;
+      padding: 0 10px;
     }
-    .nav-links a:hover { color: hsl(var(--foreground)); }
-    .nav-actions { display: flex; align-items: center; gap: 10px; }
-    .nav-github {
-      width: 36px;
-      height: 36px;
-      display: grid;
-      place-items: center;
-      border-radius: 999px;
-      color: hsl(var(--muted-foreground));
-    }
-    .nav-github:hover { background: hsl(var(--card)); color: hsl(var(--foreground)); }
-    .hero {
-      position: relative;
-      padding: 72px 0 48px;
-    }
-    .hero::before {
-      content: "";
-      position: absolute;
-      inset: 0 -20vw auto;
-      height: 640px;
-      background-image:
-        linear-gradient(to right, hsl(var(--border) / 0.35) 1px, transparent 1px),
-        linear-gradient(to bottom, hsl(var(--border) / 0.35) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: linear-gradient(to bottom, #000 40%, transparent);
-      pointer-events: none;
-    }
-    .hero-grid {
-      position: relative;
-      display: grid;
-      grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-      gap: 48px;
-      align-items: center;
-    }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: hsl(var(--card));
-      border: 1px solid hsl(var(--border));
-      font-size: 12px;
-      color: hsl(var(--muted-foreground));
-    }
-    .badge b { color: hsl(var(--primary)); font-weight: 650; }
-    h1 {
-      margin: 16px 0 14px;
-      font-size: clamp(2.4rem, 5vw, 4.1rem);
-      line-height: 1.08;
-      letter-spacing: -0.038em;
-      font-weight: 750;
-      word-break: keep-all;
-      line-break: strict;
-    }
-    .lead {
-      margin: 0 0 22px;
-      max-width: 36rem;
-      font-size: 1.08rem;
-      color: hsl(var(--muted-foreground));
-    }
-    .roles {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 0 0 24px;
-      padding: 0;
-      list-style: none;
-    }
-    .roles li {
-      font-size: 13px;
-      color: hsl(var(--muted-foreground));
-      background: hsl(var(--card));
-      border: 1px solid hsl(var(--border));
-      border-radius: 999px;
-      padding: 4px 10px;
-    }
-    .roles b { color: hsl(var(--foreground)); font-weight: 650; }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .nav-links a:hover,
+    .nav-links a[aria-current="true"] { color: var(--fg); }
+    .nav-links a[aria-current="true"] { font-weight: 650; }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -188,256 +114,231 @@
       cursor: pointer;
       font: inherit;
       font-weight: 600;
-      border-radius: 12px;
+      border-radius: 10px;
       padding: 12px 18px;
+      min-height: 44px;
     }
     .btn-primary {
-      background: hsl(var(--primary));
-      color: hsl(var(--primary-foreground));
-      box-shadow: 0 10px 28px -10px hsl(var(--primary) / 0.55);
+      background: var(--accent);
+      color: var(--accent-fg);
     }
-    .btn-primary:hover { background: hsl(var(--accent-warm)); }
-    .btn-outline {
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost {
       background: transparent;
-      color: hsl(var(--foreground));
-      border: 1px solid hsl(var(--border));
+      color: var(--fg);
+      border: 1px solid var(--line);
     }
-    .btn-outline:hover { background: hsl(var(--card)); }
-    .btn-lg { padding: 14px 22px; border-radius: 14px; font-size: 1.02rem; }
-    .btn-light {
-      background: hsl(40 30% 96%);
-      color: hsl(15 45% 28%);
+    .btn-ghost:hover { background: #fff; }
+    .btn-lg { padding: 14px 22px; font-size: 1.02rem; }
+
+    .hero {
+      padding: 56px 0 32px;
     }
-    .platforms {
-      margin: 14px 0 0;
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 40px;
+      align-items: start;
+    }
+    .hero-copy { padding-top: 12px; }
+    .kicker {
+      margin: 0 0 10px;
       font-size: 13px;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.9rem, 3.6vw, 2.6rem);
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      word-break: keep-all;
+      line-break: strict;
+    }
+    .lead {
+      margin: 0 0 22px;
+      max-width: 34rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .meta {
+      margin: 12px 0 0;
+      font-size: 13px;
+      color: var(--muted);
     }
     .hero-shot { margin: 0; }
     .hero-shot img {
       width: 100%;
       height: auto;
-      border-radius: 22px;
-      border: 1px solid hsl(var(--border));
-      box-shadow: var(--shadow), 0 32px 64px -28px hsl(262 42% 28% / 0.28);
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      background: #fff;
     }
-    .hero-shot figcaption {
-      margin: 12px 4px 0;
+    .hero-shot figcaption,
+    .shot figcaption {
+      margin: 10px 2px 0;
       font-size: 13px;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted);
     }
-    section { padding: 72px 0; }
+
+    .how {
+      padding: 8px 0 40px;
+    }
+    .how-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px 28px;
+      padding: 24px 0 0;
+      border-top: 1px solid var(--line);
+    }
+    .how h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 650;
+    }
+    .how p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    section { padding: 48px 0; }
     section[id] { scroll-margin-top: 80px; }
-    .section-kicker {
-      margin: 0 0 8px;
-      font-size: 13px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: hsl(var(--muted-foreground));
-    }
     .section-title {
-      margin: 0 0 12px;
-      font-size: clamp(1.8rem, 3vw, 2.4rem);
-      letter-spacing: -0.03em;
+      margin: 0 0 8px;
+      font-size: clamp(1.4rem, 2.4vw, 1.8rem);
+      letter-spacing: -0.02em;
       font-weight: 700;
       word-break: keep-all;
       line-break: strict;
     }
     .section-lead {
-      margin: 0 0 32px;
-      max-width: 40rem;
-      color: hsl(var(--muted-foreground));
-    }
-    .lanes {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
-    }
-    .lane {
-      display: grid;
-      gap: 12px;
-      align-content: start;
-    }
-    .lane-head h3 {
-      margin: 0 0 6px;
-      font-size: 1.2rem;
-      letter-spacing: -0.02em;
-    }
-    .lane-head p {
-      margin: 0 0 8px;
-      color: hsl(var(--muted-foreground));
-      font-size: 0.95rem;
-    }
-    .feature {
-      background: hsl(var(--card));
-      border: 1px solid hsl(var(--border) / 0.8);
-      border-radius: 20px;
-      padding: 22px 22px 20px;
-    }
-    .feature h3 {
-      margin: 0 0 8px;
-      font-size: 1.05rem;
-      letter-spacing: -0.02em;
-    }
-    .feature p {
-      margin: 0;
-      color: hsl(var(--muted-foreground));
-      font-size: 0.95rem;
+      margin: 0 0 24px;
+      color: var(--muted);
     }
     .gallery { display: grid; gap: 28px; }
     .shot { margin: 0; }
     .shot img {
       width: 100%;
       height: auto;
-      border-radius: 16px;
-      border: 1px solid hsl(var(--border));
+      border-radius: 14px;
+      border: 1px solid var(--line);
       box-shadow: var(--shadow);
       background: #fff;
     }
-    .shot.overlay img { border-radius: 22px; }
-    .shot.capsule img { border-radius: 24px; }
-    .shot figcaption {
-      margin: 10px 4px 0;
-      font-size: 13px;
-      color: hsl(var(--muted-foreground));
+    .shot.capsule img { border-radius: 20px; }
+
+    .download-box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 28px 28px 24px;
     }
-    .download-hero { text-align: center; padding-top: 24px; }
-    .download-hero h2 { font-size: clamp(2rem, 4vw, 3rem); }
-    .download-hero .lead { margin: 0 auto 10px; }
-    .ver {
-      margin: 0 0 28px;
-      color: hsl(var(--muted-foreground));
-      font-size: 14px;
-    }
-    .ver strong { color: hsl(var(--foreground)); }
+    .download-box h2 { margin-top: 0; }
     .tabs {
-      display: inline-flex;
+      display: flex;
+      flex-wrap: wrap;
       gap: 6px;
-      padding: 5px;
-      border-radius: 999px;
-      background: hsl(var(--card));
-      border: 1px solid hsl(var(--border));
-      margin: 28px 0 16px;
+      margin: 20px 0 12px;
     }
     .tabs button {
-      border: 0;
+      border: 1px solid var(--line);
       background: transparent;
       font: inherit;
-      padding: 8px 16px;
+      padding: 10px 16px;
+      min-height: 44px;
       border-radius: 999px;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted);
       cursor: pointer;
     }
     .tabs button[aria-selected="true"] {
-      background: hsl(var(--foreground));
-      color: hsl(var(--background));
+      background: var(--fg);
+      border-color: var(--fg);
+      color: #fff;
     }
-    .panel {
-      display: none;
-      text-align: left;
-      background: hsl(var(--card));
-      border: 1px solid hsl(var(--border));
-      border-radius: 20px;
-      overflow: hidden;
-    }
+    .panel { display: none; }
     .panel.is-on { display: block; }
     .row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 18px 20px;
-      border-top: 1px solid hsl(var(--border) / 0.8);
+      padding: 8px 0 4px;
     }
-    .row:first-child { border-top: 0; }
     .row h3 { margin: 0 0 4px; font-size: 15px; }
-    .row p { margin: 0; font-size: 13px; color: hsl(var(--muted-foreground)); }
+    .row p { margin: 0; font-size: 13px; color: var(--muted); }
     .chip {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
       margin-top: 8px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
-      color: hsl(var(--muted-foreground));
-      background: hsl(var(--background));
+      color: var(--muted);
+      background: var(--bg);
       border-radius: 8px;
-      padding: 10px 10px;
+      padding: 10px 12px;
       min-height: 44px;
-      border: 0;
+      border: 1px solid var(--line);
       cursor: pointer;
     }
-    .chip:hover { color: hsl(var(--foreground)); }
+    .chip:hover { color: var(--fg); }
     .note {
-      margin: 14px 0 0;
+      margin: 16px 0 0;
       font-size: 13px;
-      color: hsl(var(--muted-foreground));
-      text-align: center;
+      color: var(--muted);
     }
-    .history {
-      margin-top: 16px;
-      padding: 28px 20px;
-      border-radius: 20px;
-      background: hsl(var(--card));
-      border: 1px solid hsl(var(--border));
-      text-align: center;
-    }
-    .history h3 { margin: 0 0 6px; }
-    .history p { margin: 0 0 12px; color: hsl(var(--muted-foreground)); font-size: 14px; }
-    .history a { color: hsl(var(--primary)); font-weight: 600; text-decoration: none; }
-    .steps { max-width: 720px; }
+    .note a { font-weight: 600; text-decoration: none; }
     .steps ol { margin: 0; padding-left: 20px; }
     .steps li { margin: 0 0 10px; }
-    .cta {
-      background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent-warm)) 100%);
-      color: hsl(var(--primary-foreground));
-      padding: 72px 0;
-    }
-    .cta h2 { margin: 0 0 10px; font-size: clamp(1.8rem, 3vw, 2.6rem); letter-spacing: -0.03em; }
-    .cta p { margin: 0 0 22px; opacity: 0.9; max-width: 36rem; }
+    .warn { color: var(--warn); }
+
     footer {
-      padding: 48px 0 28px;
-      border-top: 1px solid hsl(var(--border));
+      padding: 36px 0 28px;
+      border-top: 1px solid var(--line);
     }
     .foot-grid {
       display: grid;
-      grid-template-columns: 1.4fr 1fr 1fr 1fr;
-      gap: 28px;
+      grid-template-columns: 1.6fr 1fr 1fr;
+      gap: 24px;
     }
-    footer h3 { margin: 0 0 10px; font-size: 13px; }
+    footer h3 { margin: 0 0 8px; font-size: 13px; }
     footer a {
       display: flex;
       align-items: center;
       text-decoration: none;
-      color: hsl(var(--muted-foreground));
+      color: var(--muted);
       font-size: 14px;
-      margin: 0;
       min-height: 44px;
-      padding: 8px 0;
     }
-    footer a:hover { color: hsl(var(--foreground)); }
-    .foot-brand { display: flex; align-items: center; gap: 8px; font-weight: 650; margin-bottom: 8px; }
+    footer a:hover { color: var(--fg); }
+    .foot-brand { display: flex; align-items: center; gap: 8px; font-weight: 650; margin-bottom: 6px; }
     .foot-brand img { width: 22px; height: 22px; }
+    .foot-copy { margin: 0; color: var(--muted); font-size: 14px; }
     .legal {
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 28px;
+      margin-top: 24px;
       padding-top: 16px;
-      border-top: 1px solid hsl(var(--border));
-      color: hsl(var(--muted-foreground));
+      border-top: 1px solid var(--line);
+      color: var(--muted);
       font-size: 13px;
     }
-    .warn { color: hsl(15 55% 38%); }
+
     @media (max-width: 900px) {
-      .nav-links, .nav-github, .brand-full { display: none; }
+      .nav-links { display: none; }
+      .brand-full { display: none; }
       .brand-short { display: inline; }
-      .hero { padding: 40px 0 24px; }
-      .hero-grid, .lanes, .foot-grid { grid-template-columns: 1fr; }
+      .hero { padding: 32px 0 20px; }
+      .hero-grid, .how-grid, .foot-grid { grid-template-columns: 1fr; }
       .hero-actions .btn { width: 100%; }
-      .row { flex-direction: column; align-items: flex-start; }
+      .row { flex-direction: column; align-items: stretch; }
+      .row .btn, .row .chip { width: 100%; }
       .legal { flex-direction: column; }
-      .shot.capsule img { border-radius: 20px; }
+      .download-box { padding: 22px 18px; }
+      .shot.capsule img { border-radius: 16px; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -454,120 +355,65 @@
         <span class="brand-short">话术浮窗</span>
       </a>
       <nav class="nav-links" aria-label="页面">
-        <a href="#features">功能</a>
+        <a href="#how">用法</a>
         <a href="#shots">界面</a>
-        <a href="#download">下载</a>
         <a href="#install">安装</a>
         <a href="https://github.com/tyuanww/customer-agent-prototype">源码</a>
       </nav>
-      <div class="nav-actions">
-        <a class="nav-github" href="https://github.com/tyuanww/customer-agent-prototype" aria-label="GitHub">
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 4.51c.68.003 1.36.092 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-        </a>
-        <a class="btn btn-primary" href="#download">免费下载</a>
-      </div>
+      <a class="btn btn-primary" href="#download">下载</a>
     </div>
   </header>
 
   <main>
     <section class="hero">
       <div class="wrap hero-grid">
-        <div>
-          <span class="badge">公开包 <b>v0.3.24</b></span>
-          <h1>当前发布的话术，一直浮在桌面上</h1>
-          <p class="lead">客服话术浮窗 Demo 有两套表面。坐席用狐狸头和查询胶囊查当前发布、复制原文；话术师整库替换，管理员发布后坐席才能搜到。</p>
-          <ul class="roles">
-            <li><b>坐席</b> 查询 · 复制</li>
-            <li><b>话术师</b> 导入表格</li>
-            <li><b>管理员</b> 发布 · 下架</li>
-          </ul>
+        <div class="hero-copy">
+          <p class="kicker">v0.3.24</p>
+          <h1>客服话术浮窗</h1>
+          <p class="lead">接待时查询当前已发布的话术，复制后自己发送。用公司飞书登录。下载安装包不会开通账号。</p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
               下载 Windows 安装包
             </a>
-            <a class="btn btn-outline btn-lg" href="https://github.com/tyuanww/customer-agent-prototype">查看源码</a>
           </div>
-          <p class="platforms">适用 Windows 10+ x64 · 约 87.2 MB · 未代码签名 · 下载不等于开通账号</p>
+          <p class="meta">Windows 10+ x64 · 87.2 MB · 未代码签名</p>
         </div>
         <figure class="hero-shot">
-          <img src="./shot-query.png" width="1200" height="1240" alt="查询胶囊展开后的候选话术：问句「脸部过敏，我的脸很痛」，三条结果可复制或报话术不准，并可打开过敏售后流程。">
-          <figcaption>坐席浮窗 · 登录后查当前发布 Top 3，人工点「复制话术」或按 1 / 2 / 3。</figcaption>
+          <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术，以及打开过敏售后流程。">
+          <figcaption>登录后查询，点「复制话术」或按 1 / 2 / 3。</figcaption>
         </figure>
       </div>
     </section>
 
-    <section id="features">
-      <div class="wrap">
-        <p class="section-kicker">产品</p>
-        <h2 class="section-title">两套表面，各做一件事</h2>
-        <p class="section-lead">浮窗给接待用，工作台给运营用。查询只走当前已发布的目录，不生成新话术，也不代发到接待窗口。</p>
-        <div class="lanes">
-          <div class="lane">
-            <div class="lane-head">
-              <h3>坐席浮窗</h3>
-              <p>平时桌面上只剩狐狸头。需要时展开成玻璃查询胶囊。</p>
-            </div>
-            <article class="feature">
-              <h3>狐狸头常驻</h3>
-              <p>约 88px 透明狐狸置顶，跳过任务栏。点狐狸或按 Ctrl+Shift+Space（Mac 为 ⌘⇧空格）打开查询胶囊。Esc 或再点狐狸收回。</p>
-            </article>
-            <article class="feature">
-              <h3>登录后再查当前发布</h3>
-              <p>未登录占位「登录后查询话术」。点登录走公司飞书。登录后只检索当前已发布目录，给出 Top 3 原文。点「复制话术」或按 1 / 2 / 3，人在环，不代发。</p>
-            </article>
-            <article class="feature">
-              <h3>话术不准与过敏 SOP</h3>
-              <p>结果卡可报「话术不准」。过敏问句会出现「打开过敏售后流程」，坐席只读预览，不建单。</p>
-            </article>
-            <article class="feature">
-              <h3>智能检索只重排已有话术</h3>
-              <p>胶囊右侧开关默认开：规划检索式并重排已有话术 id，不生成、不改写正文。关掉则走本地检索。</p>
-            </article>
-          </div>
-          <div class="lane">
-            <div class="lane-head">
-              <h3>运营工作台</h3>
-              <p>另开一扇「客服运营工作台」。白底、紫锚点，五个模块。</p>
-            </div>
-            <article class="feature">
-              <h3>五个模块</h3>
-              <p>管理概览、话术库、SOP、内容管理、系统同步。从查询胶囊的工作台图标、狐狸右键或系统托盘打开。</p>
-            </article>
-            <article class="feature">
-              <h3>话术库读当前发布</h3>
-              <p>产品 / 活动 / 售前 / 售后四域。搜索标题、场景、正文，可导出 CSV。管理员下架后这条仍可见，下次发布才离开目录。</p>
-            </article>
-            <article class="feature">
-              <h3>整库替换再发布</h3>
-              <p>内容管理导入 CSV 或 xlsx，进入待发布。一期仅管理员点发布后，坐席才能搜到新内容。话术师可以导表，不能发布。</p>
-            </article>
-            <article class="feature">
-              <h3>SOP 与系统同步</h3>
-              <p>SOP 是独立树，删除仅管理员；坐席过敏窗只读。系统同步用一张 rel_N 四卡标「本版已更新 / 本版沿用」。软件目录无自动更新。</p>
-            </article>
-          </div>
+    <section class="how" id="how">
+      <div class="wrap how-grid">
+        <div>
+          <h2>查询</h2>
+          <p>点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</p>
+        </div>
+        <div>
+          <h2>登录</h2>
+          <p>用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
+        </div>
+        <div>
+          <h2>发布</h2>
+          <p>话术师导表，管理员发布后，坐席才能搜到。</p>
         </div>
       </div>
     </section>
 
     <section id="shots">
       <div class="wrap">
-        <p class="section-kicker">界面</p>
-        <h2 class="section-title">就是现在坐席和运营在用的两面</h2>
-        <p class="section-lead">下面三张是产品实拍：狐狸紫玻璃浮窗，以及白底工作台。</p>
+        <h2 class="section-title">界面</h2>
         <div class="gallery">
           <figure class="shot capsule">
-            <img src="./shot-capsule.png" width="1200" height="176" loading="lazy" alt="未登录时的查询胶囊，占位「登录后查询话术」，左侧查询按钮，下方登录与工作台入口，右侧智能检索开关和狐狸头。">
-            <figcaption>未登录查询胶囊。占位「登录后查询话术」，可开飞书登录、工作台和智能检索。</figcaption>
-          </figure>
-          <figure class="shot overlay">
-            <img src="./shot-query.png" width="1200" height="1240" loading="lazy" alt="登录后查询「脸部过敏，我的脸很痛」的结果：过敏售后流程入口，以及「过敏2」「过敏包退2」等候选话术，带复制话术和话术不准。">
-            <figcaption>登录后查询。当前发布 Top 3，复制话术 / 话术不准；过敏可打开售后流程。</figcaption>
+            <img src="./shot-capsule.png" width="1200" height="176" loading="lazy" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。">
+            <figcaption>未登录</figcaption>
           </figure>
           <figure class="shot">
-            <img src="./shot-dashboard.jpg" width="1933" height="1245" loading="lazy" alt="客服运营工作台的话术库：侧栏五个模块，产品话术 106 条、活动 4 条、售前 75 条、售后 223 条，当前发布已挂载 rel_27。">
-            <figcaption>运营工作台 · 话术库。只展示当前发布四域，图为产品话术已挂载 rel_27。</figcaption>
+            <img src="./shot-dashboard.jpg" width="1933" height="1245" loading="lazy" alt="客服运营工作台的话术库，当前发布已挂载。">
+            <figcaption>运营工作台</figcaption>
           </figure>
         </div>
       </div>
@@ -575,85 +421,58 @@
 
     <section id="download">
       <div class="wrap">
-        <div class="download-hero">
-          <h2 class="section-title">下载 客服话术浮窗 Demo</h2>
-          <p class="lead">免费开源。官方安装包只从本页或 GitHub Release 获取。</p>
-          <p class="ver">最新版本 <strong>v0.3.24</strong> · 发布于 2026年9月29日</p>
-          <a class="btn btn-primary btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
-            下载 Windows 版 · 87.2 MB
-          </a>
-          <p class="platforms">Windows 10 及以上 · x64 · NSIS · 未代码签名</p>
-        </div>
-
-        <div style="text-align:center">
-          <p class="section-title" style="font-size:1.4rem;margin-top:48px">全部平台</p>
-          <div class="tabs" role="tablist" aria-label="平台">
+        <div class="download-box">
+          <h2 class="section-title">下载</h2>
+          <p class="section-lead">v0.3.24 · 2026年9月29日</p>
+          <div class="tabs" role="tablist" aria-label="系统">
             <button type="button" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="true" data-tab="win">Windows</button>
             <button type="button" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false" data-tab="mac">macOS</button>
             <button type="button" role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false" data-tab="linux">Linux</button>
           </div>
-        </div>
-
-        <div class="panel is-on" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
-          <div class="row">
-            <div>
-              <h3>Windows 安装包（.exe）</h3>
-              <p>NSIS · x64 · 当前公开包双击即装进当前用户目录</p>
-              <button class="chip" type="button" data-copy="c2dd941031791b8dc589fbadf1cbfa0231c72734ebc846c8809971f8e55510cd">SHA-256　c2dd9410…f55510cd</button>
+          <div class="panel is-on" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
+            <div class="row">
+              <div>
+                <h3>Windows 安装包</h3>
+                <p>x64 · 装进当前用户目录</p>
+                <button class="chip" type="button" data-copy="c2dd941031791b8dc589fbadf1cbfa0231c72734ebc846c8809971f8e55510cd">SHA-256　c2dd9410…f55510cd</button>
+              </div>
+              <a class="btn btn-primary" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 · 87.2 MB</a>
             </div>
-            <a class="btn btn-outline" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 · 87.2 MB</a>
           </div>
-        </div>
-        <div class="panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
-          <div class="row">
-            <div>
-              <h3>macOS 磁盘映像（.dmg）</h3>
-              <p>universal · 未公证，本页主推 Windows</p>
-              <button class="chip" type="button" data-copy="476d16e7dc7258c9f2a9765bd0e88ddf3084e5335c869b2e33f1c7406f157eb3">SHA-256　476d16e7…6f157eb3</button>
+          <div class="panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
+            <div class="row">
+              <div>
+                <h3>macOS 磁盘映像</h3>
+                <p>universal · 未公证</p>
+                <button class="chip" type="button" data-copy="476d16e7dc7258c9f2a9765bd0e88ddf3084e5335c869b2e33f1c7406f157eb3">SHA-256　476d16e7…6f157eb3</button>
+              </div>
+              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
             </div>
-            <a class="btn btn-outline" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
           </div>
-        </div>
-        <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
-          <div class="row">
-            <div>
-              <h3>Linux AppImage</h3>
-              <p>x86_64 · 未签名</p>
-              <button class="chip" type="button" data-copy="af48a3362379932cb8cd4a42e82be3f1eba2963986c2bd5677e473723f19068e">SHA-256　af48a336…3f19068e</button>
+          <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
+            <div class="row">
+              <div>
+                <h3>Linux AppImage</h3>
+                <p>x86_64 · 未签名</p>
+                <button class="chip" type="button" data-copy="af48a3362379932cb8cd4a42e82be3f1eba2963986c2bd5677e473723f19068e">SHA-256　af48a336…3f19068e</button>
+              </div>
+              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
             </div>
-            <a class="btn btn-outline" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
           </div>
-        </div>
-        <p class="note">当前公开包未做代码签名。Windows 可用 <code>certutil -hashfile 文件名 SHA256</code> 核对上面的 SHA-256。</p>
-        <div class="history">
-          <h3>历史版本</h3>
-          <p>需要旧版本？所有历史安装包都在 GitHub Releases。</p>
-          <a href="https://github.com/tyuanww/customer-agent-prototype/releases/tag/v0.3.24">前往 GitHub Releases ↗</a>
+          <p class="note">未做代码签名，也没有自动更新。新版本仍从本页或 <a href="https://github.com/tyuanww/customer-agent-prototype/releases">GitHub Releases</a> 下载。点上方 SHA-256 可复制完整校验值。</p>
         </div>
       </div>
     </section>
 
     <section id="install">
       <div class="wrap steps">
-        <p class="section-kicker">安装</p>
-        <h2 class="section-title">装完从开始菜单打开</h2>
+        <h2 class="section-title">安装</h2>
         <ol>
-          <li>下载 Windows 安装包。文件名带 <code>UNSIGNED</code>，表示未代码签名。</li>
-          <li>若 SmartScreen 弹出「Windows 已保护你的电脑」，选「更多信息」，再选「仍要运行」。</li>
-          <li>当前公开的 0.3.24 会直接装进当前用户目录，进度条走完即可。仓库已改成中文安装向导（许可、路径、快捷方式），随下一版 Windows 包发布。</li>
-          <li>从开始菜单打开「客服话术浮窗 Demo」。桌面也会有快捷方式。</li>
-          <li>下载不等于开通账号。登录仍用公司飞书。坐席查当前发布，话术师导表，管理员发布。</li>
+          <li>下载后打开。文件名带 <code>UNSIGNED</code>，表示未代码签名。</li>
+          <li>若提示「Windows 已保护你的电脑」，选「更多信息」，再选「仍要运行」。</li>
+          <li>从开始菜单打开「客服话术浮窗 Demo」，用公司飞书登录。</li>
         </ol>
-        <p class="note warn">本页不托管安装包文件，下载会跳到 GitHub Release。不要从网盘或聊天转发的来路不明副本安装。</p>
-      </div>
-    </section>
-
-    <section class="cta">
-      <div class="wrap">
-        <h2>把这个地址发给同事即可</h2>
-        <p>官方下载域名是 download.jianghua.site。登录仍走飞书，不在本页完成。</p>
-        <a class="btn btn-light btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 Windows 安装包</a>
+        <p class="note warn">不要从网盘或聊天转发的副本安装。</p>
       </div>
     </section>
   </main>
@@ -663,29 +482,24 @@
       <div class="foot-grid">
         <div>
           <div class="foot-brand"><img src="./fox-head.png" alt="" width="22" height="22">客服话术浮窗 Demo</div>
-          <p style="margin:0;color:hsl(var(--muted-foreground));font-size:14px">坐席浮窗 + 运营工作台。MIT 开源。</p>
+          <p class="foot-copy">MIT 开源。安装包在 GitHub Release。</p>
         </div>
         <div>
-          <h3>产品</h3>
-          <a href="#features">功能</a>
-          <a href="#shots">界面</a>
+          <h3>本页</h3>
           <a href="#download">下载</a>
           <a href="#install">安装</a>
+          <a href="#shots">界面</a>
         </div>
         <div>
-          <h3>资源</h3>
+          <h3>仓库</h3>
           <a href="https://github.com/tyuanww/customer-agent-prototype">源码</a>
           <a href="https://github.com/tyuanww/customer-agent-prototype/releases">Releases</a>
           <a href="https://github.com/tyuanww/customer-agent-prototype/blob/main/LICENSE">MIT 许可</a>
-        </div>
-        <div>
-          <h3>社区</h3>
           <a href="https://github.com/tyuanww/customer-agent-prototype/issues">问题反馈</a>
-          <a href="https://jianghua.site">jianghua.site</a>
         </div>
       </div>
       <div class="legal">
-        <span>© 2026 客服话术浮窗 Demo。基于 MIT 协议开源。由 jianghua.site 分发，安装包托管在 GitHub Release。</span>
+        <span>© 2026 客服话术浮窗 Demo</span>
         <span>download.jianghua.site</span>
       </div>
     </div>
@@ -698,10 +512,12 @@
       mac: document.getElementById('panel-mac'),
       linux: document.getElementById('panel-linux'),
     };
+    const order = ['win', 'mac', 'linux'];
     function show(name) {
       tabs.forEach((tab) => {
         const on = tab.dataset.tab === name;
         tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        tab.tabIndex = on ? 0 : -1;
       });
       Object.entries(panels).forEach(([key, panel]) => {
         const on = key === name;
@@ -709,7 +525,25 @@
         panel.hidden = !on;
       });
     }
-    tabs.forEach((tab) => tab.addEventListener('click', () => show(tab.dataset.tab)));
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => show(tab.dataset.tab));
+      tab.addEventListener('keydown', (event) => {
+        const i = order.indexOf(tab.dataset.tab);
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          event.preventDefault();
+          const next = event.key === 'ArrowRight'
+            ? order[(i + 1) % order.length]
+            : order[(i - 1 + order.length) % order.length];
+          show(next);
+          document.getElementById('tab-' + next).focus();
+        }
+      });
+    });
+    const ua = navigator.userAgent;
+    if (/Mac/i.test(ua) && !/iPhone|iPad|iPod/.test(ua)) show('mac');
+    else if (/Linux/i.test(ua) && !/Android/.test(ua)) show('linux');
+    else show('win');
+
     document.querySelectorAll('[data-copy]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         try {
@@ -722,6 +556,23 @@
         }
       });
     });
+
+    const navLinks = [...document.querySelectorAll('.nav-links a[href^="#"]')];
+    const sections = navLinks
+      .map((link) => document.querySelector(link.getAttribute('href')))
+      .filter(Boolean);
+    if (sections.length && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        navLinks.forEach((link) => {
+          link.setAttribute('aria-current', link.getAttribute('href') === '#' + visible.target.id ? 'true' : 'false');
+        });
+      }, { rootMargin: '-40% 0px -50% 0px', threshold: [0, 0.25, 0.5, 1] });
+      sections.forEach((section) => io.observe(section));
+    }
   </script>
 </body>
 </html>
