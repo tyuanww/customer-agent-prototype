@@ -10,6 +10,8 @@
 
 安装包**禁止外发**、未签名，文件名带 `UNSIGNED`。不要写成已签名或可给客户。
 
+本页安装步骤对应本仓 NSIS **assisted installer**（中文向导：许可、安装目录、快捷方式，默认当前用户）。GitHub Release 上仍在分发的 **0.3.24 公开包是 oneClick**，没有向导；向导从本仓下一次 `pnpm package:win` 起生效。
+
 ## 准备
 
 1. 从已跑过 `pnpm package:win` 的机器拷贝：
@@ -25,7 +27,7 @@
 
 | # | 步骤 | 预期 | 通过 |
 | --- | --- | --- | --- |
-| 1 | 双击 `UNSIGNED.exe` 安装（当前 NSIS oneClick、当前用户） | 安装完成，开始菜单或桌面出现「客服话术浮窗 Demo」 | ☐ |
+| 1 | 双击 `UNSIGNED.exe`，按中文向导完成安装（许可、目录、快捷方式；默认当前用户） | 安装完成，开始菜单或桌面出现「客服话术浮窗 Demo」 | ☐ |
 | 2 | 启动应用 | **不要**出现「缺少合成栈配置」类弹窗后退出。应出现可拖动狐狸头浮窗 | ☐ |
 | 3 | 看 `%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json` | 内容为精确 `{"mode":"synthetic-offline"}`（可有换行） | ☐ |
 | 4 | `Ctrl+Shift+Space` | 打开查询胶囊。本轮**不要求**输入查询得到 Top 3 | ☐ |
