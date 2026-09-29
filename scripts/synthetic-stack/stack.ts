@@ -3,6 +3,13 @@
  * Local synthetic stack for the macOS client.
  *
  *   node scripts/synthetic-stack/stack.ts start     prepare + start + seed + verify
+ *   node scripts/synthetic-stack/stack.ts start --no-seed
+ *       prepare + start only, leaving the synthetic catalog out. Use this for a
+ *       stack that serves a real catalog: the demo CSV must never be imported
+ *       into it. Skips the seed and the search self-check that asserts it.
+ *       Implied, and not needed, when content.env names its own database - a
+ *       stack that declares a real database is never seeded, so `restart` cannot
+ *       re-enter the seed path just because the flag was left off the command.
  *   node scripts/synthetic-stack/stack.ts stop      stop the processes this stack owns
  *   node scripts/synthetic-stack/stack.ts restart
  *   node scripts/synthetic-stack/stack.ts status    report readiness of each piece
@@ -20,6 +27,12 @@
  *     the desktop client reads the resolved origins from profile.json.
  *   - Re-running `start` on a running stack reports what is already up and only
  *     starts what is missing.
+ *
+ * Stack-root env files, all optional, each with one job:
+ *   feishu.env   Feishu OAuth client and role bindings (flips AUTH_MODE to feishu)
+ *   content.env  the content constants a real catalog needs; DATABASE_NAME too
+ *   api.env      portable production secrets (profile name, HMAC material).
+ *                Derived values - DSNs, paths, ports - are refused, not merged.
  */
 import { spawn } from 'node:child_process';
 import { closeSync, existsSync, openSync } from 'node:fs';
@@ -31,8 +44,10 @@ import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   PREFERRED_PORTS, PROFILE_FILE, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
-  loadFeishuStackConfig, readProfile, writeDesktopPackagedProfile, writeProfile,
+  loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig, mergeStackOverrides,
+  readProfile, shouldSeedSyntheticCatalog, stackPortOffset, writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
+import type { ContentStackConfig, FeishuStackConfig } from './profile.ts';
 import {
   SyntheticCluster, clusterVersionText, ensureDatabase, ensureLoginRoles, writeClusterMarker,
 } from './postgres.ts';
@@ -90,17 +105,20 @@ function requireDist(): void {
 }
 
 async function resolvePort(name: keyof typeof PREFERRED_PORTS): Promise<number> {
-  const port = PREFERRED_PORTS[name];
+  const port = PREFERRED_PORTS[name] + stackPortOffset(path.dirname(PROFILE_FILE));
   if (await portInUse(port)) {
+    // Naming the resolved port matters: the offset is derived from the stack
+    // root, so "already in use" on a shifted port means a real conflict rather
+    // than a second stack, and the reader needs the number to find the holder.
     fail(
-      `Port ${String(port)} (${name}) is already in use. Stop the process using it, or set `
-      + `CUSTOMER_AGENT_STACK_ROOT to run a second stack with different ports.`,
+      `Port ${String(port)} (${name}) is already in use. Stop the process using it, or point `
+      + `CUSTOMER_AGENT_STACK_ROOT at a different path, which shifts both ports.`,
     );
   }
   return port;
 }
 
-async function resolveProfile({ reuse }: { reuse: boolean }): Promise<StackProfile> {
+async function resolveProfile(content: ContentStackConfig | undefined, { reuse }: { reuse: boolean }): Promise<StackProfile> {
   const existing = readProfile();
   if (reuse && existing) return existing;
   const apiPort = await resolvePort('api');
@@ -113,7 +131,7 @@ async function resolveProfile({ reuse }: { reuse: boolean }): Promise<StackProfi
     identityOrigin: `http://127.0.0.1:${String(identityPort)}`,
     apiPort,
     identityPort,
-    databaseName: DATABASE_NAME,
+    databaseName: content?.databaseName ?? DATABASE_NAME,
     pgPort: PG_PORT,
     pgSocketDirectory: PG_SOCKET_DIRECTORY,
     objectStoreDirectory: OBJECT_STORE_DIRECTORY,
@@ -128,7 +146,35 @@ function liveProcessNames(): readonly string[] {
   });
 }
 
-async function startProcesses(profile: StackProfile): Promise<string[]> {
+/**
+ * The content-side API environment. With no `content.env` and no Feishu config
+ * these are exactly the constants the synthetic stack has always used, so the
+ * synthetic path is byte-for-byte unchanged.
+ *
+ * The review lead comes from the Feishu owner binding rather than from the file,
+ * matching `formal-dev-up.mjs`: the binding is the authority on who owns review,
+ * and a second source could disagree with it. Our own synthetic identities are
+ * not dual reviewers either, so when one real subject covers both sides the
+ * manager is left unset instead of naming the same person twice.
+ */
+function contentOverrides(
+  content: ContentStackConfig | undefined,
+  feishu: FeishuStackConfig | undefined,
+): Readonly<Record<string, string>> {
+  const owner = feishu?.bindings.find((binding) => binding.role === 'owner')?.openId;
+  const lead = content?.reviewLeadSubject ?? owner ?? 'synthetic_coach';
+  const manager = content?.reviewManagerSubject ?? owner ?? 'synthetic_owner';
+  const overrides: Record<string, string> = {
+    CONTENT_INTENT_TAXONOMY_VERSION: content?.intentTaxonomyVersion ?? 'itax_synthetic_stack_v1',
+    CONTENT_INTENT_ID: content?.intentId ?? 'intent_synthetic_stack_shipping',
+    CONTENT_REVIEW_LEAD_SUBJECT: lead,
+    CONTENT_REVIEW_EVIDENCE_ID: content?.reviewEvidenceId ?? 'EVD-STACK-REVIEW-001',
+  };
+  if (manager !== lead) overrides.CONTENT_REVIEW_MANAGER_SUBJECT = manager;
+  return overrides;
+}
+
+async function startProcesses(profile: StackProfile, content: ContentStackConfig | undefined): Promise<string[]> {
   const started: string[] = [];
   const live = new Set(liveProcessNames());
   const spawned: string[] = [];
@@ -142,6 +188,10 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
 
   try {
     const feishu = loadFeishuStackConfig();
+    // Both override files are read before anything is spawned, so a rejected
+    // api.env fails the start outright instead of leaving identity behind.
+    const apiConfig = loadApiStackConfig();
+    const overrides = mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {});
     const identityEntry = feishu ? PASSWORD_IDENTITY_ENTRY : IDENTITY_ENTRY;
     if (!live.has('identity')) {
       const pid = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
@@ -153,14 +203,11 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
     }
     await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
     if (feishu) started.push(`feishu: ${feishu.clientId} → ${feishu.redirectUri}`);
+    // Key names only: an operator checking "did production config land" needs the
+    // list, and none of these keys' names are secret.
+    if (apiConfig) started.push(`api.env: ${Object.keys(apiConfig).sort().join(', ')}`);
 
-    const environment = apiEnvironment(profile, {
-      CONTENT_INTENT_TAXONOMY_VERSION: 'itax_synthetic_stack_v1',
-      CONTENT_INTENT_ID: 'intent_synthetic_stack_shipping',
-      CONTENT_REVIEW_LEAD_SUBJECT: 'synthetic_coach',
-      CONTENT_REVIEW_MANAGER_SUBJECT: 'synthetic_owner',
-      CONTENT_REVIEW_EVIDENCE_ID: 'EVD-STACK-REVIEW-001',
-    }, feishu);
+    const environment = apiEnvironment(profile, overrides, feishu);
 
     if (!live.has('api')) {
       const pid = spawnLogged('api', process.execPath, [API_ENTRY], environment);
@@ -242,7 +289,18 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
 async function commandStart(): Promise<void> {
   requireDist();
   ensureStackDirectories();
-  const profile = await resolveProfile({ reuse: true });
+  // Read once: `resolveProfile` needs the database name and `contentOverrides`
+  // needs the content constants, and two reads could disagree if the file
+  // changed between them - the profile would end up naming one catalog while the
+  // overrides came from another.
+  const content = loadContentStackConfig();
+  // A stack that serves a real catalog must not import the demo CSV. On a freshly
+  // prepared database the "already published" probe finds nothing, so the seed
+  // would publish synthetic scripts as the live catalog. Everything that asserts
+  // that catalog - the search self-check and the summary lines - goes with it.
+  const noSeed = !shouldSeedSyntheticCatalog(process.argv, content?.databaseName);
+  const skipReason = process.argv.includes('--no-seed') ? '--no-seed' : 'content.env names its own database';
+  const profile = await resolveProfile(content, { reuse: true });
   writeProfile(profile);
   const packagedProfilePath = writeDesktopPackagedProfile(profile);
   log(`stack root: ${profile.stackRoot}`);
@@ -256,9 +314,9 @@ async function commandStart(): Promise<void> {
 
   const admin = cluster.connect('postgres');
   await admin.connect();
-  try { log(await ensureDatabase(cluster)); } finally { await admin.end(); }
+  try { log(await ensureDatabase(cluster, profile.databaseName)); } finally { await admin.end(); }
 
-  const database = cluster.connect();
+  const database = cluster.connect(profile.databaseName);
   await database.connect();
   try {
     for (const step of await bootstrapDatabase(database)) log(step);
@@ -266,23 +324,28 @@ async function commandStart(): Promise<void> {
     if (feishu) log(await seedFeishuBindings(database, feishu.bindings));
   } finally { await database.end(); }
 
-  log(await ensureLoginRoles(cluster));
+  log(await ensureLoginRoles(cluster, profile.databaseName));
 
-  for (const step of await startProcesses(profile)) log(step);
+  for (const step of await startProcesses(profile, content)) log(step);
   const ready = await waitReady(profile.apiOrigin);
   log(`ready: ${JSON.stringify(ready.checks)}`);
 
-  const seeded = await seedContentIfMissing(profile.apiOrigin, { log });
-  if (seeded === 'already_seeded') {
-    log('seed: already published');
+  if (noSeed) {
+    log(`seed: skipped (${skipReason}); this stack serves a real catalog`);
+    log(`search self-check skipped (${skipReason})`);
   } else {
-    log(`seeded ${String(seeded.scriptCount)} scripts into release ${seeded.releaseId} (seq ${String(seeded.releaseSeq)})`);
-  }
+    const seeded = await seedContentIfMissing(profile.apiOrigin, { log });
+    if (seeded === 'already_seeded') {
+      log('seed: already published');
+    } else {
+      log(`seeded ${String(seeded.scriptCount)} scripts into release ${seeded.releaseId} (seq ${String(seeded.releaseSeq)})`);
+    }
 
-  for (const result of await verifySearch(profile.apiOrigin)) log(`search ok — ${result}`);
-  log('catalog references: ' + catalogReferences().join(', '));
-  log(`seed script ids: ${SYNTHETIC_SCRIPT_IDS.join(', ')}`);
-  log(`identity bindings: ${SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId).join(', ')}`);
+    for (const result of await verifySearch(profile.apiOrigin)) log(`search ok — ${result}`);
+    log('catalog references: ' + catalogReferences().join(', '));
+    log(`seed script ids: ${SYNTHETIC_SCRIPT_IDS.join(', ')}`);
+    log(`identity bindings: ${SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId).join(', ')}`);
+  }
   log('');
   log('Stack is up. Launch the desktop client with:');
   log(`  ${desktopCommand(profile)}`);

@@ -9,18 +9,18 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { parseEnvFile } from './synthetic-stack/profile.ts';
+
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const formalRoot = path.join(homedir(), '.customer-agent-formal');
 const envFile = path.join(formalRoot, 'api.env');
 const logDirectory = path.join(formalRoot, 'logs');
 
 function loadEnv() {
-  const env = {};
-  for (const line of readFileSync(envFile, 'utf8').split('\n')) {
-    if (!line || line.startsWith('#') || !line.includes('=')) continue;
-    const index = line.indexOf('=');
-    env[line.slice(0, index)] = line.slice(index + 1);
-  }
+  // Shares the stack-root env parser so a duplicate or malformed line fails the
+  // same way here as it does for feishu.env and content.env, instead of this
+  // loader quietly taking the last of two conflicting values.
+  const env = Object.fromEntries(parseEnvFile(readFileSync(envFile, 'utf8'), 'api.env'));
   env.PATH = process.env.PATH ?? '';
   env.CONTENT_INTENT_TAXONOMY_VERSION = env.CONTENT_INTENT_TAXONOMY_VERSION ?? 'itax_synthetic_stack_v1';
   env.CONTENT_INTENT_ID = env.CONTENT_INTENT_ID ?? 'intent_synthetic_stack_shipping';

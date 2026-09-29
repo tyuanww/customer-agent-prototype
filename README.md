@@ -48,6 +48,7 @@ pnpm start                  # 与 pnpm dev 相同
 | 模块归属与清理边界 | [reference-project-architecture](docs/reference-project-architecture.md) |
 | 桌面 BM25 + 仓外索引 | [检索参考](docs/reference-desktop-retrieval.md) · [How to](docs/how-to-run-macos-semantic-query.md) · [为什么](docs/explanation-desktop-retrieval.md) |
 | 飞书 + 账号 how-to、P4 远端 how-to | [feishu](docs/how-to-feishu-and-password-mac.md) · [p4](docs/how-to-p4-remote-mac.md) |
+| 两个公网入口跑在杭州（更新 / 迁数据 / 切隧道 / 回滚） | [后端跑在杭州](docs/how-to-run-backend-on-hangzhou.md) |
 | 工程流程、打包签名、文档生命周期 | [workflow](docs/reference-engineering-workflow.md) · [signing](docs/reference-packaging-and-signing.md) · [lifecycle](docs/reference-document-lifecycle.md) |
 | 当前一期任务与延后债 | [执行清单](docs/plans/2026-09-06-execution-goal.md) · [TODOS](TODOS.md) · [CHANGELOG](CHANGELOG.md) |
 | 合同 / API / 数据库包 README | [contracts](packages/contracts/README.md) · [api](apps/api/README.md) · [database](packages/database/README.md) |
