@@ -12,20 +12,21 @@
   <meta property="og:description" content="Windows 官方安装包 v0.3.24。登录用公司飞书。下载不等于开通账号。">
   <meta property="og:url" content="https://download.jianghua.site/">
   <meta property="og:image" content="https://download.jianghua.site/shot-query.png">
-  <meta name="theme-color" content="#f4f5f8">
+  <meta name="theme-color" content="#f4f6f8">
   <style>
     :root {
-      --bg: #f4f5f8;
-      --fg: #16181d;
+      --bg: #f4f6f8;
+      --fg: #1b1c22;
       --muted: #5c6370;
-      --line: #e2e4ea;
+      --line: #e3e6ee;
       --card: #fff;
-      --accent: #5b4fcf;
+      --accent: #7540d9;
       --accent-fg: #fff;
-      --accent-hover: #4a40b8;
+      --accent-hover: #652bd4;
+      --accent-soft: #f3eefc;
       --warn: #9a3b1a;
       --max: 1080px;
-      --shadow: 0 8px 24px -12px rgba(22, 24, 29, 0.18);
+      --shadow: 0 8px 24px -12px rgba(27, 28, 34, 0.18);
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; color-scheme: light; }
@@ -38,14 +39,14 @@
       -webkit-font-smoothing: antialiased;
     }
     a { color: var(--accent); }
-    a:visited { color: #4338a5; }
+    a:visited { color: #5524b2; }
     .nav a, .btn, footer a { color: inherit; }
     .nav a:visited, .btn:visited, footer a:visited { color: inherit; }
     a:focus-visible, button:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
     }
-    ::selection { background: #ddd8ff; }
+    ::selection { background: #e6ddf8; }
     img { max-width: 100%; height: auto; display: block; }
     .skip {
       position: absolute;
@@ -132,7 +133,7 @@
     .btn-lg { padding: 14px 22px; font-size: 1.02rem; }
 
     .hero {
-      padding: 56px 0 32px;
+      padding: 56px 0 28px;
     }
     .hero-grid {
       display: grid;
@@ -176,32 +177,148 @@
       box-shadow: var(--shadow);
       background: #fff;
     }
-    .hero-shot figcaption,
-    .shot figcaption {
+    .hero-shot figcaption {
       margin: 10px 2px 0;
       font-size: 13px;
       color: var(--muted);
     }
 
     .how {
-      padding: 8px 0 40px;
+      padding: 12px 0 8px;
     }
-    .how-grid {
+    .showcase {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 20px 28px;
-      padding: 24px 0 0;
+      grid-template-columns: minmax(240px, 0.4fr) minmax(0, 1fr);
+      gap: 28px 36px;
+      align-items: start;
+      padding: 28px 0 8px;
       border-top: 1px solid var(--line);
     }
-    .how h2 {
-      margin: 0;
+    .show-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .show-list button {
+      appearance: none;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      min-height: 44px;
+      cursor: pointer;
+      font: inherit;
+      color: var(--muted);
+    }
+    .show-list button:hover { background: #fff; }
+    .show-list button[aria-selected="true"] {
+      background: var(--accent-soft);
+      color: var(--fg);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .show-list strong {
+      display: block;
       font-size: 15px;
       font-weight: 650;
+      color: var(--fg);
     }
-    .how p {
-      margin: 6px 0 0;
+    .show-list span {
+      display: none;
+      margin-top: 6px;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      font-weight: 400;
+    }
+    .show-list button[aria-selected="true"] span { display: block; }
+    .show-stage { min-width: 0; }
+    .show-frame {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 240px;
+      padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+    .show-frame.is-capsule {
+      min-height: 0;
+      padding: 28px 22px;
+    }
+    .show-frame img {
+      max-width: 100%;
+      max-height: 520px;
+      width: auto;
+      height: auto;
+      border-radius: 12px;
+    }
+    .show-frame.is-capsule img {
+      width: 100%;
+      max-height: 168px;
+      border-radius: 20px;
+    }
+    .show-pager {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .show-nav {
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--fg);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .show-nav:hover { background: var(--accent-soft); }
+    .show-copy {
+      display: none;
+      margin: 12px 2px 0;
       color: var(--muted);
       font-size: 0.95rem;
+    }
+    .show-cap {
+      margin: 12px 2px 0;
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 1.4em;
+    }
+    .show-dots {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .show-dots button {
+      appearance: none;
+      width: 44px;
+      height: 44px;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .show-dots button i {
+      display: block;
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: #c9ced8;
+    }
+    .show-dots button[aria-current="true"] i {
+      width: 18px;
+      background: var(--accent);
     }
 
     section { padding: 48px 0; }
@@ -218,17 +335,6 @@
       margin: 0 0 24px;
       color: var(--muted);
     }
-    .gallery { display: grid; gap: 28px; }
-    .shot { margin: 0; }
-    .shot img {
-      width: 100%;
-      height: auto;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      box-shadow: var(--shadow);
-      background: #fff;
-    }
-    .shot.capsule img { border-radius: 20px; }
 
     .download-box {
       background: var(--card);
@@ -254,9 +360,9 @@
       cursor: pointer;
     }
     .tabs button[aria-selected="true"] {
-      background: var(--fg);
-      border-color: var(--fg);
-      color: #fff;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-fg);
     }
     .panel { display: none; }
     .panel.is-on { display: block; }
@@ -332,13 +438,19 @@
       .brand-full { display: none; }
       .brand-short { display: inline; }
       .hero { padding: 32px 0 20px; }
-      .hero-grid, .how-grid, .foot-grid { grid-template-columns: 1fr; }
+      .hero-grid, .showcase, .foot-grid { grid-template-columns: 1fr; }
       .hero-actions .btn { width: 100%; }
+      .show-list { flex-direction: row; }
+      .show-list button { flex: 1; text-align: center; padding: 10px 8px; }
+      .show-list span { display: none !important; }
+      .show-frame { min-height: 180px; padding: 12px; }
+      .show-list button[aria-selected="true"] { box-shadow: none; }
+      .show-copy { display: block; }
+      .show-cap { display: none; }
       .row { flex-direction: column; align-items: stretch; }
       .row .btn, .row .chip { width: 100%; }
       .legal { flex-direction: column; }
       .download-box { padding: 22px 18px; }
-      .shot.capsule img { border-radius: 16px; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -356,7 +468,6 @@
       </a>
       <nav class="nav-links" aria-label="页面">
         <a href="#how">用法</a>
-        <a href="#shots">界面</a>
         <a href="#install">安装</a>
         <a href="https://github.com/tyuanww/customer-agent-prototype">源码</a>
       </nav>
@@ -387,34 +498,42 @@
     </section>
 
     <section class="how" id="how">
-      <div class="wrap how-grid">
-        <div>
-          <h2>查询</h2>
-          <p>点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</p>
-        </div>
-        <div>
-          <h2>登录</h2>
-          <p>用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
-        </div>
-        <div>
-          <h2>发布</h2>
-          <p>话术师导表，管理员发布后，坐席才能搜到。</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="shots">
       <div class="wrap">
-        <h2 class="section-title">界面</h2>
-        <div class="gallery">
-          <figure class="shot capsule">
-            <img src="./shot-capsule.png" width="1200" height="176" loading="lazy" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。">
-            <figcaption>未登录</figcaption>
-          </figure>
-          <figure class="shot">
-            <img src="./shot-dashboard.jpg" width="1933" height="1245" loading="lazy" alt="客服运营工作台的话术库，当前发布已挂载。">
-            <figcaption>运营工作台</figcaption>
-          </figure>
+        <div class="showcase" id="showcase">
+          <div class="show-list" id="show-tabs" role="tablist" aria-label="用法">
+            <button type="button" role="tab" id="show-query" aria-controls="show-panel" aria-selected="true" data-show="0">
+              <strong>查询</strong>
+              <span>点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</span>
+            </button>
+            <button type="button" role="tab" id="show-login" aria-controls="show-panel" aria-selected="false" data-show="1">
+              <strong>登录</strong>
+              <span>用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</span>
+            </button>
+            <button type="button" role="tab" id="show-publish" aria-controls="show-panel" aria-selected="false" data-show="2">
+              <strong>发布</strong>
+              <span>话术师导表，管理员发布后，坐席才能搜到。</span>
+            </button>
+          </div>
+          <div class="show-stage" id="show-panel" role="tabpanel" aria-labelledby="show-query">
+            <div class="show-frame" id="show-frame">
+              <img id="show-img" src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。">
+            </div>
+            <p class="show-copy" id="show-copy">点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</p>
+            <p class="show-cap" id="show-cap" aria-live="polite">登录后查询，点「复制话术」或按 1 / 2 / 3。</p>
+            <div class="show-pager">
+              <button type="button" class="show-nav show-prev" aria-label="上一张界面">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
+              </button>
+              <div class="show-dots">
+                <button type="button" aria-label="查询" aria-current="true" data-show="0"><i></i></button>
+                <button type="button" aria-label="登录" aria-current="false" data-show="1"><i></i></button>
+                <button type="button" aria-label="发布" aria-current="false" data-show="2"><i></i></button>
+              </div>
+              <button type="button" class="show-nav show-next" aria-label="下一张界面">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -424,7 +543,7 @@
         <div class="download-box">
           <h2 class="section-title">下载</h2>
           <p class="section-lead">v0.3.24 · 2026年9月29日</p>
-          <div class="tabs" role="tablist" aria-label="系统">
+          <div class="tabs" id="os-tabs" role="tablist" aria-label="系统">
             <button type="button" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="true" data-tab="win">Windows</button>
             <button type="button" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false" data-tab="mac">macOS</button>
             <button type="button" role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false" data-tab="linux">Linux</button>
@@ -486,9 +605,9 @@
         </div>
         <div>
           <h3>本页</h3>
+          <a href="#how">用法</a>
           <a href="#download">下载</a>
           <a href="#install">安装</a>
-          <a href="#shots">界面</a>
         </div>
         <div>
           <h3>仓库</h3>
@@ -506,43 +625,148 @@
   </footer>
 
   <script>
-    const tabs = [...document.querySelectorAll('[role="tab"]')];
-    const panels = {
+    const slides = [
+      {
+        src: './shot-query.png',
+        w: 1200,
+        h: 1240,
+        kind: '',
+        labelledby: 'show-query',
+        alt: '查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。',
+        cap: '登录后查询，点「复制话术」或按 1 / 2 / 3。',
+      },
+      {
+        src: './shot-capsule.png',
+        w: 1200,
+        h: 176,
+        kind: 'capsule',
+        labelledby: 'show-login',
+        alt: '未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。',
+        cap: '未登录时只能看到「登录后查询话术」。',
+      },
+      {
+        src: './shot-dashboard.jpg',
+        w: 1933,
+        h: 1245,
+        kind: 'board',
+        labelledby: 'show-publish',
+        alt: '客服运营工作台的话术库，当前发布已挂载。',
+        cap: '话术师导表，管理员发布后，坐席才能搜到。',
+      },
+    ];
+    slides.forEach((slide) => { const img = new Image(); img.src = slide.src; });
+
+    const showTabs = [...document.querySelectorAll('#show-tabs [role="tab"]')];
+    const showDots = [...document.querySelectorAll('.show-dots button')];
+    const showImg = document.getElementById('show-img');
+    const showCap = document.getElementById('show-cap');
+    const showCopy = document.getElementById('show-copy');
+    const showFrame = document.getElementById('show-frame');
+    const showPanel = document.getElementById('show-panel');
+    const showcase = document.getElementById('showcase');
+    let showIndex = 0;
+    let showTimer = 0;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function renderShow(index) {
+      showIndex = (index + slides.length) % slides.length;
+      const slide = slides[showIndex];
+      showImg.src = slide.src;
+      showImg.width = slide.w;
+      showImg.height = slide.h;
+      showImg.alt = slide.alt;
+      showCap.textContent = slide.cap;
+      showCopy.textContent = showTabs[showIndex].querySelector('span').textContent;
+      showFrame.classList.toggle('is-capsule', slide.kind === 'capsule');
+      showPanel.setAttribute('aria-labelledby', slide.labelledby);
+      showTabs.forEach((tab, i) => {
+        const on = i === showIndex;
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        tab.tabIndex = on ? 0 : -1;
+      });
+      showDots.forEach((dot, i) => {
+        dot.setAttribute('aria-current', i === showIndex ? 'true' : 'false');
+      });
+    }
+
+    function stopShowTimer() {
+      window.clearInterval(showTimer);
+      showTimer = 0;
+    }
+    function startShowTimer() {
+      stopShowTimer();
+      if (reduceMotion) return;
+      showTimer = window.setInterval(() => renderShow(showIndex + 1), 7000);
+    }
+
+    function pickShow(index, fromUser) {
+      renderShow(index);
+      if (fromUser) startShowTimer();
+    }
+
+    showTabs.forEach((tab) => {
+      tab.addEventListener('click', () => pickShow(Number(tab.dataset.show), true));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+        event.preventDefault();
+        const next = event.key === 'ArrowRight' ? showIndex + 1 : showIndex - 1;
+        pickShow(next, true);
+        showTabs[showIndex].focus();
+      });
+    });
+    showDots.forEach((dot) => {
+      dot.addEventListener('click', () => pickShow(Number(dot.dataset.show), true));
+    });
+    document.querySelector('.show-prev').addEventListener('click', () => pickShow(showIndex - 1, true));
+    document.querySelector('.show-next').addEventListener('click', () => pickShow(showIndex + 1, true));
+    showcase.addEventListener('mouseenter', stopShowTimer);
+    showcase.addEventListener('mouseleave', startShowTimer);
+    showcase.addEventListener('focusin', stopShowTimer);
+    showcase.addEventListener('focusout', (event) => {
+      if (!showcase.contains(event.relatedTarget)) startShowTimer();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopShowTimer();
+      else startShowTimer();
+    });
+    startShowTimer();
+
+    const osTabs = [...document.querySelectorAll('#os-tabs [role="tab"]')];
+    const osPanels = {
       win: document.getElementById('panel-win'),
       mac: document.getElementById('panel-mac'),
       linux: document.getElementById('panel-linux'),
     };
-    const order = ['win', 'mac', 'linux'];
-    function show(name) {
-      tabs.forEach((tab) => {
+    const osOrder = ['win', 'mac', 'linux'];
+    function showOs(name) {
+      osTabs.forEach((tab) => {
         const on = tab.dataset.tab === name;
         tab.setAttribute('aria-selected', on ? 'true' : 'false');
         tab.tabIndex = on ? 0 : -1;
       });
-      Object.entries(panels).forEach(([key, panel]) => {
+      Object.entries(osPanels).forEach(([key, panel]) => {
         const on = key === name;
         panel.classList.toggle('is-on', on);
         panel.hidden = !on;
       });
     }
-    tabs.forEach((tab) => {
-      tab.addEventListener('click', () => show(tab.dataset.tab));
+    osTabs.forEach((tab) => {
+      tab.addEventListener('click', () => showOs(tab.dataset.tab));
       tab.addEventListener('keydown', (event) => {
-        const i = order.indexOf(tab.dataset.tab);
-        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-          event.preventDefault();
-          const next = event.key === 'ArrowRight'
-            ? order[(i + 1) % order.length]
-            : order[(i - 1 + order.length) % order.length];
-          show(next);
-          document.getElementById('tab-' + next).focus();
-        }
+        const i = osOrder.indexOf(tab.dataset.tab);
+        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+        event.preventDefault();
+        const next = event.key === 'ArrowRight'
+          ? osOrder[(i + 1) % osOrder.length]
+          : osOrder[(i - 1 + osOrder.length) % osOrder.length];
+        showOs(next);
+        document.getElementById('tab-' + next).focus();
       });
     });
     const ua = navigator.userAgent;
-    if (/Mac/i.test(ua) && !/iPhone|iPad|iPod/.test(ua)) show('mac');
-    else if (/Linux/i.test(ua) && !/Android/.test(ua)) show('linux');
-    else show('win');
+    if (/Mac/i.test(ua) && !/iPhone|iPad|iPod/.test(ua)) showOs('mac');
+    else if (/Linux/i.test(ua) && !/Android/.test(ua)) showOs('linux');
+    else showOs('win');
 
     document.querySelectorAll('[data-copy]').forEach((btn) => {
       btn.addEventListener('click', async () => {
