@@ -31,7 +31,8 @@ import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   PREFERRED_PORTS, PROFILE_FILE, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
-  loadContentStackConfig, loadFeishuStackConfig, readProfile, writeDesktopPackagedProfile, writeProfile,
+  loadContentStackConfig, loadFeishuStackConfig, readProfile, stackPortOffset,
+  writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
 import type { FeishuStackConfig } from './profile.ts';
 import {
@@ -91,11 +92,14 @@ function requireDist(): void {
 }
 
 async function resolvePort(name: keyof typeof PREFERRED_PORTS): Promise<number> {
-  const port = PREFERRED_PORTS[name];
+  const port = PREFERRED_PORTS[name] + stackPortOffset(path.dirname(PROFILE_FILE));
   if (await portInUse(port)) {
+    // Naming the resolved port matters: the offset is derived from the stack
+    // root, so "already in use" on a shifted port means a real conflict rather
+    // than a second stack, and the reader needs the number to find the holder.
     fail(
-      `Port ${String(port)} (${name}) is already in use. Stop the process using it, or set `
-      + `CUSTOMER_AGENT_STACK_ROOT to run a second stack with different ports.`,
+      `Port ${String(port)} (${name}) is already in use. Stop the process using it, or point `
+      + `CUSTOMER_AGENT_STACK_ROOT at a different path, which shifts both ports.`,
     );
   }
   return port;

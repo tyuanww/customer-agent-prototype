@@ -7,10 +7,12 @@ import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
+  DEFAULT_STACK_ROOT,
   DESKTOP_APP_NAME,
   defaultDesktopUserDataDirectory,
   desktopPackagedProfilePath,
-  PID_DIRECTORY, apiEnvironment, loadContentStackConfig, parseContentEnvFile, parseFeishuEnvFile, readProfile,
+  PID_DIRECTORY, apiEnvironment, loadContentStackConfig, parseContentEnvFile, parseFeishuEnvFile,
+  readProfile, stackPortOffset,
 } from './profile.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
@@ -351,5 +353,14 @@ describe('stack content env', () => {
       () => parseContentEnvFile('DATABASE_NAME=Customer-Agent'),
       /content\.env: DATABASE_NAME must be a lower-case SQL identifier/u,
     );
+  });
+
+  it('derives a stable port offset so two stacks on one machine cannot collide', () => {
+    assert.equal(stackPortOffset(DEFAULT_STACK_ROOT), 0, 'the default root keeps the ports it has always used');
+    const shifted = stackPortOffset('/tmp/second-stack');
+    assert.ok(shifted >= 1 && shifted <= 99, `offset out of range: ${String(shifted)}`);
+    // A root has to resolve to the same ports before profile.json exists and
+    // after it is deleted, so the offset cannot be random.
+    assert.equal(stackPortOffset('/tmp/second-stack'), shifted, 'the same root must keep resolving to the same ports');
   });
 });

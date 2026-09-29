@@ -15,9 +15,27 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import os from 'node:os';
 import path from 'node:path';
 
+export const DEFAULT_STACK_ROOT = path.join(os.homedir(), '.customer-agent-synthetic-stack');
+
 export const STACK_ROOT = process.env.CUSTOMER_AGENT_STACK_ROOT
   ? path.resolve(process.env.CUSTOMER_AGENT_STACK_ROOT)
-  : path.join(os.homedir(), '.customer-agent-synthetic-stack');
+  : DEFAULT_STACK_ROOT;
+
+/**
+ * TCP loopback ports are shared machine-wide, so two stacks need two sets. The
+ * offset is derived from the stack root rather than passed in, because a root
+ * has to resolve to the same ports before `profile.json` exists and after it is
+ * deleted; the default root keeps the ports it has always used.
+ *
+ * The PostgreSQL cluster needs no offset: it listens on a Unix socket inside the
+ * stack root, so two clusters cannot collide even on the same port number.
+ */
+export function stackPortOffset(stackRoot: string): number {
+  if (stackRoot === DEFAULT_STACK_ROOT) return 0;
+  let hash = 0;
+  for (const byte of Buffer.from(stackRoot, 'utf8')) hash = (hash * 31 + byte) % 1000;
+  return 1 + (hash % 99);
+}
 
 export const PROFILE_FILE = path.join(STACK_ROOT, 'profile.json');
 export const FEISHU_ENV_FILE = path.join(STACK_ROOT, 'feishu.env');
