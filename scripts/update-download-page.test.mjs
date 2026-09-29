@@ -11,6 +11,8 @@ import {
   platformOf,
   formatSizeMb,
   formatDateZh,
+  compareVersions,
+  publishedVersion,
   renderIndex,
   renderWindows,
   updateDownloadPages,
@@ -32,6 +34,17 @@ const RELEASE_0325 = Object.freeze({
     { name: 'Demo-0.3.25-mac-universal-UNSIGNED.dmg', size: 223846710, digest: `sha256:${MAC_SHA}` },
     { name: 'Demo-0.3.25-mac-universal-UNSIGNED.zip', size: 223124003, digest: `sha256:${ZIP_SHA}` },
     { name: 'Demo-0.3.25-win-x64-UNSIGNED.exe', size: 91430255, digest: `sha256:${WIN_SHA}` },
+  ],
+});
+
+/** An older release than the page, with asset names that match its own tag. */
+const RELEASE_039 = Object.freeze({
+  tagName: 'v0.3.9',
+  publishedAt: '2026-08-01T10:00:00+08:00',
+  assets: [
+    { name: 'Demo-0.3.9-linux-x86_64-UNSIGNED.AppImage', size: 100000000, digest: `sha256:${'a'.repeat(64)}` },
+    { name: 'Demo-0.3.9-mac-universal-UNSIGNED.dmg', size: 200000000, digest: `sha256:${'b'.repeat(64)}` },
+    { name: 'Demo-0.3.9-win-x64-UNSIGNED.exe', size: 80000000, digest: `sha256:${'c'.repeat(64)}` },
   ],
 });
 
@@ -148,9 +161,53 @@ test('renderIndex and renderWindows are idempotent', () => {
 
 test('renderIndex fails loudly when the page loses a panel or a chip', () => {
   const manifest = manifestFromRelease(RELEASE_0325);
-  assert.throws(() => renderIndex('<html><body>no panels</body></html>', manifest), /missing the panel-win panel/u);
+  assert.throws(
+    () => renderIndex('<html><body>no release links at all</body></html>', manifest),
+    /links no release asset at all/u,
+  );
+  const withoutPanel = indexFixture().replace('id="panel-win"', 'id="panel-renamed"');
+  assert.throws(() => renderIndex(withoutPanel, manifest), /missing the panel-win panel/u);
   const withoutChip = indexFixture().replace(/data-copy="[0-9a-f]{64}"/u, 'data-copy=""');
   assert.throws(() => renderIndex(withoutChip, manifest), /could not find checksum chip/u);
+});
+
+test('renderIndex refuses a page that links a different repository', () => {
+  // The URL rewrite used to be anchored on this repository by name, so a page
+  // pointing somewhere else matched nothing and was published with its download
+  // links left behind while the version strings moved.
+  const moved = indexFixture().replace(/tyuanww\/customer-agent-prototype/gu, 'other-org/moved-repo');
+  assert.throws(
+    () => renderIndex(moved, manifestFromRelease(RELEASE_0325)),
+    /links a release on other-org\/moved-repo/u,
+  );
+});
+
+test('renderIndex refuses a page that stopped linking a platform', () => {
+  // windows.html carries only the Windows asset, so index.html's requirements
+  // reject it. A page that quietly lost its macOS link must not be published.
+  assert.throws(
+    () => renderIndex(windowsFixture(), manifestFromRelease(RELEASE_0325)),
+    /no longer links the mac asset/u,
+  );
+});
+
+test('renderIndex refuses a page carrying two different versions', () => {
+  const drifted = indexFixture().replace(
+    '<p class="kicker">v0.3.24</p>',
+    '<p class="kicker">v0.3.24</p>\n  <p>older v0.2.0</p>',
+  );
+  assert.throws(() => renderIndex(drifted, manifestFromRelease(RELEASE_0325)), /more than one version/u);
+});
+
+test('compareVersions orders numerically rather than as strings', () => {
+  assert.equal(compareVersions('0.10.0', '0.9.9'), 1, '0.10.0 is newer than 0.9.9');
+  assert.equal(compareVersions('0.3.25', '0.3.25'), 0);
+  assert.equal(compareVersions('0.3.9', '0.3.25'), -1);
+});
+
+test('publishedVersion reads the version a page advertises', () => {
+  assert.equal(publishedVersion(indexFixture()), '0.3.24');
+  assert.equal(publishedVersion('<html><body>no version</body></html>'), null);
 });
 
 test('renderWindows points the redirect at the release asset', () => {
@@ -195,4 +252,48 @@ test('the CLI republishes a stale page from a manifest', () => {
   const noManifest = spawnSync(process.execPath, [script, '--dir', dir], { encoding: 'utf8' });
   assert.equal(noManifest.status, 1);
   assert.match(noManifest.stderr, /pass --from-release/u);
+});
+
+test('updateDownloadPages refuses to walk the page backwards', () => {
+  // Backfilling is a supported thing to do, but publishing an older release over
+  // a newer page must not happen by accident.
+  const dir = writeFixtureDir();
+  assert.throws(
+    () => updateDownloadPages({ dir, manifest: manifestFromRelease(RELEASE_039) }),
+    /refusing to publish the older v0\.3\.9/u,
+  );
+  assert.match(readFileSync(path.join(dir, 'index.html'), 'utf8'), /0\.3\.24/u, 'the page is left alone');
+});
+
+test('updateDownloadPages publishes an older release only when told to', () => {
+  const dir = writeFixtureDir();
+  const older = manifestFromRelease(RELEASE_039);
+  assert.deepEqual(updateDownloadPages({ dir, manifest: older, allowDowngrade: true }).sort(), ['index.html', 'windows.html']);
+  assert.match(readFileSync(path.join(dir, 'index.html'), 'utf8'), /v0\.3\.9/u);
+});
+
+test('the CLI reports the resolved version and refuses a downgrade', () => {
+  const dir = writeFixtureDir();
+  const forwardPath = path.join(dir, 'forward.json');
+  const backwardPath = path.join(dir, 'backward.json');
+  const versionPath = path.join(dir, 'version.txt');
+  writeFileSync(forwardPath, JSON.stringify(manifestFromRelease(RELEASE_0325)));
+  writeFileSync(backwardPath, JSON.stringify(manifestFromRelease(RELEASE_039)));
+
+  const forward = spawnSync(
+    process.execPath,
+    [script, '--dir', dir, '--manifest', forwardPath, '--version-out', versionPath],
+    { encoding: 'utf8' },
+  );
+  assert.equal(forward.status, 0, forward.stderr);
+  assert.equal(readFileSync(versionPath, 'utf8').trim(), '0.3.25', 'the version file carries what was validated');
+
+  const backward = spawnSync(process.execPath, [script, '--dir', dir, '--manifest', backwardPath], { encoding: 'utf8' });
+  assert.equal(backward.status, 1);
+  assert.match(backward.stderr, /refusing to publish the older v0\.3\.9/u);
+  assert.match(readFileSync(path.join(dir, 'index.html'), 'utf8'), /v0\.3\.25/u, 'the page stays forward');
+
+  const forced = spawnSync(process.execPath, [script, '--dir', dir, '--manifest', backwardPath, '--allow-downgrade'], { encoding: 'utf8' });
+  assert.equal(forced.status, 0, forced.stderr);
+  assert.match(readFileSync(path.join(dir, 'index.html'), 'utf8'), /v0\.3\.9/u);
 });
