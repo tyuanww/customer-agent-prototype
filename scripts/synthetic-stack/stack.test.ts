@@ -365,6 +365,30 @@ describe('stack content env', () => {
   });
 });
 
+describe('stack database wiring', () => {
+  it('never falls back to the module constant for the database name', () => {
+    // connect() used to default to DATABASE_NAME, so a stack whose content.env
+    // set DATABASE_NAME created one database and then connected to another.
+    // Rehearsing on the Mac could not see it: there the two names are equal, and
+    // only a real override exposes it. Nothing in scripts/ is typechecked, so a
+    // missing argument would not have been caught either.
+    const postgres = readFileSync(new URL('./postgres.ts', import.meta.url), 'utf8');
+    assert.equal(/connect\(database = DATABASE_NAME/u.test(postgres), false, 'connect must not default to the constant');
+    assert.equal(
+      /export async function ensureDatabase\(cluster: SyntheticCluster, database = /u.test(postgres),
+      false,
+      'ensureDatabase must not default to the constant',
+    );
+
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.equal(/cluster\.connect\(\)/u.test(stack), false, 'every connection must name its database');
+    assert.ok(
+      stack.includes('ensureLoginRoles(cluster, profile.databaseName)'),
+      'the role bootstrap must use the resolved name too',
+    );
+  });
+});
+
 describe('stack start modes', () => {
   it('can start without importing the synthetic catalog', () => {
     // Serving a real catalog must not import the demo CSV: on a freshly prepared

@@ -293,7 +293,7 @@ async function commandStart(): Promise<void> {
   await admin.connect();
   try { log(await ensureDatabase(cluster, profile.databaseName)); } finally { await admin.end(); }
 
-  const database = cluster.connect();
+  const database = cluster.connect(profile.databaseName);
   await database.connect();
   try {
     for (const step of await bootstrapDatabase(database)) log(step);
@@ -301,7 +301,7 @@ async function commandStart(): Promise<void> {
     if (feishu) log(await seedFeishuBindings(database, feishu.bindings));
   } finally { await database.end(); }
 
-  log(await ensureLoginRoles(cluster));
+  log(await ensureLoginRoles(cluster, profile.databaseName));
 
   for (const step of await startProcesses(profile)) log(step);
   const ready = await waitReady(profile.apiOrigin);
