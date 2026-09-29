@@ -191,61 +191,109 @@
     }
 
     .overview-sec { padding: 40px 0 8px; }
-    .overview-sec .section-title { margin-bottom: 16px; }
-    .ov-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .ov-tabs {
+    .overview-sec .section-title { margin-bottom: 20px; }
+    .ov-steps {
+      --ov-progress: 0;
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      border-bottom: 1px solid var(--line);
+      grid-template-columns: repeat(3, 1fr);
+      max-width: 420px;
+      margin: 0 auto 28px;
+      position: relative;
     }
-    .ov-tabs button {
+    .ov-steps::before,
+    .ov-steps::after {
+      content: "";
+      position: absolute;
+      top: 15px;
+      left: 16.666%;
+      height: 2px;
+      pointer-events: none;
+    }
+    .ov-steps::before {
+      right: 16.666%;
+      background: var(--line);
+    }
+    .ov-steps::after {
+      width: calc(var(--ov-progress) * 66.668%);
+      background: var(--accent);
+    }
+    .ov-steps button {
       appearance: none;
-      min-height: 48px;
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      padding: 0 4px 4px;
+      min-height: 52px;
       border: 0;
       background: transparent;
       font: inherit;
-      font-weight: 650;
+      font-size: 13px;
+      font-weight: 600;
       color: var(--muted);
       cursor: pointer;
     }
-    .ov-tabs button:hover { color: var(--fg); }
-    .ov-tabs button[aria-selected="true"] {
+    .ov-steps button:hover { color: var(--fg); }
+    .ov-steps button.is-done { color: var(--fg); }
+    .ov-steps button[aria-selected="true"] {
       color: var(--accent);
-      background: var(--accent-soft);
-      box-shadow: inset 0 -2px 0 var(--accent);
+      font-weight: 650;
     }
-    .ov-view {
-      height: clamp(260px, 48vw, 520px);
-      overflow: hidden;
+    .ov-mark {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+    }
+    .ov-mark i {
+      display: block;
+      width: 10px;
+      height: 10px;
+      border-radius: 99px;
+      background: #fff;
+      border: 2px solid #c9ced8;
+      box-sizing: border-box;
+    }
+    .ov-steps button.is-done .ov-mark i,
+    .ov-steps button[aria-selected="true"] .ov-mark i {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .ov-steps button[aria-selected="true"] .ov-mark i {
+      width: 12px;
+      height: 12px;
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+    .ov-deck {
+      position: relative;
+      height: clamp(280px, 46vw, 500px);
+      margin: 0 52px 56px 0;
       touch-action: pan-y;
       cursor: grab;
       user-select: none;
     }
-    .ov-view.is-drag {
+    .ov-deck.is-drag {
       cursor: grabbing;
       touch-action: none;
     }
-    .ov-track {
-      display: flex;
-      height: 100%;
-      will-change: transform;
-    }
-    .ov-slide {
-      flex: 0 0 100%;
+    .ov-card {
+      position: absolute;
+      inset: 0;
       margin: 0;
-      height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px 24px;
+      padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 14px 32px -12px rgba(27, 28, 34, 0.28);
+      will-change: transform, opacity;
     }
-    .ov-slide img {
+    .ov-card img {
       max-width: 100%;
       max-height: 100%;
       width: auto;
@@ -255,13 +303,13 @@
       pointer-events: none;
       -webkit-user-drag: none;
     }
-    .ov-slide.is-capsule img {
+    .ov-card.is-capsule img {
       width: 92%;
       max-height: 168px;
       border-radius: 20px;
     }
     .ov-cap {
-      margin: 12px 2px 0;
+      margin: 0 2px 0;
       font-size: 14px;
       color: var(--muted);
       min-height: 1.5em;
@@ -386,8 +434,8 @@
       .hero { padding: 32px 0 20px; }
       .hero-grid, .foot-grid { grid-template-columns: 1fr; }
       .hero-actions .btn { width: 100%; }
-      .ov-view { height: clamp(220px, 72vw, 380px); }
-      .ov-slide { padding: 14px; }
+      .ov-deck { height: clamp(220px, 68vw, 360px); margin: 0 32px 40px 0; }
+      .ov-card { padding: 12px; }
       .row { flex-direction: column; align-items: stretch; }
       .row .btn, .row .chip { width: 100%; }
       .legal { flex-direction: column; }
@@ -395,7 +443,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .ov-track { transition: none !important; }
+      .ov-card { transition: none !important; }
     }
   </style>
 </head>
@@ -442,25 +490,30 @@
     <section class="overview-sec" id="overview">
       <div class="wrap">
         <h2 class="section-title">总览</h2>
-        <div class="ov-card">
-          <div class="ov-tabs" id="ov-tabs" role="tablist" aria-label="总览">
-            <button type="button" role="tab" id="ov-login" aria-controls="ov-view" aria-selected="true" data-show="0">登录</button>
-            <button type="button" role="tab" id="ov-query" aria-controls="ov-view" aria-selected="false" data-show="1">查询</button>
-            <button type="button" role="tab" id="ov-publish" aria-controls="ov-view" aria-selected="false" data-show="2">发布</button>
-          </div>
-          <div class="ov-view" id="ov-view" role="tabpanel" aria-labelledby="ov-login" aria-roledescription="轮播" tabindex="0">
-            <div class="ov-track" id="ov-track">
-              <figure class="ov-slide is-capsule">
-                <img src="./shot-capsule.png" width="1200" height="176" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。" draggable="false">
-              </figure>
-              <figure class="ov-slide">
-                <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。" draggable="false">
-              </figure>
-              <figure class="ov-slide">
-                <img src="./shot-dashboard.jpg" width="1933" height="1245" alt="客服运营工作台的话术库，当前发布已挂载。" draggable="false">
-              </figure>
-            </div>
-          </div>
+        <div class="ov-steps" id="ov-tabs" role="tablist" aria-label="总览">
+          <button type="button" role="tab" id="ov-login" aria-controls="ov-view" aria-selected="true" data-show="0">
+            <span class="ov-mark" aria-hidden="true"><i></i></span>
+            <span class="ov-label">登录</span>
+          </button>
+          <button type="button" role="tab" id="ov-query" aria-controls="ov-view" aria-selected="false" data-show="1">
+            <span class="ov-mark" aria-hidden="true"><i></i></span>
+            <span class="ov-label">查询</span>
+          </button>
+          <button type="button" role="tab" id="ov-publish" aria-controls="ov-view" aria-selected="false" data-show="2">
+            <span class="ov-mark" aria-hidden="true"><i></i></span>
+            <span class="ov-label">发布</span>
+          </button>
+        </div>
+        <div class="ov-deck" id="ov-view" role="tabpanel" aria-labelledby="ov-login" aria-roledescription="堆叠卡片" tabindex="0">
+          <figure class="ov-card is-capsule" data-show="0">
+            <img src="./shot-capsule.png" width="1200" height="176" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。" draggable="false">
+          </figure>
+          <figure class="ov-card" data-show="1">
+            <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。" draggable="false">
+          </figure>
+          <figure class="ov-card" data-show="2">
+            <img src="./shot-dashboard.jpg" width="1933" height="1245" alt="客服运营工作台的话术库，当前发布已挂载。" draggable="false">
+          </figure>
         </div>
         <p class="ov-cap" id="ov-cap" aria-live="polite">用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
       </div>
@@ -560,18 +613,77 @@
     ];
     const ovTabs = [...document.querySelectorAll('#ov-tabs [role="tab"]')];
     const ovView = document.getElementById('ov-view');
-    const ovTrack = document.getElementById('ov-track');
+    const ovCards = [...document.querySelectorAll('#ov-view .ov-card')];
     const ovCap = document.getElementById('ov-cap');
+    const ovSteps = document.getElementById('ov-tabs');
     const ovReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const ovN = ovSlides.length;
     let ovIndex = 0;
     let ovDrag = null;
 
     function ovWidth() { return ovView.getBoundingClientRect().width; }
+    function ovPeek() { return ovWidth() < 640 ? 14 : 22; }
+    function ovPose(depth) {
+      const p = ovPeek();
+      return { x: depth * p, y: depth * p, s: 1 - depth * 0.022, z: 10 - depth };
+    }
+    function ovLerp(a, b, t) {
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        s: a.s + (b.s - a.s) * t,
+        z: b.z,
+      };
+    }
+    function ovApplyCard(card, pose, opacity, animate) {
+      card.style.transition = animate && !ovReduce ? 'transform 0.32s ease, opacity 0.32s ease' : 'none';
+      card.style.transform = 'translate3d(' + pose.x + 'px,' + pose.y + 'px,0) scale(' + pose.s + ')';
+      card.style.zIndex = String(pose.z);
+      card.style.opacity = String(opacity);
+    }
     function ovSet(index, offset, animate) {
-      ovIndex = Math.max(0, Math.min(ovSlides.length - 1, index));
-      const x = -ovIndex * ovWidth() + offset;
-      ovTrack.style.transition = animate && !ovReduce ? 'transform 0.32s ease' : 'none';
-      ovTrack.style.transform = 'translate3d(' + x + 'px,0,0)';
+      ovIndex = Math.max(0, Math.min(ovN - 1, index));
+      const w = Math.max(1, ovWidth());
+      const canNext = ovIndex < ovN - 1;
+      const canPrev = ovIndex > 0;
+      let dx = offset;
+      if ((!canNext && dx < 0) || (!canPrev && dx > 0)) dx *= 0.32;
+      const tNext = canNext && offset < 0 ? Math.min(1, -offset / (w * 0.72)) : 0;
+      const tPrev = canPrev && offset > 0 ? Math.min(1, offset / (w * 0.72)) : 0;
+
+      ovCards.forEach((card, i) => {
+        const rest = ovPose((i - ovIndex + ovN) % ovN);
+        let pose = rest;
+        let opacity = 1;
+        if (tNext > 0) {
+          if (i === ovIndex) {
+            pose = { x: dx, y: 0, s: 1 - 0.04 * tNext, z: 12 };
+            opacity = 1 - 0.28 * tNext;
+          } else if (i === ovIndex + 1) {
+            pose = ovLerp(ovPose(1), ovPose(0), tNext);
+            pose.z = 13;
+          } else {
+            pose = ovLerp(ovPose(2), ovPose(1), tNext);
+            pose.z = 8;
+          }
+        } else if (tPrev > 0) {
+          if (i === ovIndex) {
+            pose = ovLerp(ovPose(0), ovPose(1), tPrev);
+            pose.z = 11;
+          } else if (i === ovIndex - 1) {
+            pose = { x: -w * 0.62 * (1 - tPrev), y: 0, s: 1, z: 14 };
+          } else {
+            pose = ovLerp(ovPose(1), ovPose(2), tPrev);
+            pose.z = 8;
+          }
+        } else if (i === ovIndex) {
+          pose = { x: rest.x + dx, y: rest.y, s: rest.s, z: rest.z };
+        }
+        ovApplyCard(card, pose, opacity, animate);
+        card.setAttribute('aria-hidden', i === ovIndex ? 'false' : 'true');
+      });
+
+      ovSteps.style.setProperty('--ov-progress', String((ovIndex + tNext - tPrev) / (ovN - 1)));
       const slide = ovSlides[ovIndex];
       ovCap.textContent = slide.cap;
       ovView.setAttribute('aria-labelledby', slide.id);
@@ -579,6 +691,7 @@
         const on = i === ovIndex;
         tab.setAttribute('aria-selected', on ? 'true' : 'false');
         tab.tabIndex = on ? 0 : -1;
+        tab.classList.toggle('is-done', i < ovIndex);
       });
     }
     function ovGo(index) { ovSet(index, 0, true); }
@@ -628,9 +741,7 @@
       if (ovDrag.axis !== 'x') return;
       event.preventDefault();
       ovDrag.dx = dx;
-      let ox = dx;
-      if ((ovIndex === 0 && dx > 0) || (ovIndex === ovSlides.length - 1 && dx < 0)) ox = dx * 0.32;
-      ovSet(ovIndex, ox, false);
+      ovSet(ovIndex, dx, false);
     });
     function ovEndDrag(event) {
       if (!ovDrag || event.pointerId !== ovDrag.id) return;
@@ -642,6 +753,9 @@
         const flick = ovDrag.vx * 1000;
         if (dx < -Math.max(48, w * 0.18) || flick < -500) next += 1;
         else if (dx > Math.max(48, w * 0.18) || flick > 500) next -= 1;
+      } else if (ovDrag.axis === null) {
+        const hit = event.target && event.target.closest ? event.target.closest('.ov-card') : null;
+        if (hit && Number(hit.dataset.show) !== ovIndex) next = Number(hit.dataset.show);
       }
       ovDrag = null;
       ovGo(next);
