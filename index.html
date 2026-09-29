@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>客服话术浮窗 Demo · 官方下载</title>
-  <meta name="description" content="客服话术浮窗 Demo 官方下载。Windows x64，v0.3.24。坐席查询并复制当前已发布话术。下载安装包不会开通账号。">
+  <meta name="description" content="客服话术浮窗 Demo 官方下载。Windows x64，v0.3.25。坐席查询并复制当前已发布话术。下载安装包不会开通账号。">
   <link rel="canonical" href="https://download.jianghua.site/">
   <link rel="icon" type="image/png" href="./favicon.png">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <meta property="og:title" content="客服话术浮窗 Demo · 官方下载">
-  <meta property="og:description" content="Windows 官方安装包 v0.3.24。登录用公司飞书。下载不等于开通账号。">
+  <meta property="og:description" content="Windows 官方安装包 v0.3.25。登录用公司飞书。下载不等于开通账号。">
   <meta property="og:url" content="https://download.jianghua.site/">
   <meta property="og:image" content="https://download.jianghua.site/shot-query.png">
   <meta name="theme-color" content="#f4f6f8">
@@ -27,6 +27,13 @@
       --warn: #9a3b1a;
       --max: 1080px;
       --shadow: 0 8px 24px -12px rgba(27, 28, 34, 0.18);
+      /* 总览卡片：不再用纯白平面，改成一层浅紫画布 + 品牌色细环 / 柔和投影 */
+      --ov-canvas: linear-gradient(180deg, #ffffff 0%, #fbfaff 52%, #f4effd 100%);
+      --ov-ring: color-mix(in srgb, var(--accent) 16%, #fff);
+      --ov-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 28px 52px -30px rgba(93, 48, 190, 0.42),
+        0 10px 22px -16px rgba(27, 28, 34, 0.18);
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; color-scheme: light; }
@@ -287,19 +294,30 @@
       align-items: center;
       justify-content: center;
       padding: 18px;
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      box-shadow: 0 14px 32px -12px rgba(27, 28, 34, 0.28);
+      background: var(--ov-canvas);
+      border: 1px solid var(--ov-ring);
+      border-radius: 20px;
+      box-shadow: var(--ov-shadow);
+      overflow: hidden;
       will-change: transform, opacity;
     }
+    /* 顶部一层高光，让画布有光感，不是一块死白 */
+    .ov-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(85% 55% at 50% 0%, rgba(255, 255, 255, 0.9), transparent 72%);
+      pointer-events: none;
+    }
     .ov-card img {
+      position: relative;
       max-width: 100%;
       max-height: 100%;
       width: auto;
       height: auto;
       object-fit: contain;
       border-radius: 12px;
+      box-shadow: 0 16px 32px -20px rgba(27, 28, 34, 0.45), 0 2px 6px -3px rgba(27, 28, 34, 0.16);
       pointer-events: none;
       -webkit-user-drag: none;
     }
@@ -307,6 +325,7 @@
       width: 92%;
       max-height: 168px;
       border-radius: 20px;
+      box-shadow: 0 22px 40px -24px rgba(27, 28, 34, 0.55), 0 3px 10px -5px rgba(27, 28, 34, 0.18);
     }
     .ov-cap {
       margin: 0 2px 0;
@@ -469,11 +488,11 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <p class="kicker">v0.3.24</p>
+          <p class="kicker">v0.3.25</p>
           <h1>客服话术浮窗</h1>
           <p class="lead">接待时查询当前已发布的话术，复制后自己发送。用公司飞书登录。下载安装包不会开通账号。</p>
           <div class="hero-actions">
-            <a class="btn btn-primary btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">
+            <a class="btn btn-primary btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-win-x64-UNSIGNED.exe">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
               下载 Windows 安装包
             </a>
@@ -523,7 +542,7 @@
       <div class="wrap">
         <div class="download-box">
           <h2 class="section-title">下载</h2>
-          <p class="section-lead">v0.3.24 · 2026年9月29日</p>
+          <p class="section-lead">v0.3.25 · 2026年9月29日</p>
           <div class="tabs" id="os-tabs" role="tablist" aria-label="系统">
             <button type="button" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="true" data-tab="win">Windows</button>
             <button type="button" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false" data-tab="mac">macOS</button>
@@ -534,9 +553,9 @@
               <div>
                 <h3>Windows 安装包</h3>
                 <p>x64 · 装进当前用户目录</p>
-                <button class="chip" type="button" data-copy="c2dd941031791b8dc589fbadf1cbfa0231c72734ebc846c8809971f8e55510cd">SHA-256　c2dd9410…f55510cd</button>
+                <button class="chip" type="button" data-copy="84795e68bc316e45999287c5532b883c232a80aa9619b68c475fc202a479aac1">SHA-256　84795e68…a479aac1</button>
               </div>
-              <a class="btn btn-primary" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 · 87.2 MB</a>
+              <a class="btn btn-primary" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-win-x64-UNSIGNED.exe">下载 · 87.2 MB</a>
             </div>
           </div>
           <div class="panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
@@ -544,9 +563,9 @@
               <div>
                 <h3>macOS 磁盘映像</h3>
                 <p>universal · 未公证</p>
-                <button class="chip" type="button" data-copy="476d16e7dc7258c9f2a9765bd0e88ddf3084e5335c869b2e33f1c7406f157eb3">SHA-256　476d16e7…6f157eb3</button>
+                <button class="chip" type="button" data-copy="556b3fa7afa2d1cd3b9177d995679d481c359eca35331f8d17b059884834e2f5">SHA-256　556b3fa7…4834e2f5</button>
               </div>
-              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
+              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
             </div>
           </div>
           <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
@@ -554,9 +573,9 @@
               <div>
                 <h3>Linux AppImage</h3>
                 <p>x86_64 · 未签名</p>
-                <button class="chip" type="button" data-copy="af48a3362379932cb8cd4a42e82be3f1eba2963986c2bd5677e473723f19068e">SHA-256　af48a336…3f19068e</button>
+                <button class="chip" type="button" data-copy="54ece2999c2c4a24cbaa40b3d477e58fee526f3609e416f42da53124b6deb610">SHA-256　54ece299…b6deb610</button>
               </div>
-              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
+              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
             </div>
           </div>
           <p class="note">未做代码签名，也没有自动更新。新版本仍从本页或 <a href="https://github.com/tyuanww/customer-agent-prototype/releases">GitHub Releases</a> 下载。点上方 SHA-256 可复制完整校验值。</p>
