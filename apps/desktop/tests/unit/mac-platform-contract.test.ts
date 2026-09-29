@@ -15,7 +15,7 @@ const packageJson = JSON.parse(
     appId: string;
     publish: null;
     afterPack: string;
-    dmg: { writeUpdateInfo: boolean };
+    dmg: { writeUpdateInfo: boolean; license: null };
     extraResources: Array<{ from: string; to: string }>;
     mac: {
       target: Array<{ target: string; arch: string[] }>;
@@ -127,6 +127,7 @@ describe('macOS distribution contract', () => {
     expect(packageJson.build.publish).toBeNull();
     expect(packageJson.build.afterPack).toBe('./scripts/after-pack-macos.mjs');
     expect(packageJson.build.dmg.writeUpdateInfo).toBe(false);
+    expect(packageJson.build.dmg.license).toBeNull();
 
     expect(packageJson.build.mac.target).toEqual([
       { target: 'dmg', arch: ['universal'] },

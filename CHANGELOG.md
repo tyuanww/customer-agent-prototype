@@ -7,6 +7,7 @@ All notable changes to this customer-agent product implementation repository are
 ### Changed
 
 - Windows NSIS 从 oneClick 改为 assisted 向导：许可、安装目录、快捷方式。源码已随 #26 合入；本版才打进 UNSIGNED。公开 GitHub Release 0.3.24 仍是旧 oneClick。不跑 `latest.yml`。
+- Mac DMG 关闭挂载许可页（`dmg.license` 为 null）：`build/license_*.txt` 只给 Windows NSIS 向导。dmgbuild 不能把 UTF-8 BOM/中文编成 mac_roman。
 
 ## [0.3.24] - 2026-09-29
 

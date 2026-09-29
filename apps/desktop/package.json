@@ -132,7 +132,8 @@
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "dmg": {
-      "writeUpdateInfo": false
+      "writeUpdateInfo": false,
+      "license": null
     },
     "nsis": {
       "oneClick": false,
