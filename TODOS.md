@@ -31,6 +31,45 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Depends on:** P2 + 独立安全评审
 **Status:** OPEN · 代码已合入 main（#133 / #135 / #145 / #153 / #154）。账号 identity 用 `https://agent-pass.jianghua.site`，口令服务仍 loopback。macOS UNSIGNED v0.3.7：狐狸 / 飞书 / 查询 / 复制已观察，账号登录与关窗/断网未观察。现行文档/详情卡口径是 v0.3.8。Windows 办公机与 Linux 打包态远端仍全部未观察。`package:linux` 须在 Linux 上跑。API 绑 `0.0.0.0` 仍未做。
 
+### 杭州迁移 · 子进程崩溃自愈
+
+**What:** 让 `stack.ts` 支持前台模式，由 systemd 直接监督 api / worker / identity，任一个退出即重启。
+
+**Why:** 杭州的 systemd 单元是 `Type=oneshot` + `RemainAfterExit`，因为 `stack.ts` 自己把四个进程 detach 出去。oneshot 不监督子进程，所以 API 单独崩掉时单元仍显示 `active`，`/ready` 掉到 503 而 systemd 一无所知。这是「杭州做服务器」留下的已知缺口，不是缺陷。
+
+**Context:** 从 `scripts/synthetic-stack/stack.ts` 的 `spawnLogged` / `startProcesses` 入手，改成前台 `exec` 并由单元 `Type=simple` 接管；合成路径共用这段代码，所以要保证默认路径行为不变。约 3 天 / CC 约 4 小时。
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** 杭州迁移完成
+**Status:** OPEN
+
+### 杭州迁移 · 去掉单点（HA）
+
+**What:** 两个公网入口不再依赖单台 WSL 桌面机。
+
+**Why:** 杭州那台同时是在用的桌面机：WSL 里跑着 fuqing-crm-analytics、WeKnora、tyuan-chat，还有 nginx / PG17 / Redis / Tailscale。它重启、被关机、或者被拿去装别的东西，办公机的登录就一起没了。
+
+**Context:** 先量负载与重启频率，再决定要不要第二台机器。量级远超本次迁移。
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** 杭州迁移完成
+**Status:** OPEN
+
+### 杭州迁移 · 公网入口健康探测与告警
+
+**What:** 给 `agent-auth` / `agent-pass` 加外部探测 + 告警通道。
+
+**Why:** 「子进程崩溃自愈」和「WSL 自启」之外，剩下的所有失效模式（隧道失效、证书过期、DNS 改错、进程崩了没人重启）目前共同的症状都是**没有任何人收到通知**——办公机那边只表现为「登录不了」，等有人说出来才知道。
+
+**Context:** 需要不在同一故障域的探测点与告警通道。Cloudflare 可用性监测，或一台外部 VPS。
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** 无
+**Status:** OPEN
+
 ### P5 · 会话未绑定后端身份
 
 **What:** 会话存储文件名固定 `product-session.enc`，未按环境或服务身份隔离。
