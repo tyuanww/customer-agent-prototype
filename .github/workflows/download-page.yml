@@ -1,0 +1,68 @@
+name: Download page
+
+# The official page at download.jianghua.site is the `gh-pages` branch with the
+# version and asset URLs hand-coded. Bumping VERSION never touched it, so the
+# site lagged the GitHub Release. This publishes a release to the page in one
+# step, driven by the Release itself rather than by hand-editing HTML.
+on:
+  release:
+    types:
+      - published
+  # Backfill: publish an existing release that shipped before this workflow.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (for example v0.3.25)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: download-page
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish release to the download page
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the download page
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: gh-pages
+          path: pages
+
+      # The script comes from the default branch, never from the released tag: a
+      # backfill of an old release would otherwise fail, because that tag predates
+      # the script. The page is rewritten from the Release data, and the script
+      # fails loudly rather than guessing, so a newer script is always safe here.
+      - name: Check out the publish script from the default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: tool
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: Rewrite the page from the release
+        run: node tool/scripts/update-download-page.mjs --dir pages --from-release "$RELEASE_TAG"
+
+      - name: Commit and push when the page moved
+        working-directory: pages
+        run: |
+          if git diff --quiet -- index.html windows.html; then
+            echo "Download page already current for $RELEASE_TAG; nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html windows.html
+          git commit -m "chore(download): publish $RELEASE_TAG"
+          git push

@@ -38,6 +38,7 @@ pnpm start                  # 与 pnpm dev 相同
 | 用一张表整库替换四库之一（手选将替换） | [how-to-replace-one-library](docs/how-to-replace-one-library.md) |
 | 在话术库下架一条已发布话术 | [how-to-retire-a-script](docs/how-to-retire-a-script.md) |
 | 换成这一版未签名包 | [how-to-upgrade-unsigned](docs/how-to-upgrade-unsigned.md) |
+| 发一版到官网下载页（`download.jianghua.site`） | [how-to-publish-download-page](docs/how-to-publish-download-page.md) |
 | 查阅导入 / 发布 IPC、限额与失败码 | [reference-content-publish](docs/reference-content-publish.md) |
 | 理解本机目录与当前发布为何会分叉 | [explanation-catalog-lease](docs/explanation-catalog-lease.md) |
 | 按目标选择 lint / 测试 / E2E / 打包 | [how-to-verify-desktop](docs/how-to-verify-desktop.md) |
