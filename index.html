@@ -4,141 +4,673 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>客服话术浮窗 Demo · 官方下载</title>
-  <meta name="description" content="客服话术浮窗 Demo 官方安装包下载。当前版本 0.3.24，Windows x64。">
+  <meta name="description" content="客服话术浮窗 Demo 官方下载。当前公开包 0.3.24，Windows x64，MIT 开源。">
   <link rel="canonical" href="https://download.jianghua.site/">
+  <link rel="icon" type="image/png" href="./favicon.png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <meta property="og:title" content="客服话术浮窗 Demo · 官方下载">
+  <meta property="og:description" content="当前公开包 0.3.24，Windows x64。下载安装包不等于开通账号。">
+  <meta property="og:url" content="https://download.jianghua.site/">
+  <meta property="og:image" content="https://download.jianghua.site/fox-head.png">
+  <meta name="theme-color" content="#e8dfd2">
   <style>
     :root {
-      --ink: #1c1917;
-      --muted: #57534e;
-      --line: #e7e5e4;
-      --paper: #fafaf9;
-      --card: #ffffff;
-      --btn: #1c1917;
-      --btn-text: #fafaf9;
+      --primary: 15 65% 52%;
+      --primary-foreground: 40 30% 96%;
+      --background: 38 28% 91%;
+      --foreground: 30 15% 15%;
+      --card: 35 22% 85%;
+      --muted: 35 20% 87%;
+      --muted-foreground: 30 12% 38%;
+      --border: 35 18% 80%;
+      --accent-warm: 15 55% 48%;
+      --radius: 0.75rem;
+      --shadow: 0 24px 60px -24px hsl(30 20% 10% / 0.28);
+      --max: 1120px;
     }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Source Han Sans SC", sans-serif;
-      color: var(--ink);
-      background: var(--paper);
+      font-family: Inter, "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: hsl(var(--foreground));
+      background: hsl(var(--background));
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
-    main {
-      max-width: 720px;
+    a { color: inherit; }
+    img { max-width: 100%; display: block; }
+    .skip {
+      position: absolute;
+      left: -999px;
+      top: 8px;
+    }
+    .skip:focus {
+      left: 12px;
+      z-index: 80;
+      background: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    .wrap {
+      width: min(var(--max), calc(100% - 40px));
       margin: 0 auto;
-      padding: 48px 24px 72px;
     }
-    header p {
-      margin: 0 0 8px;
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      font-size: 13px;
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(18px);
+      background: hsl(var(--background) / 0.82);
+      border-bottom: 1px solid hsl(var(--border) / 0.7);
     }
-    h1 {
-      margin: 0 0 12px;
-      font-size: 32px;
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 64px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
       font-weight: 650;
       letter-spacing: -0.02em;
+      white-space: nowrap;
     }
-    .lead { margin: 0 0 32px; color: var(--muted); }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 20px;
+    .brand img { width: 28px; height: 28px; }
+    .brand-short { display: none; }
+    .nav-links {
+      display: flex;
+      gap: 22px;
+      font-size: 14px;
+      color: hsl(var(--muted-foreground));
     }
-    .card h2 {
-      margin: 0 0 8px;
-      font-size: 18px;
+    .nav-links a { text-decoration: none; }
+    .nav-links a:hover { color: hsl(var(--foreground)); }
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .nav-github {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      color: hsl(var(--muted-foreground));
+    }
+    .nav-github:hover { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+    .hero {
+      position: relative;
+      padding: 72px 0 48px;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0 -20vw auto;
+      height: 640px;
+      background-image:
+        linear-gradient(to right, hsl(var(--border) / 0.35) 1px, transparent 1px),
+        linear-gradient(to bottom, hsl(var(--border) / 0.35) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: linear-gradient(to bottom, #000 40%, transparent);
+      pointer-events: none;
+    }
+    .hero-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      gap: 48px;
+      align-items: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      font-size: 12px;
+      color: hsl(var(--muted-foreground));
+    }
+    .badge b { color: hsl(var(--primary)); font-weight: 650; }
+    h1 {
+      margin: 16px 0 14px;
+      font-size: clamp(2.4rem, 5vw, 4.1rem);
+      line-height: 1.08;
+      letter-spacing: -0.038em;
+      font-weight: 750;
+    }
+    .lead {
+      margin: 0 0 28px;
+      max-width: 36rem;
+      font-size: 1.08rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
       font-weight: 600;
+      border-radius: 12px;
+      padding: 12px 18px;
     }
-    .meta {
-      margin: 0 0 20px;
-      color: var(--muted);
+    .btn-primary {
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      box-shadow: 0 10px 28px -10px hsl(var(--primary) / 0.55);
+    }
+    .btn-primary:hover { background: hsl(var(--accent-warm)); }
+    .btn-outline {
+      background: transparent;
+      color: hsl(var(--foreground));
+      border: 1px solid hsl(var(--border));
+    }
+    .btn-outline:hover { background: hsl(var(--card)); }
+    .btn-lg { padding: 14px 22px; border-radius: 14px; font-size: 1.02rem; }
+    .btn-light {
+      background: hsl(40 30% 96%);
+      color: hsl(15 45% 28%);
+    }
+    .platforms {
+      margin: 14px 0 0;
+      font-size: 13px;
+      color: hsl(var(--muted-foreground));
+    }
+    .preview {
+      perspective: 1400px;
+    }
+    .window {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid hsl(var(--border));
+      transform: rotate3d(1, -1, 0, 8deg);
+    }
+    .titlebar {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      background: #f4f1ea;
+      border-bottom: 1px solid #ece7dc;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #ff5f57; }
+    .dot.y { background: #febc2e; }
+    .dot.g { background: #28c840; }
+    .titlebar span {
+      margin-left: 8px;
+      font-size: 12px;
+      color: #8a8173;
+    }
+    .desktop {
+      position: relative;
+      height: 390px;
+      background:
+        radial-gradient(1200px 280px at 50% 120%, hsl(15 65% 52% / 0.12), transparent 60%),
+        linear-gradient(180deg, #fbf7f0, #f0e8db);
+    }
+    .capsule {
+      position: absolute;
+      left: 50%;
+      top: 42%;
+      width: min(78%, 360px);
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.62);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 18px;
+      padding: 14px 16px 12px;
+      box-shadow: 0 18px 40px -24px rgb(40 24 8 / 0.45);
+    }
+    .capsule label {
+      display: block;
+      font-size: 11px;
+      color: #8a8173;
+      margin-bottom: 6px;
+    }
+    .capsule .q {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .hits { margin: 10px 0 0; display: grid; gap: 6px; }
+    .hit {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: hsl(38 28% 91% / 0.7);
+    }
+    .hit b { font-weight: 600; }
+    .hit em { font-style: normal; color: hsl(var(--primary)); }
+    .fox {
+      position: absolute;
+      left: 28px;
+      bottom: 22px;
+      width: 86px;
+      filter: drop-shadow(0 10px 16px rgb(40 20 8 / 0.18));
+    }
+    section { padding: 72px 0; }
+    section[id] { scroll-margin-top: 80px; }
+    .section-kicker {
+      margin: 0 0 8px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .section-title {
+      margin: 0 0 12px;
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      letter-spacing: -0.03em;
+      font-weight: 700;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .feature {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border) / 0.8);
+      border-radius: 20px;
+      padding: 22px 22px 20px;
+    }
+    .feature h3 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+    .feature p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.95rem;
+    }
+    .download-hero { text-align: center; padding-top: 24px; }
+    .download-hero h2 { font-size: clamp(2rem, 4vw, 3rem); }
+    .download-hero .lead { margin: 0 auto 10px; }
+    .ver {
+      margin: 0 0 28px;
+      color: hsl(var(--muted-foreground));
       font-size: 14px;
     }
-    .btn {
-      display: inline-block;
-      background: var(--btn);
-      color: var(--btn-text);
-      text-decoration: none;
-      padding: 12px 18px;
-      border-radius: 10px;
-      font-weight: 600;
+    .ver strong { color: hsl(var(--foreground)); }
+    .tabs {
+      display: inline-flex;
+      gap: 6px;
+      padding: 5px;
+      border-radius: 999px;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      margin: 28px 0 16px;
     }
-    .btn:hover { opacity: 0.92; }
-    .btn-secondary {
+    .tabs button {
+      border: 0;
       background: transparent;
-      color: var(--ink);
-      border: 1px solid var(--line);
-      margin-left: 8px;
+      font: inherit;
+      padding: 8px 16px;
+      border-radius: 999px;
+      color: hsl(var(--muted-foreground));
+      cursor: pointer;
     }
-    code, .hash {
+    .tabs button[aria-selected="true"] {
+      background: hsl(var(--foreground));
+      color: hsl(var(--background));
+    }
+    .panel {
+      display: none;
+      text-align: left;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .panel.is-on { display: block; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px;
+      border-top: 1px solid hsl(var(--border) / 0.8);
+    }
+    .row:first-child { border-top: 0; }
+    .row h3 { margin: 0 0 4px; font-size: 15px; }
+    .row p { margin: 0; font-size: 13px; color: hsl(var(--muted-foreground)); }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
-      word-break: break-all;
-    }
-    .hash {
-      display: block;
-      margin-top: 12px;
-      padding: 12px;
-      background: var(--paper);
+      color: hsl(var(--muted-foreground));
+      background: hsl(var(--background));
       border-radius: 8px;
-      color: var(--muted);
+      padding: 6px 8px;
+      border: 0;
+      cursor: pointer;
     }
-    ol { margin: 8px 0 0; padding-left: 20px; }
-    ul.others { margin: 0; padding-left: 20px; }
+    .chip:hover { color: hsl(var(--foreground)); }
+    .note {
+      margin: 14px 0 0;
+      font-size: 13px;
+      color: hsl(var(--muted-foreground));
+      text-align: center;
+    }
+    .history {
+      margin-top: 16px;
+      padding: 28px 20px;
+      border-radius: 20px;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      text-align: center;
+    }
+    .history h3 { margin: 0 0 6px; }
+    .history p { margin: 0 0 12px; color: hsl(var(--muted-foreground)); font-size: 14px; }
+    .history a { color: hsl(var(--primary)); font-weight: 600; text-decoration: none; }
+    .steps { max-width: 720px; }
+    .steps ol { margin: 0; padding-left: 20px; }
+    .steps li { margin: 0 0 10px; }
+    .cta {
+      background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent-warm)) 100%);
+      color: hsl(var(--primary-foreground));
+      padding: 72px 0;
+    }
+    .cta h2 { margin: 0 0 10px; font-size: clamp(1.8rem, 3vw, 2.6rem); letter-spacing: -0.03em; }
+    .cta p { margin: 0 0 22px; opacity: 0.9; max-width: 36rem; }
     footer {
-      margin-top: 36px;
-      color: var(--muted);
+      padding: 48px 0 28px;
+      border-top: 1px solid hsl(var(--border));
+    }
+    .foot-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr 1fr;
+      gap: 28px;
+    }
+    footer h3 { margin: 0 0 10px; font-size: 13px; }
+    footer a { display: block; text-decoration: none; color: hsl(var(--muted-foreground)); font-size: 14px; margin: 0 0 6px; }
+    footer a:hover { color: hsl(var(--foreground)); }
+    .foot-brand { display: flex; align-items: center; gap: 8px; font-weight: 650; margin-bottom: 8px; }
+    .foot-brand img { width: 22px; height: 22px; }
+    .legal {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid hsl(var(--border));
+      color: hsl(var(--muted-foreground));
       font-size: 13px;
     }
-    a { color: var(--ink); }
+    .warn { color: hsl(15 55% 38%); }
+    @media (max-width: 900px) {
+      .nav-links, .nav-github, .brand-full { display: none; }
+      .brand-short { display: inline; }
+      .hero { padding: 40px 0 24px; }
+      .hero-grid, .features, .foot-grid { grid-template-columns: 1fr; }
+      .hero-actions .btn { width: 100%; }
+      .window { transform: none; }
+      .desktop { height: 280px; }
+      .fox { width: 64px; left: 16px; bottom: 14px; }
+      .row { flex-direction: column; align-items: flex-start; }
+      .legal { flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .window { transform: none; }
+    }
   </style>
 </head>
 <body>
+  <a class="skip" href="#download">跳到下载</a>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="./">
+        <img src="./fox-head.png" alt="" width="28" height="28">
+        <span class="brand-full">客服话术浮窗 Demo</span>
+        <span class="brand-short">话术浮窗</span>
+      </a>
+      <nav class="nav-links" aria-label="页面">
+        <a href="#features">功能</a>
+        <a href="#download">下载</a>
+        <a href="#install">安装</a>
+        <a href="https://github.com/tyuanww/customer-agent-prototype">源码</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="nav-github" href="https://github.com/tyuanww/customer-agent-prototype" aria-label="GitHub">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 4.51c.68.003 1.36.092 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        </a>
+        <a class="btn btn-primary" href="#download">免费下载</a>
+      </div>
+    </div>
+  </header>
+
   <main>
-    <header>
-      <p>JIANGHUA.SITE</p>
-      <h1>客服话术浮窗 Demo</h1>
-      <p class="lead">官方下载页。当前公开安装包是 0.3.24，面向 Windows x64。</p>
-    </header>
-
-    <section class="card">
-      <h2>Windows 安装包</h2>
-      <p class="meta">0.3.24 · x64 · NSIS · 约 87 MB · 未代码签名</p>
-      <p>
-        <a class="btn" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 Windows 安装包</a>
-        <a class="btn btn-secondary" href="https://github.com/tyuanww/customer-agent-prototype/releases/tag/v0.3.24">GitHub Release</a>
-      </p>
-      <span class="hash">SHA-256　c2dd941031791b8dc589fbadf1cbfa0231c72734ebc846c8809971f8e55510cd</span>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <span class="badge">公开包 <b>v0.3.24</b></span>
+          <h1>当前发布的话术，一直浮在桌面上</h1>
+          <p class="lead">客服话术浮窗 Demo 官方下载页。坐席用狐狸头和查询胶囊查当前发布；话术师整库替换，管理员发布后才生效。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+              下载 Windows 安装包
+            </a>
+            <a class="btn btn-outline btn-lg" href="https://github.com/tyuanww/customer-agent-prototype">查看源码</a>
+          </div>
+          <p class="platforms">适用 Windows 10+ x64 · 约 87.2 MB · 未代码签名</p>
+        </div>
+        <div class="preview" aria-hidden="true">
+          <div class="window">
+            <div class="titlebar">
+              <i class="dot r"></i><i class="dot y"></i><i class="dot g"></i>
+              <span>客服话术浮窗 Demo</span>
+            </div>
+            <div class="desktop">
+              <div class="capsule">
+                <label>查询胶囊</label>
+                <div class="q">这个面膜适合敏感肌吗？</div>
+                <div class="hits">
+                  <div class="hit"><b>敏感肌先做斑贴</b><em>产品</em></div>
+                  <div class="hit"><b>成分表对过敏原</b><em>售后</em></div>
+                  <div class="hit"><b>不承诺医疗功效</b><em>售前</em></div>
+                </div>
+              </div>
+              <img class="fox" src="./fox-head.png" alt="">
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>安装时会看到什么</h2>
-      <ol>
-        <li>双击安装包后会直接装进当前用户目录，没有欢迎页、许可页和路径选择。</li>
-        <li>Windows 可能弹出 SmartScreen。选「更多信息」，再选「仍要运行」。</li>
-        <li>装完从开始菜单打开「客服话术浮窗 Demo」。</li>
-        <li>下载安装包不等于开通账号。登录仍走公司飞书账号。</li>
-      </ol>
+    <section id="features">
+      <div class="wrap">
+        <p class="section-kicker">产品</p>
+        <h2 class="section-title">给坐席用的桌面浮窗</h2>
+        <div class="features">
+          <article class="feature">
+            <h3>狐狸头浮窗</h3>
+            <p>始终浮在工作台上面。点狐狸头或按 Ctrl+Shift+Space，打开查询胶囊。</p>
+          </article>
+          <article class="feature">
+            <h3>当前发布 Top 3</h3>
+            <p>查询只走当前发布的话术库。人工选一条再复制，不自动代发。</p>
+          </article>
+          <article class="feature">
+            <h3>整库替换再发布</h3>
+            <p>话术师在内容管理导入表格。管理员点发布后，坐席才能搜到新内容。</p>
+          </article>
+          <article class="feature">
+            <h3>飞书登录</h3>
+            <p>下载安装包不等于开通账号。登录仍走公司飞书，权限按角色来。</p>
+          </article>
+        </div>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>其他系统</h2>
-      <ul class="others">
-        <li><a href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-mac-universal-UNSIGNED.dmg">macOS universal DMG</a></li>
-        <li><a href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">Linux x64 AppImage</a></li>
-        <li><a href="https://github.com/tyuanww/customer-agent-prototype">源码（MIT）</a></li>
-      </ul>
+    <section id="download">
+      <div class="wrap">
+        <div class="download-hero">
+          <h2 class="section-title">下载 客服话术浮窗 Demo</h2>
+          <p class="lead">免费开源。官方安装包只从本页或 GitHub Release 获取。</p>
+          <p class="ver">最新版本 <strong>v0.3.24</strong> · 发布于 2026年9月29日</p>
+          <a class="btn btn-primary btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+            下载 Windows 版 · 87.2 MB
+          </a>
+          <p class="platforms">Windows 10 及以上 · x64 · NSIS · 未代码签名</p>
+        </div>
+
+        <div style="text-align:center">
+          <p class="section-title" style="font-size:1.4rem;margin-top:48px">全部平台</p>
+          <div class="tabs" role="tablist" aria-label="平台">
+            <button type="button" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="true" data-tab="win">Windows</button>
+            <button type="button" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false" data-tab="mac">macOS</button>
+            <button type="button" role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false" data-tab="linux">Linux</button>
+          </div>
+        </div>
+
+        <div class="panel is-on" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
+          <div class="row">
+            <div>
+              <h3>Windows 安装包（.exe）</h3>
+              <p>NSIS · x64 · 当前公开包双击即装进当前用户目录</p>
+              <button class="chip" type="button" data-copy="c2dd941031791b8dc589fbadf1cbfa0231c72734ebc846c8809971f8e55510cd">SHA-256　c2dd9410…f55510cd</button>
+            </div>
+            <a class="btn btn-outline" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 · 87.2 MB</a>
+          </div>
+        </div>
+        <div class="panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
+          <div class="row">
+            <div>
+              <h3>macOS 磁盘映像（.dmg）</h3>
+              <p>universal · 未公证，本页主推 Windows</p>
+              <button class="chip" type="button" data-copy="476d16e7dc7258c9f2a9765bd0e88ddf3084e5335c869b2e33f1c7406f157eb3">SHA-256　476d16e7…6f157eb3</button>
+            </div>
+            <a class="btn btn-outline" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
+          </div>
+        </div>
+        <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
+          <div class="row">
+            <div>
+              <h3>Linux AppImage</h3>
+              <p>x86_64 · 未签名</p>
+              <button class="chip" type="button" data-copy="af48a3362379932cb8cd4a42e82be3f1eba2963986c2bd5677e473723f19068e">SHA-256　af48a336…3f19068e</button>
+            </div>
+            <a class="btn btn-outline" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
+          </div>
+        </div>
+        <p class="note">当前公开包未做代码签名。Windows 可用 <code>certutil -hashfile 文件名 SHA256</code> 核对上面的 SHA-256。</p>
+        <div class="history">
+          <h3>历史版本</h3>
+          <p>需要旧版本？所有历史安装包都在 GitHub Releases。</p>
+          <a href="https://github.com/tyuanww/customer-agent-prototype/releases/tag/v0.3.24">前往 GitHub Releases ↗</a>
+        </div>
+      </div>
     </section>
 
-    <footer>
-      本页由 jianghua.site 分发。安装包文件仍托管在 GitHub Release。问题请走
-      <a href="https://github.com/tyuanww/customer-agent-prototype/issues">GitHub Issues</a>。
-    </footer>
+    <section id="install">
+      <div class="wrap steps">
+        <p class="section-kicker">安装</p>
+        <h2 class="section-title">装完从开始菜单打开</h2>
+        <ol>
+          <li>下载 Windows 安装包。文件名带 <code>UNSIGNED</code>，表示未代码签名。</li>
+          <li>若 SmartScreen 弹出「Windows 已保护你的电脑」，选「更多信息」，再选「仍要运行」。</li>
+          <li>当前公开的 0.3.24 会直接装进当前用户目录，进度条走完即可。仓库已改成中文安装向导（许可、路径、快捷方式），随下一版 Windows 包发布。</li>
+          <li>从开始菜单打开「客服话术浮窗 Demo」。桌面也会有快捷方式。</li>
+          <li>下载不等于开通账号。登录仍用公司飞书。</li>
+        </ol>
+        <p class="note warn">本页不托管安装包文件，下载会跳到 GitHub Release。不要从网盘或聊天转发的来路不明副本安装。</p>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="wrap">
+        <h2>把这个地址发给同事即可</h2>
+        <p>官方下载域名是 download.jianghua.site。登录仍走飞书，不在本页完成。</p>
+        <a class="btn btn-light btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 Windows 安装包</a>
+      </div>
+    </section>
   </main>
+
+  <footer>
+    <div class="wrap">
+      <div class="foot-grid">
+        <div>
+          <div class="foot-brand"><img src="./fox-head.png" alt="" width="22" height="22">客服话术浮窗 Demo</div>
+          <p style="margin:0;color:hsl(var(--muted-foreground));font-size:14px">坐席桌面浮窗。MIT 开源。</p>
+        </div>
+        <div>
+          <h3>产品</h3>
+          <a href="#features">功能</a>
+          <a href="#download">下载</a>
+          <a href="#install">安装</a>
+        </div>
+        <div>
+          <h3>资源</h3>
+          <a href="https://github.com/tyuanww/customer-agent-prototype">源码</a>
+          <a href="https://github.com/tyuanww/customer-agent-prototype/releases">Releases</a>
+          <a href="https://github.com/tyuanww/customer-agent-prototype/blob/main/LICENSE">MIT 许可</a>
+        </div>
+        <div>
+          <h3>社区</h3>
+          <a href="https://github.com/tyuanww/customer-agent-prototype/issues">问题反馈</a>
+          <a href="https://jianghua.site">jianghua.site</a>
+        </div>
+      </div>
+      <div class="legal">
+        <span>© 2026 客服话术浮窗 Demo。基于 MIT 协议开源。由 jianghua.site 分发，安装包托管在 GitHub Release。</span>
+        <span>download.jianghua.site</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const panels = {
+      win: document.getElementById('panel-win'),
+      mac: document.getElementById('panel-mac'),
+      linux: document.getElementById('panel-linux'),
+    };
+    function show(name) {
+      tabs.forEach((tab) => {
+        const on = tab.dataset.tab === name;
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      Object.entries(panels).forEach(([key, panel]) => {
+        const on = key === name;
+        panel.classList.toggle('is-on', on);
+        panel.hidden = !on;
+      });
+    }
+    tabs.forEach((tab) => tab.addEventListener('click', () => show(tab.dataset.tab)));
+    document.querySelectorAll('[data-copy]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy);
+          const prev = btn.textContent;
+          btn.textContent = '已复制 SHA-256';
+          setTimeout(() => { btn.textContent = prev; }, 1600);
+        } catch (err) {
+          btn.textContent = btn.dataset.copy;
+        }
+      });
+    });
+  </script>
 </body>
 </html>
