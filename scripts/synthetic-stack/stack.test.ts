@@ -11,7 +11,8 @@ import {
   DESKTOP_APP_NAME,
   defaultDesktopUserDataDirectory,
   desktopPackagedProfilePath,
-  PID_DIRECTORY, apiEnvironment, loadContentStackConfig, parseContentEnvFile, parseFeishuEnvFile,
+  PID_DIRECTORY, apiEnvironment, loadApiStackConfig, loadContentStackConfig, mergeStackOverrides,
+  parseApiEnvFile, parseContentEnvFile, parseFeishuEnvFile,
   readProfile, stackPortOffset,
 } from './profile.ts';
 import {
@@ -365,6 +366,95 @@ describe('stack content env', () => {
   });
 });
 
+describe('stack production env', () => {
+  it('reads the portable secrets a production stack cannot invent', () => {
+    const config = parseApiEnvFile([
+      'CUSTOMER_AGENT_PROFILE=production',
+      'CUSTOMER_AGENT_BUILD_VERSION=0.3.25',
+      'IDEMPOTENCY_HMAC_KEYS={"hmac-idempotency-v1":"material"}',
+      'LOG_HASH_KEY=material',
+    ].join('\n'));
+    assert.equal(config.CUSTOMER_AGENT_PROFILE, 'production');
+    assert.equal(config.CUSTOMER_AGENT_BUILD_VERSION, '0.3.25');
+    assert.equal(config.LOG_HASH_KEY, 'material');
+  });
+
+  it('treats an absent file as "run with the synthetic secrets"', () => {
+    assert.equal(loadApiStackConfig(path.join(tmpdir(), 'no-such-api.env')), undefined);
+  });
+
+  it('refuses every value the stack root can derive instead of merging it', () => {
+    // Carrying another machine's api.env over is the deploy step most likely to
+    // happen, and the damage is uneven: a wrong socket directory fails loudly,
+    // but a stale object store directory keeps accepting uploads somewhere
+    // nobody looks. Each of these must be a start-time error naming the key.
+    const derived = [
+      'PATH=/usr/bin',
+      'CUSTOMER_AGENT_API_HOST=127.0.0.1',
+      'CUSTOMER_AGENT_API_PORT=43110',
+      'DATABASE_URL=postgresql://stack_runtime@localhost/db',
+      'CONTENT_ADMIN_DATABASE_URL=postgresql://stack_content_admin@localhost/db',
+      'AUTH_DATABASE_URL=postgresql://stack_backend_auth@localhost/db',
+      'CONTENT_REVIEW_DATABASE_URL=postgresql://stack_backend_review@localhost/db',
+      'CONTENT_WORKER_DATABASE_URL=postgresql://stack_backend_worker@localhost/db',
+      'SYNTHETIC_IDENTITY_PROVIDER_ORIGIN=http://127.0.0.1:43101',
+      'CONTENT_OBJECT_STORE_DIR=/Users/someone/.customer-agent-formal/objects',
+      'AUTH_MODE=feishu',
+      'FEISHU_APP_ID=cli_aaaaaaaa',
+      'FEISHU_APP_SECRET=secret-material',
+      'FEISHU_REDIRECT_URI=https://agent-auth.jianghua.site/v1/auth/callback',
+      'FEISHU_BINDINGS=ou_aaaaaa:owner',
+      'NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem',
+    ];
+    for (const line of derived) {
+      const key = line.slice(0, line.indexOf('='));
+      assert.throws(
+        () => parseApiEnvFile(line),
+        new RegExp(`api\\.env: ${key} is derived from the stack root`, 'u'),
+        `${key} must be refused`,
+      );
+    }
+  });
+
+  it('fails closed on an empty value and a malformed profile name', () => {
+    assert.throws(() => parseApiEnvFile('LOG_HASH_KEY='), /api\.env: LOG_HASH_KEY must not be empty/u);
+    assert.throws(
+      () => parseApiEnvFile('CUSTOMER_AGENT_PROFILE=Production'),
+      /api\.env: CUSTOMER_AGENT_PROFILE must be a lower-case profile name/u,
+    );
+    assert.throws(
+      () => parseApiEnvFile('LOG_HASH_KEY=a\nLOG_HASH_KEY=b'),
+      /api\.env: duplicate LOG_HASH_KEY/u,
+    );
+  });
+
+  it('lets a portable key replace the synthetic constant', () => {
+    // The synthetic defaults are non-secret local material. A production stack
+    // that silently kept them would write idempotency and log-hash rows under
+    // keys the migrated data was not hashed with.
+    const profile = {
+      version: 1 as const, createdAt: '2026-09-29T00:00:00.000Z', stackRoot: DEFAULT_STACK_ROOT,
+      apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
+      apiPort: 43100, identityPort: 43101, databaseName: 'customer_agent_formal', pgPort: 43199,
+      pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
+    };
+    const environment = apiEnvironment(profile, parseApiEnvFile('LOG_HASH_KEY=real-material'));
+    assert.equal(environment.LOG_HASH_KEY, 'real-material');
+    // The DSN still comes from the profile, never from the file.
+    assert.match(String(environment.DATABASE_URL), /host=%2Ftmp%2Fsocket&port=43199/u);
+  });
+
+  it('refuses a key set in both api.env and content.env', () => {
+    // Merge order alone would decide it, and the losing value would look applied.
+    assert.throws(
+      () => mergeStackOverrides({ CONTENT_INTENT_ID: 'a' }, { CONTENT_INTENT_ID: 'b' }),
+      /api\.env and content\.env both set CONTENT_INTENT_ID/u,
+    );
+    const merged = mergeStackOverrides({ CONTENT_INTENT_ID: 'a' }, { LOG_HASH_KEY: 'b' });
+    assert.deepEqual(merged, { CONTENT_INTENT_ID: 'a', LOG_HASH_KEY: 'b' });
+  });
+});
+
 describe('stack database wiring', () => {
   it('never falls back to the module constant for the database name', () => {
     // connect() used to default to DATABASE_NAME, so a stack whose content.env
@@ -385,6 +475,21 @@ describe('stack database wiring', () => {
     assert.ok(
       stack.includes('ensureLoginRoles(cluster, profile.databaseName)'),
       'the role bootstrap must use the resolved name too',
+    );
+  });
+});
+
+describe('stack production wiring', () => {
+  it('applies api.env, because stack.ts is the production entry point', () => {
+    // R2 made stack.ts the production entry and retired formal-dev-up.mjs, which
+    // was the only reader of api.env. Without this the stack can only ever come
+    // up on AUTH_MODE=mock with the synthetic HMAC material - which looks like a
+    // working stack and hashes production rows under keys nothing else shares.
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.ok(stack.includes('loadApiStackConfig()'), 'start must read api.env');
+    assert.ok(
+      stack.includes('mergeStackOverrides(contentOverrides(feishu), apiConfig ?? {})'),
+      'both override files must be merged through the clash check',
     );
   });
 });

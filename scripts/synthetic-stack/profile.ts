@@ -40,6 +40,7 @@ export function stackPortOffset(stackRoot: string): number {
 export const PROFILE_FILE = path.join(STACK_ROOT, 'profile.json');
 export const FEISHU_ENV_FILE = path.join(STACK_ROOT, 'feishu.env');
 export const CONTENT_ENV_FILE = path.join(STACK_ROOT, 'content.env');
+export const API_ENV_FILE = path.join(STACK_ROOT, 'api.env');
 
 export type FeishuBindingRole = 'agent' | 'coach' | 'owner';
 export type FeishuStackBinding = Readonly<{ openId: string; role: FeishuBindingRole }>;
@@ -160,6 +161,85 @@ export function parseContentEnvFile(contents: string): ContentStackConfig {
 export function loadContentStackConfig(file = CONTENT_ENV_FILE): ContentStackConfig | undefined {
   if (!existsSync(file)) return undefined;
   return parseContentEnvFile(readFileSync(file, 'utf8'));
+}
+
+/**
+ * Portable production values: secrets and identity, never locations.
+ *
+ * `stack.ts` is the production entry point (`formal-dev-up.mjs`, which used to
+ * read `api.env` verbatim, is not), and without this file it can only ever run
+ * with the synthetic secrets and `AUTH_MODE=mock`. So a real deployment has to
+ * hand it the few values the profile cannot invent.
+ *
+ * Everything the profile *can* derive is refused instead of accepted, because a
+ * file copied from another machine carries that machine's paths and the failures
+ * are uneven: a wrong socket directory fails loudly at connect, but a stale
+ * object store directory, or a DSN whose socket directory happens to exist on
+ * both hosts, keeps working and writes where nobody looks. Refusing the derived
+ * keys turns that whole class into a start-time error that names the key.
+ */
+export type ApiStackConfig = Readonly<Record<string, string>>;
+
+const API_ENV_DERIVED_KEYS: readonly string[] = Object.freeze([
+  // Resolved from the stack root by `resolveProfile` / `apiEnvironment`.
+  'PATH',
+  'CUSTOMER_AGENT_API_HOST',
+  'CUSTOMER_AGENT_API_PORT',
+  'DATABASE_URL',
+  'CONTENT_ADMIN_DATABASE_URL',
+  'AUTH_DATABASE_URL',
+  'CONTENT_REVIEW_DATABASE_URL',
+  'CONTENT_WORKER_DATABASE_URL',
+  'SYNTHETIC_IDENTITY_PROVIDER_ORIGIN',
+  'CONTENT_OBJECT_STORE_DIR',
+  // Feishu already has a validated channel in feishu.env, and AUTH_MODE is
+  // derived from whether that file is present. A second source could disagree.
+  'AUTH_MODE',
+  'FEISHU_APP_ID',
+  'FEISHU_APP_SECRET',
+  'FEISHU_REDIRECT_URI',
+  'FEISHU_BINDINGS',
+  // macOS-specific trust store; another host must use its own.
+  'NODE_EXTRA_CA_CERTS',
+]);
+
+const PROFILE_NAME_PATTERN = /^[a-z][a-z0-9-]{1,31}$/u;
+
+export function parseApiEnvFile(contents: string): ApiStackConfig {
+  const values = parseEnvFile(contents, 'api.env');
+  const derived = [...values.keys()].filter((key) => API_ENV_DERIVED_KEYS.includes(key)).sort();
+  if (derived.length > 0) {
+    throw new Error(
+      `api.env: ${derived.join(', ')} is derived from the stack root; remove it so this stack resolves its own`,
+    );
+  }
+  for (const [key, value] of values) {
+    if (value.length === 0) throw new Error(`api.env: ${key} must not be empty`);
+  }
+  const profileName = values.get('CUSTOMER_AGENT_PROFILE');
+  if (profileName !== undefined && !PROFILE_NAME_PATTERN.test(profileName)) {
+    throw new Error('api.env: CUSTOMER_AGENT_PROFILE must be a lower-case profile name');
+  }
+  return Object.freeze(Object.fromEntries(values));
+}
+
+export function loadApiStackConfig(file = API_ENV_FILE): ApiStackConfig | undefined {
+  if (!existsSync(file)) return undefined;
+  return parseApiEnvFile(readFileSync(file, 'utf8'));
+}
+
+/**
+ * Both files are merged into one override map, so a key set in both would be
+ * decided by merge order alone and the losing value would look applied. Make the
+ * overlap an error instead, the same way a duplicate line inside one file is.
+ */
+export function mergeStackOverrides(
+  content: Readonly<Record<string, string>>,
+  api: Readonly<Record<string, string>>,
+): Readonly<Record<string, string>> {
+  const both = Object.keys(api).filter((key) => key in content).sort();
+  if (both.length > 0) throw new Error(`api.env and content.env both set ${both.join(', ')}`);
+  return { ...content, ...api };
 }
 export const PID_DIRECTORY = path.join(STACK_ROOT, 'pids');
 export const LOG_DIRECTORY = path.join(STACK_ROOT, 'logs');

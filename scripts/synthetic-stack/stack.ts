@@ -24,6 +24,12 @@
  *     the desktop client reads the resolved origins from profile.json.
  *   - Re-running `start` on a running stack reports what is already up and only
  *     starts what is missing.
+ *
+ * Stack-root env files, all optional, each with one job:
+ *   feishu.env   Feishu OAuth client and role bindings (flips AUTH_MODE to feishu)
+ *   content.env  the content constants a real catalog needs; DATABASE_NAME too
+ *   api.env      portable production secrets (profile name, HMAC material).
+ *                Derived values - DSNs, paths, ports - are refused, not merged.
  */
 import { spawn } from 'node:child_process';
 import { closeSync, existsSync, openSync } from 'node:fs';
@@ -35,8 +41,8 @@ import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   PREFERRED_PORTS, PROFILE_FILE, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
-  loadContentStackConfig, loadFeishuStackConfig, readProfile, stackPortOffset,
-  writeDesktopPackagedProfile, writeProfile,
+  loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig, mergeStackOverrides,
+  readProfile, stackPortOffset, writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
 import type { FeishuStackConfig } from './profile.ts';
 import {
@@ -178,6 +184,10 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
 
   try {
     const feishu = loadFeishuStackConfig();
+    // Both override files are read before anything is spawned, so a rejected
+    // api.env fails the start outright instead of leaving identity behind.
+    const apiConfig = loadApiStackConfig();
+    const overrides = mergeStackOverrides(contentOverrides(feishu), apiConfig ?? {});
     const identityEntry = feishu ? PASSWORD_IDENTITY_ENTRY : IDENTITY_ENTRY;
     if (!live.has('identity')) {
       const pid = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
@@ -189,8 +199,11 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
     }
     await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
     if (feishu) started.push(`feishu: ${feishu.clientId} → ${feishu.redirectUri}`);
+    // Key names only: an operator checking "did production config land" needs the
+    // list, and none of these keys' names are secret.
+    if (apiConfig) started.push(`api.env: ${Object.keys(apiConfig).sort().join(', ')}`);
 
-    const environment = apiEnvironment(profile, contentOverrides(feishu), feishu);
+    const environment = apiEnvironment(profile, overrides, feishu);
 
     if (!live.has('api')) {
       const pid = spawnLogged('api', process.execPath, [API_ENTRY], environment);
