@@ -29,7 +29,23 @@ const packageJson = JSON.parse(
       certificateSha1?: string;
     };
     nsis: {
+      oneClick: boolean;
+      perMachine: boolean;
+      allowToChangeInstallationDirectory: boolean;
+      allowElevation: boolean;
+      unicode: boolean;
       differentialPackage: boolean;
+      installerLanguages: string[];
+      language: string;
+      createDesktopShortcut: boolean;
+      createStartMenuShortcut: boolean;
+      shortcutName: string;
+      runAfterFinish: boolean;
+      deleteAppDataOnUninstall: boolean;
+      displayLanguageSelector: boolean;
+      license?: string;
+      include?: string;
+      script?: string;
     };
   };
 };
@@ -139,6 +155,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageJson.build.win.certificateFile).toBeUndefined();
     expect(packageJson.build.win.certificateSha1).toBeUndefined();
     expect(packageJson.build.win.artifactName).toContain('-UNSIGNED.');
+    expect(packageJson.build.nsis.oneClick).toBe(false);
     expect(packageJson.build.nsis.differentialPackage).toBe(false);
 
     expect(packageWindows).toContain('scripts/generate-app-icons.mjs');
@@ -185,6 +202,33 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(verifyWindowsPackage).toContain('Chromium-LICENSES.html');
     expect(verifyWindowsPackage).toContain('assertPackagedOfflineProfile');
     expect(verifyWindowsPackage).toContain('does not inspect the PE executable icon resource');
+  });
+
+  it('ships an assisted Chinese NSIS wizard instead of oneClick', () => {
+    expect(packageJson.build.nsis.oneClick).toBe(false);
+    expect(packageJson.build.nsis.perMachine).toBe(false);
+    expect(packageJson.build.nsis.allowToChangeInstallationDirectory).toBe(true);
+    expect(packageJson.build.nsis.allowElevation).toBe(true);
+    expect(packageJson.build.nsis.unicode).toBe(true);
+    expect(packageJson.build.nsis.installerLanguages).toEqual(['zh_CN', 'en_US']);
+    expect(packageJson.build.nsis.language).toBe('2052');
+    expect(packageJson.build.nsis.displayLanguageSelector).toBe(false);
+    expect(packageJson.build.nsis.createDesktopShortcut).toBe(true);
+    expect(packageJson.build.nsis.createStartMenuShortcut).toBe(true);
+    expect(packageJson.build.nsis.shortcutName).toBe('客服话术浮窗 Demo');
+    expect(packageJson.build.nsis.runAfterFinish).toBe(true);
+    expect(packageJson.build.nsis.deleteAppDataOnUninstall).toBe(false);
+    expect(packageJson.build.nsis.license).toBeUndefined();
+    expect(packageJson.build.nsis.include).toBeUndefined();
+    expect(packageJson.build.nsis.script).toBeUndefined();
+    const zh = readFileSync(path.join(root, 'build/license_zh_CN.txt'), 'utf8');
+    const en = readFileSync(path.join(root, 'build/license_en.txt'), 'utf8');
+    expect(zh).toContain('客服话术浮窗 Demo');
+    expect(zh).toContain('MIT License');
+    expect(zh).toContain('Copyright (c) 2026 tyuanww');
+    expect(en).toContain('MIT License');
+    expect(en).toContain('Copyright (c) 2026 tyuanww');
+    expect(en).toContain('Permission is hereby granted');
   });
 
   it('yields the previous Windows app without stealing focus', () => {
