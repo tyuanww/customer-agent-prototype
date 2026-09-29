@@ -33,6 +33,22 @@ node scripts/update-download-page.mjs --dir /tmp/jianghua-download-pages --check
 
 `--from-release` 用你的 `gh` 登录去读 Release；离线时也可用 `--manifest <file|->` 喂 `manifestFromRelease` 那个形状的 JSON。跑完 `git -C /tmp/jianghua-download-pages diff` 看改了什么。
 
+真要把一个**更旧**的 Release 发到页面上（回滚），加 `--allow-downgrade`——默认是拒绝的，理由见 Troubleshooting 第一行。
+
+## 脚本拒绝发布的情形
+
+脚本要么把页面完整改对，要么报错退出，不存在「改了一半」。下面这些都会让它停下来：
+
+| 情形 | 报错 |
+| --- | --- |
+| 页面上的下载链接指向**别的仓库** | `page links a release on <owner>/<repo>, but this script publishes ...` |
+| 页面不再链接某个平台（少一个下载按钮） | `page no longer links the mac asset` |
+| 一个页面里出现了**两个不同版本号** | `page carries more than one version: ...` |
+| 某个链接的文件名无法归类到平台 | `page links an asset this script cannot map: ...` |
+| 要发布的版本**比页面现有的更旧** | `<file> advertises vX.Y.Z; refusing to publish the older v...` |
+
+最后一条是最容易踩的：`workflow_dispatch` 补发一个**已经发过的老** Release，默认会被拒绝。这不是故障，是防止官网被无声地退回旧版本。
+
 ## Verification
 
 - 打开 `https://download.jianghua.site/`，hero 与「下载」段的 `vX.Y.Z` 是这次版本，「下载 · <大小>」与该 Release 资产一致。
@@ -78,6 +94,7 @@ FROM ops_loop.software_release_catalog WHERE is_current;
 
 | 你看到 | 怎么处理 |
 | --- | --- |
+| workflow 报 `refusing to publish the older vX.Y.Z` | 你要发的版本比页面现有的旧。确认确实要回滚才加 `--allow-downgrade`（本机跑）；CI 里没有这个开关，页面只会向前走。 |
 | Actions 里没跑 | Release 是 `draft` 或 `prerelease`；这两种不会触发 `published`。发布正式 Release，或用 `workflow_dispatch` 补。 |
 | workflow 红在「Rewrite the page」 | 该 Release 缺一个平台资产，或资产没有 sha256 digest。补资产后重跑。 |
 | 页面没变 | 页面已经是该版本（workflow 会跳过推送）；或 Cloudflare 还在缓存，等一会儿。 |
