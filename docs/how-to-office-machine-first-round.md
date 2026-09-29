@@ -10,15 +10,15 @@
 
 安装包**禁止外发**、未签名，文件名带 `UNSIGNED`。不要写成已签名或可给客户。
 
-本页安装步骤对应本仓 NSIS **assisted installer**（中文向导：许可、安装目录、快捷方式，默认当前用户）。GitHub Release 上仍在分发的 **0.3.24 公开包是 oneClick**，没有向导；向导从本仓下一次 `pnpm package:win` 起生效。
+本页安装步骤对应本仓 NSIS **assisted installer**（中文向导：许可、安装目录、快捷方式，默认当前用户）。本版 0.3.25 UNSIGNED 带向导。GitHub Release 上仍在分发的 **0.3.24 公开包是 oneClick**。
 
 ## 准备
 
 1. 从已跑过 `pnpm package:win` 的机器拷贝：
 
-   `release/local-unsigned/windows/客服话术浮窗 Demo-0.3.24-win-x64-UNSIGNED.exe`
+   `release/local-unsigned/windows/客服话术浮窗 Demo-0.3.25-win-x64-UNSIGNED.exe`
 
-   不要从 Git 拉安装包（产物不入库）。2026-09-29 起用 0.3.24。`release/` 是本地构建缓存，可删后重打。
+   不要从 Git 拉安装包（产物不入库）。2026-09-29 起用 0.3.25。`release/` 是本地构建缓存，可删后重打。
 2. 办公机**断开网络**。
 3. 不安装 Node / pnpm / Git。Electron 自带运行时即可。
 4. 记下日期、机器名、操作人。
