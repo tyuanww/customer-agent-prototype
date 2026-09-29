@@ -14,7 +14,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileS
 import path from 'node:path';
 import { Client } from 'pg';
 import {
-  DATABASE_NAME, DATABASE_ROLES, PG_DATA_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
+  DATABASE_ROLES, PG_DATA_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   STACK_ROOT, ensureStackDirectories, pgEnvironment,
 } from './profile.ts';
 
@@ -155,7 +155,14 @@ export class SyntheticCluster {
     return 'postgres: cluster removed';
   }
 
-  connect(database = DATABASE_NAME, user = TEMPORARY_OWNER): Client {
+  /**
+   * The connection to a database inside this cluster. The database name has no
+   * default on purpose: defaulting to the module constant let a deployment that
+   * set DATABASE_NAME in content.env create one database and then connect to
+   * another, which surfaces only later as "database does not exist". Nothing in
+   * scripts/ is typechecked, so a missing argument would not be caught either.
+   */
+  connect(database: string, user = TEMPORARY_OWNER): Client {
     return new Client({
       host: this.socket, port: PG_PORT, user, database,
     });
@@ -163,16 +170,19 @@ export class SyntheticCluster {
 }
 
 /**
- * Create the synthetic database when missing. Called before migrations, which
- * create the NOLOGIN capability roles.
+ * Create the stack database when missing. Called before migrations, which
+ * create the NOLOGIN capability roles. The name comes from the resolved profile
+ * so a deployment can keep its own database name: the API's five DSNs are built
+ * from the same value, and creating one name while connecting to another would
+ * surface only later, as "database does not exist".
  */
-export async function ensureDatabase(cluster: SyntheticCluster): Promise<string> {
+export async function ensureDatabase(cluster: SyntheticCluster, database: string): Promise<string> {
   const admin = cluster.connect('postgres');
   await admin.connect();
   try {
-    const database = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [DATABASE_NAME]);
-    if (database.rowCount === 0) await admin.query(`CREATE DATABASE ${DATABASE_NAME}`);
-    return `database: ${DATABASE_NAME} present`;
+    const existing = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [database]);
+    if (existing.rowCount === 0) await admin.query(`CREATE DATABASE ${database}`);
+    return `database: ${database} present`;
   } finally {
     await admin.end();
   }
@@ -184,8 +194,8 @@ export async function ensureDatabase(cluster: SyntheticCluster): Promise<string>
  * exist. Roles are plain LOGIN members; the stack never grants table privileges
  * directly and never reuses one login for two capabilities.
  */
-export async function ensureLoginRoles(cluster: SyntheticCluster): Promise<string> {
-  const admin = cluster.connect();
+export async function ensureLoginRoles(cluster: SyntheticCluster, database: string): Promise<string> {
+  const admin = cluster.connect(database);
   await admin.connect();
   try {
     const roleSpecs: readonly (readonly [string, string])[] = [

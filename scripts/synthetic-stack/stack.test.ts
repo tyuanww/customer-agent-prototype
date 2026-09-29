@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
+  DEFAULT_STACK_ROOT,
   DESKTOP_APP_NAME,
   defaultDesktopUserDataDirectory,
   desktopPackagedProfilePath,
-  PID_DIRECTORY, apiEnvironment, parseFeishuEnvFile, readProfile,
+  PID_DIRECTORY, PREFERRED_PORTS, STACK_ROOT, apiEnvironment, loadApiStackConfig, loadContentStackConfig,
+  mergeStackOverrides, parseApiEnvFile, parseContentEnvFile, parseFeishuEnvFile,
+  readProfile, shouldSeedSyntheticCatalog, stackPortOffset,
 } from './profile.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
@@ -302,5 +306,295 @@ describe('synthetic identity password', () => {
     } finally {
       await provider.close();
     }
+  });
+});
+
+describe('stack content env', () => {
+  it('reads a real deployment database name and content constants', () => {
+    const config = parseContentEnvFile([
+      'DATABASE_NAME=customer_agent_formal',
+      'CONTENT_INTENT_TAXONOMY_VERSION=itax_prod_v1',
+      'CONTENT_INTENT_ID=intent_prod_shipping',
+      'CONTENT_REVIEW_EVIDENCE_ID=EVD-PROD-001',
+    ].join('\n'));
+    assert.equal(config.databaseName, 'customer_agent_formal');
+    assert.equal(config.intentTaxonomyVersion, 'itax_prod_v1');
+    assert.equal(config.intentId, 'intent_prod_shipping');
+    assert.equal(config.reviewEvidenceId, 'EVD-PROD-001');
+  });
+
+  it('treats an absent file as "use the synthetic defaults"', () => {
+    assert.equal(loadContentStackConfig(path.join(tmpdir(), 'no-such-stack-content.env')), undefined);
+  });
+
+  it('fails closed on a present but invalid file rather than falling back', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'stack-content-env-'));
+    const file = path.join(directory, 'content.env');
+    writeFileSync(file, 'DATABASE_NAME=customer_agent_formal\nCONTENT_INTENT_TAXONOMY_VERSION=\n');
+    // A quiet fallback would leave the stack filing reviews under `synthetic_coach`.
+    assert.throws(
+      () => loadContentStackConfig(file),
+      /content\.env: CONTENT_INTENT_TAXONOMY_VERSION must not be empty/u,
+    );
+  });
+
+  it('rejects a misspelled key instead of ignoring it', () => {
+    assert.throws(
+      () => parseContentEnvFile('DATABASE_NAM=customer_agent_formal'),
+      /content\.env: unknown key DATABASE_NAM/u,
+    );
+  });
+
+  it('rejects duplicate keys and a non-identifier database name', () => {
+    assert.throws(
+      () => parseContentEnvFile('CONTENT_INTENT_ID=a\nCONTENT_INTENT_ID=b'),
+      /content\.env: duplicate CONTENT_INTENT_ID/u,
+    );
+    assert.throws(
+      () => parseContentEnvFile('DATABASE_NAME=Customer-Agent'),
+      /content\.env: DATABASE_NAME must be a lower-case SQL identifier/u,
+    );
+  });
+
+  it('keeps two stacks off each other\'s ports, not merely on different offsets', () => {
+    // The same offset is added to every preferred port and those ports are one
+    // apart, so an offset that is not a multiple of the span interleaves two
+    // stacks. Offsets 75 and 76 - which `/tmp/stack-0` and `/tmp/stack-1` used to
+    // produce - put one stack's `identity` port and the next stack's `api` port
+    // on 43176. The old test only asserted that the offset was stable and in
+    // range, which is exactly what made it pass while the collision was real.
+    assert.equal(stackPortOffset(DEFAULT_STACK_ROOT), 0, 'the default root keeps the ports it has always used');
+    // A root has to resolve to the same ports before profile.json exists and
+    // after it is deleted, so the offset cannot be random.
+    assert.equal(stackPortOffset('/tmp/second-stack'), stackPortOffset('/tmp/second-stack'));
+
+    const span = Math.max(...Object.values(PREFERRED_PORTS)) - Math.min(...Object.values(PREFERRED_PORTS)) + 1;
+    const offsets = new Set<number>();
+    for (let i = 0; i < 400; i++) offsets.add(stackPortOffset(`/tmp/stack-${String(i)}`));
+    assert.ok(offsets.size > 10, `expected several distinct offsets, got ${String(offsets.size)}`);
+    for (const offset of offsets) {
+      assert.equal(offset % span, 0, `offset ${String(offset)} must be a multiple of the ${String(span)}-port span`);
+    }
+    const claimed = new Map<number, number>();
+    for (const offset of offsets) {
+      for (const port of Object.values(PREFERRED_PORTS)) {
+        const previous = claimed.get(port + offset);
+        assert.equal(
+          previous,
+          undefined,
+          `port ${String(port + offset)} is claimed by both offset ${String(previous)} and offset ${String(offset)}`,
+        );
+        claimed.set(port + offset, offset);
+      }
+    }
+  });
+});
+
+describe('stack production env', () => {
+  it('reads the portable secrets a production stack cannot invent', () => {
+    const config = parseApiEnvFile([
+      'CUSTOMER_AGENT_PROFILE=production',
+      'CUSTOMER_AGENT_BUILD_VERSION=0.3.25',
+      'IDEMPOTENCY_HMAC_KEYS={"hmac-idempotency-v1":"material"}',
+      'LOG_HASH_KEY=material',
+    ].join('\n'));
+    assert.equal(config.CUSTOMER_AGENT_PROFILE, 'production');
+    assert.equal(config.CUSTOMER_AGENT_BUILD_VERSION, '0.3.25');
+    assert.equal(config.LOG_HASH_KEY, 'material');
+  });
+
+  it('treats an absent file as "run with the synthetic secrets"', () => {
+    assert.equal(loadApiStackConfig(path.join(tmpdir(), 'no-such-api.env')), undefined);
+  });
+
+  it('refuses every value the stack root can derive instead of merging it', () => {
+    // Carrying another machine's api.env over is the deploy step most likely to
+    // happen, and the damage is uneven: a wrong socket directory fails loudly,
+    // but a stale object store directory keeps accepting uploads somewhere
+    // nobody looks. Each of these must be a start-time error naming the key.
+    const derived = [
+      'PATH=/usr/bin',
+      'CUSTOMER_AGENT_API_HOST=127.0.0.1',
+      'CUSTOMER_AGENT_API_PORT=43110',
+      'DATABASE_URL=postgresql://stack_runtime@localhost/db',
+      'CONTENT_ADMIN_DATABASE_URL=postgresql://stack_content_admin@localhost/db',
+      'AUTH_DATABASE_URL=postgresql://stack_backend_auth@localhost/db',
+      'CONTENT_REVIEW_DATABASE_URL=postgresql://stack_backend_review@localhost/db',
+      'CONTENT_WORKER_DATABASE_URL=postgresql://stack_backend_worker@localhost/db',
+      'SYNTHETIC_IDENTITY_PROVIDER_ORIGIN=http://127.0.0.1:43101',
+      'CONTENT_OBJECT_STORE_DIR=/Users/someone/.customer-agent-formal/objects',
+      'AUTH_MODE=feishu',
+      'FEISHU_APP_ID=cli_aaaaaaaa',
+      'FEISHU_APP_SECRET=secret-material',
+      'FEISHU_REDIRECT_URI=https://agent-auth.jianghua.site/v1/auth/callback',
+      'FEISHU_BINDINGS=ou_aaaaaa:owner',
+      'NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem',
+    ];
+    for (const line of derived) {
+      const key = line.slice(0, line.indexOf('='));
+      assert.throws(
+        () => parseApiEnvFile(line),
+        new RegExp(`api\\.env: ${key} is derived from the stack root`, 'u'),
+        `${key} must be refused`,
+      );
+    }
+  });
+
+  it('fails closed on an empty value and a malformed profile name', () => {
+    assert.throws(() => parseApiEnvFile('LOG_HASH_KEY='), /api\.env: LOG_HASH_KEY must not be empty/u);
+    assert.throws(
+      () => parseApiEnvFile('CUSTOMER_AGENT_PROFILE=Production'),
+      /api\.env: CUSTOMER_AGENT_PROFILE must be a lower-case profile name/u,
+    );
+    assert.throws(
+      () => parseApiEnvFile('LOG_HASH_KEY=a\nLOG_HASH_KEY=b'),
+      /api\.env: duplicate LOG_HASH_KEY/u,
+    );
+  });
+
+  it('lets a portable key replace the synthetic constant', () => {
+    // The synthetic defaults are non-secret local material. A production stack
+    // that silently kept them would write idempotency and log-hash rows under
+    // keys the migrated data was not hashed with.
+    const profile = {
+      version: 1 as const, createdAt: '2026-09-29T00:00:00.000Z', stackRoot: DEFAULT_STACK_ROOT,
+      apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
+      apiPort: 43100, identityPort: 43101, databaseName: 'customer_agent_formal', pgPort: 43199,
+      pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
+    };
+    const environment = apiEnvironment(profile, parseApiEnvFile('LOG_HASH_KEY=real-material'));
+    assert.equal(environment.LOG_HASH_KEY, 'real-material');
+    // The DSN still comes from the profile, never from the file.
+    assert.match(String(environment.DATABASE_URL), /host=%2Ftmp%2Fsocket&port=43199/u);
+  });
+
+  it('refuses a key set in both api.env and content.env', () => {
+    // Merge order alone would decide it, and the losing value would look applied.
+    assert.throws(
+      () => mergeStackOverrides({ CONTENT_INTENT_ID: 'a' }, { CONTENT_INTENT_ID: 'b' }),
+      /api\.env and content\.env both set CONTENT_INTENT_ID/u,
+    );
+    const merged = mergeStackOverrides({ CONTENT_INTENT_ID: 'a' }, { LOG_HASH_KEY: 'b' });
+    assert.deepEqual(merged, { CONTENT_INTENT_ID: 'a', LOG_HASH_KEY: 'b' });
+  });
+});
+
+describe('stack profile reuse', () => {
+  const freshFile = (): string => path.join(mkdtempSync(path.join(tmpdir(), 'stack-profile-')), 'profile.json');
+  const wellFormed = {
+    version: 1 as const,
+    createdAt: '2026-09-30T00:00:00.000Z',
+    stackRoot: STACK_ROOT,
+    apiOrigin: 'http://127.0.0.1:43100',
+    identityOrigin: 'http://127.0.0.1:43101',
+    apiPort: 43100,
+    identityPort: 43101,
+    databaseName: 'customer_agent_formal',
+    pgPort: 43199,
+    pgSocketDirectory: '/tmp/socket',
+    objectStoreDirectory: '/tmp/objects',
+    clientId: 'desk_x',
+  };
+
+  it('adopts a profile it can use', () => {
+    const file = freshFile();
+    writeFileSync(file, JSON.stringify(wellFormed));
+    assert.equal(readProfile(file)?.databaseName, 'customer_agent_formal');
+  });
+
+  it('refuses a profile whose database name would reach CREATE DATABASE', () => {
+    // Only the first `start` builds a profile; every one after it reuses this
+    // file. The name is interpolated into `CREATE DATABASE` and concatenated
+    // into five DSNs, and the same name IS validated when it comes from
+    // content.env - so leaving this path unchecked put the guard on the
+    // one-time entrance instead of the one that runs every day.
+    for (const databaseName of [undefined, '', 'Customer-Agent', 'x; DROP DATABASE y', 42]) {
+      const profile: Record<string, unknown> = { ...wellFormed };
+      if (databaseName === undefined) delete profile.databaseName;
+      else profile.databaseName = databaseName;
+      const file = freshFile();
+      writeFileSync(file, JSON.stringify(profile));
+      assert.equal(readProfile(file), undefined, `must refuse databaseName ${JSON.stringify(databaseName)}`);
+    }
+  });
+});
+
+describe('stack seed policy', () => {
+  it('never seeds a stack that declares its own database', () => {
+    // `--no-seed` describes the stack, not the invocation. The systemd unit
+    // passes it, but a person repairing the stack types `restart` - and the
+    // import publishes the demo catalog as the live one when the database has
+    // nothing published yet.
+    assert.equal(shouldSeedSyntheticCatalog([], undefined), true, 'a plain synthetic stack still seeds');
+    assert.equal(shouldSeedSyntheticCatalog(['start', '--no-seed'], undefined), false);
+    assert.equal(shouldSeedSyntheticCatalog(['start'], 'customer_agent_formal'), false);
+    assert.equal(shouldSeedSyntheticCatalog(['restart'], 'customer_agent_formal'), false);
+  });
+});
+
+describe('stack database wiring', () => {
+  it('never falls back to the module constant for the database name', () => {
+    // connect() used to default to DATABASE_NAME, so a stack whose content.env
+    // set DATABASE_NAME created one database and then connected to another.
+    // Rehearsing on the Mac could not see it: there the two names are equal, and
+    // only a real override exposes it. Nothing in scripts/ is typechecked, so a
+    // missing argument would not have been caught either.
+    const postgres = readFileSync(new URL('./postgres.ts', import.meta.url), 'utf8');
+    assert.equal(/connect\(database = DATABASE_NAME/u.test(postgres), false, 'connect must not default to the constant');
+    assert.equal(
+      /export async function ensureDatabase\(cluster: SyntheticCluster, database = /u.test(postgres),
+      false,
+      'ensureDatabase must not default to the constant',
+    );
+
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.equal(/cluster\.connect\(\)/u.test(stack), false, 'every connection must name its database');
+    assert.ok(
+      stack.includes('ensureLoginRoles(cluster, profile.databaseName)'),
+      'the role bootstrap must use the resolved name too',
+    );
+  });
+});
+
+describe('stack production wiring', () => {
+  it('applies api.env, because stack.ts is the production entry point', () => {
+    // R2 made stack.ts the production entry and retired formal-dev-up.mjs, which
+    // was the only reader of api.env. Without this the stack can only ever come
+    // up on AUTH_MODE=mock with the synthetic HMAC material - which looks like a
+    // working stack and hashes production rows under keys nothing else shares.
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.ok(stack.includes('loadApiStackConfig()'), 'start must read api.env');
+    assert.ok(
+      stack.includes('mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {})'),
+      'both override files must be merged through the clash check',
+    );
+    // content.env is read once and threaded through: two reads could disagree if
+    // the file changed between them, leaving the profile naming one catalog and
+    // the overrides coming from another.
+    assert.equal(
+      (stack.match(/loadContentStackConfig\(\)/gu) ?? []).length,
+      1,
+      'content.env must be read exactly once per run',
+    );
+    assert.ok(
+      stack.includes('shouldSeedSyntheticCatalog(process.argv, content?.databaseName)'),
+      'the seed decision must come from the stack, not only from the flag',
+    );
+  });
+});
+
+describe('stack start modes', () => {
+  it('can start without importing the synthetic catalog', () => {
+    // Serving a real catalog must not import the demo CSV: on a freshly prepared
+    // database the "already published" probe finds nothing, so the seed would
+    // publish synthetic scripts as the live catalog. stack.ts runs main() at
+    // import time, so this asserts on its source rather than calling it.
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.ok(stack.includes('--no-seed'), 'start must accept --no-seed');
+    assert.ok(stack.includes('seed: skipped'), 'the skip must be visible in the start log');
+    assert.ok(
+      stack.includes('search self-check skipped'),
+      'the search self-check asserts the seeded catalog, so it has to be skipped too',
+    );
   });
 });
