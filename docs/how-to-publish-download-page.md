@@ -42,19 +42,37 @@ node scripts/update-download-page.mjs --dir /tmp/jianghua-download-pages --check
 
 ## 工作台「打开下载页」是另一条链路
 
-工作台按钮读生产 PG 表 `ops_loop.software_release_catalog` 里 `is_current=true` 的那一行。仓库里只有 migration schema 和两个只读函数（`list_software_releases` / `current_software_release`），**没有 seed、没有写 API**。切换建议版本要直写那张表：
+工作台按钮读 PG 表 `ops_loop.software_release_catalog` 里 `is_current=true` 的那一行。仓库里只有 migration schema 和两个只读函数（`list_software_releases` / `current_software_release`），**没有 seed、没有写 API**，这一行是带外直写的。
+
+**只能在跑 API 的那台机器上做。** `DATABASE_URL` 只接受 loopback URL（见 [reference-api-runtime-config](reference-api-runtime-config.md)），这张表的 PG 就在那台机器本机，开发机连不过去。
+
+两条语句必须**原子**。先清后插，如果 INSERT 失败而 UPDATE 已经生效，目录里会一行 `is_current` 都没有，工作台按钮直接空掉——比指向旧版本更糟。所以包在事务里：
 
 ```sql
+BEGIN;
+
 UPDATE ops_loop.software_release_catalog SET is_current = FALSE WHERE is_current;
+
 INSERT INTO ops_loop.software_release_catalog
   (catalog_id, version, platform, sha256, download_url, signed, is_current)
 VALUES ('sw_0325_win', '0.3.25', 'win-x64',
-        '<Release 里的 sha256>',
+        '84795e68bc316e45999287c5532b883c232a80aa9619b68c475fc202a479aac1',
         'https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-win-x64-UNSIGNED.exe',
         FALSE, TRUE);
+
+COMMIT;
 ```
 
-唯一索引保证同一时刻只有一行 `is_current`。这是正式数据写入，需要单独授权。
+`sha256` 和 `download_url` 从 Release 资产原样复制，别手打（`gh release view v0.3.25 --json assets`）。表上有 CHECK 兜底：`platform` 只接受 `mac-universal` / `win-x64` / `linux-x64`，`sha256` 必须是 64 位小写 hex，`download_url` 必须以 `https://` 开头——写错会在 INSERT 时报错，这正是要包事务的原因。
+
+事后核一下，应该只剩一行、且指向刚发布的版本：
+
+```sql
+SELECT catalog_id, version, platform, is_current
+FROM ops_loop.software_release_catalog WHERE is_current;
+```
+
+部分唯一索引 `software_release_one_current` 保证同一时刻只有一行 `is_current`。这是正式数据写入，需要单独授权。
 
 ## Troubleshooting
 
