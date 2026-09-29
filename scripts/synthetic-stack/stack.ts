@@ -7,6 +7,9 @@
  *       prepare + start only, leaving the synthetic catalog out. Use this for a
  *       stack that serves a real catalog: the demo CSV must never be imported
  *       into it. Skips the seed and the search self-check that asserts it.
+ *       Implied, and not needed, when content.env names its own database - a
+ *       stack that declares a real database is never seeded, so `restart` cannot
+ *       re-enter the seed path just because the flag was left off the command.
  *   node scripts/synthetic-stack/stack.ts stop      stop the processes this stack owns
  *   node scripts/synthetic-stack/stack.ts restart
  *   node scripts/synthetic-stack/stack.ts status    report readiness of each piece
@@ -42,9 +45,9 @@ import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   PREFERRED_PORTS, PROFILE_FILE, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
   loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig, mergeStackOverrides,
-  readProfile, stackPortOffset, writeDesktopPackagedProfile, writeProfile,
+  readProfile, shouldSeedSyntheticCatalog, stackPortOffset, writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
-import type { FeishuStackConfig } from './profile.ts';
+import type { ContentStackConfig, FeishuStackConfig } from './profile.ts';
 import {
   SyntheticCluster, clusterVersionText, ensureDatabase, ensureLoginRoles, writeClusterMarker,
 } from './postgres.ts';
@@ -115,12 +118,11 @@ async function resolvePort(name: keyof typeof PREFERRED_PORTS): Promise<number> 
   return port;
 }
 
-async function resolveProfile({ reuse }: { reuse: boolean }): Promise<StackProfile> {
+async function resolveProfile(content: ContentStackConfig | undefined, { reuse }: { reuse: boolean }): Promise<StackProfile> {
   const existing = readProfile();
   if (reuse && existing) return existing;
   const apiPort = await resolvePort('api');
   const identityPort = await resolvePort('identity');
-  const content = loadContentStackConfig();
   return Object.freeze({
     version: 1,
     createdAt: new Date().toISOString(),
@@ -155,8 +157,10 @@ function liveProcessNames(): readonly string[] {
  * not dual reviewers either, so when one real subject covers both sides the
  * manager is left unset instead of naming the same person twice.
  */
-function contentOverrides(feishu: FeishuStackConfig | undefined): Readonly<Record<string, string>> {
-  const content = loadContentStackConfig();
+function contentOverrides(
+  content: ContentStackConfig | undefined,
+  feishu: FeishuStackConfig | undefined,
+): Readonly<Record<string, string>> {
   const owner = feishu?.bindings.find((binding) => binding.role === 'owner')?.openId;
   const lead = content?.reviewLeadSubject ?? owner ?? 'synthetic_coach';
   const manager = content?.reviewManagerSubject ?? owner ?? 'synthetic_owner';
@@ -170,7 +174,7 @@ function contentOverrides(feishu: FeishuStackConfig | undefined): Readonly<Recor
   return overrides;
 }
 
-async function startProcesses(profile: StackProfile): Promise<string[]> {
+async function startProcesses(profile: StackProfile, content: ContentStackConfig | undefined): Promise<string[]> {
   const started: string[] = [];
   const live = new Set(liveProcessNames());
   const spawned: string[] = [];
@@ -187,7 +191,7 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
     // Both override files are read before anything is spawned, so a rejected
     // api.env fails the start outright instead of leaving identity behind.
     const apiConfig = loadApiStackConfig();
-    const overrides = mergeStackOverrides(contentOverrides(feishu), apiConfig ?? {});
+    const overrides = mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {});
     const identityEntry = feishu ? PASSWORD_IDENTITY_ENTRY : IDENTITY_ENTRY;
     if (!live.has('identity')) {
       const pid = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
@@ -285,12 +289,18 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
 async function commandStart(): Promise<void> {
   requireDist();
   ensureStackDirectories();
+  // Read once: `resolveProfile` needs the database name and `contentOverrides`
+  // needs the content constants, and two reads could disagree if the file
+  // changed between them - the profile would end up naming one catalog while the
+  // overrides came from another.
+  const content = loadContentStackConfig();
   // A stack that serves a real catalog must not import the demo CSV. On a freshly
   // prepared database the "already published" probe finds nothing, so the seed
   // would publish synthetic scripts as the live catalog. Everything that asserts
   // that catalog - the search self-check and the summary lines - goes with it.
-  const noSeed = process.argv.includes('--no-seed');
-  const profile = await resolveProfile({ reuse: true });
+  const noSeed = !shouldSeedSyntheticCatalog(process.argv, content?.databaseName);
+  const skipReason = process.argv.includes('--no-seed') ? '--no-seed' : 'content.env names its own database';
+  const profile = await resolveProfile(content, { reuse: true });
   writeProfile(profile);
   const packagedProfilePath = writeDesktopPackagedProfile(profile);
   log(`stack root: ${profile.stackRoot}`);
@@ -316,13 +326,13 @@ async function commandStart(): Promise<void> {
 
   log(await ensureLoginRoles(cluster, profile.databaseName));
 
-  for (const step of await startProcesses(profile)) log(step);
+  for (const step of await startProcesses(profile, content)) log(step);
   const ready = await waitReady(profile.apiOrigin);
   log(`ready: ${JSON.stringify(ready.checks)}`);
 
   if (noSeed) {
-    log('seed: skipped (--no-seed); this stack serves a real catalog');
-    log('search self-check skipped (--no-seed)');
+    log(`seed: skipped (${skipReason}); this stack serves a real catalog`);
+    log(`search self-check skipped (${skipReason})`);
   } else {
     const seeded = await seedContentIfMissing(profile.apiOrigin, { log });
     if (seeded === 'already_seeded') {

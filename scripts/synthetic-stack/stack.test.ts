@@ -11,9 +11,9 @@ import {
   DESKTOP_APP_NAME,
   defaultDesktopUserDataDirectory,
   desktopPackagedProfilePath,
-  PID_DIRECTORY, apiEnvironment, loadApiStackConfig, loadContentStackConfig, mergeStackOverrides,
-  parseApiEnvFile, parseContentEnvFile, parseFeishuEnvFile,
-  readProfile, stackPortOffset,
+  PID_DIRECTORY, PREFERRED_PORTS, STACK_ROOT, apiEnvironment, loadApiStackConfig, loadContentStackConfig,
+  mergeStackOverrides, parseApiEnvFile, parseContentEnvFile, parseFeishuEnvFile,
+  readProfile, shouldSeedSyntheticCatalog, stackPortOffset,
 } from './profile.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
@@ -356,13 +356,37 @@ describe('stack content env', () => {
     );
   });
 
-  it('derives a stable port offset so two stacks on one machine cannot collide', () => {
+  it('keeps two stacks off each other\'s ports, not merely on different offsets', () => {
+    // The same offset is added to every preferred port and those ports are one
+    // apart, so an offset that is not a multiple of the span interleaves two
+    // stacks. Offsets 75 and 76 - which `/tmp/stack-0` and `/tmp/stack-1` used to
+    // produce - put one stack's `identity` port and the next stack's `api` port
+    // on 43176. The old test only asserted that the offset was stable and in
+    // range, which is exactly what made it pass while the collision was real.
     assert.equal(stackPortOffset(DEFAULT_STACK_ROOT), 0, 'the default root keeps the ports it has always used');
-    const shifted = stackPortOffset('/tmp/second-stack');
-    assert.ok(shifted >= 1 && shifted <= 99, `offset out of range: ${String(shifted)}`);
     // A root has to resolve to the same ports before profile.json exists and
     // after it is deleted, so the offset cannot be random.
-    assert.equal(stackPortOffset('/tmp/second-stack'), shifted, 'the same root must keep resolving to the same ports');
+    assert.equal(stackPortOffset('/tmp/second-stack'), stackPortOffset('/tmp/second-stack'));
+
+    const span = Math.max(...Object.values(PREFERRED_PORTS)) - Math.min(...Object.values(PREFERRED_PORTS)) + 1;
+    const offsets = new Set<number>();
+    for (let i = 0; i < 400; i++) offsets.add(stackPortOffset(`/tmp/stack-${String(i)}`));
+    assert.ok(offsets.size > 10, `expected several distinct offsets, got ${String(offsets.size)}`);
+    for (const offset of offsets) {
+      assert.equal(offset % span, 0, `offset ${String(offset)} must be a multiple of the ${String(span)}-port span`);
+    }
+    const claimed = new Map<number, number>();
+    for (const offset of offsets) {
+      for (const port of Object.values(PREFERRED_PORTS)) {
+        const previous = claimed.get(port + offset);
+        assert.equal(
+          previous,
+          undefined,
+          `port ${String(port + offset)} is claimed by both offset ${String(previous)} and offset ${String(offset)}`,
+        );
+        claimed.set(port + offset, offset);
+      }
+    }
   });
 });
 
@@ -455,6 +479,59 @@ describe('stack production env', () => {
   });
 });
 
+describe('stack profile reuse', () => {
+  const freshFile = (): string => path.join(mkdtempSync(path.join(tmpdir(), 'stack-profile-')), 'profile.json');
+  const wellFormed = {
+    version: 1 as const,
+    createdAt: '2026-09-30T00:00:00.000Z',
+    stackRoot: STACK_ROOT,
+    apiOrigin: 'http://127.0.0.1:43100',
+    identityOrigin: 'http://127.0.0.1:43101',
+    apiPort: 43100,
+    identityPort: 43101,
+    databaseName: 'customer_agent_formal',
+    pgPort: 43199,
+    pgSocketDirectory: '/tmp/socket',
+    objectStoreDirectory: '/tmp/objects',
+    clientId: 'desk_x',
+  };
+
+  it('adopts a profile it can use', () => {
+    const file = freshFile();
+    writeFileSync(file, JSON.stringify(wellFormed));
+    assert.equal(readProfile(file)?.databaseName, 'customer_agent_formal');
+  });
+
+  it('refuses a profile whose database name would reach CREATE DATABASE', () => {
+    // Only the first `start` builds a profile; every one after it reuses this
+    // file. The name is interpolated into `CREATE DATABASE` and concatenated
+    // into five DSNs, and the same name IS validated when it comes from
+    // content.env - so leaving this path unchecked put the guard on the
+    // one-time entrance instead of the one that runs every day.
+    for (const databaseName of [undefined, '', 'Customer-Agent', 'x; DROP DATABASE y', 42]) {
+      const profile: Record<string, unknown> = { ...wellFormed };
+      if (databaseName === undefined) delete profile.databaseName;
+      else profile.databaseName = databaseName;
+      const file = freshFile();
+      writeFileSync(file, JSON.stringify(profile));
+      assert.equal(readProfile(file), undefined, `must refuse databaseName ${JSON.stringify(databaseName)}`);
+    }
+  });
+});
+
+describe('stack seed policy', () => {
+  it('never seeds a stack that declares its own database', () => {
+    // `--no-seed` describes the stack, not the invocation. The systemd unit
+    // passes it, but a person repairing the stack types `restart` - and the
+    // import publishes the demo catalog as the live one when the database has
+    // nothing published yet.
+    assert.equal(shouldSeedSyntheticCatalog([], undefined), true, 'a plain synthetic stack still seeds');
+    assert.equal(shouldSeedSyntheticCatalog(['start', '--no-seed'], undefined), false);
+    assert.equal(shouldSeedSyntheticCatalog(['start'], 'customer_agent_formal'), false);
+    assert.equal(shouldSeedSyntheticCatalog(['restart'], 'customer_agent_formal'), false);
+  });
+});
+
 describe('stack database wiring', () => {
   it('never falls back to the module constant for the database name', () => {
     // connect() used to default to DATABASE_NAME, so a stack whose content.env
@@ -488,8 +565,20 @@ describe('stack production wiring', () => {
     const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
     assert.ok(stack.includes('loadApiStackConfig()'), 'start must read api.env');
     assert.ok(
-      stack.includes('mergeStackOverrides(contentOverrides(feishu), apiConfig ?? {})'),
+      stack.includes('mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {})'),
       'both override files must be merged through the clash check',
+    );
+    // content.env is read once and threaded through: two reads could disagree if
+    // the file changed between them, leaving the profile naming one catalog and
+    // the overrides coming from another.
+    assert.equal(
+      (stack.match(/loadContentStackConfig\(\)/gu) ?? []).length,
+      1,
+      'content.env must be read exactly once per run',
+    );
+    assert.ok(
+      stack.includes('shouldSeedSyntheticCatalog(process.argv, content?.databaseName)'),
+      'the seed decision must come from the stack, not only from the flag',
     );
   });
 });

@@ -97,6 +97,14 @@ EOF
 
 `systemctl restart` 会重跑迁移与角色授权（两者都是幂等的），**不动数据**。
 
+这条栈**不会被播种**，这是从 `content.env` 推出来的，不靠命令行旗标。理由：`stack.ts start` 在不带 `--no-seed` 时会把演示话术当作线上目录发布，而 `--no-seed` 是逐次传的——单元文件里有，但人 ssh 进来修栈时打的是 `restart`，不会带。所以现在只要 `content.env` 声明了自己的 `DATABASE_NAME`，就一律跳过播种，日志会写明原因：
+
+```
+[stack] seed: skipped (content.env names its own database); this stack serves a real catalog
+```
+
+要一套**会**播种的栈，就别在它的 `content.env` 里写 `DATABASE_NAME`。
+
 ## 迁数据
 
 源：Mac 的 `~/.customer-agent-formal/pg15`，库 `customer_agent_formal`，socket 端口 43299。
@@ -110,6 +118,8 @@ pg_dump --data-only --format=custom --no-owner --no-privileges \
   "postgresql://stack_owner@localhost/customer_agent_formal?host=$HOME/.customer-agent-formal/socket&port=43299" \
   -f /tmp/mac-final.dump
 ```
+
+**它现在比从前严。** `formal-dev-up.mjs` 共用 `profile.ts` 的 `parseEnvFile`，与 `feishu.env` / `content.env` 同一套规矩：没有 `=` 的行、键为空的行都抛 `invalid line`（以前静默跳过），**重复键抛错**（以前取最后一个）。这是有意的——「悄悄从两个审核负责人里挑一个」以后没人解释得清——但代价是一份它以前能接受的 `api.env` 现在可能拒绝启动。写注释请用 `#` 开头；从 Windows 拷来的 CRLF 文件反而没问题（`parseEnvFile` 按 `\r?\n` 切）。
 
 **必须带 `--disable-triggers` 还原**：`query_events` 与 `content_releases`↔`import_batches` 有循环外键，pg_dump 会明确警告；不带这个选项还原一定失败。它需要超级用户，`stack_owner` 是。
 

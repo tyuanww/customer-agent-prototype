@@ -34,7 +34,15 @@ export function stackPortOffset(stackRoot: string): number {
   if (stackRoot === DEFAULT_STACK_ROOT) return 0;
   let hash = 0;
   for (const byte of Buffer.from(stackRoot, 'utf8')) hash = (hash * 31 + byte) % 1000;
-  return 1 + (hash % 99);
+  // The same offset is added to every preferred port, and those ports are one
+  // apart, so an offset that is not a multiple of the span interleaves two
+  // stacks: offsets 75 and 76 put the first stack's `identity` port and the
+  // second stack's `api` port on the same number (43176). Stepping by the span
+  // is what makes "a second stack gets its own ports" actually true. The bucket
+  // count keeps the highest shifted port (43197) below PG_PORT, so a shifted
+  // stack never claims a number the cluster is documented to own.
+  const span = Math.max(...Object.values(PREFERRED_PORTS)) - Math.min(...Object.values(PREFERRED_PORTS)) + 1;
+  return span * (1 + (hash % 48));
 }
 
 export const PROFILE_FILE = path.join(STACK_ROOT, 'profile.json');
@@ -128,6 +136,15 @@ export type ContentStackConfig = Readonly<{
   reviewEvidenceId?: string;
 }>;
 
+/**
+ * A database name the stack is willing to interpolate into `CREATE DATABASE`
+ * and into five DSNs. `CREATE DATABASE` takes no bind parameter, so this pattern
+ * is the only thing between the name and the statement. It therefore has to hold
+ * wherever the name comes from - including `profile.json`, which is the source
+ * every `start` after the first one reads.
+ */
+const SQL_IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/u;
+
 const CONTENT_ENV_KEYS: Readonly<Record<string, keyof ContentStackConfig>> = Object.freeze({
   DATABASE_NAME: 'databaseName',
   CONTENT_INTENT_TAXONOMY_VERSION: 'intentTaxonomyVersion',
@@ -152,7 +169,7 @@ export function parseContentEnvFile(contents: string): ContentStackConfig {
     if (value.length === 0) throw new Error(`content.env: ${key} must not be empty`);
     config[field] = value;
   }
-  if (config.databaseName !== undefined && !/^[a-z_][a-z0-9_]*$/u.test(config.databaseName)) {
+  if (config.databaseName !== undefined && !SQL_IDENTIFIER_PATTERN.test(config.databaseName)) {
     throw new Error('content.env: DATABASE_NAME must be a lower-case SQL identifier');
   }
   return Object.freeze(config);
@@ -241,6 +258,27 @@ export function mergeStackOverrides(
   if (both.length > 0) throw new Error(`api.env and content.env both set ${both.join(', ')}`);
   return { ...content, ...api };
 }
+
+/**
+ * Whether `start` may import the demo catalog.
+ *
+ * `--no-seed` describes what this stack *is* - one that serves a real catalog -
+ * not what a single invocation should do, so the stack root gets a vote too:
+ * naming your own database in `content.env` is what declaring a real deployment
+ * looks like, and the import publishes the synthetic scripts as the live
+ * catalog when it runs against a database that has nothing published yet.
+ *
+ * The flag alone was not enough. The systemd unit passes it, but a person
+ * repairing the stack types `restart` - the natural verb - and would re-enter
+ * the seed path with no sign that anything was different.
+ */
+export function shouldSeedSyntheticCatalog(
+  argv: readonly string[],
+  declaredDatabaseName: string | undefined,
+): boolean {
+  return !argv.includes('--no-seed') && declaredDatabaseName === undefined;
+}
+
 export const PID_DIRECTORY = path.join(STACK_ROOT, 'pids');
 export const LOG_DIRECTORY = path.join(STACK_ROOT, 'logs');
 export const DATA_DIRECTORY = path.join(STACK_ROOT, 'data');
@@ -369,10 +407,10 @@ export function ensureStackDirectories(): void {
   ]) mkdirSync(directory, { recursive: true, mode: 0o700 });
 }
 
-export function readProfile(): StackProfile | undefined {
-  if (!existsSync(PROFILE_FILE)) return undefined;
+export function readProfile(file = PROFILE_FILE): StackProfile | undefined {
+  if (!existsSync(file)) return undefined;
   try {
-    const value: unknown = JSON.parse(readFileSync(PROFILE_FILE, 'utf8'));
+    const value: unknown = JSON.parse(readFileSync(file, 'utf8'));
     if (!value || typeof value !== 'object') return undefined;
     const profile = value as StackProfile;
     // The recorded root must match where the file was actually read from: a
@@ -381,6 +419,15 @@ export function readProfile(): StackProfile | undefined {
     if (profile.version !== 1 || typeof profile.apiOrigin !== 'string'
       || typeof profile.identityOrigin !== 'string'
       || profile.stackRoot !== STACK_ROOT) return undefined;
+    // The database name is validated here for the same reason it is validated
+    // when it comes from content.env, and this is the path that matters: only
+    // the first `start` builds a profile, and every one after it reuses this
+    // file. It reaches `CREATE DATABASE` by interpolation and the five DSNs by
+    // concatenation, so a name that is missing or malformed has to fail here
+    // rather than create a database called `undefined` and report ready.
+    if (typeof profile.databaseName !== 'string' || !SQL_IDENTIFIER_PATTERN.test(profile.databaseName)) {
+      return undefined;
+    }
     return profile;
   } catch {
     return undefined;
