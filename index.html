@@ -40,8 +40,8 @@
     }
     a { color: var(--accent); }
     a:visited { color: #5524b2; }
-    .nav a, .btn, footer a { color: inherit; }
-    .nav a:visited, .btn:visited, footer a:visited { color: inherit; }
+    .nav-links a, .brand, footer a { color: inherit; }
+    .nav-links a:visited, .brand:visited, footer a:visited { color: inherit; }
     a:focus-visible, button:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -119,11 +119,18 @@
       padding: 12px 18px;
       min-height: 44px;
     }
-    .btn-primary {
+    .btn-primary,
+    .btn-primary:visited,
+    .nav .btn-primary,
+    .nav .btn-primary:visited {
       background: var(--accent);
       color: var(--accent-fg);
     }
-    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:hover,
+    .nav .btn-primary:hover {
+      background: var(--accent-hover);
+      color: var(--accent-fg);
+    }
     .btn-ghost {
       background: transparent;
       color: var(--fg);
@@ -231,33 +238,56 @@
       font-weight: 400;
     }
     .show-list button[aria-selected="true"] span { display: block; }
-    .show-stage { min-width: 0; }
-    .show-frame {
+    .show-stage { min-width: 0; padding: 0 36px 0 0; }
+    .show-stack {
+      position: relative;
+      height: clamp(280px, 46vw, 520px);
+      margin-bottom: 36px;
+    }
+    .show-card {
+      position: absolute;
+      inset: 0;
+      margin: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 240px;
       padding: 18px;
       background: var(--card);
       border: 1px solid var(--line);
       border-radius: 16px;
-      box-shadow: var(--shadow);
+      transition: transform 0.35s ease, box-shadow 0.35s ease;
     }
-    .show-frame.is-capsule {
-      min-height: 0;
-      padding: 28px 22px;
-    }
-    .show-frame img {
+    .show-card img {
       max-width: 100%;
-      max-height: 520px;
+      max-height: 100%;
       width: auto;
       height: auto;
+      object-fit: contain;
       border-radius: 12px;
     }
-    .show-frame.is-capsule img {
+    .show-card.is-capsule img {
       width: 100%;
       max-height: 168px;
+      height: auto;
       border-radius: 20px;
+    }
+    .show-card[data-depth="0"] {
+      z-index: 3;
+      transform: translate(0, 0);
+      box-shadow: 0 14px 32px -12px rgba(27, 28, 34, 0.28);
+      cursor: default;
+    }
+    .show-card[data-depth="1"] {
+      z-index: 2;
+      transform: translate(16px, 16px) scale(0.985);
+      box-shadow: 0 8px 20px -12px rgba(27, 28, 34, 0.2);
+      cursor: pointer;
+    }
+    .show-card[data-depth="2"] {
+      z-index: 1;
+      transform: translate(32px, 32px) scale(0.97);
+      box-shadow: 0 4px 14px -10px rgba(27, 28, 34, 0.16);
+      cursor: pointer;
     }
     .show-pager {
       display: flex;
@@ -443,7 +473,11 @@
       .show-list { flex-direction: row; }
       .show-list button { flex: 1; text-align: center; padding: 10px 8px; }
       .show-list span { display: none !important; }
-      .show-frame { min-height: 180px; padding: 12px; }
+      .show-stage { padding: 0 22px 0 0; }
+      .show-stack { height: clamp(220px, 68vw, 360px); margin-bottom: 24px; }
+      .show-card { padding: 12px; }
+      .show-card[data-depth="1"] { transform: translate(10px, 10px) scale(0.985); }
+      .show-card[data-depth="2"] { transform: translate(20px, 20px) scale(0.97); }
       .show-list button[aria-selected="true"] { box-shadow: none; }
       .show-copy { display: block; }
       .show-cap { display: none; }
@@ -454,6 +488,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
+      .show-card { transition: none; }
     }
   </style>
 </head>
@@ -501,32 +536,40 @@
       <div class="wrap">
         <div class="showcase" id="showcase">
           <div class="show-list" id="show-tabs" role="tablist" aria-label="用法">
-            <button type="button" role="tab" id="show-query" aria-controls="show-panel" aria-selected="true" data-show="0">
-              <strong>查询</strong>
-              <span>点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</span>
-            </button>
-            <button type="button" role="tab" id="show-login" aria-controls="show-panel" aria-selected="false" data-show="1">
+            <button type="button" role="tab" id="show-login" aria-controls="show-panel" aria-selected="true" data-show="0">
               <strong>登录</strong>
               <span>用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</span>
+            </button>
+            <button type="button" role="tab" id="show-query" aria-controls="show-panel" aria-selected="false" data-show="1">
+              <strong>查询</strong>
+              <span>点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</span>
             </button>
             <button type="button" role="tab" id="show-publish" aria-controls="show-panel" aria-selected="false" data-show="2">
               <strong>发布</strong>
               <span>话术师导表，管理员发布后，坐席才能搜到。</span>
             </button>
           </div>
-          <div class="show-stage" id="show-panel" role="tabpanel" aria-labelledby="show-query">
-            <div class="show-frame" id="show-frame">
-              <img id="show-img" src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。">
+          <div class="show-stage" id="show-panel" role="tabpanel" aria-labelledby="show-login">
+            <div class="show-stack" id="show-stack">
+              <figure class="show-card is-capsule" data-show="0" data-depth="0">
+                <img src="./shot-capsule.png" width="1200" height="176" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。">
+              </figure>
+              <figure class="show-card" data-show="1" data-depth="1">
+                <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。">
+              </figure>
+              <figure class="show-card" data-show="2" data-depth="2">
+                <img src="./shot-dashboard.jpg" width="1933" height="1245" alt="客服运营工作台的话术库，当前发布已挂载。">
+              </figure>
             </div>
-            <p class="show-copy" id="show-copy">点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。</p>
-            <p class="show-cap" id="show-cap" aria-live="polite">登录后查询，点「复制话术」或按 1 / 2 / 3。</p>
+            <p class="show-copy" id="show-copy">用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
+            <p class="show-cap" id="show-cap" aria-live="polite">未登录时只能看到「登录后查询话术」。</p>
             <div class="show-pager">
               <button type="button" class="show-nav show-prev" aria-label="上一张界面">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
               </button>
               <div class="show-dots">
-                <button type="button" aria-label="查询" aria-current="true" data-show="0"><i></i></button>
-                <button type="button" aria-label="登录" aria-current="false" data-show="1"><i></i></button>
+                <button type="button" aria-label="登录" aria-current="true" data-show="0"><i></i></button>
+                <button type="button" aria-label="查询" aria-current="false" data-show="1"><i></i></button>
                 <button type="button" aria-label="发布" aria-current="false" data-show="2"><i></i></button>
               </div>
               <button type="button" class="show-nav show-next" aria-label="下一张界面">
@@ -627,41 +670,24 @@
   <script>
     const slides = [
       {
-        src: './shot-query.png',
-        w: 1200,
-        h: 1240,
-        kind: '',
-        labelledby: 'show-query',
-        alt: '查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。',
-        cap: '登录后查询，点「复制话术」或按 1 / 2 / 3。',
-      },
-      {
-        src: './shot-capsule.png',
-        w: 1200,
-        h: 176,
-        kind: 'capsule',
         labelledby: 'show-login',
-        alt: '未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。',
         cap: '未登录时只能看到「登录后查询话术」。',
       },
       {
-        src: './shot-dashboard.jpg',
-        w: 1933,
-        h: 1245,
-        kind: 'board',
+        labelledby: 'show-query',
+        cap: '登录后查询，点「复制话术」或按 1 / 2 / 3。',
+      },
+      {
         labelledby: 'show-publish',
-        alt: '客服运营工作台的话术库，当前发布已挂载。',
         cap: '话术师导表，管理员发布后，坐席才能搜到。',
       },
     ];
-    slides.forEach((slide) => { const img = new Image(); img.src = slide.src; });
 
     const showTabs = [...document.querySelectorAll('#show-tabs [role="tab"]')];
     const showDots = [...document.querySelectorAll('.show-dots button')];
-    const showImg = document.getElementById('show-img');
+    const showCards = [...document.querySelectorAll('.show-card')];
     const showCap = document.getElementById('show-cap');
     const showCopy = document.getElementById('show-copy');
-    const showFrame = document.getElementById('show-frame');
     const showPanel = document.getElementById('show-panel');
     const showcase = document.getElementById('showcase');
     let showIndex = 0;
@@ -671,14 +697,15 @@
     function renderShow(index) {
       showIndex = (index + slides.length) % slides.length;
       const slide = slides[showIndex];
-      showImg.src = slide.src;
-      showImg.width = slide.w;
-      showImg.height = slide.h;
-      showImg.alt = slide.alt;
       showCap.textContent = slide.cap;
       showCopy.textContent = showTabs[showIndex].querySelector('span').textContent;
-      showFrame.classList.toggle('is-capsule', slide.kind === 'capsule');
       showPanel.setAttribute('aria-labelledby', slide.labelledby);
+      showCards.forEach((card) => {
+        const i = Number(card.dataset.show);
+        const depth = (i - showIndex + slides.length) % slides.length;
+        card.dataset.depth = String(depth);
+        card.setAttribute('aria-hidden', depth === 0 ? 'false' : 'true');
+      });
       showTabs.forEach((tab, i) => {
         const on = i === showIndex;
         tab.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -716,6 +743,12 @@
     });
     showDots.forEach((dot) => {
       dot.addEventListener('click', () => pickShow(Number(dot.dataset.show), true));
+    });
+    showCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        const i = Number(card.dataset.show);
+        if (i !== showIndex) pickShow(i, true);
+      });
     });
     document.querySelector('.show-prev').addEventListener('click', () => pickShow(showIndex - 1, true));
     document.querySelector('.show-next').addEventListener('click', () => pickShow(showIndex + 1, true));
