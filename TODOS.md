@@ -1,6 +1,6 @@
 # TODOS
 
-> **复核：** 2026-09-29（产品 0.3.24）。#24 已合入：文档、开发入口、系统同步「打开下载页」。办公机仍须用新打的 0.3.24 UNSIGNED 勾选。P1 打包态配置失败、P2 首轮范围、P3 离线 profile 三项已收口。
+> **复核：** 2026-09-29（产品 0.3.25）。#26 已合入：Windows NSIS assisted 向导。办公机须用新打的 0.3.25 UNSIGNED 勾选。公开 GitHub Release 0.3.24 仍是 oneClick。P1 打包态配置失败、P2 首轮范围、P3 离线 profile 三项已收口。
 >
 > **历史结论（2026-09-16）：** 四项 P3 窄分支已由产品 PR #69 合并。登录残留红字已由 PR #68 修复。BACKEND-CI-503 已由 PR #91 修复并关闭。它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。macOS M5 人工勾选见 `docs/how-to-verify-macos-m5.md`，清单进仓不等于验收通过。
 >
