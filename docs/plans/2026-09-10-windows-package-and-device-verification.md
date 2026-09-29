@@ -24,7 +24,7 @@
 
 | 项 | 当前事实 | 待确认 |
 | --- | --- | --- |
-| 安装包格式 | electron-builder **NSIS**，`oneClick: true`，`perMachine: false`，不可改安装目录，关闭 differential package | 试装是否改成可改目录 / 按机安装，需阶段批准 |
+| 安装包格式 | electron-builder **NSIS assisted**：`oneClick: false`，`perMachine: false`（向导可选当前用户 / 所有用户），可改安装目录，中文 2052 + `zh_CN`/`en_US` 许可页，关闭 differential package。公开 GitHub Release 0.3.24 仍是旧 oneClick 包 | 实机看向导文案、路径、快捷方式；是否要改成强制 per-machine |
 | 架构 | 仅声明 **x64**（`apps/desktop/package.json` `build.win.target`） | 是否需要 Windows ARM64 / 32 位；当前产物不能冒充已支持 |
 | 最低 OS | Windows 目标**未**声明 `minimumSystemVersion`（macOS 声明了 12.0）。Electron 43.4.0 随包 README 的官方口径是 **Windows 10 and up**；Windows 7/8/8.1 已在 Electron 23 移除。**仓库当前未就此声明任何 Windows 最低版本** | 是否要在 `build.win` 显式声明最低版本，以及声明成什么；在选定前不写“已支持 Windows 10/11” |
 | 应用身份 | `appId` 仍为 `local.demo.customer-agent`；`productName` 为「客服话术浮窗 Demo」 | 试装是否继续 Demo appId，或另批长期 ID |
@@ -77,7 +77,7 @@
 
 | 检查 | 当前实现能支持什么 | 实机仍要看什么 |
 | --- | --- | --- |
-| 安装 | NSIS `oneClick: true` + `perMachine: false` + `allowToChangeInstallationDirectory: false`：无安装向导、装进当前用户目录、安装路径不可改。产物名强制 `-UNSIGNED.exe`（`build.win.artifactName`） | SmartScreen / 未签名警告文案；是否要管理员；任务栏/开始菜单快捷方式；图标 |
+| 安装 | NSIS `oneClick: false` + `perMachine: false` + `allowToChangeInstallationDirectory: true`：中文 assisted 向导（许可、安装模式、目录、快捷方式）。默认当前用户，允许提权改装到所有用户。许可取 `build/license_zh_CN.txt` 与 `build/license_en.txt`。产物名强制 `-UNSIGNED.exe`（`build.win.artifactName`）。无自定义 `installer.nsh`。公开 0.3.24 仍是 oneClick | SmartScreen / 未签名警告文案；向导各页中文；任务栏/开始菜单快捷方式；图标 |
 | 升级 | 无自动更新元数据；`differentialPackage: false` 且后验显式拒绝 `.blockmap` / `latest*.yml` / `app-update.yml`，因此不存在增量包路径。再次安装同一 NSIS 的覆盖行为未在实机验证 | 覆盖后用户数据目录是否保留；是否出现双图标；版本号是否可见 |
 | 卸载 | 依赖 NSIS 默认卸载器 | 「应用和功能」能卸干净；开始菜单与安装目录是否残留；userData 是否按约定保留或删除 |
 | 异常恢复 | 开发态缺配置 / 非 loopback / 打包态产品 profile 均 fail-closed：`product-runtime-config.ts` 缺 `synthetic-stack.json` 或缺任一 origin 直接抛错，不退 S0 fixture | 安装中断、杀软拦截、缺 VC++ 运行库、杀进程后重启、卸载失败后的手工清理步骤 |
@@ -129,7 +129,7 @@
 **已被本仓消化、不再是 TBD 的（2026-09-16 准备，仍不构成开工）：**
 
 - 最低 OS 口径：Electron 43.4.0 官方为 **Windows 10 and up**（见第 1 节）。是否在 `build.win` 显式声明、声明成什么，仍待用户拍板
-- 安装 / 升级 / 卸载 / 异常恢复的**当前实现边界**已逐条落在第 5 节，含 NSIS `oneClick` / `perMachine` / 不可改目录、无自动更新元数据、后验拒绝 `.blockmap` 与 `latest*.yml`
+- 安装 / 升级 / 卸载 / 异常恢复的**当前实现边界**已逐条落在第 5 节，含 NSIS assisted（`oneClick: false` / 可改目录 / 中文许可）/ `perMachine: false`、无自动更新元数据、后验拒绝 `.blockmap` 与 `latest*.yml`
 - 日志口径已澄清：应用侧**无文件日志设施**（18 处 `console.*` 只写 stdout/stderr），栈侧日志由 `stack.ts` 的 `spawnLogged()`（identity/api/worker）与 `postgres.ts`（postgres）分别产生（见第 3 节）。这条从"待确认日志目录"变成了"待决定是否新增应用侧设施"
 - Windows 上的 userData 目录名风险已登记（见第 5 节）：`app.setName` 含中文，实机首启失败先查目录名再查代码
 
