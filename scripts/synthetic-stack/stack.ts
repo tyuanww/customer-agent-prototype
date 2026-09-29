@@ -3,6 +3,10 @@
  * Local synthetic stack for the macOS client.
  *
  *   node scripts/synthetic-stack/stack.ts start     prepare + start + seed + verify
+ *   node scripts/synthetic-stack/stack.ts start --no-seed
+ *       prepare + start only, leaving the synthetic catalog out. Use this for a
+ *       stack that serves a real catalog: the demo CSV must never be imported
+ *       into it. Skips the seed and the search self-check that asserts it.
  *   node scripts/synthetic-stack/stack.ts stop      stop the processes this stack owns
  *   node scripts/synthetic-stack/stack.ts restart
  *   node scripts/synthetic-stack/stack.ts status    report readiness of each piece
@@ -268,6 +272,11 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
 async function commandStart(): Promise<void> {
   requireDist();
   ensureStackDirectories();
+  // A stack that serves a real catalog must not import the demo CSV. On a freshly
+  // prepared database the "already published" probe finds nothing, so the seed
+  // would publish synthetic scripts as the live catalog. Everything that asserts
+  // that catalog - the search self-check and the summary lines - goes with it.
+  const noSeed = process.argv.includes('--no-seed');
   const profile = await resolveProfile({ reuse: true });
   writeProfile(profile);
   const packagedProfilePath = writeDesktopPackagedProfile(profile);
@@ -298,17 +307,22 @@ async function commandStart(): Promise<void> {
   const ready = await waitReady(profile.apiOrigin);
   log(`ready: ${JSON.stringify(ready.checks)}`);
 
-  const seeded = await seedContentIfMissing(profile.apiOrigin, { log });
-  if (seeded === 'already_seeded') {
-    log('seed: already published');
+  if (noSeed) {
+    log('seed: skipped (--no-seed); this stack serves a real catalog');
+    log('search self-check skipped (--no-seed)');
   } else {
-    log(`seeded ${String(seeded.scriptCount)} scripts into release ${seeded.releaseId} (seq ${String(seeded.releaseSeq)})`);
-  }
+    const seeded = await seedContentIfMissing(profile.apiOrigin, { log });
+    if (seeded === 'already_seeded') {
+      log('seed: already published');
+    } else {
+      log(`seeded ${String(seeded.scriptCount)} scripts into release ${seeded.releaseId} (seq ${String(seeded.releaseSeq)})`);
+    }
 
-  for (const result of await verifySearch(profile.apiOrigin)) log(`search ok — ${result}`);
-  log('catalog references: ' + catalogReferences().join(', '));
-  log(`seed script ids: ${SYNTHETIC_SCRIPT_IDS.join(', ')}`);
-  log(`identity bindings: ${SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId).join(', ')}`);
+    for (const result of await verifySearch(profile.apiOrigin)) log(`search ok — ${result}`);
+    log('catalog references: ' + catalogReferences().join(', '));
+    log(`seed script ids: ${SYNTHETIC_SCRIPT_IDS.join(', ')}`);
+    log(`identity bindings: ${SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId).join(', ')}`);
+  }
   log('');
   log('Stack is up. Launch the desktop client with:');
   log(`  ${desktopCommand(profile)}`);

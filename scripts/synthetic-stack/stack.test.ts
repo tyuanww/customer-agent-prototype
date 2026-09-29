@@ -364,3 +364,19 @@ describe('stack content env', () => {
     assert.equal(stackPortOffset('/tmp/second-stack'), shifted, 'the same root must keep resolving to the same ports');
   });
 });
+
+describe('stack start modes', () => {
+  it('can start without importing the synthetic catalog', () => {
+    // Serving a real catalog must not import the demo CSV: on a freshly prepared
+    // database the "already published" probe finds nothing, so the seed would
+    // publish synthetic scripts as the live catalog. stack.ts runs main() at
+    // import time, so this asserts on its source rather than calling it.
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.ok(stack.includes('--no-seed'), 'start must accept --no-seed');
+    assert.ok(stack.includes('seed: skipped'), 'the skip must be visible in the start log');
+    assert.ok(
+      stack.includes('search self-check skipped'),
+      'the search self-check asserts the seeded catalog, so it has to be skipped too',
+    );
+  });
+});
