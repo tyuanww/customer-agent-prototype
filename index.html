@@ -39,6 +39,10 @@
       -webkit-font-smoothing: antialiased;
     }
     a { color: inherit; }
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid hsl(var(--primary));
+      outline-offset: 2px;
+    }
     img { max-width: 100%; height: auto; display: block; }
     .skip {
       position: absolute;
@@ -88,7 +92,13 @@
       font-size: 14px;
       color: hsl(var(--muted-foreground));
     }
-    .nav-links a { text-decoration: none; }
+    .nav-links a {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 4px;
+    }
     .nav-links a:hover { color: hsl(var(--foreground)); }
     .nav-actions { display: flex; align-items: center; gap: 10px; }
     .nav-github {
@@ -352,7 +362,8 @@
       color: hsl(var(--muted-foreground));
       background: hsl(var(--background));
       border-radius: 8px;
-      padding: 6px 8px;
+      padding: 10px 10px;
+      min-height: 44px;
       border: 0;
       cursor: pointer;
     }
@@ -394,7 +405,16 @@
       gap: 28px;
     }
     footer h3 { margin: 0 0 10px; font-size: 13px; }
-    footer a { display: block; text-decoration: none; color: hsl(var(--muted-foreground)); font-size: 14px; margin: 0 0 6px; }
+    footer a {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      color: hsl(var(--muted-foreground));
+      font-size: 14px;
+      margin: 0;
+      min-height: 44px;
+      padding: 8px 0;
+    }
     footer a:hover { color: hsl(var(--foreground)); }
     .foot-brand { display: flex; align-items: center; gap: 8px; font-weight: 650; margin-bottom: 8px; }
     .foot-brand img { width: 22px; height: 22px; }
