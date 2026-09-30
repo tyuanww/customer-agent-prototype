@@ -1,0 +1,15 @@
+[Unit]
+Description=Watch the customer-agent stack readiness and repair it
+
+[Timer]
+# Every minute like the health probe, but the watchdog is the thing that acts; the
+# probe is what tells a human. OnBootSec is longer than the stack unit's own start
+# so a normal boot is not mistaken for a failure.
+OnBootSec=4min
+OnUnitActiveSec=1min
+AccuracySec=5s
+Persistent=false
+Unit=customer-agent-stack-watchdog.service
+
+[Install]
+WantedBy=timers.target

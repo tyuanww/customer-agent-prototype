@@ -1,0 +1,37 @@
+[Unit]
+Description=Restart the customer-agent stack when /ready fails
+Documentation=file:///srv/customer-agent/current/docs/how-to-run-backend-on-hangzhou.md
+# Do not start before the stack unit has had its own chance to come up.
+After=customer-agent-stack.service
+Wants=customer-agent-stack.service
+
+[Service]
+Type=oneshot
+User=customer-agent
+Group=customer-agent
+
+Environment=CUSTOMER_AGENT_STACK_ROOT=/srv/customer-agent/stack
+Environment=CUSTOMER_AGENT_READY_URL=http://127.0.0.1:43115/ready
+Environment=CUSTOMER_AGENT_STACK_ENTRY=/srv/customer-agent/current/scripts/synthetic-stack/stack.ts
+# node lives in /usr/local/bin, and PATH is not inherited from the unit above.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+ExecStart=/srv/customer-agent/scripts/customer-agent-stack-watchdog.sh
+
+StateDirectory=customer-agent
+
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+# The watchdog runs a repair, so it must be able to reach the stack's own port and
+# the PG socket under the stack root; StateDirectory covers the lock file.
+ReadWritePaths=/srv/customer-agent/stack
+ReadOnlyPaths=/srv/customer-agent/current
+
+[Install]
+WantedBy=multi-user.target
