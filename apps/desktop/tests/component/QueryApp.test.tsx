@@ -596,6 +596,54 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
   });
 
+  it('shows the server notice once and records only an explicit button decision', async () => {
+    const signedIn = {
+      ok: true as const,
+      enabled: true,
+      signedIn: true,
+      sessionEpoch: 12,
+      userId: 'usr_synthetic_agent',
+      role: 'agent' as const,
+      authMode: 'mock' as const,
+      expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      displayName: 'synthetic_agent',
+    };
+    const currentNotice = vi.fn().mockResolvedValue({
+      ok: true as const,
+      sessionEpoch: 12,
+      notice: {
+        version: 'pilot-notice-v1',
+        content: '服务器下发的正式告知正文',
+        content_hash: 'a'.repeat(64),
+        published_at: '2026-09-30T00:00:00.000Z',
+      },
+      decision: null,
+      decided_at: null,
+    });
+    const decideNotice = vi.fn().mockResolvedValue({
+      ok: true as const,
+      sessionEpoch: 12,
+      version: 'pilot-notice-v1',
+      decision: 'accepted' as const,
+      decided_at: '2026-09-30T00:01:00.000Z',
+    });
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedIn),
+      login: vi.fn(),
+      logout: vi.fn(),
+      currentNotice,
+      decideNotice,
+      onSessionChanged: () => () => {},
+    };
+    render(<QueryApp />);
+    expect(await screen.findByTestId('notice-content')).toHaveTextContent('服务器下发的正式告知正文');
+    expect(decideNotice).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('notice-accept'));
+    await waitFor(() => expect(decideNotice).toHaveBeenCalledWith({ version: 'pilot-notice-v1', decision: 'accepted' }));
+    await waitFor(() => expect(screen.queryByTestId('notice-backdrop')).not.toBeInTheDocument());
+    expect(currentNotice).toHaveBeenCalledTimes(1);
+  });
+
   it('distinguishes expiry and login failure from unsigned guidance', async () => {
     const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
     const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 8, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };

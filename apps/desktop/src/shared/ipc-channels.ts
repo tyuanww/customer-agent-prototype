@@ -5,6 +5,8 @@ export const IPC_CHANNELS = {
   PRODUCT_SESSION_STATUS: 'product:session-status',
   PRODUCT_LOGIN: 'product:login',
   PRODUCT_LOGOUT: 'product:logout',
+  PRODUCT_NOTICE_CURRENT: 'product:notice-current',
+  PRODUCT_NOTICE_DECISION: 'product:notice-decision',
   PRODUCT_SESSION_CHANGED: 'product:session-changed',
   PRODUCT_ANNOUNCE_REFRESH: 'product:announce-refresh',
   PRODUCT_ANNOUNCE_INVALIDATED: 'product:announce-invalidated',

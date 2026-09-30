@@ -4,6 +4,15 @@ import { LIBRARY_DOMAINS, isLibraryDomain, type LibraryDomain } from '../shared/
 import { helpFailure, isProductEscalateRequest, isProductEscalateResult, isProductTerminalRequest, isProductTerminalResult } from '../shared/product-help';
 import { catalogFailure, isProductCatalogResult } from '../shared/product-catalog';
 import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
+import {
+  isProductNoticeDecisionRequest,
+  isProductNoticeDecisionResult,
+  isProductNoticeResult,
+  noticeFailure,
+  type ProductNoticeDecisionRequest,
+  type ProductNoticeDecisionResult,
+  type ProductNoticeResult,
+} from '../shared/product-notice';
 import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
@@ -63,6 +72,19 @@ const sessionInvoke = async (channel: string): Promise<ProductSessionResult> => 
     const value: unknown = await ipcRenderer.invoke(channel);
     return isProductSessionResult(value) ? value : productFailure('UNAVAILABLE');
   } catch { return productFailure('UNAVAILABLE'); }
+};
+const noticeCurrentInvoke = async (): Promise<ProductNoticeResult> => {
+  try {
+    const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_NOTICE_CURRENT);
+    return isProductNoticeResult(value) ? value : noticeFailure('UNAVAILABLE');
+  } catch { return noticeFailure('UNAVAILABLE'); }
+};
+const noticeDecisionInvoke = async (request: ProductNoticeDecisionRequest): Promise<ProductNoticeDecisionResult> => {
+  if (!isProductNoticeDecisionRequest(request)) return noticeFailure('VALIDATION');
+  try {
+    const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_NOTICE_DECISION, request);
+    return isProductNoticeDecisionResult(value) ? value : noticeFailure('UNAVAILABLE', 0);
+  } catch { return noticeFailure('UNAVAILABLE'); }
 };
 async function queryInvoke(channel: string, request: QueryIdentity) {
   if (!isQueryIdentity(request)) return queryFailure('VALIDATION', { sessionEpoch: 0, generation: 0 });
@@ -158,6 +180,8 @@ const api: CustomerAgentApi = {
     sessionStatus: () => sessionInvoke(IPC_CHANNELS.PRODUCT_SESSION_STATUS),
     login: () => sessionInvoke(IPC_CHANNELS.PRODUCT_LOGIN),
     logout: () => sessionInvoke(IPC_CHANNELS.PRODUCT_LOGOUT),
+    currentNotice: noticeCurrentInvoke,
+    decideNotice: noticeDecisionInvoke,
     onSessionChanged(listener) { sessionListeners.add(listener); return () => { sessionListeners.delete(listener); }; },
   },
   productAnnounce: {
