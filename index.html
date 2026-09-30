@@ -132,10 +132,10 @@
       transition: color .18s ease;
     }
     .nav-links a:hover,
-    .nav-links a[aria-current="true"] {
+    .nav-links a[aria-current="location"] {
       color: var(--brand);
     }
-    .nav-links a[aria-current="true"] { font-weight: 700; }
+    .nav-links a[aria-current="location"] { font-weight: 700; }
     .btn {
       min-height: 44px;
       display: inline-flex;
@@ -820,7 +820,7 @@
       <nav class="nav-links" aria-label="页面">
         <a href="#overview">总览</a>
         <a href="#capability">产品能力</a>
-        <a href="#download" aria-current="true">下载</a>
+        <a href="#download">下载</a>
         <a href="#install">安装</a>
       </nav>
       <a class="btn btn-ink nav-cta" href="#download">立即下载 <span class="arrow" aria-hidden="true">↗</span></a>
@@ -1254,7 +1254,7 @@
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (!visible) return;
         navLinks.forEach((link) => {
-          link.setAttribute('aria-current', link.getAttribute('href') === '#' + visible.target.id ? 'true' : 'false');
+          link.setAttribute('aria-current', link.getAttribute('href') === '#' + visible.target.id ? 'location' : 'false');
         });
       }, { rootMargin: '-40% 0px -50% 0px', threshold: [0, 0.25, 0.5, 1] });
       sections.forEach((section) => io.observe(section));
