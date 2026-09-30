@@ -3,9 +3,10 @@
  *
  * The stack starts long-lived child processes (identity provider, API, worker).
  * `stop` must remove exactly those and nothing else, so every pid is recorded
- * together with a start signature captured at launch. A pid alone is not an
- * identity: pids are reused. On stop we re-read the signature and refuse to
- * signal a process that no longer matches what we started.
+ * together with a start signature and the launch command line. A pid alone is not
+ * an identity: pids are reused. On stop we re-read BOTH and refuse to signal a
+ * process that no longer matches what we started. The command line is what makes
+ * that check survive a system clock correction; see pidIsAlive.
  *
  * Nothing here enumerates or kills unrelated processes, and nothing scans for
  * "anything that looks like our app".
@@ -44,6 +45,23 @@ export function processSignature(pid: number): string | undefined {
   }
 }
 
+/**
+ * The process's full command line. Unlike `lstart`, this does NOT drift when the
+ * system clock is corrected, which is what makes it a usable fallback identity.
+ * See isOwnedProcessLive.
+ */
+export function processCommandLine(pid: number): string | undefined {
+  try {
+    const output = execFileSync('/bin/ps', ['-o', 'args=', '-p', String(pid)], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return output.length > 0 ? output : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -51,6 +69,29 @@ export function isAlive(pid: number): boolean {
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
+}
+
+/**
+ * Whether this pid is alive AND still ours, for callers that are about to signal it.
+ *
+ * This exists because `lstart` is not a reliable identity. It is recomputed on every
+ * call, and a clock correction (NTP stepping the system clock after boot) changes the
+ * rendered value for an already-running process — measured on the Hangzhou host as a
+ * 43-minute difference between what was recorded at launch and what `ps` reports
+ * later. The signature then never matches again, `stop` concludes the process is not
+ * ours, and it removes the pid file WITHOUT signalling: the old process keeps running
+ * and the next `start` trips the port guard instead.
+ *
+ * Ownership is therefore: same signature, OR the live command line is byte-identical
+ * to what was recorded at launch. The command line is stable across a clock step and
+ * still distinguishes a reused pid, which is the property the signature was for.
+ */
+export function pidIsAlive(record: OwnedProcess): boolean {
+  if (!isAlive(record.pid)) return false;
+  if (processSignature(record.pid) === record.signature) return true;
+  return typeof record.command === 'string'
+    && record.command.length > 0
+    && processCommandLine(record.pid) === record.command;
 }
 
 export function recordProcess(name: string, pid: number, command: string): OwnedProcess {
@@ -84,10 +125,13 @@ export function forgetProcess(name: string): void {
   if (existsSync(file)) unlinkSync(file);
 }
 
-/** True only when the recorded pid is still the same process instance we launched. */
+/**
+ * True when the recorded pid is still the same process instance we launched.
+ * Delegates to pidIsAlive so there is exactly one definition of ownership; the
+ * signature-only check it used to hold was defeated by a clock correction.
+ */
 export function isOwnedProcessLive(record: OwnedProcess): boolean {
-  if (!isAlive(record.pid)) return false;
-  return processSignature(record.pid) === record.signature;
+  return pidIsAlive(record);
 }
 
 function sleep(milliseconds: number): Promise<void> {
@@ -102,9 +146,9 @@ export async function stopProcess(name: string, { graceMs = 6_000, signal = 'SIG
   const record = readProcess(name);
   if (record === undefined) return `${name}: no recorded process`;
   if (!SIGNABLE.has(signal)) throw new Error(`Refusing to send ${signal}`);
-  if (!isOwnedProcessLive(record)) {
+  if (!pidIsAlive(record)) {
     forgetProcess(name);
-    return `${name}: pid ${record.pid} is gone or no longer matches the recorded start signature; record removed`;
+    return `${name}: pid ${record.pid} is gone or no longer matches the recorded identity; record removed`;
   }
   process.kill(record.pid, signal);
   const deadline = Date.now() + graceMs;
@@ -115,7 +159,7 @@ export async function stopProcess(name: string, { graceMs = 6_000, signal = 'SIG
   // Re-check ownership before escalating: the process may have exited and the
   // pid been reused during the grace period, and SIGKILL would then hit an
   // unrelated process.
-  if (!isOwnedProcessLive(record)) {
+  if (!pidIsAlive(record)) {
     forgetProcess(name);
     return `${name}: exited during grace period; record removed`;
   }
