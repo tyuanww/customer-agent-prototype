@@ -136,6 +136,34 @@
       color: var(--brand);
     }
     .nav-links a[aria-current="location"] { font-weight: 700; }
+    .nav-menu-toggle {
+      display: none;
+      min-width: 44px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .72);
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .nav-menu-toggle .menu-icon {
+      display: grid;
+      gap: 4px;
+      width: 16px;
+    }
+    .nav-menu-toggle .menu-icon i {
+      display: block;
+      height: 1.5px;
+      border-radius: 2px;
+      background: currentColor;
+      transition: transform .18s ease, opacity .18s ease;
+    }
+    .nav.is-menu-open .nav-menu-toggle .menu-icon i:first-child { transform: translateY(2.75px) rotate(45deg); }
+    .nav.is-menu-open .nav-menu-toggle .menu-icon i:last-child { transform: translateY(-2.75px) rotate(-45deg); }
+    .nav.is-menu-open .nav-menu-toggle .menu-icon i:nth-child(2) { opacity: 0; }
     .btn {
       min-height: 44px;
       display: inline-flex;
@@ -763,7 +791,35 @@
       .stats { max-width: 760px; }
     }
     @media (max-width: 820px) {
-      .nav-links { display: none; }
+      .nav-inner { position: relative; }
+      .nav-cta { display: none; }
+      .nav-menu-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: calc(100% + 12px);
+        left: 0;
+        right: 0;
+        z-index: 2;
+        margin: 0;
+        padding: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, .96);
+        box-shadow: var(--shadow);
+      }
+      .nav.is-menu-open .nav-links { display: grid; }
+      .nav-links a {
+        min-height: 46px;
+        justify-content: center;
+        margin: 0;
+        padding-inline: 12px;
+        border-radius: 12px;
+      }
+      .nav-links a:hover,
+      .nav-links a[aria-current="location"] { background: var(--lilac); }
       .hero { padding: 52px 0 56px; }
       .card-grid, .install-grid { grid-template-columns: 1fr; gap: 16px; }
       .info-card, .install-card { min-height: auto; }
@@ -817,12 +873,16 @@
           <span class="brand-sub">CUSTOMER AGENT</span>
         </span>
       </a>
-      <nav class="nav-links" aria-label="页面">
+      <nav class="nav-links" id="site-nav-links" aria-label="页面">
         <a href="#overview">总览</a>
         <a href="#capability">产品能力</a>
         <a href="#download">下载</a>
         <a href="#install">安装</a>
       </nav>
+      <button class="nav-menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav-links">
+        <span class="menu-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>菜单</span>
+      </button>
       <a class="btn btn-ink nav-cta" href="#download">立即下载 <span class="arrow" aria-hidden="true">↗</span></a>
     </div>
   </header>
@@ -1244,6 +1304,24 @@
     });
 
     const navLinks = [...document.querySelectorAll('.nav-links a[href^="#"]')];
+    const siteNav = document.querySelector('.nav');
+    const navToggle = document.querySelector('.nav-menu-toggle');
+    function setMenu(open) {
+      if (!siteNav || !navToggle) return;
+      siteNav.classList.toggle('is-menu-open', open);
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    navToggle?.addEventListener('click', () => setMenu(!siteNav.classList.contains('is-menu-open')));
+    navLinks.forEach((link) => link.addEventListener('click', () => setMenu(false)));
+    document.addEventListener('click', (event) => {
+      if (siteNav && !siteNav.contains(event.target)) setMenu(false);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && siteNav?.classList.contains('is-menu-open')) {
+        setMenu(false);
+        navToggle?.focus();
+      }
+    });
     const sections = navLinks
       .map((link) => document.querySelector(link.getAttribute('href')))
       .filter(Boolean);
