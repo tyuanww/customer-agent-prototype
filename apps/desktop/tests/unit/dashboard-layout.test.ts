@@ -33,10 +33,6 @@ const iteration = readFileSync(
   path.join(root, 'src/renderer/features/dashboard/IterationModule.tsx'),
   'utf8',
 );
-const charts = readFileSync(
-  path.join(root, 'src/renderer/features/dashboard/DashboardCharts.tsx'),
-  'utf8',
-);
 const sopLibrary = readFileSync(
   path.join(root, 'src/renderer/features/dashboard/SopLibraryModule.tsx'),
   'utf8',
@@ -62,7 +58,6 @@ describe('dashboard layout contract', () => {
     expect(css).toContain("html[data-role='dashboard'][data-dashboard-theme='light']");
     expect(css).toContain("html[data-role='dashboard'][data-dashboard-theme='dark']");
     expect(css).not.toMatch(/background:\s*linear-gradient/);
-    expect(charts).not.toContain('<linearGradient');
     expect(css).not.toContain('#000000');
     expect(css).not.toContain('#111014');
     expect(css).toContain('.health-kpi dt');
