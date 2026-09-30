@@ -186,3 +186,60 @@ test('recovery clears the counter so a later outage alerts again', async () => {
   assert.equal(counterOf(dir), '0');
   assert.equal(alertsOf(up.alertFile).length, 0);
 });
+
+const watchdogScript = fileURLToPath(new URL('./customer-agent-stack-watchdog.sh', import.meta.url));
+const watchdogService = fileURLToPath(new URL('./customer-agent-stack-watchdog.service', import.meta.url));
+const watchdogTimer = fileURLToPath(new URL('./customer-agent-stack-watchdog.timer', import.meta.url));
+
+test('the watchdog never uses flock, which may not exist on the host', () => {
+  const body = readFileSync(watchdogScript, 'utf8');
+  // flock is util-linux. If it is absent the command fails, and treating that as
+  // "lock held" would exit 0 on every run: a watchdog that looks healthy and never
+  // fires. The lock is mkdir-based instead.
+  assert.doesNotMatch(body, /^\s*flock\b/m);
+  assert.match(body, /mkdir "\$LOCK_DIR"/);
+  // A lock left by a killed run must expire, or one SIGKILL disables it forever.
+  assert.match(body, /-mmin \+10/);
+});
+
+test('the watchdog restarts via the stack unit\'s own command, and does not reseed', () => {
+  const body = readFileSync(watchdogScript, 'utf8');
+  // start, not restart: the survivors must not be disturbed.
+  assert.match(body, /node "\$STACK_ENTRY" start --no-seed/);
+  assert.doesNotMatch(body, /"\$STACK_ENTRY" restart/);
+});
+
+test('the watchdog unit carries the same environment the stack unit does', () => {
+  const unit = readFileSync(watchdogService, 'utf8');
+  assert.match(unit, /Type=oneshot/);
+  assert.match(unit, /User=customer-agent/);
+  // PATH is not inherited; node lives in /usr/local/bin on that host.
+  assert.match(unit, /Environment=PATH=\/usr\/local\/bin:/);
+  // A repair writes under the stack root and must be allowed to.
+  assert.match(unit, /ReadWritePaths=\/srv\/customer-agent\/stack/);
+  assert.match(unit, /StateDirectory=customer-agent/);
+});
+
+test('the watchdog timer starts after the stack has had a chance', () => {
+  const unit = readFileSync(watchdogTimer, 'utf8');
+  assert.match(unit, /OnBootSec=4min/);
+  assert.match(unit, /OnUnitActiveSec=1min/);
+  assert.match(unit, /Unit=customer-agent-stack-watchdog\.service/);
+});
+
+test('a healthy stack makes the watchdog exit silently without restarting', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'watchdog-'));
+  const result = spawnSync('bash', [watchdogScript], {
+    encoding: 'utf8',
+    env: {
+      PATH: process.env.PATH,
+      // Nothing listens here, so readiness fails; the entry is absent so it must
+      // stop before running anything. This asserts the guard order.
+      CUSTOMER_AGENT_READY_URL: 'http://127.0.0.1:1/ready',
+      CUSTOMER_AGENT_STACK_ENTRY: path.join(dir, 'absent-stack.ts'),
+      CUSTOMER_AGENT_WATCHDOG_LOCK: path.join(dir, 'wd.lock'),
+    },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout + result.stderr, /stack entry not found/);
+});
