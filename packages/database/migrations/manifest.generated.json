@@ -356,6 +356,39 @@
       "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
       "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
       "source_ranges": []
+    },
+    {
+      "position": 17,
+      "id": "0017_rollback_previous_target",
+      "file": "0017_rollback_previous_target.sql",
+      "sha256": "eb3ccbf3f04c4005393fc757b8f1e03d55a5078837b2b8eb9dbac72d83116788",
+      "bytes": 3969,
+      "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+      "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
+      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+      "source_ranges": []
+    },
+    {
+      "position": 18,
+      "id": "0018_owner_read_views",
+      "file": "0018_owner_read_views.sql",
+      "sha256": "c89d76992850aa562a3d24618bccb39a941a8bc88136342505a9edea5440acba",
+      "bytes": 7394,
+      "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+      "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
+      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+      "source_ranges": []
+    },
+    {
+      "position": 19,
+      "id": "0019_candidate_client_snapshot",
+      "file": "0019_candidate_client_snapshot.sql",
+      "sha256": "e4720feabd0a9b92d8d5cc22fcb6dcce75cf6e8136c0b2d9365d0d7c1cf18cd7",
+      "bytes": 5158,
+      "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+      "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
+      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+      "source_ranges": []
     }
   ]
 }

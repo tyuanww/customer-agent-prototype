@@ -235,16 +235,32 @@ function loadPriorReviewedUpgrade(projectRoot, provenance) {
     source_git_sha: sourceGitSha, source_schema_sha256: sourceSchemaSha256, sql });
 }
 
-function loadOfficeOwnerPublishOverlay(projectRoot, snapshot) {
-  const relative = 'packages/database/overlays/0016_office_owner_publish.sql';
+/**
+ * Product overlays are authored here, not derived from the frozen contract snapshot, so a new one
+ * only needs adding to PRODUCT_OVERLAYS with the next position. Keep the order stable: positions
+ * are append-only and an already-applied overlay's bytes must never change.
+ *
+ * Every overlay goes through loadProductOverlay. Do not add a bespoke loader for one entry and
+ * then filter it out of this list: that splits the registry from what actually ships, and the
+ * next overlay added tends to be inserted in the wrong place.
+ */
+const PRODUCT_OVERLAYS = Object.freeze([
+  Object.freeze({ position: 16, id: '0016_office_owner_publish' }),
+  Object.freeze({ position: 17, id: '0017_rollback_previous_target' }),
+  Object.freeze({ position: 18, id: '0018_owner_read_views' }),
+  Object.freeze({ position: 19, id: '0019_candidate_client_snapshot' }),
+]);
+
+function loadProductOverlay(projectRoot, snapshot, id, position) {
+  const relative = `packages/database/overlays/${id}.sql`;
   const overlayPath = path.join(projectRoot, relative);
   if (!existsSync(overlayPath) || !lstatSync(overlayPath).isFile()) {
-    throw new Error('Office owner publish overlay migration is missing');
+    throw new Error(`Product overlay migration is missing: ${id}`);
   }
   const body = readFileSync(overlayPath, 'utf8');
   const sql = [
     `-- ${GENERATED_HEADER}`,
-    '-- 0016_office_owner_publish; product overlay (not a frozen contract snapshot slice)',
+    `-- ${id}; product overlay (not a frozen contract snapshot slice)`,
     `-- contract_set_id=${snapshot.contract_set_id}`,
     `-- source_git_sha=${snapshot.source_git_sha}`,
     `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
@@ -252,9 +268,9 @@ function loadOfficeOwnerPublishOverlay(projectRoot, snapshot) {
     '',
   ].join('\n');
   return Object.freeze({
-    position: 16,
-    id: '0016_office_owner_publish',
-    file: '0016_office_owner_publish.sql',
+    position,
+    id,
+    file: `${id}.sql`,
     sha256: sha256(sql),
     bytes: Buffer.byteLength(sql),
     contract_set_id: snapshot.contract_set_id,
@@ -305,12 +321,13 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const { lines, ranges } = opsLoopUpgradeRanges(snapshot.database_source, projectRoot);
   const upgradeSourceBody = linesForRanges(lines, ranges);
   const upgrade = renderUpgradeMigration(upgradeSourceBody, ranges, snapshot);
-  const overlay = loadOfficeOwnerPublishOverlay(projectRoot, snapshot);
+  const productOverlays = PRODUCT_OVERLAYS
+    .map((entry) => loadProductOverlay(projectRoot, snapshot, entry.id, entry.position));
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
     ...REVIEWED_UPGRADES.map((p) => loadPriorReviewedUpgrade(projectRoot, p)),
     upgrade,
-    overlay,
+    ...productOverlays,
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
