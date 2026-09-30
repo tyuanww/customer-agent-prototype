@@ -73,16 +73,6 @@ export type OverviewHealthMetric = {
   target: DashboardModuleId;
 };
 
-export type OverviewTrendMetricId = 'questions' | 'noHitRate' | 'copyRate';
-
-export type OverviewTrendPoint = {
-  label: string;
-  range: string;
-  questions: number;
-  noHitRate: number;
-  copyRate: number;
-};
-
 export type OverviewStructureItem = {
   id: LedgerTerminal;
   label: string;
@@ -262,39 +252,12 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         target: 'wording',
       },
     ] satisfies OverviewHealthMetric[],
-    trendMetrics: [
-      {
-        id: 'questions',
-        label: '根问题量',
-        unit: '个',
-        decimals: 0,
-        explanation: '同一客户问题的合成去重根问题量，不等于消息条数或真实接待量。',
-      },
-      {
-        id: 'noHitRate',
-        label: '无命中率',
-        unit: '%',
-        decimals: 1,
-        explanation: '本地合成检索无可用有效稿的占比，只用于演示趋势判读。',
-      },
-      {
-        id: 'copyRate',
-        label: '复制完成率',
-        unit: '%',
-        decimals: 1,
-        explanation: '只表示写入剪贴板成功，不等于发送、采纳、正确或问题解决。',
-      },
-    ] as const,
-    trend: [
-      { label: 'W1', range: '06/22–06/28', questions: 94, noHitRate: 12.8, copyRate: 50.4 },
-      { label: 'W2', range: '06/29–07/05', questions: 101, noHitRate: 11.9, copyRate: 52.8 },
-      { label: 'W3', range: '07/06–07/12', questions: 108, noHitRate: 11.2, copyRate: 54.1 },
-      { label: 'W4', range: '07/13–07/19', questions: 105, noHitRate: 10.7, copyRate: 55.6 },
-      { label: 'W5', range: '07/20–07/26', questions: 116, noHitRate: 9.8, copyRate: 57.4 },
-      { label: 'W6', range: '07/27–08/02', questions: 121, noHitRate: 9.1, copyRate: 59.2 },
-      { label: 'W7', range: '08/03–08/09', questions: 124, noHitRate: 8.7, copyRate: 60.1 },
-      { label: 'W8', range: '08/10–08/13', questions: 128, noHitRate: 8.4, copyRate: 61.3 },
-    ] satisfies OverviewTrendPoint[],
+    // The W1-W8 trend series and its trendMetrics used to live here: eight weeks of
+    // invented questions/noHitRate/copyRate numbers that no component ever rendered
+    // (TrendChart and StructureDonut had zero importers). They were removed rather
+    // than left in place, because DESIGN.md forbids inventing numbers and the first
+    // person to wire a chart to them would have shipped fabricated analytics. The
+    // real rates come from the retrieval telemetry store.
     operationStructure: [
       {
         id: 'copied',

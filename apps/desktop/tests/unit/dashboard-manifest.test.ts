@@ -135,9 +135,10 @@ describe('dashboard manifest', () => {
 
   it('keeps overview charts internally consistent and explicitly non-production', () => {
     const overview = DASHBOARD_MANIFEST.overview;
-    expect(overview.trend).toHaveLength(8);
+    // The W1-W8 trend series was removed: it was eight weeks of invented numbers with no
+    // render path. Assert it stays gone, so nobody reintroduces fabricated analytics.
+    expect('trend' in overview).toBe(false);
     expect(overview.operationStructure.reduce((sum, item) => sum + item.count, 0)).toBe(346);
-    expect(overview.trend.at(-1)).toMatchObject({ questions: 128, noHitRate: 8.4, copyRate: 61.3 });
     expect(new Set(overview.health.map((item) => item.id)).size).toBe(overview.health.length);
     expect(overview.health.every((item) => item.period && item.definition && item.note)).toBe(true);
     expect(overview.health.every((item) => DASHBOARD_MODULE_IDS.includes(item.target))).toBe(true);
