@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
-import { tmpdir } from 'node:os';
+import os, { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
+import { buildAccount, isAdmittedHost, loadPasswordAccounts } from './identity-admission.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
   DEFAULT_STACK_ROOT,
@@ -272,39 +273,129 @@ async function freeLoopbackPort(): Promise<number> {
 describe('synthetic identity password', () => {
   it('grants a seeded binding and rejects unknown credentials without enumerating', async () => {
     const port = await freeLoopbackPort();
-    const provider = createIdentityProvider({ port });
-    const origin = await provider.listen();
+    // The provider no longer has a built-in password; it reads the account file. Pass
+    // it explicitly: the module-level default is fixed at import time, so an
+    // environment variable set inside a test would have no effect.
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-accounts-'));
+    const password = 'probe-password-not-a-default';
+    const accountsFile = path.join(dir, 'password-accounts.json');
+    writeFileSync(accountsFile, JSON.stringify([
+      buildAccount('synthetic_agent', 'synthetic_agent', password),
+      buildAccount('synthetic_owner', 'synthetic_owner', password),
+    ]));
     try {
-      const ok = await fetch(`${origin}/password`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username: 'synthetic_agent', password: 'synthetic-password' }),
-      });
-      assert.equal(ok.status, 200);
-      assert.deepEqual(await ok.json(), { code: 'synthetic_agent' });
-      const owner = await fetch(`${origin}/password`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username: 'synthetic_owner', password: 'synthetic-password' }),
-      });
-      assert.equal(owner.status, 200);
-      assert.deepEqual(await owner.json(), { code: 'synthetic_owner' });
-      const bad = await fetch(`${origin}/password`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username: 'synthetic_agent', password: 'wrong' }),
-      });
-      assert.equal(bad.status, 401);
-      assert.deepEqual(await bad.json(), { error: 'invalid_credentials' });
-      const unknown = await fetch(`${origin}/password`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username: 'not_a_subject', password: 'synthetic-password' }),
-      });
-      assert.equal(unknown.status, 401);
-      assert.deepEqual(await unknown.json(), { error: 'invalid_credentials' });
+      const provider = createIdentityProvider({ port, accountsFile });
+      const origin = await provider.listen();
+      try {
+        const ok = await fetch(`${origin}/password`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: 'synthetic_agent', password }),
+        });
+        assert.equal(ok.status, 200);
+        assert.deepEqual(await ok.json(), { code: 'synthetic_agent' });
+        const ownerResponse = await fetch(`${origin}/password`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: 'synthetic_owner', password }),
+        });
+        assert.equal(ownerResponse.status, 200);
+        assert.deepEqual(await ownerResponse.json(), { code: 'synthetic_owner' });
+        const bad = await fetch(`${origin}/password`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: 'synthetic_agent', password: 'wrong' }),
+        });
+        assert.equal(bad.status, 401);
+        assert.deepEqual(await bad.json(), { error: 'invalid_credentials' });
+        const unknown = await fetch(`${origin}/password`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: 'not_a_subject', password }),
+        });
+        assert.equal(unknown.status, 401);
+        assert.deepEqual(await unknown.json(), { error: 'invalid_credentials' });
+      } finally {
+        await provider.close();
+      }
     } finally {
-      await provider.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('no longer accepts the historical hardcoded password', async () => {
+    const port = await freeLoopbackPort();
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-accounts-'));
+    const accountsFile = path.join(dir, 'password-accounts.json');
+    writeFileSync(accountsFile, JSON.stringify([
+      buildAccount('synthetic_owner', 'synthetic_owner', 'a-random-one-off-password'),
+    ]));
+    try {
+      const provider = createIdentityProvider({ port, accountsFile });
+      const origin = await provider.listen();
+      try {
+        // This is the string the previous version shipped as a default for every
+        // subject, including owner. It must now be rejected.
+        const response = await fetch(`${origin}/password`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: 'synthetic_owner', password: 'synthetic-password' }),
+        });
+        assert.equal(response.status, 401);
+      } finally {
+        await provider.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to start when the account file is absent, instead of seeding a default', async () => {
+    const port = await freeLoopbackPort();
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-accounts-'));
+    try {
+      assert.throws(
+        () => createIdentityProvider({ port, accountsFile: path.join(dir, 'absent.json') }),
+        /identity accounts file is missing/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('identity admission', () => {
+  it('admits loopback Host headers and rejects a public one', () => {
+    for (const host of ['127.0.0.1', '127.0.0.1:43101', 'localhost:43101', '[::1]:43101']) {
+      assert.equal(isAdmittedHost(host), true, `${host} should be admitted`);
+    }
+    // The tunnel forwards the public hostname; this is the request the old
+    // remoteAddress-only check let straight through.
+    assert.equal(isAdmittedHost('agent-pass.jianghua.site'), false);
+    assert.equal(isAdmittedHost('agent-pass.jianghua.site:443'), false);
+    assert.equal(isAdmittedHost(undefined), false);
+    assert.equal(isAdmittedHost(''), false);
+  });
+
+  it('permits an extra hostname only when explicitly configured', () => {
+    const environment = { CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS: 'probe.example.test' };
+    assert.equal(isAdmittedHost('probe.example.test', environment), true);
+    assert.equal(isAdmittedHost('probe.example.test:443', environment), true);
+    assert.equal(isAdmittedHost('agent-pass.jianghua.site', environment), false);
+  });
+
+  it('refuses to load accounts from a missing file instead of seeding a default', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-accounts-'));
+    try {
+      assert.throws(
+        () => loadPasswordAccounts(path.join(dir, 'absent.json')),
+        /identity accounts file is missing/,
+      );
+      const empty = path.join(dir, 'empty.json');
+      writeFileSync(empty, '[]');
+      assert.throws(() => loadPasswordAccounts(empty), /contains no usable account/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

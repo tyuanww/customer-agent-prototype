@@ -22,15 +22,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SYNTHETIC_IDENTITIES } from './profile.ts';
+import { STACK_ROOT, SYNTHETIC_IDENTITIES } from './profile.ts';
+import { isAdmittedHost, loadPasswordAccounts, passwordMatches } from './identity-admission.ts';
 
 const MAX_BODY_BYTES = 4_096;
 const ALLOWED_BINDINGS = new Set(SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId));
+const ACCOUNTS_FILE = path.join(STACK_ROOT, 'password-accounts.json');
 
 /** The authorize endpoint always grants the agent subject; /exchange picks the subject. */
 const DEFAULT_BINDING = 'synthetic_agent';
-/** Non-secret local password for the synthetic account form. Never a production credential. */
-const SYNTHETIC_PASSWORD = 'synthetic-password';
 
 function send(response: ServerResponse, status: number, body: string, contentType = 'application/json'): void {
   response.writeHead(status, { 'content-type': contentType, 'cache-control': 'no-store' });
@@ -51,14 +51,17 @@ function readBody(request: IncomingMessage): Promise<string | null> {
   });
 }
 
-function loopback(url: URL, request: IncomingMessage): boolean {
-  return url.hostname === '127.0.0.1' && request.socket.remoteAddress === '127.0.0.1';
-}
-
-export function createIdentityProvider({ port }: Readonly<{ port: number }>) {
+export function createIdentityProvider(
+  { port, accountsFile = ACCOUNTS_FILE }: Readonly<{ port: number; accountsFile?: string }>,
+) {
+  // Loaded once at startup. A missing or empty file fails the process rather than
+  // falling back to a built-in password, which is what the previous version did.
+  const accounts = loadPasswordAccounts(accountsFile);
   const server = createServer((request, response) => {
+    // NOTE: `url` is built from a fixed loopback base, so `url.hostname` is always
+    // '127.0.0.1' and can never reject anything. Admission must read the Host header.
     const url = new URL(request.url ?? '/', `http://127.0.0.1:${String(port)}`);
-    if (!loopback(url, request)) { send(response, 403, '{"error":"loopback_only"}'); return; }
+    if (!isAdmittedHost(request.headers.host)) { send(response, 403, '{"error":"loopback_only"}'); return; }
 
     if (request.method === 'GET' && url.pathname === '/authorize') {
       const state = url.searchParams.get('state');
@@ -88,7 +91,13 @@ export function createIdentityProvider({ port }: Readonly<{ port: number }>) {
         const password = Reflect.get(parsed, 'password');
         if (typeof username !== 'string' || typeof password !== 'string') { send(response, 400, '{"error":"invalid_request"}'); return; }
         const identity = SYNTHETIC_IDENTITIES.find((item) => item.bindingId === username);
-        if (!identity || password !== SYNTHETIC_PASSWORD) { send(response, 401, '{"error":"invalid_credentials"}'); return; }
+        // Verify against the account file. The old code compared the submitted
+        // password to a module constant, which granted any seeded subject — including
+        // owner — to anyone who knew that string.
+        const account = identity === undefined ? undefined : accounts.get(username);
+        if (!identity || !account || !passwordMatches(account, password)) {
+          send(response, 401, '{"error":"invalid_credentials"}'); return;
+        }
         send(response, 200, JSON.stringify({ code: identity.bindingId }));
       });
       return;
