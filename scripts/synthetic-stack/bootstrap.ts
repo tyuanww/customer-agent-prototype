@@ -28,16 +28,6 @@ function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-/** True once the frozen migrations have been applied to this database. */
-export async function isMigrated(client): Promise<boolean> {
-  try {
-    const result = await client.query('SELECT 1 FROM customer_agent_meta.schema_migrations LIMIT 1');
-    return result.rowCount !== null && result.rowCount > 0;
-  } catch {
-    return false;
-  }
-}
-
 export async function applyMigrations(client): Promise<string> {
   const result = await applyDatabaseMigrations(client);
   return `migrations: ${String(result.applied?.length ?? 0)} applied`;
@@ -107,8 +97,10 @@ export async function seedFeishuBindings(client, bindings: readonly FeishuStackB
 
 export async function bootstrapDatabase(client): Promise<readonly string[]> {
   const steps: string[] = [];
-  if (!(await isMigrated(client))) steps.push(await applyMigrations(client));
-  else steps.push('migrations: already applied');
+  // The database runner owns fresh, partial, complete, and drifted ledger
+  // states. Skipping it after seeing one ledger row would strand an older
+  // database before newly released migrations and make readiness fail.
+  steps.push(await applyMigrations(client));
   steps.push(await seedReferenceData(client));
   return Object.freeze(steps);
 }
