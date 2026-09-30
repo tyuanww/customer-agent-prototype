@@ -274,6 +274,19 @@ export function syncHydrateCatalog(options: Readonly<{
   items: readonly HydrateSnapshotItem[];
   dryRun?: boolean;
   rebuild?: boolean;
+  /**
+   * The snapshot came from the announcement path, which is always the server's
+   * current published release — it is the source of truth, not a seed drop.
+   * Kept-larger exists to stop a seed snapshot from shrinking a real catalog
+   * (see docs/explanation-desktop-retrieval.md). Applied to a release upgrade
+   * it becomes a permanent trap: a release that removes more items than it adds
+   * can never be adopted, and no runtime path can recover. Authoritative
+   * snapshots therefore bypass the size guard and adopt whenever the release
+   * actually changed. Callers must pass this explicitly — it cannot be read off
+   * the file, because serializeHydrateDocument writes only
+   * {version, releaseId, scripts} with no source marker.
+   */
+  authoritative?: boolean;
 }>): SyncHydrateResult {
   const indexPath = assertOffRepoIndexPath(options.path, options.repoRoot);
   const previous = existingFingerprint(indexPath);
@@ -308,7 +321,12 @@ export function syncHydrateCatalog(options: Readonly<{
       reason: 'invalid',
     });
   }
-  if (!options.rebuild && previous && previous.total > parsed.length) {
+  // An authoritative snapshot has moved on to a different release, so the size
+  // guard does not apply. Within the same release it still does: a short read of
+  // the current release must not shrink what we already have.
+  const releaseChanged = previous !== null && previous.releaseId !== options.releaseId;
+  const guardApplies = !options.rebuild && !(options.authoritative === true && releaseChanged);
+  if (guardApplies && previous && previous.total > parsed.length) {
     return Object.freeze({
       path: indexPath,
       releaseId: previous.releaseId,
@@ -357,6 +375,7 @@ export function persistHydrateFromEnv(
       repoRoot,
       releaseId,
       items,
+      authoritative: true,
     });
     if (hydrate.reason === 'kept-larger' || hydrate.reason === 'empty' || hydrate.reason === 'invalid') {
       return hydrate;
@@ -370,6 +389,7 @@ export function persistHydrateFromEnv(
           repoRoot,
           releaseId,
           items,
+          authoritative: true,
         });
         indexWrote = index.wrote;
       } catch {

@@ -7,6 +7,7 @@ const LIST = 'dashboard:wording-list';
 const CONTENT_SESSION = 'dashboard:content-session';
 const CONTENT_PARSE = 'dashboard:content-parse';
 const CONTENT_PUBLISH = 'dashboard:content-publish';
+const CONTENT_ROLLBACK_PREVIOUS = 'dashboard:content-rollback-previous';
 const CONTENT_CANCEL_IN_FLIGHT = 'dashboard:content-cancel-in-flight';
 const ITERATION_LIST = 'dashboard:iteration-list';
 const ITERATION_START = 'dashboard:iteration-start';
@@ -261,6 +262,26 @@ function isContentParse(value: unknown): boolean {
   return record.ok === false && typeof record.code === 'string' && typeof record.message === 'string';
 }
 
+function isContentRollback(value: unknown): boolean {
+  if (isContentFailure(value)) return true;
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'rollbackOfReleaseId', 'publisherDisplayName'])
+    && record.ok === true
+    && typeof record.releaseId === 'string'
+    && record.releaseId.length > 0
+    && record.releaseId.length <= 128
+    && Number.isSafeInteger(record.releaseSeq)
+    && (record.releaseSeq as number) >= 1
+    && typeof record.rollbackOfReleaseId === 'string'
+    && record.rollbackOfReleaseId.length > 0
+    && record.rollbackOfReleaseId.length <= 128
+    && (record.publisherDisplayName === null
+      || (typeof record.publisherDisplayName === 'string'
+        && record.publisherDisplayName.length > 0
+        && record.publisherDisplayName.length <= 64));
+}
+
 contextBridge.exposeInMainWorld('dashboardContent', {
   async session() {
     try {
@@ -282,6 +303,14 @@ contextBridge.exposeInMainWorld('dashboardContent', {
     try {
       const value: unknown = await ipcRenderer.invoke(CONTENT_PUBLISH, request);
       return isContentPublish(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async rollbackPrevious() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(CONTENT_ROLLBACK_PREVIOUS);
+      return isContentRollback(value) ? value : unavailable;
     } catch {
       return unavailable;
     }

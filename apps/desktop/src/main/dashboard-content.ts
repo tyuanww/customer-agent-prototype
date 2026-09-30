@@ -7,6 +7,7 @@ import {
   CONTENT_IMPORT_MAX_BYTES,
   CONTENT_IMPORT_TIMEOUT_MS,
   CONTENT_PUBLISH_COPY,
+  CONTENT_ROLLBACK_COPY,
   ACTOR_IN_FLIGHT_IMPORT_ID,
   contentPublishGate,
   dashboardContentFailure,
@@ -16,6 +17,7 @@ import {
   type DashboardContentImportRequest,
   type DashboardContentImportResult,
   type DashboardContentPublishResult,
+  type DashboardContentRollbackResult,
   type DashboardContentSessionResult,
 } from '../shared/dashboard-content';
 import { ProductHttpError } from './product-http';
@@ -304,6 +306,39 @@ export async function dashboardContentPublish(
       releaseSeq: release.releaseSeq,
       publisherDisplayName: view.displayName,
       summary,
+    });
+  });
+}
+
+export async function dashboardContentRollbackPrevious(
+  session: DashboardContentSessionClient | null,
+): Promise<DashboardContentRollbackResult> {
+  return withSession(session, async (client, epoch) => {
+    const view = client.view();
+    if (!view.signedIn || view.role === null) {
+      return dashboardContentFailure('UNAUTHORIZED', CONTENT_PUBLISH_COPY.noSession);
+    }
+    // Rollback is owner-only in the contract (x-required-roles: [owner]); gate here so a coach
+    // gets a readable reason instead of an opaque API rejection.
+    if (view.role !== 'owner') {
+      return dashboardContentFailure('FORBIDDEN', CONTENT_ROLLBACK_COPY.ownerOnly);
+    }
+    const response = await client.request(epoch, '/v1/content/rollback-previous', {
+      method: 'POST',
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    const release = parsePublishRelease(response.value);
+    const record = response.value as Record<string, unknown> | null;
+    const rollbackOf = record === null ? undefined : Reflect.get(record, 'rollback_of_release_id');
+    if (!release || typeof rollbackOf !== 'string' || rollbackOf.length < 1) {
+      return dashboardContentFailure('UNAVAILABLE');
+    }
+    return Object.freeze({
+      ok: true as const,
+      releaseId: release.releaseId,
+      releaseSeq: release.releaseSeq,
+      rollbackOfReleaseId: rollbackOf,
+      publisherDisplayName: view.displayName,
     });
   });
 }

@@ -176,6 +176,13 @@ export function syncRetrievalIndexFromSnapshot(options: Readonly<{
   items: readonly RetrievalSnapshotItem[];
   dryRun?: boolean;
   rebuild?: boolean;
+  /**
+   * See syncHydrateCatalog: the announcement path is the server's current
+   * release, so a release change must be adoptable even when it removes more
+   * items than it adds. This file's envelope carries `source`, but the guard
+   * decision still belongs to the caller, not to the file.
+   */
+  authoritative?: boolean;
 }>): SyncRetrievalIndexResult {
   const indexPath = assertOffRepoIndexPath(options.path, options.repoRoot);
   const previous = existingIndex(indexPath);
@@ -207,7 +214,10 @@ export function syncRetrievalIndexFromSnapshot(options: Readonly<{
       reason: 'invalid',
     });
   }
-  if (!options.rebuild && previous && previousTotal > parsed.length) {
+  // See syncHydrateCatalog. Release change lifts the guard; same release keeps it.
+  const releaseChanged = previousReleaseId !== null && previousReleaseId !== options.releaseId;
+  const guardApplies = !options.rebuild && !(options.authoritative === true && releaseChanged);
+  if (guardApplies && previous && previousTotal > parsed.length) {
     return Object.freeze({
       path: indexPath,
       releaseId: previousReleaseId ?? options.releaseId,

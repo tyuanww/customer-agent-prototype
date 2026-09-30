@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentModule } from '../../src/renderer/features/dashboard/ContentModule';
-import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
+import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY, CONTENT_ROLLBACK_COPY } from '../../src/shared/dashboard-content';
 import type {
   DashboardContentApi,
   DashboardContentFailure,
@@ -30,6 +30,11 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
       message: '服务暂不可用，请重试',
     })),
     cancelInFlight: vi.fn(async () => ({ ok: true as const })),
+    rollbackPrevious: vi.fn(async () => ({
+      ok: false as const,
+      code: 'UNAVAILABLE' as const,
+      message: '服务暂不可用，请重试',
+    })),
   };
 }
 
@@ -618,5 +623,91 @@ describe('ContentModule pending dev disclosure', () => {
     // Correcting the domain must not re-enable publish for the same round.
     await user.selectOptions(screen.getByTestId('content-domain-override'), 'campaign');
     expect(screen.getByTestId('publish-action')).toBeDisabled();
+  });
+});
+
+describe('ContentModule rollback to previous release', () => {
+  beforeEach(() => {
+    delete window.dashboardContent;
+  });
+
+  afterEach(() => {
+    delete window.dashboardContent;
+  });
+
+  it('keeps rollback off without a session and for non-owner roles', async () => {
+    cleanup();
+    render(<ContentModule />);
+    expect(screen.getByTestId('content-rollback-previous')).toBeDisabled();
+
+    for (const role of ['agent', 'coach'] as const) {
+      cleanup();
+      const api = mockSession(role);
+      window.dashboardContent = api;
+      render(<ContentModule />);
+      await waitFor(() => expect(api.session).toHaveBeenCalled());
+      expect(screen.getByTestId('content-rollback-previous')).toBeDisabled();
+      expect(api.rollbackPrevious).not.toHaveBeenCalled();
+    }
+  });
+
+  it('requires a confirmation click before calling the API, then reports the copied release', async () => {
+    const api = mockSession('owner');
+    api.rollbackPrevious = vi.fn(async () => ({
+      ok: true as const,
+      releaseId: 'rel_28',
+      releaseSeq: 28,
+      rollbackOfReleaseId: 'rel_27',
+      publisherDisplayName: '合成管理员',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+
+    await user.click(screen.getByTestId('content-rollback-previous'));
+    // First click only opens the confirmation; nothing is sent yet.
+    expect(api.rollbackPrevious).not.toHaveBeenCalled();
+    expect(screen.getByTestId('content-rollback-confirm')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('content-rollback-confirm-action'));
+    await waitFor(() => expect(api.rollbackPrevious).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      expect(screen.getByTestId('publish-feedback')).toHaveTextContent('已回滚到 rel_27');
+    });
+    expect(screen.getByTestId('publish-feedback')).toHaveTextContent('rel_28');
+  });
+
+  it('reports the first-version case as no previous release instead of a raw error', async () => {
+    const api = mockSession('owner');
+    // product-http maps the API's NOT_FOUND (404) onto GONE before it reaches the renderer.
+    api.rollbackPrevious = vi.fn(async () => ({
+      ok: false as const,
+      code: 'GONE' as const,
+      message: '登录请求已过期，请重试',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+
+    await user.click(screen.getByTestId('content-rollback-previous'));
+    await user.click(screen.getByTestId('content-rollback-confirm-action'));
+    await waitFor(() => {
+      expect(screen.getByTestId('publish-feedback')).toHaveTextContent(CONTENT_ROLLBACK_COPY.noPrevious);
+    });
+  });
+
+  it('cancelling the confirmation sends nothing', async () => {
+    const api = mockSession('owner');
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+
+    await user.click(screen.getByTestId('content-rollback-previous'));
+    await user.click(screen.getByTestId('content-rollback-confirm-cancel'));
+    expect(screen.queryByTestId('content-rollback-confirm')).not.toBeInTheDocument();
+    expect(api.rollbackPrevious).not.toHaveBeenCalled();
   });
 });

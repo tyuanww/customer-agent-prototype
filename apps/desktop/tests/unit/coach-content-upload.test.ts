@@ -257,6 +257,7 @@ describe('coach content upload parser', () => {
           csvText: 'scene,script,domain\n面膜紫适用人群,亲亲这是话术,product',
         }),
         publishDraft: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
+        rollbackPrevious: async () => ({ ok: false, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' }),
         cancelInFlight: async () => ({ ok: true as const }),
       };
       const ok = await readCoachUploadFile(zipFile());
