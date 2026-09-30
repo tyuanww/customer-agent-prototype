@@ -69,6 +69,11 @@ export type SearchRouteDependencies = Readonly<{
   operation: SearchOperation;
   logHash: Readonly<{ version: string; key: string }>;
   idempotencyHmac: ApiHmacKeyRing;
+  /**
+   * Proof that the current notice version was accepted by this user. Required for
+   * collection_mode=pilot_recorded; omitted means such a request is denied.
+   */
+  hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>;
 }>;
 
 export function createUnavailableSearchOperation(): SearchOperation {
@@ -125,10 +130,22 @@ export function registerSearchRoute(
       return sendValidationError(reply);
     }
     if (contract.value.platform_source === 'unknown') return sendValidationError(reply);
-    if (contract.value.collection_mode !== 'synthetic') {
+    if (contract.value.collection_mode !== 'synthetic' && contract.value.collection_mode !== 'pilot_recorded') {
       return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
     }
     if (dependencies === undefined) return sendOverloaded(reply);
+    // pilot_recorded requires server-side proof that this user accepted the CURRENT
+    // notice; the contract adds that this check may not be delegated to JSON Schema and
+    // must fail closed. An unavailable check therefore denies the collection, it does
+    // not silently fall back to "record anyway".
+    if (contract.value.collection_mode === 'pilot_recorded') {
+      if (dependencies.hasAcceptedCurrentNotice === undefined) {
+        return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
+      }
+      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id)
+        .catch(() => false);
+      if (!accepted) return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
+    }
 
     const redacted = redactQueryText(contract.value.query_text);
     const actorSubjectHash = hmacSafeValue(

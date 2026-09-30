@@ -30,6 +30,7 @@ import {
   runWithRequestContext,
   type ApiAccessLogSink,
 } from './request-log.js';
+import { registerNoticeRoutes, type NoticeRouteDependencies } from './notice-routes.js';
 import type { ApiRuntimeConfig } from './runtime-config.js';
 import type {
   ServiceReadinessChecks,
@@ -74,6 +75,7 @@ export function createApiApp(
     logHash: Readonly<{ version: string; key: string }>;
     sink?: ApiAccessLogSink;
   }>,
+  noticeDependencies?: NoticeRouteDependencies,
 ): FastifyInstance {
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
@@ -135,6 +137,7 @@ export function createApiApp(
   });
 
   registerAuthRoutes(app, authService);
+  registerNoticeRoutes(app, authService, noticeDependencies);
   if (authService.kind === 'product') registerProductAuthRoutes(app, authService);
   registerPolicyReadRoute(app, config, repository, authService);
   registerPolicyWriteRoute(app, policyAdminRepository, authService);

@@ -14,7 +14,11 @@ import { hmacSafeValue, prepareIdempotencyHashes } from '../src/idempotency.js';
 import type { PreparedSearchOperation } from '../src/search-routes.js';
 import { parseApiRuntimeConfig } from '../src/runtime-config.js';
 import { unavailableContentImportRepository } from '../src/content-import-repository.js';
-import type { ServiceRepository } from '../src/service-repository.js';
+import {
+  createServiceRepositoryForPool,
+  type ServiceRepository,
+} from '../src/service-repository.js';
+import { createNoticeServiceForPool } from '../src/notice-service.js';
 
 const describePg15 = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1'
   ? describe.sequential
@@ -606,4 +610,114 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
     `, [queryId, request.sourceDenial.denialKey]);
     expect(facts.rows[0]).toEqual({ queries: '0', impressions: '0', idempotency: '0', audits: '1' });
   });
+});
+
+/**
+ * The pilot_recorded gate, against a real database. The unit test proves the route
+ * refuses when the check says no; this proves the check actually reads the tables the
+ * deploy would seed, and that the whole path opens only after a decision row exists.
+ */
+describePg15('pilot_recorded requires an accepted notice', () => {
+  let harness: Pg15Harness;
+  let owner: Client;
+  let pool: Pool;
+  const NOTICE_VERSION = 'pilot-notice-v1';
+
+  beforeAll(async () => {
+    harness = new Pg15Harness();
+    harness.start();
+    const database = harness.createDatabase('notice_gate');
+    owner = await harness.connect(database.config);
+    await applyDatabaseMigrations(owner);
+    pool = new Pool({ ...database.config, max: 2 });
+  }, 120_000);
+
+  afterAll(async () => {
+    // The pool is NOT ended here: createServiceRepositoryForPool registers it in
+    // sharedRuntimePools, so app.close() already ends it, and ending it twice throws
+    // "Called end on pool more than once".
+    await owner?.end();
+    harness?.stop();
+  }, 60_000);
+
+  it('denies collection until a decision row exists, then allows it', async () => {
+    const service = createServiceRepositoryForPool(pool as never, {});
+    const noticeService = createNoticeServiceForPool(pool, false);
+    const repository = createEventRepository(pool);
+    void repository;
+    // The gate must read the real tables, so wire the real service rather than a stub.
+    const app = createApiApp(
+      parseApiRuntimeConfig({
+        CUSTOMER_AGENT_PROFILE: 'test',
+        AUTH_MODE: 'mock',
+        CUSTOMER_AGENT_API_PORT: '0',
+        CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-notice-gate',
+      }),
+      service,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined,
+      undefined,
+      { service: noticeService },
+    );
+    const headers = { 'x-mock-user': ACTOR.user_id, 'x-mock-role': ACTOR.role };
+
+    // Acquire and RELEASE: the pool has max 2, and a leaked client here exhausts it
+    // and hangs every later connect until the test times out.
+    const acceptedNow = async (): Promise<boolean> => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE app_runtime');
+        const result = await noticeService.hasAcceptedCurrentNotice(client, ACTOR.user_id);
+        await client.query('COMMIT');
+        return result;
+      } finally {
+        client.release();
+      }
+    };
+
+    // No notice published at all yet: /current is a clean 404, not a crash.
+    const before = await app.inject({ method: 'GET', url: '/v1/notices/current', headers });
+    expect(before.statusCode).toBe(404);
+
+    // The gate is closed while there is nothing to accept.
+    expect(await acceptedNow()).toBe(false);
+
+    // Publish a notice and accept it as the actor.
+    await owner.query(
+      `INSERT INTO public.privacy_notices(notice_version, notice_text, content_hash, status, published_at)
+       VALUES ($1, $2, $3, 'current', now())`,
+      [NOTICE_VERSION, '试点采集告知：坐席提问正文将在脱敏后用于改进客服话术。', sha256('pilot-notice-v1')],
+    );
+    const noticeClient = await pool.connect();
+    try {
+      await noticeClient.query('BEGIN');
+      await noticeClient.query('SET LOCAL ROLE app_runtime');
+      await noticeClient.query(
+        `INSERT INTO public.notice_decisions(notice_version, user_id, decision, decision_source)
+         VALUES ($1, $2, 'accepted', 'first_run_prompt')`,
+        [NOTICE_VERSION, ACTOR.user_id],
+      );
+      await noticeClient.query('COMMIT');
+    } finally { noticeClient.release(); }
+
+    const current = await app.inject({ method: 'GET', url: '/v1/notices/current', headers });
+    expect(current.statusCode).toBe(200);
+    expect(current.json()).toMatchObject({
+      notice: { version: NOTICE_VERSION },
+      decision: 'accepted',
+    });
+
+    expect(await acceptedNow()).toBe(true);
+
+    // The audit row is append-only: a second, different decision is a conflict, not an overwrite.
+    const conflict = await app.inject({
+      method: 'POST', url: `/v1/notices/${NOTICE_VERSION}/decision`,
+      headers: { ...headers, 'idempotency-key': 'notice-key-0001' },
+      payload: { decision: 'declined' },
+    });
+    expect(conflict.statusCode).toBe(409);
+
+    await app.close();
+  }, 120_000);
 });

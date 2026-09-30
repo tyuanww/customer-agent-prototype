@@ -9,6 +9,7 @@ import { createContentReleaseServiceForPool } from './content-release-service.js
 import { createAnnounceServiceForPool } from './announce-service.js';
 import { createIterationTaskRepository } from './iteration-task-repository.js';
 import { createOpsLoopRepository } from './ops-loop-repository.js';
+import { createNoticeServiceForPool } from './notice-service.js';
 import { sharedPolicyAdminPool } from './policy-admin-repository.js';
 import type { FastifyInstance } from 'fastify';
 import { createApiApp } from './app.js';
@@ -103,12 +104,29 @@ export async function startApi(
           repository: createOpsLoopRepository(runtimePool),
           idempotencyHmac: bootstrap.idempotencyHmac,
         };
+        const notice = runtimePool === undefined ? undefined : {
+          service: createNoticeServiceForPool(runtimePool, false),
+        };
         const app = createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
-            logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
+            logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac,
+            // Reads the acceptance proof on the same runtime pool the collection write
+            // uses, so a user who accepted cannot be judged differently by two paths.
+            ...(notice === undefined ? {} : {
+              hasAcceptedCurrentNotice: (userId: string) => runtimePool === undefined
+                ? Promise.resolve(false)
+                : (async () => {
+                  const client = await runtimePool.connect();
+                  try {
+                    await client.query('SET LOCAL ROLE app_runtime');
+                    return await notice.service.hasAcceptedCurrentNotice(client, userId);
+                  } finally { client.release(); }
+                })(),
+            }) },
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
           contentImport, contentReview, contentRelease, announce, iterationTasks, opsLoop,
-          { logHash: bootstrap.logHash });
+          { logHash: bootstrap.logHash },
+          notice);
         const environment = options.environment ?? process.env;
         const reviewPort = reviewLoginPort(environment, config.port);
         if (config.profile === 'formal-dev' && auth?.kind === 'product' && reviewPort !== undefined) {
