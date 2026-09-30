@@ -318,7 +318,7 @@
       padding: 26px 20px;
       background: #FBF9FD;
     }
-    .app-sidebar h3 {
+    .app-sidebar .app-title {
       margin: 0 0 28px;
       font-size: 18px;
     }
@@ -348,7 +348,7 @@
       font-weight: 800;
       letter-spacing: .08em;
     }
-    .app-main h3 { margin: 0 0 22px; font-size: 22px; }
+    .app-main .app-title { margin: 0 0 22px; font-size: 22px; }
     .query-input {
       display: flex;
       align-items: center;
@@ -773,11 +773,11 @@
       .hero-stage { min-height: 486px; padding: 72px 16px 44px; border-radius: 26px; }
       .app-body { grid-template-columns: 92px minmax(0, 1fr); min-height: 330px; }
       .app-sidebar { padding: 20px 12px; }
-      .app-sidebar h3 { font-size: 14px; }
+      .app-sidebar .app-title { font-size: 14px; }
       .app-sidebar .active { padding: 0 10px; }
       .app-sidebar p { margin-left: 10px; font-size: 11px; }
       .app-main { padding: 18px 14px; }
-      .app-main h3 { font-size: 16px; }
+      .app-main .app-title { font-size: 16px; }
       .query-input { font-size: 11px; padding-left: 10px; }
       .result-card { padding: 0 10px; font-size: 10px; }
       .fox-badge { right: 26px; bottom: 16px; width: 70px; height: 70px; }
@@ -845,7 +845,7 @@
             </div>
             <div class="app-body">
               <aside class="app-sidebar" aria-label="工作台导航">
-                <h3>工作台</h3>
+                <div class="app-title">工作台</div>
                 <span class="active">查询</span>
                 <p>话术库</p>
                 <p>产品资料</p>
@@ -853,7 +853,7 @@
               </aside>
               <div class="app-main">
                 <p class="mini-kicker">QUERY / 01</p>
-                <h3>今天要怎么回复？</h3>
+                <div class="app-title">今天要怎么回复？</div>
                 <div class="query-input">
                   <span>脸部过敏，我的脸很痛</span>
                   <span class="query-submit" aria-hidden="true">↗</span>
