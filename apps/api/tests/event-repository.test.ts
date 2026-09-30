@@ -47,6 +47,7 @@ function searchRequest(): PreparedSearchOperation {
       topK: 3,
     },
     redactionPolicyVersion: 'redaction-synthetic-v1',
+    queryTextRedacted: '合成查询',
     queryHash: 'a'.repeat(64),
     queryHashKeyVersion: 'hmac-log-v1',
     productContextRefHash: null,

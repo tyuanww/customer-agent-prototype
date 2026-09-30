@@ -296,7 +296,7 @@ export function createEventRepository(
               text_expires_at, event_expires_at
             ) VALUES (
               $1, $2, $3, $4, $5, $6,
-              NULL, NULL, $7, 'suppressed',
+              $19, $20, $7, 'stored',
               $8, $9, $10, $11,
               $12, $13, $14,
               $15, $16, $17, $18,
@@ -321,6 +321,10 @@ export function createEventRepository(
               search.candidates.length === 0 ? 'no_hit' : 'hit',
               Math.max(0, Math.round(performance.now() - startedAt)),
               search.releaseId,
+              // $19/$20: the redacted text and its keyed hash. Bound last, after
+              // $18 (release_id), so the existing 1..18 parameter order is untouched.
+              request.queryTextRedacted,
+              request.queryHash,
             ],
           );
           for (const candidate of search.candidates) {

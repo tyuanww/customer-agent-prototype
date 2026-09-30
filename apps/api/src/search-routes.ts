@@ -40,6 +40,12 @@ export type PreparedSearchOperation = Readonly<{
   detectedPlatform: SearchRequest['detected_platform'];
   platformSource: SearchRequest['platform_source'];
   search: SearchBackendRequest;
+  // The redacted text and its policy version were already computed for the search
+  // itself; carrying them here is what lets the write side store a 'stored' row
+  // instead of a NULL 'suppressed' one. Without these two, query_text_hash is
+  // computed and thrown away, and the column shape forces text_storage_status to
+  // 'suppressed' — i.e. the text is accepted and then silently dropped.
+  queryTextRedacted: string;
   redactionPolicyVersion: string;
   queryHash: string;
   queryHashKeyVersion: string;
@@ -156,6 +162,8 @@ export function registerSearchRoute(
         topK: contract.value.top_k,
       }),
       redactionPolicyVersion: redacted.policyVersion,
+      // Stored, not discarded: the row keeps the redacted text plus a keyed hash of it.
+      queryTextRedacted: redacted.text,
       queryHash: hmacRedactedQuery(
         redacted.text,
         dependencies.logHash.version,
