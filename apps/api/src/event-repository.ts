@@ -232,7 +232,11 @@ export function createEventRepository(
 
   return Object.freeze({
     async executeSearch(request): Promise<OperationResult<SearchResponse>> {
-      if (request.collectionMode !== 'synthetic') return failure('POLICY_DENIED');
+      // The notice-acceptance check for pilot_recorded runs in the route, before this
+      // call; reaching here means it passed. Anything else is still refused.
+      if (request.collectionMode !== 'synthetic' && request.collectionMode !== 'pilot_recorded') {
+        return failure('POLICY_DENIED');
+      }
       const client = await pool.connect().catch(() => null);
       if (client === null) return failure('OVERLOADED');
       let searchResponse: SearchResponse | null = null;

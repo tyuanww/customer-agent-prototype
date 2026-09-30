@@ -85,7 +85,10 @@ function response() {
   };
 }
 
-function appWith(operation?: SearchOperation): FastifyInstance {
+function appWith(
+  operation?: SearchOperation,
+  hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>,
+): FastifyInstance {
   const app = createApiApp(
     config(),
     repository(),
@@ -99,6 +102,7 @@ function appWith(operation?: SearchOperation): FastifyInstance {
         currentVersion: 'hmac-idempotency-v1',
         keys: { 'hmac-idempotency-v1': 'synthetic-idempotency-route-key-0001' },
       },
+      ...(hasAcceptedCurrentNotice === undefined ? {} : { hasAcceptedCurrentNotice }),
     },
   );
   openApps.push(app);
@@ -142,6 +146,8 @@ describe('search HTTP route', () => {
       [authHeaders, validRequest({ platform_source: 'unknown' }), 400],
       [authHeaders, validRequest({ detected_platform: 'douyin' }), 400],
       [authHeaders, validRequest({ collection_mode: 'approved_redacted' }), 403],
+      // pilot_recorded with no acceptance check configured must fail closed: the
+      // contract forbids recording real customer text without server-side proof.
       [authHeaders, validRequest({ collection_mode: 'pilot_recorded' }), 403],
       [authHeaders, validRequest({ query_text: '🦊'.repeat(501) }), 400],
     ] as const;
@@ -149,6 +155,45 @@ describe('search HTTP route', () => {
       const result = await app.inject({ method: 'POST', url: '/v1/search', headers, payload });
       expect(result.statusCode).toBe(statusCode);
     }
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('denies pilot_recorded until the current notice has been accepted', async () => {
+    const execute = vi.fn<SearchOperation['execute']>().mockResolvedValue({
+      ok: true, response: response() as never,
+    });
+
+    // Not accepted -> refused, and the operation never runs.
+    const denied = vi.fn(async () => false);
+    const deniedApp = appWith({ execute }, denied);
+    const deniedResult = await deniedApp.inject({
+      method: 'POST', url: '/v1/search', headers: authHeaders,
+      payload: validRequest({ collection_mode: 'pilot_recorded' }),
+    });
+    expect(deniedResult.statusCode).toBe(403);
+    expect(execute).not.toHaveBeenCalled();
+    expect(denied).toHaveBeenCalledWith('usr_synthetic_agent_001');
+
+    // Accepted -> the request proceeds to the operation boundary.
+    const accepted = vi.fn(async () => true);
+    const acceptedApp = appWith({ execute }, accepted);
+    const acceptedResult = await acceptedApp.inject({
+      method: 'POST', url: '/v1/search', headers: authHeaders,
+      payload: validRequest({ collection_mode: 'pilot_recorded' }),
+    });
+    expect(acceptedResult.statusCode).toBe(200);
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it('fails pilot_recorded closed when the acceptance check itself errors', async () => {
+    const execute = vi.fn<SearchOperation['execute']>();
+    const app = appWith({ execute }, async () => { throw new Error('notice table unavailable'); });
+    const result = await app.inject({
+      method: 'POST', url: '/v1/search', headers: authHeaders,
+      payload: validRequest({ collection_mode: 'pilot_recorded' }),
+    });
+    // The contract says an unavailable check must fail closed rather than record.
+    expect(result.statusCode).toBe(403);
     expect(execute).not.toHaveBeenCalled();
   });
 
