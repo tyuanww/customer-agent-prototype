@@ -3,12 +3,14 @@ import { IPC_CHANNELS } from '../shared/ipc-channels';
 import {
   dashboardContentFailure,
   type DashboardContentPublishResult,
+  type DashboardContentRollbackResult,
   type DashboardContentSessionResult,
 } from '../shared/dashboard-content';
 import { isTrustedMainFrameSender } from './sender-guard';
 import {
   dashboardContentParseUpload,
   dashboardContentPublish,
+  dashboardContentRollbackPrevious,
   dashboardContentCancelInFlight,
   dashboardContentSession,
   type DashboardContentAfterPublish,
@@ -59,6 +61,19 @@ export function registerDashboardContentIpc(
       if (args.length !== 1) return dashboardContentFailure('VALIDATION');
       try {
         return await dashboardContentPublish(session, args[0], afterPublish);
+      } catch {
+        return dashboardContentFailure('UNAVAILABLE');
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DASHBOARD_CONTENT_ROLLBACK_PREVIOUS,
+    async (event, ...args: unknown[]): Promise<DashboardContentRollbackResult> => {
+      if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
+      if (args.length !== 0) return dashboardContentFailure('VALIDATION');
+      try {
+        return await dashboardContentRollbackPrevious(session);
       } catch {
         return dashboardContentFailure('UNAVAILABLE');
       }

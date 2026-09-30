@@ -4,6 +4,7 @@ import {
   bindingsForRows,
   contentPublishGate,
   CONTENT_PUBLISH_COPY,
+  CONTENT_ROLLBACK_COPY,
   type DashboardContentDomain,
   type DashboardContentSessionView,
 } from '@shared/dashboard-content';
@@ -31,6 +32,7 @@ const UPLOAD_COPY = {
 const SESSION_BANNER_FULL = '导入与发布走产品会话。没有会话时按钮保持未接入，不会写入假发布。';
 const REPLACE_HINT = '必须手选要换的库。发布会整库替换这一库，其它库沿用。';
 const CANCEL_ARIA_LABEL = '取消服务器上未完成的导入，不影响本页预览';
+const ROLLBACK_ARIA_LABEL = '把上一个已发布版本重新发布为当前版本，不改动任何草稿';
 
 function uniqueRowDomains(rows: readonly CoachUploadRow[]): DashboardContentDomain[] {
   const seen: DashboardContentDomain[] = [];
@@ -172,6 +174,8 @@ export function ContentModule({
   const [submitting, setSubmitting] = useState(false);
   const [publishFeedback, setPublishFeedback] = useState<string | null>(null);
   const [publishSucceededThisRound, setPublishSucceededThisRound] = useState(false);
+  const [rollbackConfirm, setRollbackConfirm] = useState(false);
+  const [rollbackBusy, setRollbackBusy] = useState(false);
   const [domainOverride, setDomainOverride] = useState<DashboardContentDomain | ''>('');
   const [pendingDevOpen, setPendingDevOpen] = useState(false);
   const ingestGeneration = useRef(0);
@@ -286,6 +290,50 @@ export function ContentModule({
 
   // The cancel sweep is the in-flight escape hatch, so submitting must not grey it.
   const cancelDisabled = sessionView?.signedIn !== true;
+  // Rollback is owner-only in the contract, and it needs a product session to reach the API.
+  const rollbackDisabled = sessionView?.signedIn !== true
+    || sessionView?.role !== 'owner'
+    || rollbackBusy
+    || submitting;
+
+  const onRollbackPrevious = () => {
+    if (rollbackDisabled) return;
+    // Rollback republishes a whole earlier snapshot, so it is a two-step action like replace.
+    if (!rollbackConfirm) {
+      setRollbackConfirm(true);
+      return;
+    }
+    const api = window.dashboardContent;
+    if (!api?.rollbackPrevious) {
+      setPublishFeedback('当前没有产品会话，无法回滚');
+      return;
+    }
+    const generation = ingestGeneration.current;
+    setRollbackBusy(true);
+    setRollbackConfirm(false);
+    setPublishFeedback(null);
+    void api.rollbackPrevious().then((result) => {
+      if (generation !== ingestGeneration.current) return;
+      if (!result.ok) {
+        // The API answers NOT_FOUND when nothing older exists; product-http maps 404 to GONE on
+        // the way back, so GONE is this endpoint's "no previous release" signal. Leaving the
+        // shared error vocabulary alone is worth the one local mapping.
+        setPublishFeedback(result.code === 'GONE' ? CONTENT_ROLLBACK_COPY.noPrevious : result.message);
+        return;
+      }
+      const who = result.publisherDisplayName ?? sessionView?.displayName;
+      const headline = who
+        ? `已回滚到 ${result.rollbackOfReleaseId} · ${who}`
+        : `已回滚到 ${result.rollbackOfReleaseId}`;
+      setPublishFeedback(`${headline}\n新版本 ${result.releaseId}`);
+      setPublishSucceededThisRound(true);
+    }).catch(() => {
+      if (generation !== ingestGeneration.current) return;
+      setPublishFeedback('服务暂不可用，请重试');
+    }).finally(() => {
+      if (generation === ingestGeneration.current) setRollbackBusy(false);
+    });
+  };
 
   const onCancelInFlight = () => {
     if (cancelDisabled) return;
@@ -366,6 +414,16 @@ export function ContentModule({
         </div>
         <div className="dash-publish-box">
           <div className="content-action-row">
+            <button
+              type="button"
+              className="dash-reset"
+              data-testid="content-rollback-previous"
+              aria-label={ROLLBACK_ARIA_LABEL}
+              disabled={rollbackDisabled}
+              onClick={onRollbackPrevious}
+            >
+              回滚上一版
+            </button>
             <button
               type="button"
               className="dash-reset"
@@ -475,6 +533,31 @@ export function ContentModule({
               onClick={submitPublish}
             >
               确认发布
+            </button>
+          </span>
+        </div>
+      ) : null}
+
+      {rollbackConfirm ? (
+        <div className="content-replace-confirm" data-testid="content-rollback-confirm" role="status">
+          <span>把上一个已发布版本重新发布为当前版本。这会新增一个版本，已有版本不会被删除。确认后才回滚。</span>
+          <span className="content-action-row">
+            <button
+              type="button"
+              className="dash-reset"
+              data-testid="content-rollback-confirm-cancel"
+              onClick={() => setRollbackConfirm(false)}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="dash-publish"
+              data-testid="content-rollback-confirm-action"
+              disabled={rollbackBusy}
+              onClick={onRollbackPrevious}
+            >
+              确认回滚
             </button>
           </span>
         </div>

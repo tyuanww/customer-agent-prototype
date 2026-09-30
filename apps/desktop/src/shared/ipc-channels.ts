@@ -25,6 +25,7 @@ export const IPC_CHANNELS = {
   DASHBOARD_CONTENT_SESSION: 'dashboard:content-session',
   DASHBOARD_CONTENT_PARSE: 'dashboard:content-parse',
   DASHBOARD_CONTENT_PUBLISH: 'dashboard:content-publish',
+  DASHBOARD_CONTENT_ROLLBACK_PREVIOUS: 'dashboard:content-rollback-previous',
   DASHBOARD_CONTENT_CANCEL_IN_FLIGHT: 'dashboard:content-cancel-in-flight',
   DASHBOARD_ITERATION_LIST: 'dashboard:iteration-list',
   DASHBOARD_ITERATION_START: 'dashboard:iteration-start',

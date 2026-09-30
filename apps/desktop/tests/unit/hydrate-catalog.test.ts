@@ -188,11 +188,48 @@ describe('hydrate catalog auto-sync', () => {
     ];
     syncHydrateCatalog({ path, repoRoot: repo, releaseId: 'rel-synthetic-001', items: larger });
     const kept = syncHydrateCatalog({
-      path, repoRoot: repo, releaseId: 'rel-synthetic-099', items: [snapshotItem],
+      path, repoRoot: repo, releaseId: 'rel-synthetic-009', items: [snapshotItem],
     });
     expect(kept).toMatchObject({ wrote: false, skipped: true, reason: 'kept-larger', total: 2 });
     expect(loadHydrateCatalog(path)?.releaseId).toBe('rel-synthetic-001');
     expect(loadHydrateCatalog(path)?.candidate('script-synthetic-002')?.script_id).toBe('script-synthetic-002');
+  });
+
+  it('adopts a smaller release when the snapshot is authoritative', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hydrate-repo-'));
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const path = join(outside, 'retrieval-hydrate.json');
+    const larger = [
+      snapshotItem,
+      { ...snapshotItem, script_id: 'script-synthetic-002', content_hash: 'b'.repeat(64) },
+    ];
+    // A release that removes more than it adds — the case that used to trap the
+    // client forever. Authoritative means it came from the announcement path.
+    syncHydrateCatalog({ path, repoRoot: repo, releaseId: 'rel-synthetic-001', items: larger });
+    const adopted = syncHydrateCatalog({
+      path, repoRoot: repo, releaseId: 'rel-synthetic-009', items: [snapshotItem], authoritative: true,
+    });
+    expect(adopted).toMatchObject({ wrote: true, skipped: false, reason: 'wrote', total: 1 });
+    expect(loadHydrateCatalog(path)?.releaseId).toBe('rel-synthetic-009');
+    expect(loadHydrateCatalog(path)?.candidate('script-synthetic-002')).toBeNull();
+  });
+
+  it('still guards a shorter snapshot inside the same release', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hydrate-repo-'));
+    const outside = mkdtempSync(join(tmpdir(), 'hydrate-outside-'));
+    const path = join(outside, 'retrieval-hydrate.json');
+    const larger = [
+      snapshotItem,
+      { ...snapshotItem, script_id: 'script-synthetic-002', content_hash: 'b'.repeat(64) },
+    ];
+    // Same release id, fewer rows: a short read of the CURRENT release must not
+    // shrink what we already hold. Lifting the guard on release change must not
+    // disable it here.
+    syncHydrateCatalog({ path, repoRoot: repo, releaseId: 'rel-synthetic-001', items: larger });
+    const kept = syncHydrateCatalog({
+      path, repoRoot: repo, releaseId: 'rel-synthetic-001', items: [snapshotItem], authoritative: true,
+    });
+    expect(kept).toMatchObject({ wrote: false, skipped: true, reason: 'kept-larger', total: 2 });
   });
 
   it('dry-run counts without writing and persistHydrateFromEnv no-ops without env', () => {
@@ -267,10 +304,13 @@ describe('hydrate catalog auto-sync', () => {
     process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX = indexPath;
     try {
       const result = persistHydrateFromEnv('rel-synthetic-099', [snapshotItem]);
-      expect(result).toMatchObject({ wrote: false, skipped: true, reason: 'kept-larger', total: 2 });
-      expect(existsSync(indexPath)).toBe(false);
-      expect(loadHydrateCatalog(hydratePath)?.releaseId).toBe('rel-synthetic-001');
-      expect(loadHydrateCatalog(hydratePath)?.candidate('script-synthetic-002')?.script_id).toBe('script-synthetic-002');
+      // The announcement path is authoritative: a release change is adopted even
+      // when it is smaller. Before this, the client stayed on rel-synthetic-001
+      // forever with no runtime way out.
+      expect(result).toMatchObject({ wrote: true, skipped: false, reason: 'wrote', total: 1 });
+      expect(existsSync(indexPath)).toBe(true);
+      expect(loadHydrateCatalog(hydratePath)?.releaseId).toBe('rel-synthetic-099');
+      expect(loadHydrateCatalog(hydratePath)?.candidate('script-synthetic-002')).toBeNull();
     } finally {
       if (previousHydrate === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previousHydrate;

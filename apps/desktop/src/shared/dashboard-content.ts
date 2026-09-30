@@ -58,6 +58,12 @@ export const CONTENT_PUBLISH_COPY = Object.freeze({
   readyToPublish: '校验通过后可由管理员发布',
 });
 
+export const CONTENT_ROLLBACK_COPY = Object.freeze({
+  ownerOnly: '一期回滚仅管理员。',
+  submitting: '正在回滚，请稍候，不要离开本页',
+  noPrevious: '没有可回滚的上一版（当前就是第一版）。',
+});
+
 /** Import/publish API reason → Chinese problem + next step. Codes stay in logs. */
 export const CONTENT_IMPORT_FAILURE_COPY = Object.freeze({
   SOURCE_SNAPSHOT_MISMATCH: '文件和当前登记的来源对不上。请确认这是要发的那份表后重新导入。',
@@ -145,10 +151,23 @@ export type DashboardContentParseResult =
   | DashboardContentFailure
   | Readonly<{ ok: false; code: string; message: string }>;
 
+export type DashboardContentRollbackView = Readonly<{
+  ok: true;
+  /** The newly created release that the rollback produced. */
+  releaseId: string;
+  releaseSeq: number;
+  /** The release that was copied. This is what the operator asked to go back to. */
+  rollbackOfReleaseId: string;
+  publisherDisplayName: string | null;
+}>;
+
+export type DashboardContentRollbackResult = DashboardContentRollbackView | DashboardContentFailure;
+
 export type DashboardContentApi = {
   session(): Promise<DashboardContentSessionResult>;
   parseUpload(request: DashboardContentParseRequest): Promise<DashboardContentParseResult>;
   publishDraft(request: DashboardContentPublishRequest): Promise<DashboardContentPublishResult>;
+  rollbackPrevious(): Promise<DashboardContentRollbackResult>;
   cancelInFlight(): Promise<DashboardContentFailure | { ok: true }>;
   onSessionChanged?(listener: () => void): () => void;
 };
@@ -316,6 +335,26 @@ export function isDashboardContentImportResult(value: unknown): value is Dashboa
     && typeof record.importBatchId === 'string'
     && record.importBatchId.length > 0
     && record.importBatchId.length <= 128;
+}
+
+export function isDashboardContentRollbackResult(value: unknown): value is DashboardContentRollbackResult {
+  if (isDashboardContentFailure(value)) return true;
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return exactKeys(record, ['ok', 'releaseId', 'releaseSeq', 'rollbackOfReleaseId', 'publisherDisplayName'])
+    && record.ok === true
+    && typeof record.releaseId === 'string'
+    && record.releaseId.length > 0
+    && record.releaseId.length <= 128
+    && Number.isSafeInteger(record.releaseSeq)
+    && (record.releaseSeq as number) >= 1
+    && typeof record.rollbackOfReleaseId === 'string'
+    && record.rollbackOfReleaseId.length > 0
+    && record.rollbackOfReleaseId.length <= 128
+    && (record.publisherDisplayName === null
+      || (typeof record.publisherDisplayName === 'string'
+        && record.publisherDisplayName.length > 0
+        && record.publisherDisplayName.length <= 64));
 }
 
 export function isDashboardContentPublishResult(value: unknown): value is DashboardContentPublishResult {
