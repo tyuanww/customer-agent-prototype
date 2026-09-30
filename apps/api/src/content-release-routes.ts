@@ -95,4 +95,21 @@ export function registerContentReleaseRoutes(
     if (!result.ok) return sendReleaseFailure(reply, result);
     return result.response;
   });
+
+  // No content-release list endpoint exists, so the operator cannot name a target_release_id.
+  // This resolves "the release before the current one" server-side and reuses the same
+  // RollbackResponse shape, so it adds no cross-repo contract dependency. Takes no body: the
+  // header contract for this route is a required idempotency key only.
+  app.post('/v1/content/rollback-previous', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const actor = await authenticateRequestHeaders(authService, request.headers);
+    if (actor === null) return sendUnauthorized(reply);
+    if (!limit('rollback', 5)) return sendRateLimited(reply);
+    const key = idempotencyKey(request.headers['idempotency-key']);
+    if (key === null) return sendValidationError(reply);
+    if (dependencies === undefined) return sendOverloaded(reply);
+    const result = await dependencies.service.rollbackPrevious({ actor, idempotencyKey: key });
+    if (!result.ok) return sendReleaseFailure(reply, result);
+    return result.response;
+  });
 }

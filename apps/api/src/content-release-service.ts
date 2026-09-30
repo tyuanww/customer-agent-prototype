@@ -37,6 +37,15 @@ export type ContentReleaseService = Readonly<{
     idempotencyKey: string;
     body: RollbackRequest;
   }>) => Promise<Readonly<{ ok: true; response: RollbackResponse }> | ContentReleaseFailure>;
+  /**
+   * Roll back to the most recent prior published release. Resolves the target server-side because
+   * no endpoint lists content releases, so the operator cannot name one. Contract shape is the same
+   * RollbackResponse, so this adds no cross-repo dependency.
+   */
+  rollbackPrevious: (request: Readonly<{
+    actor: AuthenticatedUser;
+    idempotencyKey: string;
+  }>) => Promise<Readonly<{ ok: true; response: RollbackResponse }> | ContentReleaseFailure>;
   close: () => Promise<void>;
 }>;
 
@@ -57,8 +66,22 @@ interface RollbackRow extends PublishRow {
   rollback_of_release_id: string;
 }
 
+interface PreviousReleaseRow extends QueryResultRow {
+  release_id: string | null;
+  release_seq: string | number | null;
+}
+
 const PUBLISH_SCOPE = '/v1/content/publish';
 const ROLLBACK_SCOPE = '/v1/content/rollback';
+const ROLLBACK_PREVIOUS_SCOPE = '/v1/content/rollback-previous';
+
+/** Raised inside the rollback transaction when no earlier release exists. */
+class PreviousReleaseMissingError extends Error {
+  constructor() {
+    super('no previous content release');
+    this.name = 'PreviousReleaseMissingError';
+  }
+}
 const IDEMPOTENCY_LEASE_SECONDS = 60;
 const AUDITED = new Set<string>([
   'SOURCE_SET_INCOMPLETE',
@@ -97,6 +120,7 @@ function sqlState(error: unknown): string {
 }
 
 function releaseFailure(error: unknown, commit: CommitCertainty): ContentReleaseFailure {
+  if (error instanceof PreviousReleaseMissingError) return failure('NOT_FOUND', commit);
   const detail = detailOf(error);
   if (FORBIDDEN_REASONS.has(detail) || sqlState(error) === 'ZA004') {
     return failure('FORBIDDEN', commit, AUDITED.has(detail) ? detail as SourceContractReason : undefined);
@@ -335,6 +359,41 @@ export function createContentReleaseServiceForPool(
         const rows = await client.query<RollbackRow>(
           'SELECT * FROM public.rollback_content_release($1,$2,$3,$4,$5)',
           [request.body.target_release_id, request.body.title, request.body.summary, request.actor.user_id, request.actor.role],
+        );
+        return rows.rows[0];
+      }, (row) => {
+        const value = row as RollbackRow;
+        return parseContractSchema('RollbackResponse', {
+          release_id: value.release_id,
+          release_seq: Number(value.release_seq),
+          announcement_id: value.announcement_id,
+          source_binding_hash: value.source_binding_hash,
+          rollback_of_release_id: value.rollback_of_release_id,
+        });
+      });
+      return result as Readonly<{ ok: true; response: RollbackResponse }> | ContentReleaseFailure;
+    },
+    async rollbackPrevious(request) {
+      // The target is resolved inside the same admin transaction as the rollback, so a concurrent
+      // publish cannot slip between "pick the previous release" and "roll back to it". Resolving
+      // outside the transaction and passing a target in would reopen that window.
+      const hashes = prepareIdempotencyHashes({
+        operation: 'rollback_previous',
+      }, idempotencyHmac);
+      const result = await run(ROLLBACK_PREVIOUS_SCOPE, request.actor, request.idempotencyKey, hashes, async (client) => {
+        const resolved = await client.query<PreviousReleaseRow>(
+          'SELECT release_id, release_seq FROM public.resolve_previous_content_release($1)',
+          [request.actor.role],
+        );
+        const targetId = resolved.rows[0]?.release_id;
+        // The resolver returns one row with a NULL release_id when nothing older exists. Treat
+        // both shapes as NOT_FOUND rather than passing NULL into the rollback function.
+        if (typeof targetId !== 'string' || targetId.length === 0) {
+          throw new PreviousReleaseMissingError();
+        }
+        const rows = await client.query<RollbackRow>(
+          'SELECT * FROM public.rollback_content_release($1,$2,$3,$4,$5)',
+          [targetId, null, null, request.actor.user_id, request.actor.role],
         );
         return rows.rows[0];
       }, (row) => {
