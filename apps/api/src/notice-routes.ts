@@ -13,6 +13,8 @@ import type { NoticeService } from './notice-service.js';
 
 export type NoticeRouteDependencies = Readonly<{ service: NoticeService }>;
 
+export const NOTICE_VERSION_MAX_LENGTH = 128;
+
 function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
   const keys = Object.keys(value).sort();
@@ -56,7 +58,7 @@ export function registerNoticeRoutes(
     const version = request.params !== null && typeof request.params === 'object'
       ? Reflect.get(request.params, 'version')
       : undefined;
-    if (typeof version !== 'string' || version.length < 1 || version.length > 100) {
+    if (typeof version !== 'string' || version.length < 1 || version.length > NOTICE_VERSION_MAX_LENGTH) {
       return sendValidationError(reply);
     }
     if (dependencies === undefined) return sendOverloaded(reply);

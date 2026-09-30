@@ -157,7 +157,19 @@ describe('QueryApp', () => {
 
   function connectProduct(options: { noHit?: boolean } = {}) {
     const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString(), displayName: 'synthetic' };
-    window.customerAgent!.product = { sessionStatus: vi.fn().mockResolvedValue(view), login: vi.fn().mockResolvedValue(view), logout: vi.fn(), onSessionChanged: () => () => {} };
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(view),
+      login: vi.fn().mockResolvedValue(view),
+      logout: vi.fn(),
+      currentNotice: vi.fn().mockResolvedValue({
+        ok: false as const,
+        code: 'GONE' as const,
+        sessionEpoch: view.sessionEpoch,
+        message: '登录请求已过期，请重试',
+      }),
+      decideNotice: vi.fn(),
+      onSessionChanged: () => () => {},
+    };
     const search = vi.fn(async (r: import('../../src/shared/product-search').ProductSearchRequest) => ({
       ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, queryId: '11111111-1111-4111-8111-111111111111',
       hitStatus: options.noHit ? 'no_hit' as const : 'hit' as const,
@@ -642,6 +654,35 @@ describe('QueryApp', () => {
     await waitFor(() => expect(decideNotice).toHaveBeenCalledWith({ version: 'pilot-notice-v1', decision: 'accepted' }));
     await waitFor(() => expect(screen.queryByTestId('notice-backdrop')).not.toBeInTheDocument());
     expect(currentNotice).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks search while the notice is loading or unavailable, then allows retry after the gate clears', async () => {
+    const f = connectProduct();
+    const pending = deferred<import('../../src/shared/product-notice').ProductNoticeResult>();
+    const currentNotice = vi.fn()
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce({
+        ok: false as const,
+        code: 'UNAVAILABLE' as const,
+        sessionEpoch: 10,
+        message: '服务暂不可用，请重试',
+      });
+    window.customerAgent!.product!.currentNotice = currentNotice;
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(f.search).not.toHaveBeenCalled();
+
+    await act(async () => pending.resolve({
+      ok: false,
+      code: 'UNAVAILABLE',
+      sessionEpoch: 10,
+      message: '服务暂不可用，请重试',
+    }));
+    expect(await screen.findByTestId('notice-retry')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(f.search).not.toHaveBeenCalled();
   });
 
   it('distinguishes expiry and login failure from unsigned guidance', async () => {
