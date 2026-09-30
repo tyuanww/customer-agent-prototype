@@ -1,18 +1,25 @@
 /**
  * Product-owned password identity (scheme C). Loopback sockets only.
- * A same-machine cloudflared ingress may send Host as a public hostname;
- * remoteAddress is still 127.0.0.1. Do not bind 0.0.0.0.
+ *
+ * Admission is by Host header, not by source address: a same-machine cloudflared
+ * ingress connects from 127.0.0.1, so an address check would let a public Host
+ * through. Accounts come from STACK_ROOT/password-accounts.json; there is no
+ * generated fallback password, and a missing file fails the process.
  *
  * POST /password {username, password} -> {code}  (one-time, 2 min)
  * POST /exchange {code}               -> {provider:'synthetic', binding_id}
  * GET  /health
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { STACK_ROOT, SYNTHETIC_IDENTITIES } from './profile.ts';
+import { STACK_ROOT } from './profile.ts';
+import {
+  isAdmittedHost,
+  loadPasswordAccounts,
+  passwordMatches,
+} from './identity-admission.ts';
 
 const MAX_BODY_BYTES = 4_096;
 const CODE_TTL_MS = 120_000;
@@ -20,7 +27,6 @@ const FAIL_LIMIT = 5;
 const LOCK_MS = 300_000;
 const ACCOUNTS_FILE = path.join(STACK_ROOT, 'password-accounts.json');
 
-type Account = Readonly<{ username: string; bindingId: string; salt: string; hash: string }>;
 type CodeRow = { bindingId: string; expiresAt: number };
 
 function send(response: ServerResponse, status: number, body: string): void {
@@ -42,50 +48,21 @@ function readBody(request: IncomingMessage): Promise<string | null> {
   });
 }
 
-function loadAccounts(): Map<string, Account> {
-  const accounts = new Map<string, Account>();
-  if (existsSync(ACCOUNTS_FILE)) {
-    const raw: unknown = JSON.parse(readFileSync(ACCOUNTS_FILE, 'utf8'));
-    if (!Array.isArray(raw)) throw new Error('password-accounts.json must be an array');
-    for (const row of raw) {
-      if (!row || typeof row !== 'object') continue;
-      const username = Reflect.get(row, 'username');
-      const bindingId = Reflect.get(row, 'bindingId');
-      const salt = Reflect.get(row, 'salt');
-      const hash = Reflect.get(row, 'hash');
-      if (typeof username !== 'string' || typeof bindingId !== 'string'
-        || typeof salt !== 'string' || typeof hash !== 'string') continue;
-      if (!/^synthetic_[A-Za-z0-9_-]{1,100}$/.test(bindingId)) continue;
-      accounts.set(username, Object.freeze({ username, bindingId, salt, hash }));
-    }
-  }
-  if (accounts.size === 0) {
-    for (const identity of SYNTHETIC_IDENTITIES) {
-      const salt = randomBytes(16).toString('hex');
-      const hash = scryptSync('synthetic-password', salt, 64).toString('hex');
-      accounts.set(identity.bindingId, Object.freeze({
-        username: identity.bindingId, bindingId: identity.bindingId, salt, hash,
-      }));
-    }
-  }
-  return accounts;
-}
-
-function passwordOk(account: Account, password: string): boolean {
-  const actual = scryptSync(password, account.salt, 64);
-  const expected = Buffer.from(account.hash, 'hex');
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
-
-export function createPasswordIdentityServer({ port }: Readonly<{ port: number }>) {
-  const accounts = loadAccounts();
+export function createPasswordIdentityServer(
+  { port, accountsFile = ACCOUNTS_FILE }: Readonly<{ port: number; accountsFile?: string }>,
+) {
+  // Throws when the file is missing or empty, so the process exits instead of
+  // accepting a default password. The stack start surfaces this as a failed start.
+  const accounts = loadPasswordAccounts(accountsFile);
   const codes = new Map<string, CodeRow>();
   const failures = new Map<string, { count: number; lockedUntil: number }>();
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://127.0.0.1:${String(port)}`);
+    // Host decides. The source address is kept only as a secondary signal: behind the
+    // tunnel it is always 127.0.0.1 and therefore proves nothing on its own.
     const remote = request.socket.remoteAddress;
-    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
-    if (!loopback) {
+    const fromLoopbackAddress = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+    if (!fromLoopbackAddress || !isAdmittedHost(request.headers.host)) {
       send(response, 403, '{"error":"loopback_only"}'); return;
     }
     if (request.method === 'GET' && url.pathname === '/health') {
@@ -106,10 +83,12 @@ export function createPasswordIdentityServer({ port }: Readonly<{ port: number }
         const fail = failures.get(username);
         if (fail && fail.lockedUntil > now) { send(response, 401, '{"error":"locked"}'); return; }
         const account = accounts.get(username);
-        if (!account || !passwordOk(account, password)) {
+        if (!account || !passwordMatches(account, password)) {
           const next = { count: (fail?.count ?? 0) + 1, lockedUntil: 0 };
           if (next.count >= FAIL_LIMIT) next.lockedUntil = now + LOCK_MS;
           failures.set(username, next);
+          // Same body for "no such account" and "wrong password": do not let the
+          // response tell an attacker which usernames exist.
           send(response, 401, '{"error":"invalid"}'); return;
         }
         failures.delete(username);

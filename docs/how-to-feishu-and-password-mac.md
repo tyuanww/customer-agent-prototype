@@ -20,9 +20,24 @@ FEISHU_BINDINGS=ou_你的open_id:agent
 
 ## 账号
 
-口令服务在 `43101`。默认种子仍是合成绑定用户名（如 `synthetic_agent`），密码先用本机非机密 `synthetic-password` 的哈希。外包生产账号应改 `~/.customer-agent-synthetic-stack/password-accounts.json`（`username` / `bindingId` / `salt` / `hash`），不要把明文密码提交进 git。
+口令服务在 `43101`。**账号文件是必需的，没有它就起不来**——这是有意的：早先的版本在没有账号文件时会用硬编码的 `synthetic-password` 播种全部合成身份（**包括 owner**），那个默认口令已经彻底删除，仓库里不再有任何默认密码。
+
+首次使用先生成一次（密码随机，只打印这一次，文件里只存 scrypt 哈希）：
+
+```
+pnpm identity:accounts:init          # 拒绝覆盖已存在的文件
+pnpm identity:accounts:init --force  # 重新生成（旧账号密码全部失效）
+```
+
+文件落在 `~/.customer-agent-synthetic-stack/password-accounts.json`（`username` / `bindingId` / `salt` / `hash` / `role` / `label`），权限 `0600`。**不要把明文密码提交进 git。**
 
 `bindingId` 必须是 `synthetic_…`（冻结表的 provider 档只有 `synthetic` | `feishu`）。
+
+### 准入判据看 Host，不看来源地址
+
+两个身份服务都按**请求的 Host 头**判断是否放行，默认只允许 `127.0.0.1` / `localhost` / `[::1]`（可带端口）。这很重要：Cloudflare 隧道从本机回环转发，**来源地址恒为 `127.0.0.1`**，所以旧版「只看来来源地址」的判据在隧道下等于没判——带着公网 Host 的请求会被当成本机请求放行。
+
+要临时加一个探针主机名，用 `CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS`（逗号分隔）。**绝不要把生产主机名加进去。**
 
 ## 启动
 

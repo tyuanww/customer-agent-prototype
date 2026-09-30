@@ -43,7 +43,7 @@ import { SYNTHETIC_SCRIPT_IDS } from './content.ts';
 import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
-  PREFERRED_PORTS, PROFILE_FILE, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
+  PREFERRED_PORTS, PROFILE_FILE, STACK_ROOT, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
   loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig, mergeStackOverrides,
   readProfile, shouldSeedSyntheticCatalog, stackPortOffset, writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
@@ -194,8 +194,12 @@ async function startProcesses(profile: StackProfile, content: ContentStackConfig
     const overrides = mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {});
     const identityEntry = feishu ? PASSWORD_IDENTITY_ENTRY : IDENTITY_ENTRY;
     if (!live.has('identity')) {
+      // Both identity servers resolve the accounts file from STACK_ROOT, which defaults
+      // to ~/.customer-agent-synthetic-stack. Passing it explicitly matters when the
+      // operator set CUSTOMER_AGENT_STACK_ROOT: the child would otherwise look in the
+      // default home path (and, with no fallback password, refuse to start).
       const pid = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
-        { PATH: process.env.PATH });
+        { PATH: process.env.PATH, CUSTOMER_AGENT_STACK_ROOT: STACK_ROOT });
       spawned.push('identity');
       started.push(`identity pid ${String(pid)}${feishu ? ' (password)' : ''}`);
     } else {
