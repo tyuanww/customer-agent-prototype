@@ -3,208 +3,465 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>客服话术浮窗 Demo · 官方下载</title>
-  <meta name="description" content="客服话术浮窗 Demo 官方下载。Windows x64，v0.3.25。坐席查询并复制当前已发布话术。下载安装包不会开通账号。">
+  <title>客服 Agent · 官方下载</title>
+  <meta name="description" content="客服 Agent 官方下载。把常用话术、产品知识和处理步骤放进工作流，登录后查询并复制当前已发布内容。">
   <link rel="canonical" href="https://download.jianghua.site/">
   <link rel="icon" type="image/png" href="./favicon.png">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
-  <meta property="og:title" content="客服话术浮窗 Demo · 官方下载">
-  <meta property="og:description" content="Windows 官方安装包 v0.3.25。登录用公司飞书。下载不等于开通账号。">
+  <meta property="og:title" content="客服 Agent · 官方下载">
+  <meta property="og:description" content="客服 Agent 官方安装包 v0.3.25。登录用公司飞书，复制前由坐席自己判断。">
   <meta property="og:url" content="https://download.jianghua.site/">
   <meta property="og:image" content="https://download.jianghua.site/shot-query.png">
-  <meta name="theme-color" content="#f4f6f8">
+  <meta name="theme-color" content="#F7F3F0">
   <style>
     :root {
-      --bg: #f4f6f8;
-      --fg: #1b1c22;
-      --muted: #5c6370;
-      --line: #e3e6ee;
-      --card: #fff;
-      --accent: #7540d9;
-      --accent-fg: #fff;
-      --accent-hover: #652bd4;
-      --accent-soft: #f3eefc;
-      --warn: #9a3b1a;
-      --max: 1080px;
-      --shadow: 0 8px 24px -12px rgba(27, 28, 34, 0.18);
-      /* 总览卡片：不再用纯白平面，改成一层浅紫画布 + 品牌色细环 / 柔和投影 */
-      --ov-canvas: linear-gradient(180deg, #ffffff 0%, #fbfaff 52%, #f4effd 100%);
-      --ov-ring: color-mix(in srgb, var(--accent) 16%, #fff);
-      --ov-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.9),
-        0 28px 52px -30px rgba(93, 48, 190, 0.42),
-        0 10px 22px -16px rgba(27, 28, 34, 0.18);
+      --canvas: #F7F3F0;
+      --surface: #FFFFFF;
+      --ink: #191326;
+      --muted: #61596D;
+      --brand: #6B33C7;
+      --brand-dark: #4C238F;
+      --brand-light: #D1BFFA;
+      --lilac: #F0E6FF;
+      --aubergine: #26183B;
+      --line: #DED6E4;
+      --success: #1E8C6C;
+      --max: 1296px;
+      --shadow: 0 26px 54px -34px rgba(25, 19, 38, .38);
+      --shadow-soft: 0 14px 32px -24px rgba(25, 19, 38, .34);
     }
+
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; color-scheme: light; }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
-      color: var(--fg);
-      background: var(--bg);
-      line-height: 1.6;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
-    a { color: var(--accent); }
-    a:visited { color: #5524b2; }
-    .nav-links a, .brand, footer a { color: inherit; }
-    .nav-links a:visited, .brand:visited, footer a:visited { color: inherit; }
+    a { color: var(--brand); }
+    a:visited { color: var(--brand-dark); }
     a:focus-visible, button:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
+      outline: 3px solid var(--brand-light);
+      outline-offset: 3px;
     }
-    ::selection { background: #e6ddf8; }
-    img { max-width: 100%; height: auto; display: block; }
+    ::selection { background: var(--brand-light); color: var(--ink); }
+    img { display: block; max-width: 100%; height: auto; }
     .skip {
       position: absolute;
       left: -999px;
       top: 8px;
-    }
-    .skip:focus {
-      left: 12px;
       z-index: 80;
-      background: #fff;
       padding: 8px 12px;
-      border-radius: 8px;
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--ink);
     }
+    .skip:focus { left: 16px; }
     .wrap {
-      width: min(var(--max), calc(100% - 40px));
+      width: min(var(--max), calc(100% - 48px));
       margin: 0 auto;
     }
+
     .nav {
       position: sticky;
       top: 0;
       z-index: 40;
-      background: color-mix(in srgb, var(--bg) 88%, transparent);
-      backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--line);
+      min-height: 88px;
+      border-bottom: 1px solid rgba(222, 214, 228, .78);
+      background: color-mix(in srgb, var(--canvas) 88%, transparent);
+      backdrop-filter: blur(18px);
     }
     .nav-inner {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      min-height: 64px;
+      min-height: 88px;
+      gap: 24px;
     }
     .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      font-weight: 650;
-      white-space: nowrap;
-    }
-    .brand img { width: 28px; height: 28px; }
-    .brand-short { display: none; }
-    .nav-links {
-      display: flex;
-      gap: 8px;
-      font-size: 14px;
-      color: var(--muted);
-    }
-    .nav-links a {
-      text-decoration: none;
       display: inline-flex;
       align-items: center;
+      gap: 12px;
+      color: inherit;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .brand img {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+    }
+    .brand-lockup { display: grid; gap: 1px; }
+    .brand-name {
+      font-size: 14px;
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: .12em;
+    }
+    .brand-sub {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.1;
+      letter-spacing: .08em;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .nav-links a {
       min-height: 44px;
-      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      color: inherit;
+      text-decoration: none;
+      transition: color .18s ease;
     }
     .nav-links a:hover,
-    .nav-links a[aria-current="true"] { color: var(--fg); }
-    .nav-links a[aria-current="true"] { font-weight: 650; }
+    .nav-links a[aria-current="true"] {
+      color: var(--brand);
+    }
+    .nav-links a[aria-current="true"] { font-weight: 700; }
     .btn {
+      min-height: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      text-decoration: none;
+      gap: 9px;
       border: 0;
-      cursor: pointer;
+      border-radius: 999px;
+      padding: 0 20px;
+      color: inherit;
       font: inherit;
-      font-weight: 600;
-      border-radius: 10px;
-      padding: 12px 18px;
-      min-height: 44px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform .18s ease, background-color .18s ease, box-shadow .18s ease, color .18s ease;
     }
+    .btn:hover { transform: translateY(-2px); }
     .btn-primary,
-    .btn-primary:visited,
-    .nav .btn-primary,
-    .nav .btn-primary:visited {
-      background: var(--accent);
-      color: var(--accent-fg);
+    .btn-primary:visited {
+      background: var(--brand);
+      color: var(--surface);
+      box-shadow: 0 14px 24px -18px rgba(107, 51, 199, .85);
     }
-    .btn-primary:hover,
-    .nav .btn-primary:hover {
-      background: var(--accent-hover);
-      color: var(--accent-fg);
+    .btn-primary:hover {
+      background: var(--brand-dark);
+      color: var(--surface);
+      box-shadow: 0 18px 28px -18px rgba(107, 51, 199, .9);
     }
+    .btn-ink,
+    .btn-ink:visited {
+      background: var(--ink);
+      color: var(--surface);
+    }
+    .btn-ink:hover { background: var(--aubergine); color: var(--surface); }
     .btn-ghost {
-      background: transparent;
-      color: var(--fg);
       border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
     }
-    .btn-ghost:hover { background: #fff; }
-    .btn-lg { padding: 14px 22px; font-size: 1.02rem; }
+    .btn-ghost:visited { color: var(--ink); }
+    .btn-ghost:hover { background: #FBF9FD; color: var(--ink); }
+    .btn .arrow {
+      display: inline-block;
+      transition: transform .18s ease;
+    }
+    .btn:hover .arrow { transform: translateX(4px); }
+    .nav-cta { min-width: 154px; min-height: 40px; font-size: 13px; }
 
     .hero {
-      padding: 56px 0 28px;
+      padding: 78px 0 80px;
     }
     .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-      gap: 40px;
-      align-items: start;
+      grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+      gap: 64px;
+      align-items: center;
     }
-    .hero-copy { padding-top: 12px; }
-    .kicker {
-      margin: 0 0 10px;
-      font-size: 13px;
-      color: var(--muted);
+    .hero-copy { padding: 12px 0 0; }
+    .kicker,
+    .eyebrow {
+      margin: 0;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      line-height: 1.5;
     }
+    h1, h2, h3, p { overflow-wrap: anywhere; }
     h1 {
-      margin: 0 0 12px;
-      font-size: clamp(1.9rem, 3.6vw, 2.6rem);
-      line-height: 1.2;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      word-break: keep-all;
-      line-break: strict;
+      margin: 18px 0 24px;
+      max-width: 620px;
+      color: var(--ink);
+      font-size: clamp(2.8rem, 5vw, 4.65rem);
+      font-weight: 800;
+      letter-spacing: -.055em;
+      line-height: 1.13;
     }
     .lead {
-      margin: 0 0 22px;
-      max-width: 34rem;
+      max-width: 560px;
+      margin: 0 0 30px;
       color: var(--muted);
-      font-size: 1.05rem;
+      font-size: 17px;
+      line-height: 1.8;
     }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .hero-actions .btn { min-height: 56px; padding: 0 24px; font-size: 15px; }
     .meta {
-      margin: 12px 0 0;
-      font-size: 13px;
+      margin: 18px 0 0;
       color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .01em;
     }
-    .hero-shot { margin: 0; }
-    .hero-shot img {
-      width: 100%;
-      height: auto;
-      border-radius: 16px;
-      border: 1px solid var(--line);
+    .status {
+      display: inline-flex;
+      min-height: 32px;
+      align-items: center;
+      margin: 18px 0 0;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: var(--lilac);
+      color: var(--brand-dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .hero-stage {
+      position: relative;
+      min-height: 562px;
+      overflow: hidden;
+      padding: 82px 52px 60px;
+      border-radius: 36px;
+      background: var(--brand);
       box-shadow: var(--shadow);
-      background: #fff;
+      isolation: isolate;
+      animation: stage-enter .58s cubic-bezier(.2,.8,.2,1) both;
     }
-    .hero-shot figcaption {
-      margin: 10px 2px 0;
-      font-size: 13px;
+    .hero-stage::before,
+    .hero-stage::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .hero-stage::before {
+      top: 28px;
+      left: 30px;
+      width: 240px;
+      height: 240px;
+      background: rgba(209, 191, 250, .28);
+      box-shadow: 0 0 86px 30px rgba(209, 191, 250, .16);
+      animation: orb-breathe 4.2s ease-in-out infinite;
+    }
+    .hero-stage::after {
+      right: 64px;
+      bottom: 26px;
+      width: 180px;
+      height: 180px;
+      background: rgba(255, 255, 255, .1);
+    }
+    .stage-tag {
+      position: absolute;
+      top: 28px;
+      left: 34px;
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .92);
+      color: var(--brand-dark);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .product-shell {
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+      width: 100%;
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: 0 24px 42px -28px rgba(25, 19, 38, .68);
+    }
+    .app-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 42px;
+      padding: 0 18px;
+      background: var(--aubergine);
+      color: var(--surface);
+    }
+    .traffic { display: flex; gap: 8px; }
+    .traffic i { width: 10px; height: 10px; border-radius: 50%; }
+    .traffic .red { background: #FF8B8B; }
+    .traffic .yellow { background: #F7C85B; }
+    .traffic .green { background: #68C98D; }
+    .app-titlebar strong { margin-left: 10px; font-size: 12px; }
+    .app-body {
+      display: grid;
+      grid-template-columns: 154px minmax(0, 1fr);
+      min-height: 378px;
+    }
+    .app-sidebar {
+      padding: 26px 20px;
+      background: #FBF9FD;
+    }
+    .app-sidebar h3 {
+      margin: 0 0 28px;
+      font-size: 18px;
+    }
+    .app-sidebar .active {
+      display: flex;
+      align-items: center;
+      min-height: 32px;
+      margin-bottom: 20px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: var(--lilac);
+      color: var(--brand-dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .app-sidebar p {
+      margin: 0 0 22px 14px;
       color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .app-main { padding: 24px 30px; background: var(--surface); }
+    .app-main .mini-kicker {
+      margin: 0 0 10px;
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .app-main h3 { margin: 0 0 22px; font-size: 22px; }
+    .query-input {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 46px;
+      padding: 0 8px 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #FCFBFE;
+      color: var(--ink);
+      font-size: 13px;
+    }
+    .query-submit {
+      display: inline-grid;
+      place-items: center;
+      width: 38px;
+      height: 30px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--brand);
+      color: var(--surface);
+      font: inherit;
+      font-weight: 800;
+    }
+    .result-heading {
+      margin: 22px 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .result-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 52px;
+      margin-top: 10px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #FBF9FD;
+      color: var(--ink);
+      font-size: 12px;
+    }
+    .result-card:first-of-type { border-color: transparent; background: var(--lilac); color: var(--aubergine); font-weight: 700; }
+    .result-card small { color: var(--brand); font-size: 16px; }
+    .result-card.compact { min-height: 38px; color: var(--muted); }
+    .fox-badge {
+      position: absolute;
+      right: 72px;
+      bottom: 20px;
+      z-index: 2;
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      box-shadow: 0 14px 26px -20px rgba(25, 19, 38, .9);
     }
 
-    .overview-sec { padding: 40px 0 8px; }
-    .overview-sec .section-title { margin-bottom: 20px; }
+    section[id] { scroll-margin-top: 104px; }
+    .narrative {
+      position: relative;
+      overflow: hidden;
+      padding: 70px 0 62px;
+      background: var(--aubergine);
+      color: var(--surface);
+    }
+    .narrative-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(480px, 1fr);
+      gap: 64px;
+      align-items: center;
+    }
+    .narrative h2 {
+      max-width: 560px;
+      margin: 18px 0 24px;
+      font-size: clamp(2.2rem, 4vw, 3.3rem);
+      letter-spacing: -.045em;
+      line-height: 1.28;
+    }
+    .narrative-copy { margin: 0; color: #DAD1E8; font-size: 18px; }
+    .narrative .eyebrow { color: var(--brand-light); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .stat {
+      min-height: 160px;
+      padding: 24px;
+      border-radius: 24px;
+      background: #35234F;
+    }
+    .stat strong { display: block; color: var(--brand-light); font-size: 44px; line-height: 1.1; }
+    .stat span { display: block; margin-top: 36px; color: var(--surface); font-size: 14px; font-weight: 700; }
+    .workflow-rail {
+      margin-top: 62px;
+      padding-top: 30px;
+      border-top: 1px solid #4A3861;
+    }
+    .workflow-rail .ov-steps { max-width: 540px; margin: 0 0 22px; }
+    .workflow-rail .ov-steps button { color: #DAD1E8; }
+    .workflow-rail .ov-steps button[aria-selected="true"],
+    .workflow-rail .ov-steps button.is-done { color: var(--brand-light); }
+    .workflow-rail .ov-steps::before { background: #4A3861; }
+    .workflow-rail .ov-steps::after { background: var(--brand-light); }
+    .workflow-rail .ov-mark i { border-color: #8D7B9F; background: transparent; }
+    .workflow-rail .ov-steps button.is-done .ov-mark i,
+    .workflow-rail .ov-steps button[aria-selected="true"] .ov-mark i { border-color: var(--brand-light); background: var(--brand-light); }
+    .workflow-rail .ov-steps button[aria-selected="true"] .ov-mark i { box-shadow: 0 0 0 4px rgba(209, 191, 250, .18); }
     .ov-steps {
       --ov-progress: 0;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       max-width: 420px;
-      margin: 0 auto 28px;
       position: relative;
     }
     .ov-steps::before,
@@ -218,11 +475,11 @@
     }
     .ov-steps::before {
       right: 16.666%;
-      background: var(--line);
+      background: #4A3861;
     }
     .ov-steps::after {
       width: calc(var(--ov-progress) * 66.668%);
-      background: var(--accent);
+      background: var(--brand-light);
     }
     .ov-steps button {
       appearance: none;
@@ -232,350 +489,491 @@
       flex-direction: column;
       align-items: center;
       gap: 8px;
+      min-height: 52px;
       margin: 0;
       padding: 0 4px 4px;
-      min-height: 52px;
       border: 0;
       background: transparent;
+      color: #DAD1E8;
       font: inherit;
       font-size: 13px;
-      font-weight: 600;
-      color: var(--muted);
+      font-weight: 700;
       cursor: pointer;
     }
-    .ov-steps button:hover { color: var(--fg); }
-    .ov-steps button.is-done { color: var(--fg); }
-    .ov-steps button[aria-selected="true"] {
-      color: var(--accent);
-      font-weight: 650;
-    }
+    .ov-steps button:hover { color: var(--surface); }
     .ov-mark {
+      display: grid;
       width: 32px;
       height: 32px;
-      display: grid;
       place-items: center;
     }
     .ov-mark i {
       display: block;
       width: 10px;
       height: 10px;
-      border-radius: 99px;
-      background: #fff;
-      border: 2px solid #c9ced8;
-      box-sizing: border-box;
+      border: 2px solid #8D7B9F;
+      border-radius: 50%;
+      background: transparent;
     }
     .ov-steps button.is-done .ov-mark i,
     .ov-steps button[aria-selected="true"] .ov-mark i {
-      background: var(--accent);
-      border-color: var(--accent);
-    }
-    .ov-steps button[aria-selected="true"] .ov-mark i {
       width: 12px;
       height: 12px;
-      box-shadow: 0 0 0 4px var(--accent-soft);
+      border-color: var(--brand-light);
+      background: var(--brand-light);
+    }
+    .ov-steps button[aria-selected="true"] .ov-mark i {
+      box-shadow: 0 0 0 4px rgba(209, 191, 250, .18);
     }
     .ov-deck {
       position: relative;
-      height: clamp(280px, 46vw, 500px);
-      margin: 0 52px 56px 0;
+      height: 240px;
+      max-width: 900px;
+      margin: 0;
       touch-action: pan-y;
       cursor: grab;
       user-select: none;
     }
-    .ov-deck.is-drag {
-      cursor: grabbing;
-      touch-action: none;
-    }
+    .ov-deck.is-drag { cursor: grabbing; touch-action: none; }
     .ov-card {
       position: absolute;
       inset: 0;
-      margin: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 18px;
-      background: var(--ov-canvas);
-      border: 1px solid var(--ov-ring);
-      border-radius: 20px;
-      box-shadow: var(--ov-shadow);
+      padding: 16px;
       overflow: hidden;
+      border: 1px solid #4A3861;
+      border-radius: 22px;
+      background: #35234F;
+      box-shadow: 0 24px 44px -34px rgba(0, 0, 0, .7);
       will-change: transform, opacity;
-    }
-    /* 顶部一层高光，让画布有光感，不是一块死白 */
-    .ov-card::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(85% 55% at 50% 0%, rgba(255, 255, 255, 0.9), transparent 72%);
-      pointer-events: none;
     }
     .ov-card img {
       position: relative;
       max-width: 100%;
       max-height: 100%;
-      width: auto;
-      height: auto;
       object-fit: contain;
-      border-radius: 12px;
-      box-shadow: 0 16px 32px -20px rgba(27, 28, 34, 0.45), 0 2px 6px -3px rgba(27, 28, 34, 0.16);
+      border-radius: 14px;
+      box-shadow: 0 16px 32px -20px rgba(0, 0, 0, .58);
       pointer-events: none;
       -webkit-user-drag: none;
     }
-    .ov-card.is-capsule img {
-      width: 92%;
-      max-height: 168px;
-      border-radius: 20px;
-      box-shadow: 0 22px 40px -24px rgba(27, 28, 34, 0.55), 0 3px 10px -5px rgba(27, 28, 34, 0.18);
-    }
-    .ov-cap {
-      margin: 0 2px 0;
-      font-size: 14px;
-      color: var(--muted);
-      min-height: 1.5em;
-    }
+    .ov-card.is-capsule img { width: 92%; max-height: 170px; }
+    .ov-cap { min-height: 1.5em; margin: 18px 0 0; color: #DAD1E8; font-size: 14px; }
 
-    section { padding: 48px 0; }
-    section[id] { scroll-margin-top: 80px; }
+    .capability,
+    .download,
+    .install { padding: 78px 0; }
+    .capability { background: var(--canvas); }
+    .download { background: var(--surface); }
+    .install { background: var(--canvas); }
     .section-title {
-      margin: 0 0 8px;
-      font-size: clamp(1.4rem, 2.4vw, 1.8rem);
-      letter-spacing: -0.02em;
-      font-weight: 700;
-      word-break: keep-all;
-      line-break: strict;
+      margin: 16px 0 12px;
+      color: var(--ink);
+      font-size: clamp(2rem, 3.2vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -.045em;
+      line-height: 1.2;
     }
-    .section-lead {
-      margin: 0 0 24px;
-      color: var(--muted);
+    .section-lead { max-width: 660px; margin: 0 0 34px; color: var(--muted); font-size: 16px; }
+    .card-grid,
+    .install-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      margin-top: 42px;
     }
+    .info-card,
+    .install-card {
+      min-height: 206px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: 0 12px 24px -26px rgba(25, 19, 38, .5);
+    }
+    .info-card .index {
+      color: var(--brand);
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .info-card h3 { margin: 26px 0 14px; font-size: 24px; }
+    .info-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .accent-bar { width: 56px; height: 4px; margin-top: 26px; border-radius: 99px; background: var(--brand); }
 
     .download-box {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 28px 28px 24px;
+      padding: 0;
+      background: transparent;
     }
-    .download-box h2 { margin-top: 0; }
     .tabs {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      margin: 20px 0 12px;
+      gap: 8px;
+      margin: 34px 0 20px;
     }
     .tabs button {
+      min-height: 40px;
+      padding: 0 18px;
       border: 1px solid var(--line);
-      background: transparent;
-      font: inherit;
-      padding: 10px 16px;
-      min-height: 44px;
       border-radius: 999px;
+      background: transparent;
       color: var(--muted);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
       cursor: pointer;
+      transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
     }
-    .tabs button[aria-selected="true"] {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--accent-fg);
-    }
+    .tabs button:hover { transform: translateY(-1px); color: var(--ink); }
+    .tabs button[aria-selected="true"] { border-color: var(--brand); background: var(--brand); color: var(--surface); }
     .panel { display: none; }
     .panel.is-on { display: block; }
+    .platform-panel {
+      min-height: 248px;
+      padding: 24px;
+      border-radius: 22px;
+      background: #FBF9FD;
+      border: 1px solid var(--line);
+    }
+    #panel-win .platform-panel { background: var(--aubergine); border-color: var(--aubergine); color: var(--surface); }
+    .platform-panel h3 { margin: 0 0 22px; font-size: 22px; }
+    .platform-version { margin: 0; color: var(--muted); font-size: 15px; font-weight: 700; }
+    #panel-win .platform-version { color: var(--brand-light); }
+    .platform-meta { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+    #panel-win .platform-meta { color: #DAD1E8; }
     .row {
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       justify-content: space-between;
-      gap: 16px;
-      padding: 8px 0 4px;
+      gap: 24px;
     }
-    .row h3 { margin: 0 0 4px; font-size: 15px; }
-    .row p { margin: 0; font-size: 13px; color: var(--muted); }
+    .row .btn { min-width: 250px; min-height: 44px; }
     .chip {
       display: inline-flex;
       align-items: center;
-      margin-top: 8px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      color: var(--muted);
-      background: var(--bg);
-      border-radius: 8px;
-      padding: 10px 12px;
       min-height: 44px;
+      margin-top: 22px;
+      padding: 0 12px;
       border: 1px solid var(--line);
-      cursor: pointer;
-    }
-    .chip:hover { color: var(--fg); }
-    .note {
-      margin: 16px 0 0;
-      font-size: 13px;
+      border-radius: 10px;
+      background: var(--canvas);
       color: var(--muted);
+      font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      cursor: pointer;
+      transition: color .18s ease, background-color .18s ease, border-color .18s ease, transform .18s ease;
     }
-    .note a { font-weight: 600; text-decoration: none; }
-    .steps ol { margin: 0; padding-left: 20px; }
-    .steps li { margin: 0 0 10px; }
-    .warn { color: var(--warn); }
+    .chip:hover { color: var(--ink); transform: translateY(-1px); }
+    #panel-win .chip { border-color: #4A3861; background: #35234F; color: #DAD1E8; }
+    .chip.is-copied { border-color: var(--success); background: #E5F6F0; color: var(--success); }
+    .note { margin: 22px 0 0; color: var(--muted); font-size: 13px; }
+    .note a { font-weight: 700; text-decoration: none; }
+
+    .install-grid { margin-top: 42px; }
+    .install-card { min-height: 196px; }
+    .install-number {
+      display: inline-grid;
+      width: 46px;
+      height: 46px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--brand);
+      color: var(--surface);
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .install-card h3 { display: inline-block; margin: 0 0 0 18px; vertical-align: top; font-size: 22px; line-height: 46px; }
+    .install-card p { margin: 26px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .security-notice {
+      margin-top: 32px;
+      padding: 14px 20px;
+      border-radius: 16px;
+      background: var(--lilac);
+      color: var(--brand-dark);
+      font-size: 13px;
+      font-weight: 700;
+    }
 
     footer {
-      padding: 36px 0 28px;
-      border-top: 1px solid var(--line);
+      padding: 58px 0 28px;
+      background: var(--ink);
+      color: var(--surface);
     }
-    .foot-grid {
+    .footer-grid {
       display: grid;
-      grid-template-columns: 1.6fr 1fr 1fr;
-      gap: 24px;
+      grid-template-columns: 1.5fr 1fr 1fr;
+      gap: 48px;
     }
-    footer h3 { margin: 0 0 8px; font-size: 13px; }
-    footer a {
+    .footer-brand {
       display: flex;
       align-items: center;
-      text-decoration: none;
-      color: var(--muted);
+      gap: 12px;
+      color: var(--surface);
       font-size: 14px;
-      min-height: 44px;
+      font-weight: 800;
+      letter-spacing: .08em;
     }
-    footer a:hover { color: var(--fg); }
-    .foot-brand { display: flex; align-items: center; gap: 8px; font-weight: 650; margin-bottom: 6px; }
-    .foot-brand img { width: 22px; height: 22px; }
-    .foot-copy { margin: 0; color: var(--muted); font-size: 14px; }
+    .footer-brand img { width: 34px; height: 34px; border-radius: 12px; }
+    .footer-copy { margin: 22px 0 0; color: var(--brand-light); font-size: 20px; font-weight: 700; }
+    footer h3 { margin: 0 0 12px; color: var(--brand-light); font-size: 12px; letter-spacing: .1em; }
+    footer a { display: block; min-height: 32px; color: #DAD1E8; font-size: 13px; text-decoration: none; }
+    footer a:hover { color: var(--surface); }
     .legal {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
-      margin-top: 24px;
-      padding-top: 16px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 13px;
+      gap: 16px;
+      margin-top: 48px;
+      padding-top: 18px;
+      border-top: 1px solid #403252;
+      color: var(--brand-light);
+      font-size: 11px;
+      letter-spacing: .05em;
     }
 
-    @media (max-width: 900px) {
-      .nav-links { display: none; }
-      .brand-full { display: none; }
-      .brand-short { display: inline; }
-      .hero { padding: 32px 0 20px; }
-      .hero-grid, .foot-grid { grid-template-columns: 1fr; }
-      .hero-actions .btn { width: 100%; }
-      .ov-deck { height: clamp(220px, 68vw, 360px); margin: 0 32px 40px 0; }
-      .ov-card { padding: 12px; }
-      .row { flex-direction: column; align-items: stretch; }
-      .row .btn, .row .chip { width: 100%; }
-      .legal { flex-direction: column; }
-      .download-box { padding: 22px 18px; }
+    @keyframes stage-enter {
+      from { opacity: 0; transform: translate3d(32px, 12px, 0); }
+      to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+    @keyframes orb-breathe {
+      0%, 100% { transform: scale(1); opacity: .82; }
+      50% { transform: scale(1.06); opacity: 1; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+      }
       .ov-card { transition: none !important; }
+    }
+    @media (max-width: 1080px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-stage { max-width: 760px; }
+      .narrative-grid { grid-template-columns: 1fr; }
+      .stats { max-width: 760px; }
+    }
+    @media (max-width: 820px) {
+      .nav-links { display: none; }
+      .hero { padding: 52px 0 56px; }
+      .card-grid, .install-grid { grid-template-columns: 1fr; gap: 16px; }
+      .info-card, .install-card { min-height: auto; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .footer-grid > :first-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 620px) {
+      .wrap { width: min(var(--max), calc(100% - 32px)); }
+      .nav-cta { min-width: 0; padding: 0 14px; }
+      .brand-name { font-size: 12px; }
+      .brand-sub { font-size: 9px; }
+      h1 { font-size: 2.65rem; }
+      .hero-actions { align-items: stretch; flex-direction: column; }
+      .hero-actions .btn { width: 100%; }
+      .hero-stage { min-height: 486px; padding: 72px 16px 44px; border-radius: 26px; }
+      .app-body { grid-template-columns: 92px minmax(0, 1fr); min-height: 330px; }
+      .app-sidebar { padding: 20px 12px; }
+      .app-sidebar h3 { font-size: 14px; }
+      .app-sidebar .active { padding: 0 10px; }
+      .app-sidebar p { margin-left: 10px; font-size: 11px; }
+      .app-main { padding: 18px 14px; }
+      .app-main h3 { font-size: 16px; }
+      .query-input { font-size: 11px; padding-left: 10px; }
+      .result-card { padding: 0 10px; font-size: 10px; }
+      .fox-badge { right: 26px; bottom: 16px; width: 70px; height: 70px; }
+      .narrative, .capability, .download, .install { padding: 58px 0; }
+      .stats { grid-template-columns: 1fr; gap: 12px; }
+      .stat { min-height: auto; padding: 18px 20px; }
+      .stat span { margin-top: 16px; }
+      .workflow-rail { margin-top: 44px; }
+      .ov-deck { height: 190px; }
+      .ov-cap { font-size: 12px; }
+      .row { align-items: stretch; flex-direction: column; }
+      .row .btn { width: 100%; min-width: 0; }
+      .platform-panel { padding: 20px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+      .footer-grid > :first-child { grid-column: auto; }
+      .legal { align-items: flex-start; flex-direction: column; }
     }
   </style>
 </head>
 <body>
   <a class="skip" href="#download">跳到下载</a>
+
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="./">
-        <img src="./fox-head.png" alt="" width="28" height="28">
-        <span class="brand-full">客服话术浮窗 Demo</span>
-        <span class="brand-short">话术浮窗</span>
+      <a class="brand" href="./" aria-label="客服 Agent 官方下载首页">
+        <img src="./fox-head.png" alt="" width="34" height="34">
+        <span class="brand-lockup">
+          <span class="brand-name">SHENMEI</span>
+          <span class="brand-sub">CUSTOMER AGENT</span>
+        </span>
       </a>
       <nav class="nav-links" aria-label="页面">
         <a href="#overview">总览</a>
+        <a href="#capability">产品能力</a>
+        <a href="#download" aria-current="true">下载</a>
         <a href="#install">安装</a>
-        <a href="https://github.com/tyuanww/customer-agent-prototype">源码</a>
       </nav>
-      <a class="btn btn-primary" href="#download">下载</a>
+      <a class="btn btn-ink nav-cta" href="#download">立即下载 <span class="arrow" aria-hidden="true">↗</span></a>
     </div>
   </header>
 
   <main>
-    <section class="hero">
+    <section class="hero" id="top">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <p class="kicker">v0.3.25</p>
-          <h1>客服话术浮窗</h1>
-          <p class="lead">接待时查询当前已发布的话术，复制后自己发送。用公司飞书登录。下载安装包不会开通账号。</p>
+          <p class="kicker">SHENMEI / DESKTOP UTILITY</p>
+          <h1>把每一次回复，<br>说得更专业。</h1>
+          <p class="lead">客服 Agent 把常用话术、产品知识和处理步骤放在工作流里。随时可见，需要时出现，复制即可继续沟通。</p>
           <div class="hero-actions">
-            <a class="btn btn-primary btn-lg" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-win-x64-UNSIGNED.exe">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
-              下载 Windows 安装包
+            <a class="btn btn-primary" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-win-x64-UNSIGNED.exe">
+              下载 Windows 安装包 <span class="arrow" aria-hidden="true">↗</span>
             </a>
+            <a class="btn btn-ghost" href="#install">查看安装说明</a>
           </div>
-          <p class="meta">Windows 10+ x64 · 87.2 MB · 未代码签名</p>
+          <p class="meta">v0.3.25 · Windows 10+ x64 · 87.2 MB</p>
+          <p class="status">未代码签名 · 首次运行需确认</p>
         </div>
-        <figure class="hero-shot">
-          <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术，以及打开过敏售后流程。">
-          <figcaption>登录后查询，点「复制话术」或按 1 / 2 / 3。</figcaption>
-        </figure>
+
+        <div class="hero-stage" aria-label="客服 Agent 查询窗口预览">
+          <span class="stage-tag">LIVE / WORKFLOW</span>
+          <div class="product-shell">
+            <div class="app-titlebar">
+              <span class="traffic" aria-hidden="true"><i class="red"></i><i class="yellow"></i><i class="green"></i></span>
+              <strong>客服 Agent</strong>
+            </div>
+            <div class="app-body">
+              <aside class="app-sidebar" aria-label="工作台导航">
+                <h3>工作台</h3>
+                <span class="active">查询</span>
+                <p>话术库</p>
+                <p>产品资料</p>
+                <p>发布记录</p>
+              </aside>
+              <div class="app-main">
+                <p class="mini-kicker">QUERY / 01</p>
+                <h3>今天要怎么回复？</h3>
+                <div class="query-input">
+                  <span>脸部过敏，我的脸很痛</span>
+                  <span class="query-submit" aria-hidden="true">↗</span>
+                </div>
+                <p class="result-heading">建议回复</p>
+                <div class="result-card"><span>先停手，确认是否有过敏反应。</span><small aria-hidden="true">⧉</small></div>
+                <div class="result-card"><span>如果持续不适，建议及时就医。</span><small aria-hidden="true">⧉</small></div>
+                <div class="result-card compact"><span>语气：关怀 / 清晰 / 可执行</span></div>
+              </div>
+            </div>
+          </div>
+          <img class="fox-badge" src="./fox-head.png" width="92" height="92" alt="客服 Agent 狐狸图标">
+        </div>
       </div>
     </section>
 
-    <section class="overview-sec" id="overview">
+    <section class="narrative" id="overview">
       <div class="wrap">
-        <h2 class="section-title">总览</h2>
-        <div class="ov-steps" id="ov-tabs" role="tablist" aria-label="总览">
-          <button type="button" role="tab" id="ov-login" aria-controls="ov-view" aria-selected="true" data-show="0">
-            <span class="ov-mark" aria-hidden="true"><i></i></span>
-            <span class="ov-label">登录</span>
-          </button>
-          <button type="button" role="tab" id="ov-query" aria-controls="ov-view" aria-selected="false" data-show="1">
-            <span class="ov-mark" aria-hidden="true"><i></i></span>
-            <span class="ov-label">查询</span>
-          </button>
-          <button type="button" role="tab" id="ov-publish" aria-controls="ov-view" aria-selected="false" data-show="2">
-            <span class="ov-mark" aria-hidden="true"><i></i></span>
-            <span class="ov-label">发布</span>
-          </button>
+        <div class="narrative-grid">
+          <div>
+            <p class="eyebrow">A QUIET LAYER IN YOUR WORKFLOW</p>
+            <h2>不打断工作，<br>只在需要时出现。</h2>
+            <p class="narrative-copy">让知识靠近对话，让下一句更有把握。</p>
+          </div>
+          <div class="stats" aria-label="产品原则">
+            <div class="stat"><strong>01</strong><span>随时可见</span></div>
+            <div class="stat"><strong>02</strong><span>原文优先</span></div>
+            <div class="stat"><strong>03</strong><span>人始终在环</span></div>
+          </div>
         </div>
-        <div class="ov-deck" id="ov-view" role="tabpanel" aria-labelledby="ov-login" aria-roledescription="堆叠卡片" tabindex="0">
-          <figure class="ov-card is-capsule" data-show="0">
-            <img src="./shot-capsule.png" width="1200" height="176" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。" draggable="false">
-          </figure>
-          <figure class="ov-card" data-show="1">
-            <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。" draggable="false">
-          </figure>
-          <figure class="ov-card" data-show="2">
-            <img src="./shot-dashboard.jpg" width="1933" height="1245" alt="客服运营工作台的话术库，当前发布已挂载。" draggable="false">
-          </figure>
+
+        <div class="workflow-rail">
+          <div class="ov-steps" id="ov-tabs" role="tablist" aria-label="工作流">
+            <button type="button" role="tab" id="ov-login" aria-controls="ov-view" aria-selected="true" data-show="0">
+              <span class="ov-mark" aria-hidden="true"><i></i></span><span class="ov-label">登录</span>
+            </button>
+            <button type="button" role="tab" id="ov-query" aria-controls="ov-view" aria-selected="false" data-show="1">
+              <span class="ov-mark" aria-hidden="true"><i></i></span><span class="ov-label">查询</span>
+            </button>
+            <button type="button" role="tab" id="ov-publish" aria-controls="ov-view" aria-selected="false" data-show="2">
+              <span class="ov-mark" aria-hidden="true"><i></i></span><span class="ov-label">发布</span>
+            </button>
+          </div>
+          <div class="ov-deck" id="ov-view" role="tabpanel" aria-labelledby="ov-login" aria-roledescription="工作流卡片" tabindex="0">
+            <figure class="ov-card is-capsule" data-show="0">
+              <img src="./shot-capsule.png" width="1200" height="176" alt="未登录的查询条，占位「登录后查询话术」，可打开登录和工作台。" draggable="false">
+            </figure>
+            <figure class="ov-card" data-show="1">
+              <img src="./shot-query.png" width="1200" height="1240" alt="查询窗口：问句「脸部过敏，我的脸很痛」，三条可复制的话术。" draggable="false">
+            </figure>
+            <figure class="ov-card" data-show="2">
+              <img src="./shot-dashboard.jpg" width="1933" height="1245" alt="客服运营工作台的话术库，当前发布已挂载。" draggable="false">
+            </figure>
+          </div>
+          <p class="ov-cap" id="ov-cap" aria-live="polite">用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
         </div>
-        <p class="ov-cap" id="ov-cap" aria-live="polite">用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。</p>
       </div>
     </section>
 
-    <section id="download">
+    <section class="capability" id="capability">
+      <div class="wrap">
+        <p class="eyebrow">PRODUCT CAPABILITY</p>
+        <h2 class="section-title">把复杂的事，放到一句话之后。</h2>
+        <div class="card-grid">
+          <article class="info-card"><span class="index">01</span><h3>随时可见</h3><p>从桌面边缘唤起，<br>不离开当前对话。</p><div class="accent-bar"></div></article>
+          <article class="info-card"><span class="index">02</span><h3>原文优先</h3><p>优先使用已确认的<br>产品与话术内容。</p><div class="accent-bar"></div></article>
+          <article class="info-card"><span class="index">03</span><h3>人始终在环</h3><p>复制之前先判断，<br>每一次发送由你决定。</p><div class="accent-bar"></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="download" id="download">
       <div class="wrap">
         <div class="download-box">
-          <h2 class="section-title">下载</h2>
-          <p class="section-lead">v0.3.25 · 2026年9月29日</p>
+          <p class="eyebrow">DOWNLOAD</p>
+          <h2 class="section-title">选择你的工作环境。</h2>
+          <p class="section-lead">Windows 版本已就绪，macOS 与 Linux 版本保留更新入口。</p>
           <div class="tabs" id="os-tabs" role="tablist" aria-label="系统">
             <button type="button" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="true" data-tab="win">Windows</button>
             <button type="button" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false" data-tab="mac">macOS</button>
             <button type="button" role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false" data-tab="linux">Linux</button>
           </div>
+
           <div class="panel is-on" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
-            <div class="row">
-              <div>
-                <h3>Windows 安装包</h3>
-                <p>x64 · 装进当前用户目录</p>
-                <button class="chip" type="button" data-copy="84795e68bc316e45999287c5532b883c232a80aa9619b68c475fc202a479aac1">SHA-256　84795e68…a479aac1</button>
+            <div class="platform-panel">
+              <div class="row">
+                <div>
+                  <h3>Windows 安装包</h3>
+                  <p class="platform-version">Windows 10+ x64</p>
+                  <p class="platform-meta">v0.3.25 · 87.2 MB</p>
+                  <button class="chip" type="button" data-copy="84795e68bc316e45999287c5532b883c232a80aa9619b68c475fc202a479aac1">SHA-256　84795e68…a479aac1</button>
+                </div>
+                <a class="btn btn-primary" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-win-x64-UNSIGNED.exe">下载 · 87.2 MB <span class="arrow" aria-hidden="true">↗</span></a>
               </div>
-              <a class="btn btn-primary" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-win-x64-UNSIGNED.exe">下载 · 87.2 MB</a>
             </div>
           </div>
           <div class="panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
-            <div class="row">
-              <div>
-                <h3>macOS 磁盘映像</h3>
-                <p>universal · 未公证</p>
-                <button class="chip" type="button" data-copy="556b3fa7afa2d1cd3b9177d995679d481c359eca35331f8d17b059884834e2f5">SHA-256　556b3fa7…4834e2f5</button>
+            <div class="platform-panel">
+              <div class="row">
+                <div>
+                  <h3>macOS 磁盘映像</h3>
+                  <p class="platform-version">universal · 未公证</p>
+                  <p class="platform-meta">v0.3.25 · 213.5 MB</p>
+                  <button class="chip" type="button" data-copy="556b3fa7afa2d1cd3b9177d995679d481c359eca35331f8d17b059884834e2f5">SHA-256　556b3fa7…4834e2f5</button>
+                </div>
+                <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB <span class="arrow" aria-hidden="true">↗</span></a>
               </div>
-              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
             </div>
           </div>
           <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
-            <div class="row">
-              <div>
-                <h3>Linux AppImage</h3>
-                <p>x86_64 · 未签名</p>
-                <button class="chip" type="button" data-copy="54ece2999c2c4a24cbaa40b3d477e58fee526f3609e416f42da53124b6deb610">SHA-256　54ece299…b6deb610</button>
+            <div class="platform-panel">
+              <div class="row">
+                <div>
+                  <h3>Linux AppImage</h3>
+                  <p class="platform-version">x86_64 · 未签名</p>
+                  <p class="platform-meta">v0.3.25 · 125.9 MB</p>
+                  <button class="chip" type="button" data-copy="54ece2999c2c4a24cbaa40b3d477e58fee526f3609e416f42da53124b6deb610">SHA-256　54ece299…b6deb610</button>
+                </div>
+                <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB <span class="arrow" aria-hidden="true">↗</span></a>
               </div>
-              <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.25/Demo-0.3.25-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
             </div>
           </div>
           <p class="note">未做代码签名，也没有自动更新。新版本仍从本页或 <a href="https://github.com/tyuanww/customer-agent-prototype/releases">GitHub Releases</a> 下载。点上方 SHA-256 可复制完整校验值。</p>
@@ -583,29 +981,31 @@
       </div>
     </section>
 
-    <section id="install">
-      <div class="wrap steps">
-        <h2 class="section-title">安装</h2>
-        <ol>
-          <li>下载后打开。文件名带 <code>UNSIGNED</code>，表示未代码签名。</li>
-          <li>若提示「Windows 已保护你的电脑」，选「更多信息」，再选「仍要运行」。</li>
-          <li>从开始菜单打开「客服话术浮窗 Demo」，用公司飞书登录。</li>
-        </ol>
-        <p class="note warn">不要从网盘或聊天转发的副本安装。</p>
+    <section class="install" id="install">
+      <div class="wrap">
+        <p class="eyebrow">INSTALL IN 3 STEPS</p>
+        <h2 class="section-title">三步开始，让回复更有把握。</h2>
+        <div class="install-grid">
+          <article class="install-card"><span class="install-number">01</span><h3>下载</h3><p>获取 Windows 安装包，<br>保存到本地。</p></article>
+          <article class="install-card"><span class="install-number">02</span><h3>安装</h3><p>双击安装包。首次运行<br>会看到系统提示。</p></article>
+          <article class="install-card"><span class="install-number">03</span><h3>登录</h3><p>使用公司飞书账号登录，<br>即可进入工作台。</p></article>
+        </div>
+        <div class="security-notice">首次运行可能显示“未代码签名”提示，请确认来源后继续。</div>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="wrap">
-      <div class="foot-grid">
+      <div class="footer-grid">
         <div>
-          <div class="foot-brand"><img src="./fox-head.png" alt="" width="22" height="22">客服话术浮窗 Demo</div>
-          <p class="foot-copy">MIT 开源。安装包在 GitHub Release。</p>
+          <div class="footer-brand"><img src="./fox-head.png" alt="" width="34" height="34">SHENMEI / CUSTOMER AGENT</div>
+          <p class="footer-copy">把下一句说得更专业。</p>
         </div>
         <div>
           <h3>本页</h3>
           <a href="#overview">总览</a>
+          <a href="#capability">产品能力</a>
           <a href="#download">下载</a>
           <a href="#install">安装</a>
         </div>
@@ -618,13 +1018,13 @@
         </div>
       </div>
       <div class="legal">
-        <span>© 2026 客服话术浮窗 Demo</span>
+        <span>SHENMEI · 2026</span>
         <span>download.jianghua.site</span>
       </div>
     </div>
   </footer>
 
-  <script>
+<script>
     const ovSlides = [
       { id: 'ov-login', cap: '用公司飞书。未登录时只能看到「登录后查询话术」。装完软件还没有账号。' },
       { id: 'ov-query', cap: '点桌面狐狸头，或按 Ctrl+Shift+Space。结果是当前已发布原文，不会代发到接待窗口。' },
@@ -826,8 +1226,9 @@
         try {
           await navigator.clipboard.writeText(btn.dataset.copy);
           const prev = btn.textContent;
+          btn.classList.add('is-copied');
           btn.textContent = '已复制 SHA-256';
-          setTimeout(() => { btn.textContent = prev; }, 1600);
+          setTimeout(() => { btn.classList.remove('is-copied'); btn.textContent = prev; }, 1600);
         } catch (err) {
           btn.textContent = btn.dataset.copy;
         }
