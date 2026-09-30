@@ -200,6 +200,7 @@ function searchRequest(queryId: string, overrides: Partial<PreparedSearchOperati
       topK: 3,
     }),
     redactionPolicyVersion: 'redaction-synthetic-v1',
+    queryTextRedacted: '什么时候发货',
     queryHash: hmacSafeValue('什么时候发货', LOG_HASH.version, LOG_HASH.key),
     queryHashKeyVersion: LOG_HASH.version,
     productContextRefHash: null,
@@ -296,7 +297,7 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
     harness?.stop();
   }, 60_000);
 
-  it('atomically records a suppressed query plus exact candidate tuple and replays the first response', async () => {
+  it('atomically records a stored query plus exact candidate tuple and replays the first response', async () => {
     const queryId = '10000000-0000-4000-8000-000000000001';
     const request = searchRequest(queryId);
     const first = await repository.executeSearch(request);
@@ -312,15 +313,19 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
       },
     });
     expect(replay).toEqual(first);
+    // 'stored', not 'suppressed': the redacted text and its keyed hash are written, not
+    // discarded. The column CHECK requires BOTH to be non-null for 'stored', so this
+    // assertion is what keeps the write side from regressing to NULL/NULL + 'suppressed'
+    // (which accepted the text and silently dropped it).
     await expect(owner.query(`
       SELECT query_text_redacted, query_text_hash, text_storage_status, request_hash,
              request_hash_key_version, release_id
       FROM public.query_events WHERE query_id = $1
     `, [queryId])).resolves.toMatchObject({
       rows: [{
-        query_text_redacted: null,
-        query_text_hash: null,
-        text_storage_status: 'suppressed',
+        query_text_redacted: '什么时候发货',
+        query_text_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        text_storage_status: 'stored',
         request_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
         request_hash_key_version: 'hmac-idempotency-v1',
         release_id: RELEASE_ID,
