@@ -828,6 +828,129 @@
   z-index: 1;
 }
 
+.notice-backdrop {
+  position: absolute !important;
+  z-index: 20 !important;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: color-mix(in srgb, var(--query-glass-solid) 76%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.notice-dialog {
+  display: flex;
+  width: min(520px, 100%);
+  max-height: min(560px, 100%);
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  background: var(--query-glass-solid);
+  box-shadow: var(--query-shadow), var(--query-highlight);
+  color: var(--ink);
+}
+
+.notice-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notice-dialog-eyebrow,
+.notice-dialog h2,
+.notice-dialog-content,
+.notice-dialog-hint,
+.notice-dialog-error {
+  margin: 0;
+}
+
+.notice-dialog-eyebrow {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.notice-dialog h2 {
+  font-size: 17px;
+  line-height: 24px;
+}
+
+.notice-dialog-version {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.notice-dialog-content {
+  min-height: 120px;
+  max-height: 300px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--glass-inner);
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre-wrap;
+}
+
+.notice-dialog-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.notice-dialog-error {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.notice-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.notice-dialog-primary,
+.notice-dialog-secondary {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.notice-dialog-primary {
+  border: 1px solid color-mix(in srgb, var(--fox) 28%, var(--hairline));
+  background: var(--query-accent-control);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.notice-dialog-secondary {
+  border: 1px solid var(--hairline);
+  background: var(--query-control);
+  color: var(--muted);
+}
+
+.notice-dialog-primary:focus-visible,
+.notice-dialog-secondary:focus-visible {
+  outline: 2px solid var(--fox);
+  outline-offset: 2px;
+}
+
+.notice-dialog-primary:disabled,
+.notice-dialog-secondary:disabled {
+  opacity: 0.72;
+}
+
 .query-shell.is-parked .glass-surface {
   opacity: 0;
 }

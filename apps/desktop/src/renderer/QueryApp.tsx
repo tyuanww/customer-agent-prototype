@@ -1,4 +1,5 @@
 import { PRODUCT_ERRORS, type ProductSessionResult } from '@shared/product-session';
+import type { NoticeDecision, ProductNoticeResult } from '@shared/product-notice';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -72,6 +73,9 @@ function contentUpdatedBannerCopy(domains: readonly LibraryDomain[]): string {
 
 export function QueryApp() {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
+  const [currentNotice, setCurrentNotice] = useState<ProductNoticeResult | null>(null);
+  const [noticeBusy, setNoticeBusy] = useState(false);
+  const [noticeError, setNoticeError] = useState('');
   const [sessionBusy, setSessionBusy] = useState(false);
   const productEpochRef = useRef(0);
   const [phase, setPhase] = useState<OverlayPhase>('SEARCH_INPUT');
@@ -126,6 +130,7 @@ export function QueryApp() {
   const preferenceWriteRef = useRef(Promise.resolve());
   const dashboardOpenFailedRef = useRef(false);
   const sessionBusyRef = useRef(false);
+  const noticeRequestRef = useRef(0);
   const pendingDashboardOpenRef = useRef(false);
   const openDashboardWindowRef = useRef<() => void>(() => undefined);
   const copyGenerationRef = useRef(0);
@@ -793,6 +798,49 @@ export function QueryApp() {
     setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
   }, [reportPhase]);
 
+  const refreshCurrentNotice = useCallback(async (sessionEpoch: number) => {
+    const api = window.customerAgent?.product;
+    if (!api?.currentNotice) return;
+    const requestId = ++noticeRequestRef.current;
+    const result = await api.currentNotice();
+    if (requestId !== noticeRequestRef.current || sessionEpoch !== productEpochRef.current) return;
+    if (!result.ok) {
+      setCurrentNotice(null);
+      setNoticeError(result.code === 'GONE' ? '' : result.message);
+      return;
+    }
+    setCurrentNotice(result);
+    setNoticeError('');
+    // A pending notice is an explicit blocking step. Reading the page alone
+    // never records a decision; only the buttons below call decideNotice.
+    if (result.decision === null && phaseRef.current === 'SEARCH_INPUT') {
+      reportPhase('ERROR');
+    }
+  }, [reportPhase]);
+
+  const decideCurrentNotice = useCallback(async (decision: NoticeDecision) => {
+    const api = window.customerAgent?.product;
+    if (!api?.decideNotice || !currentNotice?.ok || currentNotice.decision !== null || noticeBusy) return;
+    setNoticeBusy(true);
+    setNoticeError('');
+    try {
+      const result = await api.decideNotice({ version: currentNotice.notice.version, decision });
+      if (result.sessionEpoch !== productEpochRef.current) return;
+      if (!result.ok) {
+        setNoticeError(result.message);
+        return;
+      }
+      setCurrentNotice((previous) => previous?.ok
+        ? { ...previous, decision: result.decision, decided_at: result.decided_at }
+        : previous);
+      if (phaseRef.current === 'ERROR' && results.length === 0) reportPhase('SEARCH_INPUT');
+    } catch {
+      setNoticeError('告知决定未提交，请重试');
+    } finally {
+      setNoticeBusy(false);
+    }
+  }, [currentNotice, noticeBusy, reportPhase, results.length]);
+
   const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
     if (value.sessionEpoch < productEpochRef.current) return;
     if (productEpochRef.current !== value.sessionEpoch) {
@@ -814,15 +862,19 @@ export function QueryApp() {
       setInvalidMessage('');
     }
     if (!value.ok || (value.enabled && !value.signedIn)) {
+      noticeRequestRef.current += 1;
+      setCurrentNotice(null);
+      setNoticeError('');
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
       setAnnounceInvalid(false);
       reportPhase('SEARCH_INPUT');
     } else if (value.ok && value.signedIn) {
+      void refreshCurrentNotice(value.sessionEpoch);
       if (!(sessionBusyRef.current && source === 'status')) {
         void refreshAnnounce(value.sessionEpoch);
       }
     }
-  }, [cancelPendingSearch, cancelPendingCopy, reportPhase, refreshAnnounce]);
+  }, [cancelPendingSearch, cancelPendingCopy, refreshAnnounce, refreshCurrentNotice, reportPhase]);
 
   useEffect(() => {
     const api = window.customerAgent?.productAnnounce;
@@ -977,6 +1029,7 @@ export function QueryApp() {
   }, [acceptProductSession, productState, sessionBusy]);
 
   const runSearch = useCallback(() => {
+    if (currentNotice?.ok && currentNotice.decision === null) return;
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
       if (!(productState?.ok && productState.signedIn)) {
         return;
@@ -1092,7 +1145,7 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, currentNotice, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
 
   const copyScript = useCallback(
     async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
@@ -1788,6 +1841,42 @@ export function QueryApp() {
             onOpenHelp={window.customerAgent?.productHelp ? openHelp : undefined}
             onLeaveNoHit={window.customerAgent?.productHelp ? leaveNoHit : undefined}
           />
+        ) : null}
+        {expanded && currentNotice?.ok && currentNotice.decision === null ? (
+          <div className="notice-backdrop" data-testid="notice-backdrop">
+            <section className="notice-dialog" role="dialog" aria-modal="true" aria-labelledby="notice-title">
+              <div className="notice-dialog-header">
+                <div>
+                  <p className="notice-dialog-eyebrow">使用前请阅读</p>
+                  <h2 id="notice-title">试点采集告知</h2>
+                </div>
+                <span className="notice-dialog-version">{currentNotice.notice.version}</span>
+              </div>
+              <p className="notice-dialog-content" data-testid="notice-content">{currentNotice.notice.content}</p>
+              {noticeError ? <p className="notice-dialog-error" role="alert">{noticeError}</p> : null}
+              <p className="notice-dialog-hint">阅读页面不会自动表示同意，请选择下方按钮。</p>
+              <div className="notice-dialog-actions">
+                <button
+                  type="button"
+                  className="notice-dialog-secondary"
+                  data-testid="notice-decline"
+                  disabled={noticeBusy}
+                  onClick={() => { void decideCurrentNotice('declined'); }}
+                >
+                  {noticeBusy ? '提交中…' : '不同意'}
+                </button>
+                <button
+                  type="button"
+                  className="notice-dialog-primary"
+                  data-testid="notice-accept"
+                  disabled={noticeBusy}
+                  onClick={() => { void decideCurrentNotice('accepted'); }}
+                >
+                  {noticeBusy ? '提交中…' : '同意并继续'}
+                </button>
+              </div>
+            </section>
+          </div>
         ) : null}
         {showQueryResizeGrip ? (
           <div

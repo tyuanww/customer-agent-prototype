@@ -45,6 +45,8 @@ export type ProductSessionApi = {
   sessionStatus(): Promise<ProductSessionResult>;
   login(): Promise<ProductSessionResult>;
   logout(): Promise<ProductSessionResult>;
+  currentNotice?(): Promise<import('./product-notice').ProductNoticeResult>;
+  decideNotice?(request: import('./product-notice').ProductNoticeDecisionRequest): Promise<import('./product-notice').ProductNoticeDecisionResult>;
   onSessionChanged(listener: (value: ProductSessionResult) => void): () => void;
 };
 

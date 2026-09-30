@@ -117,6 +117,42 @@ describe('product session lifetime', () => {
     expect(await f.session.login()).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
     expect(f.session.view().signedIn).toBe(false);
   });
+  it('reads the current notice and submits an explicit idempotent decision', async () => {
+    const notice = {
+      notice: {
+        version: 'pilot-notice-v1',
+        content: '试点采集告知正文',
+        content_hash: 'a'.repeat(64),
+        published_at: new Date().toISOString(),
+      },
+      decision: null,
+      decided_at: null,
+    };
+    const f = fixture({ respond: (path) => {
+      if (path === '/v1/auth/login-requests') return Response.json({ login_id: `login_${'i'.repeat(43)}`, authorize_url: 'http://127.0.0.1:4101/authorize?state=s', expires_at: new Date(Date.now() + 300_000).toISOString() }, { status: 201 });
+      if (path.endsWith('/exchange')) return Response.json({ ...f.stored, token_type: 'Bearer' });
+      if (path === '/v1/auth/me') return Response.json(user);
+      if (path === '/v1/notices/current') return Response.json(notice);
+      if (path.endsWith('/decision')) return Response.json({ ok: true, version: 'pilot-notice-v1', decision: 'accepted', decided_at: new Date().toISOString() });
+      if (path.endsWith('/logout')) return new Response(null, { status: 204 });
+      return Response.json(user);
+    }});
+    await expect(f.session.login()).resolves.toMatchObject({ ok: true, signedIn: true });
+    const current = await f.session.currentNotice();
+    expect(current).toMatchObject({ ok: true, decision: null, notice: { version: 'pilot-notice-v1' } });
+    const decided = await f.session.decideNotice({ version: 'pilot-notice-v1', decision: 'accepted' });
+    expect(decided).toMatchObject({ ok: true, decision: 'accepted', version: 'pilot-notice-v1' });
+    const request = f.requests.find((entry) => entry.path.endsWith('/decision'));
+    expect(request?.init.method).toBe('POST');
+    expect(request?.init.headers).toEqual(expect.objectContaining({ 'idempotency-key': expect.any(String) }));
+    expect(JSON.stringify(current)).not.toContain(f.stored.access_token);
+  });
+  it('fails notice decisions closed when the version is unsafe', async () => {
+    const f = fixture();
+    await f.session.login();
+    await expect(f.session.decideNotice({ version: '../notice', decision: 'accepted' })).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+    expect(f.requests.some((entry) => entry.path.includes('notice'))).toBe(false);
+  });
 });
 describe('loopback transport', () => {
   it.each(['http://example.com', 'http://localhost:4100', 'http://127.0.0.1:4100/path', 'https://127.0.0.1'])('rejects %s', origin => {

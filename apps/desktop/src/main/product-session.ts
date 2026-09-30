@@ -7,6 +7,14 @@ import {
   type ProductSessionResult,
   type ProductSessionView,
 } from '../shared/product-session';
+import { parseContractSchema } from '@customer-agent/contracts';
+import {
+  isNoticeDecision,
+  noticeFailure,
+  type ProductNoticeDecisionRequest,
+  type ProductNoticeDecisionResult,
+  type ProductNoticeResult,
+} from '../shared/product-notice';
 import { ProductHttp, ProductHttpError } from './product-http';
 import { readOperatorDisplayName } from './operator-display-names';
 
@@ -116,6 +124,34 @@ export class ProductSession {
     } catch (error) {
       if (epoch === this.epoch && error instanceof ProductHttpError && error.code === 'UNAUTHORIZED') this.invalidate();
       throw error;
+    }
+  }
+  async currentNotice(): Promise<ProductNoticeResult> {
+    const epoch = this.epoch;
+    try {
+      const { value } = await this.request(epoch, '/v1/notices/current', { timeoutMs: 5_000 });
+      const notice = parseContractSchema('CurrentNoticeResponse', value);
+      return { ok: true, sessionEpoch: epoch, ...notice };
+    } catch (error) {
+      return noticeFailure(error instanceof ProductHttpError ? error.code : 'UNAVAILABLE', this.epoch);
+    }
+  }
+  async decideNotice(request: ProductNoticeDecisionRequest): Promise<ProductNoticeDecisionResult> {
+    const epoch = this.epoch;
+    if (!request || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(request.version) || !isNoticeDecision(request.decision)) {
+      return noticeFailure('VALIDATION', epoch);
+    }
+    try {
+      const { value } = await this.request(epoch, `/v1/notices/${encodeURIComponent(request.version)}/decision`, {
+        method: 'POST',
+        timeoutMs: 5_000,
+        body: { decision: request.decision },
+        headers: { 'idempotency-key': randomBytes(16).toString('hex') },
+      });
+      const decision = parseContractSchema('NoticeDecisionResponse', value);
+      return { ...decision, sessionEpoch: epoch };
+    } catch (error) {
+      return noticeFailure(error instanceof ProductHttpError ? error.code : 'UNAVAILABLE', this.epoch);
     }
   }
   async login(): Promise<ProductSessionResult> {
