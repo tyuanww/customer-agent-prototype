@@ -17,7 +17,8 @@ import {
   readProfile, shouldSeedSyntheticCatalog, stackPortOffset,
 } from './profile.ts';
 import {
-  forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
+  forgetProcess, isAlive, isOwnedProcessLive, pidIsAlive, portInUse, processCommandLine,
+  processSignature, readProcess, recordProcess, stopProcess,
 } from './process.ts';
 import { catalogReferences, isCatalogReference } from '../../apps/desktop/src/shared/synthetic-catalog.ts';
 
@@ -687,5 +688,51 @@ describe('stack start modes', () => {
       stack.includes('search self-check skipped'),
       'the search self-check asserts the seeded catalog, so it has to be skipped too',
     );
+  });
+});
+
+describe('process identity survives a clock correction', () => {
+  // Reproduces the failure measured on the deploy host: lstart is recomputed on
+  // every call, so once NTP steps the clock the recorded signature never matches
+  // again (43 minutes apart there). stop then removed the pid file WITHOUT
+  // signalling, leaving the old process running and making the next start trip the
+  // port guard. The command line does not drift, so it is the fallback identity.
+  it('treats a record as live when the signature drifted but the command line matches', () => {
+    const name = `drift-${String(process.pid)}`;
+    const live = processCommandLine(process.pid);
+    assert.ok(live !== undefined, 'the test process must have a readable command line');
+    const record = Object.freeze({
+      name,
+      pid: process.pid,
+      // A signature that can never match, standing in for the post-clock-step value.
+      signature: 'Tue Sep 29 23:48:15 2026   99999',
+      startedAt: '',
+      command: live,
+    });
+    assert.equal(isOwnedProcessLive(record), true);
+    assert.equal(pidIsAlive(record), true);
+  });
+
+  it('still refuses a record whose pid belongs to a different command', () => {
+    // pid 1 exists but never runs our command, so this must stay false. This is the
+    // property the signature check existed for: a reused pid must not be ours.
+    const record = Object.freeze({
+      name: 'foreign',
+      pid: 1,
+      signature: 'Tue Sep 29 23:48:15 2026   1',
+      startedAt: '',
+      command: '/usr/bin/definitely-not-this-process --x',
+    });
+    assert.equal(isAlive(1), true);
+    assert.equal(pidIsAlive(record), false);
+  });
+
+  it('does not claim ownership when the record carries no command line', () => {
+    // An older record without a usable command must not be adopted by the fallback:
+    // with no way to verify, the conservative answer is "not ours".
+    const record = Object.freeze({
+      name: 'no-command', pid: 1, signature: 'never-matches', startedAt: '', command: '',
+    });
+    assert.equal(pidIsAlive(record), false);
   });
 });
