@@ -58,7 +58,13 @@ const REQUIRED_TABLES = Object.freeze([
   'owner_acceptance_records', 'owner_acceptance_revocations',
   'source_snapshot_revisions',
 ]);
-const REQUIRED_VIEWS = Object.freeze(['v_release_source_gate', 'v_scripts_recommendable']);
+const REQUIRED_VIEWS = Object.freeze([
+  'v_release_source_gate', 'v_scripts_recommendable',
+  // 0018 owner read surface. Owned by cs_ai_definer and the only thing app_owner_read
+  // may read, so they are part of the verified shape, not an optional extra.
+  'vw_owner_asked_questions', 'vw_owner_shown_scripts',
+  'vw_owner_unmatched_questions', 'vw_owner_agent_daily',
+]);
 const REQUIRED_FUNCTION_SIGNATURES = Object.freeze([
   'publish_content_release(text,text,text,text,text)',
   'rollback_content_release(text,text,text,text,text)',
@@ -99,12 +105,21 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
   'metrics_experimental_kpi',
   'rewrite',
 ]);
-const EXPECTED_ACL_MANIFEST_ENTRIES = 203;
-const EXPECTED_ACL_MANIFEST_SHA256 = '3cd5353700fa023d94287710188821ea1af8fe94808d9ebb093609098eb3ef45';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1793;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = 'bfc3d7c4ecb31ad8006d49a8e798a5b7ee955ee594129ae494c8c9d486ed2d9b';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 188;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '661d87de6fbbf74fbfa130b611ee4ee370f693466a57582a9ecf225ba0ad933b';
+// 0017_rollback_previous_target adds resolve_previous_content_release; the +1 on each
+// manifest below is that one function and its single GRANT to app_content_admin. The
+// trigger manifest is unchanged. Recompute all four together when a later overlay lands.
+//
+// 0018_owner_read_views adds the app_owner_read role, four vw_owner_* views, and — the
+// part that is easy to miss — SELECT on four base tables for cs_ai_definer. A view runs
+// with its owner's privileges, so without those grants selecting the view fails with
+// 42501 even when the role holds the view. That is why the ACL entry count moves by more
+// than the four views: the definer's new table grants are part of it too.
+const EXPECTED_ACL_MANIFEST_ENTRIES = 211;
+const EXPECTED_ACL_MANIFEST_SHA256 = '21c5bf4d2e33119b8143d1a923997ff8a19ca4fb44205c28861591168172b203';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1839;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '41cda11861cd5bfb0c92546a04e0b6be86b374109ff9993749017ce8bbb75ce3';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 189;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '86531318d0c280d262bbb39306c237c18865df639307745551faa620c99efc98';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 36;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '84ed46ea07f6a45cc396a18a58b3dcedd8562baf03338b6e922184fd6a5916c6';
 
@@ -164,11 +179,11 @@ export async function verifyMigrationCatalogue(
           FROM pg_catalog.pg_auth_members membership
           JOIN pg_catalog.pg_roles member_role ON member_role.oid=membership.member
           JOIN pg_catalog.pg_roles granted_role ON granted_role.oid=membership.roleid
-          WHERE member_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker')
-             OR granted_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker')
+          WHERE member_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read')
+             OR granted_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read')
         ) AS memberships
       FROM pg_catalog.pg_roles role
-      WHERE role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker')
+      WHERE role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read')
     `);
   const aclResult = await verifyQuery<ManifestRow>(client, `
     WITH acl_entries(entry) AS (
@@ -676,10 +691,10 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 50 || inventory.views !== 2 || inventory.functions !== 188 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 50 || inventory.views !== 6 || inventory.functions !== 189 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
-  if (!roles || roles.total !== 9 || roles.safe !== 9 || roles.memberships !== 0) {
+  if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {
     failures.push('capability role safety');
   }
   if (!acl || acl.entries !== EXPECTED_ACL_MANIFEST_ENTRIES || sha256(acl.manifest) !== EXPECTED_ACL_MANIFEST_SHA256) {
