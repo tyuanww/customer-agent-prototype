@@ -213,3 +213,4 @@ Windows 开机/登录
 - **子进程崩溃不自愈**：单元是 `Type=oneshot`，`stack.ts` 自己把四个进程 detach 出去，systemd 不监督它们。API 单独崩掉时单元仍显示 `active`，`/ready` 却已经是 503。
 - **单点**：整套在单台 WSL 桌面机上，而那台机器同时在日常使用。
 - **没有告警**：上面每一条失效，办公机那边都只表现为「登录不了」，没有别人会知道。
+  探针与 systemd timer 已写在 `docs/how-to-health-probe-hangzhou.md`（探 `/ready`，非 `/health`），**但尚未装到机器上**。

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingHttpHeaders } from 'node:http';
 import { validateContractSchema } from '@customer-agent/contracts';
 import type { components } from '@customer-agent/contracts/generated';
+import { recordRequestActor } from './request-log.js';
 
 type UserClaims = components['schemas']['UserClaims'];
 type MockLoginResponse = components['schemas']['MockLoginResponse'];
@@ -122,5 +123,11 @@ export function authenticateRequestHeaders(
     ...(headers.authorization === undefined ? {} : { authorization: headers.authorization }),
     ...(headers['x-mock-user'] === undefined ? {} : { mockUser: headers['x-mock-user'] }),
     ...(headers['x-mock-role'] === undefined ? {} : { mockRole: headers['x-mock-role'] }),
+  }).then((actor) => {
+    // One choke point for all 34 routes: record the hashed actor here rather than
+    // threading it through every handler and into an onResponse hook. A no-op when
+    // the request is not being tracked, so this stays safe for direct calls.
+    if (actor !== null) recordRequestActor(actor.user_id);
+    return actor;
   });
 }

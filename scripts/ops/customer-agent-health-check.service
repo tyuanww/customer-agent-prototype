@@ -1,0 +1,32 @@
+[Unit]
+Description=customer-agent stack health probe
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Same unprivileged account the stack runs as. initdb refuses root, so this unit must
+# not run as root either; scripts/ is owned by customer-agent under /srv/customer-agent.
+User=customer-agent
+Group=customer-agent
+
+Environment=CUSTOMER_AGENT_MONITOR_ENV=/srv/customer-agent/monitor.env
+Environment=CUSTOMER_AGENT_HEALTH_STATE=/var/lib/customer-agent/health-failures
+ExecStart=/srv/customer-agent/scripts/customer-agent-health-check.sh
+
+# systemd creates /var/lib/customer-agent owned by User= and adds it to the writable
+# set, so the script never has to create its own state directory under ProtectSystem.
+StateDirectory=customer-agent
+
+# Each invocation gets a fresh /tmp, which is why the failure counter deliberately
+# does not live there. These hardening flags are the reason the counter path matters.
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
