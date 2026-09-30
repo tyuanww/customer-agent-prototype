@@ -107,7 +107,8 @@ export async function startApi(
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac },
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
-          contentImport, contentReview, contentRelease, announce, iterationTasks, opsLoop);
+          contentImport, contentReview, contentRelease, announce, iterationTasks, opsLoop,
+          { logHash: bootstrap.logHash });
         const environment = options.environment ?? process.env;
         const reviewPort = reviewLoginPort(environment, config.port);
         if (config.profile === 'formal-dev' && auth?.kind === 'product' && reviewPort !== undefined) {

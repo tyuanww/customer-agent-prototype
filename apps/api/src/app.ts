@@ -23,6 +23,13 @@ import {
   reportApiRuntimeDiagnostic,
   type ApiRuntimeDiagnosticSink,
 } from './runtime-diagnostics.js';
+import {
+  currentRequestActorHash,
+  formatApiAccessLog,
+  reportApiAccessLog,
+  runWithRequestContext,
+  type ApiAccessLogSink,
+} from './request-log.js';
 import type { ApiRuntimeConfig } from './runtime-config.js';
 import type {
   ServiceReadinessChecks,
@@ -63,6 +70,10 @@ export function createApiApp(
   announceDependencies?: AnnounceRouteDependencies,
   iterationTaskDependencies?: IterationTaskRouteDependencies,
   opsLoopDependencies?: OpsLoopRouteDependencies,
+  accessLog?: Readonly<{
+    logHash: Readonly<{ version: string; key: string }>;
+    sink?: ApiAccessLogSink;
+  }>,
 ): FastifyInstance {
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
@@ -88,6 +99,29 @@ export function createApiApp(
     }
     return sendInternalError(reply);
   });
+
+  if (accessLog !== undefined) {
+    const sink = accessLog.sink ?? reportApiAccessLog;
+    const startedAt = new WeakMap<object, number>();
+    // onRequest opens the context so it is still active in onResponse; ALS does not
+    // carry a store across hook boundaries on its own.
+    app.addHook('onRequest', (request, _reply, done) => {
+      startedAt.set(request, performance.now());
+      runWithRequestContext(request.id, accessLog.logHash, () => { done(); });
+    });
+    app.addHook('onResponse', async (request, reply) => {
+      const started = startedAt.get(request);
+      sink(formatApiAccessLog({
+        requestId: request.id,
+        // Hashed, never the raw subject id. 'anonymous' when nothing authenticated.
+        userId: currentRequestActorHash() ?? 'anonymous',
+        path: request.url,
+        method: request.method,
+        statusCode: reply.statusCode,
+        durationMs: started === undefined ? 0 : Math.max(0, Math.round(performance.now() - started)),
+      }));
+    });
+  }
 
   app.addHook('onClose', async () => {
     const results = await Promise.allSettled([

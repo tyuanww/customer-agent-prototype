@@ -173,6 +173,59 @@ describe('Application API bootstrap', () => {
     expect(response.json()).toEqual({ status: 'ready', checks: ALL_READY });
   });
 
+  it('logs one structured access line per request with a hashed or anonymous user', async () => {
+    const RESTRICTED = 'routine-diagnosis-material-000000000001';
+    const logHash = { version: 'hmac-log-v1', key: RESTRICTED };
+    const lines: string[] = [];
+    const app = createApiApp(
+      testConfig(),
+      stubRepository(ALL_READY),
+      undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined,
+      { logHash, sink: (line) => lines.push(line) },
+    );
+    openApps.push(app);
+
+    // Unauthenticated: the liveness probe still produces exactly one line.
+    const health = await app.inject({ method: 'GET', url: '/health' });
+    expect(health.statusCode).toBe(200);
+    expect(lines).toHaveLength(1);
+    const anonymous = JSON.parse(lines[0]!) as Record<string, unknown>;
+    expect(anonymous).toMatchObject({
+      level: 'info',
+      userId: 'anonymous',
+      path: '/health',
+      method: 'GET',
+      statusCode: 200,
+    });
+    expect(typeof anonymous.requestId).toBe('string');
+    expect(typeof anonymous.durationMs).toBe('number');
+
+    // Authenticated: userId is the hashed subject, never the raw id. /v1/auth/me
+    // reaches the real authenticateRequestHeaders path this instrumentation hooks.
+    const login = await app.inject({
+      method: 'POST', url: '/v1/auth/mock-login',
+      payload: { user_id: 'coach_log_probe', role: 'coach' },
+    });
+    expect(login.statusCode).toBe(200);
+    const token = login.json<{ token: string }>().token;
+    lines.length = 0;
+
+    const authed = await app.inject({
+      method: 'GET', url: '/v1/auth/me', headers: { authorization: `Bearer ${token}` },
+    });
+    expect(authed.statusCode).toBe(200);
+    expect(lines).toHaveLength(1);
+    const line = lines[0]!;
+    const parsed = JSON.parse(line) as Record<string, unknown>;
+    expect(parsed.userId).not.toBe('anonymous');
+    // 64 hex chars: hmacSafeValue output, not the raw subject id.
+    expect(parsed.userId).toMatch(/^[0-9a-f]{64}$/);
+    // Neither the raw subject id nor the LOG_HASH_KEY material may appear.
+    expect(line).not.toContain('coach_log_probe');
+    expect(line).not.toContain(RESTRICTED);
+  });
+
   it('fails readiness closed for every dependency and repository exceptions', async () => {
     const repository = stubRepository();
     const diagnostics = vi.fn();

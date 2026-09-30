@@ -1,0 +1,15 @@
+[Unit]
+Description=Health probe for the customer-agent stack (agent-auth)
+Documentation=file:///srv/customer-agent/releases/current/docs/how-to-run-backend-on-hangzhou.md
+
+[Timer]
+# First probe two minutes after boot, then every minute. Persistent=false: a missed
+# run while the machine slept is not worth replaying for a liveness probe.
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=5s
+Persistent=false
+Unit=customer-agent-health-check.service
+
+[Install]
+WantedBy=timers.target
