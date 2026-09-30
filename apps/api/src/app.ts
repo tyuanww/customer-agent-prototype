@@ -30,7 +30,7 @@ import {
   runWithRequestContext,
   type ApiAccessLogSink,
 } from './request-log.js';
-import { registerNoticeRoutes, type NoticeRouteDependencies } from './notice-routes.js';
+import { NOTICE_VERSION_MAX_LENGTH, registerNoticeRoutes, type NoticeRouteDependencies } from './notice-routes.js';
 import type { ApiRuntimeConfig } from './runtime-config.js';
 import type {
   ServiceReadinessChecks,
@@ -86,6 +86,10 @@ export function createApiApp(
   const authService = providedAuthService ?? createMockAuthService();
   const app = fastify({
     bodyLimit: HTTP_JSON_BODY_MAX_BYTES,
+    // Fastify defaults to 100, which would reject a contract-valid 128-byte
+    // notice version before the route can validate it. Leave one extra byte so
+    // the route returns its stable 400 contract for the first invalid length.
+    routerOptions: { maxParamLength: NOTICE_VERSION_MAX_LENGTH + 1 },
     exposeHeadRoutes: false,
     logger: false,
   });

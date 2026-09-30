@@ -2,7 +2,7 @@ import { PRODUCT_ERRORS, type ProductSessionResult } from '@shared/product-sessi
 import type { NoticeDecision, ProductNoticeResult } from '@shared/product-notice';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import {
   EMPTY_QUERY_MESSAGE,
@@ -74,6 +74,8 @@ function contentUpdatedBannerCopy(domains: readonly LibraryDomain[]): string {
 export function QueryApp() {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
   const [currentNotice, setCurrentNotice] = useState<ProductNoticeResult | null>(null);
+  const [noticeLoading, setNoticeLoading] = useState(false);
+  const [noticeBlocked, setNoticeBlocked] = useState(false);
   const [noticeBusy, setNoticeBusy] = useState(false);
   const [noticeError, setNoticeError] = useState('');
   const [sessionBusy, setSessionBusy] = useState(false);
@@ -763,11 +765,12 @@ export function QueryApp() {
       setResults([]);
       setErrorMessage('');
       setInvalidMessage('');
-      if (phase !== 'SEARCH_INPUT') {
+      const noticePending = noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null);
+      if (phase !== 'SEARCH_INPUT' && !noticePending) {
         reportPhase('SEARCH_INPUT');
       }
     },
-    [cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, phase, recordNoHitExit, reportPhase],
+    [cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, recordNoHitExit, reportPhase],
   );
 
   const refreshAnnounce = useCallback(async (sessionEpoch: number) => {
@@ -800,23 +803,62 @@ export function QueryApp() {
 
   const refreshCurrentNotice = useCallback(async (sessionEpoch: number) => {
     const api = window.customerAgent?.product;
-    if (!api?.currentNotice) return;
     const requestId = ++noticeRequestRef.current;
-    const result = await api.currentNotice();
-    if (requestId !== noticeRequestRef.current || sessionEpoch !== productEpochRef.current) return;
-    if (!result.ok) {
-      setCurrentNotice(null);
-      setNoticeError(result.code === 'GONE' ? '' : result.message);
+    if (!api?.currentNotice) {
+      // The real product preload exposes this method alongside productSearch.
+      // If that capability disappears at runtime, keep the product path closed
+      // instead of treating an unavailable consent gate as consent.
+      if (window.customerAgent?.productSearch) {
+        setNoticeLoading(false);
+        setNoticeBlocked(true);
+        setNoticeError('告知读取失败，请重试');
+        if (phaseRef.current === 'SEARCH_INPUT') reportPhase('ERROR');
+      }
       return;
     }
-    setCurrentNotice(result);
+    setCurrentNotice(null);
+    setNoticeLoading(true);
+    setNoticeBlocked(false);
     setNoticeError('');
-    // A pending notice is an explicit blocking step. Reading the page alone
-    // never records a decision; only the buttons below call decideNotice.
-    if (result.decision === null && phaseRef.current === 'SEARCH_INPUT') {
-      reportPhase('ERROR');
+    // Keep the query visibly blocked while the server decides whether a notice
+    // is required. Enter/search events are guarded by the same state below.
+    if (phaseRef.current === 'SEARCH_INPUT') reportPhase('ERROR');
+    try {
+      const result = await api.currentNotice();
+      if (requestId !== noticeRequestRef.current || sessionEpoch !== productEpochRef.current) return;
+      setNoticeLoading(false);
+      if (!result.ok) {
+        setCurrentNotice(null);
+        if (result.code === 'GONE') {
+          setNoticeBlocked(false);
+          setNoticeError('');
+          if (phaseRef.current === 'ERROR' && resultCountRef.current === 0) reportPhase('SEARCH_INPUT');
+          return;
+        }
+        setNoticeBlocked(true);
+        setNoticeError(result.message);
+        return;
+      }
+      setCurrentNotice(result);
+      setNoticeBlocked(false);
+      setNoticeError('');
+      // A pending notice is an explicit blocking step. Reading the page alone
+      // never records a decision; only the buttons below call decideNotice.
+      if (result.decision === null && phaseRef.current === 'SEARCH_INPUT') {
+        reportPhase('ERROR');
+      }
+    } catch {
+      if (requestId !== noticeRequestRef.current || sessionEpoch !== productEpochRef.current) return;
+      setCurrentNotice(null);
+      setNoticeLoading(false);
+      setNoticeBlocked(true);
+      setNoticeError('告知读取失败，请重试');
     }
   }, [reportPhase]);
+
+  const retryCurrentNotice = useCallback(() => {
+    void refreshCurrentNotice(productEpochRef.current);
+  }, [refreshCurrentNotice]);
 
   const decideCurrentNotice = useCallback(async (decision: NoticeDecision) => {
     const api = window.customerAgent?.product;
@@ -864,6 +906,8 @@ export function QueryApp() {
     if (!value.ok || (value.enabled && !value.signedIn)) {
       noticeRequestRef.current += 1;
       setCurrentNotice(null);
+      setNoticeLoading(false);
+      setNoticeBlocked(false);
       setNoticeError('');
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
       setAnnounceInvalid(false);
@@ -1029,7 +1073,7 @@ export function QueryApp() {
   }, [acceptProductSession, productState, sessionBusy]);
 
   const runSearch = useCallback(() => {
-    if (currentNotice?.ok && currentNotice.decision === null) return;
+    if (noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null)) return;
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
       if (!(productState?.ok && productState.signedIn)) {
         return;
@@ -1145,7 +1189,7 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, currentNotice, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
 
   const copyScript = useCallback(
     async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
@@ -1445,6 +1489,52 @@ export function QueryApp() {
 
   const showQueryResizeGrip = isQueryContentLayoutPhase(phase);
   const expanded = showQueryResizeGrip || phase === 'COPIED';
+  const pendingNotice = currentNotice?.ok && currentNotice.decision === null;
+  let noticeDialogContent = '暂时无法读取服务端告知，查询已暂停。';
+  if (noticeLoading) {
+    noticeDialogContent = '正在读取服务端告知，请稍候。';
+  } else if (pendingNotice && currentNotice?.ok) {
+    noticeDialogContent = currentNotice.notice.content;
+  }
+  let noticeDialogActions: ReactNode = null;
+  if (noticeBlocked) {
+    noticeDialogActions = (
+      <div className="notice-dialog-actions">
+        <button
+          type="button"
+          className="notice-dialog-primary"
+          data-testid="notice-retry"
+          disabled={noticeLoading}
+          onClick={retryCurrentNotice}
+        >
+          重试
+        </button>
+      </div>
+    );
+  } else if (pendingNotice) {
+    noticeDialogActions = (
+      <div className="notice-dialog-actions">
+        <button
+          type="button"
+          className="notice-dialog-secondary"
+          data-testid="notice-decline"
+          disabled={noticeBusy || noticeLoading}
+          onClick={() => { void decideCurrentNotice('declined'); }}
+        >
+          {noticeBusy ? '提交中…' : '不同意'}
+        </button>
+        <button
+          type="button"
+          className="notice-dialog-primary"
+          data-testid="notice-accept"
+          disabled={noticeBusy || noticeLoading}
+          onClick={() => { void decideCurrentNotice('accepted'); }}
+        >
+          {noticeBusy ? '提交中…' : '同意并继续'}
+        </button>
+      </div>
+    );
+  }
 
   const applyQueryResizeAck = useCallback((
     ack: QueryLayoutAck | null | undefined,
@@ -1842,39 +1932,22 @@ export function QueryApp() {
             onLeaveNoHit={window.customerAgent?.productHelp ? leaveNoHit : undefined}
           />
         ) : null}
-        {expanded && currentNotice?.ok && currentNotice.decision === null ? (
+        {expanded && (noticeLoading || noticeBlocked || pendingNotice) ? (
           <div className="notice-backdrop" data-testid="notice-backdrop">
             <section className="notice-dialog" role="dialog" aria-modal="true" aria-labelledby="notice-title">
               <div className="notice-dialog-header">
                 <div>
                   <p className="notice-dialog-eyebrow">使用前请阅读</p>
-                  <h2 id="notice-title">试点采集告知</h2>
+                  <h2 id="notice-title">{noticeBlocked ? '暂时无法读取告知' : '试点采集告知'}</h2>
                 </div>
-                <span className="notice-dialog-version">{currentNotice.notice.version}</span>
+                {pendingNotice ? <span className="notice-dialog-version">{currentNotice.notice.version}</span> : null}
               </div>
-              <p className="notice-dialog-content" data-testid="notice-content">{currentNotice.notice.content}</p>
+              <p className="notice-dialog-content" data-testid="notice-content">
+                {noticeDialogContent}
+              </p>
               {noticeError ? <p className="notice-dialog-error" role="alert">{noticeError}</p> : null}
-              <p className="notice-dialog-hint">阅读页面不会自动表示同意，请选择下方按钮。</p>
-              <div className="notice-dialog-actions">
-                <button
-                  type="button"
-                  className="notice-dialog-secondary"
-                  data-testid="notice-decline"
-                  disabled={noticeBusy}
-                  onClick={() => { void decideCurrentNotice('declined'); }}
-                >
-                  {noticeBusy ? '提交中…' : '不同意'}
-                </button>
-                <button
-                  type="button"
-                  className="notice-dialog-primary"
-                  data-testid="notice-accept"
-                  disabled={noticeBusy}
-                  onClick={() => { void decideCurrentNotice('accepted'); }}
-                >
-                  {noticeBusy ? '提交中…' : '同意并继续'}
-                </button>
-              </div>
+              {pendingNotice ? <p className="notice-dialog-hint">阅读页面不会自动表示同意，请选择下方按钮。</p> : null}
+              {noticeDialogActions}
             </section>
           </div>
         ) : null}
