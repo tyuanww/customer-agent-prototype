@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto';
 // Import the built package rather than `src/`, whose internal `./x.js` specifiers
 // only resolve after compilation. `stack start` already requires a prior
 // `pnpm build:services`.
-import { applyDatabaseMigrations } from '../../packages/database/dist/index.js';
+import { applyDatabaseMigrations, inspectDatabaseMigrations } from '../../packages/database/dist/index.js';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SOURCES } from './content.ts';
 import { SYNTHETIC_IDENTITIES, type FeishuStackBinding } from './profile.ts';
 import { SEED_INTENT } from './seed.ts';
@@ -98,9 +98,13 @@ export async function seedFeishuBindings(client, bindings: readonly FeishuStackB
 export async function bootstrapDatabase(client): Promise<readonly string[]> {
   const steps: string[] = [];
   // The database runner owns fresh, partial, complete, and drifted ledger
-  // states. Skipping it after seeing one ledger row would strand an older
-  // database before newly released migrations and make readiness fail.
-  steps.push(await applyMigrations(client));
+  // states. A complete ledger must skip the apply path: its verifier runs
+  // before deployment login roles are bound, while an existing stack already
+  // has those bindings. The original presence-only check was too weak because
+  // it also skipped partial ledgers.
+  const migrationStatus = await inspectDatabaseMigrations(client);
+  if (migrationStatus.state === 'COMPLETE') steps.push('migrations: already applied');
+  else steps.push(await applyMigrations(client));
   steps.push(await seedReferenceData(client));
   return Object.freeze(steps);
 }
