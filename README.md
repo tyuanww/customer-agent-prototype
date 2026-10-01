@@ -49,7 +49,10 @@ pnpm start                  # 与 pnpm dev 相同
 | 桌面 BM25 + 仓外索引 | [检索参考](docs/reference-desktop-retrieval.md) · [How to](docs/how-to-run-macos-semantic-query.md) · [为什么](docs/explanation-desktop-retrieval.md) |
 | 飞书 + 账号 how-to、P4 远端 how-to | [feishu](docs/how-to-feishu-and-password-mac.md) · [p4](docs/how-to-p4-remote-mac.md) |
 | 两个公网入口跑在杭州（更新 / 迁数据 / 切隧道 / 回滚） | [后端跑在杭州](docs/how-to-run-backend-on-hangzhou.md) |
+| 从远端仓库开发、在 Windows WSL 测试并按 SHA 交付 | [远端开发与交付](docs/how-to-remote-development-and-deployment.md) |
+| 查端口、环境边界、发布软链和远端磁盘占用 | [运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) · [为什么要分环境](docs/explanation-environment-boundaries.md) |
 | 工程流程、打包签名、文档生命周期 | [workflow](docs/reference-engineering-workflow.md) · [signing](docs/reference-packaging-and-signing.md) · [lifecycle](docs/reference-document-lifecycle.md) |
+| 查看本轮开发体验、安全和远端仓库诊断（partial） | [2026-10-01 审计](docs/reviews/2026-10-01-devex-security-audit.md) |
 | 当前一期任务与延后债 | [执行清单](docs/plans/2026-09-06-execution-goal.md) · [TODOS](TODOS.md) · [CHANGELOG](CHANGELOG.md) |
 | 合同 / API / 数据库包 README | [contracts](packages/contracts/README.md) · [api](apps/api/README.md) · [database](packages/database/README.md) |
 | 其它现行参考 | [组织已审证据](docs/explanation-org-review-evidence.md) · [adapter 衔接](docs/reference-api-adapter-handoff.md) · [抽出模块](docs/reference-extracted-module-contracts.md) · [API 配置](docs/reference-api-runtime-config.md) · [上游合同](contracts/upstream/customer-agent/README.md) · [失败安全](docs/explanation-failure-safe-lifecycle.md) · [M5 勾选](docs/how-to-verify-macos-m5.md) · [搜索实验](apps/api/experiments/search-decision/README.md) · [第三方许可](apps/desktop/THIRD_PARTY_NOTICES.md) |

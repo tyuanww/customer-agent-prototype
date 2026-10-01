@@ -21,6 +21,14 @@ macOS 已装好依赖时，也可双击仓根 [`启动客服Agent.command`](启�
 
 企业 CA 只适用于**当前这台**被拦截 TLS 的开发机，不是通用前置。禁止关闭 TLS 验证。
 
+## 远端开发、测试与交付
+
+代码从 GitHub 拉到本地工作树或独立 worktree 后再修改。Windows WSL 上的 `/srv/customer-agent/current` 是生产 release 的软链，不是编辑器工作区；不要在里面 `git pull`、切分支或直接改文件。
+
+日常顺序是：本地分支开发 → Node 24 + pnpm 11.19.0 检查 → 合成测试 → WSL 临时测试端口 `43180/43181` → 停测试 unit 并复核生产 `43115/43116` → 只有获得部署授权后，按 Git SHA 创建新 release、安装冻结依赖、构建服务并切换 `current`。生产 API 和口令服务只监听 `127.0.0.1`，测试客户端不能指向生产端口。
+
+具体命令、账号初始化失败排查、Windows 包证据和远端磁盘清理边界见 [远端开发与交付](docs/how-to-remote-development-and-deployment.md)、[运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) 和 [环境边界说明](docs/explanation-environment-boundaries.md)。
+
 ## 命令找不到时
 
 `pnpm` 对未知脚本只报 `ERR_PNPM_NO_SCRIPT` / `Missing script`，不会列出下一步。这时：
