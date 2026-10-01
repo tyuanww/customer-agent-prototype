@@ -2,6 +2,22 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.26] - 2026-10-01
+
+### Added
+
+- Added a remote development, synthetic acceptance, and production delivery how-to for the Mac-to-Windows-WSL workflow.
+- Added references for environment boundaries, runtime ports, release layout, cleanup rules, and the developer/security audit.
+
+### Changed
+
+- Documented Node 24 and pnpm 11.19.0 as the supported remote workflow, with separate test and production ports, stacks, service users, build users, and release directories.
+- Added contributor and README entry points for developing from a local clone while keeping the remote production checkout immutable.
+
+### Fixed
+
+- Hardened documented acceptance and deployment procedures with full Git SHA provenance, credential-like path guards, isolated test profiles, lease locking, build-user separation, atomic release switching, readiness rollback, failed-release retention, and interrupted-acceptance recovery.
+
 ## [0.3.25] - 2026-09-29
 
 ### Changed
