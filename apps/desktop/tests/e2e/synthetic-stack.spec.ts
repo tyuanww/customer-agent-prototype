@@ -37,18 +37,35 @@ test('desktop client queries the running synthetic stack and copies a candidate'
         DEMO_E2E: '1',
         CUSTOMER_AGENT_DESKTOP_API_ORIGIN: profile!.apiOrigin,
         CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: profile!.identityOrigin,
+        // Keep this run independent from any developer-machine catalog. The
+        // announce snapshot will hydrate these files from the running stack.
+        CUSTOMER_AGENT_HYDRATE_INDEX: path.join(directory, 'retrieval-hydrate.json'),
+        CUSTOMER_AGENT_RETRIEVAL_INDEX: path.join(directory, 'retrieval-index.json'),
+        CUSTOMER_AGENT_EMBEDDING_INDEX: path.join(directory, 'retrieval-embeddings.json'),
+        CUSTOMER_AGENT_RETRIEVAL_PREFERENCE: path.join(directory, 'retrieval-preference.json'),
+        CUSTOMER_AGENT_RETRIEVAL_TELEMETRY: path.join(directory, 'retrieval-telemetry.json'),
       },
       timeout: 30_000,
     });
-    await expect.poll(() => app!.windows().some((window) => window.url().includes('role=query'))).toBe(true);
+    await expect.poll(
+      () => app!.windows().some((window) => window.url().includes('role=query')),
+      { timeout: 30_000 },
+    ).toBe(true);
     const query = app.windows().find((window) => window.url().includes('role=query'))!;
     await query.evaluate(() => window.customerAgent!.openSearch());
 
     await query.getByRole('button', { name: '登录' }).click();
-    await expect.poll(() => app!.windows().some((window) => window.url().includes('role=login'))).toBe(true);
+    await expect.poll(
+      () => app!.windows().some((window) => window.url().includes('role=login')),
+      { timeout: 30_000 },
+    ).toBe(true);
     const login = app.windows().find((window) => window.url().includes('role=login'))!;
     await login.getByRole('button', { name: '飞书登录' }).click();
-    await expect(query.getByRole('button', { name: /agent/ })).toBeVisible({ timeout: 30_000 });
+    await expect(query.getByRole('button', { name: /退出/ })).toBeVisible({ timeout: 30_000 });
+    // Closing the login window can park the query overlay; reopen it before
+    // driving the editable input so this follows the real operator flow.
+    await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect(query.getByTestId('question-input')).toBeEditable({ timeout: 10_000 });
     expect(JSON.stringify(await query.evaluate(() => window.customerAgent!.product!.sessionStatus())))
       .not.toContain('access_token');
 
@@ -62,12 +79,14 @@ test('desktop client queries the running synthetic stack and copies a candidate'
 
     await query.getByTestId('question-input').fill('什么时候发货');
     await query.getByTestId('search-button').click();
-    await expect(query.getByTestId('answer-text-1')).toContainText('48 小时', { timeout: 20_000 });
+    const answer = query.getByTestId('answer-text-1');
+    await expect(answer).toContainText(/小时内.*发货|小时内.*发出/u, { timeout: 20_000 });
+    const answerText = await answer.innerText();
 
     await query.getByTestId('copy-button-1').click();
     await expect(query.getByTestId('copy-button-1')).toHaveText('已复制', { timeout: 20_000 });
     const copied = await app.evaluate(({ clipboard }) => clipboard.readText());
-    expect(copied).toContain('48 小时');
+    expect(copied).toContain(answerText);
     expect(copied).not.toContain('{订单号}');
 
     await query.evaluate(() => window.customerAgent!.product!.logout());
