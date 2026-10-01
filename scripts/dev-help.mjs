@@ -11,7 +11,9 @@ const text = `客服话术浮窗 Demo · 开发入口
   pnpm -v          # 11.19.x
   pnpm install --frozen-lockfile
   pnpm electron:install
-  pnpm dev         # 或 pnpm start；macOS 也可双击 启动客服Agent.command
+  pnpm dev         # 或 pnpm start；会先准备 contracts runtime
+  # 手动启动合成栈 / API 时：pnpm build:services
+  # macOS 也可双击 启动客服Agent.command（会自动准备服务运行时）
 
 若刚才看到 ERR_PNPM_NO_SCRIPT / Missing script：
   1. 这个名字不是仓根脚本。先跑：pnpm run
@@ -29,6 +31,7 @@ if (process.argv.includes('--check')) {
   const required = [
     'pnpm dev',
     'pnpm start',
+    'pnpm build:services',
     'ERR_PNPM_NO_SCRIPT',
     'docs/tutorial-first-run.md',
     'CONTRIBUTING.md',

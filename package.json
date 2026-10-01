@@ -10,8 +10,8 @@
     "pnpm": "11.19.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @customer-agent/desktop dev",
-    "start": "pnpm --filter @customer-agent/desktop dev",
+    "dev": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/desktop dev",
+    "start": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/desktop dev",
     "help:dev": "node scripts/dev-help.mjs",
     "dev:api": "pnpm --filter @customer-agent/api dev",
     "lint": "eslint .",

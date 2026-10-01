@@ -23,6 +23,14 @@ TTHW 本轮没有在清洁机器上完成“安装依赖 → 安装 Electron →
 
 最有效的 DX 改进已在本轮沉淀：将 Node 24 设为硬前置、把远端端口合同写成单独参考、把“从远端拉取后在哪里写代码”写成 How-to，并明确 `ERR_PNPM_NO_SCRIPT` 的定位方式。后续可以再补一条无凭据的 `pnpm doctor`，把 Node/pnpm/工作树/端口前置检查合并成一条命令。
 
+### 开发体验复审（2026-10-01）
+
+清理掉构建产物后按 README 的原始步骤实测，`pnpm dev` 会因为缺少 `@customer-agent/contracts` 的 `dist` 入口失败；手动合成栈还需要 API / worker 的 `dist`。这不是使用者应该自己猜的依赖顺序，已在 v0.3.26 收口：根 `pnpm dev` / `pnpm start` 先构建 contracts runtime，`启动客服Agent.command` 在启动隔离合成栈前先运行 `pnpm build:services`，README、CONTRIBUTING、第一次运行、远端开发 how-to 和 `pnpm help:dev` 已同步。
+
+复测结果：依赖已在本机缓存时 `pnpm install --frozen-lockfile` 约 `0.18s`，`pnpm build:services` 约 `5s`，`pnpm dev` 在 `12s` 内进入 Electron 启动阶段；完整清洁机器下载与真实人机窗口首帧仍未计时。`pnpm lint`、`pnpm typecheck`、`pnpm docs:check`、`pnpm test`、`pnpm build` 均通过，文档入口和远端 how-to 在 GitHub 页面返回 `200` 且无浏览器控制台错误。
+
+复审评分：Getting Started `8/10`、API / CLI / SDK `8/10`、错误信息 `8/10`、文档结构 `8/10`、升级路径 `8/10`、开发环境 `9/10`、社区与协作 `4/10`、DX 反馈指标 `3/10`，整体 `7.0/10`。剩余限制是 Aside 不可用、未在清洁机器完成真实安装计时，社区与 TTHW 指标仍属于后续建设项。
+
 初始审计按建议清理了本地旧安装包、macOS 解包目录和可重建构建输出，当时保留 0.3.25 安装包、`node_modules` 和 `.codegraph`；随后收尾清理又删除了可重建依赖与构建输出，保留 0.3.25 安装包、`faq/`、`.codegraph/` 和 `.gstack/`。当前仓库约 `609M`，源码、文档和 Git 状态未被清理动作改动。
 
 ## 安全审计

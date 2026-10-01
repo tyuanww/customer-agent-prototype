@@ -14,7 +14,7 @@ node -v    # v24.x
 pnpm -v    # 11.19.x
 pnpm install --frozen-lockfile
 pnpm electron:install
-pnpm start    # 与 pnpm dev 相同
+pnpm start    # 与 pnpm dev 相同；会先准备 contracts runtime
 ```
 
 macOS 已装好依赖时，也可双击仓根 [`启动客服Agent.command`](启动客服Agent.command)。成功标志：桌面出现约 88px 透明狐狸头。逐步核验见教程第 3 步。
@@ -38,7 +38,7 @@ pnpm help:dev    # 黄金路径 + 常见别名
 pnpm run         # 仓根全部脚本
 ```
 
-日常入口是 `pnpm dev`（别名 `pnpm start`）。根脚本没有 serve 或 desktop 这种名字。按「要证明什么」选命令时打开 [如何验证桌面](docs/how-to-verify-desktop.md)。
+日常入口是 `pnpm dev`（别名 `pnpm start`），它会先准备桌面依赖的 contracts runtime。根脚本没有 serve 或 desktop 这种名字；手动运行合成栈或 API 前先跑 `pnpm build:services`。按「要证明什么」选命令时打开 [如何验证桌面](docs/how-to-verify-desktop.md)。
 
 ## 改完怎么证明
 
