@@ -46,6 +46,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 | macOS / Linux 打包态远端 | [macos](docs/how-to-macos-packaged-product-remote.md) · [linux](docs/how-to-linux-packaged-product-remote.md) |
 | Fox / Query / Dashboard IPC 与窗口合同 | [reference-desktop-contracts](docs/reference-desktop-contracts.md) |
 | 模块归属与清理边界 | [reference-project-architecture](docs/reference-project-architecture.md) |
+| 评估哪些能力值得跨项目复用 | [可复用能力 RFC](docs/rfcs/README.md) |
 | 桌面 BM25 + 仓外索引 | [检索参考](docs/reference-desktop-retrieval.md) · [How to](docs/how-to-run-macos-semantic-query.md) · [为什么](docs/explanation-desktop-retrieval.md) |
 | 飞书 + 账号 how-to、P4 远端 how-to | [feishu](docs/how-to-feishu-and-password-mac.md) · [p4](docs/how-to-p4-remote-mac.md) |
 | 两个公网入口跑在杭州（更新 / 迁数据 / 切隧道 / 回滚） | [后端跑在杭州](docs/how-to-run-backend-on-hangzhou.md) |
