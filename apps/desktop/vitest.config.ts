@@ -10,6 +10,13 @@ export default defineConfig({
       '@shared': resolve(__dirname, 'src/shared'),
       '@renderer': resolve(__dirname, 'src/renderer'),
     },
+    conditions: ['source'],
+  },
+  ssr: {
+    noExternal: ['@customer-agent/retrieval-core'],
+    resolve: {
+      conditions: ['source'],
+    },
   },
   test: {
     environment: 'jsdom',

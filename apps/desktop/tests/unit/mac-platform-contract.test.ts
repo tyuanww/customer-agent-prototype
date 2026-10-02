@@ -33,6 +33,10 @@ const controller = readFileSync(
   path.join(root, 'src/main/overlay-controller.ts'),
   'utf8',
 );
+const overlayPlatform = readFileSync(
+  path.join(root, 'src/main/overlay-platform.ts'),
+  'utf8',
+);
 const releasePreflight = readFileSync(
   path.join(root, 'scripts/verify-mac-release-env.mjs'),
   'utf8',
@@ -282,12 +286,14 @@ describe('macOS runtime contract', () => {
     expect(controller).toContain('otherChromeWindowsVisible');
     expect(controller).toContain('isDevToolsWindow');
     expect(controller).toContain('setFoxFocusable(false)');
-    expect(controller).toMatch(/app\.hide\(\)/);
-    expect(controller).toMatch(/generation !== this\.foxYieldGeneration/);
+    expect(controller).toContain('this.platform.yieldPreviousApp');
+    expect(controller).toContain('if (this.chromeHandoffMode !== null)');
     expect(controller).not.toContain('macPanel: false');
     expect(controller).not.toMatch(/app\.focus\([^)]*steal/);
-    expect(controller).toMatch(/if \(process\.platform !== 'darwin'\) \{\s*try \{\s*app\.focus\(\);/);
-    expect(controller).toContain('if (this.chromeHandoffMode !== null)');
+    expect(overlayPlatform).toMatch(/app\.hide\(\)/);
+    expect(overlayPlatform).toMatch(/generation !== this\.yieldGeneration/);
+    expect(overlayPlatform).not.toMatch(/app\.focus\([^)]*steal/);
+    expect(overlayPlatform).toMatch(/if \(process\.platform !== 'darwin'\) \{\s*try \{\s*app\.focus\(\);/);
   });
 
   it('adopts WindowServer fox bounds without moving the native window on hover', () => {

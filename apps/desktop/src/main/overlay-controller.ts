@@ -1,9 +1,7 @@
 import {
-  app,
   BrowserWindow,
   globalShortcut,
   screen,
-  systemPreferences,
   type WebContents,
 } from 'electron';
 import { join } from 'node:path';
@@ -102,6 +100,7 @@ import {
 } from './shutdown-fence';
 import { lockRendererWindow } from './window-security';
 import { createOverlayChromeWindow, type OverlayChromeWindowSize } from './overlay-chrome-window';
+import { OverlayPlatform } from './overlay-platform';
 import { loadRenderer } from './overlay-renderer-loader';
 import { attachTestHarness, isTestHarnessEnabled } from './overlay-test-harness';
 
@@ -171,12 +170,11 @@ export class OverlayController {
   private queryLayoutFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private dashboardOpening: Promise<OpenDashboardResult> | null = null;
   private restorePreviousAppOnIdle = false;
-  private foxYieldShowTimer: ReturnType<typeof setTimeout> | null = null;
-  private foxYieldGeneration = 0;
 
   private disposed = false;
   private readonly fence: ShutdownFence;
   private readonly scheduler = new GuardedScheduler();
+  private readonly platform = new OverlayPlatform(this.scheduler);
   private readonly preloadPath: string;
   private readonly onDispose?: () => void;
   private readonly onDashboardShown?: () => void;
@@ -1096,8 +1094,8 @@ export class OverlayController {
     if (this.live(this.fox)) {
       this.fox.hide();
     }
-    if (process.platform === 'darwin' && this.live(this.query)) {
-      this.query.invalidateShadow();
+    if (this.live(this.query)) {
+      this.platform.refreshTransparentShadow(this.query);
     }
   }
 
@@ -1138,9 +1136,7 @@ export class OverlayController {
     // adopts that frame without issuing a compensating setBounds call.
     fox.showInactive();
     this.syncFoxOriginFromNativeBounds(fox);
-    if (process.platform === 'darwin') {
-      query.invalidateShadow();
-    }
+    this.platform.refreshTransparentShadow(query);
     this.resignQueryKeyboard({ hide: true });
     this.yieldOrKeepPalette(fox);
   }
@@ -1155,54 +1151,19 @@ export class OverlayController {
       this.resignPaletteActivation(fox);
       return;
     }
-    if (process.platform === 'darwin') {
-      this.yieldDarwinPalette(fox);
-      return;
+    const yielded = this.platform.yieldPreviousApp(fox, {
+      canShow: () => (
+        this.phase === 'FOX_IDLE'
+        && this.chromeHandoffMode === null
+        && this.live(fox)
+      ),
+      onShown: (shown) => {
+        this.syncFoxOriginFromNativeBounds(shown);
+      },
+    });
+    if (!yielded) {
+      this.resignPaletteActivation(fox);
     }
-    if (process.platform === 'win32') {
-      this.yieldWindowsForeground(fox);
-      return;
-    }
-    this.resignPaletteActivation(fox);
-  }
-
-  private yieldDarwinPalette(fox: BrowserWindow): void {
-    const generation = ++this.foxYieldGeneration;
-    try {
-      app.hide();
-    } catch {
-      // hide() can throw if the Dock policy is already accessory.
-    }
-    this.scheduleIdleFoxShow(fox, generation);
-  }
-
-  /** Hide fox one frame so Windows can activate 千牛, then show without stealing. */
-  private yieldWindowsForeground(fox: BrowserWindow): void {
-    const generation = ++this.foxYieldGeneration;
-    if (typeof fox.blur === 'function') {
-      fox.blur();
-    }
-    if (fox.isVisible()) {
-      fox.hide();
-    }
-    this.scheduleIdleFoxShow(fox, generation);
-  }
-
-  private scheduleIdleFoxShow(fox: BrowserWindow, generation: number): void {
-    this.clearFoxYieldShowTimer();
-    this.foxYieldShowTimer = this.scheduler.schedule(() => {
-      this.foxYieldShowTimer = null;
-      if (
-        generation !== this.foxYieldGeneration
-        || this.phase !== 'FOX_IDLE'
-        || this.chromeHandoffMode !== null
-        || !this.live(fox)
-      ) {
-        return;
-      }
-      fox.showInactive();
-      this.syncFoxOriginFromNativeBounds(fox);
-    }, 34);
   }
 
   private otherChromeWindowsVisible(): boolean {
@@ -1239,13 +1200,7 @@ export class OverlayController {
   }
 
   private clearFoxYieldShow(): void {
-    this.foxYieldGeneration += 1;
-    this.clearFoxYieldShowTimer();
-  }
-
-  private clearFoxYieldShowTimer(): void {
-    this.scheduler.clear(this.foxYieldShowTimer);
-    this.foxYieldShowTimer = null;
+    this.platform.cancelYield();
   }
 
   private queryAcceptsKeyboard(): boolean {
@@ -1290,19 +1245,10 @@ export class OverlayController {
   }
 
   private resignPaletteActivation(fox: BrowserWindow): void {
-    // Hide Query only. Hiding the whole app would hide the idle fox and help.
-    // A non-activating panel yields IME when it hides; fox stays on screen.
     if (!this.live(fox)) {
       return;
     }
-    if (process.platform === 'darwin' && typeof app.isHidden === 'function' && app.isHidden()) {
-      try {
-        app.show();
-      } catch {
-        // show() can throw if the Dock policy is accessory.
-      }
-    }
-    fox.showInactive();
+    this.platform.restorePalette(fox);
   }
 
   private focusQueryWindow(): void {
@@ -1310,18 +1256,7 @@ export class OverlayController {
     if (!this.live(query)) {
       return;
     }
-    // macOS Query is a non-activating panel: key focus without making this
-    // process frontmost. Windows/Linux Query is a normal always-on-top window
-    // and still needs app.focus() (without steal) so the palette can type.
-    if (process.platform !== 'darwin') {
-      try {
-        app.focus();
-      } catch {
-        // Some Linux window managers do not support explicit application focus.
-      }
-    }
-    query.focus();
-    query.webContents.focus();
+    this.platform.focusQuery(query);
   }
 
   private scheduleQueryFocusRetry(): void {
@@ -1778,14 +1713,7 @@ export class OverlayController {
   }
 
   private prefersReducedMotion(): boolean {
-    if (process.platform !== 'darwin' && process.platform !== 'win32') {
-      return false;
-    }
-    try {
-      return systemPreferences.getAnimationSettings().prefersReducedMotion;
-    } catch {
-      return false;
-    }
+    return this.platform.prefersReducedMotion();
   }
 
   private currentQueryAnchor(): QueryAnchor {

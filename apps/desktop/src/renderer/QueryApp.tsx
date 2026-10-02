@@ -1,8 +1,8 @@
-import { PRODUCT_ERRORS, type ProductSessionResult } from '@shared/product-session';
+import type { ProductSessionResult } from '@shared/product-session';
 import type { NoticeDecision, ProductNoticeResult } from '@shared/product-notice';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
   EMPTY_QUERY_MESSAGE,
@@ -23,8 +23,6 @@ import {
   measureQueryHugHeight,
   QUERY_CONTENT_BLANK_TOLERANCE_PX,
   QUERY_LAYOUT_FALLBACK_MS,
-  QUERY_LAYOUT_MAX_HEIGHT,
-  QUERY_LAYOUT_MIN_HEIGHT,
   type QueryLayoutAck,
   type QueryLayoutRequest,
   type QueryResizeEdge,
@@ -36,8 +34,13 @@ import {
   type ResultCount,
 } from '@shared/overlay-events';
 import { reduceOverlay, type OverlayPhase } from '@shared/overlay-machine';
+import { QueryAnnounceBanner } from './features/search/QueryAnnounceBanner';
 import { QueryCapsule } from './features/search/QueryCapsule';
+import { QueryNoticeDialog } from './features/search/QueryNoticeDialog';
+import { QueryResizeGrip } from './features/search/QueryResizeGrip';
 import { QueryResultsPane } from './features/search/QueryResultsPane';
+import { QueryScopeFields } from './features/search/QueryScopeFields';
+import { QuerySessionControl } from './features/search/QuerySessionControl';
 import { searchScripts } from './features/search/search-service';
 import type { RankedScript } from './features/search/types';
 import { inaccuracyReportKey, shouldAcceptInaccuracyReport } from '@shared/inaccuracy-report';
@@ -47,13 +50,13 @@ import {
   DEEP_THINKING_DESCRIPTION,
   SEARCH_FEEDBACK_MS,
   SESSION_ENTRY_UNSIGNED_LABEL,
+  sessionEntryLabel,
   maxContentBottom,
   queryFoxVisualState,
   queryHandoffCssVars,
   queryShellClassName,
   resultCopyRankFromKey,
   sessionNoticeForResult,
-  sessionEntryLabel,
   type SessionNotice,
   type SessionNoticeSource,
 } from './features/search/query-view';
@@ -63,13 +66,13 @@ import { useWindowDrag } from './lib/use-window-drag';
 import { ALLERGY_SOP_SCENE_ID, isAllergySopEntry } from '@shared/sop-entry';
 import { compactQueryText } from '@shared/query-analyze';
 import { SOP_OPEN_FAILURE_MESSAGE } from '@shared/sop-window';
-import { LIBRARY_DOMAINS, LIBRARY_DOMAIN_LABELS, type LibraryDomain } from '@shared/library-delta';
-
-/** 多域固定顺序 产品→活动→售前→售后，一句指名更新了哪几库。 */
-function contentUpdatedBannerCopy(domains: readonly LibraryDomain[]): string {
-  const ordered = LIBRARY_DOMAINS.filter((domain) => domains.includes(domain));
-  return `${ordered.map((domain) => `${LIBRARY_DOMAIN_LABELS[domain]}话术`).join('、')}已更新`;
-}
+import type { LibraryDomain } from '@shared/library-delta';
+import {
+  adoptedPlaceholderValues,
+  announceInvalidationEffect,
+  copySuccessErrorMessage,
+  rankedScriptsFromProductCandidates,
+} from './features/search/query-view-model';
 
 export function QueryApp() {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
@@ -931,41 +934,19 @@ export function QueryApp() {
         || phaseRef.current === 'COPIED';
       setAnnounce(null); cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({});
       lastProductQueryRef.current = null; setHelpStatus('待核实');
-      if (value.reason === 'signed_out' || value.reason === 'replaced' || sessionBusyRef.current) {
-        setAnnounceInvalid(false);
-        setErrorMessage('');
-        reportPhase('SEARCH_INPUT');
-        return;
+      const invalidation = announceInvalidationEffect({
+        reason: value.reason,
+        sessionBusy: sessionBusyRef.current,
+        searchInFlight: searchInFlightRef.current,
+        showingQueryContent,
+      });
+      setAnnounceInvalid(invalidation.announceInvalid);
+      if (invalidation.errorMessage !== null) {
+        setErrorMessage(invalidation.errorMessage);
       }
-      if (value.reason === 'source_gate' || value.reason === 'unavailable') {
-        setAnnounceInvalid(false);
-        if (searchInFlightRef.current || showingQueryContent) {
-          setErrorMessage(value.reason === 'source_gate'
-            ? PRODUCT_ERRORS.SOURCE_GATE_NOT_READY
-            : PRODUCT_ERRORS.UNAVAILABLE);
-          reportPhase('ERROR');
-          return;
-        }
-        setErrorMessage('');
-        reportPhase('SEARCH_INPUT');
-        return;
+      if (invalidation.phase !== null) {
+        reportPhase(invalidation.phase);
       }
-      if (value.reason !== 'expired') {
-        setAnnounceInvalid(false);
-        if (!searchInFlightRef.current) {
-          setErrorMessage('');
-          reportPhase('SEARCH_INPUT');
-        }
-        return;
-      }
-      if (!showingQueryContent) {
-        setAnnounceInvalid(true);
-        setErrorMessage('');
-        reportPhase('SEARCH_INPUT');
-        return;
-      }
-      setAnnounceInvalid(false);
-      setErrorMessage('当前版本已失效，请重新核验'); reportPhase('ERROR');
     });
   }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
 
@@ -1103,16 +1084,13 @@ export function QueryApp() {
         if (!result || generation !== searchGenerationRef.current || sessionEpoch !== productEpochRef.current) return;
         if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
         if (!('queryId' in result) || result.generation !== generation || result.sessionEpoch !== sessionEpoch) return;
-        const domains = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
-        const items: RankedScript[] = result.candidates.map(c => ({
-          scriptId: c.script_id, domain: domains[c.category as keyof typeof domains] ?? '产品', questionVariants: [], answerText: c.answer_text,
-          platform: c.platform_scope.includes('qianniu') && c.platform_scope.includes('douyin') ? '千牛 / 抖音'
-            : c.platform_scope.includes('douyin') ? '抖音' : '千牛', scopeLabel: c.title, riskLevel: c.risk_level,
-          effectiveFrom: c.effective_from, effectiveTo: c.effective_to ?? '', rank: c.rank as 1 | 2 | 3, score: 0,
-          matchKind: 'exact', matchLabel: result.telemetryStatus === 'collection_disabled' ? '后端候选 · 不记录事件' : '后端候选',
-          productCopy: { sessionEpoch, generation, queryId: result.queryId, rank: c.rank, scriptId: c.script_id, scriptVersion: c.script_version, contentHash: c.content_hash },
-          placeholderKeys: c.placeholder_keys,
-        }));
+        const items = rankedScriptsFromProductCandidates({
+          candidates: result.candidates,
+          telemetryStatus: result.telemetryStatus,
+          sessionEpoch,
+          generation,
+          queryId: result.queryId,
+        });
         lastProductQueryRef.current = { sessionEpoch, generation, queryId: result.queryId, hitStatus: result.hitStatus };
         setResults(items); reportPhase(items.length ? 'RESULTS' : 'EMPTY', items.length as ResultCount);
       }).catch(() => {
@@ -1220,14 +1198,17 @@ export function QueryApp() {
       try {
         const connected = !!api.product && !(productState?.ok && !productState.enabled);
         const result = connected ? (script.productCopy && api.productSearch
-          ? await api.productSearch.copyAdopt({ ...script.productCopy, placeholderValues: Object.fromEntries((script.placeholderKeys ?? []).filter(k => placeholderValues[k]).map(k => [k, placeholderValues[k]!])) })
+          ? await api.productSearch.copyAdopt({
+            ...script.productCopy,
+            placeholderValues: adoptedPlaceholderValues(script.placeholderKeys, placeholderValues),
+          })
           : { ok: false as const, message: '候选已失效，请重新查询' }) : await api.copyText(script.answerText);
         if (copyGeneration !== copyGenerationRef.current) {
           return;
         }
         if (result.ok) {
           setCopiedRank(script.rank);
-          setErrorMessage('eventStatus' in result && result.eventStatus === 'unrecorded' ? '已复制；事件未记录，请勿重复复制' : '');
+          setErrorMessage(copySuccessErrorMessage(result));
           reportPhase('COPIED', resultCount);
           dismissTimerRef.current = window.setTimeout(() => {
             dismissTimerRef.current = null;
@@ -1489,52 +1470,18 @@ export function QueryApp() {
 
   const showQueryResizeGrip = isQueryContentLayoutPhase(phase);
   const expanded = showQueryResizeGrip || phase === 'COPIED';
-  const pendingNotice = currentNotice?.ok && currentNotice.decision === null;
-  let noticeDialogContent = '暂时无法读取服务端告知，查询已暂停。';
-  if (noticeLoading) {
-    noticeDialogContent = '正在读取服务端告知，请稍候。';
-  } else if (pendingNotice && currentNotice?.ok) {
-    noticeDialogContent = currentNotice.notice.content;
-  }
-  let noticeDialogActions: ReactNode = null;
-  if (noticeBlocked) {
-    noticeDialogActions = (
-      <div className="notice-dialog-actions">
-        <button
-          type="button"
-          className="notice-dialog-primary"
-          data-testid="notice-retry"
-          disabled={noticeLoading}
-          onClick={retryCurrentNotice}
-        >
-          重试
-        </button>
-      </div>
-    );
-  } else if (pendingNotice) {
-    noticeDialogActions = (
-      <div className="notice-dialog-actions">
-        <button
-          type="button"
-          className="notice-dialog-secondary"
-          data-testid="notice-decline"
-          disabled={noticeBusy || noticeLoading}
-          onClick={() => { void decideCurrentNotice('declined'); }}
-        >
-          {noticeBusy ? '提交中…' : '不同意'}
-        </button>
-        <button
-          type="button"
-          className="notice-dialog-primary"
-          data-testid="notice-accept"
-          disabled={noticeBusy || noticeLoading}
-          onClick={() => { void decideCurrentNotice('accepted'); }}
-        >
-          {noticeBusy ? '提交中…' : '同意并继续'}
-        </button>
-      </div>
-    );
-  }
+  const openNotice = currentNotice?.ok && currentNotice.decision === null ? currentNotice : null;
+  const scopeKeys = [...new Set(results.flatMap((row) => row.placeholderKeys ?? []))];
+  const showScopeFields = Boolean(
+    window.customerAgent?.productSearch
+    && productState?.ok
+    && productState.enabled
+    && scopeKeys.length > 0,
+  );
+  const signedInSession = productState?.ok && productState.signedIn ? productState : null;
+  const showProductSession = Boolean(
+    window.customerAgent?.product && !(productState?.ok && !productState.enabled),
+  );
 
   const applyQueryResizeAck = useCallback((
     ack: QueryLayoutAck | null | undefined,
@@ -1789,11 +1736,17 @@ export function QueryApp() {
       >
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
-          productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
-            <button type="button" className="capsule-session-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
-              title={productState?.ok && productState.signedIn ? `${sessionEntryLabel(productState)} · 到期 ${productState.expiresAt}` : '登录后查询话术'}>
-              {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${sessionEntryLabel(productState)} · 退出` : SESSION_ENTRY_UNSIGNED_LABEL}
-            </button>
+          productControl={showProductSession ? (
+            <QuerySessionControl
+              busy={sessionBusy}
+              signedIn={signedInSession !== null}
+              label={signedInSession ? sessionEntryLabel(signedInSession) : ''}
+              title={signedInSession
+                ? `${sessionEntryLabel(signedInSession)} · 到期 ${signedInSession.expiresAt}`
+                : '登录后查询话术'}
+              unsignedLabel={SESSION_ENTRY_UNSIGNED_LABEL}
+              onClick={() => { void sessionAction(); }}
+            />
           ) : null}
           foxVisualState={foxVisualState}
           foxDrag={drag}
@@ -1838,40 +1791,24 @@ export function QueryApp() {
             {shortcutHint || '全局快捷键注册失败，请点击狐狸头打开。'}
           </p>
         ) : null}
-        {announceInvalid ? (
-          <p className="product-announce-banner is-invalid" data-testid="announce-banner" role="status">
-            当前版本已失效，请重新核验
-          </p>
-        ) : contentUpdatedDomains.length > 0 ? (
-          <p
-            ref={contentUpdatedBannerRef}
-            className="product-announce-banner is-muted"
-            data-testid="announce-content-updated-banner"
-            role="status"
-            data-domains={contentUpdatedDomains.join(',')}
-          >
-            <span>{contentUpdatedBannerCopy(contentUpdatedDomains)}</span>
-            <button
-              type="button"
-              className="product-announce-dismiss"
-              data-testid="announce-content-updated-dismiss"
-              aria-label="关掉话术更新提示"
-              onClick={dismissContentUpdated}
-            >
-              知道了
-            </button>
-          </p>
-        ) : null}
+        <QueryAnnounceBanner
+          invalid={announceInvalid}
+          domains={contentUpdatedDomains}
+          contentUpdatedBannerRef={contentUpdatedBannerRef}
+          onDismiss={dismissContentUpdated}
+        />
 
         {expanded ? (
           <QueryResultsPane
-            contextControls={window.customerAgent?.productSearch && productState?.ok && productState.enabled && results.some((row) => (row.placeholderKeys ?? []).length > 0) ? (
-              <fieldset aria-label="查询范围" className="product-query-context">
-                <legend>查询范围</legend>
-                {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '订单号' : '日期'}
-                  <input disabled={copying} aria-label={key === 'order_id' ? '订单号' : '日期'} value={placeholderValues[key] ?? ''} onChange={e => setPlaceholderValues(v => ({ ...v, [key]: e.target.value }))} />
-                </label>)}
-              </fieldset>
+            contextControls={showScopeFields ? (
+              <QueryScopeFields
+                keys={scopeKeys}
+                values={placeholderValues}
+                disabled={copying}
+                onChange={(key, value) => {
+                  setPlaceholderValues((current) => ({ ...current, [key]: value }));
+                }}
+              />
             ) : undefined}
             phase={phase}
             resultPaneRef={resultPaneRef}
@@ -1932,53 +1869,29 @@ export function QueryApp() {
             onLeaveNoHit={window.customerAgent?.productHelp ? leaveNoHit : undefined}
           />
         ) : null}
-        {expanded && (noticeLoading || noticeBlocked || pendingNotice) ? (
-          <div className="notice-backdrop" data-testid="notice-backdrop">
-            <section className="notice-dialog" role="dialog" aria-modal="true" aria-labelledby="notice-title">
-              <div className="notice-dialog-header">
-                <div>
-                  <p className="notice-dialog-eyebrow">使用前请阅读</p>
-                  <h2 id="notice-title">{noticeBlocked ? '暂时无法读取告知' : '试点采集告知'}</h2>
-                </div>
-                {pendingNotice ? <span className="notice-dialog-version">{currentNotice.notice.version}</span> : null}
-              </div>
-              <p className="notice-dialog-content" data-testid="notice-content">
-                {noticeDialogContent}
-              </p>
-              {noticeError ? <p className="notice-dialog-error" role="alert">{noticeError}</p> : null}
-              {pendingNotice ? <p className="notice-dialog-hint">阅读页面不会自动表示同意，请选择下方按钮。</p> : null}
-              {noticeDialogActions}
-            </section>
-          </div>
+        {expanded && (noticeLoading || noticeBlocked || openNotice) ? (
+          <QueryNoticeDialog
+            noticeLoading={noticeLoading}
+            noticeBlocked={noticeBlocked}
+            noticeBusy={noticeBusy}
+            noticeError={noticeError}
+            pendingNotice={openNotice !== null}
+            noticeVersion={openNotice?.notice.version ?? null}
+            noticeContent={openNotice?.notice.content ?? null}
+            onRetry={retryCurrentNotice}
+            onDecline={() => { void decideCurrentNotice('declined'); }}
+            onAccept={() => { void decideCurrentNotice('accepted'); }}
+          />
         ) : null}
         {showQueryResizeGrip ? (
-          <div
-            ref={resizeGripRef}
-            className="query-resize-grip"
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label="调整查询窗高度"
-            aria-valuemin={QUERY_LAYOUT_MIN_HEIGHT}
-            aria-valuemax={QUERY_LAYOUT_MAX_HEIGHT}
-            aria-valuenow={queryHeight}
-            aria-valuetext={`${queryHeight} 像素`}
-            data-edge={resizeEdge}
-            data-testid="query-resize-grip"
-            tabIndex={0}
+          <QueryResizeGrip
+            gripRef={resizeGripRef}
+            activePointerIdRef={resizePointerRef}
+            edge={resizeEdge}
+            height={queryHeight}
             onPointerDown={startQueryResize}
             onPointerMove={moveQueryResize}
-            onPointerUp={(event) => {
-              if (resizePointerRef.current !== event.pointerId) return;
-              finishQueryResize('end', event.pointerId);
-            }}
-            onPointerCancel={(event) => {
-              if (resizePointerRef.current !== event.pointerId) return;
-              finishQueryResize('cancel', event.pointerId);
-            }}
-            onLostPointerCapture={(event) => {
-              if (resizePointerRef.current !== event.pointerId) return;
-              finishQueryResize('cancel', event.pointerId, { alreadyLost: true });
-            }}
+            onFinish={finishQueryResize}
             onKeyDown={handleQueryResizeKey}
           />
         ) : null}

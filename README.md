@@ -21,12 +21,12 @@ hash -r
 node -v && pnpm -v          # v24.x · 11.19.x
 pnpm install --frozen-lockfile
 pnpm electron:install
-pnpm start                  # 与 pnpm dev 相同
+pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runtime
 ```
 
 成功：桌面出现约 88px 透明狐狸头。点它 → 查询 → Top 3 →「复制话术」显示「已复制」。逐步核验走 [第一次运行](docs/tutorial-first-run.md)。依赖已经装好时，macOS 可双击 [`启动客服Agent.command`](启动客服Agent.command)。
 
-`pnpm` 报 `Missing script` / `ERR_PNPM_NO_SCRIPT` 时跑 `pnpm help:dev`，不要猜 `serve` / `desktop`。贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+`pnpm` 报 `Missing script` / `ERR_PNPM_NO_SCRIPT` 时跑 `pnpm help:dev`，不要猜 `serve` / `desktop`。根命令会先准备桌面依赖的 contracts runtime；手动运行合成栈或 API 时再跑 `pnpm build:services`。贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 文档
 
@@ -86,7 +86,7 @@ export NODE_OPTIONS=--use-system-ca
 export NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem
 pnpm install --frozen-lockfile
 pnpm electron:install
-pnpm start    # 与 pnpm dev 相同；命令名不对时跑 pnpm help:dev
+pnpm start    # 与 pnpm dev 相同；会先准备 contracts runtime
 ```
 
 Application API 与桌面合成模式分开启动；它提供本机 liveness、基础设施 readiness 及 mock auth / policy / synthetic-only Search + Events。先按[配置真源](docs/reference-api-runtime-config.md#2-当前变量)在当前终端设置两套独立数据库登录与私有密钥；以下命令检查必填项后启动：
@@ -117,7 +117,7 @@ pnpm test:db:integration  # 只重跑隔离 PG15 集成门禁
 
 `pnpm test` 只跑 database 的 unit/package smoke，不要求每位普通前端开发者安装 PostgreSQL；改动 migration、runner、verifier 或 PG harness 时必须另跑 `pnpm test:db`。其他电脑可通过 `CUSTOMER_AGENT_PG15_BIN` 指向自己的 PostgreSQL 15 `bin` 目录；Homebrew 安装可使用 `$(brew --prefix postgresql@15)/bin`。
 
-上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 只用于**当前这台机器**的企业证书环境，不是每台电脑的通用要求；没有企业拦截 TLS 时不要照抄。禁止关闭 TLS 验证。本项目用 `pnpm electron:install` 在唯一桌面包内显式准备锁定版本的 Electron 运行时；后续启动会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。逐步操作见 [第一次运行](docs/tutorial-first-run.md)。
+上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 只用于**当前这台机器**的企业证书环境，不是每台电脑的通用要求；没有企业拦截 TLS 时不要照抄。禁止关闭 TLS 验证。本项目用 `pnpm electron:install` 在唯一桌面包内显式准备锁定版本的 Electron 运行时；后续启动会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 会先准备桌面所需的 contracts runtime，再连接本机 Vite/HMR。手动启动合成 API 栈前先跑 `pnpm build:services`。逐步操作见 [第一次运行](docs/tutorial-first-run.md)。
 
 ## 交互
 

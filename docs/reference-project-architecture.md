@@ -39,6 +39,8 @@
 contracts/upstream（不可变输入；同一受锁 snapshot）
   ├─ packages/contracts（bundle / generated TS / runtime validator）
   │    └─ apps/api → 合成身份 / 内容闭环 / search / announce（loopback only）
+  ├─ packages/retrieval-core（BM25 / RRF / similarity / threshold；纯算法）
+  │    └─ apps/desktop → shared adapter 注入字段权重、分词和检索策略
   └─ packages/database（0001..0014 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
@@ -64,7 +66,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页/`content-updated`、D4 无命中求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排；Query `product:inaccuracy-report`；Dashboard 话术库只读 `dashboard:wording-list`、内容 `dashboard:content-*`、话术优化待办 `dashboard:iteration-*`、ops-loop `dashboard:ops-*`、系统同步 `dashboard:announce-*` 与 origin-keyed `product-last-seen` | React 视图、业务 fixture、通用 HTTP 客户端 |
 | `apps/desktop/src/preload/` | overlay `index.ts` 把 `CustomerAgentApi` 白名单暴露给 Fox/Query；`login.ts` / `sop.ts` 是独立入口，通道字符串必须内联 | `ipcRenderer` 通用转发、Node 文件系统、token、独立 preload 去 import `ipc-channels.ts` |
 | `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard、登录 chooser、SOP 投影和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
-| `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何、状态纯函数，以及 BM25+RRF `hybrid-retrieve` | 依赖 DOM、Electron、React 的实现 |
+| `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何、状态纯函数，以及把产品字段权重、分词和弃权策略接到 `@customer-agent/retrieval-core` 的检索适配器 | 依赖 DOM、Electron、React 的实现，或把产品策略硬编码进通用检索包 |
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
@@ -72,14 +74,29 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/api/tests/support/g1a-e0/` | 测试专用仓外输入校验、一次性 PG15 装载、同一 SearchBackend 评测、聚合报告与清理 | HTTP route、事件写入、桌面依赖、长期数据库、真实内容或正式构建产物 |
 | `apps/api/src/search-decision.ts`、`search-relations.ts` | 产品搜索判定、内部诊断，以及有界正文关系/否定/论元语义；实验复用同一规则 | 人工来源注解、实验 fixture、HTTP 诊断字段或绕过来源门禁 |
 | `apps/api/experiments/search-decision/` | 合成搜索判定实验与验收工具：固定产品源码哈希 + 仅重定位 import 的诊断副本、合成夹具、需求判定和事实/行为/失败门禁 | 产品 `src` 行为、SearchBackend、真实来源、runtime 依赖、正式构建产物 |
-| 根 `scripts/` | 合同快照接收、workspace 卫生门、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
+| 根 `scripts/` | 合同快照接收、workspace 卫生门、架构依赖门（`pnpm check:architecture`）、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
+| `packages/retrieval-core/` | 纯 TypeScript 检索算法：BM25、RRF、余弦相似度、分数门槛和字符分词；通过显式输入隐藏算法细节，不拥有产品字段、HTTP、Electron、数据库或 UI 策略 | `apps/*` 依赖、产品字段权重、合成/真实数据读取、运行时 I/O |
 | `packages/database/` | 在同一已验证快照内确定性生成 migration（当前十四段）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
 | `docs/`、`evidence/qa/` | 可读合同、教程、验证方法和冻结证据 | 可执行源码、运行时缓存 |
+
+### 依赖方向门
+
+`pnpm check:architecture` 读取源码和 workspace 的 package 依赖，不启动应用，也不改运行时行为。失败时退出码非零，并打印文件、规则和修复方向。别名只认 `apps/desktop/tsconfig.json` 的 `paths`（与桌面 bundler 使用的是同一张表）。
+
+| 规则 | 禁止 | 当前允许 |
+| --- | --- | --- |
+| `renderer-no-privileged-import` | renderer 导入 main、preload、`electron` 或数据库（`@customer-agent/database`、`pg`、sqlite） | `@shared/*` 纯类型与纯函数、renderer 自己的 React 视图、`@customer-agent/contracts` 类型 |
+| `preload-no-generic-ipc` | 把 `send` / `on` / `invoke`，或调用方传入的 channel，暴露给 renderer | 对 preload 内部写死的 channel 调用 `ipcRenderer`；私有 helper 可以收口多个固定 channel |
+| `packages-no-app-dependency` | `packages/*` 的源码或 package 依赖指向 `apps/*` | 依赖其他 package、Node 内置模块和根 `scripts/` |
+| `api-no-desktop-dependency` | `apps/api` 的源码或 package 依赖指向 `apps/desktop` | `@customer-agent/contracts` 与 `@customer-agent/database`。D5 合成整链只允许 `apps/api/tests/backend-runtime.e2e.test.ts` 动态装载 main 的 `product-http`、`product-session`、`product-announce`、`product-search` |
+| `shared-no-ui-runtime` | `apps/desktop/src/shared` 依赖 React、DOM 或 Electron，包括再导入 renderer、preload、main | `import type` 自 `@customer-agent/contracts`，以及 `node:crypto` 这类纯计算 |
+
+`document` / `window` 作为普通参数名或协议字段（例如检索文档、`RetrievalWindow`）不是 DOM 依赖。共享包不得因此改读浏览器全局对象。
 
 `DEV-M0-W1` 只把现有桌面包原样移入 `apps/desktop`，并同步 package、路径、测试和打包配置；根 `pnpm` 命令继续作为唯一公开入口。该切片不得混入 IPC 改造、API、DB 或 UI 行为，迁移后的模块边界和依赖方向保持不变。
 
@@ -189,6 +206,7 @@ pnpm artifact:m0:verify # 只复核非部署型 contracts/database/API 候选产
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm check:architecture # 模块依赖方向；不启动应用
 ```
 
 自动化 renderer 点击不能冒充真实 WindowServer、Dock、Stage Manager 或 Windows 合成器证明。真实设备门禁继续列在 [如何验证桌面 Demo](how-to-verify-desktop.md)。
@@ -227,6 +245,7 @@ Fox presence 的纯姿态解析、deadline 计算与数值几何保留在 `apps/
 - [第一次运行客服话术浮窗 Demo](tutorial-first-run.md)
 - [如何验证桌面 Demo](how-to-verify-desktop.md)
 - [桌面合同](reference-desktop-contracts.md)
+- [桌面语义检索与检索内核](reference-desktop-retrieval.md)
 - [抽取叶子模块合同](reference-extracted-module-contracts.md)
 - [失败安全说明](explanation-failure-safe-lifecycle.md)
 - [API adapter 衔接](reference-api-adapter-handoff.md)

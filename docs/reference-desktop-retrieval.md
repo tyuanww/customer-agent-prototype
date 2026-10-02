@@ -49,7 +49,7 @@
 | 规划超时 | `minimax-plan.ts` | 1800ms |
 | 重排超时 | `minimax-rerank.ts` | 2500ms；只看前 8 条 |
 
-BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75`，CJK 单字+二元组。查询分析槽在 `query-analyze.ts`，只扩展检索式，不映射某条标题。
+BM25、RRF 和余弦的公式在 [`packages/retrieval-core`](../packages/retrieval-core/README.md)。桌面常量仍在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75`，标题权重 3、问法权重 2.5、正文权重 1，RRF `k=60`。分词用该包的单字+相邻二字，由适配层注入。查询分析槽在 `query-analyze.ts`，只扩展检索式，不映射某条标题。弃权停用词和 `1/(60+20)` 门槛留在 `retrieval-quality.ts`。
 
 ## 失败
 
@@ -69,5 +69,5 @@ BM25 常量在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75
 ## Related
 
 - 实现：`apps/desktop/src/main/retrieval-pipeline.ts`、`hydrate-catalog.ts`、`product-announce.ts`、`product-search.ts`、`doc2query-generate.ts`、`retrieval-index-store.ts`、`minimax-embed.ts`、`retrieval-embeddings-store.ts`
-- 纯函数：`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`、`dense-retrieve.ts`、`query-route.ts`、`retrieval-quality.ts`
+- 纯函数：`packages/retrieval-core`、`apps/desktop/src/shared/hybrid-retrieve.ts`、`query-analyze.ts`、`doc2query.ts`、`retrieval-index.ts`、`dense-retrieve.ts`、`query-route.ts`、`retrieval-quality.ts`
 - 冻结 HTTP 判定仍在 `apps/api/src/search-decision.ts`，本页不修改它

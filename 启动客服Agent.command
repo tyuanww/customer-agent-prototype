@@ -49,6 +49,13 @@ fi
 
 print ""
 print "正在准备本机合成环境（首次启动会初始化隔离数据库，请稍候）..."
+if ! pnpm build:services; then
+  print -u2 ""
+  print -u2 "服务运行时构建失败。请检查上面的 Node / pnpm / TypeScript 错误。"
+  print -u2 "手动重试：pnpm build:services"
+  read -r "?按回车关闭..."
+  exit 1
+fi
 if ! node scripts/synthetic-stack/stack.ts start; then
   print -u2 ""
   print -u2 "合成环境启动失败。上面 [stack] 行给出了具体原因。"

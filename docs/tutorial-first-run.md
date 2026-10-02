@@ -60,7 +60,7 @@ pnpm electron:install
 | 步骤 | 可观察成功标志 |
 | --- | --- |
 | `pnpm install --frozen-lockfile` | 结束码 0；没有改写 `pnpm-lock.yaml`；`node_modules/` 就位 |
-| `pnpm electron:install` | 在 `apps/desktop` 显式准备本仓锁定版本的 Electron 桌面运行时。成功时后续根命令 `pnpm dev` 能启动窗口，而不是报缺少 Electron 二进制 |
+| `pnpm electron:install` | 在 `apps/desktop` 显式准备本仓锁定版本的 Electron 桌面运行时。根命令 `pnpm dev` / `pnpm start` 还会自动准备桌面所需的 contracts runtime |
 
 应用不访问外部业务网络。`pnpm install` 只拉注册表依赖；`pnpm dev` 只连本机 Vite / HMR。
 
@@ -69,7 +69,7 @@ pnpm electron:install
 ## 3. 启动 Demo
 
 ```bash
-pnpm start    # 与 pnpm dev 相同
+pnpm start    # 与 pnpm dev 相同；会先准备 contracts runtime
 ```
 
 若终端写 `ERR_PNPM_NO_SCRIPT` / `Missing script`，跑 `pnpm help:dev` 再 `pnpm run`。根脚本没有 serve 这种名字。

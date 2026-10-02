@@ -1,0 +1,287 @@
+{
+  "minRrf": 0.0125,
+  "cosine": {
+    "same": 1,
+    "orthogonal": 0,
+    "mismatch": 0,
+    "empty": 0,
+    "zero": 0
+  },
+  "dense": [
+    {
+      "scriptId": "tie-a",
+      "rank": 1
+    },
+    {
+      "scriptId": "tie-b",
+      "rank": 2
+    },
+    {
+      "scriptId": "ship",
+      "rank": 3
+    }
+  ],
+  "single": {
+    "什么时候发货啊": [
+      {
+        "scriptId": "ship-express",
+        "title": "发货快递",
+        "questionText": "发货快递",
+        "answerText": "订单付款后四十八小时内发出，物流单号同步到订单页。",
+        "category": "presale",
+        "score": 0.03252247488101534
+      },
+      {
+        "scriptId": "address",
+        "title": "改地址",
+        "questionText": "改地址",
+        "answerText": "未发货前可以修改一次收货地址。",
+        "category": "presale",
+        "score": 0.01639344262295082
+      },
+      {
+        "scriptId": "eta",
+        "title": "到货时效",
+        "questionText": "到货时效",
+        "answerText": "一般三到五天送达，偏远地区可能更久。",
+        "category": "presale",
+        "score": 0.016129032258064516
+      }
+    ],
+    "这款面膜敏感肌可以用吗": [
+      {
+        "scriptId": "mask",
+        "title": "面膜适用人群",
+        "questionText": "面膜适用人群",
+        "answerText": "敏感肌也能用，建议先在耳后试用。",
+        "category": "product",
+        "questions": [
+          "敏感肌可以用吗",
+          "这款面膜适合什么人"
+        ],
+        "score": 0.03278688524590164
+      },
+      {
+        "scriptId": "address",
+        "title": "改地址",
+        "questionText": "改地址",
+        "answerText": "未发货前可以修改一次收货地址。",
+        "category": "presale",
+        "score": 0.016129032258064516
+      },
+      {
+        "scriptId": "ship-express",
+        "title": "发货快递",
+        "questionText": "发货快递",
+        "answerText": "订单付款后四十八小时内发出，物流单号同步到订单页。",
+        "category": "presale",
+        "score": 0.015873015873015872
+      }
+    ],
+    "我填错地址了能不能改": [
+      {
+        "scriptId": "address",
+        "title": "改地址",
+        "questionText": "改地址",
+        "answerText": "未发货前可以修改一次收货地址。",
+        "category": "presale",
+        "score": 0.03278688524590164
+      },
+      {
+        "scriptId": "eta",
+        "title": "到货时效",
+        "questionText": "到货时效",
+        "answerText": "一般三到五天送达，偏远地区可能更久。",
+        "category": "presale",
+        "score": 0.016129032258064516
+      },
+      {
+        "scriptId": "mask",
+        "title": "面膜适用人群",
+        "questionText": "面膜适用人群",
+        "answerText": "敏感肌也能用，建议先在耳后试用。",
+        "category": "product",
+        "questions": [
+          "敏感肌可以用吗",
+          "这款面膜适合什么人"
+        ],
+        "score": 0.015873015873015872
+      }
+    ],
+    "四十八小时内发出": [
+      {
+        "scriptId": "ship-express",
+        "title": "发货快递",
+        "questionText": "发货快递",
+        "answerText": "订单付款后四十八小时内发出，物流单号同步到订单页。",
+        "category": "presale",
+        "score": 0.03252247488101534
+      },
+      {
+        "scriptId": "eta",
+        "title": "到货时效",
+        "questionText": "到货时效",
+        "answerText": "一般三到五天送达，偏远地区可能更久。",
+        "category": "presale",
+        "score": 0.01639344262295082
+      },
+      {
+        "scriptId": "address",
+        "title": "改地址",
+        "questionText": "改地址",
+        "answerText": "未发货前可以修改一次收货地址。",
+        "category": "presale",
+        "score": 0.016129032258064516
+      }
+    ],
+    "!!!": [],
+    "": []
+  },
+  "top1": [
+    {
+      "scriptId": "ship-express",
+      "title": "发货快递",
+      "questionText": "发货快递",
+      "answerText": "订单付款后四十八小时内发出，物流单号同步到订单页。",
+      "category": "presale",
+      "score": 0.03252247488101534
+    }
+  ],
+  "denseOverride": [
+    {
+      "scriptId": "address",
+      "title": "改地址",
+      "questionText": "改地址",
+      "answerText": "未发货前可以修改一次收货地址。",
+      "category": "presale",
+      "score": 0.01639344262295082
+    },
+    {
+      "scriptId": "eta",
+      "title": "到货时效",
+      "questionText": "到货时效",
+      "answerText": "一般三到五天送达，偏远地区可能更久。",
+      "category": "presale",
+      "score": 0.01639344262295082
+    },
+    {
+      "scriptId": "ship-express",
+      "title": "发货快递",
+      "questionText": "发货快递",
+      "answerText": "订单付款后四十八小时内发出，物流单号同步到订单页。",
+      "category": "presale",
+      "score": 0.016129032258064516
+    }
+  ],
+  "multi": [
+    {
+      "scriptId": "address",
+      "title": "改地址",
+      "questionText": "改地址",
+      "answerText": "未发货前可以修改一次收货地址。",
+      "category": "presale",
+      "score": 0.03252247488101534
+    },
+    {
+      "scriptId": "eta",
+      "title": "到货时效",
+      "questionText": "到货时效",
+      "answerText": "一般三到五天送达，偏远地区可能更久。",
+      "category": "presale",
+      "score": 0.03200204813108039
+    },
+    {
+      "scriptId": "mask",
+      "title": "面膜适用人群",
+      "questionText": "面膜适用人群",
+      "answerText": "敏感肌也能用，建议先在耳后试用。",
+      "category": "product",
+      "questions": [
+        "敏感肌可以用吗",
+        "这款面膜适合什么人"
+      ],
+      "score": 0.03149801587301587
+    },
+    {
+      "scriptId": "ship-express",
+      "title": "发货快递",
+      "questionText": "发货快递",
+      "answerText": "订单付款后四十八小时内发出，物流单号同步到订单页。",
+      "category": "presale",
+      "score": 0.01639344262295082
+    }
+  ],
+  "multiSingle": [
+    {
+      "scriptId": "ship-express",
+      "title": "发货快递",
+      "questionText": "发货快递",
+      "answerText": "订单付款后四十八小时内发出，物流单号同步到订单页。",
+      "category": "presale",
+      "score": 0.03252247488101534
+    },
+    {
+      "scriptId": "address",
+      "title": "改地址",
+      "questionText": "改地址",
+      "answerText": "未发货前可以修改一次收货地址。",
+      "category": "presale",
+      "score": 0.01639344262295082
+    },
+    {
+      "scriptId": "eta",
+      "title": "到货时效",
+      "questionText": "到货时效",
+      "answerText": "一般三到五天送达，偏远地区可能更久。",
+      "category": "presale",
+      "score": 0.016129032258064516
+    },
+    {
+      "scriptId": "mask",
+      "title": "面膜适用人群",
+      "questionText": "面膜适用人群",
+      "answerText": "敏感肌也能用，建议先在耳后试用。",
+      "category": "product",
+      "questions": [
+        "敏感肌可以用吗",
+        "这款面膜适合什么人"
+      ],
+      "score": 0.015873015873015872
+    }
+  ],
+  "multiBlank": [],
+  "duplicates": [
+    {
+      "scriptId": "a",
+      "title": "发货快递",
+      "questionText": "发货",
+      "answerText": "先发",
+      "score": 0.03278688524590164
+    }
+  ],
+  "emptyCorpus": [],
+  "admit": {
+    "keep": [
+      {
+        "scriptId": "ship",
+        "title": "发货时效",
+        "questionText": "几天能到",
+        "answerText": "",
+        "score": 0.03
+      }
+    ],
+    "bodyOnly": [],
+    "low": [],
+    "floor": [
+      {
+        "scriptId": "ship",
+        "title": "发货时效",
+        "questionText": "",
+        "answerText": "",
+        "score": 0.0125
+      }
+    ],
+    "hits": 1,
+    "stop": 0
+  }
+}

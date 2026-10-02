@@ -13,6 +13,7 @@ All notable changes to this customer-agent product implementation repository are
 
 - Documented Node 24 and pnpm 11.19.0 as the supported remote workflow, with separate test and production ports, stacks, service users, build users, and release directories.
 - Added contributor and README entry points for developing from a local clone while keeping the remote production checkout immutable.
+- Made `pnpm dev` / `pnpm start` prepare the desktop contracts runtime automatically; the macOS launcher now prepares service runtime artifacts before starting the synthetic stack.
 
 ### Fixed
 
