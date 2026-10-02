@@ -1,6 +1,6 @@
 # How to 启动 macOS 语义检索开发浮窗
 
-在本机已有 `rel_6` MENOKIN 发布的前提下，拉起查询胶囊，用顾客问句检索原文，而不是重新播种合成栈。
+在本机已有 `rel_6` MENOKIN 发布的前提下，拉起查询胶囊，用顾客问句检索原文，而不是重新播种合成栈。开发端口选择、S0 与 API-only 模式见 [开发端口 How-to](how-to-development-ports.md)。
 
 ## Prerequisites
 
@@ -87,3 +87,8 @@
 | 查询很慢或 400 | 旧路径会打 leftover `/v1/search`。有 hydrate 时不再走这条路。产品模式确认带后缀 hydrate 文件存在；显式覆盖时才 export `CUSTOMER_AGENT_HYDRATE_INDEX` |
 | MiniMax 证书错误 | main 必须用 Electron `net.fetch`，不要让 Node 的 `fetch` 直连 |
 | `stack start` 已经跑过 | 种子发布可能已覆盖 `rel_6`。按冻结点把 `rel_7` superseded、`rel_6` published，再点胶囊「登录」回写 hydrate。检索会优先更大的仓外索引，不会用 11 条种子盖掉已有大库 |
+
+## Related
+
+- [How to 选择开发端口并运行本地服务](how-to-development-ports.md)
+- [运行环境、端口与发布目录参考](reference-runtime-ports-and-release-layout.md)

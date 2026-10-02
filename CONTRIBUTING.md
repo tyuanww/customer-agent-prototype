@@ -27,7 +27,7 @@ macOS 已装好依赖时，也可双击仓根 [`启动客服Agent.command`](启�
 
 日常顺序是：本地分支开发 → Node 24 + pnpm 11.19.0 检查 → 合成测试 → WSL 临时测试端口 `43180/43181` → 停测试 unit 并复核生产 `43115/43116` → 只有获得部署授权后，按 Git SHA 创建新 release、安装冻结依赖、构建服务并切换 `current`。生产 API 和口令服务只监听 `127.0.0.1`，测试客户端不能指向生产端口。
 
-具体命令、账号初始化失败排查、Windows 包证据和远端磁盘清理边界见 [远端开发与交付](docs/how-to-remote-development-and-deployment.md)、[运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) 和 [环境边界说明](docs/explanation-environment-boundaries.md)。
+开发端口的选择和本机验证先看 [开发端口 How-to](docs/how-to-development-ports.md)。具体远端命令、账号初始化失败排查、Windows 包证据和远端磁盘清理边界见 [远端开发与交付](docs/how-to-remote-development-and-deployment.md)、[运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) 和 [环境边界说明](docs/explanation-environment-boundaries.md)。
 
 ## 命令找不到时
 
