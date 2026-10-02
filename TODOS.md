@@ -37,12 +37,12 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Why:** 旧的 `Type=oneshot` 单元无法监督 `stack.ts` detach 出去的子进程，API 单独崩掉时单元仍显示 `active`。生产入口现在增加 `--foreground` 模式，由前台 supervisor 持有 identity、API、worker；任一子进程异常退出都会让栈失败，交给 systemd `Restart=on-failure` 重启整组。
 
-**Context:** `scripts/synthetic-stack/stack.ts` 增加前台启动和子进程监督；`scripts/ops/customer-agent-stack.service` 固化 `Type=simple`、`Restart=on-failure`、`KillMode=control-group`。普通 `start/stop/restart` 仍保留 detached 行为，Mac 合成开发路径不变。杭州机器的 unit 安装和真实故障演练仍需单独执行。
+**Context:** `scripts/synthetic-stack/stack.ts` 增加前台启动和子进程监督；`scripts/ops/customer-agent-stack.service` 固化 `Type=simple`、`Restart=on-failure`、`KillMode=control-group`。普通 `start/stop/restart` 仍保留 detached 行为，Mac 合成开发路径不变。2026-10-02 已在杭州 WSL 部署 SHA `8faf5759382bf3ded9ba0245bec8c893701cf270`，并完成 API 子进程强杀后的自动恢复演练。
 
 **Effort:** M
 **Priority:** P2
 **Depends on:** 杭州迁移完成
-**Status:** 已实现 · 待杭州安装与子进程故障演练
+**Status:** 已实现 · 杭州已安装并完成子进程故障演练；健康告警 timer 待补齐 `monitor.env`
 
 ### 杭州迁移 · 去掉单点（HA）
 
