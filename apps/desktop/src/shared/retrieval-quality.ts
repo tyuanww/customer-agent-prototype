@@ -9,12 +9,13 @@
  * - Microsoft / RAG abstention practice: refuse when retrieval evidence is
  *   weak rather than always returning Top 3.
  */
+import { countCoveringTerms, rowIsAdmitted } from '@customer-agent/retrieval-core';
 import { termsOf, type RankedRetrieval } from './hybrid-retrieve.ts';
 
 const RRF_K = 60;
 export const MIN_RRF_SCORE = 1 / (RRF_K + 20);
 export const MIN_QUERY_BIGRAM_HITS = 1;
-const STOP_BIGRAMS = new Set([
+const STOP_BIGRAMS = Object.freeze([
   '什么', '怎么', '可以', '一下', '这个', '那个', '有没', '没有', '是不', '不是',
   '还是', '还有', '一个', '我们', '你们', '亲爱', '的话', '是否', '哪种',
 ]);
@@ -24,24 +25,21 @@ function documentAskText(row: RankedRetrieval): string {
 }
 
 export function queryBigramHits(query: string, document: string): number {
-  const doc = new Set(termsOf(document).filter((term) => term.length >= 2));
-  const seen = new Set<string>();
-  let hits = 0;
-  for (const term of termsOf(query)) {
-    if (term.length < 2 || STOP_BIGRAMS.has(term) || seen.has(term)) continue;
-    seen.add(term);
-    if (doc.has(term)) hits += 1;
-  }
-  return hits;
+  return countCoveringTerms(termsOf(query), termsOf(document), {
+    minimumLength: 2,
+    ignoredTerms: STOP_BIGRAMS,
+  });
 }
 
 export function admitRetrieval(
   query: string,
   ranked: readonly RankedRetrieval[],
 ): readonly RankedRetrieval[] {
-  const kept = ranked.filter((row) => (
-    row.score >= MIN_RRF_SCORE
-    && queryBigramHits(query, documentAskText(row)) >= MIN_QUERY_BIGRAM_HITS
+  const kept = ranked.filter((row) => rowIsAdmitted(
+    row.score,
+    queryBigramHits(query, documentAskText(row)),
+    MIN_RRF_SCORE,
+    MIN_QUERY_BIGRAM_HITS,
   ));
   return Object.freeze(kept);
 }

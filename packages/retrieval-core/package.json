@@ -1,0 +1,32 @@
+{
+  "name": "@customer-agent/retrieval-core",
+  "private": true,
+  "type": "module",
+  "description": "可序列化的 BM25、RRF、向量相似度和分数门槛。分词、字段权重和融合参数由调用方注入。",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./src/index.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:runtime": "tsc -p tsconfig.build.json",
+    "test:package": "pnpm build:runtime && node --test tests/package-entry.smoke.mjs",
+    "test:unit": "vitest run",
+    "test": "pnpm test:unit && pnpm test:package",
+    "build": "pnpm build:runtime",
+    "test:package:built": "node --test tests/package-entry.smoke.mjs",
+    "test:built": "pnpm test:unit && pnpm test:package:built"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.2",
+    "vitest": "3.2.7"
+  }
+}

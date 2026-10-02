@@ -3,6 +3,7 @@
  * sha256(answerText) plus the embedding model id. Callers fuse these ranks
  * with BM25 title/question; they must not send answer text to chat models.
  */
+import { cosineSimilarity, rankByCosine } from '@customer-agent/retrieval-core';
 import { createHash } from 'node:crypto';
 
 export const DENSE_MODEL_EMBO = 'embo-01';
@@ -28,30 +29,17 @@ export function answerContentHash(answerText: string): string {
 }
 
 export function cosine(left: readonly number[], right: readonly number[]): number {
-  if (left.length === 0 || left.length !== right.length) return 0;
-  let dot = 0;
-  let leftNorm = 0;
-  let rightNorm = 0;
-  for (let i = 0; i < left.length; i += 1) {
-    const a = left[i] ?? 0;
-    const b = right[i] ?? 0;
-    dot += a * b;
-    leftNorm += a * a;
-    rightNorm += b * b;
-  }
-  if (leftNorm <= 0 || rightNorm <= 0) return 0;
-  return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
+  return cosineSimilarity(left, right);
 }
 
 export function rankDense(
   queryVector: readonly number[],
   rows: readonly DenseVectorRow[],
 ): readonly DenseRank[] {
-  const scored = rows
-    .map((row) => ({ scriptId: row.scriptId, score: cosine(queryVector, row.vector) }))
-    .filter((row) => row.score > 0)
-    .sort((left, right) => right.score - left.score || left.scriptId.localeCompare(right.scriptId));
-  return Object.freeze(scored.map((row, offset) => Object.freeze({ scriptId: row.scriptId, rank: offset + 1 })));
+  return Object.freeze(rankByCosine(
+    queryVector,
+    rows.map((row) => ({ id: row.scriptId, vector: row.vector })),
+  ).map((row) => Object.freeze({ scriptId: row.id, rank: row.rank })));
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
