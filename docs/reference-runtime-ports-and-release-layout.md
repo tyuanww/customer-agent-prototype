@@ -17,11 +17,14 @@
 
 | 端口 | 监听地址 | 所属 | 说明 |
 | --- | --- | --- | --- |
+| `3100` | `127.0.0.1` | Mac 直接 `formal-dev` API | `pnpm dev:api` 默认端口；只用于 API 配置 / 路由开发，桌面不会自动接入 |
+| `43100` | `127.0.0.1` | Mac 合成 API | `scripts/synthetic-stack/stack.ts` 默认 API origin；自定义 stack root 可能按 profile 偏移 |
+| `43101` | `127.0.0.1` | Mac 合成口令身份服务 | 只供同一套 Mac 合成 API 使用；自定义 stack root 可能按 profile 偏移 |
 | `43115` | `127.0.0.1` | 生产 API | 通过受控 HTTPS 隧道访问；不直接暴露到局域网 |
 | `43116` | `127.0.0.1` | 生产口令身份服务 | 只供生产 API 使用 |
 | `43180` | `127.0.0.1` | 测试 API | 临时测试端口，验收后应无监听 |
 | `43181` | `127.0.0.1` | 测试口令身份服务 | 临时测试端口，验收后应无监听 |
-| `43199` | Unix socket 文件名后缀 | 生产 PG15 | 只在 stack root 内部使用，不开放 TCP；`profile.json.pgPort` 只是 socket 连接参数，不是 TCP listener |
+| `43199` | Unix socket 文件名后缀 | 各 stack 的 PG15 | 只在对应 stack root 的 socket 目录内使用，不开放 TCP；`profile.json.pgPort` 只是 socket 连接参数，不是 TCP listener |
 
 查看端口和 readiness：
 
@@ -91,6 +94,7 @@ find /srv/customer-agent/releases -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
 ## 相关
 
 - [How to 从远端仓库开发、测试并交付](how-to-remote-development-and-deployment.md)
+- [How to 选择开发端口并运行本地服务](how-to-development-ports.md)
 - [为什么开发、测试和生产要分开](explanation-environment-boundaries.md)
 - [杭州后端操作手册](how-to-run-backend-on-hangzhou.md)
 - [打包与签名边界](reference-packaging-and-signing.md)

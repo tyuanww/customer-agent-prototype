@@ -51,6 +51,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 | 飞书 + 账号 how-to、P4 远端 how-to | [feishu](docs/how-to-feishu-and-password-mac.md) · [p4](docs/how-to-p4-remote-mac.md) |
 | 两个公网入口跑在杭州（更新 / 迁数据 / 切隧道 / 回滚） | [后端跑在杭州](docs/how-to-run-backend-on-hangzhou.md) |
 | 从远端仓库开发、在 Windows WSL 测试并按 SHA 交付 | [远端开发与交付](docs/how-to-remote-development-and-deployment.md) |
+| 选择 Mac / API / WSL 开发端口并验证 | [开发端口 How-to](docs/how-to-development-ports.md) |
 | 查端口、环境边界、发布软链和远端磁盘占用 | [运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) · [为什么要分环境](docs/explanation-environment-boundaries.md) |
 | 工程流程、打包签名、文档生命周期 | [workflow](docs/reference-engineering-workflow.md) · [signing](docs/reference-packaging-and-signing.md) · [lifecycle](docs/reference-document-lifecycle.md) |
 | 查看本轮开发体验、安全和远端仓库诊断（partial） | [2026-10-01 审计](docs/reviews/2026-10-01-devex-security-audit.md) |
