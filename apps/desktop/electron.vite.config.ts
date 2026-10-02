@@ -5,10 +5,21 @@ import { stripCrossOriginAttributes } from './src/shared/file-renderer-html';
 
 export default defineConfig({
   main: {
-    // Workspace contracts must be inlined. Windows smoke launches out/main
+    // Workspace packages must be inlined. Windows smoke launches out/main
     // without nested apps/desktop/node_modules/@customer-agent/*, and the
     // unsigned package only ships out/** plus package.json.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts'] })],
+    // `source` keeps retrieval-core on its TypeScript entry so packaging does
+    // not need a separate dist build before electron-vite.
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/retrieval-core'] })],
+    resolve: {
+      conditions: ['source'],
+    },
+    ssr: {
+      noExternal: ['@customer-agent/retrieval-core'],
+      resolve: {
+        conditions: ['source'],
+      },
+    },
     build: {
       rollupOptions: {
         input: {

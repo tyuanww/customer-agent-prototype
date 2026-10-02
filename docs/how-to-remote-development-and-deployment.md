@@ -26,6 +26,7 @@
    pnpm -v        # 11.19.0
    pnpm install --frozen-lockfile
    pnpm electron:install
+   pnpm build:services   # 需要本机启动合成 API / 手动验收栈时
    ```
 
    如果 `node -v` 是 25.x，先在 login shell 中加载 Node 24，再继续。项目的 `engines` 会拒绝把 Node 25 当作受支持环境。
@@ -42,7 +43,7 @@
 3. 在 Mac 上跑本地桌面和受影响检查。
 
    ```bash
-   pnpm dev
+   pnpm dev              # 会先准备 contracts runtime
    pnpm docs:check       # 改文档或链接时
    pnpm lint
    pnpm typecheck

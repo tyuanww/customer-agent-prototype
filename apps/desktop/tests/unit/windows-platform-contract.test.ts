@@ -56,6 +56,7 @@ const verifyWindowsPackage = readFileSync(
   'utf8',
 );
 const overlayController = readFileSync(path.join(root, 'src/main/overlay-controller.ts'), 'utf8');
+const overlayPlatform = readFileSync(path.join(root, 'src/main/overlay-platform.ts'), 'utf8');
 const readme = readFileSync(path.join(repositoryRoot, 'README.md'), 'utf8');
 const developmentBrief = readFileSync(path.join(repositoryRoot, 'DEVELOPMENT_BRIEF.md'), 'utf8');
 const stackProfile = readFileSync(
@@ -166,7 +167,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageWindows).toContain('assertMainBundle(desktopRoot)');
     expect(packageWindows).toContain('assertMainBundleHasNoWorkspaceBareImports');
     expect(packageWindows).toContain("node_modules/electron-builder/out/cli/cli.js");
-    expect(electronViteConfig).toContain("externalizeDepsPlugin({ exclude: ['@customer-agent/contracts'] })");
+    expect(electronViteConfig).toContain("externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/retrieval-core'] })");
     expect(packageWindows).not.toMatch(/execFileSync\(['"](?:pnpm|electron-builder)['"]/);
     expect(packageWindows).toContain("WINDOWS_LOCAL_UNSIGNED_OUTPUT = 'release/local-unsigned/windows'");
     expect(packageWindows).toContain("buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false'");
@@ -232,10 +233,18 @@ describe('Windows local-unsigned packaging contract', () => {
   });
 
   it('yields the previous Windows app without stealing focus', () => {
-    expect(overlayController).toContain('yieldWindowsForeground');
-    expect(overlayController).toContain('fox.hide()');
+    expect(overlayController).toContain('yieldOrKeepPalette');
+    expect(overlayController).toContain('this.platform.yieldPreviousApp');
     expect(overlayController).not.toMatch(/app\.focus\([^)]*steal/);
-    expect(overlayController).toContain("process.platform === 'win32'");
+    const windowsYield = overlayPlatform.match(
+      /private yieldWindowsForeground\([\s\S]*?\n {2}\}/,
+    )?.[0] ?? '';
+    expect(windowsYield).toContain('fox.hide()');
+    expect(windowsYield).toContain('fox.blur()');
+    expect(windowsYield).not.toContain('app.hide()');
+    expect(windowsYield).not.toContain('app.focus');
+    expect(overlayPlatform).not.toMatch(/app\.focus\([^)]*steal/);
+    expect(overlayPlatform).toContain("process.platform === 'win32'");
   });
 
   it('documents the unsigned fact and forbids presenting the local artifact as a signed release', () => {

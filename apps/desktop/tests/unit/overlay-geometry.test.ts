@@ -474,6 +474,7 @@ describe('overlay geometry', () => {
   it('applies the inferred-fox dock resolution when a Query drag finishes', () => {
     const srcRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../src');
     const controller = readFileSync(path.join(srcRoot, 'main/overlay-controller.ts'), 'utf8');
+    const overlayPlatform = readFileSync(path.join(srcRoot, 'main/overlay-platform.ts'), 'utf8');
     const geometry = readFileSync(path.join(srcRoot, 'shared/overlay-geometry.ts'), 'utf8');
     expect(controller).toContain('this.queryDragAnchor = this.currentQueryAnchor()');
     expect(controller).toContain('inferFoxRectFromQuery(next, workArea, this.queryDragAnchor)');
@@ -501,9 +502,10 @@ describe('overlay geometry', () => {
     expect(controller).toContain("url.startsWith('devtools:')");
     expect(controller).toContain('setFoxFocusable(false)');
     expect(controller).toContain('clearFoxYieldShow');
-    expect(controller).toContain('foxYieldGeneration');
-    expect(controller).toMatch(/app\.hide\(\)/);
-    expect(controller).toMatch(/generation !== this\.foxYieldGeneration/);
+    expect(controller).toContain('this.platform.cancelYield()');
+    expect(overlayPlatform).toContain('yieldGeneration');
+    expect(overlayPlatform).toMatch(/app\.hide\(\)/);
+    expect(overlayPlatform).toMatch(/generation !== this\.yieldGeneration/);
     expect(controller).toMatch(/finishClosingHandoff[\s\S]*this\.clearQueryDragGesture\(\)/);
     expect(controller).toContain('resignQueryKeyboard');
     expect(controller).toContain("webContents.on('before-input-event'");

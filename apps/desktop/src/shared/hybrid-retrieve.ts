@@ -1,12 +1,23 @@
 /**
- * Field-weighted BM25 + RRF. Title/question BM25 is fused with either a dense
- * embedding rank list or BM25(answer). Dense ranks are optional; missing or
- * failed embeddings keep the answer BM25 lane.
+ * Desktop adapter for field-weighted BM25 + RRF.
  *
- * RRF: score = Σ 1 / (k + rank), k = 60. Azure and Elasticsearch both use
- * this fusion so BM25 and vector scores never have to be normalized together.
+ * The formulas live in `@customer-agent/retrieval-core`. This file owns the
+ * script fields, weights, RRF k, pool size, and query-slot expansion. Dense
+ * ranks stay optional: a missing or failed embedding keeps the answer BM25 lane.
+ *
+ * RRF: score = Σ 1 / (k + rank), k = 60.
  */
-import { analyzeQuery, compactQueryText, type QuerySlots } from './query-analyze.js';
+import {
+  buildBm25Index,
+  characterUnigramBigramTerms,
+  fuseReciprocalRanks,
+  rankBm25,
+  takeUniqueByKey,
+  type Bm25Index,
+  type FusedScore,
+  type RankRef,
+} from '@customer-agent/retrieval-core';
+import { analyzeQuery, type QuerySlots } from './query-analyze.js';
 
 export type RetrievalScript = Readonly<{
   scriptId: string;
@@ -26,20 +37,17 @@ const B = 0.75;
 const RRF_K = 60;
 const DEFAULT_LIMIT = 3;
 export const RETRIEVAL_POOL = 24;
-const TITLE_BOOST = 3;
-const QUESTION_BOOST = 2.5;
-const ANSWER_BOOST = 1;
+const HEAD_WEIGHTS = Object.freeze([
+  Object.freeze({ field: 'title', weight: 3 }),
+  Object.freeze({ field: 'question', weight: 2.5 }),
+]);
+const ANSWER_WEIGHTS = Object.freeze([
+  Object.freeze({ field: 'answer', weight: 1 }),
+]);
+const BM25 = Object.freeze({ k1: K1, b: B });
 
 export function termsOf(text: string): readonly string[] {
-  const compact = compactQueryText(text);
-  const chars = Array.from(compact);
-  if (chars.length === 0) return Object.freeze([]);
-  const terms: string[] = [];
-  for (let index = 0; index < chars.length; index += 1) {
-    terms.push(chars[index] ?? '');
-    if (index + 1 < chars.length) terms.push(`${chars[index]}${chars[index + 1]}`);
-  }
-  return Object.freeze(terms.filter((term) => term.length > 0));
+  return Object.freeze([...characterUnigramBigramTerms(text)]);
 }
 
 type FieldIndex = Readonly<{
@@ -65,113 +73,101 @@ export type RetrievalIndex = Readonly<{
   avgAnswer: number;
 }>;
 
-function fieldIndex(text: string): FieldIndex {
-  const tf = new Map<string, number>();
-  const terms = termsOf(text);
-  for (const term of terms) tf.set(term, (tf.get(term) ?? 0) + 1);
-  return Object.freeze({ length: Math.max(terms.length, 1), tf });
+function questionField(script: RetrievalScript): string {
+  return [script.questionText, ...(script.questions ?? [])].filter((part) => part.length > 0).join(' ');
 }
 
-function addDf(df: Map<string, number>, field: FieldIndex): void {
-  for (const term of field.tf.keys()) df.set(term, (df.get(term) ?? 0) + 1);
+function toDocuments(scripts: readonly RetrievalScript[]) {
+  return scripts.map((script) => ({
+    id: script.scriptId,
+    fields: [
+      { name: 'title', text: script.title },
+      { name: 'question', text: questionField(script) },
+      { name: 'answer', text: script.answerText },
+    ],
+  }));
+}
+
+function termMap(terms: readonly { term: string; count: number }[]): ReadonlyMap<string, number> {
+  return new Map(terms.map((row) => [row.term, row.count]));
+}
+
+function fieldStats(index: Bm25Index, name: string): { df: ReadonlyMap<string, number>; avg: number } {
+  const frequency = index.documentFrequency.find((row) => row.field === name);
+  const average = index.averageLength.find((row) => row.field === name);
+  return {
+    df: termMap(frequency?.terms ?? []),
+    avg: average?.length ?? 0,
+  };
 }
 
 export function buildRetrievalIndex(scripts: readonly RetrievalScript[]): RetrievalIndex {
-  const dfTitle = new Map<string, number>();
-  const dfQuestion = new Map<string, number>();
-  const dfAnswer = new Map<string, number>();
-  const docs = scripts.map((script) => {
-    const title = fieldIndex(script.title);
-    const question = fieldIndex([script.questionText, ...(script.questions ?? [])].filter((part) => part.length > 0).join(' '));
-    const answer = fieldIndex(script.answerText);
-    addDf(dfTitle, title);
-    addDf(dfQuestion, question);
-    addDf(dfAnswer, answer);
-    return Object.freeze({ script, title, question, answer });
-  });
-  const size = Math.max(docs.length, 1);
-  const avg = (pick: (doc: DocIndex) => number) => docs.reduce((sum, doc) => sum + pick(doc), 0) / size;
-  return Object.freeze({
-    size,
-    docs: Object.freeze(docs),
-    dfTitle,
-    dfQuestion,
-    dfAnswer,
-    avgTitle: avg((doc) => doc.title.length),
-    avgQuestion: avg((doc) => doc.question.length),
-    avgAnswer: avg((doc) => doc.answer.length),
-  });
-}
-
-function idf(df: number, size: number): number {
-  return Math.log(1 + (size - df + 0.5) / (df + 0.5));
-}
-
-function bm25Field(
-  queryTerms: readonly string[],
-  field: FieldIndex,
-  df: ReadonlyMap<string, number>,
-  avgLength: number,
-  size: number,
-  boost: number,
-): number {
-  let score = 0;
-  const seen = new Set<string>();
-  for (const term of queryTerms) {
-    if (seen.has(term)) continue;
-    seen.add(term);
-    const freq = field.tf.get(term);
-    if (freq === undefined || freq <= 0) continue;
-    const tfNorm = (freq * (K1 + 1)) / (freq + K1 * (1 - B + B * (field.length / Math.max(avgLength, 1))));
-    score += idf(df.get(term) ?? 0, size) * tfNorm * boost;
-  }
-  return score;
-}
-
-function bm25Score(
-  queryTerms: readonly string[],
-  doc: DocIndex,
-  index: RetrievalIndex,
-  parts: Readonly<{ title: boolean; question: boolean; answer: boolean }>,
-): number {
-  let score = 0;
-  if (parts.title) {
-    score += bm25Field(queryTerms, doc.title, index.dfTitle, index.avgTitle, index.size, TITLE_BOOST);
-  }
-  if (parts.question) {
-    score += bm25Field(queryTerms, doc.question, index.dfQuestion, index.avgQuestion, index.size, QUESTION_BOOST);
-  }
-  if (parts.answer) {
-    score += bm25Field(queryTerms, doc.answer, index.dfAnswer, index.avgAnswer, index.size, ANSWER_BOOST);
-  }
-  return score;
-}
-
-function rankedList(
-  queryTerms: readonly string[],
-  index: RetrievalIndex,
-  parts: Readonly<{ title: boolean; question: boolean; answer: boolean }>,
-): readonly { scriptId: string; rank: number }[] {
-  const scored = index.docs
-    .map((doc) => ({ scriptId: doc.script.scriptId, score: bm25Score(queryTerms, doc, index, parts) }))
-    .filter((row) => row.score > 0)
-    .sort((left, right) => right.score - left.score || left.scriptId.localeCompare(right.scriptId));
-  return Object.freeze(scored.map((row, offset) => ({ scriptId: row.scriptId, rank: offset + 1 })));
-}
-
-function rrf(lists: readonly (readonly { scriptId: string; rank: number }[])[]): Map<string, number> {
-  const fused = new Map<string, number>();
-  for (const list of lists) {
-    for (const row of list) {
-      fused.set(row.scriptId, (fused.get(row.scriptId) ?? 0) + 1 / (RRF_K + row.rank));
+  const index = buildBm25Index(toDocuments(scripts), characterUnigramBigramTerms);
+  const title = fieldStats(index, 'title');
+  const question = fieldStats(index, 'question');
+  const answer = fieldStats(index, 'answer');
+  const docs = scripts.map((script, offset) => {
+    const indexed = index.documents[offset];
+    if (!indexed || indexed.id !== script.scriptId) {
+      throw new Error(`retrieval index drifted at ${script.scriptId}`);
     }
-  }
-  return fused;
+    const field = (name: string): FieldIndex => {
+      const found = indexed.fields.find((item) => item.name === name);
+      return Object.freeze({
+        length: found?.length ?? 1,
+        tf: termMap(found?.terms ?? []),
+      });
+    };
+    return Object.freeze({
+      script,
+      title: field('title'),
+      question: field('question'),
+      answer: field('answer'),
+    });
+  });
+  return Object.freeze({
+    size: index.size,
+    docs: Object.freeze(docs),
+    dfTitle: title.df,
+    dfQuestion: question.df,
+    dfAnswer: answer.df,
+    avgTitle: title.avg,
+    avgQuestion: question.avg,
+    avgAnswer: answer.avg,
+  });
 }
 
 function expandQuery(query: string, slots: QuerySlots): string {
   if (slots.entities.length === 0) return query;
   return `${query} ${slots.entities.join(' ')}`;
+}
+
+function rankLane(
+  queryTerms: readonly string[],
+  index: Bm25Index,
+  fieldWeights: readonly { field: string; weight: number }[],
+): readonly RankRef[] {
+  return rankBm25(queryTerms, index, { ...BM25, fieldWeights }).map((row) => ({
+    id: row.id,
+    rank: row.rank,
+  }));
+}
+
+function materialize(
+  ordered: readonly FusedScore[],
+  scripts: readonly RetrievalScript[],
+  limit: number,
+): readonly RankedRetrieval[] {
+  const keys = scripts.map((script) => ({ id: script.scriptId, dedupeKey: script.title }));
+  const byId = new Map(scripts.map((script) => [script.scriptId, script]));
+  const selected = takeUniqueByKey(ordered, keys, limit);
+  const unique: RankedRetrieval[] = [];
+  for (const row of selected) {
+    const script = byId.get(row.id);
+    if (!script) continue;
+    unique.push(Object.freeze({ ...script, score: row.score }));
+  }
+  return Object.freeze(unique);
 }
 
 export function rankScripts(
@@ -182,27 +178,14 @@ export function rankScripts(
   dense: readonly RetrievalRank[] | null = null,
 ): readonly RankedRetrieval[] {
   if (scripts.length === 0) return Object.freeze([]);
-  const index = buildRetrievalIndex(scripts);
+  const index = buildBm25Index(toDocuments(scripts), characterUnigramBigramTerms);
   const queryTerms = termsOf(expandQuery(query, slots));
   if (queryTerms.length === 0) return Object.freeze([]);
-  const head = rankedList(queryTerms, index, { title: true, question: true, answer: false });
+  const head = rankLane(queryTerms, index, HEAD_WEIGHTS);
   const body = dense && dense.length > 0
-    ? dense
-    : rankedList(queryTerms, index, { title: false, question: false, answer: true });
-  const fused = rrf([head, body]);
-  const byId = new Map(index.docs.map((doc) => [doc.script.scriptId, doc.script]));
-  const ordered = [...fused.entries()]
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
-  const unique: RankedRetrieval[] = [];
-  const titles = new Set<string>();
-  for (const [scriptId, score] of ordered) {
-    const script = byId.get(scriptId);
-    if (!script || titles.has(script.title)) continue;
-    titles.add(script.title);
-    unique.push(Object.freeze({ ...script, score }));
-    if (unique.length >= limit) break;
-  }
-  return Object.freeze(unique);
+    ? dense.map((row) => ({ id: row.scriptId, rank: row.rank }))
+    : rankLane(queryTerms, index, ANSWER_WEIGHTS);
+  return materialize(fuseReciprocalRanks([head, body], RRF_K), scripts, limit);
 }
 
 export function rankScriptsMulti(
@@ -213,27 +196,29 @@ export function rankScriptsMulti(
 ): readonly RankedRetrieval[] {
   const uniqueQueries = [...new Set(queries.map((item) => item.trim()).filter((item) => item.length > 0))];
   if (uniqueQueries.length === 0) return Object.freeze([]);
-  if (uniqueQueries.length === 1) return rankScripts(uniqueQueries[0] ?? '', scripts, limit, analyzeQuery(uniqueQueries[0] ?? ''), dense);
+  const first = uniqueQueries[0];
+  if (uniqueQueries.length === 1 && first !== undefined) {
+    return rankScripts(first, scripts, limit, analyzeQuery(first), dense);
+  }
   const rankedLists = uniqueQueries.map((query) => rankScripts(query, scripts, limit, analyzeQuery(query), dense));
   const lists = rankedLists.map((list) => list.map((row, index) => ({
-    scriptId: row.scriptId,
+    id: row.scriptId,
     rank: index + 1,
   })));
-  const fused = rrf(lists);
   const byId = new Map<string, RankedRetrieval>();
   for (const list of rankedLists) {
     for (const row of list) if (!byId.has(row.scriptId)) byId.set(row.scriptId, row);
   }
-  const ordered = [...fused.entries()]
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+  const selected = takeUniqueByKey(
+    fuseReciprocalRanks(lists, RRF_K),
+    [...byId.values()].map((row) => ({ id: row.scriptId, dedupeKey: row.title })),
+    limit,
+  );
   const unique: RankedRetrieval[] = [];
-  const titles = new Set<string>();
-  for (const [scriptId, score] of ordered) {
-    const script = byId.get(scriptId);
-    if (!script || titles.has(script.title)) continue;
-    titles.add(script.title);
-    unique.push(Object.freeze({ ...script, score }));
-    if (unique.length >= limit) break;
+  for (const row of selected) {
+    const script = byId.get(row.id);
+    if (!script) continue;
+    unique.push(Object.freeze({ ...script, score: row.score }));
   }
   return Object.freeze(unique);
 }
