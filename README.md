@@ -54,7 +54,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 | 选择 Mac / API / WSL 开发端口并验证 | [开发端口 How-to](docs/how-to-development-ports.md) |
 | 查端口、环境边界、发布软链和远端磁盘占用 | [运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) · [为什么要分环境](docs/explanation-environment-boundaries.md) |
 | 工程流程、打包签名、文档生命周期 | [workflow](docs/reference-engineering-workflow.md) · [signing](docs/reference-packaging-and-signing.md) · [lifecycle](docs/reference-document-lifecycle.md) |
-| 查看本轮开发体验、安全和远端仓库诊断（partial） | [2026-10-01 审计](docs/reviews/2026-10-01-devex-security-audit.md) |
+| 查看本轮开发体验、安全、架构和远端仓库诊断 | [2026-10-02 审计](docs/reviews/2026-10-02-docs-architecture-security-audit.md) · [2026-10-01 审计](docs/reviews/2026-10-01-devex-security-audit.md) |
 | 当前一期任务与延后债 | [执行清单](docs/plans/2026-09-06-execution-goal.md) · [TODOS](TODOS.md) · [CHANGELOG](CHANGELOG.md) |
 | 合同 / API / 数据库包 README | [contracts](packages/contracts/README.md) · [api](apps/api/README.md) · [database](packages/database/README.md) |
 | 其它现行参考 | [组织已审证据](docs/explanation-org-review-evidence.md) · [adapter 衔接](docs/reference-api-adapter-handoff.md) · [抽出模块](docs/reference-extracted-module-contracts.md) · [API 配置](docs/reference-api-runtime-config.md) · [上游合同](contracts/upstream/customer-agent/README.md) · [失败安全](docs/explanation-failure-safe-lifecycle.md) · [M5 勾选](docs/how-to-verify-macos-m5.md) · [搜索实验](apps/api/experiments/search-decision/README.md) · [第三方许可](apps/desktop/THIRD_PARTY_NOTICES.md) |
@@ -70,7 +70,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
 - `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是独立 Node 服务，当前只允许 loopback。无 `feishu.env` 时仍是 mock auth；有仓外 `feishu.env` 时本机可走飞书 OAuth，账号走 loopback 口令服务，公网 identity 用独立 HTTPS 主机（当前 how-to 为 `agent-pass.jianghua.site`）。合成 `search/adoption/escalate` 事务仍在。显式 loopback profile 下 D1–D5 桌面 adapter 已接线；登录后的查询主链是本地 BM25 + 仓外 origin 分文件 embedding + RRF 与可选 MiniMax，有 hydrate 快照时不打 leftover `/v1/search`。`packages/database` 是 W4 的离线 migration 控制面，不创建连接、不读取环境变量，只有其显式 testkit 作为 API 集成测试的 devDependency，生产 API 不导入 migration 控制面。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
 - `packages/contracts` 是正式 OpenAPI 的唯一产品仓编译边界；它只从已验证快照生成 bundle、TypeScript 类型与 component runtime validator，不拥有 HTTP、DB、桌面接线或运行时激活状态。
-- `packages/database` 是正式 DDL 的唯一产品仓 migration 边界；它从同一受锁快照确定性生成 `0001..0014`、内嵌 catalogue 与私有账本，并封装 `status → plan → apply → verify`。当前只在一次性本机 PG15 cluster 中使用合成数据验证，不等于已有业务数据库或生产连接。
+- `packages/database` 是正式 DDL 的唯一产品仓 migration 边界；它从同一受锁快照确定性生成 `0001..0019`、内嵌 catalogue 与私有账本，并封装 `status → plan → apply → verify`。当前只在一次性本机 PG15 cluster 中使用合成数据验证，不等于已有业务数据库或生产连接。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `apps/desktop/assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `apps/desktop/fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `apps/desktop/assets/app-icon.png`（近白 squircle）、`apps/desktop/build/icon.png` 与 `apps/desktop/build/icon.ico`；在 macOS 上还会生成 `apps/desktop/build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Git 合成运行时；仓内话术与看板继续全部使用虚构合成内容。
 
@@ -224,8 +224,8 @@ pnpm test:e2e
 
 | 命令 | 实际覆盖 | 不要误读成 |
 | --- | --- | --- |
-| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；150 个 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
-| `pnpm db:migrations:check` / `pnpm test:db` | 已验证 DDL 被确定性分成十二段且来源完整覆盖；PG15 临时 cluster 中的 v1.15 clean install、精确 v1.12/v1.13/v1.14→v1.15 后缀升级、双客户端串行化、账本/DDL 原子回滚、精确 ACL/函数/触发器/seed 漂移拒绝与 SQLSTATE 后验通过 | 已连接真实业务库、备份恢复或生产就绪 |
+| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；165 个 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
+| `pnpm db:migrations:check` / `pnpm test:db` | 已验证 DDL catalogue 的 `0001..0019` 顺序与来源覆盖；PG15 临时 cluster 中的受锁 migration、账本/DDL 原子回滚、精确 ACL/函数/触发器/seed 漂移拒绝与 SQLSTATE 后验通过 | 已连接真实业务库、备份恢复或生产就绪 |
 | `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
 | `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |
 | `pnpm test:e2e:float` | 先 `pnpm build`，再跑 `smoke.spec.ts` 里 `@float` | 不是全量 E2E，也不是真实台前调度验收 |
