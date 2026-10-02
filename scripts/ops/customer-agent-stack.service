@@ -1,0 +1,29 @@
+[Unit]
+Description=Customer Agent product stack
+Documentation=file:///srv/customer-agent/current/docs/how-to-run-backend-on-hangzhou.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=customer-agent
+Group=customer-agent
+WorkingDirectory=/srv/customer-agent/current
+
+Environment=CUSTOMER_AGENT_STACK_ROOT=/srv/customer-agent/stack
+Environment=CUSTOMER_AGENT_PG15_BIN=/opt/pg15/usr/lib/postgresql/15/bin
+Environment=CUSTOMER_AGENT_DESKTOP_USERDATA=/srv/customer-agent/desktop-profile
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+ExecStart=/usr/local/bin/node /srv/customer-agent/current/scripts/synthetic-stack/stack.ts start --foreground --no-seed
+ExecStop=/usr/local/bin/node /srv/customer-agent/current/scripts/synthetic-stack/stack.ts stop
+
+# The stack process owns identity, API and worker in foreground mode. If any
+# child exits, stack.ts exits non-zero and systemd restarts the whole group.
+Restart=on-failure
+RestartSec=5s
+KillMode=control-group
+TimeoutStartSec=420s
+TimeoutStopSec=120s
+
+[Install]
+WantedBy=multi-user.target

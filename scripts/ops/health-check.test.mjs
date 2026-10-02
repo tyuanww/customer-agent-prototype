@@ -190,6 +190,21 @@ test('recovery clears the counter so a later outage alerts again', async () => {
 const watchdogScript = fileURLToPath(new URL('./customer-agent-stack-watchdog.sh', import.meta.url));
 const watchdogService = fileURLToPath(new URL('./customer-agent-stack-watchdog.service', import.meta.url));
 const watchdogTimer = fileURLToPath(new URL('./customer-agent-stack-watchdog.timer', import.meta.url));
+const stackService = fileURLToPath(new URL('./customer-agent-stack.service', import.meta.url));
+
+test('the production stack stays in the foreground and restarts on child failure', () => {
+  const unit = readFileSync(stackService, 'utf8');
+  assert.match(unit, /Type=simple/);
+  assert.match(unit, /--foreground --no-seed/);
+  assert.match(unit, /Environment=CUSTOMER_AGENT_PG15_BIN=\/opt\/pg15\/usr\/lib\/postgresql\/15\/bin/);
+  assert.match(unit, /Environment=CUSTOMER_AGENT_DESKTOP_USERDATA=\/srv\/customer-agent\/desktop-profile/);
+  assert.match(unit, /ExecStop=\/usr\/local\/bin\/node \/srv\/customer-agent\/current\/scripts\/synthetic-stack\/stack\.ts stop/);
+  assert.match(unit, /Restart=on-failure/);
+  assert.match(unit, /KillMode=control-group/);
+  assert.match(unit, /TimeoutStartSec=420s/);
+  assert.match(unit, /TimeoutStopSec=120s/);
+  assert.doesNotMatch(unit, /RemainAfterExit/);
+});
 
 test('the watchdog never uses flock, which may not exist on the host', () => {
   const body = readFileSync(watchdogScript, 'utf8');
@@ -207,16 +222,22 @@ test('the watchdog restarts via the stack unit\'s own command, and does not rese
   // start, not restart: the survivors must not be disturbed.
   assert.match(body, /node "\$STACK_ENTRY" start --no-seed/);
   assert.doesNotMatch(body, /"\$STACK_ENTRY" restart/);
+  // If systemd has stopped the foreground unit, never fall back to detached
+  // children: that would recreate the old unsupervised-process failure mode.
+  assert.match(body, /systemctl is-active --quiet "\$STACK_UNIT"/);
+  assert.match(body, /leaving process ownership to systemd/);
 });
 
 test('the watchdog unit carries the same environment the stack unit does', () => {
   const unit = readFileSync(watchdogService, 'utf8');
   assert.match(unit, /Type=oneshot/);
   assert.match(unit, /User=customer-agent/);
+  assert.match(unit, /Environment=CUSTOMER_AGENT_PG15_BIN=\/opt\/pg15\/usr\/lib\/postgresql\/15\/bin/);
+  assert.match(unit, /Environment=CUSTOMER_AGENT_DESKTOP_USERDATA=\/srv\/customer-agent\/desktop-profile/);
   // PATH is not inherited; node lives in /usr/local/bin on that host.
   assert.match(unit, /Environment=PATH=\/usr\/local\/bin:/);
   // A repair writes under the stack root and must be allowed to.
-  assert.match(unit, /ReadWritePaths=\/srv\/customer-agent\/stack/);
+  assert.match(unit, /ReadWritePaths=\/srv\/customer-agent\/stack \/srv\/customer-agent\/desktop-profile/);
   assert.match(unit, /StateDirectory=customer-agent/);
 });
 

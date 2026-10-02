@@ -131,7 +131,7 @@ describe('stack profile', () => {
     const desktop = stack.slice(stack.indexOf('function commandDesktop()'));
     assert.ok(desktop.includes('writeDesktopPackagedProfile(profile)'), 'desktop handoff must refresh the packaged profile');
     assert.ok(stack.includes("case 'packaged-profile': commandPackagedProfile()"), 'packaged-profile must print the userData file path');
-    assert.ok(stack.includes('<start|stop|restart|status|destroy|desktop|packaged-profile|anomaly>'));
+    assert.match(stack, /<start(?: \[--no-seed\] \[--foreground\])?\|stop\|restart\|status\|destroy\|desktop\|packaged-profile\|anomaly>/u);
     assert.ok(written.includes('desktopPackagedProfilePath()'), 'packaged profile path must be resolved at write time');
   });
 
@@ -688,6 +688,18 @@ describe('stack start modes', () => {
       stack.includes('search self-check skipped'),
       'the search self-check asserts the seeded catalog, so it has to be skipped too',
     );
+  });
+
+  it('keeps production children attached for systemd supervision', () => {
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    assert.ok(stack.includes("detached: mode === 'detached'"), 'foreground mode must not detach children');
+    assert.ok(stack.includes("if (mode === 'detached') child.unref()"), 'only the local mode may unref children');
+    assert.ok(stack.includes("process.argv.includes('--foreground')"), 'production mode must be an explicit flag');
+    assert.ok(stack.includes('superviseForegroundProcesses(processes.children)'), 'foreground mode must wait on child exits');
+    assert.ok(stack.includes('foreground start cannot adopt existing processes'), 'foreground mode must fail closed on an already running stack');
+    assert.ok(stack.includes("const FOREGROUND_PROCESS_NAME = 'stack-foreground'"), 'foreground mode must publish an ownership record');
+    assert.ok(stack.includes('processCommandLine(process.pid)'), 'foreground ownership must survive a clock correction via the real command line');
+    assert.ok(stack.includes('foreground supervisor already running; leaving child ownership to systemd'), 'detached repair must not race a foreground restart');
   });
 });
 

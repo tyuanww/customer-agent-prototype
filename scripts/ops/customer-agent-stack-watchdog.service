@@ -11,6 +11,8 @@ User=customer-agent
 Group=customer-agent
 
 Environment=CUSTOMER_AGENT_STACK_ROOT=/srv/customer-agent/stack
+Environment=CUSTOMER_AGENT_PG15_BIN=/opt/pg15/usr/lib/postgresql/15/bin
+Environment=CUSTOMER_AGENT_DESKTOP_USERDATA=/srv/customer-agent/desktop-profile
 Environment=CUSTOMER_AGENT_READY_URL=http://127.0.0.1:43115/ready
 Environment=CUSTOMER_AGENT_STACK_ENTRY=/srv/customer-agent/current/scripts/synthetic-stack/stack.ts
 # node lives in /usr/local/bin, and PATH is not inherited from the unit above.
@@ -30,7 +32,7 @@ RestrictSUIDSGID=true
 
 # The watchdog runs a repair, so it must be able to reach the stack's own port and
 # the PG socket under the stack root; StateDirectory covers the lock file.
-ReadWritePaths=/srv/customer-agent/stack
+ReadWritePaths=/srv/customer-agent/stack /srv/customer-agent/desktop-profile
 ReadOnlyPaths=/srv/customer-agent/current
 
 [Install]

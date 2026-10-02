@@ -64,7 +64,7 @@ fi
 /srv/customer-agent/stack/                # PG、对象、日志和私有 env
 ```
 
-生产 unit 当前为 `customer-agent-stack.service`，运行身份是非 root 的 `customer-agent`。代码目录保留 Git 元数据和依赖，便于回滚和复核；生产进程不应从工作树分支直接启动。
+生产 unit 当前为 `customer-agent-stack.service`，运行身份是非 root 的 `customer-agent`；仓库中的模板使用 `Type=simple` 和 `stack.ts start --foreground --no-seed`，由 systemd 监督 identity、API、worker 的退出并按 `Restart=on-failure` 重启。代码目录保留 Git 元数据和依赖，便于回滚和复核；生产进程不应从工作树分支直接启动。
 
 部署完成后核对：
 
