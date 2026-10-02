@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Restarts the customer-agent stack's own child processes when they die.
+# Repairs the customer-agent stack when its dependencies are not ready.
 #
-# Why this is a separate unit rather than a systemd Restart=: the stack unit is
-# Type=oneshot and stack.ts detaches four children (postgres, api, worker,
-# identity) itself. systemd therefore does NOT supervise them — when the API dies
-# alone the unit still reads `active` while /ready is already 503. There is nothing
-# for Restart= to restart.
+# The production stack unit now uses stack.ts --foreground and systemd
+# Restart=on-failure to supervise identity, API and worker exits. This watchdog
+# remains a separate readiness repair path for a stack whose processes are alive
+# but whose database, storage or content checks are not ready.
 #
 # stack.ts start is idempotent: it checks whether each child is live and starts
 # only the missing ones, so calling it against a half-dead stack is safe and does
@@ -19,6 +18,7 @@ set -u
 STACK_ROOT="${CUSTOMER_AGENT_STACK_ROOT:-/srv/customer-agent/stack}"
 READY_URL="${CUSTOMER_AGENT_READY_URL:-http://127.0.0.1:43115/ready}"
 STACK_ENTRY="${CUSTOMER_AGENT_STACK_ENTRY:-/srv/customer-agent/current/scripts/synthetic-stack/stack.ts}"
+STACK_UNIT="${CUSTOMER_AGENT_STACK_UNIT:-customer-agent-stack.service}"
 LOCK_FILE="${CUSTOMER_AGENT_WATCHDOG_LOCK:-/var/lib/customer-agent/stack-watchdog.lock}"
 CURL_TIMEOUT=10
 
@@ -57,6 +57,10 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 if [ ! -f "$STACK_ENTRY" ]; then
   log "FATAL stack entry not found: $STACK_ENTRY"
+  exit 1
+fi
+if command -v systemctl >/dev/null 2>&1 && ! systemctl is-active --quiet "$STACK_UNIT"; then
+  log "stack unit is not active ($STACK_UNIT); leaving process ownership to systemd"
   exit 1
 fi
 

@@ -42,6 +42,7 @@
 | PG 数据 | `/srv/customer-agent/stack/data/pg15/` |
 | PG socket | `/srv/customer-agent/stack/data/pg15-socket/` |
 | 对象存储 | `/srv/customer-agent/stack/objects/` |
+| 桌面 profile | `/srv/customer-agent/desktop-profile/`（栈启动时写入 loopback origin） |
 | 日志 | `/srv/customer-agent/stack/logs/`，以及 `journalctl -u customer-agent-stack` |
 | 库备份 | `/srv/customer-agent/backups/` |
 | 隧道 token | `/etc/cloudflared/customer-agent-hangzhou.token`（root 0600） |
@@ -200,7 +201,7 @@ DNS 是两条 CNAME，改 `content` 即可：
 ```
 Windows 开机/登录
   → 计划任务拉起 WSL（目前靠 WSL-Start-Dockerd 的 logon trigger）
-    → systemd 起 customer-agent-stack（PG15 + API + worker + 口令身份）
+    → systemd 起 customer-agent-stack（前台 supervisor + PG15 + API + worker + 口令身份）
     → systemd 起 customer-agent-tunnel（cloudflared）
 ```
 
@@ -210,7 +211,7 @@ Windows 开机/登录
 
 ## 已知缺口（都在 `TODOS.md`）
 
-- **子进程崩溃不自愈**：单元是 `Type=oneshot`，`stack.ts` 自己把四个进程 detach 出去，systemd 不监督它们。API 单独崩掉时单元仍显示 `active`，`/ready` 却已经是 503。
+- **依赖异常仍需 watchdog / 告警**：`customer-agent-stack.service` 已使用 `Type=simple` 前台模式，identity、API 或 worker 退出会触发 `Restart=on-failure` 重启整组；但进程都还活着而数据库、存储或内容就绪失败时，仍由 watchdog 和健康告警处理。
 - **单点**：整套在单台 WSL 桌面机上，而那台机器同时在日常使用。
 - **没有告警**：上面每一条失效，办公机那边都只表现为「登录不了」，没有别人会知道。
   探针与 systemd timer 已写在 `docs/how-to-health-probe-hangzhou.md`（探 `/ready`，非 `/health`），**但尚未装到机器上**。

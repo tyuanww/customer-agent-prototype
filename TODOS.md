@@ -35,14 +35,14 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **What:** 让 `stack.ts` 支持前台模式，由 systemd 直接监督 api / worker / identity，任一个退出即重启。
 
-**Why:** 杭州的 systemd 单元是 `Type=oneshot` + `RemainAfterExit`，因为 `stack.ts` 自己把四个进程 detach 出去。oneshot 不监督子进程，所以 API 单独崩掉时单元仍显示 `active`，`/ready` 掉到 503 而 systemd 一无所知。这是「杭州做服务器」留下的已知缺口，不是缺陷。
+**Why:** 旧的 `Type=oneshot` 单元无法监督 `stack.ts` detach 出去的子进程，API 单独崩掉时单元仍显示 `active`。生产入口现在增加 `--foreground` 模式，由前台 supervisor 持有 identity、API、worker；任一子进程异常退出都会让栈失败，交给 systemd `Restart=on-failure` 重启整组。
 
-**Context:** 从 `scripts/synthetic-stack/stack.ts` 的 `spawnLogged` / `startProcesses` 入手，改成前台 `exec` 并由单元 `Type=simple` 接管；合成路径共用这段代码，所以要保证默认路径行为不变。约 3 天 / CC 约 4 小时。
+**Context:** `scripts/synthetic-stack/stack.ts` 增加前台启动和子进程监督；`scripts/ops/customer-agent-stack.service` 固化 `Type=simple`、`Restart=on-failure`、`KillMode=control-group`。普通 `start/stop/restart` 仍保留 detached 行为，Mac 合成开发路径不变。杭州机器的 unit 安装和真实故障演练仍需单独执行。
 
 **Effort:** M
 **Priority:** P2
 **Depends on:** 杭州迁移完成
-**Status:** OPEN
+**Status:** 已实现 · 待杭州安装与子进程故障演练
 
 ### 杭州迁移 · 去掉单点（HA）
 

@@ -1,7 +1,7 @@
 # 健康探针与告警（杭州）
 
-`docs/how-to-run-backend-on-hangzhou.md` 的「已知缺口」里写了三条：子进程崩溃不自愈、单点、**没有告警**。
-本文件覆盖**前两条的告警与自愈**。去单点不在范围内。
+`docs/how-to-run-backend-on-hangzhou.md` 的「已知缺口」里曾写了三条：子进程崩溃不自愈、单点、**没有告警**。
+前台栈单元已经覆盖子进程崩溃重启；本文件覆盖依赖异常时的告警与自愈。去单点不在范围内。
 
 > **状态：仓库里已有脚本与单元文件，但杭州机器上尚未安装。** 下面的命令需要你在机器上执行。
 
@@ -10,11 +10,11 @@
 | | 做什么 | 出问题时 |
 | --- | --- | --- |
 | `customer-agent-health-check` | 探 `/ready`，连续失败 3 次**发飞书** | 通知人 |
-| `customer-agent-stack-watchdog` | 探 `/ready`，不 ok 就**跑 `stack.ts start`** 修复 | 自己修 |
+| `customer-agent-stack-watchdog` | 探 `/ready`，依赖异常时**跑 `stack.ts start`** 修复 | 自己修 |
 
-**为什么不能靠 systemd 的 `Restart=`**：栈单元是 `Type=oneshot`，`stack.ts` 自己把四个子进程 detach 出去，systemd **根本不监督它们**。API 单独崩掉时单元仍显示 `active` 而 `/ready` 已是 503 —— 没有东西可供 `Restart=` 重启。
+**子进程崩溃由栈单元负责**：`customer-agent-stack.service` 使用 `Type=simple`，以 `stack.ts start --foreground --no-seed` 启动。identity、API 或 worker 任一异常退出，前台 supervisor 会停止剩余进程并以失败退出，systemd 的 `Restart=on-failure` 随后重启整组。watchdog 继续保留，用于进程都还活着但 `/ready` 依赖不完整的情况。
 
-**为什么看门狗可以这么短**：`stack.ts start` 本身幂等（只启动缺的那个进程），所以对着半死的栈调用它是安全的，也不会打扰还活着的进程。
+**为什么看门狗仍然调用 `stack.ts start`**：主 unit 仍 active 时，普通 `start` 是 detached、幂等的本机依赖修复入口；它只启动缺失的进程，不会打扰活着的进程。看门狗先检查主 unit，主 unit 已 inactive 就退出，把进程所有权留给 systemd，避免重新产生脱离 supervisor 的进程。生产 unit 使用独立的 `--foreground` 模式，不能在已有生产 supervisor 上重复启动。
 
 ## 为什么探的是 `/ready` 而不是 `/health`
 
@@ -25,8 +25,8 @@
 | `/health` | 静态。只回 `{status:'ok', service, version}`，**不碰数据库、认证、存储**。依赖全挂时它照样回 200。 |
 | `/ready` | 依赖不全就回 **503** 并带 `retry-after: 1`。 |
 
-那台机器已知的失效方式恰好是：**API 单独崩掉，systemd 单元仍显示 `active`，而 `/ready` 已经是 503**。
-所以探 `/health` 会在真正的故障期间一直报平安 —— 你会以为自己有监控，其实没有。
+历史上那台机器的失效方式是：**API 单独崩掉，systemd 单元仍显示 `active`，而 `/ready` 已经是 503**；现在这类子进程退出由前台 supervisor 交给 systemd 重启。探针继续覆盖另一类故障：进程都活着，但依赖没有就绪。
+所以仍然必须探 `/ready`，探 `/health` 会在依赖故障期间一直报平安 —— 你会以为自己有监控，其实没有。
 脚本里探的是 `/ready`，并且有测试钉住这个选择。
 
 ## 文件
@@ -36,6 +36,7 @@
 | `scripts/ops/customer-agent-health-check.sh` | 探针。连续失败 3 次发飞书告警。 |
 | `scripts/ops/customer-agent-health-check.service` | oneshot，以 `customer-agent` 身份运行。 |
 | `scripts/ops/customer-agent-health-check.timer` | 开机 2 分钟后起，之后每分钟一次。 |
+| `scripts/ops/customer-agent-stack.service` | `Type=simple` 前台栈单元；子进程退出时由 systemd 重启整组。 |
 | `scripts/ops/customer-agent-stack-watchdog.sh` | 探 `/ready`，不 ok 就跑 `stack.ts start`。 |
 | `scripts/ops/customer-agent-stack-watchdog.service` | oneshot，同上身份。 |
 | `scripts/ops/customer-agent-stack-watchdog.timer` | 开机 4 分钟后起，之后每分钟一次。 |
@@ -60,6 +61,10 @@ sudo chmod 600 /srv/customer-agent/monitor.env
 ### 2. 放脚本与单元文件
 
 ```bash
+sudo install -m 0644 scripts/ops/customer-agent-stack.service /etc/systemd/system/
+sudo install -m 0755 scripts/ops/customer-agent-stack-watchdog.sh /srv/customer-agent/scripts/
+sudo install -m 0644 scripts/ops/customer-agent-stack-watchdog.service /etc/systemd/system/
+sudo install -m 0644 scripts/ops/customer-agent-stack-watchdog.timer /etc/systemd/system/
 sudo install -m 0755 scripts/ops/customer-agent-health-check.sh /srv/customer-agent/scripts/
 sudo install -m 0644 scripts/ops/customer-agent-health-check.service /etc/systemd/system/
 sudo install -m 0644 scripts/ops/customer-agent-health-check.timer   /etc/systemd/system/
@@ -69,6 +74,7 @@ sudo systemctl daemon-reload
 ### 3. 启用
 
 ```bash
+sudo systemctl enable --now customer-agent-stack.service
 sudo systemctl enable --now customer-agent-health-check.timer
 sudo systemctl enable --now customer-agent-stack-watchdog.timer
 ```
