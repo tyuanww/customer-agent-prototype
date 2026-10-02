@@ -42,7 +42,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** 杭州迁移完成
-**Status:** 已实现 · 杭州已安装并完成子进程故障演练；健康告警 timer 待补齐 `monitor.env`
+**Status:** 已实现 · 杭州已安装并完成子进程故障演练；健康告警 timer 已启用并完成一次告警演练（2026-10-02）
 
 ### 杭州迁移 · 去掉单点（HA）
 

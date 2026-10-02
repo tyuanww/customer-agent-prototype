@@ -3,7 +3,7 @@
 `docs/how-to-run-backend-on-hangzhou.md` 的「已知缺口」里曾写了三条：子进程崩溃不自愈、单点、**没有告警**。
 前台栈单元已经覆盖子进程崩溃重启；本文件覆盖依赖异常时的告警与自愈。去单点不在范围内。
 
-> **状态（2026-10-02）：watchdog 已安装并在杭州 WSL 运行。** `customer-agent-stack.service` 使用前台 supervisor，watchdog timer 已启用；本次未启用健康告警 timer，因为机器上还没有 `/srv/customer-agent/monitor.env`。下面的安装命令保留给新机器或重装时复用。
+> **状态（2026-10-02）：watchdog 与健康告警 timer 均已安装并在杭州 WSL 运行。** `customer-agent-stack.service` 使用前台 supervisor；`/srv/customer-agent/monitor.env` 已按 `customer-agent:customer-agent 0600` 配置，健康告警已完成一次告警演练。下面的安装命令保留给新机器或重装时复用。
 
 ## 两个单元，分工不同
 
