@@ -43,6 +43,6 @@
 
 ## 相关目录
 
-- [docs/reviews](../reviews/) — 带日期的审查材料（2 个）
+- [docs/reviews](../reviews/) — 带日期的审查材料（4 个）
 - [docs/acceptance](../acceptance/) — 检索验收 JSON 与 manifest
 - [内容导入与发布合同](../reference-content-publish.md) — 现行实现参考
