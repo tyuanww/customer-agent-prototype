@@ -412,7 +412,7 @@ Windows 包仍是未签名包。包结构后验不等于真实安装、企业策
 
 ### 生产 readiness 失败
 
-先只读检查 `systemctl is-active`、`ss` 和 `journalctl -u customer-agent-stack.service -n 80 --no-pager`。不要直接重播 seed、删除 PG 数据或覆盖 `api.env`。如果只是 API 子进程退出，当前 watchdog 仍是已知缺口，按 [TODOS.md](../TODOS.md) 的运维债处理。
+先只读检查 `systemctl is-active`、`ss` 和 `journalctl -u customer-agent-stack.service -n 80 --no-pager`。不要直接重播 seed、删除 PG 数据或覆盖 `api.env`。如果只是 API 子进程退出，先确认 `customer-agent-stack.service` 的前台 supervisor 和 `Restart=on-failure` 已生效；依赖仍未就绪时再检查 watchdog 和健康告警。
 
 ### 切换脚本中断后的手动回滚
 

@@ -10,6 +10,9 @@
  *       Implied, and not needed, when content.env names its own database - a
  *       stack that declares a real database is never seeded, so `restart` cannot
  *       re-enter the seed path just because the flag was left off the command.
+ *   node scripts/synthetic-stack/stack.ts start --foreground --no-seed
+ *       production mode: keep identity, API and worker attached to this process;
+ *       an unexpected child exit fails the service so systemd can restart the group.
  *   node scripts/synthetic-stack/stack.ts stop      stop the processes this stack owns
  *   node scripts/synthetic-stack/stack.ts restart
  *   node scripts/synthetic-stack/stack.ts status    report readiness of each piece
@@ -35,6 +38,7 @@
  *                Derived values - DSNs, paths, ports - are refused, not merged.
  */
 import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { closeSync, existsSync, openSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +56,7 @@ import {
   SyntheticCluster, clusterVersionText, ensureDatabase, ensureLoginRoles, writeClusterMarker,
 } from './postgres.ts';
 import {
-  forgetProcess, isOwnedProcessLive, portInUse, readProcess, recordProcess, stopProcess, waitForHttp,
+  forgetProcess, isOwnedProcessLive, portInUse, processCommandLine, readProcess, recordProcess, stopProcess, waitForHttp,
 } from './process.ts';
 import { loginAs, seedContentIfMissing } from './seed.ts';
 import { anomalyStatus, revokeSessions, suspendSource } from './anomaly.ts';
@@ -62,6 +66,7 @@ const API_ENTRY = path.join(repositoryRoot, 'apps/api/dist/main.js');
 const WORKER_ENTRY = path.join(repositoryRoot, 'apps/api/dist/content-worker-main.js');
 const IDENTITY_ENTRY = fileURLToPath(new URL('./identity-provider.ts', import.meta.url));
 const PASSWORD_IDENTITY_ENTRY = fileURLToPath(new URL('./password-identity-server.ts', import.meta.url));
+const FOREGROUND_PROCESS_NAME = 'stack-foreground';
 
 function log(message: string): void {
   console.info(`[stack] ${message}`);
@@ -71,7 +76,33 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
-function spawnLogged(name: string, command: string, args: readonly string[], environment: NodeJS.ProcessEnv): number {
+type ProcessLaunchMode = 'detached' | 'foreground';
+
+type ChildExit = Readonly<{
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  error?: Error;
+}>;
+
+type SpawnedProcess = Readonly<{
+  name: string;
+  pid: number;
+  child: ChildProcess;
+  exited: Promise<ChildExit>;
+}>;
+
+type StartProcessesResult = Readonly<{
+  messages: readonly string[];
+  children: readonly SpawnedProcess[];
+}>;
+
+function spawnLogged(
+  name: string,
+  command: string,
+  args: readonly string[],
+  environment: NodeJS.ProcessEnv,
+  mode: ProcessLaunchMode,
+): SpawnedProcess {
   ensureStackDirectories();
   const out = openSync(path.join(LOG_DIRECTORY, `${name}.log`), 'a');
   try {
@@ -79,12 +110,32 @@ function spawnLogged(name: string, command: string, args: readonly string[], env
       cwd: repositoryRoot,
       env: environment,
       stdio: ['ignore', out, out],
-      detached: true,
+      detached: mode === 'detached',
     });
     if (child.pid === undefined) fail(`${name}: spawn produced no pid`);
-    child.unref();
-    recordProcess(name, child.pid, `${command} ${args.join(' ')}`);
-    return child.pid;
+    const exited = new Promise<ChildExit>((resolve) => {
+      let settled = false;
+      const settle = (result: ChildExit): void => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+      child.once('error', (error: Error) => {
+        log(`${name} process error: ${error.message}`);
+        settle({ code: null, signal: null, error });
+      });
+      child.once('exit', (code: number | null, signal: NodeJS.Signals | null) => {
+        settle({ code, signal });
+      });
+    });
+    if (mode === 'detached') child.unref();
+    try {
+      recordProcess(name, child.pid, `${command} ${args.join(' ')}`);
+    } catch (error) {
+      child.kill('SIGTERM');
+      throw error;
+    }
+    return Object.freeze({ name, pid: child.pid, child, exited });
   } finally {
     closeSync(out);
   }
@@ -146,6 +197,21 @@ function liveProcessNames(): readonly string[] {
   });
 }
 
+function foregroundSupervisorLive(): boolean {
+  const record = readProcess(FOREGROUND_PROCESS_NAME);
+  if (record === undefined) return false;
+  if (isOwnedProcessLive(record)) return true;
+  forgetProcess(FOREGROUND_PROCESS_NAME);
+  return false;
+}
+
+function claimForegroundSupervisor(): void {
+  if (foregroundSupervisorLive()) fail('foreground supervisor is already running');
+  const command = processCommandLine(process.pid)
+    ?? [process.execPath, ...process.argv.slice(1)].join(' ');
+  recordProcess(FOREGROUND_PROCESS_NAME, process.pid, command);
+}
+
 /**
  * The content-side API environment. With no `content.env` and no Feishu config
  * these are exactly the constants the synthetic stack has always used, so the
@@ -174,10 +240,25 @@ function contentOverrides(
   return overrides;
 }
 
-async function startProcesses(profile: StackProfile, content: ContentStackConfig | undefined): Promise<string[]> {
-  const started: string[] = [];
+async function startProcesses(
+  profile: StackProfile,
+  content: ContentStackConfig | undefined,
+  mode: ProcessLaunchMode,
+): Promise<StartProcessesResult> {
+  const messages: string[] = [];
   const live = new Set(liveProcessNames());
   const spawned: string[] = [];
+  const children: SpawnedProcess[] = [];
+  if (mode === 'detached' && foregroundSupervisorLive()) {
+    messages.push('foreground supervisor already running; leaving child ownership to systemd');
+    for (const name of ['identity', 'api', 'worker']) {
+      messages.push(live.has(name) ? `${name} already running` : `${name} restart delegated to systemd`);
+    }
+    return Object.freeze({ messages: Object.freeze(messages), children: Object.freeze(children) });
+  }
+  if (mode === 'foreground' && live.size > 0) {
+    fail(`foreground start cannot adopt existing processes: ${[...live].sort().join(', ')}`);
+  }
   /** A failed start must not leave the pieces it just launched behind. */
   const cleanup = async (): Promise<void> => {
     for (const name of spawned.reverse()) {
@@ -198,42 +279,64 @@ async function startProcesses(profile: StackProfile, content: ContentStackConfig
       // to ~/.customer-agent-synthetic-stack. Passing it explicitly matters when the
       // operator set CUSTOMER_AGENT_STACK_ROOT: the child would otherwise look in the
       // default home path (and, with no fallback password, refuse to start).
-      const pid = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
-        { PATH: process.env.PATH, CUSTOMER_AGENT_STACK_ROOT: STACK_ROOT });
+      const processInfo = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
+        { PATH: process.env.PATH, CUSTOMER_AGENT_STACK_ROOT: STACK_ROOT }, mode);
+      if (mode === 'foreground') children.push(processInfo);
       spawned.push('identity');
-      started.push(`identity pid ${String(pid)}${feishu ? ' (password)' : ''}`);
+      messages.push(`identity pid ${String(processInfo.pid)}${feishu ? ' (password)' : ''}`);
     } else {
-      started.push('identity already running');
+      messages.push('identity already running');
     }
     await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
-    if (feishu) started.push(`feishu: ${feishu.clientId} → ${feishu.redirectUri}`);
+    if (feishu) messages.push(`feishu: ${feishu.clientId} → ${feishu.redirectUri}`);
     // Key names only: an operator checking "did production config land" needs the
     // list, and none of these keys' names are secret.
-    if (apiConfig) started.push(`api.env: ${Object.keys(apiConfig).sort().join(', ')}`);
+    if (apiConfig) messages.push(`api.env: ${Object.keys(apiConfig).sort().join(', ')}`);
 
     const environment = apiEnvironment(profile, overrides, feishu);
 
     if (!live.has('api')) {
-      const pid = spawnLogged('api', process.execPath, [API_ENTRY], environment);
+      const processInfo = spawnLogged('api', process.execPath, [API_ENTRY], environment, mode);
+      if (mode === 'foreground') children.push(processInfo);
       spawned.push('api');
-      started.push(`api pid ${String(pid)}`);
+      messages.push(`api pid ${String(processInfo.pid)}`);
     } else {
-      started.push('api already running');
+      messages.push('api already running');
     }
     await waitForHttp(`${profile.apiOrigin}/health`, { timeoutMs: 30_000 });
 
     if (!live.has('worker')) {
-      const pid = spawnLogged('worker', process.execPath, [WORKER_ENTRY], environment);
+      const processInfo = spawnLogged('worker', process.execPath, [WORKER_ENTRY], environment, mode);
+      if (mode === 'foreground') children.push(processInfo);
       spawned.push('worker');
-      started.push(`worker pid ${String(pid)}`);
+      messages.push(`worker pid ${String(processInfo.pid)}`);
     } else {
-      started.push('worker already running');
+      messages.push('worker already running');
     }
-    return started;
+    return Object.freeze({ messages: Object.freeze(messages), children: Object.freeze(children) });
   } catch (error) {
     await cleanup();
     throw error;
   }
+}
+
+async function superviseForegroundProcesses(children: readonly SpawnedProcess[]): Promise<never> {
+  if (children.length === 0) {
+    return new Promise<never>(() => undefined);
+  }
+  const firstExit = await Promise.race(children.map(async (processInfo) => ({
+    processInfo,
+    exit: await processInfo.exited,
+  })));
+  const detail = firstExit.exit.error
+    ? `error: ${firstExit.exit.error.message}`
+    : `code=${String(firstExit.exit.code)} signal=${String(firstExit.exit.signal)}`;
+  log(`foreground child ${firstExit.processInfo.name} exited (${detail}); stopping the remaining stack`);
+  for (const processInfo of [...children].reverse()) {
+    const result = await stopProcess(processInfo.name).catch((error: unknown) => `${processInfo.name}: cleanup failed (${String(error)})`);
+    log(result);
+  }
+  throw new Error(`foreground child ${firstExit.processInfo.name} exited unexpectedly`);
 }
 
 /** Wait for every readiness check to be `ok`, with a locatable failure reason. */
@@ -290,7 +393,7 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
   return Object.freeze(hits);
 }
 
-async function commandStart(): Promise<void> {
+async function runStart(foreground: boolean): Promise<void> {
   requireDist();
   ensureStackDirectories();
   // Read once: `resolveProfile` needs the database name and `contentOverrides`
@@ -330,7 +433,8 @@ async function commandStart(): Promise<void> {
 
   log(await ensureLoginRoles(cluster, profile.databaseName));
 
-  for (const step of await startProcesses(profile, content)) log(step);
+  const processes = await startProcesses(profile, content, foreground ? 'foreground' : 'detached');
+  for (const step of processes.messages) log(step);
   const ready = await waitReady(profile.apiOrigin);
   log(`ready: ${JSON.stringify(ready.checks)}`);
 
@@ -353,6 +457,24 @@ async function commandStart(): Promise<void> {
   log('');
   log('Stack is up. Launch the desktop client with:');
   log(`  ${desktopCommand(profile)}`);
+  if (foreground) {
+    log('Foreground supervisor is active; an unexpected child exit will fail this service.');
+    await superviseForegroundProcesses(processes.children);
+  }
+}
+
+async function commandStart(): Promise<void> {
+  const foreground = process.argv.includes('--foreground');
+  if (!foreground) {
+    await runStart(false);
+    return;
+  }
+  claimForegroundSupervisor();
+  try {
+    await runStart(true);
+  } finally {
+    forgetProcess(FOREGROUND_PROCESS_NAME);
+  }
 }
 
 function desktopCommand(profile: StackProfile): string {
@@ -462,7 +584,7 @@ async function main(): Promise<void> {
     case 'packaged-profile': commandPackagedProfile(); break;
     case 'anomaly': await commandAnomaly(process.argv[3]); break;
     default:
-      fail('Usage: node scripts/synthetic-stack/stack.ts <start|stop|restart|status|destroy|desktop|packaged-profile|anomaly>');
+      fail('Usage: node scripts/synthetic-stack/stack.ts <start [--no-seed] [--foreground]|stop|restart|status|destroy|desktop|packaged-profile|anomaly>');
   }
 }
 
