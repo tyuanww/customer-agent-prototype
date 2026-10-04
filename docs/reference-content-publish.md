@@ -1,6 +1,7 @@
 # 内容导入与发布合同
 
 > 本文是**当前实现**的参考。它描述桌面工作台「内容管理」到 API 的导入 / 取消 / 发布链路，字段、状态、限额与失败码均可从源码核对。
+> 本次 P1 新权限/审批/统一模板仅在隔离合成验证中，见[合同差集](reference-content-intake-p1-contract-gap.md)；下文仍是现行运行合同。
 >
 > 组织审核在**飞书文档**完成，产品不读飞书。库里的审核证据是 worker 自己写的一条声明，不是独立控制——见[组织已审证据的边界](explanation-org-review-evidence.md)。操作步骤见 [How to 用一张表替换四库之一](how-to-replace-one-library.md)。
 

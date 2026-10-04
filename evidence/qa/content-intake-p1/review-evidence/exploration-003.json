@@ -1,0 +1,14 @@
+{
+  "observationCapture": "002",
+  "observationArgv": [
+    "node",
+    ".gstack/p1-review/edge-repro.mjs"
+  ],
+  "observed": "{\"case\":\"impossible-date\",\"ok\":true,\"issues\":[]}\n{\"case\":\"example-question-id\",\"ok\":false,\"issues\":[{\"code\":\"INVALID_QUESTION\",\"sheet\":\"相似问法\",\"row\":2,\"column\":\"A\",\"fix\":\"核对条目引用、稳定问法编号、问法及状态\"}]}\n{\"case\":\"duplicate-cell\",\"ok\":true,\"issues\":[]}\n",
+  "hypothesis": "The invalid question was blocked only by a mistaken parent entry ID; retain the real synthetic parent ID to isolate the forbidden EXAMPLE question ID. Impossible dates and duplicate cells were accepted.",
+  "nextCapture": "003",
+  "nextArgv": [
+    "node",
+    ".gstack/p1-review/edge-repro.mjs"
+  ]
+}

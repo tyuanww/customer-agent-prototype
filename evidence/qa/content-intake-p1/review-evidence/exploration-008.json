@@ -1,0 +1,19 @@
+{
+  "observationCapture": "007",
+  "observationArgv": [
+    "pnpm",
+    "test:content-intake:p1"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (39 tests) 1853ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  578ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  450ms\n\n Test Files  1 passed (1)\n      Tests  39 passed (39)\n   Start at  20:34:45\n   Duration  2.21s (transform 81ms, setup 0ms, collect 204ms, tests 1.85s, environment 0ms, prepare 42ms)\n\n\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-p1.test.ts (28 tests) 5ms\n\n Test Files  1 passed (1)\n      Tests  28 passed (28)\n   Start at  20:34:47\n   Duration  179ms (transform 35ms, setup 0ms, collect 37ms, tests 5ms, environment 0ms, prepare 36ms)\n\n",
+  "hypothesis": "The combined 67-case suite passes; rerun the original standalone parser entrypoint on the final source so its earlier result is not reused across input changes.",
+  "nextCapture": "008",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/content-intake",
+    "exec",
+    "vitest",
+    "run",
+    "tests/workbook.test.ts"
+  ]
+}

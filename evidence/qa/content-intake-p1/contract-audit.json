@@ -1,0 +1,53 @@
+{
+  "schema": "content-intake-p1-contract-audit/1",
+  "verifiedAt": "2026-10-04T12:02:12.287Z",
+  "productHead": "8ab309fcd9c494b7343ed88bacb253205d36575f",
+  "consumptionLock": {
+    "schema": "customer-agent-contract-consumption/v1",
+    "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+    "source_repository": "ai-赋能立项",
+    "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
+    "manifest_sha256": "4799468a36febe0c383163ebbb4c8a3b490bbada6e2707a2a31bccf63ca668c8",
+    "openapi_sha256": "39f69edfdbffcad6a57d3e9fc43e1f6a3cbdc1e8fdd951e30bdbbfe97eb3e394",
+    "database_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+    "intake_status": "VERIFIED_NOT_ACTIVATED",
+    "ddev_authorized": false,
+    "runtime_activated": false
+  },
+  "exportManifest": {
+    "schema": "customer-agent-contract-set/v1",
+    "contract_set_id": "cs-ai-c11-openapi-1.15.0-schema-1.19-34a958e8193c",
+    "source_repository": "ai-赋能立项",
+    "source_git_sha": "34a958e8193c5b78e6ea736fdfed574d88094eb0",
+    "architecture_version": "1.16",
+    "implementation_version": "1.22",
+    "openapi": {
+      "version": "1.15.0",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/openapi.v1.15.yaml",
+      "file": "openapi.v1.yaml",
+      "sha256": "ab328c09293df5b534594f46469381b312f8aa3644fab214ac7278fe4f91435e",
+      "bytes": 230761
+    },
+    "database": {
+      "version": "schema.v1.19",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/schema.v1.19.sql",
+      "file": "schema-v1.19.sql",
+      "sha256": "7bfa432637b8fcf07668e3c308cd00616869097c04d6951944dbdc26f2a61a34",
+      "bytes": 572406
+    }
+  },
+  "files": [
+    {
+      "kind": "openapi",
+      "sha256": "ab328c09293df5b534594f46469381b312f8aa3644fab214ac7278fe4f91435e",
+      "bytes": 230761,
+      "sourceBlobMatches": true
+    },
+    {
+      "kind": "database",
+      "sha256": "7bfa432637b8fcf07668e3c308cd00616869097c04d6951944dbdc26f2a61a34",
+      "bytes": 572406,
+      "sourceBlobMatches": true
+    }
+  ]
+}

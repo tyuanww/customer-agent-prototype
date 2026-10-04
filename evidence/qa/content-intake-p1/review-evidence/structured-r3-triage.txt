@@ -1,0 +1,3 @@
+Optional-chain false positive: no throw
+{"case":"duplicate-sheet","changed":true,"ok":false,"issues":[{"code":"INVALID_XLSX","sheet":"","row":0,"column":"","fix":"检查文件或重新导出标准模板后重试"}]}
+{"case":"excluded-binary-media","ok":true,"mediaCount":1,"issues":[]}

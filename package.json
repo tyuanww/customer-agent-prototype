@@ -15,7 +15,7 @@
     "help:dev": "node scripts/dev-help.mjs",
     "dev:api": "pnpm --filter @customer-agent/api dev",
     "lint": "eslint .",
-    "typecheck": "pnpm --filter @customer-agent/contracts typecheck && pnpm --filter @customer-agent/retrieval-core typecheck && pnpm --filter @customer-agent/database typecheck && pnpm --filter @customer-agent/api typecheck && pnpm --filter @customer-agent/desktop typecheck",
+    "typecheck": "pnpm --filter @customer-agent/contracts typecheck && pnpm --filter @customer-agent/retrieval-core typecheck && pnpm --filter @customer-agent/content-intake typecheck && pnpm --filter @customer-agent/database typecheck && pnpm --filter @customer-agent/api typecheck && pnpm --filter @customer-agent/desktop typecheck",
     "test": "pnpm build:services && pnpm test:built",
     "test:artifact-boundary": "node --test scripts/formal-artifact-boundary.test.mjs",
     "test:architecture": "node --test scripts/architecture-boundary-check.test.mjs",
@@ -64,8 +64,8 @@
     "package:linux": "pnpm --filter @customer-agent/desktop package:linux",
     "package:mac:local": "pnpm --filter @customer-agent/desktop package:mac:local",
     "package:mac": "pnpm --filter @customer-agent/desktop package:mac",
-    "build:services": "pnpm --filter @customer-agent/contracts build && pnpm --filter @customer-agent/retrieval-core build && pnpm --filter @customer-agent/database build && pnpm --filter @customer-agent/api build",
-    "test:built": "pnpm --filter @customer-agent/contracts test:built && pnpm --filter @customer-agent/retrieval-core test:built && pnpm --filter @customer-agent/database test:built && pnpm --filter @customer-agent/api test:built && pnpm --filter @customer-agent/desktop test && pnpm test:artifact-boundary && pnpm test:architecture && pnpm test:workflow",
+    "build:services": "pnpm --filter @customer-agent/contracts build && pnpm --filter @customer-agent/retrieval-core build && pnpm --filter @customer-agent/content-intake build && pnpm --filter @customer-agent/database build && pnpm --filter @customer-agent/api build",
+    "test:built": "pnpm --filter @customer-agent/contracts test:built && pnpm --filter @customer-agent/retrieval-core test:built && pnpm --filter @customer-agent/content-intake test:built && pnpm --filter @customer-agent/database test:built && pnpm --filter @customer-agent/api test:built && pnpm --filter @customer-agent/desktop test && pnpm test:artifact-boundary && pnpm test:architecture && pnpm test:workflow",
     "docs:check": "node scripts/check-documentation.mjs",
     "retrieval:questions": "node scripts/enrich-retrieval-questions.ts",
     "retrieval:embeddings": "node scripts/embed-retrieval-index.ts",
@@ -79,7 +79,9 @@
     "download-page:check": "node scripts/update-download-page.mjs --check",
     "test:g1a:e0:ci": "node scripts/run-g1a-synthetic.mjs",
     "test:search-decision:proof": "pnpm --filter @customer-agent/api test:search-decision:proof",
-    "test:g1a:comparison:package": "pnpm --filter @customer-agent/api test:g1a:comparison:package"
+    "test:g1a:comparison:package": "pnpm --filter @customer-agent/api test:g1a:comparison:package",
+    "test:content-intake:p1": "pnpm --filter @customer-agent/content-intake test && pnpm --filter @customer-agent/api exec vitest run tests/content-intake-p1.test.ts",
+    "content:intake:probe": "pnpm --filter @customer-agent/content-intake probe"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
