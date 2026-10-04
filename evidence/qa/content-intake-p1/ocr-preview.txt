@@ -1,0 +1,278 @@
+{
+  "schema_version": "1",
+  "mode": "workspace",
+  "repository": "/Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype",
+  "total_files": 42,
+  "reviewable_count": 30,
+  "excluded_count": 12,
+  "total_insertions": 5690,
+  "total_deletions": 11,
+  "reviewable_files": [
+    {
+      "path": "package.json",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 4
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "status": "modified",
+      "insertions": 4,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/dev-help.mjs",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 0
+    },
+    {
+      "path": "apps/api/experiments/content-intake-p1/approval.ts",
+      "status": "added",
+      "insertions": 202,
+      "deletions": 0
+    },
+    {
+      "path": "apps/api/experiments/content-intake-p1/permissions.ts",
+      "status": "added",
+      "insertions": 118,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/contract-audit.json",
+      "status": "added",
+      "insertions": 53,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/probe.json",
+      "status": "added",
+      "insertions": 234,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-attempts.json",
+      "status": "added",
+      "insertions": 207,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/cycles-1-2.json",
+      "status": "added",
+      "insertions": 195,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-002.json",
+      "status": "added",
+      "insertions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-003.json",
+      "status": "added",
+      "insertions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-004.json",
+      "status": "added",
+      "insertions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-005.json",
+      "status": "added",
+      "insertions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-006.json",
+      "status": "added",
+      "insertions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-007.json",
+      "status": "added",
+      "insertions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-008.json",
+      "status": "added",
+      "insertions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-009.json",
+      "status": "added",
+      "insertions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/exploration-010.json",
+      "status": "added",
+      "insertions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/final-regressions.json",
+      "status": "added",
+      "insertions": 24,
+      "deletions": 0
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/verification.json",
+      "status": "added",
+      "insertions": 102,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/package.json",
+      "status": "added",
+      "insertions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/scripts/probe.mjs",
+      "status": "added",
+      "insertions": 73,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/src/archive.ts",
+      "status": "added",
+      "insertions": 155,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/src/parser-process.ts",
+      "status": "added",
+      "insertions": 33,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/src/policy.ts",
+      "status": "added",
+      "insertions": 61,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/src/runner.ts",
+      "status": "added",
+      "insertions": 58,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/src/workbook.ts",
+      "status": "added",
+      "insertions": 132,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/tests/fixtures.ts",
+      "status": "added",
+      "insertions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/tsconfig.build.json",
+      "status": "added",
+      "insertions": 5,
+      "deletions": 0
+    },
+    {
+      "path": "packages/content-intake/tsconfig.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0
+    }
+  ],
+  "excluded_files": [
+    {
+      "path": "docs/reference-content-publish.md",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "status": "modified",
+      "insertions": 496,
+      "deletions": 7,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/api/tests/content-intake-p1.test.ts",
+      "status": "added",
+      "insertions": 235,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "added",
+      "insertions": 38,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "added",
+      "insertions": 2665,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-content-intake-p1-contract-gap.md",
+      "status": "added",
+      "insertions": 112,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/README.md",
+      "status": "added",
+      "insertions": 40,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review-evidence/structured-r3-triage.txt",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p1/review.md",
+      "status": "added",
+      "insertions": 70,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/content-intake/README.md",
+      "status": "added",
+      "insertions": 9,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/content-intake/tests/workbook.test.ts",
+      "status": "added",
+      "insertions": 167,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    }
+  ]
+}

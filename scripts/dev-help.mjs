@@ -22,6 +22,11 @@ const text = `客服话术浮窗 Demo · 开发入口
   4. 逐步说明：docs/tutorial-first-run.md
   5. 贡献约定：CONTRIBUTING.md
 
+P1 合成资料导入验证（不启动产品、API 或真实飞书）：
+  pnpm test:content-intake:p1
+  pnpm content:intake:probe  # 生成并重开合成 XLSX/报告，测量限制和取消
+  说明：docs/how-to-develop-content-intake.md
+
 文档写错了或命令对不上：
   GitHub Issues → 模板「文档」或「缺陷」
 `;

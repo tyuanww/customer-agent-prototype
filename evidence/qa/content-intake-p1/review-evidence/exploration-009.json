@@ -1,0 +1,19 @@
+{
+  "observationCapture": "008",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/content-intake",
+    "exec",
+    "vitest",
+    "run",
+    "tests/workbook.test.ts"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (39 tests) 1840ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  587ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  431ms\n\n Test Files  1 passed (1)\n      Tests  39 passed (39)\n   Start at  20:39:23\n   Duration  2.09s (transform 31ms, setup 0ms, collect 110ms, tests 1.84s, environment 0ms, prepare 34ms)\n\n",
+  "hypothesis": "The final standalone suite passes; replay the original calendar, EXAMPLE question ID and duplicate-cell inputs to prove the concrete earlier failures now reject.",
+  "nextCapture": "009",
+  "nextArgv": [
+    "node",
+    ".gstack/p1-review/edge-repro.mjs"
+  ]
+}

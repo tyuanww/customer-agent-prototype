@@ -1,0 +1,14 @@
+{
+  "observationCapture": "006",
+  "observationArgv": [
+    "node",
+    ".gstack/p1-review/edge-repro-r2.mjs"
+  ],
+  "observed": "{\"case\":\"rich-fragments-total-33000\",\"ok\":true,\"issues\":[]}\n{\"case\":\"array-state\",\"accepted\":true}\n{\"case\":\"retroactive-grant\",\"decision\":{\"ok\":true}}\n",
+  "hypothesis": "Complete cell/shared-string accumulation including CDATA, strict state enums and both endpoints of grant validity now reject each reproduced defect; exact-budget rich text must remain accepted.",
+  "nextCapture": "007",
+  "nextArgv": [
+    "pnpm",
+    "test:content-intake:p1"
+  ]
+}

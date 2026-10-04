@@ -1,0 +1,158 @@
+pnpm lint
+exitCode=0
+logSha256=050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1
+
+
+pnpm typecheck
+exitCode=0
+logSha256=2d04208e6cdad20b16b90d90f409a3e306077d29d71ca506b6f772a4191a2542
+
+
+pnpm test
+exitCode=0
+logSha256=02e1562fb9129f72f948e76224eb36e9713a597d788c6862ea675b146cb956ec
+ Test Files  3 passed (3)
+      Tests  19 passed (19)
+   Duration  970ms (transform 186ms, setup 0ms, collect 258ms, tests 974ms, environment 0ms, prepare 120ms)
+ℹ tests 1
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Duration  203ms (transform 35ms, setup 0ms, collect 39ms, tests 9ms, environment 0ms, prepare 42ms)
+ℹ tests 1
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Duration  2.55s (transform 41ms, setup 0ms, collect 167ms, tests 2.23s, environment 0ms, prepare 47ms)
+ Test Files  5 passed (5)
+      Tests  19 passed (19)
+   Duration  322ms (transform 191ms, setup 0ms, collect 487ms, tests 114ms, environment 0ms, prepare 226ms)
+ℹ tests 1
+ ✓ tests/app.test.ts (32 tests | 1 skipped) 435ms
+ ↓ tests/content-import.integration.test.ts (13 tests | 13 skipped)
+ ↓ tests/content-release.integration.test.ts (3 tests | 3 skipped)
+ ↓ tests/content-worker.integration.test.ts (5 tests | 5 skipped)
+ ↓ tests/g1a-comparison.integration.test.ts (5 tests | 5 skipped)
+ ↓ tests/event-postgres.integration.test.ts (10 tests | 10 skipped)
+ ↓ tests/g1a-e0-synthetic.integration.test.ts (11 tests | 11 skipped)
+ ↓ tests/search-postgres.integration.test.ts (28 tests | 28 skipped)
+ ↓ tests/product-auth.integration.test.ts (8 tests | 8 skipped)
+ Test Files  50 passed | 15 skipped (65)
+      Tests  443 passed | 91 skipped (534)
+   Duration  5.43s (transform 1.27s, setup 0ms, collect 7.55s, tests 22.19s, environment 7ms, prepare 3.17s)
+ℹ tests 3
+ Test Files  122 passed | 1 skipped (123)
+      Tests  1095 passed | 1 skipped (1096)
+   Duration  58.90s (transform 970ms, setup 6.34s, collect 2.00s, tests 27.92s, environment 11.74s, prepare 2.87s)
+ℹ tests 9
+ℹ tests 19
+ℹ tests 81
+
+pnpm build
+exitCode=0
+logSha256=247630a2d58e8e4c3e04702a08ea44ca16ffce8249626d24190e10204432524a
+
+
+source-binding-before
+logSha256=4bfd61ad7529ce6086915888477424e8f909ca357f35948c346508bc37ca0c8a
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api
+
+ ❯ tests/content-intake-p1.test.ts (34 tests | 3 failed) 8ms
+   ✓ P1 permissions — proposed rules, no production API grants > intersects identity, exact department/job ceiling and manually granted store scope 1ms
+   ✓ P1 permissions — proposed rules, no production API grants > never infers managerial rights from a title substring or missing fields 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > fails closed on disabled organization facts 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > fails closed on stale organization facts 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > fails closed on future organization facts 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > requires selection for multiple stores, rejects zero or an ungranted store 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > separates grant qualification from business capabilities and denies redelegation 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > denies self elevation (including same-person alias), extra scope and extended lifetime 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > revokes distribution qualification while keeping downstream rights and original issuer 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > keeps action and store stewardship independent and repeated revocation inert 0ms
+   ✓ P1 permissions — proposed rules, no production API grants > treats null source as explicit all-sources within one fixed shop/domain only 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > allows routine human self review and first evidence advances readiness without changing digest/version 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects an APPROVED instance with task type AUTO_PASS 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects an APPROVED instance with task type AUTO_REJECT 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects an APPROVED instance with task type UNKNOWN 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects non-string approval task-type without coercion 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects non-string approval form without coercion 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects instance status REJECTED without changing a candidate 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects instance status CANCELED without changing a candidate 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects instance status DELETED without changing a candidate 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > rejects instance status PENDING without changing a candidate 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > binds exact instance, tenant, material form and re-read attachment bytes 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > requires matching human task timeline, identity mapping and historical/current authorization 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > critical changes require a qualified non-contributor, even when an alias uploads 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > freezes material references; any content/base/contributor change breaks the old approval binding 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > derives differences and risk from complete snapshots instead of trusting an omitted critical diff 0ms
+   × P1 candidate and official-shaped synthetic approval evidence > rejects a candidate whose authorization scope source is source-b instead of its registered source 3ms
+     → expected [Function] to throw an error
+   × P1 candidate and official-shaped synthetic approval evidence > rejects a candidate whose authorization scope source is null instead of its registered source 0ms
+     → expected [Function] to throw an error
+   × P1 candidate and official-shaped synthetic approval evidence > rejects a candidate whose authorization scope source is  instead of its registered source 0ms
+     → expected [Function] to throw an error
+   ✓ P1 candidate and official-shaped synthetic approval evidence > never extends reviewer grant, organization facts, or attachment proof deadlines 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > retains missing entries and detects explicit/batched/split 24h deactivation risk 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > counts real deactivations and matches risk terms within each field, without joining different revisions 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > checks revocation, scope, baseline, one-use and expiry again at simulated commit 0ms
+   ✓ P1 candidate and official-shaped synthetic approval evidence > bounds existing usage after a commit wins the remote-revocation race; failed refresh never extends it 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/content-intake-p1.test.ts > P1 candidate and official-shaped synthetic approval evidence > rejects a candidate whose authorization scope source is source-b instead of its registered source
+ FAIL  tests/content-intake-p1.test.ts > P1 candidate and official-shaped synthetic approval evidence > rejects a candidate whose authorization scope source is null instead of its registered source
+ FAIL  tests/content-intake-p1.test.ts > P1 candidate and official-shaped synthetic approval evidence > rejects a candidate whose authorization scope source is  instead of its registered source
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ tests/content-intake-p1.test.ts:181:59
+    179|   it.each(['source-b', null, ''])('rejects a candidate whose authoriza…
+    180|     expect(() => freezeCandidate('candidate-2', 1, { ...materials, sco…
+    181|       { publishedEntries: [], recentDisables: [], now })).toThrow('INV…
+       |                                                           ^
+    182|   });
+    183|   it('never extends reviewer grant, organization facts, or attachment …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 31 passed (34)
+   Start at  21:07:28
+   Duration  248ms (transform 67ms, setup 0ms, collect 67ms, tests 8ms, environment 0ms, prepare 44ms)
+
+undefined
+/Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/content-intake-p1.test.ts
+
+
+targeted-after
+logSha256=105ab9d0c74b429648eb62c8244338b05ad367bc4a44292d0cdeac666dd0d3a3
+$ pnpm --filter @customer-agent/content-intake test && pnpm --filter @customer-agent/api exec vitest run tests/content-intake-p1.test.ts
+$ pnpm build && pnpm test:built
+$ tsc -p tsconfig.build.json
+$ vitest run
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake
+
+ ✓ tests/workbook.test.ts (41 tests) 2018ms
+   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  581ms
+   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  444ms
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  21:07:57
+   Duration  2.38s (transform 69ms, setup 0ms, collect 189ms, tests 2.02s, environment 0ms, prepare 41ms)
+
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api
+
+ ✓ tests/content-intake-p1.test.ts (34 tests) 5ms
+
+ Test Files  1 passed (1)
+      Tests  34 passed (34)
+   Start at  21:08:00
+   Duration  174ms (transform 35ms, setup 0ms, collect 37ms, tests 5ms, environment 0ms, prepare 37ms)
