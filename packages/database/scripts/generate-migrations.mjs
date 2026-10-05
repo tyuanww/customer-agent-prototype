@@ -16,7 +16,7 @@ import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
-const EXPECTED_DATABASE_SHA256 = '5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa';
+const EXPECTED_DATABASE_SHA256 = '1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41';
 const BASELINE = Object.freeze({
   contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c',
   sourceGitSha: '1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38',
@@ -171,7 +171,25 @@ const PRIOR_V1_17 = Object.freeze({
   migrationCount: 14,
   schemaFile: 'schema-v1.17.sql',
 });
-const REVIEWED_UPGRADES = Object.freeze([PRIOR_REVIEWED_UPGRADE, PRIOR_V1_14, PRIOR_V1_15, PRIOR_V1_16, PRIOR_V1_17]);
+const PRIOR_V1_18 = Object.freeze({
+  "position": 15,
+  "id": "0015_ops_loop_v1_18",
+  "file": "0015_ops_loop_v1_18.sql",
+  "source_ranges": [
+    {
+      "start_line": 10739,
+      "end_line": 11309
+    }
+  ],
+  "sha256": "e7ac1d9c5f487336b63ed4a8abeb66031dbcd3189286fbd2d07b97407685613b",
+  "bytes": 22449,
+  "contractSetId": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+  "sourceGitSha": "260ef224c5340a4d26e857bd02119044dd813f9a",
+  "sourceSchemaSha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+  "migrationCount": 19,
+  "schemaFile": "schema-v1.18.sql"
+});
+const REVIEWED_UPGRADES = Object.freeze([PRIOR_REVIEWED_UPGRADE, PRIOR_V1_14, PRIOR_V1_15, PRIOR_V1_16, PRIOR_V1_17, PRIOR_V1_18]);
 
 function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
@@ -181,21 +199,32 @@ function linesForRanges(lines, ranges) {
   return ranges.map(({ start_line, end_line }) => lines.slice(start_line - 1, end_line).join('\n')).join('\n');
 }
 
-// The runner owns the migration transaction; the entire predecessor remains immutable.
-function opsLoopUpgradeRanges(source, projectRoot) {
-  const previousPath = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_V1_17.contractSetId, PRIOR_V1_17.schemaFile);
-  if (!existsSync(previousPath) || !lstatSync(previousPath).isFile()) throw new Error('Immutable v1.17 source must be a regular file');
+// Only append the two bounded increments. The complete v1.18 input and all
+// previously shipped migrations keep their original bytes and provenance.
+function intakeUpgradeSlices(source, projectRoot) {
+  const previousPath = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_V1_18.contractSetId, PRIOR_V1_18.schemaFile);
+  if (!existsSync(previousPath) || !lstatSync(previousPath).isFile()) throw new Error('Immutable v1.18 source must be a regular file');
   const previous = readFileSync(previousPath, 'utf8');
-  if (sha256(previous) !== PRIOR_V1_17.sourceSchemaSha256) throw new Error('Immutable v1.17 digest drifted');
-  const prefix = '-- schema.v1.18 — ops-loop clean-install reference\n' + previous + '\n';
-  if (!source.startsWith(prefix)) throw new Error('Ops-loop predecessor differs from immutable v1.17');
-  const match = source.slice(prefix.length).match(/^-- BEGIN OPS LOOP ([0-9a-f]{64})\n([\s\S]+)-- END OPS LOOP\n$/);
-  if (!match || sha256(match[2]) !== match[1]) throw new Error('Ops-loop source digest drifted');
-  const body = match[2].trimEnd().split('\n');
-  const begin = body.indexOf('BEGIN;');
-  if (begin < 0 || body.filter(line => line === 'BEGIN;').length !== 1 || body.at(-1) !== 'COMMIT;' || body.filter(line => line === 'COMMIT;').length !== 1) throw new Error('Ops-loop transaction anchors drifted');
-  const offset = prefix.split('\n').length + 1;
-  return { lines: source.trimEnd().split('\n'), ranges: [{ start_line: offset + begin + 1, end_line: offset + body.length - 2 }] };
+  if (sha256(previous) !== PRIOR_V1_18.sourceSchemaSha256) throw new Error('Immutable v1.18 digest drifted');
+  const prefix = '-- schema.v1.20 — content-intake additive storage contract candidate\n'
+    + '-- schema.v1.19 — coach product/campaign publish clean-install reference\n' + previous + '\n';
+  if (!source.startsWith(prefix)) throw new Error('Content-intake predecessor differs from immutable v1.18');
+  const rest = source.slice(prefix.length);
+  const match = rest.match(/^-- BEGIN COACH PUBLISH ([0-9a-f]{64})\n([\s\S]+)-- END COACH PUBLISH\n\n-- BEGIN CONTENT INTAKE ([0-9a-f]{64})\n([\s\S]+)-- END CONTENT INTAKE\n$/);
+  if (!match || sha256(match[2]) !== match[1] || sha256(match[4]) !== match[3]) throw new Error('Content-intake increment digest drifted');
+  const lines = source.trimEnd().split('\n');
+  return [
+    { position: 20, id: '0020_coach_publish_v1_19', version: 'schema.v1.19', body: match[2], wrapped: false },
+    { position: 21, id: '0021_content_intake_v1_20', version: 'schema.v1.20', body: match[4], wrapped: true },
+  ].map(({ body, wrapped, ...descriptor }) => {
+    const bodyLines = body.trimEnd().split('\n');
+    const offset = source.slice(0, source.indexOf(body, prefix.length)).split('\n').length;
+    const begin = bodyLines.indexOf('BEGIN;');
+    if (wrapped && (begin < 0 || bodyLines.filter(line => line === 'BEGIN;').length !== 1 || bodyLines.at(-1) !== 'COMMIT;' || bodyLines.filter(line => line === 'COMMIT;').length !== 1)) throw new Error('Content-intake transaction anchors drifted');
+    if (!wrapped && bodyLines.some(line => line === 'BEGIN;' || line === 'COMMIT;')) throw new Error('Unexpected coach transaction anchor');
+    const ranges = [{ start_line: offset + (wrapped ? begin + 1 : 0), end_line: offset + bodyLines.length - (wrapped ? 2 : 1) }];
+    return { ...descriptor, ranges, sourceBody: linesForRanges(lines, ranges) };
+  });
 }
 
 function loadBaselineMigrations(projectRoot) {
@@ -235,63 +264,72 @@ function loadPriorReviewedUpgrade(projectRoot, provenance) {
     source_git_sha: sourceGitSha, source_schema_sha256: sourceSchemaSha256, sql });
 }
 
-/**
- * Product overlays are authored here, not derived from the frozen contract snapshot, so a new one
- * only needs adding to PRODUCT_OVERLAYS with the next position. Keep the order stable: positions
- * are append-only and an already-applied overlay's bytes must never change.
- *
- * Every overlay goes through loadProductOverlay. Do not add a bespoke loader for one entry and
- * then filter it out of this list: that splits the registry from what actually ships, and the
- * next overlay added tends to be inserted in the wrong place.
- */
-const PRODUCT_OVERLAYS = Object.freeze([
-  Object.freeze({ position: 16, id: '0016_office_owner_publish' }),
-  Object.freeze({ position: 17, id: '0017_rollback_previous_target' }),
-  Object.freeze({ position: 18, id: '0018_owner_read_views' }),
-  Object.freeze({ position: 19, id: '0019_candidate_client_snapshot' }),
+// The four existing product overlays were shipped against v1.18. Re-stamping
+// their headers with a newer contract would break installed ledger checksums.
+const FROZEN_PRODUCT_OVERLAYS = Object.freeze([
+  {
+    "position": 16,
+    "id": "0016_office_owner_publish",
+    "file": "0016_office_owner_publish.sql",
+    "sha256": "d574ebd891e3a7db771e6f6a5fb7a85f6e6d3614c7880f2dea4b4bb642d6b447",
+    "bytes": 21181,
+    "source_ranges": []
+  },
+  {
+    "position": 17,
+    "id": "0017_rollback_previous_target",
+    "file": "0017_rollback_previous_target.sql",
+    "sha256": "eb3ccbf3f04c4005393fc757b8f1e03d55a5078837b2b8eb9dbac72d83116788",
+    "bytes": 3969,
+    "source_ranges": []
+  },
+  {
+    "position": 18,
+    "id": "0018_owner_read_views",
+    "file": "0018_owner_read_views.sql",
+    "sha256": "c89d76992850aa562a3d24618bccb39a941a8bc88136342505a9edea5440acba",
+    "bytes": 7394,
+    "source_ranges": []
+  },
+  {
+    "position": 19,
+    "id": "0019_candidate_client_snapshot",
+    "file": "0019_candidate_client_snapshot.sql",
+    "sha256": "e4720feabd0a9b92d8d5cc22fcb6dcce75cf6e8136c0b2d9365d0d7c1cf18cd7",
+    "bytes": 5158,
+    "source_ranges": []
+  }
 ]);
 
-function loadProductOverlay(projectRoot, snapshot, id, position) {
-  const relative = `packages/database/overlays/${id}.sql`;
-  const overlayPath = path.join(projectRoot, relative);
-  if (!existsSync(overlayPath) || !lstatSync(overlayPath).isFile()) {
-    throw new Error(`Product overlay migration is missing: ${id}`);
-  }
-  const body = readFileSync(overlayPath, 'utf8');
-  const sql = [
+
+function loadFrozenProductOverlay(projectRoot, descriptor) {
+  const migration = loadPriorReviewedUpgrade(projectRoot, { ...PRIOR_V1_18, ...descriptor });
+  const sourcePath = path.join(projectRoot, 'packages/database/overlays', descriptor.file);
+  if (!existsSync(sourcePath) || !lstatSync(sourcePath).isFile()) throw new Error(`Product overlay source is missing: ${descriptor.file}`);
+  const expected = [
     `-- ${GENERATED_HEADER}`,
-    `-- ${id}; product overlay (not a frozen contract snapshot slice)`,
-    `-- contract_set_id=${snapshot.contract_set_id}`,
-    `-- source_git_sha=${snapshot.source_git_sha}`,
-    `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
-    body.trimEnd(),
-    '',
+    `-- ${descriptor.id}; product overlay (not a frozen contract snapshot slice)`,
+    `-- contract_set_id=${PRIOR_V1_18.contractSetId}`,
+    `-- source_git_sha=${PRIOR_V1_18.sourceGitSha}`,
+    `-- source_schema_sha256=${PRIOR_V1_18.sourceSchemaSha256}`,
+    readFileSync(sourcePath, 'utf8').trimEnd(), '',
   ].join('\n');
-  return Object.freeze({
-    position,
-    id,
-    file: `${id}.sql`,
-    sha256: sha256(sql),
-    bytes: Buffer.byteLength(sql),
-    contract_set_id: snapshot.contract_set_id,
-    source_git_sha: snapshot.source_git_sha,
-    source_schema_sha256: snapshot.manifest.database.sha256,
-    source_ranges: Object.freeze([]),
-    sql,
-  });
+  if (migration.sql !== expected) throw new Error(`Frozen product overlay source drifted: ${descriptor.file}; append a new migration instead`);
+  return migration;
 }
 
-function renderUpgradeMigration(sourceBody, ranges, snapshot) {
-  const descriptor = { position: 15, id: '0015_ops_loop_v1_18', file: '0015_ops_loop_v1_18.sql', source_ranges: ranges };
+function renderUpgradeMigration(descriptor, snapshot) {
+  const { position, id, version, ranges, sourceBody } = descriptor;
   const sql = [
     `-- ${GENERATED_HEADER}`,
-    `-- ${descriptor.id}; source schema.v1.18 lines ${ranges.map((r) => `${r.start_line}-${r.end_line}`).join(', ')}`,
+    `-- ${id}; source ${version} lines ${ranges.map((r) => `${r.start_line}-${r.end_line}`).join(', ')}`,
     `-- contract_set_id=${snapshot.contract_set_id}`,
     `-- source_git_sha=${snapshot.source_git_sha}`,
     `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
     'SET LOCAL search_path = public, pg_catalog, pg_temp;', '', sourceBody, '',
   ].join('\n');
-  return Object.freeze({ ...descriptor, sha256: sha256(sql), bytes: Buffer.byteLength(sql),
+  return Object.freeze({ position, id, file: `${id}.sql`, source_ranges: ranges,
+    sha256: sha256(sql), bytes: Buffer.byteLength(sql),
     contract_set_id: snapshot.contract_set_id, source_git_sha: snapshot.source_git_sha,
     source_schema_sha256: snapshot.manifest.database.sha256, sql });
 }
@@ -318,16 +356,16 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (snapshot.manifest?.database?.sha256 !== EXPECTED_DATABASE_SHA256 || sha256(snapshot.database_source) !== EXPECTED_DATABASE_SHA256) {
     throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
   }
-  const { lines, ranges } = opsLoopUpgradeRanges(snapshot.database_source, projectRoot);
-  const upgradeSourceBody = linesForRanges(lines, ranges);
-  const upgrade = renderUpgradeMigration(upgradeSourceBody, ranges, snapshot);
-  const productOverlays = PRODUCT_OVERLAYS
-    .map((entry) => loadProductOverlay(projectRoot, snapshot, entry.id, entry.position));
+  const slices = intakeUpgradeSlices(snapshot.database_source, projectRoot);
+  const upgradeSourceBody = slices.map(({ sourceBody }) => sourceBody).join('\n');
+  const upgrades = slices.map((slice) => renderUpgradeMigration(slice, snapshot));
+  const productOverlays = FROZEN_PRODUCT_OVERLAYS.map((descriptor) =>
+    loadFrozenProductOverlay(projectRoot, descriptor));
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
     ...REVIEWED_UPGRADES.map((p) => loadPriorReviewedUpgrade(projectRoot, p)),
-    upgrade,
     ...productOverlays,
+    ...upgrades,
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,

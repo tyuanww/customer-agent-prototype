@@ -1,6 +1,602 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
 export interface paths {
+    "/v1/intake/rollback/{rollbackPlanId}/review/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 请求核验回退计划的原人工实例
+         * @description 按原rollbackPlanId、impactDigest和expectedEvidenceVersion核验已绑定的原人工实例与审核包，不新建UUID或实例，不改变材料。只有认证适配器成功核验才推进事实版本与validUntil；失败不续期。资源权限及全量影响范围资格仍须重验。
+         */
+        post: operations["refreshIntakeRollbackReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/principals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 选择同租户范围内已确认主体
+         * @description 调用者必须有目标 source 的分配资格（grant-recipient）或 import 权限（contributor）。返回同 tenant/app 已确认的登记身份及 factsVersion/validUntil/enabled，不以目标主体已拥有该来源或店铺 grant 为前提；首次授权与增加新店铺必须可选择。授权接收人仅列当前启用且岗位适格的主体，提交按返回事实版本 CAS 并重新核验。贡献人可声明已离职/禁用但身份可确认的人，不要求其有内容业务权；无法确认的身份先走受控登记。只返回内部主键与展示名，不返回员工原始部门、邮箱或提供方ID。游标签名绑定会话、source、purpose和版本，每页重新授权。
+         */
+        get: operations["listIntakePrincipals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/rollback/{rollbackPlanId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询全目录回退计划人工审核事实
+         * @description 只读已绑定回退计划的人工审核事实，不发起实例、不重验或延长validUntil。证据过期时调用同计划review/refresh；提交仍须校验全部影响范围与审核资格。
+         */
+        get: operations["getIntakeRollbackReview"];
+        put?: never;
+        /**
+         * 发起全目录回退计划的人工复核
+         * @description 服务端持久uuid后调用认证适配器，未知响应使用原uuid核对；绑定独立rollbackPlanId/impactDigest及完整影响范围审核包，不复用单候选审批。客户端不能提交PASS、审核人、instanceCode或附件证明；审核资格按回退实际影响范围核验。
+         */
+        post: operations["requestIntakeRollbackReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页获取同版本 FAQ 和实际空 SOP
+         * @description entitlementId 必填且绑定当前产品会话与店铺上下文。每页重验资格。整页结果按授权范围裁剪；先过滤店铺/商品/场景/时间，再处理显式 family 覆盖；普通新发布与真正失效分开。
+         */
+        get: operations["readIntakeSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/entitlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 签发当前店铺使用资格
+         * @description P2 只签当前 release；未来历史 SOP 资格须后续合同。截止取组织事实、授权、全部承继审批事实、内容时间和既有 lease 最大值的最早者。失败不得延长期限。 使用业务 action=query；按当前店铺和全部相关来源授权签发。entitlementId 为服务器随机不透明标识，其SHA-256作为 entitlement_hash 存储；不能用数据库hash替代标识，所有读取仍绑定当前会话主体及有效期。
+         */
+        post: operations["issueIntakeEntitlement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 提交已批准的全范围回退
+         * @description 目标/基线 CAS、全部实际范围权限及有效证据在提交点复核。撤销内容不可复活。受限范围走重新审核的纠正候选。
+         */
+        post: operations["rollbackIntakeRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/rollback/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 预览全目录回退实际范围
+         * @description 重算实际影响集合；覆盖不了全部范围时返回 requiresCorrectiveCandidate，不允许调用全目录回退。
+         */
+        post: operations["previewIntakeRollback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/operations/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 按原操作键恢复结果
+         * @description 以当前会话主体 + action + operationId 精确查持久操作记录及永久发布/回退关联，再查同命名空间24h幂等缓存。unknown 不改键重试；无权和不存在使用相同外部结果及受控诊断 ID。
+         */
+        get: operations["getIntakeOperation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates/{candidateId}/versions/{version}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 精准取消候选及关联在途尝试
+         * @description 不取消同人的其他候选或 Main 本地读取。与发布同序串行；发布先赢返回 ALREADY_PUBLISHED。unknown 保留原文件和键。
+         */
+        post: operations["cancelIntakeCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates/{candidateId}/versions/{version}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 发布精确候选及证据版本
+         * @description 仅服务端签发一次 60s 票据。提交在统一锁序核对 current/base、全部权限/模式/证据代际，原子更新既有 current、FAQ+空 SOP+媒体快照、公告和永久发布回执。原 operation 查询未知结果，不自动换键或重基线。
+         */
+        post: operations["publishIntakeCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates/{candidateId}/versions/{version}/review/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 请求核验原人工实例
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        post: operations["refreshIntakeHumanReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates/{candidateId}/versions/{version}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取最近有效审核事实
+         * @description 缓存状态读取不续期；显式刷新由认证适配器核验原始人工 task/timeline 和审核包字节摘要，失败不延长五分钟截止。
+         */
+        get: operations["getIntakeHumanReview"];
+        put?: never;
+        /**
+         * 发起或恢复飞书人工审批请求
+         * @description 服务端持久 uuid 后调用认证适配器；未知响应用原 uuid 核对。客户端不能提交 PASS、审核人、instanceCode 或附件证明。常规可自审；关键稿排除所有贡献人和同人别名。
+         */
+        post: operations["requestIntakeHumanReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates/{candidateId}/versions/{version}/source-confirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 绑定独立来源核验证据
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        post: operations["confirmIntakeSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates/{candidateId}/versions/{version}/material": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分块读取已冻结规范内容和差异
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["getIntakeCandidateMaterial"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates/{candidateId}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取候选状态和证据版本
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["getIntakeCandidate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页恢复有权范围候选
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["listIntakeCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/parse-jobs/{jobId}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 下载可重新打开的错误与编号建议报告
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["downloadIntakeReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/parse-jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取服务端解析任务
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["getIntakeParseJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/sources/{sourceId}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 服务端独立解析并冻结候选
+         * @description 仅接受已上传 objectId；不接受 rows、客户端 hash、角色或审核结论。整批阻断错误不生成候选；缺行保留。原子配额：actor 10/source 100/tenant 1GiB。 expectedPriorKey 显式区分新建与修订；job 持久记录原键及成功结果候选键。修订原子废旧/建新，不影响同来源其他候选；失败不废旧。
+         */
+        post: operations["receiveIntakeCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/sources/{sourceId}/objects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 接收受控 XLSX 对象
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        post: operations["uploadIntakeObject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/sources/{sourceId}/vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页获取词项与显示版本
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["listIntakeVocabulary"];
+        put?: never;
+        /**
+         * 新建、更名或停用词项
+         * @description 语义及范围一旦引用不可修改；rename 只追加显示版本。变义须新 ID；被引用不得停用。
+         */
+        post: operations["writeIntakeVocabulary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/sources/{sourceId}/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 下载带来源及稳定编号说明的统一模板
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["downloadIntakeTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/sources/{sourceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 确认下一版固定映射
+         * @description 来源范围由受控登记固定，文件和此请求都不能更换范围。mapping/template/rule 修改追加版本并使依赖旧映射的未发布候选失效。
+         */
+        put: operations["updateIntakeSourceMapping"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页读取登记来源
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["listIntakeSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/grants/{grantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 撤权或接管
+         * @description 撤分配资格不撤已签业务权；保留原签发者，批量接管并增代际。无接管人保留业务权、冻结新分配。
+         */
+        patch: operations["changeIntakeGrant"];
+        trace?: never;
+    };
+    "/v1/intake/grants/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 预览原子授权批次
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        post: operations["previewIntakeGrants"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页列出可管理授权
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["listIntakeGrants"];
+        put?: never;
+        /**
+         * 原子创建业务授权或分配资格
+         * @description 每项一个动作/范围；岗位能力上限与分配资格相交。禁止同人自提权及再转授；全部成功或全部失败。
+         */
+        post: operations["createIntakeGrants"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/authorization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取当前主体范围及资格
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["getIntakeAuthorization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/intake/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取版本化导入规则
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         */
+        get: operations["getIntakePolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/software/releases/current": {
         parameters: {
             query?: never;
@@ -834,9 +1430,11 @@ export interface paths {
         put?: never;
         /**
          * 将 staged 批次发布为新的 current release
-         * @description 一期仅 Owner。调用受控 publish_content_release 事务并使用全站 try-lock；第二个
-         *     并发发布立即返回 409。发布必须 CAS 校验 base_release_id，原子写入四域绑定、内容
-         *     快照、current、公告与审计。被本批次绑定的域按全域快照替换，不保留该域旧来源残行。
+         * @description Owner 可发任意 staged 批次。coach 仅可发产品/活动：bindings 与 staging 行均为 product 或 campaign，
+         *     且 title/answer_text 不含「过敏」「赔付」。售后及过敏/赔付仍仅 Owner。回滚仍仅 Owner。
+         *     调用受控 publish_content_release 事务并使用全站 try-lock；第二个并发发布立即返回 409。
+         *     发布必须 CAS 校验 base_release_id，原子写入四域绑定、内容快照、current、公告与审计。
+         *     被本批次绑定的域按全域快照替换，不保留该域旧来源残行。
          *     只发布 `quality_status=clean AND quality_gate_passed=true` 的行，且二次计算
          *     `SHA-256(JCS(normalized governance snapshot))`；quarantined 行保留在导入证据中而不进 release。
          */
@@ -1007,6 +1605,570 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description 经当前店铺、词项、时段、显式覆盖和有效使用资格过滤后的坐席投影。内部说明与附件说明不得下发；复制只含 answerText，风险提示单独展示。 */
+        IntakePublishedEntry: {
+            businessEntryId: string;
+            scriptVersion: components["schemas"]["IntakeVersion"];
+            /** @enum {string} */
+            operation: "upsert";
+            title: string;
+            answerText: string;
+            questions: components["schemas"]["IntakeQuestion"][];
+            productRefs: components["schemas"]["IntakeTermRef"][];
+            scenarioRefs: components["schemas"]["IntakeTermRef"][];
+            /** Format: date-time */
+            effectiveFrom: string;
+            /** Format: date-time */
+            effectiveTo: string | null;
+            applicabilityNote: string;
+            familySourceId: string | null;
+            familyBusinessEntryId: string | null;
+            brandNonOverridable: boolean;
+            category: string;
+            riskNote: string;
+        };
+        IntakePrincipalPage: {
+            items: {
+                principalId: string;
+                displayLabel: string;
+                factsVersion: components["schemas"]["IntakeVersion"];
+                /** Format: date-time */
+                validUntil: string;
+                enabled: boolean;
+            }[];
+            nextCursor: string | null;
+        };
+        /** @description 当前上传主体声明整理责任人及全部实际改稿人，纯本人制作也需显式列本人。服务端加入上传主体，按同租户/app已确认身份归一、校验并冻结入 contributors；这些是被声明贡献人，不能代替会话 actor 或赋予权限。声明变更须新候选版本。 */
+        IntakeContributorDeclaration: {
+            preparerPrincipalId: string;
+            editorPrincipalIds: string[];
+            /** @enum {boolean} */
+            confirmed: true;
+        };
+        IntakeMaterialHeader: {
+            /** @enum {string} */
+            canonicalEncodingVersion: "candidate-p1.1";
+            scope: components["schemas"]["IntakeSourceScope"];
+            sourceVersion: components["schemas"]["IntakeVersion"];
+            sourceClaim: components["schemas"]["IntakeSourceClaim"];
+            templateVersion: string;
+            ruleVersion: string;
+            mappingVersion: string;
+            selectedSheets: string[];
+            object: components["schemas"]["IntakeObject"];
+            contributors: string[];
+            risk: components["schemas"]["IntakeRisk"];
+            baseReleaseId: string | null;
+            media: {
+                objectId: string;
+                sha256: string;
+                mime: string;
+                bytes: components["schemas"]["IntakeVersion"];
+                required: boolean;
+                alt: string;
+            }[];
+        };
+        IntakeOperationReceipt: components["schemas"]["IntakeReceipt"] | components["schemas"]["IntakeRollbackReceipt"];
+        /** @description 全目录回退的独立人工审核材料绑定和最长5分钟核验事实。unavailable 不续期，不可仅凭 approved 忽略 validUntil；提交仍由服务端重验。 */
+        IntakeRollbackReview: {
+            rollbackPlanId: components["schemas"]["IntakeId"];
+            reviewRequestId: string;
+            evidenceVersion: number;
+            /** @enum {string} */
+            state: "creating" | "pending" | "approved" | "rejected" | "revoked" | "unavailable";
+            instanceCode: string | null;
+            revocationGeneration: number;
+            /** Format: date-time */
+            checkedAt: string | null;
+            /** Format: date-time */
+            validUntil: string | null;
+            reviewPackageObjectId: string;
+            reviewPackageSha256: string;
+            impactDigest: string;
+        };
+        IntakeRollbackReviewRequest: {
+            operationId: components["schemas"]["IntakeId"];
+            impactDigest: components["schemas"]["IntakeDigest"];
+            expectedEvidenceVersion: number;
+        };
+        IntakeRollbackReceipt: {
+            operationId: string;
+            /** @enum {string} */
+            state: "pending" | "unknown" | "published" | "cancelled" | "failed";
+            releaseId: string | null;
+            announcementId: string | null;
+            reason: string | null;
+            rollbackPlanId: components["schemas"]["IntakeId"];
+            /** @enum {string} */
+            action: "rollback";
+        };
+        IntakeSnapshot: {
+            releaseId: string;
+            entitlementId: string;
+            contextGeneration: components["schemas"]["IntakeVersion"];
+            faq: {
+                sourceId: string;
+                entry: components["schemas"]["IntakePublishedEntry"];
+            }[];
+            sopNodes: {
+                id: string;
+            }[];
+            sopEdges: {
+                from: string;
+                to: string;
+            }[];
+            media: {
+                objectId: string;
+                sha256: string;
+            }[];
+            vocabulary: components["schemas"]["IntakeVocabulary"][];
+            nextCursor: string | null;
+        };
+        IntakeEntitlement: {
+            entitlementId: string;
+            releaseId: string;
+            shopId: string;
+            contextGeneration: components["schemas"]["IntakeVersion"];
+            revocationGeneration: number;
+            /** Format: date-time */
+            validUntil: string;
+            scopes: components["schemas"]["IntakeSourceScope"][];
+        };
+        IntakeEntitlementRequest: {
+            shopId: string;
+            contextGeneration: components["schemas"]["IntakeVersion"];
+            releaseId: string | null;
+        };
+        IntakeRollbackImpact: {
+            baseReleaseId: string;
+            targetReleaseId: string;
+            impactDigest: string;
+            scopes: components["schemas"]["IntakeSourceScope"][];
+            requiresCorrectiveCandidate: boolean;
+            rollbackPlanId: components["schemas"]["IntakeId"];
+            approvalEvidenceVersion: number;
+        };
+        IntakeRollback: {
+            operationId: string;
+            baseReleaseId: string;
+            targetReleaseId: string;
+            impactDigest: string;
+            approvalEvidenceVersion: components["schemas"]["IntakeVersion"];
+            rollbackPlanId: components["schemas"]["IntakeId"];
+        };
+        IntakeRollbackPreview: {
+            baseReleaseId: string;
+            targetReleaseId: string;
+        };
+        IntakeReceipt: {
+            operationId: string;
+            key: components["schemas"]["IntakeCandidateKey"];
+            /** @enum {string} */
+            state: "pending" | "unknown" | "published" | "cancelled" | "failed";
+            releaseId: string | null;
+            announcementId: string | null;
+            reason: string | null;
+            /** @enum {string} */
+            action: "publish" | "cancel";
+        };
+        IntakeCancel: {
+            operationId: string;
+            key: components["schemas"]["IntakeCandidateKey"];
+        };
+        IntakePublish: {
+            operationId: string;
+            key: components["schemas"]["IntakeCandidateKey"];
+            baseReleaseId: string | null;
+            sourceEvidenceVersion: components["schemas"]["IntakeVersion"];
+            approvalEvidenceVersion: components["schemas"]["IntakeVersion"];
+            title: string;
+            summary: string;
+        };
+        IntakeReview: {
+            key: components["schemas"]["IntakeCandidateKey"];
+            reviewRequestId: string;
+            instanceCode: string | null;
+            evidenceVersion: number;
+            revocationGeneration: number;
+            /** @enum {string} */
+            state: "creating" | "pending" | "approved" | "rejected" | "revoked" | "unavailable";
+            /** Format: date-time */
+            checkedAt: string | null;
+            /** Format: date-time */
+            validUntil: string | null;
+            reviewPackageObjectId: string;
+            reviewPackageSha256: string;
+        };
+        IntakeReviewRequest: {
+            operationId: string;
+            key: components["schemas"]["IntakeCandidateKey"];
+            expectedEvidenceVersion: number;
+        };
+        IntakeSourceConfirmation: {
+            operationId: string;
+            key: components["schemas"]["IntakeCandidateKey"];
+            expectedEvidenceVersion: number;
+            /** @enum {string} */
+            confirmedVersionKind: "integer" | "opaque";
+            confirmedVersionValue: string;
+            /** @enum {string} */
+            acquisition: "feishu-export" | "controlled-synthetic-export";
+            objectSha256: string;
+            reason: string;
+        };
+        IntakeCandidatePage: {
+            key: components["schemas"]["IntakeCandidateKey"];
+            entries: components["schemas"]["IntakeEntry"][];
+            differences: components["schemas"]["IntakeDifference"][];
+            nextCursor: string | null;
+            materialHeader: components["schemas"]["IntakeMaterialHeader"];
+        };
+        IntakeCandidateList: {
+            items: components["schemas"]["IntakeCandidate"][];
+            nextCursor: string | null;
+        };
+        IntakeCandidate: {
+            key: components["schemas"]["IntakeCandidateKey"];
+            sourceId: string;
+            /** @enum {string} */
+            state: "awaiting-evidence" | "ready" | "publishing" | "published" | "cancelled" | "invalidated";
+            readinessReasons: string[];
+            sourceEvidenceVersion: number;
+            approvalEvidenceVersion: number;
+            revocationGeneration: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            publishedReleaseId: string | null;
+        };
+        IntakeMaterial: {
+            /** @enum {string} */
+            canonicalEncodingVersion: "candidate-p1.1";
+            scope: components["schemas"]["IntakeSourceScope"];
+            sourceVersion: components["schemas"]["IntakeVersion"];
+            sourceClaim: components["schemas"]["IntakeSourceClaim"];
+            templateVersion: string;
+            ruleVersion: string;
+            mappingVersion: string;
+            selectedSheets: string[];
+            object: components["schemas"]["IntakeObject"];
+            entries: components["schemas"]["IntakeEntry"][];
+            differences: components["schemas"]["IntakeDifference"][];
+            /** @description 上传主体 + 声明的整理责任人 + 全部实际改稿人，经认证身份归一去重。声明源由 IntakeReceive 提供，解析器不能从文件作者或上传者推断。 */
+            contributors: string[];
+            risk: components["schemas"]["IntakeRisk"];
+            baseReleaseId: string | null;
+            media: {
+                objectId: string;
+                sha256: string;
+                mime: string;
+                bytes: components["schemas"]["IntakeVersion"];
+                required: boolean;
+                alt: string;
+            }[];
+        };
+        IntakeRisk: {
+            /** @enum {string} */
+            policyVersion: "risk-p1.1";
+            /** @enum {string} */
+            level: "routine" | "critical";
+            reasons: string[];
+            explicitDisableCount: number;
+            sameSourceDisabledLast24Hours: number;
+            /** Format: date-time */
+            evaluatedAt: string;
+        };
+        IntakeDifference: {
+            businessEntryId: string;
+            /** @enum {string} */
+            change: "add" | "modify" | "disable" | "reenable";
+            previousVersion: number | null;
+            nextVersion: components["schemas"]["IntakeVersion"];
+            beforeDigest: string | null;
+            afterDigest: string;
+        };
+        /** @description 完整审核材料。分类用于检索；内部说明不进入坐席正文或复制。风险提示单独展示且不拼入复制文本；附件说明不得用来冒充已解析媒体。P2 非空附件说明阻断导入，规范条目该字段保留为空。复制只含 answerText。 */
+        IntakeEntry: {
+            businessEntryId: string;
+            scriptVersion: components["schemas"]["IntakeVersion"];
+            /** @enum {string} */
+            operation: "upsert" | "disable";
+            title: string;
+            answerText: string;
+            questions: components["schemas"]["IntakeQuestion"][];
+            productRefs: components["schemas"]["IntakeTermRef"][];
+            scenarioRefs: components["schemas"]["IntakeTermRef"][];
+            /** Format: date-time */
+            effectiveFrom: string;
+            /** Format: date-time */
+            effectiveTo: string | null;
+            applicabilityNote: string;
+            familySourceId: string | null;
+            familyBusinessEntryId: string | null;
+            brandNonOverridable: boolean;
+            category: string;
+            internalNote: string;
+            riskNote: string;
+            attachmentNote: string;
+        };
+        IntakeTermRef: {
+            id: string;
+            displayVersion: components["schemas"]["IntakeVersion"];
+        };
+        IntakeQuestion: {
+            id: string;
+            version: components["schemas"]["IntakeVersion"];
+            text: string;
+            active: boolean;
+        };
+        IntakeSourceClaim: {
+            /** @enum {string} */
+            versionKind: "integer" | "opaque" | "unknown";
+            versionValue: string | null;
+            /** @enum {string} */
+            acquisition: "feishu-export" | "controlled-synthetic-export";
+            fileSha256: string;
+        };
+        IntakeCandidateKey: {
+            candidateId: string;
+            version: components["schemas"]["IntakeVersion"];
+            digest: string;
+        };
+        IntakeReceive: {
+            operationId: string;
+            objectId: string;
+            sourceVersion: components["schemas"]["IntakeVersion"];
+            baseReleaseId: string | null;
+            contributorDeclaration: components["schemas"]["IntakeContributorDeclaration"];
+            /** @description 明确 null 为新建独立候选；完整旧键为修订该候选，不得从 source/file 推测。成功解析并复算后在同事务 CAS 旧键和可修订状态，废旧并冻结同 candidateId 的下一版。解析失败保留旧版；publishing/unknown/published/cancelled/invalidated 不允许修订，返回明确冲突。 */
+            expectedPriorKey: components["schemas"]["IntakeCandidateKey"] | null;
+        };
+        IntakeParseJob: {
+            jobId: string;
+            generation: components["schemas"]["IntakeVersion"];
+            /** @enum {string} */
+            state: "reading" | "parsing" | "validated" | "failed" | "cancelled";
+            candidateId: string | null;
+            candidateVersion: number | null;
+            issues: components["schemas"]["IntakeIssue"][];
+            totalIssues: number;
+            excludedSheetCount: number;
+            excludedMediaCount: number;
+            reportObjectId: string | null;
+        };
+        IntakeIssue: {
+            code: string;
+            message: string;
+            location: components["schemas"]["IntakeCoordinate"];
+        };
+        IntakeCoordinate: {
+            sheet: string;
+            row: number;
+            column: number;
+        };
+        IntakeObject: {
+            objectId: string;
+            sha256: string;
+            bytes: number;
+            /** @enum {string} */
+            mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            sourceId: string;
+        };
+        IntakeVocabularyWrite: {
+            operationId: string;
+            /** @enum {string} */
+            change: "create" | "rename" | "retire";
+            id: string;
+            /** @enum {string} */
+            kind: "product" | "scenario";
+            expectedDisplayVersion: number;
+            displayName: string;
+            meaningDigest: string;
+        };
+        IntakeVocabularyList: {
+            items: components["schemas"]["IntakeVocabulary"][];
+            nextCursor: string | null;
+        };
+        IntakeVocabulary: {
+            id: string;
+            /** @enum {string} */
+            kind: "product" | "scenario";
+            displayVersion: components["schemas"]["IntakeVersion"];
+            displayName: string;
+            meaningDigest: string;
+            scope: components["schemas"]["IntakeScope"];
+            active: boolean;
+        };
+        IntakeSourceList: {
+            items: components["schemas"]["IntakeSource"][];
+            nextCursor: string | null;
+        };
+        IntakeSourceWrite: {
+            operationId: string;
+            expectedVersion: components["schemas"]["IntakeVersion"];
+            templateVersion: string;
+            ruleVersion: string;
+            mappingVersion: string;
+            structureDigest: string;
+        };
+        IntakeSource: {
+            scope: components["schemas"]["IntakeSourceScope"];
+            version: components["schemas"]["IntakeVersion"];
+            templateVersion: string;
+            ruleVersion: string;
+            mappingVersion: string;
+            structureDigest: string;
+            /** @enum {string} */
+            contentIntakeMode: "legacy" | "v2-preview" | "v2-active";
+            modeVersion: components["schemas"]["IntakeVersion"];
+        };
+        IntakePolicy: {
+            /** @enum {string} */
+            policyVersion: "intake-p1.1";
+            /** @enum {string} */
+            templateVersion: "faq-p1.1";
+            /** @enum {integer} */
+            maxFileBytes: 10485760;
+            /** @enum {integer} */
+            maxExpandedBytes: 52428800;
+            /** @enum {integer} */
+            maxZipEntries: 512;
+            /** @enum {integer} */
+            maxRows: 5000;
+            /** @enum {integer} */
+            maxColumns: 32;
+            /** @enum {integer} */
+            maxCells: 200000;
+            /** @enum {integer} */
+            maxCellCharacters: 32767;
+            /** @enum {integer} */
+            maxSharedStrings: 100000;
+            /** @enum {integer} */
+            parseTimeoutMs: 30000;
+            /** @enum {integer} */
+            maxActiveCandidatesPerActor: 10;
+            /** @enum {integer} */
+            maxActiveCandidatesPerSource: 100;
+            /** @enum {integer} */
+            maxTenantStagingBytes: 1073741824;
+            /** @enum {integer} */
+            orgFactsMaxAgeSeconds: 300;
+            /** @enum {integer} */
+            approvalFactsMaxAgeSeconds: 300;
+            /** @enum {integer} */
+            ticketMaxAgeSeconds: 60;
+            /** @enum {boolean} */
+            selectedMediaSupported: false;
+        };
+        IntakeGrantChange: {
+            operationId: string;
+            expectedVersion: components["schemas"]["IntakeVersion"];
+            /** @enum {string} */
+            change: "revoke" | "takeover";
+            stewardPrincipalId: string | null;
+            /** @description 本次变更原因；受控事务写入新版本lastChangeReason，保留初次reason及全部历史。 */
+            reason: string;
+        };
+        IntakeGrantList: {
+            items: components["schemas"]["IntakeGrant"][];
+            nextCursor: string | null;
+        };
+        IntakeGrant: {
+            grantId: string;
+            version: components["schemas"]["IntakeVersion"];
+            /** @enum {string} */
+            kind: "business" | "allocation" | "delegation";
+            issuerPrincipalId: string;
+            recipientPrincipalId: string;
+            action: components["schemas"]["IntakeAction"];
+            scope: components["schemas"]["IntakeScope"];
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            revokedAt: string | null;
+            stewardPrincipalId: string | null;
+            /** @description 初次授予原因，不可改写；后续请求原因写 lastChangeReason 并随版本追加历史。 */
+            reason: string;
+            /** @enum {boolean} */
+            mayRedelegate: false;
+            /** @description 版本1为null；后续版本为该次撤权或接管请求的reason，旧版本在grant_history中保留。 */
+            lastChangeReason: string | null;
+        };
+        IntakeGrantBatch: {
+            operationId: string;
+            issuerFactsVersion: components["schemas"]["IntakeVersion"];
+            policyVersion: components["schemas"]["IntakeVersion"];
+            items: components["schemas"]["IntakeGrantItem"][];
+        };
+        IntakeGrantItem: {
+            /** @enum {string} */
+            kind: "business" | "delegation";
+            recipientPrincipalId: string;
+            recipientFactsVersion: components["schemas"]["IntakeVersion"];
+            action: components["schemas"]["IntakeAction"];
+            scope: components["schemas"]["IntakeScope"];
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            reason: string;
+        };
+        IntakeAuthorization: {
+            factsVersion: components["schemas"]["IntakeVersion"];
+            revocationGeneration: number;
+            policyVersion: components["schemas"]["IntakeVersion"];
+            /** Format: date-time */
+            validUntil: string;
+            capabilities: {
+                scope: components["schemas"]["IntakeScope"];
+                actions: components["schemas"]["IntakeAction"][];
+                mayAllocate: components["schemas"]["IntakeAction"][];
+                mayDelegate: components["schemas"]["IntakeAction"][];
+                /** Format: date-time */
+                validUntil: string;
+            }[];
+            nextCursor: string | null;
+        };
+        IntakeError: {
+            error: components["schemas"]["IntakeFailure"];
+        };
+        IntakeFailure: {
+            /** @enum {string} */
+            code: "VALIDATION" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "RATE_LIMITED" | "OVERLOADED" | "INTERNAL_ERROR";
+            message: string;
+            details: {
+                /** @enum {string} */
+                reason: "ORG_FACTS_UNAVAILABLE" | "PERMISSION_CHANGED" | "SCOPE_DENIED" | "ROLE_CEILING" | "GRANT_AUTHORITY_DENIED" | "SELF_ESCALATION" | "REDELEGATION_DENIED" | "NO_STEWARD" | "SOURCE_MISMATCH" | "SOURCE_ORDER_UNKNOWN" | "FILE_INVALID" | "FILE_LIMIT" | "TEMPLATE_VERSION" | "EMPTY_DATA" | "QUOTA_EXCEEDED" | "AWAITING_APPROVAL" | "APPROVAL_UNAVAILABLE" | "HUMAN_REVIEW_REQUIRED" | "APPROVAL_BINDING" | "ATTACHMENT_UNVERIFIED" | "MATERIAL_CHANGED" | "BASE_CHANGED" | "APPROVAL_CHANGED" | "APPROVAL_REVOKED" | "TICKET_EXPIRED" | "TICKET_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "COMMIT_UNKNOWN" | "ALREADY_PUBLISHED" | "MODE_CONFLICT" | "UPGRADE_REQUIRED" | "VOCABULARY_IN_USE" | "MEANING_CHANGED" | "LEASE_EXPIRED" | "NO_SHOP" | "CHOOSE_SHOP";
+                diagnosticId: string;
+            };
+        };
+        /** @enum {string} */
+        IntakeAction: "query" | "content-manage" | "import" | "source-confirm" | "review" | "publish" | "candidate-cancel" | "rollback";
+        IntakeSourceScope: {
+            tenantId: string;
+            appId: string;
+            brandId: string;
+            shopId: string | null;
+            /** @enum {string} */
+            domain: "presale" | "campaign" | "aftersale" | "product";
+            sourceId: string;
+        };
+        /** @description 所有字段必填。shopId=null 只代表品牌通用范围，不覆盖任意店；sourceId=null 显式覆盖该精确范围全部来源。 */
+        IntakeScope: {
+            tenantId: string;
+            appId: string;
+            brandId: string;
+            shopId: string | null;
+            /** @enum {string} */
+            domain: "presale" | "campaign" | "aftersale" | "product";
+            sourceId: string | null;
+        };
+        IntakeDigest: string;
+        IntakeVersion: number;
+        IntakeId: string;
         SoftwareReleaseList: {
             items: components["schemas"]["SoftwareRelease"][];
         };
@@ -2669,6 +3831,3195 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    refreshIntakeRollbackReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rollbackPlanId: components["schemas"]["IntakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeRollbackReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description 请求核验已绑定的回退人工实例 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeRollbackReview"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    listIntakePrincipals: {
+        parameters: {
+            query: {
+                sourceId: string;
+                limit?: number;
+                cursor?: string;
+                purpose: "grant-recipient" | "contributor";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 可选择的主体分页 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakePrincipalPage"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakeRollbackReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rollbackPlanId: components["schemas"]["IntakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 读取已绑定的回退人工审核及其有效截止 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeRollbackReview"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    requestIntakeRollbackReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rollbackPlanId: components["schemas"]["IntakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeRollbackReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description 发起或恢复飞书人工审批请求 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeRollbackReview"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    readIntakeSnapshot: {
+        parameters: {
+            query: {
+                entitlementId: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页获取同版本 FAQ 和实际空 SOP */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeSnapshot"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    issueIntakeEntitlement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeEntitlementRequest"];
+            };
+        };
+        responses: {
+            /** @description 签发当前店铺使用资格 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeEntitlement"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    rollbackIntakeRelease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeRollback"];
+            };
+        };
+        responses: {
+            /** @description 提交已批准的全范围回退 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeRollbackReceipt"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    previewIntakeRollback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeRollbackPreview"];
+            };
+        };
+        responses: {
+            /** @description 预览全目录回退实际范围 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeRollbackImpact"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakeOperation: {
+        parameters: {
+            query: {
+                action: "publish" | "cancel" | "rollback";
+            };
+            header?: never;
+            path: {
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 按原操作键恢复结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeOperationReceipt"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    cancelIntakeCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeCancel"];
+            };
+        };
+        responses: {
+            /** @description 精准取消候选及关联在途尝试 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeReceipt"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    publishIntakeCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakePublish"];
+            };
+        };
+        responses: {
+            /** @description 发布精确候选及证据版本 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeReceipt"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    refreshIntakeHumanReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description 请求核验原人工实例 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeReview"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakeHumanReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 读取最近有效审核事实 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeReview"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    requestIntakeHumanReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description 发起或恢复飞书人工审批请求 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeReview"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    confirmIntakeSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeSourceConfirmation"];
+            };
+        };
+        responses: {
+            /** @description 绑定独立来源核验证据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeCandidate"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakeCandidateMaterial: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分块读取已冻结规范内容和差异 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeCandidatePage"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakeCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: string;
+                version: components["schemas"]["IntakeVersion"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 读取候选状态和证据版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeCandidate"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    listIntakeCandidates: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                sourceId?: string;
+                state?: "awaiting-evidence" | "ready" | "publishing" | "published" | "cancelled" | "invalidated";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页恢复有权范围候选 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeCandidateList"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    downloadIntakeReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 下载可重新打开的错误与编号建议报告 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakeParseJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 读取服务端解析任务 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeParseJob"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    receiveIntakeCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeReceive"];
+            };
+        };
+        responses: {
+            /** @description 服务端独立解析并冻结候选 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeParseJob"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    uploadIntakeObject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    operationId: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 接收受控 XLSX 对象 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeObject"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    listIntakeVocabulary: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页获取词项与显示版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeVocabularyList"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    writeIntakeVocabulary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeVocabularyWrite"];
+            };
+        };
+        responses: {
+            /** @description 新建、更名或停用词项 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeVocabulary"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    downloadIntakeTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 下载带来源及稳定编号说明的统一模板 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    updateIntakeSourceMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeSourceWrite"];
+            };
+        };
+        responses: {
+            /** @description 确认下一版固定映射 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeSource"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    listIntakeSources: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页读取登记来源 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeSourceList"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    changeIntakeGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeGrantChange"];
+            };
+        };
+        responses: {
+            /** @description 撤权或接管 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeGrant"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    previewIntakeGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeGrantBatch"];
+            };
+        };
+        responses: {
+            /** @description 预览原子授权批次 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeGrantList"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    listIntakeGrants: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页列出可管理授权 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeGrantList"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    createIntakeGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeGrantBatch"];
+            };
+        };
+        responses: {
+            /** @description 原子创建业务授权或分配资格 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeGrantList"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakeAuthorization: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 获取当前主体范围及资格 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeAuthorization"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
+    getIntakePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 获取版本化导入规则 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakePolicy"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
     getCurrentSoftwareRelease: {
         parameters: {
             query?: never;

@@ -1,6 +1,6 @@
 # @customer-agent/database
 
-PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 确定性生成十五个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是已复核 `schema.v1.13` 的受控 search projection 升级，第十一段是 `schema.v1.14` 的 ready-no-hit 搜索上下文升级；第十二段以一个事务安装 `schema.v1.15` 的完整负责人承接后缀，第十三段安装 `schema.v1.16` 的身份和审核命名空间；第十四段以固定 definer 修复发布延迟校验权限，不给 app_content_admin 增加底表权限；第十五段追加 `schema.v1.18` 的 ops-loop 存储与 SECURITY DEFINER 入口；公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
+PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 确定性生成二十一个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是已复核 `schema.v1.13` 的受控 search projection 升级，第十一段是 `schema.v1.14` 的 ready-no-hit 搜索上下文升级；第十二段以一个事务安装 `schema.v1.15` 的完整负责人承接后缀，第十三段安装 `schema.v1.16` 的身份和审核命名空间；第十四段以固定 definer 修复发布延迟校验权限，不给 app_content_admin 增加底表权限；第十五段追加 `schema.v1.18` 的 ops-loop 存储与 SECURITY DEFINER 入口；第十六至十九段为冻结的产品 overlay；第二十段接收 coach 发布合同，第二十一段安装未开放应用授权的 content_intake 存储。公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
 
 生成命令会先在同一文件系统完整暂存 migration 目录与内嵌 catalogue 目录，再进行目录级替换；普通 I/O 失败会把两个目录一起回滚，避免留下已知的新旧混合生成物，额外旧成员也会在成功发布时被移除。
 
@@ -14,8 +14,10 @@ pnpm test:db                 # database 全门禁，含隔离 PG15
 pnpm test:db:integration     # 仅隔离 PG15 集成门禁
 ```
 
-PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前验证 `schema.v1.18` 全迁移安装、精确 `schema.v1.12` / `v1.13` / `v1.14` / `v1.15` / `v1.16` / `v1.17` ledger 分别只执行 `0010–0015` / `0011–0015` / `0012–0015` / `0013–0015` / `0014–0015` / `0015`；未知、缺失、改写或额外 ledger 仍失败关闭。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
+PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前验证 `schema.v1.20` 全迁移安装及各已接入历史 ledger 的精确前缀升级；已发 0001–0019 的字节与来源不变，当前十九段基线只追加 0020/0021。未知、缺失、改写或额外 ledger 仍失败关闭。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
 
 仓内其它 package 若需复用同一临时 PG15 证据面，只能以 devDependency 导入显式 `@customer-agent/database/testkit` 子入口；它不属于 migration/runtime 公共入口，也不得进入生产请求链。
 
 负责人承接迁移保留 0001–0011 的原字节与来源，将完整新合同的六段增量按来源行号提取为单个事务，最后更新 schema marker。`app_owner_acceptance_registrar` 为未绑定登录的 NOLOGIN 能力角色；合同要求安装时不存在同名角色，遇到既有角色即回滚本段并保留可追踪的旧账本前缀。因此隔离测试各自使用独立 cluster，不向共享 cluster 重复安装。runtime 无登记、撤销或登记表读取权限，当前不授权真实装载。
+
+历史 overlay 源与冻结 SQL 必须逐字节对应，修改旧源会失败关闭；新的产品事务必须追加 migration。P2 新命名空间纳入 ACL、对象/owner、DOMAIN 定义和 CHECK、函数和触发器的精确后验，应用角色仍无访问权；存储安装不代表新事务或正式激活已完成。

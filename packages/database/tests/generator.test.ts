@@ -1,4 +1,5 @@
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -25,7 +26,7 @@ type BuiltMigration = Readonly<{
 }>;
 
 type GeneratorModule = Readonly<{
-  buildDatabaseMigrationOutputs: (snapshot: unknown) => Readonly<{
+  buildDatabaseMigrationOutputs: (snapshot: unknown, options?: Readonly<{ projectRoot: string }>) => Readonly<{
     migrations: readonly BuiltMigration[];
     outputs: ReadonlyMap<string, string>;
   }>;
@@ -81,11 +82,11 @@ function prepareExistingPublication(root: string): void {
 }
 
 describe('database migration generator', () => {
-  it('preserves all fourteen immutable migrations and appends the product overlays', () => {
+  it('preserves nineteen immutable migrations and appends only the two reviewed contract increments', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());
 
-    expect(first.migrations).toHaveLength(19);
+    expect(first.migrations).toHaveLength(21);
     expect(first.migrations.map(({ id }) => id)).toEqual([
       '0001_extensions',
       '0002_identity_and_content',
@@ -105,7 +106,7 @@ describe('database migration generator', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20',
     ]);
     expect([...first.outputs]).toEqual([...second.outputs]);
     expect(first.migrations.slice(0, 9).map(({ sha256 }) => sha256)).toEqual([
@@ -127,7 +128,31 @@ describe('database migration generator', () => {
     expect(first.migrations[12]?.sha256).toBe('8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2');
     expect(first.migrations[13]?.contract_set_id).toContain('schema-1.17-');
     expect(first.migrations[13]?.sha256).toBe('ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339');
-    expect(first.migrations[14]?.contract_set_id).toBe(contractSetId);
+    expect(first.migrations[14]?.contract_set_id).toBe('cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534');
+    expect(first.migrations[20]?.contract_set_id).toBe(contractSetId);
+    expect(first.migrations[20]?.sql).toContain('CREATE SCHEMA content_intake');
+    expect(first.migrations[20]?.sql).not.toMatch(/^BEGIN;$/m);
+    expect(first.migrations.slice(0, 19).map(({ sha256 }) => sha256)).toEqual([
+      '4876b7ef62bb033b4b7b487e06e88a525b9cb8b3e32e82e6516124b7fc8eca62',
+      '62322728f1621c75b2cc0f66ac20e65710a916c714caa84761a93108b71e1b64',
+      'c109b3c7ec79c73cb6e3748808aca9296ed1c96e5d8fc91ab0046c80fd2b50d4',
+      'ff68d5969e28a9d4d7eed963906f2fc3783f4c34b5ec1fa347ea87c3bc0b2f6a',
+      '715db39163e2a99d10a88126a4bded14c75f4fb4ba1ec97dcba573265babdf02',
+      'f5b369165b5e5f0e21801f8fd8eb2c4589ee26ca0761327811f4ed5c5903d4ca',
+      '7cf632ec4123b9031893646b0b67348cf5a89dd3fe89ec544dccecb576513189',
+      'f883a929a8742e0f71a498e70de410124e8c25fd2fdee6a492047201475990f2',
+      'a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e',
+      '026497120b6ad6d7d885de47d54335bb8891d8b45e2da010cc85eae6ea7b6818',
+      '8f5337b69b1a10fb85013694699e683c99e14399fa3471bd970eb89ac8591a0f',
+      '3bc06f81ed596049e0539a679e066b7a6c2d1814314c3d2ba9fd4d65f469be18',
+      '8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2',
+      'ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339',
+      'e7ac1d9c5f487336b63ed4a8abeb66031dbcd3189286fbd2d07b97407685613b',
+      'd574ebd891e3a7db771e6f6a5fb7a85f6e6d3614c7880f2dea4b4bb642d6b447',
+      'eb3ccbf3f04c4005393fc757b8f1e03d55a5078837b2b8eb9dbac72d83116788',
+      'c89d76992850aa562a3d24618bccb39a941a8bc88136342505a9edea5440acba',
+      'e4720feabd0a9b92d8d5cc22fcb6dcce75cf6e8136c0b2d9365d0d7c1cf18cd7'
+    ]);
     expect(first.migrations[14]?.sql).toContain('CREATE SCHEMA ops_loop');
     expect(first.migrations[14]?.sql).toContain('SECURITY DEFINER');
     expect(first.migrations[14]?.sql).not.toMatch(/^BEGIN;$/m);
@@ -151,6 +176,19 @@ describe('database migration generator', () => {
     expect(() => generator.buildDatabaseMigrationOutputs(snapshot(`${databaseSource}-- drift\n`))).toThrow(
       /SHA-256 drifted/,
     );
+  });
+
+  it('rejects edits to a shipped overlay source even when its frozen migration is untouched', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'customer-agent-overlay-drift-'));
+    try {
+      for (const relative of ['contracts/upstream/customer-agent', 'packages/database/migrations', 'packages/database/overlays']) {
+        cpSync(path.join(projectRoot, relative), path.join(root, relative), { recursive: true });
+      }
+      const sourcePath = path.join(root, 'packages/database/overlays/0016_office_owner_publish.sql');
+      writeFileSync(sourcePath, readFileSync(sourcePath, 'utf8') + '\n-- changed after shipping\n');
+      expect(() => generator.buildDatabaseMigrationOutputs(snapshot(), { projectRoot: root }))
+        .toThrow(/Frozen product overlay source drifted/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
   it('stages the complete output set and removes stale generated members on publish', () => {

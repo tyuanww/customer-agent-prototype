@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。当前基线是 `v0.3.26 / main@4739c39`：合同消费锁为 OpenAPI `1.14.0` / `schema.v1.18`，`packages/database` 保留 `0001..0019`（其中 `0016..0019` 是产品 overlay），合同生成物包含 165 个 component runtime schema。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。当前基线是 `v0.3.26 / main@4739c39`：P2 合同消费锁已推进到 OpenAPI `1.16.0` / `schema.v1.20`，`packages/database` 保留 `0001..0019` 原字节并追加 `0020..0021`（`0016..0019` 是历史产品 overlay），合同生成物包含 222 个 component runtime schema。本次只交接合同及封闭存储，P2 API/Main/renderer 运行切片仍待实现；详见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
 
 ## 1. 先看整体
 
@@ -41,7 +41,7 @@ contracts/upstream（不可变输入；同一受锁 snapshot）
   │    └─ apps/api → 合成身份 / 内容闭环 / search / announce（loopback only）
   ├─ packages/retrieval-core（BM25 / RRF / similarity / threshold；纯算法）
   │    └─ apps/desktop → shared adapter 注入字段权重、分词和检索策略
-  └─ packages/database（0001..0019 / catalogue / ledger / verify）
+  └─ packages/database（0001..0021 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
 apps/api（DEV-M1 COMPLETE）
@@ -80,7 +80,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `packages/retrieval-core/` | 纯 TypeScript 检索算法：BM25、RRF、余弦相似度、分数门槛和字符分词；通过显式输入隐藏算法细节，不拥有产品字段、HTTP、Electron、数据库或 UI 策略 | `apps/*` 依赖、产品字段权重、合成/真实数据读取、运行时 I/O |
 | `packages/content-intake/` | P1 合成标准 FAQ 工作簿解析、预算前检、错误/模板实物及可取消子进程探针；当前无产品运行时消费者 | 授权/审批/正式候选、renderer IPC、真实来源或自行发布 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
-| `packages/database/` | 在同一已验证快照内确定性生成 migration（当前十九段，含四个产品 overlay）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成 migration（当前二十一段，含四个冻结产品 overlay 和两段 P2 合同增量）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |

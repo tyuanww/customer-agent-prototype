@@ -3,7 +3,7 @@ openapi: 3.1.1
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: CS-AI-C11 Customer Service Agent API
-  version: 1.14.0
+  version: 1.16.0
   license:
     name: Proprietary - internal use only
     identifier: LicenseRef-Proprietary
@@ -202,6 +202,8 @@ servers:
   - url: /
     description: 与当前 Web/Electron 客户端同源的 API 根路径
 tags:
+  - name: content-intake
+    description: P2 合成内容接入合同候选；未经冻结/intake 不启用。
   - name: ops-loop
     description: DEV-M2 运营闭环：不准落库、SOP 写库、话术单条草稿、检索账、软件目录
   - name: backend-candidate
@@ -231,6 +233,2633 @@ security:
   - mockUser: []
     mockRole: []
 paths:
+  /v1/intake/rollback/{rollbackPlanId}/review/refresh:
+    post:
+      operationId: refreshIntakeRollbackReview
+      summary: 请求核验回退计划的原人工实例
+      description: 按原rollbackPlanId、impactDigest和expectedEvidenceVersion核验已绑定的原人工实例与审核包，不新建UUID或实例，不改变材料。只有认证适配器成功核验才推进事实版本与validUntil；失败不续期。资源权限及全量影响范围资格仍须重验。
+      tags:
+        - content-intake
+      responses:
+        "202":
+          description: 请求核验已绑定的回退人工实例
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeRollbackReview"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: rollbackPlanId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeRollbackReviewRequest"
+      security:
+        - ProductSession: []
+  /v1/intake/principals:
+    get:
+      operationId: listIntakePrincipals
+      summary: 选择同租户范围内已确认主体
+      description: 调用者必须有目标 source 的分配资格（grant-recipient）或 import 权限（contributor）。返回同 tenant/app 已确认的登记身份及 factsVersion/validUntil/enabled，不以目标主体已拥有该来源或店铺 grant 为前提；首次授权与增加新店铺必须可选择。授权接收人仅列当前启用且岗位适格的主体，提交按返回事实版本 CAS 并重新核验。贡献人可声明已离职/禁用但身份可确认的人，不要求其有内容业务权；无法确认的身份先走受控登记。只返回内部主键与展示名，不返回员工原始部门、邮箱或提供方ID。游标签名绑定会话、source、purpose和版本，每页重新授权。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 可选择的主体分页
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakePrincipalPage"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: sourceId
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: purpose
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - grant-recipient
+              - contributor
+      security:
+        - ProductSession: []
+  /v1/intake/rollback/{rollbackPlanId}/review:
+    post:
+      operationId: requestIntakeRollbackReview
+      summary: 发起全目录回退计划的人工复核
+      description: 服务端持久uuid后调用认证适配器，未知响应使用原uuid核对；绑定独立rollbackPlanId/impactDigest及完整影响范围审核包，不复用单候选审批。客户端不能提交PASS、审核人、instanceCode或附件证明；审核资格按回退实际影响范围核验。
+      tags:
+        - content-intake
+      responses:
+        "202":
+          description: 发起或恢复飞书人工审批请求
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeRollbackReview"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: rollbackPlanId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeRollbackReviewRequest"
+      security:
+        - ProductSession: []
+    get:
+      operationId: getIntakeRollbackReview
+      summary: 查询全目录回退计划人工审核事实
+      description: 只读已绑定回退计划的人工审核事实，不发起实例、不重验或延长validUntil。证据过期时调用同计划review/refresh；提交仍须校验全部影响范围与审核资格。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 读取已绑定的回退人工审核及其有效截止
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeRollbackReview"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: rollbackPlanId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+      security:
+        - ProductSession: []
+  /v1/intake/snapshot:
+    get:
+      operationId: readIntakeSnapshot
+      summary: 分页获取同版本 FAQ 和实际空 SOP
+      description: entitlementId 必填且绑定当前产品会话与店铺上下文。每页重验资格。整页结果按授权范围裁剪；先过滤店铺/商品/场景/时间，再处理显式 family 覆盖；普通新发布与真正失效分开。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 分页获取同版本 FAQ 和实际空 SOP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeSnapshot"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: entitlementId
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      security:
+        - ProductSession: []
+  /v1/intake/entitlements:
+    post:
+      operationId: issueIntakeEntitlement
+      summary: 签发当前店铺使用资格
+      description: P2 只签当前 release；未来历史 SOP 资格须后续合同。截止取组织事实、授权、全部承继审批事实、内容时间和既有 lease 最大值的最早者。失败不得延长期限。 使用业务 action=query；按当前店铺和全部相关来源授权签发。entitlementId 为服务器随机不透明标识，其SHA-256作为 entitlement_hash 存储；不能用数据库hash替代标识，所有读取仍绑定当前会话主体及有效期。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 签发当前店铺使用资格
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeEntitlement"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeEntitlementRequest"
+      security:
+        - ProductSession: []
+  /v1/intake/rollback:
+    post:
+      operationId: rollbackIntakeRelease
+      summary: 提交已批准的全范围回退
+      description: 目标/基线 CAS、全部实际范围权限及有效证据在提交点复核。撤销内容不可复活。受限范围走重新审核的纠正候选。
+      tags:
+        - content-intake
+      responses:
+        "202":
+          description: 提交已批准的全范围回退
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeRollbackReceipt"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeRollback"
+      security:
+        - ProductSession: []
+  /v1/intake/rollback/preview:
+    post:
+      operationId: previewIntakeRollback
+      summary: 预览全目录回退实际范围
+      description: 重算实际影响集合；覆盖不了全部范围时返回 requiresCorrectiveCandidate，不允许调用全目录回退。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 预览全目录回退实际范围
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeRollbackImpact"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeRollbackPreview"
+      security:
+        - ProductSession: []
+  /v1/intake/operations/{operationId}:
+    get:
+      operationId: getIntakeOperation
+      summary: 按原操作键恢复结果
+      description: 以当前会话主体 + action + operationId 精确查持久操作记录及永久发布/回退关联，再查同命名空间24h幂等缓存。unknown 不改键重试；无权和不存在使用相同外部结果及受控诊断 ID。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 按原操作键恢复结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeOperationReceipt"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: action
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - publish
+              - cancel
+              - rollback
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/cancel:
+    post:
+      operationId: cancelIntakeCandidate
+      summary: 精准取消候选及关联在途尝试
+      description: 不取消同人的其他候选或 Main 本地读取。与发布同序串行；发布先赢返回 ALREADY_PUBLISHED。unknown 保留原文件和键。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 精准取消候选及关联在途尝试
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeReceipt"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeCancel"
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/publish:
+    post:
+      operationId: publishIntakeCandidate
+      summary: 发布精确候选及证据版本
+      description: 仅服务端签发一次 60s 票据。提交在统一锁序核对 current/base、全部权限/模式/证据代际，原子更新既有 current、FAQ+空 SOP+媒体快照、公告和永久发布回执。原 operation 查询未知结果，不自动换键或重基线。
+      tags:
+        - content-intake
+      responses:
+        "202":
+          description: 发布精确候选及证据版本
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeReceipt"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakePublish"
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/review/refresh:
+    post:
+      operationId: refreshIntakeHumanReview
+      summary: 请求核验原人工实例
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "202":
+          description: 请求核验原人工实例
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeReview"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeReviewRequest"
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/review:
+    post:
+      operationId: requestIntakeHumanReview
+      summary: 发起或恢复飞书人工审批请求
+      description: 服务端持久 uuid 后调用认证适配器；未知响应用原 uuid 核对。客户端不能提交 PASS、审核人、instanceCode 或附件证明。常规可自审；关键稿排除所有贡献人和同人别名。
+      tags:
+        - content-intake
+      responses:
+        "202":
+          description: 发起或恢复飞书人工审批请求
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeReview"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeReviewRequest"
+      security:
+        - ProductSession: []
+    get:
+      operationId: getIntakeHumanReview
+      summary: 读取最近有效审核事实
+      description: 缓存状态读取不续期；显式刷新由认证适配器核验原始人工 task/timeline 和审核包字节摘要，失败不延长五分钟截止。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 读取最近有效审核事实
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeReview"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/source-confirmation:
+    post:
+      operationId: confirmIntakeSource
+      summary: 绑定独立来源核验证据
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 绑定独立来源核验证据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeCandidate"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeSourceConfirmation"
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/material:
+    get:
+      operationId: getIntakeCandidateMaterial
+      summary: 分块读取已冻结规范内容和差异
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 分块读取已冻结规范内容和差异
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeCandidatePage"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}:
+    get:
+      operationId: getIntakeCandidate
+      summary: 读取候选状态和证据版本
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 读取候选状态和证据版本
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeCandidate"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      security:
+        - ProductSession: []
+  /v1/intake/candidates:
+    get:
+      operationId: listIntakeCandidates
+      summary: 分页恢复有权范围候选
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 分页恢复有权范围候选
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeCandidateList"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: sourceId
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - awaiting-evidence
+              - ready
+              - publishing
+              - published
+              - cancelled
+              - invalidated
+      security:
+        - ProductSession: []
+  /v1/intake/parse-jobs/{jobId}/report:
+    get:
+      operationId: downloadIntakeReport
+      summary: 下载可重新打开的错误与编号建议报告
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 下载可重新打开的错误与编号建议报告
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      security:
+        - ProductSession: []
+  /v1/intake/parse-jobs/{jobId}:
+    get:
+      operationId: getIntakeParseJob
+      summary: 读取服务端解析任务
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 读取服务端解析任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeParseJob"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      security:
+        - ProductSession: []
+  /v1/intake/sources/{sourceId}/candidates:
+    post:
+      operationId: receiveIntakeCandidate
+      summary: 服务端独立解析并冻结候选
+      description: 仅接受已上传 objectId；不接受 rows、客户端 hash、角色或审核结论。整批阻断错误不生成候选；缺行保留。原子配额：actor 10/source 100/tenant 1GiB。 expectedPriorKey 显式区分新建与修订；job 持久记录原键及成功结果候选键。修订原子废旧/建新，不影响同来源其他候选；失败不废旧。
+      tags:
+        - content-intake
+      responses:
+        "202":
+          description: 服务端独立解析并冻结候选
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeParseJob"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeReceive"
+      security:
+        - ProductSession: []
+  /v1/intake/sources/{sourceId}/objects:
+    post:
+      operationId: uploadIntakeObject
+      summary: 接收受控 XLSX 对象
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "201":
+          description: 接收受控 XLSX 对象
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeObject"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - operationId
+                - file
+              properties:
+                operationId:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                  minLength: 1
+                  maxLength: 128
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              file:
+                contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      security:
+        - ProductSession: []
+  /v1/intake/sources/{sourceId}/vocabulary:
+    get:
+      operationId: listIntakeVocabulary
+      summary: 分页获取词项与显示版本
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 分页获取词项与显示版本
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeVocabularyList"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      security:
+        - ProductSession: []
+    post:
+      operationId: writeIntakeVocabulary
+      summary: 新建、更名或停用词项
+      description: 语义及范围一旦引用不可修改；rename 只追加显示版本。变义须新 ID；被引用不得停用。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 新建、更名或停用词项
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeVocabulary"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeVocabularyWrite"
+      security:
+        - ProductSession: []
+  /v1/intake/sources/{sourceId}/template:
+    get:
+      operationId: downloadIntakeTemplate
+      summary: 下载带来源及稳定编号说明的统一模板
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 下载带来源及稳定编号说明的统一模板
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      security:
+        - ProductSession: []
+  /v1/intake/sources/{sourceId}:
+    put:
+      operationId: updateIntakeSourceMapping
+      summary: 确认下一版固定映射
+      description: 来源范围由受控登记固定，文件和此请求都不能更换范围。mapping/template/rule 修改追加版本并使依赖旧映射的未发布候选失效。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 确认下一版固定映射
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeSource"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeSourceWrite"
+      security:
+        - ProductSession: []
+  /v1/intake/sources:
+    get:
+      operationId: listIntakeSources
+      summary: 分页读取登记来源
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 分页读取登记来源
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeSourceList"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      security:
+        - ProductSession: []
+  /v1/intake/grants/{grantId}:
+    patch:
+      operationId: changeIntakeGrant
+      summary: 撤权或接管
+      description: 撤分配资格不撤已签业务权；保留原签发者，批量接管并增代际。无接管人保留业务权、冻结新分配。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 撤权或接管
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeGrant"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: grantId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeGrantChange"
+      security:
+        - ProductSession: []
+  /v1/intake/grants/preview:
+    post:
+      operationId: previewIntakeGrants
+      summary: 预览原子授权批次
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 预览原子授权批次
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeGrantList"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeGrantBatch"
+      security:
+        - ProductSession: []
+  /v1/intake/grants:
+    get:
+      operationId: listIntakeGrants
+      summary: 分页列出可管理授权
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 分页列出可管理授权
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeGrantList"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      security:
+        - ProductSession: []
+    post:
+      operationId: createIntakeGrants
+      summary: 原子创建业务授权或分配资格
+      description: 每项一个动作/范围；岗位能力上限与分配资格相交。禁止同人自提权及再转授；全部成功或全部失败。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 原子创建业务授权或分配资格
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeGrantList"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeGrantBatch"
+      security:
+        - ProductSession: []
+  /v1/intake/authorization:
+    get:
+      operationId: getIntakeAuthorization
+      summary: 获取当前主体范围及资格
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 获取当前主体范围及资格
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeAuthorization"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      security:
+        - ProductSession: []
+  /v1/intake/policy:
+    get:
+      operationId: getIntakePolicy
+      summary: 获取版本化导入规则
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      tags:
+        - content-intake
+      responses:
+        "200":
+          description: 获取版本化导入规则
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakePolicy"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      security:
+        - ProductSession: []
   /v1/software/releases/current:
     get:
       operationId: getCurrentSoftwareRelease
@@ -2992,14 +5621,16 @@ paths:
       operationId: publishContent
       summary: 将 staged 批次发布为新的 current release
       description: |
-        一期仅 Owner。调用受控 publish_content_release 事务并使用全站 try-lock；第二个
-        并发发布立即返回 409。发布必须 CAS 校验 base_release_id，原子写入四域绑定、内容
-        快照、current、公告与审计。被本批次绑定的域按全域快照替换，不保留该域旧来源残行。
+        Owner 可发任意 staged 批次。coach 仅可发产品/活动：bindings 与 staging 行均为 product 或 campaign，
+        且 title/answer_text 不含「过敏」「赔付」。售后及过敏/赔付仍仅 Owner。回滚仍仅 Owner。
+        调用受控 publish_content_release 事务并使用全站 try-lock；第二个并发发布立即返回 409。
+        发布必须 CAS 校验 base_release_id，原子写入四域绑定、内容快照、current、公告与审计。
+        被本批次绑定的域按全域快照替换，不保留该域旧来源残行。
         只发布 `quality_status=clean AND quality_gate_passed=true` 的行，且二次计算
         `SHA-256(JCS(normalized governance snapshot))`；quarantined 行保留在导入证据中而不进 release。
       x-required-roles:
+        - coach
         - owner
-      x-phase1-owner-only: true
       x-error-reasons:
         "400":
           - SOURCE_SET_INCOMPLETE
@@ -4107,6 +6738,2453 @@ components:
                   code: INTERNAL
                   message: 服务内部错误
   schemas:
+    IntakePublishedEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - businessEntryId
+        - scriptVersion
+        - operation
+        - title
+        - answerText
+        - questions
+        - productRefs
+        - scenarioRefs
+        - effectiveFrom
+        - effectiveTo
+        - applicabilityNote
+        - familySourceId
+        - familyBusinessEntryId
+        - brandNonOverridable
+        - category
+        - riskNote
+      properties:
+        businessEntryId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        scriptVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        operation:
+          type: string
+          enum:
+            - upsert
+        title:
+          type: string
+          minLength: 1
+          maxLength: 512
+        answerText:
+          type: string
+          minLength: 1
+          maxLength: 32767
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeQuestion"
+          minItems: 0
+          maxItems: 100
+        productRefs:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeTermRef"
+          minItems: 0
+          maxItems: 100
+        scenarioRefs:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeTermRef"
+          minItems: 0
+          maxItems: 100
+        effectiveFrom:
+          type: string
+          format: date-time
+          maxLength: 35
+        effectiveTo:
+          type:
+            - string
+            - "null"
+          format: date-time
+          maxLength: 35
+        applicabilityNote:
+          type: string
+          maxLength: 4096
+        familySourceId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        familyBusinessEntryId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        brandNonOverridable:
+          type: boolean
+        category:
+          type: string
+          maxLength: 32767
+        riskNote:
+          type: string
+          maxLength: 32767
+      description: 经当前店铺、词项、时段、显式覆盖和有效使用资格过滤后的坐席投影。内部说明与附件说明不得下发；复制只含 answerText，风险提示单独展示。
+      if:
+        properties:
+          familySourceId:
+            type: "null"
+      then:
+        properties:
+          familyBusinessEntryId:
+            type: "null"
+      else:
+        properties:
+          familyBusinessEntryId:
+            type: string
+    IntakePrincipalPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - principalId
+              - displayLabel
+              - factsVersion
+              - validUntil
+              - enabled
+            properties:
+              principalId:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+              displayLabel:
+                type: string
+                minLength: 1
+                maxLength: 256
+              factsVersion:
+                $ref: "#/components/schemas/IntakeVersion"
+              validUntil:
+                type: string
+                format: date-time
+                maxLength: 35
+              enabled:
+                type: boolean
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+    IntakeContributorDeclaration:
+      type: object
+      additionalProperties: false
+      required:
+        - preparerPrincipalId
+        - editorPrincipalIds
+        - confirmed
+      properties:
+        preparerPrincipalId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        editorPrincipalIds:
+          type: array
+          items:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+          minItems: 1
+          maxItems: 98
+          uniqueItems: true
+        confirmed:
+          type: boolean
+          enum:
+            - true
+      description: 当前上传主体声明整理责任人及全部实际改稿人，纯本人制作也需显式列本人。服务端加入上传主体，按同租户/app已确认身份归一、校验并冻结入 contributors；这些是被声明贡献人，不能代替会话 actor 或赋予权限。声明变更须新候选版本。
+    IntakeMaterialHeader:
+      type: object
+      additionalProperties: false
+      required:
+        - canonicalEncodingVersion
+        - scope
+        - sourceVersion
+        - sourceClaim
+        - templateVersion
+        - ruleVersion
+        - mappingVersion
+        - selectedSheets
+        - object
+        - contributors
+        - risk
+        - baseReleaseId
+        - media
+      properties:
+        canonicalEncodingVersion:
+          type: string
+          enum:
+            - candidate-p1.1
+        scope:
+          $ref: "#/components/schemas/IntakeSourceScope"
+        sourceVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        sourceClaim:
+          $ref: "#/components/schemas/IntakeSourceClaim"
+        templateVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        ruleVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        mappingVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        selectedSheets:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+          minItems: 1
+          maxItems: 16
+        object:
+          $ref: "#/components/schemas/IntakeObject"
+        contributors:
+          type: array
+          items:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+          minItems: 1
+          maxItems: 100
+        risk:
+          $ref: "#/components/schemas/IntakeRisk"
+        baseReleaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        media:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - objectId
+              - sha256
+              - mime
+              - bytes
+              - required
+              - alt
+            properties:
+              objectId:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+              sha256:
+                type: string
+                pattern: ^[0-9a-f]{64}$
+                minLength: 64
+                maxLength: 64
+              mime:
+                type: string
+                minLength: 1
+                maxLength: 128
+              bytes:
+                $ref: "#/components/schemas/IntakeVersion"
+              required:
+                type: boolean
+              alt:
+                type: string
+                minLength: 1
+                maxLength: 1024
+          minItems: 0
+          maxItems: 0
+    IntakeOperationReceipt:
+      oneOf:
+        - $ref: "#/components/schemas/IntakeReceipt"
+        - $ref: "#/components/schemas/IntakeRollbackReceipt"
+    IntakeRollbackReview:
+      type: object
+      additionalProperties: false
+      required:
+        - rollbackPlanId
+        - reviewRequestId
+        - evidenceVersion
+        - state
+        - instanceCode
+        - revocationGeneration
+        - checkedAt
+        - validUntil
+        - reviewPackageObjectId
+        - reviewPackageSha256
+        - impactDigest
+      properties:
+        rollbackPlanId:
+          $ref: "#/components/schemas/IntakeId"
+        reviewRequestId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        evidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        state:
+          type: string
+          enum:
+            - creating
+            - pending
+            - approved
+            - rejected
+            - revoked
+            - unavailable
+        instanceCode:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        revocationGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        checkedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          maxLength: 35
+        validUntil:
+          type:
+            - string
+            - "null"
+          format: date-time
+          maxLength: 35
+        reviewPackageObjectId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        reviewPackageSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        impactDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+      description: 全目录回退的独立人工审核材料绑定和最长5分钟核验事实。unavailable 不续期，不可仅凭 approved 忽略 validUntil；提交仍由服务端重验。
+      if:
+        properties:
+          state:
+            const: approved
+      then:
+        properties:
+          checkedAt:
+            type: string
+          validUntil:
+            type: string
+          instanceCode:
+            type: string
+          evidenceVersion:
+            minimum: 1
+            type: integer
+    IntakeRollbackReviewRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - impactDigest
+        - expectedEvidenceVersion
+      properties:
+        operationId:
+          $ref: "#/components/schemas/IntakeId"
+        impactDigest:
+          $ref: "#/components/schemas/IntakeDigest"
+        expectedEvidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+    IntakeRollbackReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - rollbackPlanId
+        - state
+        - releaseId
+        - announcementId
+        - reason
+        - action
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        state:
+          type: string
+          enum:
+            - pending
+            - unknown
+            - published
+            - cancelled
+            - failed
+        releaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        announcementId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        reason:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 64
+        rollbackPlanId:
+          $ref: "#/components/schemas/IntakeId"
+        action:
+          type: string
+          enum:
+            - rollback
+    IntakeSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - releaseId
+        - entitlementId
+        - contextGeneration
+        - faq
+        - sopNodes
+        - sopEdges
+        - media
+        - vocabulary
+        - nextCursor
+      properties:
+        releaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        entitlementId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        contextGeneration:
+          $ref: "#/components/schemas/IntakeVersion"
+        faq:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - sourceId
+              - entry
+            properties:
+              sourceId:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+              entry:
+                $ref: "#/components/schemas/IntakePublishedEntry"
+          minItems: 0
+          maxItems: 100
+        sopNodes:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+            properties:
+              id:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+          minItems: 0
+          maxItems: 0
+        sopEdges:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - from
+              - to
+            properties:
+              from:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+              to:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+          minItems: 0
+          maxItems: 0
+        media:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - objectId
+              - sha256
+            properties:
+              objectId:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+              sha256:
+                type: string
+                pattern: ^[0-9a-f]{64}$
+                minLength: 64
+                maxLength: 64
+          minItems: 0
+          maxItems: 0
+        vocabulary:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeVocabulary"
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+    IntakeEntitlement:
+      type: object
+      additionalProperties: false
+      required:
+        - entitlementId
+        - releaseId
+        - shopId
+        - contextGeneration
+        - revocationGeneration
+        - validUntil
+        - scopes
+      properties:
+        entitlementId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        releaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        shopId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        contextGeneration:
+          $ref: "#/components/schemas/IntakeVersion"
+        revocationGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        validUntil:
+          type: string
+          format: date-time
+          maxLength: 35
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeSourceScope"
+          minItems: 0
+          maxItems: 1000
+    IntakeEntitlementRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - shopId
+        - contextGeneration
+        - releaseId
+      properties:
+        shopId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        contextGeneration:
+          $ref: "#/components/schemas/IntakeVersion"
+        releaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+    IntakeRollbackImpact:
+      type: object
+      additionalProperties: false
+      required:
+        - baseReleaseId
+        - targetReleaseId
+        - impactDigest
+        - scopes
+        - requiresCorrectiveCandidate
+        - rollbackPlanId
+        - approvalEvidenceVersion
+      properties:
+        baseReleaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        targetReleaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        impactDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeSourceScope"
+          minItems: 0
+          maxItems: 1000
+        requiresCorrectiveCandidate:
+          type: boolean
+        rollbackPlanId:
+          $ref: "#/components/schemas/IntakeId"
+        approvalEvidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+    IntakeRollback:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - baseReleaseId
+        - targetReleaseId
+        - impactDigest
+        - approvalEvidenceVersion
+        - rollbackPlanId
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        baseReleaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        targetReleaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        impactDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        approvalEvidenceVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        rollbackPlanId:
+          $ref: "#/components/schemas/IntakeId"
+    IntakeRollbackPreview:
+      type: object
+      additionalProperties: false
+      required:
+        - baseReleaseId
+        - targetReleaseId
+      properties:
+        baseReleaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        targetReleaseId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+    IntakeReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - key
+        - state
+        - releaseId
+        - announcementId
+        - reason
+        - action
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        state:
+          type: string
+          enum:
+            - pending
+            - unknown
+            - published
+            - cancelled
+            - failed
+        releaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        announcementId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        reason:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 64
+        action:
+          type: string
+          enum:
+            - publish
+            - cancel
+    IntakeCancel:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - key
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+    IntakePublish:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - key
+        - baseReleaseId
+        - sourceEvidenceVersion
+        - approvalEvidenceVersion
+        - title
+        - summary
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        baseReleaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        sourceEvidenceVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        approvalEvidenceVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 2048
+    IntakeReview:
+      type: object
+      additionalProperties: false
+      required:
+        - key
+        - reviewRequestId
+        - instanceCode
+        - evidenceVersion
+        - revocationGeneration
+        - state
+        - checkedAt
+        - validUntil
+        - reviewPackageObjectId
+        - reviewPackageSha256
+      properties:
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        reviewRequestId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        instanceCode:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        evidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        revocationGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        state:
+          type: string
+          enum:
+            - creating
+            - pending
+            - approved
+            - rejected
+            - revoked
+            - unavailable
+        checkedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          maxLength: 35
+        validUntil:
+          type:
+            - string
+            - "null"
+          format: date-time
+          maxLength: 35
+        reviewPackageObjectId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        reviewPackageSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+      if:
+        properties:
+          state:
+            const: approved
+      then:
+        properties:
+          checkedAt:
+            type: string
+          validUntil:
+            type: string
+          instanceCode:
+            type: string
+          evidenceVersion:
+            minimum: 1
+            type: integer
+    IntakeReviewRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - key
+        - expectedEvidenceVersion
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        expectedEvidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+    IntakeSourceConfirmation:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - key
+        - expectedEvidenceVersion
+        - confirmedVersionKind
+        - confirmedVersionValue
+        - acquisition
+        - objectSha256
+        - reason
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        expectedEvidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        confirmedVersionKind:
+          type: string
+          enum:
+            - integer
+            - opaque
+        confirmedVersionValue:
+          type: string
+          minLength: 1
+          maxLength: 128
+        acquisition:
+          type: string
+          enum:
+            - feishu-export
+            - controlled-synthetic-export
+        objectSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 512
+    IntakeCandidatePage:
+      type: object
+      additionalProperties: false
+      required:
+        - key
+        - entries
+        - differences
+        - nextCursor
+        - materialHeader
+      properties:
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeEntry"
+          minItems: 0
+          maxItems: 100
+        differences:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeDifference"
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+        materialHeader:
+          $ref: "#/components/schemas/IntakeMaterialHeader"
+    IntakeCandidateList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeCandidate"
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+    IntakeCandidate:
+      type: object
+      additionalProperties: false
+      required:
+        - key
+        - sourceId
+        - state
+        - readinessReasons
+        - sourceEvidenceVersion
+        - approvalEvidenceVersion
+        - revocationGeneration
+        - createdAt
+        - updatedAt
+        - publishedReleaseId
+      properties:
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        sourceId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        state:
+          type: string
+          enum:
+            - awaiting-evidence
+            - ready
+            - publishing
+            - published
+            - cancelled
+            - invalidated
+        readinessReasons:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+          minItems: 0
+          maxItems: 32
+        sourceEvidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        approvalEvidenceVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        revocationGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        createdAt:
+          type: string
+          format: date-time
+          maxLength: 35
+        updatedAt:
+          type: string
+          format: date-time
+          maxLength: 35
+        publishedReleaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+    IntakeMaterial:
+      type: object
+      additionalProperties: false
+      required:
+        - canonicalEncodingVersion
+        - scope
+        - sourceVersion
+        - sourceClaim
+        - templateVersion
+        - ruleVersion
+        - mappingVersion
+        - selectedSheets
+        - object
+        - entries
+        - differences
+        - contributors
+        - risk
+        - baseReleaseId
+        - media
+      properties:
+        canonicalEncodingVersion:
+          type: string
+          enum:
+            - candidate-p1.1
+        scope:
+          $ref: "#/components/schemas/IntakeSourceScope"
+        sourceVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        sourceClaim:
+          $ref: "#/components/schemas/IntakeSourceClaim"
+        templateVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        ruleVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        mappingVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        selectedSheets:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+          minItems: 1
+          maxItems: 16
+        object:
+          $ref: "#/components/schemas/IntakeObject"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeEntry"
+          minItems: 1
+          maxItems: 5000
+        differences:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeDifference"
+          minItems: 0
+          maxItems: 5000
+        contributors:
+          type: array
+          items:
+            type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+            minLength: 1
+            maxLength: 128
+          minItems: 1
+          maxItems: 100
+          description: 上传主体 + 声明的整理责任人 + 全部实际改稿人，经认证身份归一去重。声明源由 IntakeReceive 提供，解析器不能从文件作者或上传者推断。
+          uniqueItems: true
+        risk:
+          $ref: "#/components/schemas/IntakeRisk"
+        baseReleaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        media:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - objectId
+              - sha256
+              - mime
+              - bytes
+              - required
+              - alt
+            properties:
+              objectId:
+                type: string
+                pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+                minLength: 1
+                maxLength: 128
+              sha256:
+                type: string
+                pattern: ^[0-9a-f]{64}$
+                minLength: 64
+                maxLength: 64
+              mime:
+                type: string
+                minLength: 1
+                maxLength: 128
+              bytes:
+                $ref: "#/components/schemas/IntakeVersion"
+              required:
+                type: boolean
+              alt:
+                type: string
+                minLength: 1
+                maxLength: 1024
+          minItems: 0
+          maxItems: 0
+    IntakeRisk:
+      type: object
+      additionalProperties: false
+      required:
+        - policyVersion
+        - level
+        - reasons
+        - explicitDisableCount
+        - sameSourceDisabledLast24Hours
+        - evaluatedAt
+      properties:
+        policyVersion:
+          type: string
+          enum:
+            - risk-p1.1
+        level:
+          type: string
+          enum:
+            - routine
+            - critical
+        reasons:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+          minItems: 0
+          maxItems: 32
+        explicitDisableCount:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        sameSourceDisabledLast24Hours:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        evaluatedAt:
+          type: string
+          format: date-time
+          maxLength: 35
+    IntakeDifference:
+      type: object
+      additionalProperties: false
+      required:
+        - businessEntryId
+        - change
+        - previousVersion
+        - nextVersion
+        - beforeDigest
+        - afterDigest
+      properties:
+        businessEntryId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        change:
+          type: string
+          enum:
+            - add
+            - modify
+            - disable
+            - reenable
+        previousVersion:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 9007199254740991
+        nextVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        beforeDigest:
+          type:
+            - string
+            - "null"
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        afterDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+    IntakeEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - businessEntryId
+        - scriptVersion
+        - operation
+        - title
+        - answerText
+        - questions
+        - productRefs
+        - scenarioRefs
+        - effectiveFrom
+        - effectiveTo
+        - applicabilityNote
+        - familySourceId
+        - familyBusinessEntryId
+        - brandNonOverridable
+        - category
+        - internalNote
+        - riskNote
+        - attachmentNote
+      properties:
+        businessEntryId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        scriptVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        operation:
+          type: string
+          enum:
+            - upsert
+            - disable
+        title:
+          type: string
+          minLength: 1
+          maxLength: 512
+        answerText:
+          type: string
+          minLength: 1
+          maxLength: 32767
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeQuestion"
+          minItems: 0
+          maxItems: 100
+        productRefs:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeTermRef"
+          minItems: 0
+          maxItems: 100
+        scenarioRefs:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeTermRef"
+          minItems: 0
+          maxItems: 100
+        effectiveFrom:
+          type: string
+          format: date-time
+          maxLength: 35
+        effectiveTo:
+          type:
+            - string
+            - "null"
+          format: date-time
+          maxLength: 35
+        applicabilityNote:
+          type: string
+          maxLength: 4096
+        familySourceId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        familyBusinessEntryId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        brandNonOverridable:
+          type: boolean
+        category:
+          type: string
+          maxLength: 32767
+        internalNote:
+          type: string
+          maxLength: 32767
+        riskNote:
+          type: string
+          maxLength: 32767
+        attachmentNote:
+          type: string
+          maxLength: 0
+      description: 完整审核材料。分类用于检索；内部说明不进入坐席正文或复制。风险提示单独展示且不拼入复制文本；附件说明不得用来冒充已解析媒体。P2 非空附件说明阻断导入，规范条目该字段保留为空。复制只含 answerText。
+      if:
+        properties:
+          familySourceId:
+            type: "null"
+      then:
+        properties:
+          familyBusinessEntryId:
+            type: "null"
+      else:
+        properties:
+          familyBusinessEntryId:
+            type: string
+    IntakeTermRef:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - displayVersion
+      properties:
+        id:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        displayVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+    IntakeQuestion:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version
+        - text
+        - active
+      properties:
+        id:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        version:
+          $ref: "#/components/schemas/IntakeVersion"
+        text:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        active:
+          type: boolean
+    IntakeSourceClaim:
+      type: object
+      additionalProperties: false
+      required:
+        - versionKind
+        - versionValue
+        - acquisition
+        - fileSha256
+      properties:
+        versionKind:
+          type: string
+          enum:
+            - integer
+            - opaque
+            - unknown
+        versionValue:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 128
+        acquisition:
+          type: string
+          enum:
+            - feishu-export
+            - controlled-synthetic-export
+        fileSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+    IntakeCandidateKey:
+      type: object
+      additionalProperties: false
+      required:
+        - candidateId
+        - version
+        - digest
+      properties:
+        candidateId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        version:
+          $ref: "#/components/schemas/IntakeVersion"
+        digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+    IntakeReceive:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - objectId
+        - sourceVersion
+        - baseReleaseId
+        - contributorDeclaration
+        - expectedPriorKey
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        objectId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        sourceVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        baseReleaseId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        contributorDeclaration:
+          $ref: "#/components/schemas/IntakeContributorDeclaration"
+        expectedPriorKey:
+          oneOf:
+            - $ref: "#/components/schemas/IntakeCandidateKey"
+            - type: "null"
+          description: 明确 null 为新建独立候选；完整旧键为修订该候选，不得从 source/file 推测。成功解析并复算后在同事务 CAS 旧键和可修订状态，废旧并冻结同 candidateId 的下一版。解析失败保留旧版；publishing/unknown/published/cancelled/invalidated 不允许修订，返回明确冲突。
+    IntakeParseJob:
+      type: object
+      additionalProperties: false
+      required:
+        - jobId
+        - generation
+        - state
+        - candidateId
+        - candidateVersion
+        - issues
+        - totalIssues
+        - excludedSheetCount
+        - excludedMediaCount
+        - reportObjectId
+      properties:
+        jobId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        generation:
+          $ref: "#/components/schemas/IntakeVersion"
+        state:
+          type: string
+          enum:
+            - reading
+            - parsing
+            - validated
+            - failed
+            - cancelled
+        candidateId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        candidateVersion:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 9007199254740991
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeIssue"
+          minItems: 0
+          maxItems: 100
+        totalIssues:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        excludedSheetCount:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        excludedMediaCount:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        reportObjectId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+    IntakeIssue:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - location
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+        message:
+          type: string
+          minLength: 1
+          maxLength: 512
+        location:
+          $ref: "#/components/schemas/IntakeCoordinate"
+    IntakeCoordinate:
+      type: object
+      additionalProperties: false
+      required:
+        - sheet
+        - row
+        - column
+      properties:
+        sheet:
+          type: string
+          minLength: 1
+          maxLength: 64
+        row:
+          type: integer
+          minimum: 1
+          maximum: 5002
+        column:
+          type: integer
+          minimum: 1
+          maximum: 32
+    IntakeObject:
+      type: object
+      additionalProperties: false
+      required:
+        - objectId
+        - sha256
+        - bytes
+        - mime
+        - sourceId
+      properties:
+        objectId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        bytes:
+          type: integer
+          minimum: 1
+          maximum: 10485760
+        mime:
+          type: string
+          enum:
+            - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        sourceId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+    IntakeVocabularyWrite:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - change
+        - id
+        - kind
+        - expectedDisplayVersion
+        - displayName
+        - meaningDigest
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        change:
+          type: string
+          enum:
+            - create
+            - rename
+            - retire
+        id:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        kind:
+          type: string
+          enum:
+            - product
+            - scenario
+        expectedDisplayVersion:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 256
+        meaningDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+    IntakeVocabularyList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeVocabulary"
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+    IntakeVocabulary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - kind
+        - displayVersion
+        - displayName
+        - meaningDigest
+        - scope
+        - active
+      properties:
+        id:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        kind:
+          type: string
+          enum:
+            - product
+            - scenario
+        displayVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 256
+        meaningDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        scope:
+          $ref: "#/components/schemas/IntakeScope"
+        active:
+          type: boolean
+    IntakeSourceList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeSource"
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+    IntakeSourceWrite:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - expectedVersion
+        - templateVersion
+        - ruleVersion
+        - mappingVersion
+        - structureDigest
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        expectedVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        templateVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        ruleVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        mappingVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        structureDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+    IntakeSource:
+      type: object
+      additionalProperties: false
+      required:
+        - scope
+        - version
+        - templateVersion
+        - ruleVersion
+        - mappingVersion
+        - structureDigest
+        - contentIntakeMode
+        - modeVersion
+      properties:
+        scope:
+          $ref: "#/components/schemas/IntakeSourceScope"
+        version:
+          $ref: "#/components/schemas/IntakeVersion"
+        templateVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        ruleVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        mappingVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+        structureDigest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        contentIntakeMode:
+          type: string
+          enum:
+            - legacy
+            - v2-preview
+            - v2-active
+        modeVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+    IntakePolicy:
+      type: object
+      additionalProperties: false
+      required:
+        - policyVersion
+        - templateVersion
+        - maxFileBytes
+        - maxExpandedBytes
+        - maxZipEntries
+        - maxRows
+        - maxColumns
+        - maxCells
+        - maxCellCharacters
+        - maxSharedStrings
+        - parseTimeoutMs
+        - maxActiveCandidatesPerActor
+        - maxActiveCandidatesPerSource
+        - maxTenantStagingBytes
+        - orgFactsMaxAgeSeconds
+        - approvalFactsMaxAgeSeconds
+        - ticketMaxAgeSeconds
+        - selectedMediaSupported
+      properties:
+        policyVersion:
+          type: string
+          enum:
+            - intake-p1.1
+        templateVersion:
+          type: string
+          enum:
+            - faq-p1.1
+        maxFileBytes:
+          type: integer
+          enum:
+            - 10485760
+        maxExpandedBytes:
+          type: integer
+          enum:
+            - 52428800
+        maxZipEntries:
+          type: integer
+          enum:
+            - 512
+        maxRows:
+          type: integer
+          enum:
+            - 5000
+        maxColumns:
+          type: integer
+          enum:
+            - 32
+        maxCells:
+          type: integer
+          enum:
+            - 200000
+        maxCellCharacters:
+          type: integer
+          enum:
+            - 32767
+        maxSharedStrings:
+          type: integer
+          enum:
+            - 100000
+        parseTimeoutMs:
+          type: integer
+          enum:
+            - 30000
+        maxActiveCandidatesPerActor:
+          type: integer
+          enum:
+            - 10
+        maxActiveCandidatesPerSource:
+          type: integer
+          enum:
+            - 100
+        maxTenantStagingBytes:
+          type: integer
+          enum:
+            - 1073741824
+        orgFactsMaxAgeSeconds:
+          type: integer
+          enum:
+            - 300
+        approvalFactsMaxAgeSeconds:
+          type: integer
+          enum:
+            - 300
+        ticketMaxAgeSeconds:
+          type: integer
+          enum:
+            - 60
+        selectedMediaSupported:
+          type: boolean
+          enum:
+            - false
+    IntakeGrantChange:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - expectedVersion
+        - change
+        - stewardPrincipalId
+        - reason
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        expectedVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        change:
+          type: string
+          enum:
+            - revoke
+            - takeover
+        stewardPrincipalId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: \S
+          description: 本次变更原因；受控事务写入新版本lastChangeReason，保留初次reason及全部历史。
+    IntakeGrantList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeGrant"
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+    IntakeGrant:
+      type: object
+      additionalProperties: false
+      required:
+        - grantId
+        - version
+        - kind
+        - issuerPrincipalId
+        - recipientPrincipalId
+        - action
+        - scope
+        - startsAt
+        - expiresAt
+        - revokedAt
+        - stewardPrincipalId
+        - reason
+        - mayRedelegate
+        - lastChangeReason
+      properties:
+        grantId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        version:
+          $ref: "#/components/schemas/IntakeVersion"
+        kind:
+          type: string
+          enum:
+            - business
+            - allocation
+            - delegation
+        issuerPrincipalId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        recipientPrincipalId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        action:
+          $ref: "#/components/schemas/IntakeAction"
+        scope:
+          $ref: "#/components/schemas/IntakeScope"
+        startsAt:
+          type: string
+          format: date-time
+          maxLength: 35
+        expiresAt:
+          type: string
+          format: date-time
+          maxLength: 35
+        revokedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          maxLength: 35
+        stewardPrincipalId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: 初次授予原因，不可改写；后续请求原因写 lastChangeReason 并随版本追加历史。
+          pattern: \S
+        mayRedelegate:
+          type: boolean
+          enum:
+            - false
+        lastChangeReason:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+          pattern: \S
+          description: 版本1为null；后续版本为该次撤权或接管请求的reason，旧版本在grant_history中保留。
+      if:
+        properties:
+          version:
+            const: 1
+        required:
+          - version
+      then:
+        properties:
+          lastChangeReason:
+            type: "null"
+      else:
+        properties:
+          lastChangeReason:
+            type: string
+    IntakeGrantBatch:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - issuerFactsVersion
+        - policyVersion
+        - items
+      properties:
+        operationId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        issuerFactsVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        policyVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeGrantItem"
+          minItems: 1
+          maxItems: 64
+    IntakeGrantItem:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - recipientPrincipalId
+        - recipientFactsVersion
+        - action
+        - scope
+        - startsAt
+        - expiresAt
+        - reason
+      properties:
+        kind:
+          type: string
+          enum:
+            - business
+            - delegation
+        recipientPrincipalId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        recipientFactsVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        action:
+          $ref: "#/components/schemas/IntakeAction"
+        scope:
+          $ref: "#/components/schemas/IntakeScope"
+        startsAt:
+          type: string
+          format: date-time
+          maxLength: 35
+        expiresAt:
+          type: string
+          format: date-time
+          maxLength: 35
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 512
+    IntakeAuthorization:
+      type: object
+      additionalProperties: false
+      required:
+        - factsVersion
+        - revocationGeneration
+        - policyVersion
+        - validUntil
+        - capabilities
+        - nextCursor
+      properties:
+        factsVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        revocationGeneration:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        policyVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        validUntil:
+          type: string
+          format: date-time
+          maxLength: 35
+        capabilities:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - scope
+              - actions
+              - mayAllocate
+              - mayDelegate
+              - validUntil
+            properties:
+              scope:
+                $ref: "#/components/schemas/IntakeScope"
+              actions:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntakeAction"
+                minItems: 0
+                maxItems: 8
+                uniqueItems: true
+              mayAllocate:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntakeAction"
+                minItems: 0
+                maxItems: 8
+                uniqueItems: true
+              mayDelegate:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntakeAction"
+                minItems: 0
+                maxItems: 8
+                uniqueItems: true
+              validUntil:
+                type: string
+                format: date-time
+                maxLength: 35
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+    IntakeError:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/IntakeFailure"
+    IntakeFailure:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - details
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - CONFLICT
+            - RATE_LIMITED
+            - OVERLOADED
+            - INTERNAL_ERROR
+        message:
+          type: string
+          minLength: 1
+          maxLength: 512
+        details:
+          type: object
+          additionalProperties: false
+          required:
+            - reason
+            - diagnosticId
+          properties:
+            reason:
+              type: string
+              enum:
+                - ORG_FACTS_UNAVAILABLE
+                - PERMISSION_CHANGED
+                - SCOPE_DENIED
+                - ROLE_CEILING
+                - GRANT_AUTHORITY_DENIED
+                - SELF_ESCALATION
+                - REDELEGATION_DENIED
+                - NO_STEWARD
+                - SOURCE_MISMATCH
+                - SOURCE_ORDER_UNKNOWN
+                - FILE_INVALID
+                - FILE_LIMIT
+                - TEMPLATE_VERSION
+                - EMPTY_DATA
+                - QUOTA_EXCEEDED
+                - AWAITING_APPROVAL
+                - APPROVAL_UNAVAILABLE
+                - HUMAN_REVIEW_REQUIRED
+                - APPROVAL_BINDING
+                - ATTACHMENT_UNVERIFIED
+                - MATERIAL_CHANGED
+                - BASE_CHANGED
+                - APPROVAL_CHANGED
+                - APPROVAL_REVOKED
+                - TICKET_EXPIRED
+                - TICKET_CONSUMED
+                - IDEMPOTENCY_CONFLICT
+                - COMMIT_UNKNOWN
+                - ALREADY_PUBLISHED
+                - MODE_CONFLICT
+                - UPGRADE_REQUIRED
+                - VOCABULARY_IN_USE
+                - MEANING_CHANGED
+                - LEASE_EXPIRED
+                - NO_SHOP
+                - CHOOSE_SHOP
+            diagnosticId:
+              type: string
+              pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+              minLength: 1
+              maxLength: 128
+    IntakeAction:
+      type: string
+      enum:
+        - query
+        - content-manage
+        - import
+        - source-confirm
+        - review
+        - publish
+        - candidate-cancel
+        - rollback
+    IntakeSourceScope:
+      type: object
+      additionalProperties: false
+      required:
+        - tenantId
+        - appId
+        - brandId
+        - shopId
+        - domain
+        - sourceId
+      properties:
+        tenantId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        appId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        brandId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        shopId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        domain:
+          type: string
+          enum:
+            - presale
+            - campaign
+            - aftersale
+            - product
+        sourceId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+    IntakeScope:
+      type: object
+      additionalProperties: false
+      required:
+        - tenantId
+        - appId
+        - brandId
+        - shopId
+        - domain
+        - sourceId
+      properties:
+        tenantId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        appId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        brandId:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        shopId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+        domain:
+          type: string
+          enum:
+            - presale
+            - campaign
+            - aftersale
+            - product
+        sourceId:
+          type:
+            - string
+            - "null"
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+          minLength: 1
+          maxLength: 128
+      description: 所有字段必填。shopId=null 只代表品牌通用范围，不覆盖任意店；sourceId=null 显式覆盖该精确范围全部来源。
+    IntakeDigest:
+      type: string
+      pattern: ^[0-9a-f]{64}$
+      minLength: 64
+      maxLength: 64
+    IntakeVersion:
+      type: integer
+      minimum: 1
+      maximum: 9007199254740991
+    IntakeId:
+      type: string
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+      minLength: 1
+      maxLength: 128
     SoftwareReleaseList:
       type: object
       additionalProperties: false
@@ -8184,3 +13262,14 @@ x-ops-loop-development:
   runtime_activated: false
   sqlContract: schema.v1.18
   latestYml: false
+x-coach-publish-development:
+  status: SYNTHETIC_DEVELOPMENT_ONLY
+  runtime_activated: false
+  sqlContract: schema.v1.19
+  coachProductCampaign: true
+x-content-intake-development:
+  status: SYNTHETIC_DEVELOPMENT_ONLY
+  runtime_activated: false
+  sqlContract: schema.v1.20
+  transactionImplementationRequired: true
+  minimumSnapshotFormat: intake-v2.1

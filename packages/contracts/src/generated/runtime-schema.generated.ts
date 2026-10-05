@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.14.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.16.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -53,6 +53,63 @@ export const COMPONENT_SCHEMA_NAMES = [
   "ImportStatusResponseBase",
   "InaccuracyReportRequest",
   "InaccuracyReportResponse",
+  "IntakeAction",
+  "IntakeAuthorization",
+  "IntakeCancel",
+  "IntakeCandidate",
+  "IntakeCandidateKey",
+  "IntakeCandidateList",
+  "IntakeCandidatePage",
+  "IntakeContributorDeclaration",
+  "IntakeCoordinate",
+  "IntakeDifference",
+  "IntakeDigest",
+  "IntakeEntitlement",
+  "IntakeEntitlementRequest",
+  "IntakeEntry",
+  "IntakeError",
+  "IntakeFailure",
+  "IntakeGrant",
+  "IntakeGrantBatch",
+  "IntakeGrantChange",
+  "IntakeGrantItem",
+  "IntakeGrantList",
+  "IntakeId",
+  "IntakeIssue",
+  "IntakeMaterial",
+  "IntakeMaterialHeader",
+  "IntakeObject",
+  "IntakeOperationReceipt",
+  "IntakeParseJob",
+  "IntakePolicy",
+  "IntakePrincipalPage",
+  "IntakePublish",
+  "IntakePublishedEntry",
+  "IntakeQuestion",
+  "IntakeReceipt",
+  "IntakeReceive",
+  "IntakeReview",
+  "IntakeReviewRequest",
+  "IntakeRisk",
+  "IntakeRollback",
+  "IntakeRollbackImpact",
+  "IntakeRollbackPreview",
+  "IntakeRollbackReceipt",
+  "IntakeRollbackReview",
+  "IntakeRollbackReviewRequest",
+  "IntakeScope",
+  "IntakeSnapshot",
+  "IntakeSource",
+  "IntakeSourceClaim",
+  "IntakeSourceConfirmation",
+  "IntakeSourceList",
+  "IntakeSourceScope",
+  "IntakeSourceWrite",
+  "IntakeTermRef",
+  "IntakeVersion",
+  "IntakeVocabulary",
+  "IntakeVocabularyList",
+  "IntakeVocabularyWrite",
   "IntentId",
   "IntentTaxonomyVersion",
   "InteractionReason",
@@ -172,7 +229,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.14.0:components",
+  "$id": "urn:customer-agent:openapi:1.16.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -2040,6 +2097,3189 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "type": "string",
           "minLength": 1,
           "maxLength": 128
+        }
+      }
+    },
+    "IntakeAction": {
+      "type": "string",
+      "enum": [
+        "query",
+        "content-manage",
+        "import",
+        "source-confirm",
+        "review",
+        "publish",
+        "candidate-cancel",
+        "rollback"
+      ]
+    },
+    "IntakeAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factsVersion",
+        "revocationGeneration",
+        "policyVersion",
+        "validUntil",
+        "capabilities",
+        "nextCursor"
+      ],
+      "properties": {
+        "factsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "policyVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "actions",
+              "mayAllocate",
+              "mayDelegate",
+              "validUntil"
+            ],
+            "properties": {
+              "scope": {
+                "$ref": "#/$defs/IntakeScope"
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/IntakeAction"
+                },
+                "minItems": 0,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "mayAllocate": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/IntakeAction"
+                },
+                "minItems": 0,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "mayDelegate": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/IntakeAction"
+                },
+                "minItems": 0,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "validUntil": {
+                "type": "string",
+                "format": "date-time",
+                "maxLength": 35
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeCancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        }
+      }
+    },
+    "IntakeCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "sourceId",
+        "state",
+        "readinessReasons",
+        "sourceEvidenceVersion",
+        "approvalEvidenceVersion",
+        "revocationGeneration",
+        "createdAt",
+        "updatedAt",
+        "publishedReleaseId"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "awaiting-evidence",
+            "ready",
+            "publishing",
+            "published",
+            "cancelled",
+            "invalidated"
+          ]
+        },
+        "readinessReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "sourceEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "approvalEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "publishedReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakeCandidateKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "IntakeCandidateList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeCandidate"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeCandidatePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "entries",
+        "differences",
+        "nextCursor",
+        "materialHeader"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeEntry"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "differences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeDifference"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "materialHeader": {
+          "$ref": "#/$defs/IntakeMaterialHeader"
+        }
+      }
+    },
+    "IntakeContributorDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preparerPrincipalId",
+        "editorPrincipalIds",
+        "confirmed"
+      ],
+      "properties": {
+        "preparerPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "editorPrincipalIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 98,
+          "uniqueItems": true
+        },
+        "confirmed": {
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        }
+      }
+    },
+    "IntakeCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sheet",
+        "row",
+        "column"
+      ],
+      "properties": {
+        "sheet": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5002
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
+      }
+    },
+    "IntakeDifference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "businessEntryId",
+        "change",
+        "previousVersion",
+        "nextVersion",
+        "beforeDigest",
+        "afterDigest"
+      ],
+      "properties": {
+        "businessEntryId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "change": {
+          "type": "string",
+          "enum": [
+            "add",
+            "modify",
+            "disable",
+            "reenable"
+          ]
+        },
+        "previousVersion": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "nextVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "beforeDigest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "afterDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "IntakeDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "IntakeEntitlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entitlementId",
+        "releaseId",
+        "shopId",
+        "contextGeneration",
+        "revocationGeneration",
+        "validUntil",
+        "scopes"
+      ],
+      "properties": {
+        "entitlementId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "releaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "shopId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contextGeneration": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeSourceScope"
+          },
+          "minItems": 0,
+          "maxItems": 1000
+        }
+      }
+    },
+    "IntakeEntitlementRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shopId",
+        "contextGeneration",
+        "releaseId"
+      ],
+      "properties": {
+        "shopId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contextGeneration": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "releaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakeEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "businessEntryId",
+        "scriptVersion",
+        "operation",
+        "title",
+        "answerText",
+        "questions",
+        "productRefs",
+        "scenarioRefs",
+        "effectiveFrom",
+        "effectiveTo",
+        "applicabilityNote",
+        "familySourceId",
+        "familyBusinessEntryId",
+        "brandNonOverridable",
+        "category",
+        "internalNote",
+        "riskNote",
+        "attachmentNote"
+      ],
+      "properties": {
+        "businessEntryId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "scriptVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "upsert",
+            "disable"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "answerText": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32767
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeQuestion"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "productRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeTermRef"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "scenarioRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeTermRef"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "effectiveFrom": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "effectiveTo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "applicabilityNote": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "familySourceId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "familyBusinessEntryId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "brandNonOverridable": {
+          "type": "boolean"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 32767
+        },
+        "internalNote": {
+          "type": "string",
+          "maxLength": 32767
+        },
+        "riskNote": {
+          "type": "string",
+          "maxLength": 32767
+        },
+        "attachmentNote": {
+          "type": "string",
+          "maxLength": 0
+        }
+      },
+      "if": {
+        "properties": {
+          "familySourceId": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "familyBusinessEntryId": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "else": {
+        "properties": {
+          "familyBusinessEntryId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/IntakeFailure"
+        }
+      }
+    },
+    "IntakeFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "details"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "VALIDATION",
+            "UNAUTHORIZED",
+            "FORBIDDEN",
+            "NOT_FOUND",
+            "CONFLICT",
+            "RATE_LIMITED",
+            "OVERLOADED",
+            "INTERNAL_ERROR"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reason",
+            "diagnosticId"
+          ],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "enum": [
+                "ORG_FACTS_UNAVAILABLE",
+                "PERMISSION_CHANGED",
+                "SCOPE_DENIED",
+                "ROLE_CEILING",
+                "GRANT_AUTHORITY_DENIED",
+                "SELF_ESCALATION",
+                "REDELEGATION_DENIED",
+                "NO_STEWARD",
+                "SOURCE_MISMATCH",
+                "SOURCE_ORDER_UNKNOWN",
+                "FILE_INVALID",
+                "FILE_LIMIT",
+                "TEMPLATE_VERSION",
+                "EMPTY_DATA",
+                "QUOTA_EXCEEDED",
+                "AWAITING_APPROVAL",
+                "APPROVAL_UNAVAILABLE",
+                "HUMAN_REVIEW_REQUIRED",
+                "APPROVAL_BINDING",
+                "ATTACHMENT_UNVERIFIED",
+                "MATERIAL_CHANGED",
+                "BASE_CHANGED",
+                "APPROVAL_CHANGED",
+                "APPROVAL_REVOKED",
+                "TICKET_EXPIRED",
+                "TICKET_CONSUMED",
+                "IDEMPOTENCY_CONFLICT",
+                "COMMIT_UNKNOWN",
+                "ALREADY_PUBLISHED",
+                "MODE_CONFLICT",
+                "UPGRADE_REQUIRED",
+                "VOCABULARY_IN_USE",
+                "MEANING_CHANGED",
+                "LEASE_EXPIRED",
+                "NO_SHOP",
+                "CHOOSE_SHOP"
+              ]
+            },
+            "diagnosticId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        }
+      }
+    },
+    "IntakeGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grantId",
+        "version",
+        "kind",
+        "issuerPrincipalId",
+        "recipientPrincipalId",
+        "action",
+        "scope",
+        "startsAt",
+        "expiresAt",
+        "revokedAt",
+        "stewardPrincipalId",
+        "reason",
+        "mayRedelegate",
+        "lastChangeReason"
+      ],
+      "properties": {
+        "grantId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "business",
+            "allocation",
+            "delegation"
+          ]
+        },
+        "issuerPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "recipientPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action": {
+          "$ref": "#/$defs/IntakeAction"
+        },
+        "scope": {
+          "$ref": "#/$defs/IntakeScope"
+        },
+        "startsAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "revokedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "stewardPrincipalId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "mayRedelegate": {
+          "type": "boolean",
+          "enum": [
+            false
+          ]
+        },
+        "lastChangeReason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      },
+      "if": {
+        "properties": {
+          "version": {
+            "const": 1
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "lastChangeReason": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "else": {
+        "properties": {
+          "lastChangeReason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeGrantBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "issuerFactsVersion",
+        "policyVersion",
+        "items"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "issuerFactsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "policyVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeGrantItem"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        }
+      }
+    },
+    "IntakeGrantChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "expectedVersion",
+        "change",
+        "stewardPrincipalId",
+        "reason"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "expectedVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "change": {
+          "type": "string",
+          "enum": [
+            "revoke",
+            "takeover"
+          ]
+        },
+        "stewardPrincipalId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "IntakeGrantItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "recipientPrincipalId",
+        "recipientFactsVersion",
+        "action",
+        "scope",
+        "startsAt",
+        "expiresAt",
+        "reason"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "business",
+            "delegation"
+          ]
+        },
+        "recipientPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "recipientFactsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "action": {
+          "$ref": "#/$defs/IntakeAction"
+        },
+        "scope": {
+          "$ref": "#/$defs/IntakeScope"
+        },
+        "startsAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeGrantList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeGrant"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "IntakeIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "location"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "location": {
+          "$ref": "#/$defs/IntakeCoordinate"
+        }
+      }
+    },
+    "IntakeMaterial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalEncodingVersion",
+        "scope",
+        "sourceVersion",
+        "sourceClaim",
+        "templateVersion",
+        "ruleVersion",
+        "mappingVersion",
+        "selectedSheets",
+        "object",
+        "entries",
+        "differences",
+        "contributors",
+        "risk",
+        "baseReleaseId",
+        "media"
+      ],
+      "properties": {
+        "canonicalEncodingVersion": {
+          "type": "string",
+          "enum": [
+            "candidate-p1.1"
+          ]
+        },
+        "scope": {
+          "$ref": "#/$defs/IntakeSourceScope"
+        },
+        "sourceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "sourceClaim": {
+          "$ref": "#/$defs/IntakeSourceClaim"
+        },
+        "templateVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "mappingVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "selectedSheets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "object": {
+          "$ref": "#/$defs/IntakeObject"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeEntry"
+          },
+          "minItems": 1,
+          "maxItems": 5000
+        },
+        "differences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeDifference"
+          },
+          "minItems": 0,
+          "maxItems": 5000
+        },
+        "contributors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "risk": {
+          "$ref": "#/$defs/IntakeRisk"
+        },
+        "baseReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "objectId",
+              "sha256",
+              "mime",
+              "bytes",
+              "required",
+              "alt"
+            ],
+            "properties": {
+              "objectId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "mime": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "bytes": {
+                "$ref": "#/$defs/IntakeVersion"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "alt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        }
+      }
+    },
+    "IntakeMaterialHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalEncodingVersion",
+        "scope",
+        "sourceVersion",
+        "sourceClaim",
+        "templateVersion",
+        "ruleVersion",
+        "mappingVersion",
+        "selectedSheets",
+        "object",
+        "contributors",
+        "risk",
+        "baseReleaseId",
+        "media"
+      ],
+      "properties": {
+        "canonicalEncodingVersion": {
+          "type": "string",
+          "enum": [
+            "candidate-p1.1"
+          ]
+        },
+        "scope": {
+          "$ref": "#/$defs/IntakeSourceScope"
+        },
+        "sourceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "sourceClaim": {
+          "$ref": "#/$defs/IntakeSourceClaim"
+        },
+        "templateVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "mappingVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "selectedSheets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "object": {
+          "$ref": "#/$defs/IntakeObject"
+        },
+        "contributors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 100
+        },
+        "risk": {
+          "$ref": "#/$defs/IntakeRisk"
+        },
+        "baseReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "objectId",
+              "sha256",
+              "mime",
+              "bytes",
+              "required",
+              "alt"
+            ],
+            "properties": {
+              "objectId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "mime": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "bytes": {
+                "$ref": "#/$defs/IntakeVersion"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "alt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        }
+      }
+    },
+    "IntakeObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objectId",
+        "sha256",
+        "bytes",
+        "mime",
+        "sourceId"
+      ],
+      "properties": {
+        "objectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10485760
+        },
+        "mime": {
+          "type": "string",
+          "enum": [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          ]
+        },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakeOperationReceipt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/IntakeReceipt"
+        },
+        {
+          "$ref": "#/$defs/IntakeRollbackReceipt"
+        }
+      ]
+    },
+    "IntakeParseJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jobId",
+        "generation",
+        "state",
+        "candidateId",
+        "candidateVersion",
+        "issues",
+        "totalIssues",
+        "excludedSheetCount",
+        "excludedMediaCount",
+        "reportObjectId"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "generation": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "reading",
+            "parsing",
+            "validated",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "candidateId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "candidateVersion": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeIssue"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "totalIssues": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "excludedSheetCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "excludedMediaCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reportObjectId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyVersion",
+        "templateVersion",
+        "maxFileBytes",
+        "maxExpandedBytes",
+        "maxZipEntries",
+        "maxRows",
+        "maxColumns",
+        "maxCells",
+        "maxCellCharacters",
+        "maxSharedStrings",
+        "parseTimeoutMs",
+        "maxActiveCandidatesPerActor",
+        "maxActiveCandidatesPerSource",
+        "maxTenantStagingBytes",
+        "orgFactsMaxAgeSeconds",
+        "approvalFactsMaxAgeSeconds",
+        "ticketMaxAgeSeconds",
+        "selectedMediaSupported"
+      ],
+      "properties": {
+        "policyVersion": {
+          "type": "string",
+          "enum": [
+            "intake-p1.1"
+          ]
+        },
+        "templateVersion": {
+          "type": "string",
+          "enum": [
+            "faq-p1.1"
+          ]
+        },
+        "maxFileBytes": {
+          "type": "integer",
+          "enum": [
+            10485760
+          ]
+        },
+        "maxExpandedBytes": {
+          "type": "integer",
+          "enum": [
+            52428800
+          ]
+        },
+        "maxZipEntries": {
+          "type": "integer",
+          "enum": [
+            512
+          ]
+        },
+        "maxRows": {
+          "type": "integer",
+          "enum": [
+            5000
+          ]
+        },
+        "maxColumns": {
+          "type": "integer",
+          "enum": [
+            32
+          ]
+        },
+        "maxCells": {
+          "type": "integer",
+          "enum": [
+            200000
+          ]
+        },
+        "maxCellCharacters": {
+          "type": "integer",
+          "enum": [
+            32767
+          ]
+        },
+        "maxSharedStrings": {
+          "type": "integer",
+          "enum": [
+            100000
+          ]
+        },
+        "parseTimeoutMs": {
+          "type": "integer",
+          "enum": [
+            30000
+          ]
+        },
+        "maxActiveCandidatesPerActor": {
+          "type": "integer",
+          "enum": [
+            10
+          ]
+        },
+        "maxActiveCandidatesPerSource": {
+          "type": "integer",
+          "enum": [
+            100
+          ]
+        },
+        "maxTenantStagingBytes": {
+          "type": "integer",
+          "enum": [
+            1073741824
+          ]
+        },
+        "orgFactsMaxAgeSeconds": {
+          "type": "integer",
+          "enum": [
+            300
+          ]
+        },
+        "approvalFactsMaxAgeSeconds": {
+          "type": "integer",
+          "enum": [
+            300
+          ]
+        },
+        "ticketMaxAgeSeconds": {
+          "type": "integer",
+          "enum": [
+            60
+          ]
+        },
+        "selectedMediaSupported": {
+          "type": "boolean",
+          "enum": [
+            false
+          ]
+        }
+      }
+    },
+    "IntakePrincipalPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "principalId",
+              "displayLabel",
+              "factsVersion",
+              "validUntil",
+              "enabled"
+            ],
+            "properties": {
+              "principalId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "displayLabel": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "factsVersion": {
+                "$ref": "#/$defs/IntakeVersion"
+              },
+              "validUntil": {
+                "type": "string",
+                "format": "date-time",
+                "maxLength": 35
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakePublish": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "baseReleaseId",
+        "sourceEvidenceVersion",
+        "approvalEvidenceVersion",
+        "title",
+        "summary"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "baseReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sourceEvidenceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "approvalEvidenceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "IntakePublishedEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "businessEntryId",
+        "scriptVersion",
+        "operation",
+        "title",
+        "answerText",
+        "questions",
+        "productRefs",
+        "scenarioRefs",
+        "effectiveFrom",
+        "effectiveTo",
+        "applicabilityNote",
+        "familySourceId",
+        "familyBusinessEntryId",
+        "brandNonOverridable",
+        "category",
+        "riskNote"
+      ],
+      "properties": {
+        "businessEntryId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "scriptVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "upsert"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "answerText": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32767
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeQuestion"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "productRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeTermRef"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "scenarioRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeTermRef"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "effectiveFrom": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "effectiveTo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "applicabilityNote": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "familySourceId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "familyBusinessEntryId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "brandNonOverridable": {
+          "type": "boolean"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 32767
+        },
+        "riskNote": {
+          "type": "string",
+          "maxLength": 32767
+        }
+      },
+      "if": {
+        "properties": {
+          "familySourceId": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "familyBusinessEntryId": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "else": {
+        "properties": {
+          "familyBusinessEntryId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "text",
+        "active"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "active": {
+          "type": "boolean"
+        }
+      }
+    },
+    "IntakeReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "state",
+        "releaseId",
+        "announcementId",
+        "reason",
+        "action"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "unknown",
+            "published",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "releaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "announcementId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "publish",
+            "cancel"
+          ]
+        }
+      }
+    },
+    "IntakeReceive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "objectId",
+        "sourceVersion",
+        "baseReleaseId",
+        "contributorDeclaration",
+        "expectedPriorKey"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "objectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sourceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "baseReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contributorDeclaration": {
+          "$ref": "#/$defs/IntakeContributorDeclaration"
+        },
+        "expectedPriorKey": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IntakeCandidateKey"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "IntakeReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "reviewRequestId",
+        "instanceCode",
+        "evidenceVersion",
+        "revocationGeneration",
+        "state",
+        "checkedAt",
+        "validUntil",
+        "reviewPackageObjectId",
+        "reviewPackageSha256"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "reviewRequestId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "instanceCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "creating",
+            "pending",
+            "approved",
+            "rejected",
+            "revoked",
+            "unavailable"
+          ]
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "validUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "reviewPackageObjectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reviewPackageSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "approved"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "checkedAt": {
+            "type": "string"
+          },
+          "validUntil": {
+            "type": "string"
+          },
+          "instanceCode": {
+            "type": "string"
+          },
+          "evidenceVersion": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeReviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "expectedEvidenceVersion"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "expectedEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "IntakeRisk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyVersion",
+        "level",
+        "reasons",
+        "explicitDisableCount",
+        "sameSourceDisabledLast24Hours",
+        "evaluatedAt"
+      ],
+      "properties": {
+        "policyVersion": {
+          "type": "string",
+          "enum": [
+            "risk-p1.1"
+          ]
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "routine",
+            "critical"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "explicitDisableCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sameSourceDisabledLast24Hours": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "evaluatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        }
+      }
+    },
+    "IntakeRollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "baseReleaseId",
+        "targetReleaseId",
+        "impactDigest",
+        "approvalEvidenceVersion",
+        "rollbackPlanId"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "baseReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "impactDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "approvalEvidenceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        }
+      }
+    },
+    "IntakeRollbackImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseReleaseId",
+        "targetReleaseId",
+        "impactDigest",
+        "scopes",
+        "requiresCorrectiveCandidate",
+        "rollbackPlanId",
+        "approvalEvidenceVersion"
+      ],
+      "properties": {
+        "baseReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "impactDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeSourceScope"
+          },
+          "minItems": 0,
+          "maxItems": 1000
+        },
+        "requiresCorrectiveCandidate": {
+          "type": "boolean"
+        },
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "approvalEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "IntakeRollbackPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseReleaseId",
+        "targetReleaseId"
+      ],
+      "properties": {
+        "baseReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakeRollbackReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "rollbackPlanId",
+        "state",
+        "releaseId",
+        "announcementId",
+        "reason",
+        "action"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "unknown",
+            "published",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "releaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "announcementId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "rollback"
+          ]
+        }
+      }
+    },
+    "IntakeRollbackReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rollbackPlanId",
+        "reviewRequestId",
+        "evidenceVersion",
+        "state",
+        "instanceCode",
+        "revocationGeneration",
+        "checkedAt",
+        "validUntil",
+        "reviewPackageObjectId",
+        "reviewPackageSha256",
+        "impactDigest"
+      ],
+      "properties": {
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "reviewRequestId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "creating",
+            "pending",
+            "approved",
+            "rejected",
+            "revoked",
+            "unavailable"
+          ]
+        },
+        "instanceCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "validUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "reviewPackageObjectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reviewPackageSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "impactDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "approved"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "checkedAt": {
+            "type": "string"
+          },
+          "validUntil": {
+            "type": "string"
+          },
+          "instanceCode": {
+            "type": "string"
+          },
+          "evidenceVersion": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeRollbackReviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "impactDigest",
+        "expectedEvidenceVersion"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "impactDigest": {
+          "$ref": "#/$defs/IntakeDigest"
+        },
+        "expectedEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "IntakeScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenantId",
+        "appId",
+        "brandId",
+        "shopId",
+        "domain",
+        "sourceId"
+      ],
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "appId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "brandId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "shopId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "domain": {
+          "type": "string",
+          "enum": [
+            "presale",
+            "campaign",
+            "aftersale",
+            "product"
+          ]
+        },
+        "sourceId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakeSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "entitlementId",
+        "contextGeneration",
+        "faq",
+        "sopNodes",
+        "sopEdges",
+        "media",
+        "vocabulary",
+        "nextCursor"
+      ],
+      "properties": {
+        "releaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "entitlementId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contextGeneration": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "faq": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "entry"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "entry": {
+                "$ref": "#/$defs/IntakePublishedEntry"
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "sopNodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "sopEdges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to"
+            ],
+            "properties": {
+              "from": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "objectId",
+              "sha256"
+            ],
+            "properties": {
+              "objectId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "minLength": 64,
+                "maxLength": 64
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "vocabulary": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeVocabulary"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "version",
+        "templateVersion",
+        "ruleVersion",
+        "mappingVersion",
+        "structureDigest",
+        "contentIntakeMode",
+        "modeVersion"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/IntakeSourceScope"
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "templateVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "mappingVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "structureDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "contentIntakeMode": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "v2-preview",
+            "v2-active"
+          ]
+        },
+        "modeVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        }
+      }
+    },
+    "IntakeSourceClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "versionKind",
+        "versionValue",
+        "acquisition",
+        "fileSha256"
+      ],
+      "properties": {
+        "versionKind": {
+          "type": "string",
+          "enum": [
+            "integer",
+            "opaque",
+            "unknown"
+          ]
+        },
+        "versionValue": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "acquisition": {
+          "type": "string",
+          "enum": [
+            "feishu-export",
+            "controlled-synthetic-export"
+          ]
+        },
+        "fileSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "IntakeSourceConfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "expectedEvidenceVersion",
+        "confirmedVersionKind",
+        "confirmedVersionValue",
+        "acquisition",
+        "objectSha256",
+        "reason"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "expectedEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "confirmedVersionKind": {
+          "type": "string",
+          "enum": [
+            "integer",
+            "opaque"
+          ]
+        },
+        "confirmedVersionValue": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "acquisition": {
+          "type": "string",
+          "enum": [
+            "feishu-export",
+            "controlled-synthetic-export"
+          ]
+        },
+        "objectSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeSourceList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeSource"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeSourceScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenantId",
+        "appId",
+        "brandId",
+        "shopId",
+        "domain",
+        "sourceId"
+      ],
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "appId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "brandId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "shopId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "domain": {
+          "type": "string",
+          "enum": [
+            "presale",
+            "campaign",
+            "aftersale",
+            "product"
+          ]
+        },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakeSourceWrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "expectedVersion",
+        "templateVersion",
+        "ruleVersion",
+        "mappingVersion",
+        "structureDigest"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "expectedVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "templateVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "mappingVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "structureDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "IntakeTermRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayVersion"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "displayVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        }
+      }
+    },
+    "IntakeVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "IntakeVocabulary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "displayVersion",
+        "displayName",
+        "meaningDigest",
+        "scope",
+        "active"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "product",
+            "scenario"
+          ]
+        },
+        "displayVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "meaningDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "scope": {
+          "$ref": "#/$defs/IntakeScope"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      }
+    },
+    "IntakeVocabularyList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeVocabulary"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeVocabularyWrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "change",
+        "id",
+        "kind",
+        "expectedDisplayVersion",
+        "displayName",
+        "meaningDigest"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "change": {
+          "type": "string",
+          "enum": [
+            "create",
+            "rename",
+            "retire"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "product",
+            "scenario"
+          ]
+        },
+        "expectedDisplayVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "meaningDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
         }
       }
     },

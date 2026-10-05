@@ -1,17 +1,17 @@
 {
   "schema": "customer-agent-contract-codegen/v1",
-  "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+  "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
   "source_repository": "ai-赋能立项",
-  "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-  "manifest_sha256": "4799468a36febe0c383163ebbb4c8a3b490bbada6e2707a2a31bccf63ca668c8",
-  "openapi_version": "1.14.0",
-  "openapi_sha256": "39f69edfdbffcad6a57d3e9fc43e1f6a3cbdc1e8fdd951e30bdbbfe97eb3e394",
-  "database_version": "schema.v1.18",
-  "database_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+  "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+  "manifest_sha256": "9355557862c5a621f91ae6e106479f4b4dbe64ac07d1329f3850c630a5c539fb",
+  "openapi_version": "1.16.0",
+  "openapi_sha256": "2f029b210baa27164f2fbddc237f9775ac994629f354a5307c7c9f339f72ebb2",
+  "database_version": "schema.v1.20",
+  "database_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "runtime_activated": false,
   "runtime_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
-  "component_schema_count": 165,
+  "component_schema_count": 222,
   "tools": {
     "openapi_typescript": "7.13.0",
     "yaml": "2.9.0",
@@ -21,22 +21,22 @@
   "artifacts": {
     "bundle": {
       "path": "packages/contracts/openapi/bundle.generated.yaml",
-      "sha256": "a840444d834ce3cdd8e620721e9c953ffbd733449f076c95f8b1ceef27cd6bd2",
-      "bytes": 259810
+      "sha256": "fcfca33065f4f4d399a3a0dac4c1098126d36bc337f6a0e51ed84f593741f5a3",
+      "bytes": 426485
     },
     "types": {
       "path": "packages/contracts/src/generated/openapi.generated.ts",
-      "sha256": "e8ed79079696bf6e8e075f3ba8225444dbe2cd75389ac373245ada642719509f",
-      "bytes": 207173
+      "sha256": "a5ebedfc03a170032f482ac721c2a0bc6915725d2d577a500cefac3b7fc87891",
+      "bytes": 373794
     },
     "runtime_schema": {
       "path": "packages/contracts/src/generated/runtime-schema.generated.ts",
-      "sha256": "21c254ef8a46f74be8a9496abfb7c83f37db17b966c0fbcea5d90a0c1e6448ca",
-      "bytes": 130362
+      "sha256": "437156764578e39032f661deab82c7a6ba8096389fb55ba14594df95db4a10bc",
+      "bytes": 207392
     },
     "provenance": {
       "path": "packages/contracts/src/generated/provenance.generated.ts",
-      "sha256": "de59f8b64c55d07ba7c4908881bdf34ec56d818f4061a6c0826a2adb01eae962",
+      "sha256": "e88534ad1557360038d17a985ba359ea121f648d68786fe9ee202815546f061e",
       "bytes": 1648
     }
   }
