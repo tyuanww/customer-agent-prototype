@@ -5,7 +5,7 @@
 ## Implementation plan
 # 资料接入、内容维护与发布：需求工作稿
 
-> 状态：**APPROVED · P1 ONLY（合同差集与本地合成验证）；P2–P5 未获本轮实施授权**
+> 状态：**APPROVED · P1 已本地提交；P2 合同已冻结、提交并 export，产品 intake / codegen / 追加迁移已验收。FAQ 运行接线、三方公开交付 EVD 与真实运行仍待完成；历史 /review 的 INCOMPLETE 保留，P3–P5 未获本轮新增授权。**
 > 日期：2026-10-03；核对基线：`main@8ab309f`，产品 `0.3.26`。
 > 本文是本次工单的唯一需求工作稿。只保存功能要求、源码证据和资料结构聚合，不保存客户原文、内部链接、凭据或工作簿副本。实际本机来源位置见本次会话。
 > 执行依据：[工程工作流程](../reference-engineering-workflow.md)、[项目章程](../../PROJECT_CHARTER.md)。既有正式发布链路已经存在，本需求不重做基础后端，也不以旧 S0 基线推断全仓能力。
@@ -37,6 +37,44 @@
 - 当前步骤：P1 合同差集、隔离代码及合成验证已落地。追加 OCR 宿主复审覆盖 30/30 文件，发现并修复候选来源与授权范围不一致，75 项定向回归及仓库级 lint/typecheck/test/build 通过；已复核修后差异，无已确认待修问题。此前 `/review` 的 INCOMPLETE、外部超时和完成校验失败保留为历史，不改写为全部通过。正式上游快照、生成合同、API/IPC/DB 权限本轮不变。
 - 交付入口：[合同差集与 P2 条件](../reference-content-intake-p1-contract-gap.md)、[运行配方](../how-to-develop-content-intake.md)、[实际运行证据](../../evidence/qa/content-intake-p1/README.md)、[当前 OCR 复审](../../evidence/qa/content-intake-p1/ocr-review.md)、[历史审查](../../evidence/qa/content-intake-p1/review.md)。提交 P1 后开始 P2 合同准备；正式接线先治理合同 export/intake。
 - Git：本地编辑、检查及当前 P1 候选修后的一次 commit 已获上述追加授权；push、PR、merge、deploy 仍未获授权。20 条 R1 任务中的 P1 标签是审查优先级，不能因此扩大到 P2–P4 全功能实现。
+
+### 0.2 P2 接续与合同准备（2026-10-04 历史记录，当前结果见 §0.3）
+
+- 承接用户“审核、维修、没问题就 commit，然后开始下一步”的持续指令。P1 已提交 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`，OCR 审核 30/30，来源绑定问题已修复，75 项定向回归及仓库级检查通过。P1 分支工作树干净、未推送；历史 `/review` 外部失败没有改写。
+- P2 使用独立 `codex/content-intake-p2` worktree，明确以 P1 提交为依赖基线；后续 PR 若获授权，须说明依赖 P1，不能把 P1 代码重复算作 P2 变更。
+- 当前产物：[P2 正式合同交接提案](../reference-content-intake-p2-contract-handoff.md)。这份提案明确资源字段、单来源绑定、候选/证据/操作版本、事务竞争与未知恢复、旧写影响集、下游验收；已有 E0–E18 边界未实质改变，复用既有 autoplan。
+- 当前状态：用户追加“开始按照顺序进行推进”后，已在治理仓独立 `codex/content-intake-p2-contracts` 工作树（基线 `7c9460be6e2cba9a498f350fbb3c07acf39b0e2a`）制作规范、OpenAPI 1.16 / schema1.20 候选、生成/导出门和合成测试。状态仍是 DRAFT / NOT FROZEN / NOT EXPORTED / NOT INTAKE。候选路径 `business-docs/01-客服Agent项目/30-开发-进行中/13-P2资料接入合同候选.md`，版本双哈希只由该规范页拥有。本仓 upstream、migration、API/Main 接线尚未修改。
+- 检查结果：本仓 P2 仍仅文档，`docs:check` 通过（175 篇）、`workspace:check` 通过（18.3MiB / 32MiB）、差异与引用检查通过；P1 测试证据继续绑定原提交，未重复全仓测试。新 worktree 首次 pnpm 入口自动从缓存补齐锁定依赖，下载 0，锁文件未变。治理候选最终 wire/export 15项、隔离PG存储/当前授权谓词69项及全部机器合同检查通过；已修复首次授权/主体事实版本/候选修订、永久回执、材料投影及逐次授权变更原因等缺口。OCR 11/11代码与生成物已核对，另4份文档已检查。原生第三轮无新增问题，外部结构化第三轮发现已修复；外部对抗第二、三轮均超时。/review 达到3次修复上限，INCOMPLETE / converged:false，最终修后测试不替代零修改复审。完整 release 在末尾依赖审计失败：3条既有依赖告警，锁文件与基线相同；DOMPurify 升级牵涉冻结的安全维护归档，须独立版本处理，不能直接覆盖旧资产。最终检查与审查结果以治理候选证据为准，不视为阶段通过。P2 文档保持未提交；本次 P1 commit 的授权不扩大到 P2 commit、push、PR、merge 或 deploy。
+
+### 0.3 审查后维护追加授权（2026-10-05，冻结接续见 §0.4）
+
+用户明确要求“修复之前先进行 open-code-review-delegate 代码审核，然后进行全部维修，然后继续推进下一步事项”。本轮先完成宿主 OCR 当前候选与依赖维护链审查，再修复已确认的 DOMPurify、fast-uri、undici 及必要的安全快照/测试/发布包生成链。保持两份冻结历史字节，创建新的日期安全快照；完整 release 与审计通过后重建精确候选清单。此授权已覆盖此前请求确认的独立安全维护，不再重复索取。正式合同批准、freeze/export/intake、真实数据与 Git 对外动作仍按各自既有门禁，不代签三方 EVD。
+
+- 实际结果：上述 3 个依赖已升级并进入新的 `2026-10-05` 安全维护快照；新日期 manifest 配对漏洞及旧 Pages 哈希断言一并修复。OCR 43/43 可审代码与生成物完成复核，另 21 项排除文件有理由和补充核验；无剩余已确认待修代码问题。历史外部超时未改写。
+- 治理仓完整 release 26/26 步骤通过，含 240 单元测试、浏览器/公开边界及全部机器合同；依赖审计 0 漏洞。隔离 PG 69 项通过；实际 Pages 产物的 HTTP/file 消费及依赖/Bundle 字节核验通过，未部署。详细证据在治理工作树 `output/content-intake-maintenance-review/`。
+- 下一依赖：正式成对合同批准 → 冻结/profile/批准记录 → 重建最终 bundle 并取得 Product/Security/Tech 同 bundle 的受控 EVD → 按有效 Git 授权提交和不可变 export → 产品 versioned intake → FAQ 运行切片。冻结会改变 bundle，当前维护候选清单不能直接授权后续漂移版本。产品 P2 仍只更新文档，运行代码及正式合同输入不变。
+
+### 0.4 合同冻结接续授权（2026-10-05 历史记录，后续见 §0.5）
+
+上轮已展示具体合同、成对哈希与“合同批准/冻结 → export/intake”的下一步范围，用户随后明确指示“开始下一步”。据此推进本次精确成对合同的合成开发冻结，授权来源及解释已在治理仓独立批准记录中落盘；这不是三方发布 EVD，也不扩展到真实数据、active 模式或上线。
+
+- 治理合同规范已标记 FROZEN，profile 从 `coach-publish-v1` 切换为 `content-intake-v2`；OpenAPI1.16 / schema1.20 机器字节和双哈希不变。批准记录使用导出器既定的 `2026-10-04_P2内容接入合同批准.md` 路径，正文明确实际记录日期为 2026-10-05。
+- 冻结前先完成 OCR 变更核对，发现导出拒绝测试依赖仓库仍为 DRAFT。实际复现两项失败后，改成显式合成 DRAFT/FROZEN 输入，15 项全部通过；生产导出门不变。冻结后的工作树合同门预检和完整 release 26/26 步骤通过，审计 0 漏洞；OCR 44/44 可审项复核完成，另 22 项保留排除理由和补充核验。无变化的 PG69 与 Pages 实物证据复用，详细结果在治理仓 `output/content-intake-freeze-review/`。
+- 当前最小待办：Product/Security/Tech 对冻结后的最终 bundle 全分组分别提供受控 EVD → 有效 Git 授权下精确暂存/提交 → 不可变 export → 产品 versioned intake → FAQ 运行切片。完整验证后的最终清单由治理工具生成并核验；旧冻结前 bundle 已失效。产品合同锁、upstream、迁移、API/Main 仍不提前修改。
+
+
+### 0.5 本地提交与产品合同交接（2026-10-05 授权，2026-10-06 接续）
+
+用户在已展示三方 EVD 缺失与未提交状态后再次明确要求“代码审核、维修，然后没问题就 commit，然后开始下一步”，中断后又指示“继续推进”。据此复审当前候选、完成修复并执行本地 commit，继续精确提交 export → 产品 versioned intake / codegen / 追加 migration 的合成开发交接。该直接授权覆盖本次本地动作；治理仓已明确记录其与 DEC-PUBLISH-01 三方公开交付确认的区别，不代签 EVD，不修改通用门禁；push、PR、merge、deploy、真实数据及 active 模式不在本次授权内。
+
+- 治理仓已提交 `d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713`。本次 OCR 44/44 可审项、22 排除项逐一交代；精确暂存发现新快照继承历史 Markdown 行尾空格，由生成器修复并重建，原快照不改。最终 66 路径 index 与重建 bundle 一致，完整 release 26/26、240 单元、15 wire/export、audit 0；历史 PG69 和 Pages 实物按未变字节复用。
+- 产品通过既有 intake 接收 `cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa`，只读取已提交 Git blob。来源、双哈希、字节数及激活状态由消费锁/manifest 统一拥有，不手工复制或修改 upstream。
+- 所有者保持不变：根脚本拥有输入校验与快照锁；contracts generator 拥有类型/validator；database generator 与 verifier 拥有追加迁移和后验。最小接口沿用 `ingest / verify`、`generate / --check`、`status → plan → apply → verify`。
+- 两种方案比较：A 重新生成全部 migration 并换成新 provenance，会改写已安装账本 checksum；B 固定前 19 段字节和旧 provenance，只追加 0020/0021。选择 B；四个历史 overlay 的源与生成 SQL 同时校验，任何改写都要求追加新迁移。
+- 失败面：版本/来源不配对、双哈希漂移、旧 migration/overlay 改写、schema 字段名与关键字冲突、DOMAIN/ACL/函数/触发器漂移、未知提交回执。隔离 PG 只用合成数据；消费锁仍为 `VERIFIED_NOT_ACTIVATED`，不开放 P2 schema 应用权限。
+- 当前交接已验收：生成 222 个 schema，保留原 19 段并追加 0020/0021；修复字段字典误转 schema、历史 overlay provenance 重写风险及 DOMAIN 漂移漏检。仓库四项检查、PG17、既有 API 实库21通过。已完成宿主 OCR、本机修后复核和外部结构化两组；外部对抗一组格式校验失败保留缺口，不写成全部外部审查通过。证据见 [P2 交接验收](../../evidence/qa/content-intake-p2-handoff/README.md)。
+- 下一运行切片的入口已核对：API 复用既有 product-auth 身份与 idempotency/未知提交处理，P1 权限与材料模型先按正式 validator 转正，DB 追加受控事务而不改已发 SQL。先验收主体事实、按动作/店铺/来源授权与撤权、持久候选，再接审批和发布；通过旧写隔离与读门前不开放新 schema 应用角色。第二坐席查询与完整 FAQ 验收仍是待完成项，不能以本次合同接收代替。
+- 实际结果、未验证项和后续 FAQ 运行切片见 [P2 交接](../reference-content-intake-p2-contract-handoff.md)。本次实现不扩展 API/Main/renderer 的权限与发布行为。
 
 ## 1. 已确认的目标
 

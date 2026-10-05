@@ -40,6 +40,12 @@ const NON_VALIDATION_SCHEMA_KEYS = new Set([
   'xml',
 ]);
 const VALIDATION_EXTENSION_SCHEMA_KEYS = new Set(['x-unique-by']);
+const SCHEMA_MAP_KEYS = new Set(['properties', 'patternProperties', '$defs', 'dependentSchemas']);
+const SCHEMA_ARRAY_KEYS = new Set(['allOf', 'anyOf', 'oneOf', 'prefixItems']);
+const SUBSCHEMA_KEYS = new Set([
+  'items', 'contains', 'not', 'if', 'then', 'else', 'propertyNames',
+  'additionalProperties', 'unevaluatedProperties', 'unevaluatedItems', 'contentSchema',
+]);
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -115,8 +121,22 @@ export function toRuntimeSchema(value) {
       } else {
         transformed[key] = requireString(child, key);
       }
-    } else {
+    } else if (SCHEMA_MAP_KEYS.has(key)) {
+      // Dictionary keys are business field names, even when named "required",
+      // "description" or "x-*". Only their values are schema nodes.
+      const schemas = Object.create(null);
+      for (const [name, schema] of Object.entries(requireRecord(child, key))) {
+        schemas[name] = toRuntimeSchema(schema);
+      }
+      transformed[key] = schemas;
+    } else if (SCHEMA_ARRAY_KEYS.has(key)) {
+      if (!Array.isArray(child)) throw new Error(`${key} must be a schema array`);
+      transformed[key] = child.map(toRuntimeSchema);
+    } else if (SUBSCHEMA_KEYS.has(key)) {
       transformed[key] = toRuntimeSchema(child);
+    } else {
+      // const/enum/default and other literal values are data, not schemas.
+      transformed[key] = child;
     }
   }
 

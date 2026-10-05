@@ -108,20 +108,24 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 0017_rollback_previous_target adds resolve_previous_content_release; the +1 on each
 // manifest below is that one function and its single GRANT to app_content_admin. The
 // trigger manifest is unchanged. Recompute all four together when a later overlay lands.
+// P2 adds sealed content_intake storage: include its ACL, functions and triggers
+// in the same exact manifests, even before any application role is permitted.
 //
 // 0018_owner_read_views adds the app_owner_read role, four vw_owner_* views, and — the
 // part that is easy to miss — SELECT on four base tables for cs_ai_definer. A view runs
 // with its owner's privileges, so without those grants selecting the view fails with
 // 42501 even when the role holds the view. That is why the ACL entry count moves by more
 // than the four views: the definer's new table grants are part of it too.
-const EXPECTED_ACL_MANIFEST_ENTRIES = 211;
-const EXPECTED_ACL_MANIFEST_SHA256 = '21c5bf4d2e33119b8143d1a923997ff8a19ca4fb44205c28861591168172b203';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 1839;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '41cda11861cd5bfb0c92546a04e0b6be86b374109ff9993749017ce8bbb75ce3';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 189;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '86531318d0c280d262bbb39306c237c18865df639307745551faa620c99efc98';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 36;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = '84ed46ea07f6a45cc396a18a58b3dcedd8562baf03338b6e922184fd6a5916c6';
+// Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
+// Their CHECKs and full definitions are separate from table constraints and columns.
+const EXPECTED_ACL_MANIFEST_ENTRIES = 215;
+const EXPECTED_ACL_MANIFEST_SHA256 = 'c6be7b14238e4c6e92f9829fbd9b678c5629e802df1247719713975584d3a057';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2680;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '6decbc893186c331b69a31676068905eeb5a4d9931a04fa55c16c926b176822e';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 209;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '854697afaf4828f83bf27c295c932e35b0a3b135ea51f820f908e2b6223909a1';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 74;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = '294a8fa2df968ec428364781b1657e136398b3e6541c9c250af2ebb30fec0979';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -161,9 +165,9 @@ export async function verifyMigrationCatalogue(
 
   const inventoryResult = await verifyQuery<InventoryRow>(client, `
       SELECT
-        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review') AND relation.relkind IN ('r','p')) AS tables,
-        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review') AND relation.relkind='v') AS views,
-        (SELECT count(*)::int FROM pg_catalog.pg_proc procedure JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review')) AS functions,
+        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake') AND relation.relkind IN ('r','p')) AS tables,
+        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake') AND relation.relkind='v') AS views,
+        (SELECT count(*)::int FROM pg_catalog.pg_proc procedure JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake')) AS functions,
         (SELECT extversion FROM pg_catalog.pg_extension WHERE extname='pgcrypto') AS pgcrypto,
         (SELECT extversion FROM pg_catalog.pg_extension WHERE extname='pg_trgm') AS pg_trgm
     `);
@@ -199,7 +203,7 @@ export async function verifyMigrationCatalogue(
         COALESCE(namespace.nspacl, acldefault('n', namespace.nspowner))
       ) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
         AND acl.grantee <> namespace.nspowner
 
       UNION ALL
@@ -223,7 +227,7 @@ export async function verifyMigrationCatalogue(
         )
       )) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
         AND relation.relkind IN ('r','p','v','m','S','f')
         AND acl.grantee <> relation.relowner
 
@@ -243,7 +247,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace
       CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
         AND attribute.attnum > 0
         AND NOT attribute.attisdropped
         AND acl.grantee <> relation.relowner
@@ -265,8 +269,27 @@ export async function verifyMigrationCatalogue(
         COALESCE(procedure.proacl, acldefault('f', procedure.proowner))
       ) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
         AND acl.grantee <> procedure.proowner
+
+      UNION ALL
+
+      SELECT format(
+        'domain|%s.%s|%s|%s|%s',
+        namespace.nspname,
+        type_object.typname,
+        COALESCE(grantee.rolname, 'PUBLIC'),
+        acl.privilege_type,
+        acl.is_grantable
+      )
+      FROM pg_catalog.pg_type type_object
+      JOIN pg_catalog.pg_namespace namespace ON namespace.oid=type_object.typnamespace
+      CROSS JOIN LATERAL aclexplode(
+        COALESCE(type_object.typacl, acldefault('T', type_object.typowner))
+      ) acl
+      LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
+        AND type_object.typtype='d' AND acl.grantee <> type_object.typowner
 
       UNION ALL
 
@@ -366,6 +389,39 @@ export async function verifyMigrationCatalogue(
       FROM pg_catalog.pg_constraint constraint_object
       JOIN pg_catalog.pg_class relation ON relation.oid=constraint_object.conrelid
       JOIN user_namespaces namespace ON namespace.oid=relation.relnamespace
+
+      UNION ALL
+
+      -- DOMAIN constraints have conrelid=0; table constraints cannot cover them.
+      SELECT format(
+        'domain_constraint|%s.%s.%s|type=%s|validated=%s|definition=%s',
+        namespace.nspname,
+        type_object.typname,
+        constraint_object.conname,
+        constraint_object.contype,
+        constraint_object.convalidated,
+        pg_catalog.pg_get_constraintdef(constraint_object.oid, false)
+      )
+      FROM pg_catalog.pg_constraint constraint_object
+      JOIN pg_catalog.pg_type type_object ON type_object.oid=constraint_object.contypid
+      JOIN user_namespaces namespace ON namespace.oid=type_object.typnamespace
+
+      UNION ALL
+
+      SELECT format(
+        'domain|%s.%s|base=%s|not_null=%s|collation=%s|default=%s',
+        namespace.nspname,
+        type_object.typname,
+        pg_catalog.format_type(type_object.typbasetype, type_object.typtypmod),
+        type_object.typnotnull,
+        COALESCE(collation_namespace.nspname || '.' || collation_object.collname, '<none>'),
+        COALESCE(pg_catalog.pg_get_expr(type_object.typdefaultbin, 0), '<none>')
+      )
+      FROM pg_catalog.pg_type type_object
+      JOIN user_namespaces namespace ON namespace.oid=type_object.typnamespace
+      LEFT JOIN pg_catalog.pg_collation collation_object ON collation_object.oid=type_object.typcollation
+      LEFT JOIN pg_catalog.pg_namespace collation_namespace ON collation_namespace.oid=collation_object.collnamespace
+      WHERE type_object.typtype='d'
 
       UNION ALL
 
@@ -607,7 +663,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace
       JOIN pg_catalog.pg_roles owner_role ON owner_role.oid=procedure.proowner
       JOIN pg_catalog.pg_language language_object ON language_object.oid=procedure.prolang
-      WHERE namespace.nspname IN ('public','backend_identity','backend_review')
+      WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake')
     )
     SELECT
       COALESCE(string_agg(entry, E'\\n' ORDER BY entry), '') AS manifest,
@@ -632,7 +688,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace table_namespace ON table_namespace.oid=relation.relnamespace
       JOIN pg_catalog.pg_proc procedure ON procedure.oid=trigger.tgfoid
       JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid=procedure.pronamespace
-      WHERE table_namespace.nspname IN ('public','backend_identity','backend_review') AND NOT trigger.tgisinternal
+      WHERE table_namespace.nspname IN ('public','backend_identity','backend_review','content_intake') AND NOT trigger.tgisinternal
     )
     SELECT
       COALESCE(string_agg(entry, E'\\n' ORDER BY entry), '') AS manifest,
@@ -691,7 +747,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 50 || inventory.views !== 6 || inventory.functions !== 189 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 81 || inventory.views !== 7 || inventory.functions !== 209 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {

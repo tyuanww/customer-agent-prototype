@@ -1,9 +1,9 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
-  "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-  "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
-  "upgrade_source_sha256": "624ba4c86a953563f59ab844c85685b8a90cd5c5e0efd4df08cdc777ca4d08bb",
+  "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+  "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+  "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
+  "upgrade_source_sha256": "aad27190bd06c7e094ba32f006000c17dc857ee6ca565e85f76e82da3d4f2811",
   "compatibility": {
     "current": "N",
     "prior_signed_baseline": {
@@ -42,6 +42,12 @@
         "source_git_sha": "0904a0aa11f2dc29ae7700871a943c41295cd329",
         "source_schema_sha256": "419d84fbe827a5803b731250145e97786f6cb76c6d7aa9b3bc21bcac3c90f133",
         "migration_count": 14
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+        "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
+        "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+        "migration_count": 19
       }
     ]
   },
@@ -350,45 +356,77 @@
       "position": 16,
       "id": "0016_office_owner_publish",
       "file": "0016_office_owner_publish.sql",
+      "source_ranges": [],
       "sha256": "d574ebd891e3a7db771e6f6a5fb7a85f6e6d3614c7880f2dea4b4bb642d6b447",
       "bytes": 21181,
       "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
       "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
-      "source_ranges": []
+      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa"
     },
     {
       "position": 17,
       "id": "0017_rollback_previous_target",
       "file": "0017_rollback_previous_target.sql",
+      "source_ranges": [],
       "sha256": "eb3ccbf3f04c4005393fc757b8f1e03d55a5078837b2b8eb9dbac72d83116788",
       "bytes": 3969,
       "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
       "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
-      "source_ranges": []
+      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa"
     },
     {
       "position": 18,
       "id": "0018_owner_read_views",
       "file": "0018_owner_read_views.sql",
+      "source_ranges": [],
       "sha256": "c89d76992850aa562a3d24618bccb39a941a8bc88136342505a9edea5440acba",
       "bytes": 7394,
       "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
       "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
-      "source_ranges": []
+      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa"
     },
     {
       "position": 19,
       "id": "0019_candidate_client_snapshot",
       "file": "0019_candidate_client_snapshot.sql",
+      "source_ranges": [],
       "sha256": "e4720feabd0a9b92d8d5cc22fcb6dcce75cf6e8136c0b2d9365d0d7c1cf18cd7",
       "bytes": 5158,
       "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
       "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
-      "source_ranges": []
+      "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa"
+    },
+    {
+      "position": 20,
+      "id": "0020_coach_publish_v1_19",
+      "file": "0020_coach_publish_v1_19.sql",
+      "source_ranges": [
+        {
+          "start_line": 11316,
+          "end_line": 11900
+        }
+      ],
+      "sha256": "fd261530461c20aca90c5468997a695d67921fe53ff74b39de2c0a5f6b80d678",
+      "bytes": 28423,
+      "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+      "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+      "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
+    },
+    {
+      "position": 21,
+      "id": "0021_content_intake_v1_20",
+      "file": "0021_content_intake_v1_20.sql",
+      "source_ranges": [
+        {
+          "start_line": 11909,
+          "end_line": 12730
+        }
+      ],
+      "sha256": "7c19bf3f97fecb5af61c92131c0ce2a5f5f42822d2e104bb4202d96e292c73db",
+      "bytes": 53864,
+      "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+      "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+      "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
     }
   ]
 }

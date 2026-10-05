@@ -100,16 +100,16 @@ function runGit(repositoryRoot: string, arguments_: string[]): string {
   }).trim();
 }
 
-function createSourceRepository(openapi: string, database: string, marker: string): Readonly<{
+function createSourceRepository(openapi: string, database: string, marker: string, openapiPath = OPENAPI_SOURCE_PATH, databasePath = DATABASE_SOURCE_PATH): Readonly<{
   repositoryRoot: string;
   sourceGitSha: string;
 }> {
   const repositoryRoot = temporaryDirectory('customer-agent-record-source');
-  mkdirSync(path.dirname(path.join(repositoryRoot, OPENAPI_SOURCE_PATH)), { recursive: true });
-  writeFileSync(path.join(repositoryRoot, OPENAPI_SOURCE_PATH), openapi);
-  writeFileSync(path.join(repositoryRoot, DATABASE_SOURCE_PATH), database);
+  mkdirSync(path.dirname(path.join(repositoryRoot, openapiPath)), { recursive: true });
+  writeFileSync(path.join(repositoryRoot, openapiPath), openapi);
+  writeFileSync(path.join(repositoryRoot, databasePath), database);
   runGit(repositoryRoot, ['init', '--quiet']);
-  runGit(repositoryRoot, ['add', '--', OPENAPI_SOURCE_PATH, DATABASE_SOURCE_PATH]);
+  runGit(repositoryRoot, ['add', '--', openapiPath, databasePath]);
   runGit(repositoryRoot, [
     '-c', 'user.name=Contract Test',
     '-c', 'user.email=contract-test@example.invalid',
@@ -124,9 +124,11 @@ function createSourceRepository(openapi: string, database: string, marker: strin
 function createContractSet({
   marker = 'first',
   declaredSourceGitSha,
+  intake = false,
 }: {
   marker?: string;
   declaredSourceGitSha?: string;
+  intake?: boolean;
 } = {}): Readonly<{
   directory: string;
   contractSetId: string;
@@ -135,12 +137,17 @@ function createContractSet({
   repositoryRoot: string;
   sourceGitSha: string;
 }> {
+  const apiVersion = intake ? '1.16.0' : '1.11.0';
+  const schemaVersion = intake ? '1.20' : '1.12';
+  const developmentRoot = 'business-docs/01-客服Agent项目/30-开发-进行中';
+  const openapiPath = intake ? `${developmentRoot}/openapi.v1.16.yaml` : OPENAPI_SOURCE_PATH;
+  const databasePath = intake ? `${developmentRoot}/schema.v1.20.sql` : DATABASE_SOURCE_PATH;
   const openapi = `openapi: 3.1.0\ninfo:\n  title: Synthetic contract test ${marker}\n`;
   const database = `CREATE TABLE contract_test_${marker} (id bigint PRIMARY KEY);\n`;
-  const sourceRepository = createSourceRepository(openapi, database, marker);
+  const sourceRepository = createSourceRepository(openapi, database, marker, openapiPath, databasePath);
   const sourceGitSha = declaredSourceGitSha ?? sourceRepository.sourceGitSha;
   const directory = temporaryDirectory('customer-agent-contract-source');
-  const contractSetId = `cs-ai-c11-openapi-1.11.0-schema-1.12-${sourceGitSha.slice(0, 12)}`;
+  const contractSetId = `cs-ai-c11-openapi-${apiVersion}-schema-${schemaVersion}-${sourceGitSha.slice(0, 12)}`;
   const manifest = {
     schema: 'customer-agent-contract-set/v1',
     contract_set_id: contractSetId,
@@ -149,22 +156,22 @@ function createContractSet({
     architecture_version: '1.16',
     implementation_version: '1.21',
     openapi: {
-      version: '1.11.0',
-      source_path: OPENAPI_SOURCE_PATH,
+      version: apiVersion,
+      source_path: openapiPath,
       file: 'openapi.v1.yaml',
       sha256: sha256(openapi),
       bytes: Buffer.byteLength(openapi),
     },
     database: {
-      version: 'schema.v1.12',
-      source_path: DATABASE_SOURCE_PATH,
-      file: 'schema-v1.12.sql',
+      version: `schema.v${schemaVersion}`,
+      source_path: databasePath,
+      file: `schema-v${schemaVersion}.sql`,
       sha256: sha256(database),
       bytes: Buffer.byteLength(database),
     },
   };
   writeFileSync(path.join(directory, 'openapi.v1.yaml'), openapi);
-  writeFileSync(path.join(directory, 'schema-v1.12.sql'), database);
+  writeFileSync(path.join(directory, `schema-v${schemaVersion}.sql`), database);
   writeFileSync(
     path.join(directory, 'contract-set.json'),
     `${JSON.stringify(manifest, null, 2)}\n`,
@@ -462,6 +469,26 @@ describe('customer-agent contract-set intake', () => {
     }
   });
 
+  it('accepts the reviewed P2 pair from the exact source commit and rejects mixed versions or paths', () => {
+    const source = createContractSet({ intake: true });
+    const result = contractSet.ingestContractSet({ projectRoot: createProductRoot(), sourceDirectory: source.directory, sourceRepositoryRoot: source.repositoryRoot });
+    expect(result).toMatchObject({ status: 'CREATED', runtime_activated: false, ddev_authorized: false });
+    const manifestPath = path.join(source.directory, 'contract-set.json');
+    const original = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      contract_set_id: string; database: { version: string; file: string }; openapi: { source_path: string };
+    };
+    const mixed = structuredClone(original);
+    mixed.database.version = 'schema.v1.19';
+    mixed.database.file = 'schema-v1.19.sql';
+    mixed.contract_set_id = mixed.contract_set_id.replace('schema-1.20-', 'schema-1.19-');
+    writeFileSync(manifestPath, JSON.stringify(mixed));
+    expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
+    const wrongPath = structuredClone(original);
+    wrongPath.openapi.source_path = OPENAPI_SOURCE_PATH;
+    writeFileSync(manifestPath, JSON.stringify(wrongPath));
+    expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/source_path/);
+  });
+
   it('verifies the repository snapshot without enabling Ddev or runtime use', () => {
     const verified = contractSet.verifyIngestedContractSet({ projectRoot: repositoryRoot });
     const manifestBytes = readFileSync(path.join(verified.path, 'contract-set.json'));
@@ -469,8 +496,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534',
-      source_git_sha: '260ef224c5340a4d26e857bd02119044dd813f9a',
+      contract_set_id: 'cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa',
+      source_git_sha: 'd029cb0908faf9a0d1c1ffc1c8a5fcf39784d713',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -480,13 +507,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      '4799468a36febe0c383163ebbb4c8a3b490bbada6e2707a2a31bccf63ca668c8',
+      '9355557862c5a621f91ae6e106479f4b4dbe64ac07d1329f3850c630a5c539fb',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      '39f69edfdbffcad6a57d3e9fc43e1f6a3cbdc1e8fdd951e30bdbbfe97eb3e394',
+      '2f029b210baa27164f2fbddc237f9775ac994629f354a5307c7c9f339f72ebb2',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.18.sql')))).toBe(
-      '5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.20.sql')))).toBe(
+      '1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41',
     );
   });
 });

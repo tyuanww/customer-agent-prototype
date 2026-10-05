@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONTRACT_PROVENANCE } from '@customer-agent/contracts';
 import {
   ApiConfigError,
   formatApiShutdownFailure,
@@ -101,7 +102,7 @@ describe('API runtime configuration', () => {
       host: '127.0.0.1',
       port: 3100,
       buildVersion: '0.2.0-w3',
-      contractSetId: 'cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534',
+      contractSetId: CONTRACT_PROVENANCE.contract_set_id,
       runtimeActivated: false,
     });
     expect(Object.isFrozen(config)).toBe(true);
