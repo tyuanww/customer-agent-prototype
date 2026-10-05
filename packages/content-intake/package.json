@@ -2,8 +2,8 @@
   "name": "@customer-agent/content-intake",
   "private": true,
   "type": "module",
-  "description": "P1 synthetic-only standard workbook parsing and bounded process probe; no product wiring",
-  "exports": { ".": { "types": "./src/workbook.ts", "import": "./dist/workbook.js" }, "./runner": { "types": "./src/runner.ts", "import": "./dist/runner.js" } },
+  "description": "Versioned standard FAQ workbook parsing and bounded process runner; synthetic P1/P2 development",
+  "exports": { ".": { "types": "./dist/workbook.d.ts", "import": "./dist/workbook.js" }, "./runner": { "types": "./dist/runner.d.ts", "import": "./dist/runner.js" } },
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
