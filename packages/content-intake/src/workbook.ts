@@ -3,7 +3,7 @@ import { inspectArchive } from './archive.js';
 import { FAQ_HEADERS, QUESTION_HEADERS, SOURCE_HEADERS, TEMPLATE_VERSION, INTAKE_POLICY as P,
   IntakeFailure, failedParse, type ParseContext, type ParseResult, type Issue, type FaqRow } from './policy.js';
 export { FAQ_HEADERS, QUESTION_HEADERS, SOURCE_HEADERS, TEMPLATE_VERSION, INTAKE_POLICY, type ParseContext,
-  type ParseResult, type Issue, type FaqRow } from './policy.js';
+  isParseResult, type ParseResult, type Issue, type FaqRow } from './policy.js';
 
 const stableId = (value: string) => /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/u.test(value) && !value.startsWith('EXAMPLE_');
 function validTime(value: string): boolean {

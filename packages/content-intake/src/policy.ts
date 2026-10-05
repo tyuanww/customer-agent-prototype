@@ -1,7 +1,7 @@
-/** P1 experiment policy. Budgets bound allocation before ExcelJS loads the archive.
+/** Versioned FAQ parser policy. Budgets bound allocation before ExcelJS loads the archive.
  * These are synthetic probe limits, not production capacity or an OS RSS limit. */
 export const INTAKE_POLICY = Object.freeze({
-  version: 'p1-synthetic-1', fileBytes: 10 * 1024 * 1024, expandedBytes: 50 * 1024 * 1024,
+  version: 'intake-p1.1', fileBytes: 10 * 1024 * 1024, expandedBytes: 50 * 1024 * 1024,
   zipEntries: 512, rows: 5000, columns: 32, cells: 200_000, cellChars: 32_767,
   sharedStrings: 100_000, mediaCount: 100, mediaBytes: 20 * 1024 * 1024,
   // Count expanded selected-cell text, including repeated shared-string references.

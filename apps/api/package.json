@@ -20,6 +20,7 @@
     "typecheck": "node experiments/search-decision/check-generated-types.mjs && tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test:package": "pnpm build && node --test tests/package-entry.smoke.mjs tests/main-entry.smoke.mjs",
+    "test:intake:transactions": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && pnpm --filter @customer-agent/content-intake build && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/content-intake.integration.test.ts tests/content-intake-material.test.ts",
     "test:integration": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 CUSTOMER_AGENT_API_G1A_RUNNER=1 vitest run tests/product-auth.integration.test.ts tests/content-import.integration.test.ts tests/content-worker.integration.test.ts tests/content-release.integration.test.ts tests/announce.integration.test.ts tests/app.test.ts tests/search-postgres.integration.test.ts tests/event-postgres.integration.test.ts tests/g1a-synthetic.runner.test.ts",
     "test:e2e:backend": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/retrieval-core build:runtime && pnpm --filter @customer-agent/database build:runtime && pnpm build && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/backend-runtime.e2e.test.ts",
     "test:g1a:synthetic": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_API_G1A_RUNNER=1 vitest run tests/g1a-synthetic.runner.test.ts",
@@ -37,6 +38,7 @@
     "test:g1a:comparison:package": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_G1A_COMPARISON=1 vitest run tests/g1a-comparison.runner.test.ts"
   },
   "dependencies": {
+    "@customer-agent/content-intake": "workspace:*",
     "@customer-agent/contracts": "workspace:*",
     "fastify": "5.12.1",
     "pg": "8.23.0"

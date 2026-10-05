@@ -47,6 +47,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@customer-agent/content-intake':
+        specifier: workspace:*
+        version: link:../../packages/content-intake
       '@customer-agent/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
