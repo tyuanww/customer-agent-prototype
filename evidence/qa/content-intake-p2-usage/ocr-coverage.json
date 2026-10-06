@@ -1,8 +1,8 @@
 {
-  "total_files": 17,
-  "reviewed_files": 17,
+  "total_files": 18,
+  "reviewed_files": 18,
   "skipped_files": 0,
-  "coverage_rate": 1,
+  "coverage_rate": 1.0,
   "files": [
     {
       "path": "apps/api/src/content-intake/material.ts",
@@ -105,6 +105,12 @@
       "status": "added",
       "review": "reviewed",
       "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/wsl.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff and validation against completed WSL logs, cleanup output and source hashes."
     }
   ]
 }

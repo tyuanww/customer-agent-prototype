@@ -1,6 +1,6 @@
 # P2 使用资格与按店目录验收
 
-2026-10-06；分支 `codex/content-intake-p2`；基线 `bfa68aa`，被测功能提交 `c97dc801d19b9c4589e43a781320f4d15345c848`。仅合成 XLSX、审批响应及临时 PostgreSQL。没有生产路由/ACL、Main/renderer 或真实数据接入。
+2026-10-06；分支 `codex/content-intake-p2`；基线 `bfa68aa`，功能提交 `c97dc80`；两端最终被测提交 `45a533088d11af09bdf237bb87d441e3100466b3`。仅合成 XLSX、审批响应及临时 PostgreSQL。没有生产路由/ACL、Main/renderer 或真实数据接入。
 
 ## 交付
 
@@ -16,7 +16,9 @@
 - 独立审查发现的词项预算缺陷已复现并修复：单页 vocabulary 最多 100，但合法多条/单条引用可超限。现在单条准入与发布预检共用上限，多条自动提前分页，不截断、不跳行。111 词项用例修复前失败，修复后两页 80/31 完整输出；下一份单条超限材料在审批前 FILE_LIMIT 拒绝，发布计数不变。
 - 开发阶段修复租约微秒时间经 JS Date 截断导致的签发失败：改为 SQL 内保留 issued_at。该行为与 [node-postgres 时间类型说明](https://node-postgres.com/features/types)一致；未放宽数据库约束。另修正合成时间样例、测试候选引用和循环类型标注。
 
-杭州 WSL 首轮归档测试：83/85 通过，两个精确五分钟 fixture 因重复 `clock_timestamp()` 相差微秒而违反约束；已统一为 `statement_timestamp()`，Mac 定向 2 项与 API typecheck 通过。下一次隔离归档复验正在准备，不将首轮计作 PASS。生产约束未变。
+杭州 WSL 首轮为 83/85：两个精确五分钟 fixture 因重复 `clock_timestamp()` 相差微秒而违反约束；统一为 `statement_timestamp()` 后，Mac 和 WSL 最终均为 85/85，WSL API typecheck/build 同时通过。生产约束未变。
+
+杭州最终环境为 Node 24.21.0 / pnpm 11.19.0 / PostgreSQL 15.19。从精确 Git SHA 归档，在无特权 transient unit 中遮蔽生产目录、限制写目录并使用独立临时 PG；最终测试代码及锁文件哈希与 Mac 一致。5,000 行/50 页完整链约 8.80 秒，不是生产 SLA。测试结束后已删除自有源码、依赖缓存与临时目录；没有切换现有服务。命令、限制、首轮失败及清理证据见 [wsl.json](wsl.json)。
 
 ## 审查与覆盖
 
