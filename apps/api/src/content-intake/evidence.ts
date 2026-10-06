@@ -170,11 +170,13 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
       if (!prepared.ok) return prepared;
       const { req,context } = prepared.value;
       let b = prepared.value.prior;
+      let reclaimObjectId: string | null = null;
       try {
         if (!b) {
           const reviewRequestId = `review_${randomUUID()}`;
           const bytes = Buffer.from(canonical({ format: 'intake-review-package-v1',reviewRequestId,key:req.key,material:context.material }));
           const obj = await store.persist((async function* () { yield bytes; })(),'csv',{ maxBytes: INTAKE_POLICY.outputBytes });
+          reclaimObjectId = obj.objectId;
           const verified = await store.readPayload(obj.objectId);
           if (verified.length !== bytes.length || digest(verified) !== digest(bytes)) throw new IntakeRejection('ATTACHMENT_UNVERIFIED');
           const frozen = await run(actor,'review-request',json(req),req.operationId,async (client,who) => {
@@ -194,6 +196,10 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
               revocation_generation=revocation_generation+1,state='awaiting-evidence',updated_at=clock_timestamp() WHERE candidate_id=$1 AND version=$2`,[req.key.candidateId,req.key.version]);
             return reviewView(client,await binding(client,reviewRequestId));
           },review);
+          // Retain any possibly committed package. A concurrent permanent replay
+          // can adopt a different package; only this request's unused copy is ours
+          // to reclaim. Later provider/session failures cannot revoke DB ownership.
+          if (frozen.ok ? frozen.value.reviewPackageObjectId === obj.objectId : frozen.commit === 'unknown') reclaimObjectId = null;
           if (!frozen.ok) return frozen;
           const loaded = await run(actor,'review-resume',null,null,async (client,who) => {
             await candidateContext(client,who,req.key,'content-manage');
@@ -235,6 +241,11 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
           return reviewView(client,await binding(client,b!.reviewRequestId));
         },review);
       } catch (error) { diagnostic(error); return failed(actor,error,review); }
+      finally {
+        if (reclaimObjectId) {
+          try { await store.reclaim(reclaimObjectId); } catch (error) { diagnostic(error); }
+        }
+      }
     },
     review(actor: AuthenticatedUser, rawKey: unknown) {
       return run(actor,'review-read',null,null,async (client,who) => {

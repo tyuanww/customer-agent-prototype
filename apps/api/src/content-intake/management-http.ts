@@ -4,6 +4,7 @@ import type { ProductAuthService } from '../auth-service.js';
 import { CONTENT_UPLOAD_MAX_BYTES, type ContentObjectStore } from '../content-object-store.js';
 import { createContentIntakeService } from './service.js';
 import type { IntakePool } from './transaction.js';
+import type { ApprovalAdapter } from './approval-adapter.js';
 import { intakeFailure, intakeHttpBoundary, intakePageQuery, sendIntake } from './http-boundary.js';
 
 const MAX_PENDING_PARSE = 10;
@@ -12,6 +13,15 @@ const params = (request: FastifyRequest) => request.params as Record<string, str
 function version(request: FastifyRequest): number {
   const raw = params(request).version!;
   return /^[1-9][0-9]{0,15}$/.test(raw) ? Number(raw) : NaN;
+}
+function candidateCommand(request: FastifyRequest): boolean {
+  if (!noQuery(request) || (request.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase() !== 'application/json') return false;
+  const body = request.body;
+  if (!body || typeof body !== 'object' || !('key' in body) || !body.key || typeof body.key !== 'object') return false;
+  // Never let a valid body authorize a different path. Leave the complete body
+  // untouched for the service's strict frozen-schema validation.
+  return 'candidateId' in body.key && body.key.candidateId === params(request).candidateId
+    && 'version' in body.key && body.key.version === version(request);
 }
 
 /** Explicitly registered by the isolated synthetic host only. The plugin creates
@@ -23,10 +33,11 @@ function version(request: FastifyRequest): number {
  * command to resume a reading/parsing job using its durable receipt. */
 export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   auth: ProductAuthService; pool: IntakePool; store: ContentObjectStore;
+  approval?: ApprovalAdapter;
   report?: (diagnosticId: string, error: unknown) => void;
-}> = async (app, { auth, pool, store, report }) => {
+}> = async (app, { auth, pool, store, approval, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
-  const service = createContentIntakeService(pool, store, report, undefined, { requireProductSession: true });
+  const service = createContentIntakeService(pool, store, report, approval, { requireProductSession: true });
   const stopping = new AbortController();
   let pending = 0;
   let tail = Promise.resolve();
@@ -81,4 +92,27 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   });
   app.get('/v1/intake/candidates/:candidateId/versions/:version/material', { exposeHeadRoute: false }, async (request, reply) =>
     sendIntake(reply, await service.material(actor(request), params(request).candidateId!, version(request), intakePageQuery(request)), 'IntakeCandidatePage'));
+  for (const [path, method, schema, status] of [
+    ['source-confirmation', 'confirmSource', 'IntakeCandidate', 200],
+    ['review', 'requestReview', 'IntakeReview', 202],
+    ['review/refresh', 'refreshReview', 'IntakeReview', 202],
+    ['publish', 'publish', 'IntakeReceipt', 202],
+    ['cancel', 'cancel', 'IntakeReceipt', 200],
+  ] as const) app.post(`/v1/intake/candidates/:candidateId/versions/:version/${path}`, { bodyLimit: 65_536 }, async (request, reply) => {
+    if (!candidateCommand(request)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    return sendIntake(reply, await service[method](actor(request), request.body), schema, status);
+  });
+  app.get('/v1/intake/candidates/:candidateId/versions/:version/review', { exposeHeadRoute: false }, async (request, reply) => {
+    if (!noQuery(request)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    const candidate = await service.candidate(actor(request), params(request).candidateId!, version(request));
+    if (!candidate.ok) return intakeFailure(reply, candidate.code, candidate.reason, candidate.diagnosticId);
+    // Versioned material is immutable. Both reads authorize independently; this
+    // address-to-key lookup cannot carry authority across a logout/revocation.
+    return sendIntake(reply, await service.review(actor(request), candidate.value.key), 'IntakeReview');
+  });
+  app.get('/v1/intake/operations/:operationId', { exposeHeadRoute: false }, async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    if (Object.keys(query).length !== 1 || !('action' in query)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    return sendIntake(reply, await service.operationReceipt(actor(request), params(request).operationId!, query.action), 'IntakeOperationReceipt');
+  });
 };

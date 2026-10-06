@@ -226,3 +226,13 @@ export async function cancelCandidate(client: IntakeTransaction, actor: Principa
   await client.query("UPDATE content_intake.write_attempts SET state='cancelled' WHERE actor_id=$1 AND action='cancel' AND operation_id=$2", [actor.id, req.operationId]);
   return readCandidate(client, actor, req.key.candidateId, req.key.version, 'candidate-cancel');
 }
+
+/** Project the existing permanent cancellation result into the frozen wire receipt.
+ * Keep stored candidate responses readable across restart; no receipt migration or
+ * renewed candidate authority is implied by reading this historical result. */
+export function cancellationReceipt(operationId: string, response: unknown): C['IntakeReceipt'] {
+  const candidate = parseContractSchema('IntakeCandidate', response);
+  if (candidate.state !== 'cancelled') throw new IntakeRejection('COMMIT_UNKNOWN');
+  return parseContractSchema('IntakeReceipt', { operationId, key: candidate.key, action: 'cancel', state: 'cancelled',
+    releaseId: null, announcementId: null, reason: null });
+}

@@ -1,0 +1,196 @@
+{
+  "scope": "Incremental delta from reviewed 750d992; unchanged earlier slices retain their own evidence.",
+  "mode": "workspace",
+  "total_files": 23,
+  "reviewed_files": 17,
+  "skipped_files": 0,
+  "coverage_rate": 100,
+  "reviewable": [
+    {
+      "path": "apps/api/src/content-intake/candidate.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "715d04a0f0ea7c7168d30d4a78a68b5ebd3a3bd38e6acaeeb8a4fe6c84a5325a"
+    },
+    {
+      "path": "apps/api/src/content-intake/evidence.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "da2d24954423aabd1a9a3eae34d6eb5fd2de9aba72369b581d179d0491389c71"
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "d9656e454ecc17c00aaccc76879c32ce5bc62db45207683bde30ec4e9be2b176"
+    },
+    {
+      "path": "apps/api/src/content-intake/publication.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "6bb5c91cab5804976b90bb258c7475964ecc1ada055a6d1ab02b3ec9f70a0b6b"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "6c86713866843a4aa96f7b1e679fa753e8571c654df68c1efcf522ef8743b092"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-002.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "cde2e6093591227a3d919ac319e5b5962bf5ed0e740f7834d4c06bc9fed3efe4"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-003.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "9f6d9a8daa89cf7177a7dce2e6482260708f91f60dfea222da7e5987b155cd08"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-004.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "5cdcfd1fb4c4a5177ad1eb77640f1d5b2593d29323b32c8f321b0293a5bc1e41"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-005.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "81e9726eec95ae14d31293c9c72c6e9d623f06039e21fa3582bd3ec40f538287"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-006.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "237cc87842231279ac2092ee21e076cf2682ed0030c1262b499e6221b33c12cc"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-007.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "1e42a6f47ee020fbdcec3fc619d57fe64a445045e8acaeb3604dae096555b35e"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-008.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "cbf63cac74d94d853d6911b9998f8bf0b06c8eb32bb648b969882e8bb300dbd8"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-009.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "673f40d5c9ac0e0c7a28e5a2b028fcab50b15d38a01bdff3979b024bad5244a9"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/exploration-010.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "df2d8fd0e6f03058bcc8f99bc2215a2c9a583339256b6c8a1da295c3603d8f1c"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/functional-evidence.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "28ed12f965bc9783c20d60c59097807237169f1ac928b2d087f34bb746e6deea"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/review-coverage.json",
+      "status": "added",
+      "result": "reviewed",
+      "selfIndex": true
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/verification.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "9a2bf1726f32b1256fdcbc5c47945e98cc51f57c299a3310dbc244f48935c85c"
+    }
+  ],
+  "excludedReviewed": [
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "ocrReason": "default_path",
+      "result": "manual full review by parent"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "result": "manual full review by parent"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "result": "manual full review by parent"
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "result": "manual full review by parent"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "result": "manual full review by parent"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-workflow/README.md",
+      "status": "added",
+      "ocrReason": "unsupported_ext",
+      "result": "manual full review by parent"
+    }
+  ],
+  "rules": [
+    {
+      "group": 1,
+      "source": "system",
+      "pattern": "**/*.{ts,js,tsx,jsx,mjs,cjs}",
+      "files": [
+        "apps/api/src/content-intake/candidate.ts",
+        "apps/api/src/content-intake/evidence.ts",
+        "apps/api/src/content-intake/management-http.ts",
+        "apps/api/src/content-intake/publication.ts",
+        "apps/api/src/content-intake/service.ts"
+      ]
+    },
+    {
+      "group": 2,
+      "source": "system",
+      "pattern": "**/*.{json,json5}",
+      "files": [
+        "evidence/qa/content-intake-p2-workflow/exploration-002.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-003.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-004.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-005.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-006.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-007.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-008.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-009.json",
+        "evidence/qa/content-intake-p2-workflow/exploration-010.json",
+        "evidence/qa/content-intake-p2-workflow/functional-evidence.json",
+        "evidence/qa/content-intake-p2-workflow/review-coverage.json",
+        "evidence/qa/content-intake-p2-workflow/verification.json"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "path": "apps/api/src/content-intake/evidence.ts",
+      "content": "Review-package objects persisted before registration survived definite rollback, verification failure or concurrent durable replay. Evidence owner now reclaims only unused objects; unknown commit and adopted packages remain recoverable. Real HTTP regression failed twice then passed.",
+      "start_line": 173,
+      "end_line": 202,
+      "category": "bug",
+      "severity": "medium",
+      "disposition": "fixed"
+    }
+  ],
+  "nativeCoverage": "Codex in-host adversarial; source/context read, fixtures and tests summary-only; parent reads and executes tests.",
+  "outsideCoverage": "Disabled by continuing user preference; historical timeouts and malformed results are not reported as passes."
+}

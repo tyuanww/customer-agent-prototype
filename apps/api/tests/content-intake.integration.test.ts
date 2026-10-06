@@ -125,10 +125,11 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     return { operationId: op, objectId: obj.objectId, sourceVersion: 1, baseReleaseId: null,
       contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior };
   }
-  async function managementHost(customStore = store, hostPool: IntakePool = pool) {
+  async function managementHost(customStore = store, hostPool: IntakePool = pool, transport: ApprovalTransport | null = provider.transport) {
     const logged = await seat('enabler');
     const app = Fastify();
     await app.register(contentIntakeManagementRoutes, { auth: auth!, pool: hostPool, store: customStore,
+      ...(transport ? { approval: createApprovalAdapter(route, transport) } : {}),
       report: (_id, error) => diagnostics.push(error) });
     const origin = await app.listen({ host: '127.0.0.1', port: 0 });
     const headers = { authorization: `Bearer ${logged.token}` };
@@ -138,9 +139,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       form.set('file', new Blob([new Uint8Array(bytes)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), '../../synthetic.xlsx');
       return fetch(`${origin}/v1/intake/sources/${sourceId}/objects`, { method: 'POST', headers, body: form });
     }
-    async function receive(objectId: string, operationId = 'http-receive', prior: C['IntakeCandidateKey'] | null = null) {
+    async function receive(objectId: string, operationId = 'http-receive', prior: C['IntakeCandidateKey'] | null = null, baseReleaseId: string | null = null) {
       return app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/candidates', headers,
-        payload: { operationId, objectId, sourceVersion: 1, baseReleaseId: null,
+        payload: { operationId, objectId, sourceVersion: 1, baseReleaseId,
           contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior } });
     }
     async function settled(id: string) {
@@ -156,9 +157,343 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     }
     return { app, origin, headers, upload, receive, settled, logged };
   }
-  const httpWorkbook = (bodies = ['第一行。\n第二行。', '合成第二条。', '合成第三条。']) => createTemplate(
+  const httpWorkbook = (bodies = ['第一行。\n第二行。', '合成第二条。', '合成第三条。'], critical = false) => createTemplate(
     { sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' },
-    bodies.map((body, index) => [`faq-${index}`, `合成问题${index}`, body, '', '', '分类', '', '启用', '', '', '', '合成内部说明', '', '', 'false']));
+    bodies.map((body, index) => [`faq-${index}`, `合成问题${index}`, body, '', '', '分类', '', '启用', '', '', '', '合成内部说明', critical ? '合成风险提示' : '', '', 'false']));
+
+  async function httpCandidate(host: Awaited<ReturnType<typeof managementHost>>, label = 'workflow', critical = false) {
+    const object = parseContractSchema('IntakeObject', await (await host.upload(await httpWorkbook(undefined, critical), `${label}-upload`)).json());
+    const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+    const received = await host.receive(object.objectId, `${label}-receive`, null, baseReleaseId);
+    expect(received.statusCode, received.body).toBe(202);
+    const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+    expect(job.state, JSON.stringify(job.issues)).toBe('validated');
+    const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
+    const c = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
+    const source: C['IntakeSourceConfirmation'] = { operationId: `${label}-source`, key: c.key, expectedEvidenceVersion: 0,
+      confirmedVersionKind: 'opaque', confirmedVersionValue: 'synthetic-export-one', acquisition: 'controlled-synthetic-export',
+      objectSha256: object.sha256, reason: '合成人工来源确认' };
+    const publish: C['IntakePublish'] = { operationId: `${label}-publish`, key: c.key, baseReleaseId,
+      sourceEvidenceVersion: 1, approvalEvidenceVersion: 1, title: '合成 HTTP 发布', summary: '三条 FAQ' };
+    const post = (suffix: string, body: unknown, headers = host.headers) => fetch(`${url}/${suffix}`, {
+      method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    return { c, url, source, publish, post };
+  }
+  async function httpReview(f: Awaited<ReturnType<typeof httpCandidate>>) {
+    const confirmed = await f.post('source-confirmation', f.source);
+    expect(confirmed.status, await confirmed.clone().text()).toBe(200);
+    const started = await f.post('review', reviewRequest(f.c));
+    expect(started.status, await started.clone().text()).toBe(202);
+    return parseContractSchema('IntakeReview', await started.json());
+  }
+  async function internalHttpQuality(c: C['IntakeCandidate']) {
+    // The frozen wire contract has no quality routes yet. This explicit fixture
+    // step uses the real quality service with a product session, never a SQL PASS.
+    const quality = createContentIntakeService(pool, store, undefined, undefined, { requireProductSession: true });
+    const reviewer = (await seat('reviewer')).actor;
+    const frozen = value(await quality.freezeQuality(reviewer, { operationId: `quality-${c.key.candidateId}`, key: c.key }));
+    expect(value(await quality.checkQuality(reviewer, { operationId: `checks-${c.key.candidateId}`, key: c.key,
+      phase: 'initial', checks: qualityChecks(frozen) })).state).toBe('passed');
+  }
+
+  it('workflow HTTP publishes the uploaded material after real evidence gates and a second seat consumes that release', async () => {
+    await publicationBase();
+    const host = await managementHost();
+    const reader = Fastify();
+    await reader.register(contentIntakeUsageRoutes, { auth: auth!, usage: service });
+    const origin = await reader.listen({ host: '127.0.0.1', port: 0 });
+    try {
+      const f = await httpCandidate(host);
+      await httpReview(f);
+      expect((await f.post('publish', f.publish)).status).toBe(409);
+      await noPublication();
+      provider.approve('enabler'); // routine content allows a qualified self-review
+      const refreshed = await f.post('review/refresh', reviewRequest(f.c, 1, 'workflow-refresh'));
+      expect(refreshed.status).toBe(202);
+      const review = parseContractSchema('IntakeReview', await refreshed.json());
+      expect(review.state).toBe('approved');
+      const observations = provider.instanceCalls();
+      expect(await (await fetch(`${f.url}/review`, { headers: host.headers })).json()).toEqual(review);
+      expect(provider.instanceCalls()).toBe(observations);
+      expect((await f.post('publish', f.publish)).status).toBe(409); // ready is not quality-passed
+      await noPublication();
+      await internalHttpQuality(f.c);
+      const published = await f.post('publish', f.publish);
+      expect(published.status, await published.clone().text()).toBe(202);
+      const receipt = parseContractSchema('IntakeReceipt', await published.json());
+      expect(receipt).toMatchObject({ state: 'published', action: 'publish', key: f.c.key });
+      expect(await (await f.post('publish', f.publish)).json()).toEqual(receipt);
+      expect((await f.post('publish', { ...f.publish, summary: '改写重放' })).status).toBe(409);
+      expect(await (await fetch(`${host.origin}/v1/intake/operations/${f.publish.operationId}?action=publish`, { headers: host.headers })).json()).toEqual(receipt);
+      expect((await f.post('cancel', { operationId: 'too-late', key: f.c.key })).status).toBe(409);
+      const secondSeat = await seat('agent');
+      const headers = { authorization: `Bearer ${secondSeat.token}` };
+      const entitlementResponse = await fetch(`${origin}/v1/intake/entitlements`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ ...usage, releaseId: receipt.releaseId }) });
+      expect(entitlementResponse.status).toBe(200);
+      const entitlement = parseContractSchema('IntakeEntitlement', await entitlementResponse.json());
+      const response = await fetch(`${origin}/v1/intake/snapshot?entitlementId=${entitlement.entitlementId}`, { headers });
+      expect(response.status).toBe(200);
+      const snapshot = parseContractSchema('IntakeSnapshot', await response.json());
+      expect(snapshot.releaseId).toBe(receipt.releaseId);
+      expect(snapshot.faq).toHaveLength(3);
+      expect(snapshot.faq[0]!.entry.answerText).toBe('第一行。\n第二行。');
+      expect(JSON.stringify(snapshot)).not.toContain('合成内部说明');
+      console.log(JSON.stringify({ probe: 'workflow-http-second-seat', source: 'uploaded-synthetic-xlsx', releaseId: receipt.releaseId,
+        faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'internal-session-required-service', approvalTransport: 'synthetic' }));
+    } finally { await reader.close(); await host.app.close(); }
+  }, 40_000);
+
+  it('workflow HTTP validates exact candidate paths, complete bodies and action namespaces without trusting caller approval', async () => {
+    const host = await managementHost();
+    try {
+      const f = await httpCandidate(host);
+      const agent = { authorization: `Bearer ${(await seat('agent')).token}` };
+      const commands = [['source-confirmation', f.source], ['review', reviewRequest(f.c)], ['review/refresh', reviewRequest(f.c, 1)],
+        ['publish', f.publish], ['cancel', { operationId: 'cancel', key: f.c.key }]] as const;
+      for (const [suffix, body] of commands) {
+        expect((await f.post(suffix, body, {} as typeof host.headers)).status).toBe(401);
+        expect((await f.post(suffix, body, agent)).status).toBe(404);
+        for (const key of [{ ...f.c.key, candidateId: 'different-candidate' }, { ...f.c.key, version: 2 }])
+          expect((await f.post(suffix, { ...body, key })).status).toBe(400);
+        expect((await f.post(suffix, { ...body, approved: true })).status).toBe(400);
+        expect((await f.post(`${suffix}?unknown=1`, body)).status).toBe(400);
+        expect((await fetch(`${f.url.replace('/versions/1', '/versions/01')}/${suffix}`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' }, body: JSON.stringify(body) })).status).toBe(400);
+      }
+      const wrongDigest = await f.post('source-confirmation', { ...f.source, key: { ...f.c.key, digest: 'f'.repeat(64) } });
+      expect(wrongDigest.status).toBe(409);
+      expect((await fetch(`${f.url}/review`, { headers: agent })).status).toBe(404);
+      expect((await fetch(`${f.url}/review?key=spoof`, { headers: host.headers })).status).toBe(400);
+      for (const query of ['', '?action=publish&action=cancel', '?action=review', '?action=publish&extra=1'])
+        expect((await fetch(`${host.origin}/v1/intake/operations/unknown${query}`, { headers: host.headers })).status).toBe(400);
+      expect(provider.calls()).toBe(0);
+      expect((await admin.query('SELECT count(*) FROM content_intake.source_confirmations')).rows[0].count).toBe('0');
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  it('workflow HTTP recovers an unknown provider creation with its original UUID across host restart', async () => {
+    let lose = true;
+    const transport = { ...provider.transport, async create(...args: Parameters<ApprovalTransport['create']>) {
+      const created = await provider.transport.create(...args);
+      if (lose) { lose = false; throw new Error('synthetic lost provider response'); }
+      return created;
+    } };
+    const host = await managementHost(store, pool, transport);
+    let restarted: Awaited<ReturnType<typeof managementHost>> | undefined;
+    try {
+      const f = await httpCandidate(host);
+      const first = await httpReview(f);
+      expect(first.state).toBe('creating');
+      expect((await f.post('review', reviewRequest(f.c, 1, 'replacement'))).status).toBe(409);
+      await host.app.close();
+      restarted = await managementHost(store, pool, transport);
+      const response = await fetch(`${f.url.replace(host.origin, restarted.origin)}/review`, { method: 'POST',
+        headers: { ...restarted.headers, 'content-type': 'application/json' }, body: JSON.stringify(reviewRequest(f.c)) });
+      expect(response.status).toBe(202);
+      expect(parseContractSchema('IntakeReview', await response.json())).toMatchObject({ reviewRequestId: first.reviewRequestId,
+        evidenceVersion: 1, reviewPackageSha256: first.reviewPackageSha256, state: 'unavailable' });
+      expect(provider.instances.size).toBe(1);
+      expect(provider.calls()).toBe(2);
+    } finally { await restarted?.app.close(); await host.app.close(); }
+  }, 40_000);
+
+  it('workflow HTTP fails closed without an adapter and does not accept critical self-review or renew facts on provider failure', async () => {
+    await publicationBase();
+    const host = await managementHost();
+    let unavailable: Awaited<ReturnType<typeof managementHost>> | undefined;
+    try {
+      const f = await httpCandidate(host, 'critical-http', true);
+      expect((await admin.query('SELECT risk FROM content_intake.candidate_versions WHERE candidate_id=$1', [f.c.key.candidateId])).rows[0].risk).toBe('critical');
+      await httpReview(f);
+      provider.approve('enabler');
+      expect((await f.post('review/refresh', reviewRequest(f.c, 1, 'self-review'))).status).toBe(409);
+      provider.approve('reviewer');
+      const valid = await f.post('review/refresh', reviewRequest(f.c, 1, 'other-review'));
+      expect(valid.status).toBe(202);
+      const old = parseContractSchema('IntakeReview', await valid.json());
+      unavailable = await managementHost(store, pool, null);
+      const url = f.url.replace(host.origin, unavailable.origin);
+      const refresh = await fetch(`${url}/review/refresh`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },
+        body: JSON.stringify(reviewRequest(f.c, 1, 'missing-adapter')) });
+      expect(refresh.status).toBe(503);
+      expect(await (await fetch(`${url}/review`, { headers: host.headers })).json()).toEqual(old);
+      provider.latest().state = 'REVOKED';
+      expect((await f.post('review/refresh', reviewRequest(f.c, 1, 'revoked'))).status).toBe(202);
+      expect((await f.post('publish', f.publish)).status).toBe(409);
+      await noPublication();
+    } finally { await unavailable?.app.close(); await host.app.close(); }
+  }, 40_000);
+
+  it.each(['logout', 'revoke', 'cancel', 'source-change'] as const)('workflow HTTP fences %s during publish approval I/O', async change => {
+    await publicationBase();
+    let armed = false;
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const host = await managementHost(store, pool, { ...provider.transport, async instance(...args) {
+      const snapshot = await provider.transport.instance(...args);
+      if (armed) { enter(); await gate; }
+      return snapshot;
+    } });
+    try {
+      const f = await httpCandidate(host);
+      await httpReview(f); provider.approve('reviewer'); await internalHttpQuality(f.c);
+      armed = true;
+      const pending = f.post('publish', f.publish); await entered;
+      if (change === 'logout') await auth!.logout(host.logged.token);
+      else if (change === 'revoke') value(await service.changeGrant(actor('director'), 'business-enabler-publish', {
+        operationId: 'revoke-http', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+      else {
+        const headers = { authorization: `Bearer ${(await seat('other')).token}` };
+        const result = change === 'cancel' ? await f.post('cancel', { operationId: 'concurrent-cancel', key: f.c.key }, headers)
+          : await f.post('source-confirmation', { ...f.source, operationId: 'source-changed', expectedEvidenceVersion: 1 }, headers);
+        expect(result.status).toBe(200);
+      }
+      release();
+      const result = await pending;
+      expect(result.status).toBe(change === 'logout' ? 401 : change === 'revoke' ? 404 : 409);
+      await noPublication();
+    } finally { release(); await host.app.close(); }
+  }, 40_000);
+
+  it('workflow HTTP recovers a lost publish COMMIT through actor/action-scoped receipts without another publication', async () => {
+    await publicationBase();
+    let lost = false;
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect(); let publishes = false;
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql.includes('content_intake.publish_candidate(')) publishes = true;
+          if (sql === 'COMMIT' && publishes && !lost) { lost = true; throw new Error('synthetic lost publish COMMIT'); }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, key); return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const host = await managementHost(store, uncertain);
+    try {
+      const f = await httpCandidate(host);
+      await httpReview(f); provider.approve('reviewer'); await internalHttpQuality(f.c);
+      const first = await f.post('publish', f.publish);
+      expect(first.status).toBe(503);
+      expect(await first.json()).toMatchObject({ error: { details: { reason: 'COMMIT_UNKNOWN' } } });
+      const url = `${host.origin}/v1/intake/operations/${f.publish.operationId}`;
+      const recovered = parseContractSchema('IntakeReceipt', await (await fetch(`${url}?action=publish`, { headers: host.headers })).json());
+      expect(recovered.state).toBe('published');
+      expect((await fetch(`${url}?action=publish`, { headers: { authorization: `Bearer ${(await seat('other')).token}` } })).status).toBe(404);
+      expect((await fetch(`${url}?action=cancel`, { headers: host.headers })).status).toBe(404);
+      const observations = provider.instanceCalls();
+      expect(await (await f.post('publish', f.publish)).json()).toEqual(recovered);
+      expect(provider.instanceCalls()).toBe(observations);
+      expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('1');
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  it('workflow HTTP preserves historical cancellation receipts and requires a live owning session to recover them', async () => {
+    const host = await managementHost();
+    try {
+      const f = await httpCandidate(host);
+      const req = { operationId: 'http-cancel', key: f.c.key };
+      const cancelled = await f.post('cancel', req);
+      expect(cancelled.status).toBe(200);
+      const receipt = parseContractSchema('IntakeReceipt', await cancelled.json());
+      expect(receipt).toMatchObject({ operationId: req.operationId, key: f.c.key, state: 'cancelled', action: 'cancel', releaseId: null });
+      const stored = (await admin.query("SELECT response FROM backend_review.receipts WHERE operation='intake:cancel'")).rows[0].response;
+      expect(parseContractSchema('IntakeCandidate', stored).state).toBe('cancelled'); // existing durable format retained
+      expect(await (await f.post('cancel', req)).json()).toEqual(receipt);
+      const url = `${host.origin}/v1/intake/operations/${req.operationId}?action=cancel`;
+      value(await service.changeGrant(actor('director'), 'business-enabler-candidate-cancel', {
+        operationId: 'cancel-revoke', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+      expect(await (await fetch(url, { headers: host.headers })).json()).toEqual(receipt);
+      expect((await fetch(url, { headers: { authorization: `Bearer ${(await seat('other')).token}` } })).status).toBe(404);
+      await auth!.logout(host.logged.token);
+      expect((await fetch(url, { headers: host.headers })).status).toBe(401);
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  // Value: protects=DB quota and disk agree after concurrent request recovery;
+  // fails_when=losing review packages survive durable replay; seam=owned store I/O barrier.
+  it('workflow HTTP approval package cleanup keeps only the concurrently adopted package', async () => {
+    let arrivals = 0;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const host = await managementHost({ ...store, async persist(...args) {
+      const object = await store.persist(...args);
+      if (args[1] === 'csv') { if (++arrivals === 2) release(); await gate; }
+      return object;
+    } });
+    try {
+      const f = await httpCandidate(host);
+      const responses = await Promise.all([f.post('review', reviewRequest(f.c)), f.post('review', reviewRequest(f.c))]);
+      expect(responses.map(r => r.status)).toEqual([202, 202]);
+      const reviews = await Promise.all(responses.map(async r => parseContractSchema('IntakeReview', await r.json())));
+      expect(reviews[0]!.reviewRequestId).toBe(reviews[1]!.reviewRequestId);
+      expect(arrivals).toBe(2);
+      const referenced = (await admin.query('SELECT object_id FROM content_intake.objects ORDER BY object_id')).rows.map(r => r.object_id);
+      expect(referenced).toHaveLength(2); // uploaded workbook and one review package
+      expect((await readdir(path.join(store.rootDirectory, 'objects'))).sort()).toEqual(referenced);
+      expect(provider.instances.size).toBe(1);
+    } finally { release(); await host.app.close(); }
+  }, 40_000);
+
+  it.each(['verification', 'logout'] as const)('workflow HTTP approval package cleanup reclaims after %s before registration', async failure => {
+    let packageId: string | undefined;
+    const host = await managementHost({ ...store, async persist(...args) {
+      const object = await store.persist(...args);
+      if (args[1] === 'csv') {
+        packageId = object.objectId;
+        if (failure === 'logout') await auth!.logout((await seat('enabler')).token);
+      }
+      return object;
+    }, async readPayload(id) {
+      return id === packageId && failure === 'verification' ? Buffer.from('synthetic corrupted package') : store.readPayload(id);
+    } });
+    try {
+      const f = await httpCandidate(host);
+      const response = await f.post('review', reviewRequest(f.c));
+      expect(response.status).toBe(failure === 'logout' ? 401 : 409);
+      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('0');
+      expect((await readdir(path.join(store.rootDirectory, 'objects')))).toHaveLength(1);
+      expect(provider.calls()).toBe(0);
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  it.each(['unknown-commit', 'logout-after-adoption'] as const)('workflow HTTP retains the adopted approval package after %s', async failure => {
+    let injected = false;
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect(); let adopts = false;
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql.includes('INSERT INTO content_intake.review_bindings')) adopts = true;
+          if (failure === 'unknown-commit' && sql === 'COMMIT' && adopts && !injected) { injected = true; throw new Error('synthetic lost package adoption COMMIT'); }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, key); return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const host = await managementHost(store, uncertain, { ...provider.transport, async create(...args) {
+      const result = await provider.transport.create(...args);
+      if (failure === 'logout-after-adoption' && !injected) { injected = true; await auth!.logout((await seat('enabler')).token); }
+      return result;
+    } });
+    try {
+      const f = await httpCandidate(host);
+      const response = await f.post('review', reviewRequest(f.c));
+      expect(response.status).toBe(failure === 'unknown-commit' ? 503 : 401);
+      const binding = (await admin.query('SELECT package_object_id,package_sha256 FROM content_intake.review_bindings')).rows[0];
+      expect(digest(await store.readPayload(binding.package_object_id))).toBe(binding.package_sha256);
+      const headers = { authorization: `Bearer ${(await seat('enabler', 'recovery')).token}` };
+      const recovered = await f.post('review', reviewRequest(f.c), headers);
+      expect(recovered.status, await recovered.clone().text()).toBe(202);
+      expect(parseContractSchema('IntakeReview', await recovered.json()).reviewPackageObjectId).toBe(binding.package_object_id);
+      expect((await readdir(path.join(store.rootDirectory, 'objects')))).toHaveLength(2);
+      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('1');
+      expect(provider.instances.size).toBe(1);
+    } finally { await host.app.close(); }
+  }, 40_000);
 
   it('management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material', async () => {
     const host = await managementHost();
@@ -1042,7 +1377,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(published.ok,JSON.stringify(diagnostics)).toBe(true);
     const out=value(published);
     expect(out).toMatchObject({ state:'published',action:'publish',key:c.key });
-    expect(value(await service.publicationReceipt(actor('enabler'),request.operationId))).toEqual(out);
+    expect(value(await service.operationReceipt(actor('enabler'),request.operationId,'publish'))).toEqual(out);
     expect(value(await createContentIntakeService(pool,store).publish(actor('enabler'),request))).toEqual(out);
     expect(await service.publish(actor('enabler'),{ ...request,title:'不同载荷' })).toMatchObject({ ok:false,reason:'IDEMPOTENCY_CONFLICT' });
     expect(await service.publish(actor('other'),{ ...request,operationId:'another-publish' })).toMatchObject({ ok:false,reason:'ALREADY_PUBLISHED' });
@@ -1174,11 +1509,11 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const first=createContentIntakeService(unreliable,store,(_id,e)=>diagnostics.push(e),createApprovalAdapter(route,provider.transport));
     expect(await first.publish(actor('enabler'),request)).toMatchObject({ ok:false,commit:'unknown',reason:'COMMIT_UNKNOWN' });
     const restarted=createContentIntakeService(pool,store);
-    const recovered=value(await restarted.publicationReceipt(actor('enabler'),request.operationId));
+    const recovered=value(await restarted.operationReceipt(actor('enabler'),request.operationId,'publish'));
     expect(value(await restarted.publish(actor('enabler'),request))).toEqual(recovered);
     expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('1');
     expect((await admin.query('SELECT count(*) FROM content_intake.commit_tickets')).rows[0].count).toBe('1');
-    expect(await restarted.publicationReceipt(actor('other'),request.operationId)).toMatchObject({ ok:false });
+    expect(await restarted.operationReceipt(actor('other'),request.operationId,'publish')).toMatchObject({ ok:false });
   });
 
   it.each(['cancel','revoke'] as const)('lets %s win while publication is observing approval without locks', async action => {
