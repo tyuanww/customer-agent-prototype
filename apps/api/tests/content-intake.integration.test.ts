@@ -14,6 +14,7 @@ import { syntheticApproval } from './support/intake-approval.js';
 import { digest } from '../src/content-intake/material.js';
 import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
 import type { IntakeQualityPreview, IntakeQualityProgress, QualityCheck } from '../src/content-intake/quality.js';
+import type { IntakeUsageContext } from '../src/content-intake/usage.js';
 
 type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -84,7 +85,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   async function input(op: string, prior: C['IntakeCandidateKey'] | null = null, rows = [
     ['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','风险提示','','false'],
   ], source = 'a'): Promise<C['IntakeReceive']> {
-    const bytes = await createTemplate({ sourceId: `source-${source}`, brandId: 'brand-a', scope: `shop-${source}`, domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' }, rows);
+    const bytes = await createTemplate({ sourceId: `source-${source}`, brandId: 'brand-a', scope: source==='brand' ? 'brand' : `shop-${source}`, domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' }, rows);
     const obj = await store.persist((async function* () { yield bytes; })(), 'excel');
     await admin.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
       VALUES ($1,$5,'enabler','tenant-a','app-a',$2,$3,$4,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','input',clock_timestamp())`,
@@ -163,7 +164,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   async function publishable(label='one', rows=[['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','','','false']], source='a') {
     const req = await input(`pub-input-${label}`,null,rows,source);
     req.baseReleaseId=(await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
-    const c = value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),`source-${source}`,req)).jobId));
+    const job=value(await service.receive(actor('enabler'),`source-${source}`,req)).jobId;
+    const parsed=await service.parse(actor('enabler'),job);
+    if (!parsed.ok) throw new Error(JSON.stringify({parsed,diagnostics:diagnostics.map(e=>String(e)),report:await service.job(actor('enabler'),job)}));
+    const c = value(parsed);
     value((await confirm(c,`pub-source-${label}`)).result);
     value(await service.requestReview(actor('enabler'),reviewRequest(c,0,`pub-review-${label}`)));
     provider.approve('reviewer');
@@ -180,6 +184,180 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     }
     expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows).toEqual([{ current_release_id:'rel_native_base' }]);
   }
+
+  const usage: IntakeUsageContext={ sessionId:'synthetic-agent-session',shopId:'shop-a',contextGeneration:1,productIds:[],scenarioIds:[] };
+  const issue=async(ctx=usage,releaseId: string|null=null)=>{
+    const result=await service.issueEntitlement(actor('agent'),ctx,
+      { shopId:ctx.shopId,contextGeneration:ctx.contextGeneration,releaseId });
+    if (!result.ok && result.code==='INTERNAL_ERROR') throw new Error(JSON.stringify(diagnostics.map(e=>String(e))));
+    return result;
+  };
+  const snapshot=(id: string,ctx=usage,extra={})=>service.snapshot(actor('agent'),ctx,{ entitlementId:id,...extra });
+  async function cloneScopeGrants(suffix: string) {
+    await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+      to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-'||$1,'scope_id','scope-'||$1,
+        'source_id',CASE WHEN source_id IS NULL THEN NULL ELSE 'source-'||$1 END,
+        'parent_grant_id',CASE WHEN parent_grant_id IS NULL THEN NULL ELSE parent_grant_id||'-'||$1 END))).*
+      FROM content_intake.grants g WHERE scope_id='scope-a' ORDER BY (kind='allocation') DESC`,[suffix]);
+  }
+
+  it('usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages', async () => {
+    await publicationBase();await cloneScopeGrants('b');await cloneScopeGrants('brand');
+    for (const source of ['a','b','brand']) {
+      const c=await publishable(`usage-${source}`,[['faq-one','相同标题',`${source} 第一行。\n第二行。`,'','','分类','适用说明','启用','','','','管理内部说明','','','false']],source);
+      value(await service.publish(actor('enabler'),c.request));
+    }
+    const ent=value(await issue());
+    expect(ent.scopes.map(s=>s.sourceId).sort()).toEqual(['source-a','source-brand']);
+    const first=value(await snapshot(ent.entitlementId,usage,{limit:1}));
+    expect(first.faq.map(f=>f.sourceId)).toEqual(['source-a']);expect(first.nextCursor).not.toBeNull();
+    const restarted=createContentIntakeService(pool,store);
+    const next=value(await restarted.snapshot(actor('agent'),usage,{entitlementId:ent.entitlementId,cursor:first.nextCursor,limit:1}));
+    expect(next.faq.map(f=>f.sourceId)).toEqual(['source-brand']);expect(next.nextCursor).toBeNull();
+    expect(next.releaseId).toBe(first.releaseId);
+    expect(first.faq[0]!.entry.answerText).toBe('a 第一行。\n第二行。');
+    expect(JSON.stringify([first,next])).not.toMatch(/internalNote|attachmentNote|管理内部说明/);
+    expect(first).toMatchObject({sopNodes:[],sopEdges:[],media:[]});
+    expect(await service.candidate(actor('agent'),'unknown',1)).toMatchObject({ok:false,code:'NOT_FOUND'});
+    for (const ctx of [{...usage,shopId:'shop-b'},{...usage,contextGeneration:2},{...usage,sessionId:'relogin'}]) {
+      expect(await snapshot(ent.entitlementId,ctx)).toMatchObject({ok:false,code:'NOT_FOUND'});
+    }
+    expect(await service.snapshot(actor('other'),usage,{entitlementId:ent.entitlementId})).toMatchObject({ok:false,code:'NOT_FOUND'});
+    expect(await snapshot(digest(ent.entitlementId))).toMatchObject({ok:false,code:'NOT_FOUND'});
+    expect(await snapshot(ent.entitlementId,usage,{limit:101})).toMatchObject({ok:false,code:'VALIDATION'});
+    const other=value(await issue());
+    expect(await snapshot(other.entitlementId,usage,{cursor:first.nextCursor})).toMatchObject({ok:false,code:'VALIDATION'});
+    expect((await admin.query('SELECT entitlement_hash FROM content_intake.entitlements')).rows.map(r=>r.entitlement_hash)).not.toContain(ent.entitlementId);
+  });
+
+  it('usage: shop access does not imply brand access, and brand permission alone cannot select an arbitrary shop', async () => {
+    await publicationBase();await cloneScopeGrants('brand');
+    value(await service.changeGrant(actor('director'),'business-agent-query-brand',
+      {operationId:'no-brand',expectedVersion:1,change:'revoke',reason:'合成品牌隔离',stewardPrincipalId:null}));
+    expect(value(await issue()).scopes.map(s=>s.sourceId)).toEqual(['source-a']);
+    expect(await issue({...usage,shopId:'shop-b'})).toMatchObject({ok:false,code:'NOT_FOUND'});
+    value(await service.grantBatch(actor('director'),{...batch('agent','query','business','brand-only'),items:[{
+      ...batch('agent','query').items[0]!,scope:{...scope,shopId:null,sourceId:'source-brand'}}]}));
+    value(await service.changeGrant(actor('director'),'business-agent-query',
+      {operationId:'no-shop',expectedVersion:1,change:'revoke',reason:'合成店铺撤权',stewardPrincipalId:null}));
+    expect(await issue()).toMatchObject({ok:false,code:'NOT_FOUND'});
+  });
+
+  it.each(['grant','source','release','facts','approval-unavailable','approval-revoked'] as const)('usage: denies every page after %s changes', async change => {
+    await publicationBase();const c=await publishable();value(await service.publish(actor('enabler'),c.request));
+    const ent=value(await issue());value(await snapshot(ent.entitlementId));
+    if (change==='grant') value(await service.changeGrant(actor('director'),'business-agent-query',
+      {operationId:'usage-revoke',expectedVersion:1,change:'revoke',reason:'合成坐席撤权',stewardPrincipalId:null}));
+    if (change==='source') await admin.query("UPDATE content_intake.sources SET revocation_generation=revocation_generation+1 WHERE source_id='source-a'");
+    if (change==='release') await admin.query('INSERT INTO content_intake.release_revocations VALUES ($1,1,\'合成失效\',clock_timestamp())',[ent.releaseId]);
+    if (change==='facts') {
+      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
+        clock_timestamp()-interval '2 minutes',clock_timestamp()-interval '1 minute',repeat('b',64))`);
+      await admin.query("UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='agent'");
+    }
+    if (change==='approval-revoked') { provider.latest().state='REVOKED';value(await refresh(c.c,'usage-revoked')); }
+    if (change==='approval-unavailable') {
+      // Simulates lost events + unavailable refresh after the last bounded fact.
+      await admin.query(`INSERT INTO content_intake.approval_facts SELECT (jsonb_populate_record(NULL::content_intake.approval_facts,
+        to_jsonb(f)||jsonb_build_object('facts_version',facts_version+1,'checked_at',clock_timestamp(),
+          'valid_until',clock_timestamp()+interval '0.2 seconds'))).*
+        FROM content_intake.approval_current cur JOIN content_intake.approval_facts f USING(review_request_id,facts_version)`);
+      await admin.query('UPDATE content_intake.approval_current SET facts_version=facts_version+1');
+      await admin.query('SELECT pg_sleep(0.25)');
+    }
+    expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false});
+    if (change!=='source') expect(await issue()).toMatchObject({ok:false});
+    expect((await admin.query('SELECT count(*) FROM content_intake.entitlements')).rows[0].count).toBe('1');
+  });
+
+  it('usage: a normal new publication preserves a valid old page and a fresh empty snapshot clears explicitly disabled rows', async () => {
+    await publicationBase();const c=await publishable();const r=value(await service.publish(actor('enabler'),c.request));
+    const old=value(await issue());
+    const next=await publishable('disable',[['faq-one','合成问题','第一行。\n第二行。','','','分类','','停用','','','','内部说明','','','false']]);
+    const published=value(await service.publish(actor('enabler'),next.request));
+    expect(value(await snapshot(old.entitlementId)).faq).toHaveLength(1);
+    expect(await issue(usage,r.releaseId)).toMatchObject({ok:false,reason:'BASE_CHANGED'});
+    const fresh=value(await issue());expect(fresh.releaseId).toBe(published.releaseId);
+    expect(value(await snapshot(fresh.entitlementId)).faq).toEqual([]);
+  });
+
+  it('usage: filters product/scenario/time before paging, pins vocabulary labels and expires at the next content boundary', async () => {
+    await publicationBase();
+    for (const [id,kind] of [['prod-one','product'],['scene-one','scenario']]) {
+      await admin.query('INSERT INTO content_intake.vocabulary VALUES ($1,\'scope-a\',$2,repeat(\'a\',64),true)',[id,kind]);
+      await admin.query('INSERT INTO content_intake.vocabulary_displays VALUES ($1,1,\'原始标签\')',[id]);
+    }
+    const boundary=new Date(Math.floor(Date.now()/1000)*1000+30_000).toISOString();
+    const c=await publishable('selection',[
+      ['faq-one','合成选品','正文','prod-one','scene-one','分类','','启用','2020-01-01T00:00:00Z',boundary.replace('.000Z','Z'),'','内部说明','','','false'],
+      ['faq-two','未到生效时间','未来正文','','','分类','','启用','2098-01-01T00:00:00Z','','','','','','false'],
+      ['faq-three','过期内容','过期正文','','','分类','','启用','2020-01-01T00:00:00Z','2021-01-01T00:00:00Z','','','','','false'],
+    ]);value(await service.publish(actor('enabler'),c.request));
+    await admin.query("INSERT INTO content_intake.vocabulary_displays VALUES ('prod-one',2,'新版标签')");
+    const ctx={...usage,productIds:['prod-one'],scenarioIds:['scene-one']};
+    const ent=value(await issue(ctx));expect(ent.validUntil).toBe(boundary);
+    const page=value(await snapshot(ent.entitlementId,ctx));expect(page.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
+    expect(page.vocabulary.map(v=>v.displayName)).toEqual(['原始标签','原始标签']);
+    expect(await snapshot(ent.entitlementId,{...ctx,productIds:[]})).toMatchObject({ok:false});
+    const unselected=value(await issue());expect(value(await snapshot(unselected.entitlementId)).faq).toEqual([]);
+  });
+
+  it('usage: does not renew or return a page after its immutable deadline, even when facts are refreshed', async () => {
+    await publicationBase();
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
+      clock_timestamp(),clock_timestamp()+interval '1 second',repeat('b',64))`);
+    await admin.query("UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='agent'");
+    const ent=value(await issue());
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',3,ARRAY['dept-a'],'job-agent',true,
+      clock_timestamp(),clock_timestamp()+interval '5 minutes',repeat('c',64))`);
+    await admin.query("UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='agent'");
+    const slow={async connect() {const client=await pool.connect();return new Proxy(client,{get(target,key) {
+      if (key==='query') return async(sql:string,args?:unknown[])=>{
+        const result=await target.query(sql,args);
+        if (sql.includes('SELECT DISTINCT jsonb_build_object')) await target.query('SELECT pg_sleep(1.1)');
+        return result;
+      };
+      const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+    }}) as PoolClient;}};
+    expect(await createContentIntakeService(slow,store).snapshot(actor('agent'),usage,{entitlementId:ent.entitlementId}))
+      .toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
+    expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false,reason:'LEASE_EXPIRED'});
+    expect(Date.parse(value(await issue()).validUntil)).toBeGreaterThan(Date.parse(ent.validUntil));
+  });
+
+  it('usage: consumes a maximum 5000-row native catalog within bounded transactions without duplicate or missing pages', async () => {
+    await publicationBase();
+    const rows=Array.from({length:5000},(_,i)=>[`faq-${String(i).padStart(4,'0')}`,'合成问题',`合成正文 ${i}`,'','','分类','','启用','','','','内部说明','','','false']);
+    const c=await publishable('maximum',rows);value(await service.publish(actor('enabler'),c.request));
+    const ent=value(await issue());
+    const ids:string[]=[];let nextCursor:string|null=null;
+    do {
+      const page:C['IntakeSnapshot']=value(await snapshot(ent.entitlementId,usage,{limit:100,...(nextCursor===null?{}:{cursor:nextCursor})}));
+      ids.push(...page.faq.map(f=>f.entry.businessEntryId));nextCursor=page.nextCursor;
+    } while (nextCursor!==null);
+    expect(ids).toEqual(rows.map(r=>r[0]));expect(new Set(ids).size).toBe(5000);
+  },60_000);
+
+  it('usage: pages within the 100 vocabulary budget and rejects an individually unpageable candidate before review', async () => {
+    await publicationBase();
+    const products=Array.from({length:60},(_,i)=>`prod-${i}`),scenarios=Array.from({length:51},(_,i)=>`scene-${i}`);
+    for (const [ids,kind] of [[products,'product'],[scenarios,'scenario']] as const) {
+      await admin.query(`INSERT INTO content_intake.vocabulary SELECT id,'scope-a',$2,repeat('a',64),true FROM unnest($1::text[]) id`,[ids,kind]);
+      await admin.query(`INSERT INTO content_intake.vocabulary_displays SELECT id,1,'合成标签' FROM unnest($1::text[]) id`,[ids]);
+    }
+    const row=(id:string,prod:string[],scene:string[])=>[id,'合成词项','完整正文',prod.join(','),scene.join(','),'分类','','启用','','','','','','','false'];
+    const c=await publishable('vocabulary-budget',[row('faq-one',products,scenarios.slice(0,20)),row('faq-two',[],scenarios.slice(20))]);
+    value(await service.publish(actor('enabler'),c.request));
+    const ctx={...usage,productIds:products,scenarioIds:scenarios};const ent=value(await issue(ctx));
+    const first=value(await snapshot(ent.entitlementId,ctx));expect(first.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
+    expect(first.vocabulary).toHaveLength(80);expect(first.nextCursor).not.toBeNull();
+    const second=value(await snapshot(ent.entitlementId,ctx,{cursor:first.nextCursor}));
+    expect(second.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-two']);expect(second.vocabulary).toHaveLength(31);expect(second.nextCursor).toBeNull();
+    const bad=await input('unpageable',null,[row('faq-one',products,scenarios)]);bad.baseReleaseId=ent.releaseId;
+    const job=value(await service.receive(actor('enabler'),'source-a',bad));
+    expect(await service.parse(actor('enabler'),job.jobId)).toMatchObject({ok:false,reason:'FILE_LIMIT'});
+    expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('1');
+  });
 
   it('publishes native material atomically without invented legacy fields, and recovers its permanent receipt', async () => {
     await publicationBase();

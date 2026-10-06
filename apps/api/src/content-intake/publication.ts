@@ -3,6 +3,7 @@ import { parseContractSchema, type components } from '@customer-agent/contracts'
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { candidateContext } from './candidate.js';
+import { assertSnapshotPageable } from './material.js';
 import { createIntakeTransactions, intakeReplay, IntakeRejection, type IntakeResult, type Reason } from './transaction.js';
 
 type C = components['schemas'];
@@ -28,6 +29,8 @@ export function createIntakePublication(run: Run,
         const prior = await intakeReplay(client,who,'publish',json(req),req.operationId,receipt);
         if (prior) return { req, prior: prior.value };
         const c = await candidateContext(client,who,req.key,'publish',true);
+        // Also guard durable candidates created before the reader's admission rule.
+        assertSnapshotPageable(c.material.entries);
         if (c.material.baseReleaseId!==req.baseReleaseId) throw new IntakeRejection('BASE_CHANGED');
         if (c.view.sourceEvidenceVersion!==req.sourceEvidenceVersion) throw new IntakeRejection('SOURCE_MISMATCH');
         if (c.view.approvalEvidenceVersion!==req.approvalEvidenceVersion) throw new IntakeRejection('APPROVAL_CHANGED');

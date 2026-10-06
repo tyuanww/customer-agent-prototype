@@ -98,7 +98,7 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 | 边界 | 本轮实现与所有者 | 后续限制 |
 | --- | --- | --- |
 | 材料身份 | release_lineage 精确引用不可变 candidate/version、来源、业务 ID、稿版本及 reviewRequestId；候选摘要包含整份材料 | 不能把质量 population hash 当旧 governance hash |
-| 问法及检索字段 | 正文、独立问法版本、商品/场景词项、分类、适用说明、有效期原样留在 material；不截断或猜 platform/taxonomy/sku | 原生坐席读模型仍待实现，必须按正式 IntakePublishedEntry 白名单输出；内部说明只供管理审核，不得下发 |
+| 问法及检索字段 | 正文、独立问法版本、商品/场景词项、分类、适用说明、有效期原样留在 material；不截断或猜 platform/taxonomy/sku | 封闭 usage 按正式 IntakePublishedEntry 白名单输出；内部/附件说明不下发，停用问法不进入坐席页；生产 adapter 仍待接线 |
 | 质量 | 最终事务要求候选绑定的质量状态为 passed；初样、扩样和逐条证据复用 0023 | 无冻结计划或新修订不能借用旧质量通过结论；旧 SQL 的 passed 不替代候选质量 |
 | 来源与审批 | 来源确认与对象 SHA 绑定；锁外即时观察原审核实例，锁内核对 exact evidenceVersion、checkedAt、generation 及双方当前资格 | 原生人工证据不生成旧 single/dual/owner 记录；真实 transport 未实现 |
 | 目录合并 | 当前来源使用完整候选（含缺行继承与显式停用）；其他来源谱系原样继承，并检查审批状态与最早期限 | 停用仍留历史谱系，读时过滤操作/有效期；显式 family 覆盖没有冲突证明时拒绝 |
@@ -108,6 +108,14 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 既有 owner 承接仍使用原 `g1a_offline_only` 合同及包外批准；新候选没有该旧身份时不伪造记录。最终事务先取得内容锁再取既有发布锁，重验 base、当前来源/发布人/审核人、材料及审批代际；继承审批和 owner 记录期限共同限制最晚提交。任何失败都不能留下票据、发布尝试或半个目录。实际验证与审查见[发布验收](../evidence/qa/content-intake-p2-publication/README.md)。
 
-下一可验收切片是封闭合成运行中的使用资格和原生按店读模型：另一坐席只能看到当前店及获准的品牌通用内容；漏项/撤权/过期/审批撤销即时失败关闭；内部说明不下发，空 SOP/media 是真实空集合；同店内容更新与权限失效分开。显式覆盖、旧数据迁移/初始基线、生产 ACL/HTTP/Main/renderer、真实 transport 和现场多端验收仍是各自未完成项。本轮不把发布服务成功称为完整 FAQ 闭环。
+### 使用资格与目录消费
+
+封闭合成服务已有 `issueEntitlement` / `snapshot`，复用原 `snapshot_offline_leases`、`content_intake.entitlements` 和单一 current。资格存随机不透明 ID 的 SHA-256；底层租约 token 不出服务。会话/店铺/上下文代际/商品与场景选择及来源代际绑定在服务生成的租约 client identity 中；没有新的 schema 或运行 ACL。仅签当前 release；同店普通新发布不主动使旧页失效，但旧资格永远不续命，不能签历史 SOP 资格。
+
+每页重验主体、业务 query、来源代际、全 release 承继审批、原来源/owner 门及最早截止；按店/独立品牌授权、商品、场景、有效期过滤后分页。内容下一次生效/失效会缩短资格，防止跨页结果随时间漂移；停用/过期行不下发，词项取材料引用的显示版本，内部/附件说明永不进入坐席合同，SOP/media 确为实际空集合。
+
+单页还受 `IntakeSnapshot.vocabulary.maxItems=100` 限制；候选单条的商品/场景去重引用总数超过 100 时以 FILE_LIMIT 阻断，发布预检也核对历史候选。跨多条累计超限自动提前分页，保持每条正文及引用完整。正式模型允许单条最多 200 引用但响应页只容 100，这个差集需所属仓协调；当前不擅自放宽响应合同。
+
+**剩余正式合同差集：** `/v1/intake/snapshot` 只有 entitlementId/cursor/limit，`IntakeEntitlementRequest` 只有 shopId/contextGeneration/releaseId；未定义商品/场景选择传输和服务器会话上下文所有权。当前选择由受控合成 adapter 注入并绑定，不冒充正式 HTTP 已实现。下一阶段先准备这部分所属仓版本化变更及 Main 使用资格/当前店 adapter；显式 family 冲突证明、旧内容认领/初始基线、生产 ACL/HTTP、真实 transport 与 Windows 桌面现场链各有未完成条件。该目录模块不等于完整 FAQ 界面闭环。
 
 现场资料 B 最新版/维护人、真实租户组织字段/人工节点/附件保真属于后续真实验证；本轮未读取真实资料、员工信息或凭据，未 push、PR、merge、deploy，也未启用 v2-active。

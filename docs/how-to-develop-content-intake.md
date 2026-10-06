@@ -116,4 +116,15 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 
 发生 `COMMIT_UNKNOWN` 时，用原 operationId 调 `publicationReceipt`，或重试原 publish 请求；成功提交后的历史回执不再触发远程观察，不产生第二个 release。相同键换载荷拒绝；新操作键不能重复发布同一候选。历史回执不代替当前使用资格。
 
-新字段保留在不可变材料，release_lineage 绑定完整候选及来源内条目；缺行继承、显式停用保留版本历史。不同来源谱系和不同域旧成员完整复制，并重新核对其审批/来源/owner 门。内部说明仍只供管理审核；坐席白名单读模型尚未接线。未支持媒体的解析规则保持阻断，非空附件说明不能被本发布入口绕过。具体映射、限制和下一切片验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
+新字段保留在不可变材料，release_lineage 绑定完整候选及来源内条目；缺行继承、显式停用保留版本历史。不同来源谱系和不同域旧成员完整复制，并重新核对其审批/来源/owner 门。内部说明仍只供管理审核；封闭坐席白名单读模型见下节，生产桌面尚未接线。未支持媒体的解析规则保持阻断，非空附件说明不能被本发布入口绕过。具体映射、限制和下一切片验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
+
+
+## P2 使用资格与按店目录
+
+仅受控合成执行器调用 `issueEntitlement(actor,context,request)` 和 `snapshot(actor,context,{entitlementId,cursor?,limit?})`。`context` 来自认证 adapter，包含 sessionId/shopId/contextGeneration/productIds/scenarioIds；不是来自 renderer 的身份声明。请求与返回用当前正式 validator，分页 limit 为 1–100，默认 50；整页去重词项最多 100，必要时提前分页。单条引用超出该预算在冻结/发布前返回 FILE_LIMIT，须拆分业务条件或等待正式合同调整；不截断词项。正式商品/场景上下文传输仍待版本化合同，不把内部参数塞进现有 HTTP 请求。
+
+同一资格分页须沿用相同会话和选择；换店、重新登录或改变选择后重签。新资格只能签 current，可指定 releaseId 作 CAS。普通新发布时旧页保持自己的 release；若希望展示新版，重新取资格并完成全部页面后整体替换，不能把新旧页合并。实际空目录必须能替换旧目录。游标只定位，不授予权限；每页均重验，不能把回执/旧资格/hash 当权限。
+
+资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 停止使用并处理审批；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。失败不自动恢复旧正文或延长旧资格。正式 Main 的撤文/禁复制及通知扇出属于下一 adapter 切片。
+
+本机定向验证：`CUSTOMER_AGENT_PG15_BIN=<PG15 bin> pnpm --filter @customer-agent/api test:intake:transactions`。使用临时 Unix socket PG，不读业务数据库；原生 Windows 不能直接运行此 PG harness，WSL 可提供 Linux 后端证据。远端需独立无特权目录并遮蔽生产路径；按 [远端测试流程](how-to-remote-development-and-deployment.md) 从已审阅 Git SHA 导出，不能把它变成生产发布。

@@ -9,6 +9,19 @@ type C = components['schemas'];
 type Entry = C['IntakeEntry'];
 export const digest = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex');
 
+// The accepted IntakeSnapshot contract limits the WHOLE page to 100 vocabulary
+// displays, even though IntakeEntry permits 100 refs of each kind. Keep producer
+// admission and consumer pagination on one budget until a versioned intake changes it.
+export const SNAPSHOT_VOCABULARY_LIMIT = 100;
+export function snapshotVocabularyKeys(entry: Pick<Entry,'productRefs'|'scenarioRefs'>): Set<string> {
+  return new Set([...entry.productRefs,...entry.scenarioRefs].map(ref=>`${ref.id}:${ref.displayVersion}`));
+}
+export function assertSnapshotPageable(entries: Entry[]): void {
+  if (entries.some(e=>e.operation==='upsert' && snapshotVocabularyKeys(e).size>SNAPSHOT_VOCABULARY_LIMIT)) {
+    throw new IntakeRejection('FILE_LIMIT','VALIDATION');
+  }
+}
+
 /** Formal material is JSON only. Reject invalid Unicode rather than hashing text
  * PostgreSQL or another JCS consumer cannot preserve. */
 export function canonical(value: CanonicalJsonValue): string {
@@ -112,6 +125,7 @@ export function materialFromParse(input: {
     risk: { policyVersion: 'risk-p1.1', level: critical ? 'critical' : 'routine', reasons: critical ? ['CRITICAL_CHANGE'] : [],
       explicitDisableCount: disables, sameSourceDisabledLast24Hours: input.recentDisables, evaluatedAt: new Date(now).toISOString() },
   });
+  assertSnapshotPageable(material.entries);
   canonical(material);
   return material;
 }
