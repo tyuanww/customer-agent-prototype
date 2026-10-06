@@ -1,0 +1,252 @@
+{
+  "revision": "a995ac14bdca458a6122f256c0c4a039f5a5d2fa",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "HTTP wire double only; no current API/PostgreSQL integration rerun.",
+    "No real Feishu/customer data, external model, packaged or Windows compositor validation.",
+    "Captures 001-006 are historical; 002-003 reproduce discovery cancellation. Final 007-010 supersede all earlier required commands.",
+    "300-second smoke deadline was not reset; final probes are required repair revalidation."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-query.test.ts tests/unit/content-intake-query-ipc.test.ts tests/unit/product-runtime-config.test.ts",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-query.test.ts (7 tests) 288ms\n ✓ tests/unit/content-intake-query-ipc.test.ts (1 test) 2ms\n ✓ tests/unit/product-runtime-config.test.ts (13 tests) 11ms\n\n Test Files  3 passed (3)\n      Tests  21 passed (21)\n   Start at  01:45:44\n   Duration  1.13s (transform 101ms, setup 182ms, collect 190ms, tests 301ms, environment 174ms, prepare 73ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "superseded",
+      "observed": "\nRunning 1 test using 1 worker\n\n  ✘  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (6.3s)\n\n\n  1) tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows \n\n    Error: expect(received).toEqual(expected) // deep equality\n\n    - Expected  - 2\n    + Received  + 4\n\n      Object {\n    -   \"error\": Array [],\n    -   \"options\": 3,\n    +   \"error\": Array [\n    +     \"查询已取消或上下文已改变，请重新查询。\",\n    +   ],\n    +   \"options\": 1,\n        \"requests\": Any<Array>,\n        \"signedIn\": true,\n      }\n\n    Call Log:\n    - Timeout 5000ms exceeded while waiting on the predicate\n\n      56 |       const status = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());\n      57 |       return { signedIn: status.ok && status.signedIn, options: await shop.locator('option').count(), error: await query.locator('[role=alert]').allTextContents(), requests: [...requests] };\n    > 58 |     }).toEqual({ signedIn: true, options: 3, error: [], requests: expect.any(Array) });\n         |        ^\n      59 |     await shop.selectOption('shop-a');\n      60 |     await expect(shop).toHaveValue('shop-a');\n      61 |     await query.getByTestId('question-input').fill('洁面');\n        at /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-query.spec.ts:58:8\n\n    Error Context: test-results/content-intake-query-FAQ-Q-90ee9--and-isolates-other-windows/error-context.md\n\n  1 failed\n    tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows \nundefined\n/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test tests/e2e/content-intake-query.spec.ts\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "superseded",
+      "observed": "\nRunning 1 test using 1 worker\n\n  ✘  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (6.2s)\n\n\n  1) tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows \n\n    Error: expect(received).toEqual(expected) // deep equality\n\n    - Expected  - 2\n    + Received  + 4\n\n      Object {\n    -   \"error\": Array [],\n    -   \"options\": 3,\n    +   \"error\": Array [\n    +     \"查询已取消或上下文已改变，请重新查询。\",\n    +   ],\n    +   \"options\": 1,\n        \"requests\": Any<Array>,\n        \"signedIn\": true,\n      }\n\n    Call Log:\n    - Timeout 5000ms exceeded while waiting on the predicate\n\n      56 |       const status = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());\n      57 |       return { signedIn: status.ok && status.signedIn, options: await shop.locator('option').count(), error: await query.locator('[role=alert]').allTextContents(), requests: [...requests] };\n    > 58 |     }).toEqual({ signedIn: true, options: 3, error: [], requests: expect.any(Array) });\n         |        ^\n      59 |     await shop.selectOption('shop-a');\n      60 |     await expect(shop).toHaveValue('shop-a');\n      61 |     await query.getByTestId('question-input').fill('洁面');\n        at /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-query.spec.ts:58:8\n\n    Error Context: test-results/content-intake-query-FAQ-Q-90ee9--and-isolates-other-windows/error-context.md\n\n  1 failed\n    tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows \nundefined\n/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test tests/e2e/content-intake-query.spec.ts\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "superseded",
+      "observed": "\nRunning 1 test using 1 worker\n\n  ✓  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (4.7s)\n\n  1 passed (4.9s)\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-query.test.ts tests/unit/content-intake-query-ipc.test.ts tests/unit/content-intake-usage.test.ts tests/unit/product-runtime-config.test.ts tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/component/QueryApp.test.tsx (96 tests) 17577ms\n   ✓ QueryApp > does not mark read while the window is hidden, then marks read after it becomes visible  1016ms\n   ✓ QueryApp > keeps the same fixture ranking after toggling smart retrieval  343ms\n   ✓ QueryApp > exposes distinct SEARCHING, RESULTS, COPIED and EMPTY fox states  697ms\n   ✓ QueryApp > reports RESULTS with 1, 2, and 3 candidates for the demo queries  924ms\n   ✓ QueryApp > shows a stable Top 3 without numeric match scores  338ms\n   ✓ QueryApp > shows the allergy SOP banner between the heading and cards for the gold query  341ms\n   ✓ QueryApp > does not show the SOP button for usage-plus-allergy or empty results  324ms\n   ✓ QueryApp > keeps 少发/长痘 on aftersale Top 3 without a SOP button  327ms\n   ✓ QueryApp > renders the original synthetic aftersales wording for a natural category question  326ms\n   ✓ QueryApp > keeps result cards mounted long enough to play the closing fade  449ms\n   ✓ QueryApp > shows searching feedback before revealing results  341ms\n   ✓ QueryApp > uses number keys to copy the matching result but never hijacks input typing  326ms\n   ✓ QueryApp > does not hijack numeric typing when the user returns to the input from RESULTS  349ms\n   ✓ QueryApp > supports Numpad selection while blocking repeat, modifiers, and IME key events  336ms\n   ✓ QueryApp > ignores a number shortcut when that result rank does not exist  322ms\n   ✓ QueryApp > auto-dismisses only after successful copy feedback  1276ms\n   ✓ QueryApp > locks every copy entry point during COPIED feedback  353ms\n   ✓ QueryApp > never surfaces expired campaign copy in the result list  329ms\n   ✓ QueryApp > copies original answer text and only says 已复制  351ms\n   ✓ QueryApp > shows a hairline 话术不准 control on query results  332ms\n   ✓ QueryApp > records a local inaccuracy report for high-risk scripts without claiming it was processed  338ms\n   ✓ QueryApp > keeps the copy path as 已复制 after a local inaccuracy report  361ms\n   ✓ QueryApp > scopes a local inaccuracy record to the current query session  677ms\n   ✓ QueryApp > dismisses with Esc after copy without implying the reply was sent  339ms\n   ✓ QueryApp > clears customer text and transient results when the overlay collapses  348ms\n   ✓ QueryApp > shows a recoverable copy error with retry  344ms\n   ✓ QueryApp > never auto-dismisses after a failed copy  338ms\n   ✓ QueryApp > cancels an old success-dismiss timer when a new session opens  335ms\n   ✓ QueryApp > ignores a late copy promise after collapse and reopen  332ms\n   ✓ QueryApp > measures shortcut and status banners as independent layout owners  395ms\n   ✓ QueryApp > keeps manual search usable when getWindowContext rejects  340ms\n   ✓ QueryApp > measures shortcut and ERROR banners as independent layout owners  405ms\n   ✓ QueryApp > ignores stale layout ACKs from another session and keeps the new session waiting  665ms\n   ✓ QueryApp > rejects a second resize pointer, rolls back cancel after height changes, then allows another drag  368ms\n   ✓ QueryApp > applies a matching fallback ACK then lets the next natural layout succeed  660ms\n   ✓ QueryApp > cancels immediately on lostpointercapture even when buttons is still 1  338ms\n ✓ tests/component/QueryResultsPane.test.tsx (4 tests) 67ms\n ✓ tests/unit/product-runtime-config.test.ts (13 tests) 11ms\n ✓ tests/unit/content-intake-query.test.ts (9 tests) 309ms\n ✓ tests/unit/content-intake-usage.test.ts (18 tests) 226ms\n ✓ tests/unit/content-intake-query-ipc.test.ts (1 test) 2ms\n\n Test Files  6 passed (6)\n      Tests  141 passed (141)\n   Start at  01:50:21\n   Duration  19.87s (transform 209ms, setup 315ms, collect 415ms, tests 18.19s, environment 389ms, prepare 134ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "superseded",
+      "observed": "\nRunning 1 test using 1 worker\n\n  ✓  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (5.7s)\n\n  1 passed (5.9s)\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "pass",
+      "observed": "\nRunning 1 test using 1 worker\n\n  ✓  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (4.8s)\n\n  1 passed (5.0s)\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/dashboard.spec.ts --grep 'macOS-style Dock activation'",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "pass",
+      "observed": "\nRunning 1 test using 1 worker\n\n  ✓  1 tests/e2e/dashboard.spec.ts:237:1 › opens and restores the Dashboard from a macOS-style Dock activation (1.2s)\n\n  1 passed (1.5s)\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-query.test.ts tests/unit/content-intake-query-ipc.test.ts tests/unit/product-runtime-config.test.ts",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-query.test.ts (9 tests) 302ms\n ✓ tests/unit/content-intake-query-ipc.test.ts (1 test) 2ms\n ✓ tests/unit/product-runtime-config.test.ts (13 tests) 10ms\n\n Test Files  3 passed (3)\n      Tests  23 passed (23)\n   Start at  02:06:17\n   Duration  1.03s (transform 99ms, setup 152ms, collect 181ms, tests 315ms, environment 109ms, prepare 68ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-query.test.ts tests/unit/content-intake-query-ipc.test.ts tests/unit/content-intake-usage.test.ts tests/unit/product-runtime-config.test.ts tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx",
+      "contract": "Qualified FAQ original copy, bounded cancellation/discovery, visible notice and profile-gated native entry; fixture tests own temporary runtime state.",
+      "expected": "All assertions pass; no cross-shop or expired copy capability.",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/component/QueryApp.test.tsx (96 tests) 17302ms\n   ✓ QueryApp > does not mark read while the window is hidden, then marks read after it becomes visible  1015ms\n   ✓ QueryApp > keeps the same fixture ranking after toggling smart retrieval  341ms\n   ✓ QueryApp > exposes distinct SEARCHING, RESULTS, COPIED and EMPTY fox states  679ms\n   ✓ QueryApp > reports RESULTS with 1, 2, and 3 candidates for the demo queries  921ms\n   ✓ QueryApp > shows a stable Top 3 without numeric match scores  335ms\n   ✓ QueryApp > shows the allergy SOP banner between the heading and cards for the gold query  343ms\n   ✓ QueryApp > does not show the SOP button for usage-plus-allergy or empty results  328ms\n   ✓ QueryApp > keeps 少发/长痘 on aftersale Top 3 without a SOP button  327ms\n   ✓ QueryApp > renders the original synthetic aftersales wording for a natural category question  322ms\n   ✓ QueryApp > keeps result cards mounted long enough to play the closing fade  446ms\n   ✓ QueryApp > shows searching feedback before revealing results  329ms\n   ✓ QueryApp > uses number keys to copy the matching result but never hijacks input typing  334ms\n   ✓ QueryApp > does not hijack numeric typing when the user returns to the input from RESULTS  346ms\n   ✓ QueryApp > supports Numpad selection while blocking repeat, modifiers, and IME key events  331ms\n   ✓ QueryApp > ignores a number shortcut when that result rank does not exist  323ms\n   ✓ QueryApp > auto-dismisses only after successful copy feedback  1266ms\n   ✓ QueryApp > locks every copy entry point during COPIED feedback  343ms\n   ✓ QueryApp > never surfaces expired campaign copy in the result list  327ms\n   ✓ QueryApp > copies original answer text and only says 已复制  347ms\n   ✓ QueryApp > shows a hairline 话术不准 control on query results  326ms\n   ✓ QueryApp > records a local inaccuracy report for high-risk scripts without claiming it was processed  339ms\n   ✓ QueryApp > keeps the copy path as 已复制 after a local inaccuracy report  353ms\n   ✓ QueryApp > scopes a local inaccuracy record to the current query session  662ms\n   ✓ QueryApp > dismisses with Esc after copy without implying the reply was sent  330ms\n   ✓ QueryApp > clears customer text and transient results when the overlay collapses  338ms\n   ✓ QueryApp > shows a recoverable copy error with retry  344ms\n   ✓ QueryApp > never auto-dismisses after a failed copy  330ms\n   ✓ QueryApp > cancels an old success-dismiss timer when a new session opens  330ms\n   ✓ QueryApp > ignores a late copy promise after collapse and reopen  332ms\n   ✓ QueryApp > measures shortcut and status banners as independent layout owners  387ms\n   ✓ QueryApp > keeps manual search usable when getWindowContext rejects  335ms\n   ✓ QueryApp > measures shortcut and ERROR banners as independent layout owners  352ms\n   ✓ QueryApp > ignores stale layout ACKs from another session and keeps the new session waiting  649ms\n   ✓ QueryApp > rejects a second resize pointer, rolls back cancel after height changes, then allows another drag  355ms\n   ✓ QueryApp > applies a matching fallback ACK then lets the next natural layout succeed  628ms\n   ✓ QueryApp > cancels immediately on lostpointercapture even when buttons is still 1  323ms\n ✓ tests/component/QueryResultsPane.test.tsx (4 tests) 66ms\n ✓ tests/unit/product-runtime-config.test.ts (13 tests) 10ms\n ✓ tests/unit/content-intake-query.test.ts (9 tests) 311ms\n ✓ tests/unit/content-intake-usage.test.ts (18 tests) 231ms\n ✓ tests/unit/content-intake-query-ipc.test.ts (1 test) 2ms\n\n Test Files  6 passed (6)\n      Tests  141 passed (141)\n   Start at  02:07:42\n   Duration  19.61s (transform 214ms, setup 324ms, collect 422ms, tests 17.92s, environment 392ms, prepare 136ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-query.test.ts",
+        "tests/unit/content-intake-query-ipc.test.ts",
+        "tests/unit/product-runtime-config.test.ts"
+      ],
+      "hypothesis": "Main contract cases pass; native session fanout may cancel independent discovery before the initial menu is installed.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-query.spec.ts"
+      ]
+    },
+    {
+      "observationCapture": "004",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-query.spec.ts"
+      ],
+      "hypothesis": "Required repair verification: new Main budget/deadline/discovery regressions and pending-notice plus stale-renderer-result tests, with adjacent Query regression.",
+      "nextCapture": "005",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-query.test.ts",
+        "tests/unit/content-intake-query-ipc.test.ts",
+        "tests/unit/content-intake-usage.test.ts",
+        "tests/unit/product-runtime-config.test.ts",
+        "tests/component/QueryApp.test.tsx",
+        "tests/component/QueryResultsPane.test.tsx"
+      ]
+    },
+    {
+      "observationCapture": "005",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-query.test.ts",
+        "tests/unit/content-intake-query-ipc.test.ts",
+        "tests/unit/content-intake-usage.test.ts",
+        "tests/unit/product-runtime-config.test.ts",
+        "tests/component/QueryApp.test.tsx",
+        "tests/component/QueryResultsPane.test.tsx"
+      ],
+      "hypothesis": "Required native revalidation after adding opt-in screenshot evidence; same synthetic journey and platform assertions.",
+      "nextCapture": "006",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-query.spec.ts"
+      ]
+    },
+    {
+      "observationCapture": "007",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-query.spec.ts"
+      ],
+      "hypothesis": "Verify the default profile still opens and restores Dashboard through macOS activate after the FAQ-specific entry restriction.",
+      "nextCapture": "008",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/dashboard.spec.ts",
+        "--grep",
+        "macOS-style Dock activation"
+      ]
+    },
+    {
+      "observationCapture": "008",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/dashboard.spec.ts",
+        "--grep",
+        "macOS-style Dock activation"
+      ],
+      "hypothesis": "Record current Main/profile/IPC checks after both repair cycles so the export does not use pre-repair observations.",
+      "nextCapture": "009",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-query.test.ts",
+        "tests/unit/content-intake-query-ipc.test.ts",
+        "tests/unit/product-runtime-config.test.ts"
+      ]
+    },
+    {
+      "observationCapture": "009",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-query.test.ts",
+        "tests/unit/content-intake-query-ipc.test.ts",
+        "tests/unit/product-runtime-config.test.ts"
+      ],
+      "hypothesis": "Bind final notice, cancellation and old-expiry replacement regressions to the current Query code alongside Main qualification checks.",
+      "nextCapture": "010",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-query.test.ts",
+        "tests/unit/content-intake-query-ipc.test.ts",
+        "tests/unit/content-intake-usage.test.ts",
+        "tests/unit/product-runtime-config.test.ts",
+        "tests/component/QueryApp.test.tsx",
+        "tests/component/QueryResultsPane.test.tsx"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

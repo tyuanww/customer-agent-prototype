@@ -91,21 +91,22 @@ function editEntries(capabilities: EditCapabilities): DesktopMenuEntry[] {
 
 export function createOverlayContextMenuModel(
   capabilities: EditCapabilities | null,
+  dashboardEnabled = true,
 ): readonly DesktopMenuEntry[] {
   const editing = capabilities ? [...editEntries(capabilities), separator()] : [];
   return [
     ...editing,
     action('open-search'),
-    action('open-dashboard'),
+    ...(dashboardEnabled ? [action('open-dashboard')] : []),
     separator(),
     action('quit'),
   ];
 }
 
-export function createTrayMenuModel(): readonly DesktopMenuEntry[] {
+export function createTrayMenuModel(dashboardEnabled = true): readonly DesktopMenuEntry[] {
   return [
     action('open-search'),
-    action('open-dashboard'),
+    ...(dashboardEnabled ? [action('open-dashboard')] : []),
     separator(),
     action('quit'),
   ];
@@ -113,11 +114,12 @@ export function createTrayMenuModel(): readonly DesktopMenuEntry[] {
 
 export function createApplicationMenuModel(
   platform: NodeJS.Platform,
+  dashboardEnabled = true,
 ): readonly ApplicationMenuSection[] {
   const agent: ApplicationMenuSection = {
     type: 'agent',
     label: '客服 Agent',
-    items: [action('open-search'), action('open-dashboard')],
+    items: [action('open-search'), ...(dashboardEnabled ? [action('open-dashboard')] : [])],
   };
   if (platform === 'darwin') {
     return [

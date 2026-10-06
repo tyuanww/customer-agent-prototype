@@ -51,3 +51,9 @@ export type SearchOutcome =
   | { status: 'hit'; results: RankedScript[] }
   | { status: 'no-hit' }
   | { status: 'invalid'; reason: 'too-long' };
+
+/** Native FAQ preserves its own contract; no invented legacy metadata. */
+export type QueryResult = RankedScript | import('@shared/content-intake-query').IntakeQueryRow;
+export function isIntakeRow(row: QueryResult): row is import('@shared/content-intake-query').IntakeQueryRow {
+  return 'kind' in row && row.kind === 'intake';
+}

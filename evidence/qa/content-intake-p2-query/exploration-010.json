@@ -1,0 +1,31 @@
+{
+  "observationCapture": "009",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-query.test.ts",
+    "tests/unit/content-intake-query-ipc.test.ts",
+    "tests/unit/product-runtime-config.test.ts"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-query.test.ts (9 tests) 302ms\n ✓ tests/unit/content-intake-query-ipc.test.ts (1 test) 2ms\n ✓ tests/unit/product-runtime-config.test.ts (13 tests) 10ms\n\n Test Files  3 passed (3)\n      Tests  23 passed (23)\n   Start at  02:06:17\n   Duration  1.03s (transform 99ms, setup 152ms, collect 181ms, tests 315ms, environment 109ms, prepare 68ms)\n\n",
+  "hypothesis": "Bind final notice, cancellation and old-expiry replacement regressions to the current Query code alongside Main qualification checks.",
+  "nextCapture": "010",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-query.test.ts",
+    "tests/unit/content-intake-query-ipc.test.ts",
+    "tests/unit/content-intake-usage.test.ts",
+    "tests/unit/product-runtime-config.test.ts",
+    "tests/component/QueryApp.test.tsx",
+    "tests/component/QueryResultsPane.test.tsx"
+  ]
+}

@@ -42,7 +42,8 @@ import { QueryResultsPane } from './features/search/QueryResultsPane';
 import { QueryScopeFields } from './features/search/QueryScopeFields';
 import { QuerySessionControl } from './features/search/QuerySessionControl';
 import { searchScripts } from './features/search/search-service';
-import type { RankedScript } from './features/search/types';
+import { isIntakeRow, type QueryResult } from './features/search/types';
+import { useIntakeShops } from './features/search/use-intake-shops';
 import { inaccuracyReportKey, shouldAcceptInaccuracyReport } from '@shared/inaccuracy-report';
 import { PRODUCT_QUERY_UUID } from '@shared/product-search';
 import {
@@ -74,7 +75,7 @@ import {
   rankedScriptsFromProductCandidates,
 } from './features/search/query-view-model';
 
-export function QueryApp() {
+export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
   const [currentNotice, setCurrentNotice] = useState<ProductNoticeResult | null>(null);
   const [noticeLoading, setNoticeLoading] = useState(false);
@@ -85,7 +86,7 @@ export function QueryApp() {
   const productEpochRef = useRef(0);
   const [phase, setPhase] = useState<OverlayPhase>('SEARCH_INPUT');
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<RankedScript[]>([]);
+  const [results, setResults] = useState<QueryResult[]>([]);
   const [invalidMessage, setInvalidMessage] = useState('');
   const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
   const sessionNoticeRef = useRef<SessionNotice | null>(null);
@@ -166,7 +167,7 @@ export function QueryApp() {
   const openingFrameRef = useRef<number | null>(null);
   const inputFocusFrameRef = useRef<number | null>(null);
   const collapseCleanupTimerRef = useRef<number | null>(null);
-  const pendingCopyRef = useRef<RankedScript | null>(null);
+  const pendingCopyRef = useRef<QueryResult | null>(null);
   const activeHandoffIdRef = useRef(0);
   const queryInteractiveRef = useRef(false);
   const openingRef = useRef(false);
@@ -409,7 +410,7 @@ export function QueryApp() {
       .catch(() => {
         // Click path still works.
       });
-    void api.productSearch?.retrievalPreference?.()
+    if (!intake) void api.productSearch?.retrievalPreference?.()
       .then((preference) => setSmartEnabled(preference.smartEnabled))
       .catch(() => undefined);
 
@@ -425,7 +426,8 @@ export function QueryApp() {
         openingUserInteractionRef.current = false;
         searchGenerationRef.current += 1;
         setPlaceholderValues({});
-        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
+        if (intake) void window.customerAgent?.intakeQuery?.cancel();
+        else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
         searchInFlightRef.current = false;
         if (searchTimerRef.current !== null) {
           window.clearTimeout(searchTimerRef.current);
@@ -537,7 +539,8 @@ export function QueryApp() {
         cancelScheduledResultFocus();
         searchGenerationRef.current += 1;
         setPlaceholderValues({});
-        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
+        if (intake) void window.customerAgent?.intakeQuery?.cancel();
+        else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
         copyGenerationRef.current += 1;
         searchInFlightRef.current = false;
         if (searchTimerRef.current !== null) {
@@ -600,6 +603,7 @@ export function QueryApp() {
       }
     });
   }, [
+    intake,
     cancelScheduledCollapseContent,
     cancelScheduledInputFocus,
     cancelScheduledOpening,
@@ -700,7 +704,8 @@ export function QueryApp() {
     () => () => {
       searchGenerationRef.current += 1;
         setPlaceholderValues({});
-        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
+        if (intake) void window.customerAgent?.intakeQuery?.cancel();
+        else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
       copyGenerationRef.current += 1;
       searchInFlightRef.current = false;
       copyInFlightRef.current = false;
@@ -716,6 +721,7 @@ export function QueryApp() {
       }
     },
     [
+      intake,
       cancelScheduledCollapseContent,
       cancelScheduledInputFocus,
       cancelScheduledOpening,
@@ -732,14 +738,15 @@ export function QueryApp() {
   const cancelPendingSearch = useCallback(() => {
     searchGenerationRef.current += 1;
         setPlaceholderValues({});
-        void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
+        if (intake) void window.customerAgent?.intakeQuery?.cancel();
+        else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
     searchInFlightRef.current = false;
     if (searchTimerRef.current !== null) {
       window.clearTimeout(searchTimerRef.current);
       searchTimerRef.current = null;
     }
     setSearching(false);
-  }, []);
+  }, [intake]);
 
   const cancelPendingCopy = useCallback(() => {
     copyGenerationRef.current += 1;
@@ -777,7 +784,7 @@ export function QueryApp() {
   );
 
   const refreshAnnounce = useCallback(async (sessionEpoch: number) => {
-    const api = window.customerAgent?.productAnnounce;
+    const api = intake ? undefined : window.customerAgent?.productAnnounce;
     if (!api) return null;
     const generation = ++announceGenerationRef.current;
     const result = await api.refresh({ sessionEpoch, generation });
@@ -802,7 +809,7 @@ export function QueryApp() {
     }
     announceReleaseRef.current = result.releaseId;
     setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
-  }, [reportPhase]);
+  }, [reportPhase, intake]);
 
   const refreshCurrentNotice = useCallback(async (sessionEpoch: number) => {
     const api = window.customerAgent?.product;
@@ -924,7 +931,7 @@ export function QueryApp() {
   }, [cancelPendingSearch, cancelPendingCopy, refreshAnnounce, refreshCurrentNotice, reportPhase]);
 
   useEffect(() => {
-    const api = window.customerAgent?.productAnnounce;
+    const api = intake ? undefined : window.customerAgent?.productAnnounce;
     if (!api) return;
     return api.onInvalidated(value => {
       if (value.sessionEpoch !== productEpochRef.current) return;
@@ -948,18 +955,18 @@ export function QueryApp() {
         reportPhase(invalidation.phase);
       }
     });
-  }, [cancelPendingCopy, cancelPendingSearch, reportPhase]);
+  }, [intake, cancelPendingCopy, cancelPendingSearch, reportPhase]);
 
   // 软更新横幅：独立 content-updated，不走 onInvalidated，不清结果。
   useEffect(() => {
-    const api = window.customerAgent?.productAnnounce;
+    const api = intake ? undefined : window.customerAgent?.productAnnounce;
     if (!api?.onContentUpdated) return undefined;
     return api.onContentUpdated((value) => {
       if (value.sessionEpoch !== productEpochRef.current) return;
       announceReleaseRef.current = value.releaseId;
       setContentUpdatedDomains([...value.unreadDomains]);
     });
-  }, []);
+  }, [intake]);
 
   // 已读：Query 窗可见（非 FOX_IDLE、未收起、非 document.hidden）且横幅停留 ≥1s。
   // 计时器随可见性变化重排：事件到达时窗口若不可见，展开/回到前台后会补排，不会卡住。
@@ -1053,8 +1060,47 @@ export function QueryApp() {
     }
   }, [acceptProductSession, productState, sessionBusy]);
 
+  const resetIntakeView = useCallback(() => {
+    cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+    if (phaseRef.current !== 'FOX_IDLE') reportPhase(noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null) ? 'ERROR' : 'SEARCH_INPUT');
+  }, [cancelPendingSearch, cancelPendingCopy, reportPhase, noticeLoading, noticeBlocked, currentNotice]);
+  const intakeShops = useIntakeShops(intake, Boolean(productState?.ok && productState.signedIn),
+    productState?.sessionEpoch ?? 0, resetIntakeView);
+  useEffect(() => {
+    if (!intake) return;
+    return window.customerAgent?.intakeQuery?.onInvalidated(reason => {
+      cancelPendingCopy(); setResults([]);
+      // An old qualification expiring cannot cancel its in-flight replacement.
+      if (reason !== 'expired') cancelPendingSearch();
+      if (!searchInFlightRef.current && phaseRef.current !== 'FOX_IDLE') {
+        setErrorMessage('资料资格已失效，请重新查询。'); reportPhase('ERROR');
+      }
+    });
+  }, [intake, cancelPendingSearch, cancelPendingCopy, reportPhase]);
+
   const runSearch = useCallback(() => {
     if (noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null)) return;
+    if (intake) {
+      if (!(productState?.ok && productState.signedIn)) return;
+      const api = window.customerAgent?.intakeQuery;
+      const text = (inputRef.current?.value ?? query).trim();
+      if (!api || !text || [...text].length > 500 || !intakeShops.shopId || intakeShops.busy) {
+        setErrorMessage(!intakeShops.shopId ? '请先选择有权限的店铺。' : '请输入最多 500 字的客户问题。'); reportPhase('ERROR'); return;
+      }
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+      const generation = ++searchGenerationRef.current;
+      searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
+      void api.search({ queryText: text }).then(result => {
+        if (generation !== searchGenerationRef.current) return;
+        if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
+        setResults(result.rows); reportPhase(result.rows.length ? 'RESULTS' : 'EMPTY', result.rows.length as ResultCount);
+      }).catch(() => {
+        if (generation === searchGenerationRef.current) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); }
+      }).finally(() => {
+        if (generation === searchGenerationRef.current) { searchInFlightRef.current = false; setSearching(false); }
+      });
+      return;
+    }
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
       if (!(productState?.ok && productState.signedIn)) {
         return;
@@ -1167,10 +1213,10 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
 
   const copyScript = useCallback(
-    async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
+    async (script: QueryResult, trigger: HTMLButtonElement | null = null) => {
       if (
         copyInFlightRef.current ||
         phase === 'COPIED' ||
@@ -1197,7 +1243,8 @@ export function QueryApp() {
       setCopying(true);
       try {
         const connected = !!api.product && !(productState?.ok && !productState.enabled);
-        const result = connected ? (script.productCopy && api.productSearch
+        const result = isIntakeRow(script) ? await api.intakeQuery?.copy({ key: script.key }) ?? { ok: false as const, message: '复制通道不可用' }
+          : connected ? (script.productCopy && api.productSearch
           ? await api.productSearch.copyAdopt({
             ...script.productCopy,
             placeholderValues: adoptedPlaceholderValues(script.placeholderKeys, placeholderValues),
@@ -1281,7 +1328,7 @@ export function QueryApp() {
 
   useEffect(() => {
     let cancelled = false;
-    const allergyHit = (phase === 'RESULTS' || phase === 'COPIED')
+    const allergyHit = !intake && (phase === 'RESULTS' || phase === 'COPIED')
       && results.length > 0
       && isAllergySopEntry(compactQueryText(query));
     if (!allergyHit) {
@@ -1317,11 +1364,11 @@ export function QueryApp() {
     return () => {
       cancelled = true;
     };
-  }, [phase, query, results.length]);
+  }, [intake, phase, query, results.length]);
 
   useEffect(() => {
     const onFocus = () => {
-      const resume = window.customerAgent?.sopWindow?.resumeAvailable;
+      const resume = intake ? undefined : window.customerAgent?.sopWindow?.resumeAvailable;
       if (!resume) {
         return;
       }
@@ -1333,7 +1380,7 @@ export function QueryApp() {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, []);
+  }, [intake]);
 
   const openAllergySop = useCallback(() => {
     const api = window.customerAgent?.sopWindow;
@@ -1471,7 +1518,7 @@ export function QueryApp() {
   const showQueryResizeGrip = isQueryContentLayoutPhase(phase);
   const expanded = showQueryResizeGrip || phase === 'COPIED';
   const openNotice = currentNotice?.ok && currentNotice.decision === null ? currentNotice : null;
-  const scopeKeys = [...new Set(results.flatMap((row) => row.placeholderKeys ?? []))];
+  const scopeKeys = [...new Set(results.flatMap((row) => isIntakeRow(row) ? [] : row.placeholderKeys ?? []))];
   const showScopeFields = Boolean(
     window.customerAgent?.productSearch
     && productState?.ok
@@ -1736,6 +1783,18 @@ export function QueryApp() {
       >
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
+          intake={intake}
+          scopeControl={<div className="intake-shop-control">
+            <label htmlFor="intake-shop">店铺通用 FAQ</label>
+            <select id="intake-shop" aria-label="当前店铺" value={intakeShops.shopId ?? ''}
+              disabled={intakeShops.busy || !signedInSession} onChange={event => { void intakeShops.load(event.target.value); }}>
+              <option value="" disabled>{intakeShops.busy ? '读取中…' : intakeShops.shops.length ? '请选择店铺' : '暂无可用店铺'}</option>
+              {intakeShops.shops.map(shop => <option key={shop} value={shop}>{shop}</option>)}
+            </select>
+            <button type="button" className="retry-btn" disabled={intakeShops.busy || !signedInSession}
+              title={intakeShops.error || '重新读取有权店铺'} onClick={() => { void intakeShops.load(); }}>刷新店铺</button>
+            {intakeShops.error ? <span role="alert" className="validation-error">{intakeShops.error}</span> : null}
+          </div>}
           productControl={showProductSession ? (
             <QuerySessionControl
               busy={sessionBusy}
@@ -1864,9 +1923,9 @@ export function QueryApp() {
             onCopy={(item, trigger) => {
               void copyScript(item, trigger);
             }}
-            onCopyContact={window.customerAgent?.productHelp ? copyContact : undefined}
-            onOpenHelp={window.customerAgent?.productHelp ? openHelp : undefined}
-            onLeaveNoHit={window.customerAgent?.productHelp ? leaveNoHit : undefined}
+            onCopyContact={!intake && window.customerAgent?.productHelp ? copyContact : undefined}
+            onOpenHelp={!intake && window.customerAgent?.productHelp ? openHelp : undefined}
+            onLeaveNoHit={!intake && window.customerAgent?.productHelp ? leaveNoHit : undefined}
           />
         ) : null}
         {expanded && (noticeLoading || noticeBlocked || openNotice) ? (

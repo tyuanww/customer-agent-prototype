@@ -1,0 +1,95 @@
+import { buildBm25Index, characterUnigramBigramTerms, rankBm25 } from '@customer-agent/retrieval-core';
+import type { IntakeQueryContext, IntakeQueryRow } from '../shared/content-intake-query';
+import { loadIntakeAccess } from './content-intake-access';
+import { ContentIntakeUsage, IntakeUsageError, type IntakeCatalog, type IntakeUsageSession } from './content-intake-usage';
+
+/** One Query window's context. Discovery is a menu, never a qualification.
+ * Every search obtains a fresh complete qualified snapshot. Only the displayed
+ * Top 3 keys may copy, and the catalog rechecks its own immutable deadline. */
+export class ContentIntakeQuery {
+  private readonly usage: ContentIntakeUsage;
+  private readonly unsubscribe: () => void;
+  private generation = 0;
+  private discovery: AbortController | null = null;
+  private context: IntakeQueryContext = { shops: [], shopId: null };
+  private shown: { catalog: IntakeCatalog; keys: Set<string> } | null = null;
+  private epoch: number;
+  private disposed = false;
+  private listeners = new Set<(reason: 'invalidated' | 'expired') => void>();
+  constructor(private readonly session: IntakeUsageSession, writeClipboard: (text: string) => void) {
+    this.epoch = session.view().sessionEpoch;
+    this.usage = new ContentIntakeUsage(session, writeClipboard);
+    this.usage.subscribe(event => {
+      if (event === 'updated') return;
+      this.shown = null;
+      for (const listener of this.listeners) listener(event);
+    });
+    this.unsubscribe = session.subscribe(() => {
+      const current = session.view();
+      if (!current.signedIn || current.sessionEpoch !== this.epoch) {
+        this.epoch = current.sessionEpoch; this.discovery?.abort(); this.discovery = null; this.cancel(); this.context = { shops: [], shopId: null };
+      }
+    });
+  }
+  subscribe(listener: (reason: 'invalidated' | 'expired') => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  cancel() {
+    this.generation++;
+    this.usage.cancelRefresh(); this.shown = null;
+  }
+  async access(shopId?: string): Promise<IntakeQueryContext> {
+    this.cancel();
+    this.discovery?.abort();
+    const controller = new AbortController(); this.discovery = controller;
+    try {
+      const access = await loadIntakeAccess(this.session, controller.signal);
+      if (this.disposed || controller.signal.aborted || this.discovery !== controller) throw new IntakeUsageError('STALE');
+      const selected = shopId ?? this.context.shopId;
+      if (selected !== null && !access.shops.includes(selected)) {
+        this.context = { shops: access.shops, shopId: null };
+        throw new IntakeUsageError('FORBIDDEN');
+      }
+      this.context = { shops: access.shops, shopId: selected };
+      if (selected !== null) this.usage.select({ shopId: selected, productIds: [], scenarioIds: [] });
+      return structuredClone(this.context);
+    } finally { if (this.discovery === controller) this.discovery = null; }
+  }
+  async search(queryText: string): Promise<IntakeQueryRow[]> {
+    this.cancel();
+    if (this.disposed || this.discovery || !this.context.shopId) throw new IntakeUsageError('FORBIDDEN');
+    const generation = this.generation;
+    const catalog = await this.usage.refresh();
+    if (this.disposed || generation !== this.generation) throw new IntakeUsageError('STALE');
+    const snapshot = catalog.read();
+    if (!snapshot) throw new IntakeUsageError('EXPIRED');
+    // Bound Main's synchronous work independently of the transport budget.
+    // Refuse the whole query, never silently truncate the authorized catalog.
+    const indexBytes = snapshot.faq.reduce((sum, { entry }) => sum + Buffer.byteLength(
+      entry.title + entry.answerText + entry.questions.filter(q => q.active).map(q => q.text).join('\n')), 0);
+    if (snapshot.faq.length > 5000 || indexBytes > 2 * 1024 * 1024) throw new IntakeUsageError('LIMIT');
+    const indexedRows = snapshot.faq.map((row, i) => ({ id: String(i).padStart(8, '0'), row }));
+    const index = buildBm25Index(indexedRows.map(({ id, row }) => ({ id, fields: [
+      { name: 'question', text: [row.entry.title, ...row.entry.questions.filter(q => q.active).map(q => q.text)].join('\n') },
+      { name: 'answer', text: row.entry.answerText },
+    ] })), characterUnigramBigramTerms);
+    const hits = rankBm25(characterUnigramBigramTerms(queryText), index,
+      { k1: 1.2, b: 0.75, fieldWeights: [{ field: 'question', weight: 3 }, { field: 'answer', weight: 1 }] }).slice(0, 3);
+    const byKey = new Map(indexedRows.map(({ id, row }) => [id, row]));
+    const rows: IntakeQueryRow[] = hits.map((hit, i) => {
+      const { entry, key } = byKey.get(hit.id)!;
+      return { kind: 'intake', key, rank: (i + 1) as 1 | 2 | 3, title: entry.title,
+        answerText: entry.answerText, applicabilityNote: entry.applicabilityNote, riskNote: entry.riskNote,
+        releaseId: snapshot.releaseId, validUntil: snapshot.validUntil };
+    });
+    // Yield so already-queued cancellation/session/expiry signals take effect.
+    await new Promise<void>(resolve => setImmediate(resolve));
+    if (this.disposed || generation !== this.generation) throw new IntakeUsageError('STALE');
+    if (!catalog.read()) throw new IntakeUsageError('EXPIRED');
+    this.shown = { catalog, keys: new Set(rows.map(row => row.key)) };
+    return rows;
+  }
+  copy(key: string) {
+    if (!this.shown?.keys.has(key)) throw new IntakeUsageError('STALE');
+    return this.shown.catalog.copy(key);
+  }
+  dispose() { this.disposed = true; this.discovery?.abort(); this.discovery = null; this.cancel(); this.unsubscribe(); this.usage.dispose(); this.listeners.clear(); }
+}

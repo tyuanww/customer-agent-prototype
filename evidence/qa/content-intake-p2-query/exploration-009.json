@@ -1,0 +1,28 @@
+{
+  "observationCapture": "008",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/dashboard.spec.ts",
+    "--grep",
+    "macOS-style Dock activation"
+  ],
+  "observed": "\nRunning 1 test using 1 worker\n\n  ✓  1 tests/e2e/dashboard.spec.ts:237:1 › opens and restores the Dashboard from a macOS-style Dock activation (1.2s)\n\n  1 passed (1.5s)\n",
+  "hypothesis": "Record current Main/profile/IPC checks after both repair cycles so the export does not use pre-repair observations.",
+  "nextCapture": "009",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-query.test.ts",
+    "tests/unit/content-intake-query-ipc.test.ts",
+    "tests/unit/product-runtime-config.test.ts"
+  ]
+}

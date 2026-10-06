@@ -1,0 +1,24 @@
+{
+  "observationCapture": "003",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/content-intake-query.spec.ts"
+  ],
+  "observed": "\nRunning 1 test using 1 worker\n\n  ✘  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (6.2s)\n\n\n  1) tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows \n\n    Error: expect(received).toEqual(expected) // deep equality\n\n    - Expected  - 2\n    + Received  + 4\n\n      Object {\n    -   \"error\": Array [],\n    -   \"options\": 3,\n    +   \"error\": Array [\n    +     \"查询已取消或上下文已改变，请重新查询。\",\n    +   ],\n    +   \"options\": 1,\n        \"requests\": Any<Array>,\n        \"signedIn\": true,\n      }\n\n    Call Log:\n    - Timeout 5000ms exceeded while waiting on the predicate\n\n      56 |       const status = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());\n      57 |       return { signedIn: status.ok && status.signedIn, options: await shop.locator('option').count(), error: await query.locator('[role=alert]').allTextContents(), requests: [...requests] };\n    > 58 |     }).toEqual({ signedIn: true, options: 3, error: [], requests: expect.any(Array) });\n         |        ^\n      59 |     await shop.selectOption('shop-a');\n      60 |     await expect(shop).toHaveValue('shop-a');\n      61 |     await query.getByTestId('question-input').fill('洁面');\n        at /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-query.spec.ts:58:8\n\n    Error Context: test-results/content-intake-query-FAQ-Q-90ee9--and-isolates-other-windows/error-context.md\n\n  1 failed\n    tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows \nundefined\n/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test tests/e2e/content-intake-query.spec.ts\n",
+  "hypothesis": "Discovery now has its own lifecycle; replay the unchanged native journey against the repaired build.",
+  "nextCapture": "004",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/content-intake-query.spec.ts"
+  ]
+}

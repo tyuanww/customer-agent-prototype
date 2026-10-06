@@ -31,6 +31,7 @@ export { IPC_CHANNELS, IPC_CHANNEL_WHITELIST } from './ipc-channels';
 export type { IpcChannel } from './ipc-channels';
 
 export type CustomerAgentApi = {
+  intakeQuery?: import('./content-intake-query').IntakeQueryApi;
   product?: import('./product-session').ProductSessionApi;
   productSearch?: ProductSearchApi;
   productAnnounce?: import('./product-announce').ProductAnnounceApi;

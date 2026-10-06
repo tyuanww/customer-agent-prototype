@@ -40,7 +40,8 @@ export class ProductSession {
   private operation: AbortController | null = null;
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<(state: ProductSessionResult) => void>();
-  constructor(readonly http: ProductHttp, private readonly store: SessionStore, private readonly window: LoginWindow) {}
+  constructor(readonly http: ProductHttp, private readonly store: SessionStore, private readonly window: LoginWindow,
+    private readonly displayNameFor: (userId: string) => string | null = readOperatorDisplayName) {}
   subscribe(listener: (state: ProductSessionResult) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private emit(state: ProductSessionResult) { for (const listener of this.listeners) listener(state); }
   view(): ProductSessionView {
@@ -48,7 +49,7 @@ export class ProductSession {
     const userId = this.user?.userId ?? null;
     const displayName = sessionDisplayName({
       role: this.user?.role ?? null,
-      mappedName: userId ? readOperatorDisplayName(userId) : null,
+      mappedName: userId ? this.displayNameFor(userId) : null,
     });
     return { ok: true, enabled: true, signedIn: !!this.token && !!this.user, sessionEpoch: this.epoch,
       userId, role: this.user?.role ?? null, authMode: this.user?.authMode ?? null,
