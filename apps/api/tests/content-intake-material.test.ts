@@ -3,6 +3,7 @@ import { createTemplate, parseWorkbook, type ParseResult } from '@customer-agent
 import { parseContractSchema } from '@customer-agent/contracts';
 import { canonical, digest, materialFromParse } from '../src/content-intake/material.js';
 import type { Source } from '../src/content-intake/authority.js';
+import { qualityPopulation } from '../src/content-intake/quality.js';
 
 const now = Date.parse('2026-10-06T00:00:00Z');
 const source: Source = { scopeId: 'scope', scope: { tenantId: 't', appId: 'a', brandId: 'b', shopId: 'shop', domain: 'product', sourceId: 'source' },
@@ -17,6 +18,51 @@ async function input(rows = [row()]) {
 }
 
 describe('formal candidate material from independently parsed workbook', () => {
+  it('binds every material field to the sampling tuple without pretending it is a governance hash', async () => {
+    const material = materialFromParse(await input());
+    const preview = (m = material) => qualityPopulation({ candidateId: 'candidate', version: 1, digest: digest(canonical(m)) }, m);
+    const original = preview();
+    expect(original.entries[0]?.entry.answerText).toBe('合成回答');
+    for (const field of ['internalNote', 'riskNote', 'applicabilityNote'] as const) {
+      const m = structuredClone(material); m.entries[0]![field] = '不同的合成说明';
+      expect(preview(m).population[0]?.content_hash).not.toBe(original.population[0]?.content_hash);
+    }
+    const m = structuredClone(material);
+    m.entries[0]!.questions = [{ id: 'question-a', version: 2, text: '不同的问法', active: false }];
+    expect(preview(m).population[0]?.content_hash).not.toBe(original.population[0]?.content_hash);
+    expect(() => qualityPopulation(original.key, m)).toThrow('MATERIAL_CHANGED');
+    m.entries[0]!.attachmentNote = 'P2 未支持的附件说明';
+    expect(() => preview(m)).toThrow('Contract validation failed');
+  });
+
+  it('namespaces IDs by source, keeps missing entries and binds explicit disables outside the old population', async () => {
+    const material = materialFromParse(await input([row(), row('entry-b')]));
+    const preview = (m = material) => qualityPopulation({ candidateId: 'candidate', version: 1, digest: digest(canonical(m)) }, m);
+    const original = preview();
+    const other = structuredClone(material); other.scope.sourceId = 'other-source'; other.object.sourceId = 'other-source';
+    expect(preview(other).population[0]?.script_id).not.toBe(original.population[0]?.script_id);
+    const disabled = materialFromParse({ ...await input([row('entry-a','合成回答','停用')]), previous: material.entries });
+    const projection = preview(disabled);
+    expect(projection.withdrawals).toEqual(['entry-a']);
+    expect(projection.entries.map(x => x.entry.businessEntryId)).toEqual(['entry-b']);
+    expect(projection.population[0]?.script_id).toBe(original.population[1]?.script_id);
+    expect(projection.population[0]?.content_hash).not.toBe(original.population[1]?.content_hash);
+    const duplicate = structuredClone(material); duplicate.entries.push(duplicate.entries[0]!);
+    expect(() => preview(duplicate)).toThrow('MATERIAL_CHANGED');
+  });
+
+  it('uses the existing 500/501 sampling boundary and makes a critical candidate entirely mandatory', async () => {
+    const material = materialFromParse(await input());
+    const preview = (count: number, critical = false) => {
+      const m = structuredClone(material);
+      m.entries = Array.from({ length: count }, (_, n) => ({ ...material.entries[0]!, businessEntryId: `entry-${n}` }));
+      m.risk.level = critical ? 'critical' : 'routine';
+      return qualityPopulation({ candidateId: 'candidate', version: 1, digest: digest(canonical(m)) }, m);
+    };
+    expect(preview(500)).toMatchObject({ ordinaryCount: 500, mandatoryCount: 0, initialTarget: 500, expandedTarget: 500 });
+    expect(preview(501)).toMatchObject({ ordinaryCount: 501, mandatoryCount: 0, initialTarget: 100, expandedTarget: 151 });
+    expect(preview(501, true)).toMatchObject({ ordinaryCount: 0, mandatoryCount: 501, initialTarget: 0, expandedTarget: 0 });
+  });
   it('preserves omitted entries and questions, with separate answer/question version allocation', async () => {
     const original = await input([row(), row('entry-b')]);
     const parsed: ParseResult = { ...original.parsed, questions: [{ entryId: 'entry-a', id: 'question-a', text: '合成问法', state: '启用' }] };

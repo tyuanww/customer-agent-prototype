@@ -79,7 +79,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
 | `packages/retrieval-core/` | 纯 TypeScript 检索算法：BM25、RRF、余弦相似度、分数门槛和字符分词；通过显式输入隐藏算法细节，不拥有产品字段、HTTP、Electron、数据库或 UI 策略 | `apps/*` 依赖、产品字段权重、合成/真实数据读取、运行时 I/O |
 | `packages/content-intake/` | `intake-p1.1` 标准 FAQ 工作簿解析、预算前检、错误/模板实物及可取消子进程；P2 API 合成事务切片复用其编译产物 | 授权/审批/正式候选、renderer IPC、真实来源或自行发布 |
-| `apps/api/src/content-intake/` | 产品会话主体到组织/岗位/业务授权交集；原子授权、接收/解析/材料冻结、修订/取消、来源确认与固定审核包；适配器核验人工任务及附件，追加历史证明审核时资格，当前事实投影 readiness，撤销传播到全部引用谱系 | 当前仅隔离 PG/合成审批 transport 消费者，无真实 Feishu adapter/生产 factory/HTTP/新 ACL；不签发 release、不创建第二 current |
+| `apps/api/src/content-intake/` | 产品会话主体到组织/岗位/业务授权交集；原子授权、接收/解析/材料冻结、修订/取消、来源确认与固定审核包；适配器核验人工任务及附件，追加历史证明审核时资格，当前事实投影 readiness，撤销传播到全部引用谱系；候选质量预览复用 DB population/选样，不写质量结论 | 当前仅隔离 PG/合成审批 transport 消费者，无真实 Feishu adapter/生产 factory/HTTP/新 ACL；不签发 release、不创建第二 current |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
 | `packages/database/` | 在同一已验证快照内确定性生成 migration（当前二十一段，含四个冻结产品 overlay 和两段 P2 合同增量）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |

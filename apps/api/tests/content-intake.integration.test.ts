@@ -13,6 +13,7 @@ import { createApprovalAdapter, type ApprovalTransport } from '../src/content-in
 import { syntheticApproval } from './support/intake-approval.js';
 import { digest } from '../src/content-intake/material.js';
 import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
+import type { IntakeQualityPreview } from '../src/content-intake/quality.js';
 
 type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -110,6 +111,99 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   const reviewRequest = (c: C['IntakeCandidate'], expected = 0, op = 'review-one'): C['IntakeReviewRequest'] =>
     ({ operationId:op,key:c.key,expectedEvidenceVersion:expected });
   const refresh = (c: C['IntakeCandidate'], op = 'refresh-one', expected = 1) => service.refreshReview(actor('other'),reviewRequest(c,expected,op));
+
+  // A consumer probe, not a production bridge: synthetic legacy batch/lease only.
+  // No staging, native review-to-owner conversion, publication or mode activation.
+  async function freezeQualityProbe(p: IntakeQualityPreview, label = 'one') {
+    const batchId = `quality-probe-${label}`;
+    const planId = `qplan_probe-${label}`;
+    const jobId = `quality-job-${label}`;
+    await admin.query(`INSERT INTO public.import_batches(import_batch_id,source_type,source_binding_hash,status)
+      VALUES ($1,'other',repeat('a',64),'validating')`, [batchId]);
+    await admin.query(`INSERT INTO public.outbox_jobs(job_id,job_type,payload,status,lease_owner,lease_version,lease_expires_at)
+      VALUES ($1,'import_validate',jsonb_build_object('import_batch_id',$2::text),'running','quality-probe',1,clock_timestamp()+interval '60 seconds')`, [jobId,batchId]);
+    const frozen = await admin.query(`SELECT * FROM public.freeze_content_quality_review_plan(
+      $1,'quality-probe',1,$2,$3,'quality-sampling-v1',clock_timestamp(),$4,$5,$6,$7,$8,'sha256-ranked-v1',$9::jsonb)`,
+    [jobId,batchId,planId,p.population.length,p.ordinaryCount,p.mandatoryCount,p.seedHash,p.selectionManifestHash,JSON.stringify(p.population)]);
+    expect(frozen.rows[0]).toEqual({ frozen_plan_id:planId, initial_sample_target:p.initialTarget, expanded_sample_target:p.expandedTarget });
+    const stored = (await admin.query('SELECT * FROM public.content_quality_review_plans WHERE plan_id=$1',[planId])).rows[0];
+    expect(stored).toMatchObject({ population_manifest_hash:p.populationManifestHash,selection_manifest_hash:p.selectionManifestHash });
+    return planId;
+  }
+
+  it('quality preview preserves the candidate and is actually consumable by the existing SQL plan freezer', async () => {
+    const c = await routine();
+    const before = (await admin.query('SELECT * FROM content_intake.candidate_versions')).rows;
+    const p = value(await service.qualityPreview(actor('reviewer'),c.key));
+    expect(p.purpose).toBe('synthetic-quality-preview');
+    expect(p.entries[0]?.entry.answerText).toBe('第一行。\n第二行。');
+    expect(p.entries[0]?.entry.internalNote).toBe('内部说明');
+    expect(p.initialScriptIds).toEqual(p.population.map(r => r.script_id));
+    expect(value(await service.qualityPreview(actor('reviewer'),c.key))).toEqual(p);
+    expect((await admin.query('SELECT * FROM content_intake.candidate_versions')).rows).toEqual(before);
+    expect((await admin.query('SELECT count(*) FROM public.content_quality_review_plans')).rows[0].count).toBe('0');
+    await freezeQualityProbe(p);
+    expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM public.content_quality_review_evidence')).rows[0].count).toBe('0');
+  });
+
+  it('quality SQL requires expanded review and rejects a fabricated passing conclusion', async () => {
+    const rows = Array.from({ length:501 }, (_, n) => [`faq-${n}`,'合成标题','合成正文','','','分类','','启用','','','','','','','false']);
+    const req = await input('quality-large',null,rows);
+    const c = value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',req)).jobId));
+    const p = value(await service.qualityPreview(actor('reviewer'),c.key));
+    expect(p.initialScriptIds).toHaveLength(100);
+    expect(p.expandedScriptIds).toHaveLength(151);
+    expect(p.initialScriptIds.every(id => p.expandedScriptIds.includes(id))).toBe(true);
+    const plan = await freezeQualityProbe(p);
+    const record = (expanded: number | null, defects: number | null, conclusion: string) => admin.query(
+      `SELECT public.record_content_quality_review_evidence($1,100,3,$2,$3,0,0,491,10,$4,'synthetic-quality-evidence','content_quality_reviewer')`,
+      [plan,expanded,defects,conclusion]);
+    await expect(record(null,null,'passed')).rejects.toMatchObject({ detail:'QUALITY_EXPANSION_REQUIRED' });
+    await expect(record(151,10,'passed')).rejects.toMatchObject({ detail:'QUALITY_THRESHOLD_MISMATCH' });
+    expect((await admin.query('SELECT count(*) FROM public.content_quality_review_evidence')).rows[0].count).toBe('0');
+    await record(151,10,'blocked');
+    expect((await admin.query('SELECT conclusion FROM public.content_quality_review_evidence')).rows).toEqual([{ conclusion:'blocked' }]);
+    expect((await admin.query('SELECT quality_gate_passed FROM public.import_batches')).rows).toEqual([{ quality_gate_passed:false }]);
+    expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('0');
+  });
+
+  it('critical quality population requires every live entry and does not fabricate owner acceptance', async () => {
+    const c = await candidate();
+    value((await confirm(c)).result);
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('reviewer');
+    value(await refresh(c));
+    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,c.key.version)).state).toBe('ready');
+    const p = value(await service.qualityPreview(actor('reviewer'),c.key));
+    expect(p).toMatchObject({ ordinaryCount:0,mandatoryCount:1,initialTarget:0,expandedTarget:0 });
+    expect(p.initialScriptIds).toEqual(p.population.map(r => r.script_id));
+    expect(p.expandedScriptIds).toEqual(p.initialScriptIds);
+    const plan = await freezeQualityProbe(p);
+    await expect(admin.query(`SELECT public.record_content_quality_review_evidence($1,0,0,NULL,NULL,0,0,1,0,'passed','synthetic-evidence','content_quality_reviewer')`,[plan]))
+      .rejects.toMatchObject({ detail:'QUALITY_EVIDENCE_INVALID' });
+    await admin.query(`SELECT public.record_content_quality_review_evidence($1,0,0,NULL,NULL,1,0,1,0,'passed','synthetic-evidence','content_quality_reviewer')`,[plan]);
+    // Native human approval and a quality pass are neither legacy owner evidence
+    // nor a P2 publication. Even the old purpose needs a separately registered record.
+    for (const purpose of ['native-intake-approval','g1a_offline_only']) await expect(admin.query(
+      "SELECT public.assert_owner_acceptance('tenant-a',$1,repeat('a',64),$2,'{}'::jsonb)", [c.key.digest,purpose]))
+      .rejects.toMatchObject({ message:'OWNER_ACCEPTANCE_NOT_ACTIVE' });
+    expect((await admin.query('SELECT count(*) FROM public.owner_acceptance_records')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM content_intake.commit_tickets')).rows[0].count).toBe('0');
+  });
+
+  it('quality preview rechecks role, current grants, the exact key and cancellation on every read', async () => {
+    const c = await routine();
+    expect(await service.qualityPreview(actor('agent'),c.key)).toMatchObject({ ok:false,code:'NOT_FOUND' });
+    expect(await service.qualityPreview(actor('reviewer'),{ ...c.key,digest:'a'.repeat(64) })).toMatchObject({ ok:false,reason:'MATERIAL_CHANGED' });
+    value(await service.qualityPreview(actor('reviewer'),c.key));
+    value(await service.changeGrant(actor('director'),'business-reviewer-review',
+      { operationId:'revoke-quality-reviewer',expectedVersion:1,change:'revoke',stewardPrincipalId:null,reason:'合成质量预览撤权' }));
+    expect(await service.qualityPreview(actor('reviewer'),c.key)).toMatchObject({ ok:false,code:'NOT_FOUND' });
+    value(await service.cancel(actor('enabler'),{ operationId:'cancel-quality',key:c.key }));
+    expect(await service.qualityPreview(actor('other'),c.key)).toMatchObject({ ok:false,reason:'MATERIAL_CHANGED' });
+  });
 
   it('ignores the login owner label; enabler needs an exact shop/source business grant', async () => {
     value(await service.authorization(actor('enabler'), 'source-a', 'import'));

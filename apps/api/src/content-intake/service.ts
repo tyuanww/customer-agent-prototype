@@ -11,6 +11,7 @@ import { cancelCandidate, freezeParsed, getJob, jobView, readCandidate, receive 
 import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
+import { previewQuality, type IntakeQualityPreview } from './quality.js';
 
 type C = components['schemas'];
 const operation = (value: unknown): string | null => typeof value === 'object' && value !== null
@@ -101,6 +102,10 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
 
   return {
     ...createIntakeEvidence(run, store, approval, report),
+    qualityPreview(actor: AuthenticatedUser, key: unknown) {
+      return run(actor, 'quality-preview', null, null,
+        (client, who) => previewQuality(client, who, key), value => value as IntakeQualityPreview);
+    },
     grantBatch(actor: AuthenticatedUser, raw: unknown) {
       return run(actor, 'grants', json(raw), operation(raw),
         (client, who) => createGrants(client, who, parseContractSchema('IntakeGrantBatch', raw)), grantList);
