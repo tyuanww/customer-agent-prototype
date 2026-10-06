@@ -1,0 +1,59 @@
+{
+  "revision": "98b888b5e98a367a9e3a458565504c704023d0f3",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Functional-only; no UI, real Feishu, production ACL or runtime activation.",
+    "Two captures / six selected tests; isolated Unix socket PG harness and synthetic XLSX.",
+    "Other planned verification is recorded separately in checks.json."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'publishes native'",
+      "contract": "原生发布成功与永久回执恢复",
+      "expected": "实际读回新 release、谱系材料、current、公告、一次票据和永久回执，旧字段不伪造，同键重放不重复发布",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (64 tests | 63 skipped) 1148ms\n   ✓ P2 sealed synthetic authority and durable candidates > publishes native material atomically without invented legacy fields, and recovers its permanent receipt  1148ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 63 skipped (64)\n   Start at  16:14:02\n   Duration  1.58s (transform 160ms, setup 0ms, collect 303ms, tests 1.15s, environment 0ms, prepare 40ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'late announcement|lost publication|publication is observing|cancellation waits'",
+      "contract": "部分失败回滚、未知 COMMIT 恢复及取消/撤权竞争",
+      "expected": "最终公告失败无半提交，丢响应恢复唯一发布；取消/撤权先赢无发布，发布先赢后续取消拒绝",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (64 tests | 59 skipped) 5633ms\n   ✓ P2 sealed synthetic authority and durable candidates > rolls back ticket, catalog, candidate, current and release on a late announcement failure  1207ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers a lost publication COMMIT after restart without remote I/O or a second release  1150ms\n   ✓ P2 sealed synthetic authority and durable candidates > lets cancel win while publication is observing approval without locks  1077ms\n   ✓ P2 sealed synthetic authority and durable candidates > lets revoke win while publication is observing approval without locks  1091ms\n   ✓ P2 sealed synthetic authority and durable candidates > commits once when cancellation waits behind the final publication transaction  1107ms\n\n Test Files  1 passed (1)\n      Tests  5 passed | 59 skipped (64)\n   Start at  16:16:14\n   Duration  6.15s (transform 159ms, setup 0ms, collect 369ms, tests 5.63s, environment 0ms, prepare 30ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "publishes native"
+      ],
+      "hypothesis": "The durable publication and receipt replay succeeded, so now check whether late failures roll back every effect and whether cancellation, revocation and a lost COMMIT response preserve one publication.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "late announcement|lost publication|publication is observing|cancellation waits"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

@@ -449,6 +449,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
       "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
       "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
+    },
+    {
+      "position": 24,
+      "id": "0024_intake_publication",
+      "file": "0024_intake_publication.sql",
+      "source_ranges": [],
+      "sha256": "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2",
+      "bytes": 13591,
+      "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+      "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+      "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
     }
   ]
 }

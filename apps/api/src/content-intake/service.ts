@@ -11,6 +11,7 @@ import { cancelCandidate, freezeParsed, getJob, jobView, readCandidate, receive 
 import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
+import { createIntakePublication } from './publication.js';
 import { checkQuality, freezeQuality, previewQuality, qualityCommand, qualitySubmission, readQuality,
   type IntakeQualityPreview, type IntakeQualityProgress } from './quality.js';
 
@@ -30,6 +31,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   const grant = (v: unknown) => parseContractSchema('IntakeGrant', v);
   const candidate = (v: unknown) => parseContractSchema('IntakeCandidate', v);
   const job = (v: unknown) => parseContractSchema('IntakeParseJob', v);
+  const { refreshForPublish, ...evidence } = createIntakeEvidence(run, store, approval, report);
 
   /** Worker-only terminal bookkeeping must still finish after user permission expires.
    * It cannot create a candidate, alter a terminal job or grant any authority. */
@@ -102,7 +104,8 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   }
 
   return {
-    ...createIntakeEvidence(run, store, approval, report),
+    ...evidence,
+    ...createIntakePublication(run, refreshForPublish),
     qualityPreview(actor: AuthenticatedUser, key: unknown) {
       return run(actor, 'quality-preview', null, null,
         (client, who) => previewQuality(client, who, key), value => value as IntakeQualityPreview);

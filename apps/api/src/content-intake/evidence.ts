@@ -64,6 +64,61 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
       throw error instanceof IntakeRejection ? error : new IntakeRejection('APPROVAL_UNAVAILABLE', 'OVERLOADED');
     }, decode);
   }
+  async function refresh(actor: AuthenticatedUser, raw: unknown, action: 'content-manage' | 'publish'): Promise<IntakeResult<C['IntakeReview']>> {
+    type Prepared = { req: C['IntakeReviewRequest']; reply: C['IntakeReview'] } | {
+      req: C['IntakeReviewRequest']; binding: ReviewBinding; generation: number; factsVersion: number; checkedAt: string };
+    const prepared = await run(actor,'review-refresh-prepare',null,null,async (client,who): Promise<Prepared> => {
+      const req = parseContractSchema('IntakeReviewRequest',raw);
+      const prior = await intakeReplay(client,who,'review-refresh',json(req),req.operationId,review);
+      if (prior) return { req,reply:prior.value };
+      if (!adapter) throw new IntakeRejection('APPROVAL_UNAVAILABLE','OVERLOADED');
+      const c = await candidateContext(client,who,req.key,action);
+      if (!['awaiting-evidence','ready','published'].includes(c.view.state)) throw new IntakeRejection('MATERIAL_CHANGED');
+      if (c.view.approvalEvidenceVersion !== req.expectedEvidenceVersion) throw new IntakeRejection('APPROVAL_CHANGED');
+      const b = await currentBinding(client,req.key,req.expectedEvidenceVersion);
+      return { req,binding:b,generation:c.view.revocationGeneration,factsVersion:Number((await facts(client,b))?.facts_version ?? 0),
+        checkedAt:new Date(await clock(client)).toISOString() };
+    },v => v as Prepared);
+    if (!prepared.ok) return prepared;
+    if ('reply' in prepared.value) return { ok:true,value:prepared.value.reply };
+    const { req,binding:b,generation,factsVersion,checkedAt } = prepared.value;
+    try {
+      const observation = await adapter!.observe(b);
+      return run(actor,'review-refresh',json(req),req.operationId,async (client,who) => {
+        const c = await candidateContext(client,who,req.key,action);
+        if (!['awaiting-evidence','ready','published'].includes(c.view.state)) throw new IntakeRejection('MATERIAL_CHANGED');
+        if (c.view.approvalEvidenceVersion !== req.expectedEvidenceVersion || c.view.revocationGeneration !== generation) throw new IntakeRejection('APPROVAL_CHANGED');
+        const previous = await facts(client,b);
+        if (Number(previous?.facts_version ?? 0) !== factsVersion) throw new IntakeRejection('APPROVAL_CHANGED');
+        if (previous?.state === 'revoked' && observation.state !== 'revoked') throw new IntakeRejection('APPROVAL_REVOKED');
+        const until = Date.parse(checkedAt)+300_000;
+        if (await clock(client) >= until) throw new IntakeRejection('APPROVAL_UNAVAILABLE');
+        client.validUntil(until);
+        // This package was registered under lock_content(), shared by authority
+        // writers, without changing authority itself. Earlier role/grant history
+        // therefore committed before this checkpoint; later grants need a new review.
+        const reviewer = observation.human ? await historicalReviewer(client,c.src,c.material,observation.human,checkedAt,b.createdAt) : null;
+        const invalidates = previous?.state === 'approved' && (observation.state !== 'approved' || previous.reviewer_id !== reviewer?.id
+          || previous.human_task_id !== observation.human?.taskId || previous.decided_at?.toISOString() !== observation.human?.decidedAt);
+        const revoked = observation.state === 'revoked' && previous?.state !== 'revoked';
+        const nextGeneration = Number(previous?.revocation_generation ?? 0)+Number(invalidates || revoked);
+        await client.query(`INSERT INTO content_intake.approval_facts(review_request_id,facts_version,revocation_generation,state,checked_at,
+          valid_until,raw_facts_digest,package_verified_sha256,human_task_id,reviewer_id,reviewer_facts_version,decided_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [b.reviewRequestId,factsVersion+1,nextGeneration,observation.state,checkedAt,
+          new Date(until).toISOString(),observation.rawDigest,observation.packageSha256,observation.human?.taskId ?? null,
+          reviewer?.id ?? null,reviewer?.factsVersion ?? null,observation.human?.decidedAt ?? null]);
+        await client.query(`INSERT INTO content_intake.approval_current VALUES ($1,$2)
+          ON CONFLICT(review_request_id) DO UPDATE SET facts_version=excluded.facts_version`,[b.reviewRequestId,factsVersion+1]);
+        await client.query(`UPDATE content_intake.candidate_versions SET revocation_generation=revocation_generation+1,
+          updated_at=clock_timestamp() WHERE candidate_id=$1 AND version=$2`,[req.key.candidateId,req.key.version]);
+        if (invalidates || revoked) await client.query(`INSERT INTO content_intake.release_revocations(release_id,generation,reason,revoked_at)
+          SELECT DISTINCT release_id,$2::bigint,$3::text,clock_timestamp() FROM content_intake.release_lineage WHERE review_request_id=$1
+          ON CONFLICT(release_id) DO NOTHING`,[b.reviewRequestId,nextGeneration,revoked ? 'APPROVAL_REVOKED' : 'APPROVAL_CHANGED']);
+        await syncCandidateReadiness(client,who,req.key,action);
+        return reviewView(client,b);
+      },review);
+    } catch (error) { diagnostic(error); return failed(actor,error,review); }
+  }
   return {
     async confirmSource(actor: AuthenticatedUser, raw: unknown): Promise<IntakeResult<C['IntakeCandidate']>> {
       // Keep the human reason in the permanent private receipt alongside its result.
@@ -188,60 +243,7 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
         return reviewView(client,await currentBinding(client,key,c.view.approvalEvidenceVersion));
       },review);
     },
-    async refreshReview(actor: AuthenticatedUser, raw: unknown): Promise<IntakeResult<C['IntakeReview']>> {
-      type Prepared = { req: C['IntakeReviewRequest']; reply: C['IntakeReview'] } | {
-        req: C['IntakeReviewRequest']; binding: ReviewBinding; generation: number; factsVersion: number; checkedAt: string };
-      const prepared = await run(actor,'review-refresh-prepare',null,null,async (client,who): Promise<Prepared> => {
-        const req = parseContractSchema('IntakeReviewRequest',raw);
-        const prior = await intakeReplay(client,who,'review-refresh',json(req),req.operationId,review);
-        if (prior) return { req,reply:prior.value };
-        if (!adapter) throw new IntakeRejection('APPROVAL_UNAVAILABLE','OVERLOADED');
-        const c = await candidateContext(client,who,req.key,'content-manage');
-        if (!['awaiting-evidence','ready','published'].includes(c.view.state)) throw new IntakeRejection('MATERIAL_CHANGED');
-        if (c.view.approvalEvidenceVersion !== req.expectedEvidenceVersion) throw new IntakeRejection('APPROVAL_CHANGED');
-        const b = await currentBinding(client,req.key,req.expectedEvidenceVersion);
-        return { req,binding:b,generation:c.view.revocationGeneration,factsVersion:Number((await facts(client,b))?.facts_version ?? 0),
-          checkedAt:new Date(await clock(client)).toISOString() };
-      },v => v as Prepared);
-      if (!prepared.ok) return prepared;
-      if ('reply' in prepared.value) return { ok:true,value:prepared.value.reply };
-      const { req,binding:b,generation,factsVersion,checkedAt } = prepared.value;
-      try {
-        const observation = await adapter!.observe(b);
-        return run(actor,'review-refresh',json(req),req.operationId,async (client,who) => {
-          const c = await candidateContext(client,who,req.key,'content-manage');
-          if (!['awaiting-evidence','ready','published'].includes(c.view.state)) throw new IntakeRejection('MATERIAL_CHANGED');
-          if (c.view.approvalEvidenceVersion !== req.expectedEvidenceVersion || c.view.revocationGeneration !== generation) throw new IntakeRejection('APPROVAL_CHANGED');
-          const previous = await facts(client,b);
-          if (Number(previous?.facts_version ?? 0) !== factsVersion) throw new IntakeRejection('APPROVAL_CHANGED');
-          if (previous?.state === 'revoked' && observation.state !== 'revoked') throw new IntakeRejection('APPROVAL_REVOKED');
-          const until = Date.parse(checkedAt)+300_000;
-          if (await clock(client) >= until) throw new IntakeRejection('APPROVAL_UNAVAILABLE');
-          client.validUntil(until);
-          // This package was registered under lock_content(), shared by authority
-          // writers, without changing authority itself. Earlier role/grant history
-          // therefore committed before this checkpoint; later grants need a new review.
-          const reviewer = observation.human ? await historicalReviewer(client,c.src,c.material,observation.human,checkedAt,b.createdAt) : null;
-          const invalidates = previous?.state === 'approved' && (observation.state !== 'approved' || previous.reviewer_id !== reviewer?.id
-            || previous.human_task_id !== observation.human?.taskId || previous.decided_at?.toISOString() !== observation.human?.decidedAt);
-          const revoked = observation.state === 'revoked' && previous?.state !== 'revoked';
-          const nextGeneration = Number(previous?.revocation_generation ?? 0)+Number(invalidates || revoked);
-          await client.query(`INSERT INTO content_intake.approval_facts(review_request_id,facts_version,revocation_generation,state,checked_at,
-            valid_until,raw_facts_digest,package_verified_sha256,human_task_id,reviewer_id,reviewer_facts_version,decided_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [b.reviewRequestId,factsVersion+1,nextGeneration,observation.state,checkedAt,
-            new Date(until).toISOString(),observation.rawDigest,observation.packageSha256,observation.human?.taskId ?? null,
-            reviewer?.id ?? null,reviewer?.factsVersion ?? null,observation.human?.decidedAt ?? null]);
-          await client.query(`INSERT INTO content_intake.approval_current VALUES ($1,$2)
-            ON CONFLICT(review_request_id) DO UPDATE SET facts_version=excluded.facts_version`,[b.reviewRequestId,factsVersion+1]);
-          await client.query(`UPDATE content_intake.candidate_versions SET revocation_generation=revocation_generation+1,
-            updated_at=clock_timestamp() WHERE candidate_id=$1 AND version=$2`,[req.key.candidateId,req.key.version]);
-          if (invalidates || revoked) await client.query(`INSERT INTO content_intake.release_revocations(release_id,generation,reason,revoked_at)
-            SELECT DISTINCT release_id,$2::bigint,$3::text,clock_timestamp() FROM content_intake.release_lineage WHERE review_request_id=$1
-            ON CONFLICT(release_id) DO NOTHING`,[b.reviewRequestId,nextGeneration,revoked ? 'APPROVAL_REVOKED' : 'APPROVAL_CHANGED']);
-          await syncCandidateReadiness(client,who,req.key,'content-manage');
-          return reviewView(client,b);
-        },review);
-      } catch (error) { diagnostic(error); return failed(actor,error,review); }
-    },
+    refreshReview: (actor: AuthenticatedUser, raw: unknown) => refresh(actor,raw,'content-manage'),
+    refreshForPublish: (actor: AuthenticatedUser, raw: unknown) => refresh(actor,raw,'publish'),
   };
 }

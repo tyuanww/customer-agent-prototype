@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。当前基线是 `v0.3.26 / main@4739c39`：P2 合同消费锁已推进到 OpenAPI `1.16.0` / `schema.v1.20`，`packages/database` 保留 `0001..0019` 原字节并追加 `0020..0021`（`0016..0019` 是历史产品 overlay），合同生成物包含 222 个 component runtime schema。API 的权限、持久候选、来源确认与人工审批证据已由隔离 PG 合成执行器消费；真实审批 transport、生产路由、P2 原子发布和 Main/renderer 接线仍待完成，新 schema 应用 ACL 继续封闭；详见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。当前基线是 `v0.3.26 / main@4739c39`：P2 合同消费锁已推进到 OpenAPI `1.16.0` / `schema.v1.20`，`packages/database` 保留 `0001..0019` 原字节并追加 `0020..0024`（`0016..0019` 是历史产品 overlay），合同生成物包含 222 个 component runtime schema。API 的权限、持久候选、来源确认、人工审批、候选质量与原生原子发布已由隔离 PG 合成执行器消费；真实审批 transport、生产路由、使用资格/原生读模型和 Main/renderer 接线仍待完成，新 schema 应用 ACL 继续封闭；详见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
 
 ## 1. 先看整体
 
@@ -79,13 +79,15 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
 | `packages/retrieval-core/` | 纯 TypeScript 检索算法：BM25、RRF、余弦相似度、分数门槛和字符分词；通过显式输入隐藏算法细节，不拥有产品字段、HTTP、Electron、数据库或 UI 策略 | `apps/*` 依赖、产品字段权重、合成/真实数据读取、运行时 I/O |
 | `packages/content-intake/` | `intake-p1.1` 标准 FAQ 工作簿解析、预算前检、错误/模板实物及可取消子进程；P2 API 合成事务切片复用其编译产物 | 授权/审批/正式候选、renderer IPC、真实来源或自行发布 |
-| `apps/api/src/content-intake/` | 产品会话主体到组织/岗位/业务授权交集；原子授权、接收/解析/材料冻结、修订/取消、来源确认与固定审核包；适配器核验人工任务及附件，追加历史证明审核时资格，当前事实投影 readiness，撤销传播到全部引用谱系；候选质量预览复用 DB population/选样，冻结计划与逐条检查在封闭存储持久化，由 DB 投影质量状态 | 当前仅隔离 PG/合成审批 transport 消费者，无真实 Feishu adapter/生产 factory/HTTP/新 ACL；不签发 release、不创建第二 current |
+| `apps/api/src/content-intake/` | 产品会话主体到组织/岗位/业务授权交集；原子授权、接收/解析/材料冻结、修订/取消、来源确认与固定审核包；适配器核验人工任务及附件，追加历史证明审核时资格，当前事实投影 readiness，撤销传播到全部引用谱系；候选质量预览复用 DB population/选样，冻结计划与逐条检查在封闭存储持久化，由 DB 投影质量状态；publication 拥有即时审批观察及原 operation 恢复，内部 SQL 原子签发 release | 当前仅隔离 PG/合成审批 transport 消费者，无真实 Feishu adapter/生产 factory/HTTP/新 ACL；不创建第二 current，不隐式 bootstrap/迁移旧同域内容 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
-| `packages/database/` | 在同一已验证快照内确定性生成 migration（当前二十一段，含四个冻结产品 overlay 和两段 P2 合同增量）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成 migration（当前二十四段，含四个历史产品 overlay、两段 P2 合同增量及三个 P2 内部产品 overlay）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
 | `docs/`、`evidence/qa/` | 可读合同、教程、验证方法和冻结证据 | 可执行源码、运行时缓存 |
+
+产品迁移 `0024_intake_publication` 拥有原生候选最终门、一次票据、永久发布身份及 release/catalog/lineage/current/公告的原子写入；旧成员完整继承，复核原 source/owner 门。仅 security-invoker 私有函数，应用无 EXECUTE；API 事务 owner 同时写永久回执并复核最早截止。字段/证据映射见[P2 交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
 
 产品迁移 `0023_intake_quality` 拥有不可变候选质量计划/逐条检查及质量状态投影，不签发发布资格，应用 ACL 不变。
 

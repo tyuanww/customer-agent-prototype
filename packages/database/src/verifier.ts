@@ -118,15 +118,16 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // than the four views: the definer's new table grants are part of it too.
 // 0022 adds five private policy/trigger functions and eight privileges only for cs_ai_definer.
 // 0023 adds two sealed quality tables, two private functions and three triggers; ACL stays identical.
+// 0024 adds one sealed native publication function, with unchanged ACL and table shapes.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
 const EXPECTED_ACL_MANIFEST_ENTRIES = 223;
 const EXPECTED_ACL_MANIFEST_SHA256 = '733889747d9dbd94c592e64bd4c9c3e69e981eb00e1fe5fdc4ea3d50f2c4ab00';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2731;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = 'a61774c0f28ee00f6b85cc21469b5d8748522f52cb6bf01f60ddfb851b3b79f5';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 216;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '33e7dffc7e7b8e7923a67db2966b909e6401d6c1594f43f2b06206c8fb122aed';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2732;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '1c1c66854244166ac4fbba2fb02d7354bed1053791517a61bc99d8b714ccfd6f';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 217;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '685f205ba09598753bb5ef375ca084a90061ce5f979f84642e5f3999e89b4572';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 79;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'd995a1e42c0f6433b25fd8d03d803d2dc6637a80437f1ddefbc0015d363c853f';
 
@@ -750,7 +751,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 83 || inventory.views !== 7 || inventory.functions !== 216 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 83 || inventory.views !== 7 || inventory.functions !== 217 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {
