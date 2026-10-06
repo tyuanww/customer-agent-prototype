@@ -46,18 +46,18 @@ describe('generated customer-agent runtime contracts', () => {
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
-      contract_set_id: 'cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa',
-      source_git_sha: 'd029cb0908faf9a0d1c1ffc1c8a5fcf39784d713',
-      openapi_sha256: '2f029b210baa27164f2fbddc237f9775ac994629f354a5307c7c9f339f72ebb2',
-      database_sha256: '1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41',
+      contract_set_id: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288',
+      source_git_sha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6',
+      openapi_sha256: '3e0a3f122aefa0bff9c330e105f1a5cbb2b26662fd5f04db1ef3a93ac1bc1121',
+      database_sha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
     });
     const runtimeDefinitions = (OPENAPI_RUNTIME_SCHEMA_DOCUMENT as {
       $defs: Record<string, unknown>;
     }).$defs;
-    expect(contractSchemaNames).toHaveLength(222);
-    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(222);
+    expect(contractSchemaNames).toHaveLength(223);
+    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(223);
     expect(Object.keys(runtimeDefinitions)).toEqual([...contractSchemaNames]);
     expect(runtimeDefinitions).toMatchObject({
       FileImportRequest: {
@@ -89,6 +89,28 @@ describe('generated customer-agent runtime contracts', () => {
     const result = validateContractSchema('QualityEvidence', { ...envelope, checks: [item, { ...item, defect: true }] });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.issues[0]?.keyword).toBe('x-unique-by');
+  });
+
+  it('requires explicit bounded selections and keeps session references out of the wire', () => {
+    const request={shopId:'shop-a',contextGeneration:1,releaseId:null,productIds:[],scenarioIds:[]};
+    expect(validateContractSchema('IntakeEntitlementRequest',request).ok).toBe(true);
+    for(const change of [{productIds:undefined},{scenarioIds:undefined},{productIds:['same','same']},
+      {productIds:Array.from({length:101},(_,i)=>`p-${i}`)},{sessionTokenHash:'a'.repeat(64)},{userId:'forged'}]) {
+      expect(validateContractSchema('IntakeEntitlementRequest',{...request,...change}).ok).toBe(false);
+    }
+  });
+
+  it('enforces all combined 100-reference boundaries in the generated published validator', () => {
+    const entry={businessEntryId:'entry',scriptVersion:1,operation:'upsert',title:'合成标题',answerText:'合成原文',questions:[],
+      effectiveFrom:'2020-01-01T00:00:00Z',effectiveTo:null,applicabilityNote:'',familySourceId:null,familyBusinessEntryId:null,
+      brandNonOverridable:false,category:'分类',riskNote:''};
+    const refs=(n:number,prefix:string)=>Array.from({length:n},(_,i)=>({id:`${prefix}-${i}`,displayVersion:1}));
+    for(let products=0;products<=100;products++) {
+      const valid={...entry,productRefs:refs(products,'p'),scenarioRefs:refs(100-products,'s')};
+      expect(validateContractSchema('IntakePublishedEntry',valid).ok,`${products}+${100-products}`).toBe(true);
+      if(products<100)expect(validateContractSchema('IntakePublishedEntry',{...valid,productRefs:refs(products+1,'p')}).ok).toBe(false);
+    }
+    expect(validateContractSchema('IntakePublishedEntry',{...entry,productRefs:refs(100,'p'),scenarioRefs:refs(1,'s')}).ok).toBe(false);
   });
 
   it('accepts a contract-valid search request' , () => {

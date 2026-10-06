@@ -1,4 +1,10 @@
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
+import { fileURLToPath } from 'node:url';
 import { Pool, type Client, type PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
@@ -8,13 +14,14 @@ import type { components } from '@customer-agent/contracts';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
 import type { IntakeResult } from '../src/content-intake/transaction.js';
-import type { AuthenticatedUser } from '../src/auth-service.js';
+import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.js';
+import { createProductAuthService, authenticatedProductSession } from '../src/product-auth-service.js';
+import type { ApiDatabaseBootstrapConfig } from '../src/runtime-config.js';
 import { createApprovalAdapter, type ApprovalTransport } from '../src/content-intake/approval-adapter.js';
 import { syntheticApproval } from './support/intake-approval.js';
 import { digest } from '../src/content-intake/material.js';
 import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
 import type { IntakeQualityPreview, IntakeQualityProgress, QualityCheck } from '../src/content-intake/quality.js';
-import type { IntakeUsageContext } from '../src/content-intake/usage.js';
 
 type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -33,6 +40,25 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   let service: ReturnType<typeof createContentIntakeService>;
   let store: ReturnType<typeof createContentObjectStore>;
   let policyVersion: number;
+  let auth: ProductAuthService | undefined;
+  let authConfig: ApiDatabaseBootstrapConfig;
+  const seats=new Map<string,{actor:AuthenticatedUser;token:string}>();
+  async function seat(id='agent',name='primary') {
+    const key=`${id}:${name}`;
+    const cached=seats.get(key);if(cached)return cached;
+    auth ??= await createProductAuthService(authConfig,{
+      authorizeUrl:state=>`http://127.0.0.1:45000/authorize?state=${state}`,
+      exchange:async code=>code,close:()=>undefined,
+    },'mock');
+    const verifier='v'.repeat(43);
+    const login=await auth.createLogin(createHash('sha256').update(verifier).digest('base64url'));
+    await auth.callback(new URL(login.authorize_url).searchParams.get('state')!,id);
+    const session=await auth.exchange(login.login_id,verifier);
+    expect(session).not.toBeNull();
+    const user=await auth.authenticate({authorization:`Bearer ${session!.access_token}`});
+    expect(user).not.toBeNull();
+    const value={actor:user!,token:session!.access_token};seats.set(key,value);return value;
+  }
   const diagnostics: unknown[] = [];
   let provider: ReturnType<typeof syntheticApproval>;
   const route = { tenantId:'tenant-a',appId:'app-a',definitionId:'synthetic-definition',nodeId:'manual-node' };
@@ -46,6 +72,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     admin = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
     pool = new Pool({ ...db.config, max: 4 });
+    auth=undefined;seats.clear();
+    await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
+    authConfig={connectionString:`postgresql://synthetic_intake_auth@localhost/${db.name}?${new URLSearchParams({host:harness.socket,port:String(harness.port)})}`,
+      poolMax:2,connectionTimeoutMs:2000,readinessTimeoutMs:3000};
     store = createContentObjectStore(path.join(harness.root, db.name));
     provider = syntheticApproval();
     service = evidenceService();
@@ -76,7 +106,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query('COMMIT');
     policyVersion = Number((await admin.query('SELECT version FROM content_intake.policy_versions')).rows[0].version);
   }, 60_000);
-  afterEach(async () => { await pool?.end(); await admin?.end(); harness?.stop(); }, 60_000);
+  afterEach(async () => { await auth?.close(); await pool?.end(); await admin?.end(); harness?.stop(); }, 60_000);
 
   function batch(recipient: string, action: C['IntakeAction'] = 'import', kind: 'business' | 'delegation' = 'business', op = 'batch-one'): C['IntakeGrantBatch'] {
     return { operationId: op, issuerFactsVersion: 1, policyVersion, items: [{ kind, recipientPrincipalId: recipient,
@@ -185,14 +215,13 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows).toEqual([{ current_release_id:'rel_native_base' }]);
   }
 
-  const usage: IntakeUsageContext={ sessionId:'synthetic-agent-session',shopId:'shop-a',contextGeneration:1,productIds:[],scenarioIds:[] };
+  const usage: Omit<C['IntakeEntitlementRequest'],'releaseId'>={shopId:'shop-a',contextGeneration:1,productIds:[],scenarioIds:[]};
   const issue=async(ctx=usage,releaseId: string|null=null)=>{
-    const result=await service.issueEntitlement(actor('agent'),ctx,
-      { shopId:ctx.shopId,contextGeneration:ctx.contextGeneration,releaseId });
+    const result=await service.issueEntitlement((await seat()).actor,{...ctx,releaseId});
     if (!result.ok && result.code==='INTERNAL_ERROR') throw new Error(JSON.stringify(diagnostics.map(e=>String(e))));
     return result;
   };
-  const snapshot=(id: string,ctx=usage,extra={})=>service.snapshot(actor('agent'),ctx,{ entitlementId:id,...extra });
+  const snapshot=async(id: string,extra={})=>service.snapshot((await seat()).actor,{entitlementId:id,...extra});
   async function cloneScopeGrants(suffix: string) {
     await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
       to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-'||$1,'scope_id','scope-'||$1,
@@ -209,25 +238,182 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     }
     const ent=value(await issue());
     expect(ent.scopes.map(s=>s.sourceId).sort()).toEqual(['source-a','source-brand']);
-    const first=value(await snapshot(ent.entitlementId,usage,{limit:1}));
+    const first=value(await snapshot(ent.entitlementId,{limit:1}));
     expect(first.faq.map(f=>f.sourceId)).toEqual(['source-a']);expect(first.nextCursor).not.toBeNull();
     const restarted=createContentIntakeService(pool,store);
-    const next=value(await restarted.snapshot(actor('agent'),usage,{entitlementId:ent.entitlementId,cursor:first.nextCursor,limit:1}));
+    const next=value(await restarted.snapshot((await seat()).actor,{entitlementId:ent.entitlementId,cursor:first.nextCursor,limit:1}));
     expect(next.faq.map(f=>f.sourceId)).toEqual(['source-brand']);expect(next.nextCursor).toBeNull();
     expect(next.releaseId).toBe(first.releaseId);
     expect(first.faq[0]!.entry.answerText).toBe('a 第一行。\n第二行。');
     expect(JSON.stringify([first,next])).not.toMatch(/internalNote|attachmentNote|管理内部说明/);
     expect(first).toMatchObject({sopNodes:[],sopEdges:[],media:[]});
     expect(await service.candidate(actor('agent'),'unknown',1)).toMatchObject({ok:false,code:'NOT_FOUND'});
-    for (const ctx of [{...usage,shopId:'shop-b'},{...usage,contextGeneration:2},{...usage,sessionId:'relogin'}]) {
-      expect(await snapshot(ent.entitlementId,ctx)).toMatchObject({ok:false,code:'NOT_FOUND'});
-    }
-    expect(await service.snapshot(actor('other'),usage,{entitlementId:ent.entitlementId})).toMatchObject({ok:false,code:'NOT_FOUND'});
+    expect(await service.snapshot((await seat('agent','relogin')).actor,{entitlementId:ent.entitlementId})).toMatchObject({ok:false,code:'NOT_FOUND'});
+    expect(await service.snapshot({...((await seat()).actor)},{entitlementId:ent.entitlementId})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+    expect(await snapshot(ent.entitlementId,{shopId:'shop-b'})).toMatchObject({ok:false,code:'VALIDATION'});
+    expect(await service.snapshot((await seat('other')).actor,{entitlementId:ent.entitlementId})).toMatchObject({ok:false,code:'NOT_FOUND'});
     expect(await snapshot(digest(ent.entitlementId))).toMatchObject({ok:false,code:'NOT_FOUND'});
-    expect(await snapshot(ent.entitlementId,usage,{limit:101})).toMatchObject({ok:false,code:'VALIDATION'});
+    expect(await snapshot(ent.entitlementId,{limit:101})).toMatchObject({ok:false,code:'VALIDATION'});
     const other=value(await issue());
-    expect(await snapshot(other.entitlementId,usage,{cursor:first.nextCursor})).toMatchObject({ok:false,code:'VALIDATION'});
+    expect(await snapshot(other.entitlementId,{cursor:first.nextCursor})).toMatchObject({ok:false,code:'VALIDATION'});
     expect((await admin.query('SELECT entitlement_hash FROM content_intake.entitlements')).rows.map(r=>r.entitlement_hash)).not.toContain(ent.entitlementId);
+  });
+
+  it.each(['logout','cleanup','disabled','expired'] as const)('usage: stored qualification immediately rejects a %s session', async change => {
+    await publicationBase();const logged=await seat();const ent=value(await issue());
+    const sessionHash=authenticatedProductSession(logged.actor)!;
+    expect(sessionHash).toBe(digest(logged.token));
+    expect(JSON.stringify(logged.actor)).not.toContain(sessionHash);
+    expect(JSON.stringify(ent)).not.toContain(sessionHash);
+    if(change==='logout')await auth!.logout(logged.token);
+    if(change==='cleanup')await admin.query('DELETE FROM backend_identity.sessions WHERE token_hash=$1',[sessionHash]);
+    if(change==='disabled')await admin.query("UPDATE backend_identity.subject_bindings SET enabled=false WHERE binding_id='agent'");
+    if(change==='expired')await admin.query("UPDATE backend_identity.sessions SET issued_at=statement_timestamp()-interval '20 minutes',expires_at=statement_timestamp()-interval '10 minutes' WHERE token_hash=$1",[sessionHash]);
+    expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false});
+    expect(await issue()).toMatchObject({ok:false});
+    // Historical context survives session retention, but can never recreate authority.
+    expect((await admin.query('SELECT count(*) FROM content_intake.entitlement_contexts')).rows[0].count).toBe('1');
+  });
+
+  it('usage: caps issuance at session expiry and reauthenticates persisted selection after a service restart', async () => {
+    await publicationBase();const logged=await seat();
+    const expiry=new Date(Date.now()+20_000);
+    await admin.query('UPDATE backend_identity.sessions SET expires_at=$2 WHERE token_hash=$1',[digest(logged.token),expiry]);
+    const ent=value(await issue());expect(ent.validUntil).toBe(expiry.toISOString());
+    await auth!.close();
+    auth=await createProductAuthService(authConfig,{authorizeUrl:s=>`http://127.0.0.1:45000/?state=${s}`,exchange:async c=>c,close:()=>undefined},'mock');
+    const resumed=await auth.authenticate({authorization:`Bearer ${logged.token}`});
+    const restarted=createContentIntakeService(pool,store);
+    expect(value(await restarted.snapshot(resumed!,{entitlementId:ent.entitlementId})).faq).toEqual([]);
+    expect(await restarted.issueEntitlement({...resumed!},{...usage,releaseId:null})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+  });
+
+  it('usage: validates explicit selections by kind and scope without expanding source access', async () => {
+    await publicationBase();
+    await admin.query("INSERT INTO content_intake.scopes VALUES ('scope-foreign','tenant-other','app-a','brand-a','shop-a','product')");
+    for(const [id,kind,scopeId,active] of [
+      ['Z-product','product','scope-a',true],['a-product','product','scope-a',true],
+      ['brand-product','product','scope-brand',true],['scene','scenario','scope-a',true],
+      ['other-shop','product','scope-b',true],['foreign','product','scope-foreign',true],
+      ['inactive','product','scope-a',false],
+    ]) await admin.query("INSERT INTO content_intake.vocabulary VALUES ($1,$2,$3,repeat('a',64),$4)",[id,scopeId,kind,active]);
+    for(const productIds of [['missing'],['scene'],['other-shop'],['foreign'],['inactive']]) {
+      expect(await issue({...usage,productIds})).toMatchObject({ok:false,code:'NOT_FOUND'});
+    }
+    for(const productIds of [['Z-product','Z-product'],Array.from({length:101},(_,i)=>`id-${i}`),['bad id']]) {
+      expect(await issue({...usage,productIds})).toMatchObject({ok:false,code:'VALIDATION'});
+    }
+    const ent=value(await issue({...usage,productIds:['a-product','brand-product','Z-product'],scenarioIds:['scene']}));
+    expect(ent.scopes.map(s=>s.sourceId)).toEqual(['source-a']);
+    expect((await admin.query('SELECT product_ids FROM content_intake.entitlement_contexts')).rows).toEqual([{product_ids:['Z-product','a-product','brand-product']}]);
+  });
+
+  it.each(['reader-first','logout-first'] as const)('usage: linearizes the page with logout (%s)', async order => {
+    await publicationBase();const logged=await seat();const ent=value(await issue());
+    const control=await pool.connect();
+    try {
+      if(order==='logout-first') {
+        await control.query('BEGIN');
+        await control.query('UPDATE backend_identity.sessions SET revoked_at=clock_timestamp() WHERE token_hash=$1',[digest(logged.token)]);
+        const reading=snapshot(ent.entitlementId);
+        await control.query('COMMIT');
+        expect(await reading).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+      } else {
+        let reached!:()=>void;const atLock=new Promise<void>(r=>{reached=r;});
+        let proceed!:()=>void;const resume=new Promise<void>(r=>{proceed=r;});
+        const gated={connect:async()=>{
+          const client=await pool.connect();
+          return new Proxy(client,{get(target,key){
+            if(key!=='query'){const v=Reflect.get(target,key);return typeof v==='function'?v.bind(target):v;}
+            return async(sql:string,args?:unknown[])=>{
+              const result=await target.query(sql,args);
+              if(sql.includes('FOR SHARE OF s,b')){reached();await resume;}
+              return result;
+            };
+          }});
+        }};
+        const reading=createContentIntakeService(gated,store).snapshot(logged.actor,{entitlementId:ent.entitlementId});
+        await atLock;
+        // NOWAIT proves the API holds a real session row lock until the page commits.
+        try {
+          await expect(control.query('SELECT 1 FROM backend_identity.sessions WHERE token_hash=$1 FOR UPDATE NOWAIT',[digest(logged.token)]))
+            .rejects.toMatchObject({code:'55P03'});
+        } finally {proceed();}
+        expect(value(await reading).faq).toEqual([]);
+        await auth!.logout(logged.token);
+        expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+      }
+    } finally {await control.query('ROLLBACK');control.release();}
+  });
+
+  it('usage: Main consumes actual synthetic HTTP pages and handles publication and revocation', async () => {
+    await publicationBase();const prepared=await publishable('main-consumer');
+    const release=value(await service.publish(actor('enabler'),prepared.request));
+    const logged=await seat();
+    // Test-only loopback host. The API test has no desktop import; a root-owned
+    // consumer process crosses HTTP, preserving the application dependency boundary.
+    let expireNext=false;let expiring:{id:string;until:number}|null=null;
+    const server=createServer((request,response)=>{
+      void (async()=>{
+        const authorization=request.headers.authorization;
+        const current=authorization===undefined?null:await auth!.authenticate({authorization});
+        if(!current){response.writeHead(401).end(JSON.stringify({code:'UNAUTHORIZED'}));return;}
+        const url=new URL(request.url!,'http://127.0.0.1');let result;
+        if(request.method==='POST' && url.pathname==='/v1/intake/entitlements') {
+          let body='';for await(const chunk of request){body+=String(chunk);if(body.length>65536)throw new Error('BODY_LIMIT');}
+          if(expireNext) {
+            await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
+              clock_timestamp(),clock_timestamp()+interval '1 second',repeat('b',64))`);
+            await admin.query("UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='agent'");
+          }
+          result=await service.issueEntitlement(current,JSON.parse(body));
+          if(expireNext) {
+            const short=value(result);expiring={id:short.entitlementId,until:Date.parse(short.validUntil)};expireNext=false;
+            await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',3,ARRAY['dept-a'],'job-agent',true,
+              clock_timestamp(),clock_timestamp()+interval '5 minutes',repeat('c',64))`);
+            await admin.query("UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='agent'");
+          }
+        } else if(request.method==='GET' && url.pathname==='/v1/intake/snapshot') {
+          if(expiring?.id===url.searchParams.get('entitlementId')) {
+            await new Promise(r=>setTimeout(r,Math.max(0,expiring!.until-Date.now())+20));expiring=null;
+          }
+          result=await service.snapshot(current,{...Object.fromEntries(url.searchParams),limit:Number(url.searchParams.get('limit'))});
+        } else if(request.method==='POST' && url.pathname==='/__synthetic__/expire-next') {
+          expireNext=true;result={ok:true as const,value:null};
+        } else if(request.method==='POST' && url.pathname==='/__synthetic__/next-release') {
+          const next=await publishable('main-disable',[['faq-one','合成问题','第一行。\n第二行。','','','分类','','停用','','','','内部说明','','','false']]);
+          value(await service.publish(actor('enabler'),next.request));result={ok:true as const,value:null};
+        } else if(request.method==='POST' && url.pathname==='/__synthetic__/revoke') {
+          value(await service.changeGrant(actor('director'),'business-agent-query',
+            {operationId:'main-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));
+          result={ok:true as const,value:null};
+        } else {response.writeHead(404).end();return;}
+        response.writeHead(result.ok?200:403,{'content-type':'application/json'}).end(JSON.stringify(result.ok?result.value:{code:result.code,reason:result.reason}));
+      })().catch(()=>{response.writeHead(500).end(JSON.stringify({code:'INTERNAL_ERROR'}));});
+    });
+    server.listen(0,'127.0.0.1');await once(server,'listening');
+    const port=(server.address() as AddressInfo).port;
+    const child=spawn(process.execPath,['--experimental-transform-types',fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs',import.meta.url))],
+      {stdio:['pipe','pipe','pipe']});
+    const ended=once(child,'close');let stdout='',stderr='';
+    child.stdout.on('data',chunk=>{stdout+=String(chunk);});child.stderr.on('data',chunk=>{stderr+=String(chunk);});
+    const timeout=setTimeout(()=>child.kill('SIGKILL'),20_000);
+    child.stdin.end(JSON.stringify({origin:`http://127.0.0.1:${port}`,token:logged.token,releaseId:release.releaseId}));
+    try {
+      expect((await ended)[0],stderr).toBe(0);
+      expect(JSON.parse(stdout)).toEqual({status:'PASS',publishedText:true,localExpiry:true,normalUpdate:true,revocationFanout:true});
+      expect(stdout).not.toContain(logged.token);expect(stdout).not.toContain(digest(logged.token));
+    }finally{clearTimeout(timeout);if(child.exitCode===null)child.kill('SIGKILL');server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
+  },30_000);
+
+  it('usage: contextless predecessor qualifications cannot be guessed or reused', async () => {
+    await publicationBase();const ent=value(await issue());
+    // Fault injection stands for a pre-0025 history row; no application role can do this.
+    await admin.query('BEGIN; ALTER TABLE content_intake.entitlement_contexts DISABLE TRIGGER immutable_history');
+    await admin.query('DELETE FROM content_intake.entitlement_contexts WHERE entitlement_hash=$1',[digest(ent.entitlementId)]);
+    await admin.query('ALTER TABLE content_intake.entitlement_contexts ENABLE TRIGGER immutable_history; COMMIT');
+    expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false,code:'NOT_FOUND'});
+    expect(value(await issue()).entitlementId).not.toBe(ent.entitlementId);
   });
 
   it('usage: shop access does not imply brand access, and brand permission alone cannot select an arbitrary shop', async () => {
@@ -296,9 +482,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query("INSERT INTO content_intake.vocabulary_displays VALUES ('prod-one',2,'新版标签')");
     const ctx={...usage,productIds:['prod-one'],scenarioIds:['scene-one']};
     const ent=value(await issue(ctx));expect(ent.validUntil).toBe(boundary);
-    const page=value(await snapshot(ent.entitlementId,ctx));expect(page.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
+    const page=value(await snapshot(ent.entitlementId));expect(page.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
     expect(page.vocabulary.map(v=>v.displayName)).toEqual(['原始标签','原始标签']);
-    expect(await snapshot(ent.entitlementId,{...ctx,productIds:[]})).toMatchObject({ok:false});
+    expect(await snapshot(ent.entitlementId,{productIds:[]})).toMatchObject({ok:false,code:'VALIDATION'});
+    expect((await admin.query('SELECT product_ids,scenario_ids FROM content_intake.entitlement_contexts WHERE entitlement_hash=$1',[digest(ent.entitlementId)])).rows).toEqual([{product_ids:['prod-one'],scenario_ids:['scene-one']}]);
     const unselected=value(await issue());expect(value(await snapshot(unselected.entitlementId)).faq).toEqual([]);
   });
 
@@ -319,7 +506,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       };
       const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
     }}) as PoolClient;}};
-    expect(await createContentIntakeService(slow,store).snapshot(actor('agent'),usage,{entitlementId:ent.entitlementId}))
+    expect(await createContentIntakeService(slow,store).snapshot((await seat()).actor,{entitlementId:ent.entitlementId}))
       .toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
     expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false,reason:'LEASE_EXPIRED'});
     expect(Date.parse(value(await issue()).validUntil)).toBeGreaterThan(Date.parse(ent.validUntil));
@@ -332,7 +519,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const ent=value(await issue());
     const ids:string[]=[];let nextCursor:string|null=null;
     do {
-      const page:C['IntakeSnapshot']=value(await snapshot(ent.entitlementId,usage,{limit:100,...(nextCursor===null?{}:{cursor:nextCursor})}));
+      const page:C['IntakeSnapshot']=value(await snapshot(ent.entitlementId,{limit:100,...(nextCursor===null?{}:{cursor:nextCursor})}));
       ids.push(...page.faq.map(f=>f.entry.businessEntryId));nextCursor=page.nextCursor;
     } while (nextCursor!==null);
     expect(ids).toEqual(rows.map(r=>r[0]));expect(new Set(ids).size).toBe(5000);
@@ -349,9 +536,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const c=await publishable('vocabulary-budget',[row('faq-one',products,scenarios.slice(0,20)),row('faq-two',[],scenarios.slice(20))]);
     value(await service.publish(actor('enabler'),c.request));
     const ctx={...usage,productIds:products,scenarioIds:scenarios};const ent=value(await issue(ctx));
-    const first=value(await snapshot(ent.entitlementId,ctx));expect(first.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
+    const first=value(await snapshot(ent.entitlementId));expect(first.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
     expect(first.vocabulary).toHaveLength(80);expect(first.nextCursor).not.toBeNull();
-    const second=value(await snapshot(ent.entitlementId,ctx,{cursor:first.nextCursor}));
+    const second=value(await snapshot(ent.entitlementId,{cursor:first.nextCursor}));
     expect(second.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-two']);expect(second.vocabulary).toHaveLength(31);expect(second.nextCursor).toBeNull();
     const bad=await input('unpageable',null,[row('faq-one',products,scenarios)]);bad.baseReleaseId=ent.releaseId;
     const job=value(await service.receive(actor('enabler'),'source-a',bad));

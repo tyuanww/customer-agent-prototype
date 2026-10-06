@@ -1,0 +1,24 @@
+{
+  "observationCapture": "002",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-usage.test.ts"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-usage.test.ts (11 tests) 123ms\n\n Test Files  1 passed (1)\n      Tests  11 passed (11)\n   Start at  21:40:32\n   Duration  365ms (transform 61ms, setup 55ms, collect 95ms, tests 123ms, environment 0ms, prepare 24ms)\n\n",
+  "hypothesis": "Per-catalog expiry repair must preserve fresh in-flight pages and longer valid handles; added two regression cases should pass with existing consumer cases.",
+  "nextCapture": "003",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-usage.test.ts"
+  ]
+}

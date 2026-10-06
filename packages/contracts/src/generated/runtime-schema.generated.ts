@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.16.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.17.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -98,6 +98,7 @@ export const COMPONENT_SCHEMA_NAMES = [
   "IntakeRollbackReview",
   "IntakeRollbackReviewRequest",
   "IntakeScope",
+  "IntakeSelectionIds",
   "IntakeSnapshot",
   "IntakeSource",
   "IntakeSourceClaim",
@@ -229,7 +230,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.16.0:components",
+  "$id": "urn:customer-agent:openapi:1.17.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -2582,7 +2583,9 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
       "required": [
         "shopId",
         "contextGeneration",
-        "releaseId"
+        "releaseId",
+        "productIds",
+        "scenarioIds"
       ],
       "properties": {
         "shopId": {
@@ -2602,6 +2605,12 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
           "minLength": 1,
           "maxLength": 128
+        },
+        "productIds": {
+          "$ref": "#/$defs/IntakeSelectionIds"
+        },
+        "scenarioIds": {
+          "$ref": "#/$defs/IntakeSelectionIds"
         }
       }
     },
@@ -2757,7 +2766,2023 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           }
         },
         "type": "object"
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "upsert"
+              }
+            },
+            "type": "object"
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 1
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 99
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 2
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 98
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 3
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 97
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 4
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 96
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 5
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 95
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 6
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 94
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 7
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 93
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 8
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 92
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 9
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 91
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 10
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 90
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 11
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 89
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 12
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 88
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 13
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 87
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 14
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 86
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 15
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 85
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 16
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 84
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 17
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 83
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 18
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 82
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 19
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 81
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 20
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 80
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 21
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 79
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 22
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 78
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 23
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 77
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 24
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 76
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 25
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 75
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 26
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 74
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 27
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 73
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 28
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 72
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 29
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 71
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 30
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 70
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 31
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 69
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 32
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 68
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 33
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 67
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 34
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 66
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 35
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 65
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 36
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 64
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 37
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 63
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 38
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 62
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 39
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 61
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 40
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 60
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 41
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 59
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 42
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 58
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 43
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 57
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 44
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 56
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 45
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 55
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 46
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 54
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 47
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 53
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 48
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 52
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 49
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 51
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 50
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 50
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 51
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 49
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 52
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 48
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 53
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 47
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 54
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 46
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 55
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 45
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 56
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 44
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 57
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 43
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 58
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 42
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 59
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 41
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 60
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 40
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 61
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 39
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 62
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 38
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 63
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 37
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 64
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 36
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 65
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 35
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 66
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 34
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 67
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 33
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 68
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 32
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 69
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 31
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 70
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 30
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 71
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 29
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 72
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 28
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 73
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 27
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 74
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 26
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 75
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 25
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 76
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 24
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 77
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 23
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 78
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 22
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 79
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 21
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 80
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 20
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 81
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 19
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 82
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 18
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 83
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 17
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 84
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 16
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 85
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 15
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 86
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 14
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 87
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 13
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 88
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 12
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 89
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 11
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 90
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 10
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 91
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 9
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 92
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 8
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 93
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 7
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 94
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 6
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 95
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 5
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 96
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 4
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 97
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 3
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 98
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 2
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 99
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 1
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 100
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 0
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     "IntakeError": {
       "type": "object",
@@ -3980,7 +6005,2023 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           }
         },
         "type": "object"
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "upsert"
+              }
+            },
+            "type": "object"
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 1
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 99
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 2
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 98
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 3
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 97
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 4
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 96
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 5
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 95
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 6
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 94
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 7
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 93
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 8
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 92
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 9
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 91
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 10
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 90
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 11
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 89
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 12
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 88
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 13
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 87
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 14
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 86
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 15
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 85
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 16
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 84
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 17
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 83
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 18
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 82
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 19
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 81
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 20
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 80
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 21
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 79
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 22
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 78
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 23
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 77
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 24
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 76
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 25
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 75
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 26
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 74
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 27
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 73
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 28
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 72
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 29
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 71
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 30
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 70
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 31
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 69
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 32
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 68
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 33
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 67
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 34
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 66
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 35
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 65
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 36
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 64
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 37
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 63
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 38
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 62
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 39
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 61
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 40
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 60
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 41
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 59
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 42
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 58
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 43
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 57
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 44
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 56
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 45
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 55
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 46
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 54
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 47
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 53
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 48
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 52
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 49
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 51
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 50
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 50
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 51
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 49
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 52
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 48
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 53
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 47
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 54
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 46
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 55
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 45
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 56
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 44
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 57
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 43
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 58
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 42
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 59
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 41
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 60
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 40
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 61
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 39
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 62
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 38
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 63
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 37
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 64
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 36
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 65
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 35
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 66
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 34
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 67
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 33
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 68
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 32
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 69
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 31
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 70
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 30
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 71
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 29
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 72
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 28
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 73
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 27
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 74
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 26
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 75
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 25
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 76
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 24
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 77
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 23
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 78
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 22
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 79
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 21
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 80
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 20
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 81
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 19
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 82
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 18
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 83
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 17
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 84
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 16
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 85
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 15
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 86
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 14
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 87
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 13
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 88
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 12
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 89
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 11
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 90
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 10
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 91
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 9
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 92
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 8
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 93
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 7
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 94
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 6
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 95
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 5
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 96
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 4
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 97
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 3
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 98
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 2
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 99
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 1
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "productRefs": {
+                      "type": "array",
+                      "minItems": 100
+                    }
+                  },
+                  "type": "object"
+                },
+                "then": {
+                  "properties": {
+                    "scenarioRefs": {
+                      "type": "array",
+                      "maxItems": 0
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     "IntakeQuestion": {
       "type": "object",
@@ -4699,6 +8740,15 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "maxLength": 128
         }
       }
+    },
+    "IntakeSelectionIds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/IntakeId"
+      },
+      "minItems": 0,
+      "maxItems": 100,
+      "uniqueItems": true
     },
     "IntakeSnapshot": {
       "type": "object",

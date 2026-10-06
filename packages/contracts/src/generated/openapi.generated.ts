@@ -74,7 +74,7 @@ export interface paths {
         };
         /**
          * 分页获取同版本 FAQ 和实际空 SOP
-         * @description entitlementId 必填且绑定当前产品会话与店铺上下文。每页重验资格。整页结果按授权范围裁剪；先过滤店铺/商品/场景/时间，再处理显式 family 覆盖；普通新发布与真正失效分开。
+         * @description 仅接受 entitlementId/cursor/limit；当前认证产品会话必须与资格持久绑定一致。每页从数据库重读原 shop/contextGeneration/选择集合及会话有效性，不依赖进程内当前选择或 renderer 重传。缺少绑定的旧资格失败关闭并重新申请。普通新发布保留原资格期限，换店/选择由 Main 增加代际并立即撤销旧界面动作；该代际不是授权。分页先做范围/选择/时段过滤，再按词项预算完整返回条目。
          */
         get: operations["readIntakeSnapshot"];
         put?: never;
@@ -96,7 +96,7 @@ export interface paths {
         put?: never;
         /**
          * 签发当前店铺使用资格
-         * @description P2 只签当前 release；未来历史 SOP 资格须后续合同。截止取组织事实、授权、全部承继审批事实、内容时间和既有 lease 最大值的最早者。失败不得延长期限。 使用业务 action=query；按当前店铺和全部相关来源授权签发。entitlementId 为服务器随机不透明标识，其SHA-256作为 entitlement_hash 存储；不能用数据库hash替代标识，所有读取仍绑定当前会话主体及有效期。
+         * @description P2 仅签当前 release。productIds/scenarioIds 必填，按登记词项的 kind、tenant/app/brand 与当前店授权核验后规范排序；未知/越界词项同样返回脱敏 NOT_FOUND。产品会话来自认证层，禁止 body/sessionId/userId/token/hash。服务端同事务保存会话私有 token_hash、选择集合与 entitlement 的绑定；截止还必须受产品会话截止约束。丢签发响应可重签但旧资格不得延长。
          */
         post: operations["issueIntakeEntitlement"];
         delete?: never;
@@ -1605,7 +1605,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description 经当前店铺、词项、时段、显式覆盖和有效使用资格过滤后的坐席投影。内部说明与附件说明不得下发；复制只含 answerText，风险提示单独展示。 */
+        /** @description 显式选择；空集合只匹配无该类限制的条目。API 按 C/ASCII 顺序排序后绑定资格，选择不能增加访问范围。 */
+        IntakeSelectionIds: components["schemas"]["IntakeId"][];
+        /** @description 经当前店铺、词项、时段、显式覆盖和有效使用资格过滤后的坐席投影。内部说明与附件说明不得下发；复制只含 answerText，风险提示单独展示。 启用条目的商品与场景引用总数最多 100；整页去重词项最多 100，分页不得截断条目。 */
         IntakePublishedEntry: {
             businessEntryId: string;
             scriptVersion: components["schemas"]["IntakeVersion"];
@@ -1626,7 +1628,7 @@ export interface components {
             brandNonOverridable: boolean;
             category: string;
             riskNote: string;
-        };
+        } & unknown;
         IntakePrincipalPage: {
             items: {
                 principalId: string;
@@ -1738,6 +1740,8 @@ export interface components {
             shopId: string;
             contextGeneration: components["schemas"]["IntakeVersion"];
             releaseId: string | null;
+            productIds: components["schemas"]["IntakeSelectionIds"];
+            scenarioIds: components["schemas"]["IntakeSelectionIds"];
         };
         IntakeRollbackImpact: {
             baseReleaseId: string;
@@ -1888,7 +1892,7 @@ export interface components {
             beforeDigest: string | null;
             afterDigest: string;
         };
-        /** @description 完整审核材料。分类用于检索；内部说明不进入坐席正文或复制。风险提示单独展示且不拼入复制文本；附件说明不得用来冒充已解析媒体。P2 非空附件说明阻断导入，规范条目该字段保留为空。复制只含 answerText。 */
+        /** @description 完整审核材料。分类用于检索；内部说明不进入坐席正文或复制。风险提示单独展示且不拼入复制文本；附件说明不得用来冒充已解析媒体。P2 非空附件说明阻断导入，规范条目该字段保留为空。复制只含 answerText。 启用条目的商品与场景引用总数最多 100；整页去重词项最多 100，分页不得截断条目。 */
         IntakeEntry: {
             businessEntryId: string;
             scriptVersion: components["schemas"]["IntakeVersion"];
@@ -1911,7 +1915,7 @@ export interface components {
             internalNote: string;
             riskNote: string;
             attachmentNote: string;
-        };
+        } & unknown;
         IntakeTermRef: {
             id: string;
             displayVersion: components["schemas"]["IntakeVersion"];

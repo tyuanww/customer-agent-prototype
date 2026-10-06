@@ -3,7 +3,7 @@ openapi: 3.1.1
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: CS-AI-C11 Customer Service Agent API
-  version: 1.16.0
+  version: 1.17.0
   license:
     name: Proprietary - internal use only
     identifier: LicenseRef-Proprietary
@@ -554,7 +554,7 @@ paths:
     get:
       operationId: readIntakeSnapshot
       summary: 分页获取同版本 FAQ 和实际空 SOP
-      description: entitlementId 必填且绑定当前产品会话与店铺上下文。每页重验资格。整页结果按授权范围裁剪；先过滤店铺/商品/场景/时间，再处理显式 family 覆盖；普通新发布与真正失效分开。
+      description: 仅接受 entitlementId/cursor/limit；当前认证产品会话必须与资格持久绑定一致。每页从数据库重读原 shop/contextGeneration/选择集合及会话有效性，不依赖进程内当前选择或 renderer 重传。缺少绑定的旧资格失败关闭并重新申请。普通新发布保留原资格期限，换店/选择由 Main 增加代际并立即撤销旧界面动作；该代际不是授权。分页先做范围/选择/时段过滤，再按词项预算完整返回条目。
       tags:
         - content-intake
       responses:
@@ -642,7 +642,7 @@ paths:
     post:
       operationId: issueIntakeEntitlement
       summary: 签发当前店铺使用资格
-      description: P2 只签当前 release；未来历史 SOP 资格须后续合同。截止取组织事实、授权、全部承继审批事实、内容时间和既有 lease 最大值的最早者。失败不得延长期限。 使用业务 action=query；按当前店铺和全部相关来源授权签发。entitlementId 为服务器随机不透明标识，其SHA-256作为 entitlement_hash 存储；不能用数据库hash替代标识，所有读取仍绑定当前会话主体及有效期。
+      description: P2 仅签当前 release。productIds/scenarioIds 必填，按登记词项的 kind、tenant/app/brand 与当前店授权核验后规范排序；未知/越界词项同样返回脱敏 NOT_FOUND。产品会话来自认证层，禁止 body/sessionId/userId/token/hash。服务端同事务保存会话私有 token_hash、选择集合与 entitlement 的绑定；截止还必须受产品会话截止约束。丢签发响应可重签但旧资格不得延长。
       tags:
         - content-intake
       responses:
@@ -6738,6 +6738,14 @@ components:
                   code: INTERNAL
                   message: 服务内部错误
   schemas:
+    IntakeSelectionIds:
+      type: array
+      items:
+        $ref: "#/components/schemas/IntakeId"
+      minItems: 0
+      maxItems: 100
+      uniqueItems: true
+      description: 显式选择；空集合只匹配无该类限制的条目。API 按 C/ASCII 顺序排序后绑定资格，选择不能增加访问范围。
     IntakePublishedEntry:
       type: object
       additionalProperties: false
@@ -6831,7 +6839,7 @@ components:
         riskNote:
           type: string
           maxLength: 32767
-      description: 经当前店铺、词项、时段、显式覆盖和有效使用资格过滤后的坐席投影。内部说明与附件说明不得下发；复制只含 answerText，风险提示单独展示。
+      description: 经当前店铺、词项、时段、显式覆盖和有效使用资格过滤后的坐席投影。内部说明与附件说明不得下发；复制只含 answerText，风险提示单独展示。 启用条目的商品与场景引用总数最多 100；整页去重词项最多 100，分页不得截断条目。
       if:
         properties:
           familySourceId:
@@ -6844,6 +6852,1013 @@ components:
         properties:
           familyBusinessEntryId:
             type: string
+      allOf:
+        - if:
+            properties:
+              operation:
+                const: upsert
+          then:
+            allOf:
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 1
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 99
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 2
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 98
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 3
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 97
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 4
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 96
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 5
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 95
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 6
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 94
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 7
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 93
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 8
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 92
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 9
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 91
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 10
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 90
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 11
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 89
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 12
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 88
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 13
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 87
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 14
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 86
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 15
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 85
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 16
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 84
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 17
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 83
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 18
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 82
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 19
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 81
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 20
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 80
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 21
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 79
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 22
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 78
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 23
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 77
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 24
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 76
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 25
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 75
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 26
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 74
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 27
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 73
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 28
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 72
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 29
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 71
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 30
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 70
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 31
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 69
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 32
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 68
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 33
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 67
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 34
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 66
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 35
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 65
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 36
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 64
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 37
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 63
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 38
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 62
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 39
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 61
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 40
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 60
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 41
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 59
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 42
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 58
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 43
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 57
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 44
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 56
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 45
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 55
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 46
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 54
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 47
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 53
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 48
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 52
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 49
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 51
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 50
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 50
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 51
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 49
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 52
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 48
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 53
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 47
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 54
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 46
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 55
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 45
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 56
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 44
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 57
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 43
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 58
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 42
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 59
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 41
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 60
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 40
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 61
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 39
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 62
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 38
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 63
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 37
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 64
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 36
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 65
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 35
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 66
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 34
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 67
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 33
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 68
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 32
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 69
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 31
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 70
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 30
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 71
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 29
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 72
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 28
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 73
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 27
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 74
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 26
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 75
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 25
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 76
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 24
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 77
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 23
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 78
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 22
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 79
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 21
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 80
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 20
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 81
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 19
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 82
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 18
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 83
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 17
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 84
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 16
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 85
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 15
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 86
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 14
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 87
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 13
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 88
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 12
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 89
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 11
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 90
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 10
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 91
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 9
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 92
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 8
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 93
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 7
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 94
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 6
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 95
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 5
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 96
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 4
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 97
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 3
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 98
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 2
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 99
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 1
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 100
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 0
     IntakePrincipalPage:
       type: object
       additionalProperties: false
@@ -7344,6 +8359,8 @@ components:
         - shopId
         - contextGeneration
         - releaseId
+        - productIds
+        - scenarioIds
       properties:
         shopId:
           type: string
@@ -7359,6 +8376,10 @@ components:
           pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
           minLength: 1
           maxLength: 128
+        productIds:
+          $ref: "#/components/schemas/IntakeSelectionIds"
+        scenarioIds:
+          $ref: "#/components/schemas/IntakeSelectionIds"
     IntakeRollbackImpact:
       type: object
       additionalProperties: false
@@ -8128,7 +9149,7 @@ components:
         attachmentNote:
           type: string
           maxLength: 0
-      description: 完整审核材料。分类用于检索；内部说明不进入坐席正文或复制。风险提示单独展示且不拼入复制文本；附件说明不得用来冒充已解析媒体。P2 非空附件说明阻断导入，规范条目该字段保留为空。复制只含 answerText。
+      description: 完整审核材料。分类用于检索；内部说明不进入坐席正文或复制。风险提示单独展示且不拼入复制文本；附件说明不得用来冒充已解析媒体。P2 非空附件说明阻断导入，规范条目该字段保留为空。复制只含 answerText。 启用条目的商品与场景引用总数最多 100；整页去重词项最多 100，分页不得截断条目。
       if:
         properties:
           familySourceId:
@@ -8141,6 +9162,1013 @@ components:
         properties:
           familyBusinessEntryId:
             type: string
+      allOf:
+        - if:
+            properties:
+              operation:
+                const: upsert
+          then:
+            allOf:
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 1
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 99
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 2
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 98
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 3
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 97
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 4
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 96
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 5
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 95
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 6
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 94
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 7
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 93
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 8
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 92
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 9
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 91
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 10
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 90
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 11
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 89
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 12
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 88
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 13
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 87
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 14
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 86
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 15
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 85
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 16
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 84
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 17
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 83
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 18
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 82
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 19
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 81
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 20
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 80
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 21
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 79
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 22
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 78
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 23
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 77
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 24
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 76
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 25
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 75
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 26
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 74
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 27
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 73
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 28
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 72
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 29
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 71
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 30
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 70
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 31
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 69
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 32
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 68
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 33
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 67
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 34
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 66
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 35
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 65
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 36
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 64
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 37
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 63
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 38
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 62
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 39
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 61
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 40
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 60
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 41
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 59
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 42
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 58
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 43
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 57
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 44
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 56
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 45
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 55
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 46
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 54
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 47
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 53
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 48
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 52
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 49
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 51
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 50
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 50
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 51
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 49
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 52
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 48
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 53
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 47
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 54
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 46
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 55
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 45
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 56
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 44
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 57
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 43
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 58
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 42
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 59
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 41
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 60
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 40
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 61
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 39
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 62
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 38
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 63
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 37
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 64
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 36
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 65
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 35
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 66
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 34
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 67
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 33
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 68
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 32
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 69
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 31
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 70
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 30
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 71
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 29
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 72
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 28
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 73
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 27
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 74
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 26
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 75
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 25
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 76
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 24
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 77
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 23
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 78
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 22
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 79
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 21
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 80
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 20
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 81
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 19
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 82
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 18
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 83
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 17
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 84
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 16
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 85
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 15
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 86
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 14
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 87
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 13
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 88
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 12
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 89
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 11
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 90
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 10
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 91
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 9
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 92
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 8
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 93
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 7
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 94
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 6
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 95
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 5
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 96
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 4
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 97
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 3
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 98
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 2
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 99
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 1
+              - if:
+                  properties:
+                    productRefs:
+                      type: array
+                      minItems: 100
+                then:
+                  properties:
+                    scenarioRefs:
+                      type: array
+                      maxItems: 0
     IntakeTermRef:
       type: object
       additionalProperties: false
@@ -13273,3 +15301,8 @@ x-content-intake-development:
   sqlContract: schema.v1.20
   transactionImplementationRequired: true
   minimumSnapshotFormat: intake-v2.1
+x-content-intake-usage-development:
+  status: DRAFT
+  runtime_activated: false
+  sqlContract: schema.v1.21
+  transactionImplementationRequired: true

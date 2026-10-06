@@ -10,13 +10,13 @@ type Entry = C['IntakeEntry'];
 export const digest = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex');
 
 // The accepted IntakeSnapshot contract limits the WHOLE page to 100 vocabulary
-// displays, even though IntakeEntry permits 100 refs of each kind. Keep producer
-// admission and consumer pagination on one budget until a versioned intake changes it.
+// displays; OpenAPI 1.17 also caps enabled entries at this combined budget.
+// Keep visible FILE_LIMIT admission ahead of the generic contract validator.
 export const SNAPSHOT_VOCABULARY_LIMIT = 100;
 export function snapshotVocabularyKeys(entry: Pick<Entry,'productRefs'|'scenarioRefs'>): Set<string> {
   return new Set([...entry.productRefs,...entry.scenarioRefs].map(ref=>`${ref.id}:${ref.displayVersion}`));
 }
-export function assertSnapshotPageable(entries: Entry[]): void {
+export function assertSnapshotPageable(entries: Pick<Entry,'operation'|'productRefs'|'scenarioRefs'>[]): void {
   if (entries.some(e=>e.operation==='upsert' && snapshotVocabularyKeys(e).size>SNAPSHOT_VOCABULARY_LIMIT)) {
     throw new IntakeRejection('FILE_LIMIT','VALIDATION');
   }
@@ -83,11 +83,14 @@ export function materialFromParse(input: {
     // Family override needs a cross-source overlap proof at publication. Until that
     // slice exists, explicit family input is rejected, never guessed from a title.
     if (values[10]) throw new IntakeRejection('SOURCE_MISMATCH', 'VALIDATION');
+    const operation = row.state === '停用' ? 'disable' : 'upsert';
+    const productRefs = refs(values[3]!, 'product'), scenarioRefs = refs(values[4]!, 'scenario');
+    assertSnapshotPageable([{operation,productRefs,scenarioRefs}]);
     const next: Entry = parseContractSchema('IntakeEntry', {
       businessEntryId: row.id, scriptVersion: old?.scriptVersion ?? 1,
-      operation: row.state === '停用' ? 'disable' : 'upsert', title: row.title, answerText: row.body,
+      operation, title: row.title, answerText: row.body,
       questions: [...questions.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-      productRefs: refs(values[3]!, 'product'), scenarioRefs: refs(values[4]!, 'scenario'),
+      productRefs, scenarioRefs,
       effectiveFrom: values[8] ? new Date(values[8]).toISOString() : old?.effectiveFrom ?? new Date(now).toISOString(),
       effectiveTo: values[9] ? new Date(values[9]).toISOString() : null,
       applicabilityNote: values[6], familySourceId: null, familyBusinessEntryId: null,

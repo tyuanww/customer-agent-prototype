@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Pool, type QueryResultRow } from 'pg';
 import { parseContractSchema } from '@customer-agent/contracts';
-import { bearerToken, type ProductAuthService, type MockCredentials } from './auth-service.js';
+import { bearerToken, type ProductAuthService, type MockCredentials, type AuthenticatedUser } from './auth-service.js';
 import type { ApiDatabaseBootstrapConfig, AuthMode } from './runtime-config.js';
 
 export class IdentityFailure extends Error {
@@ -19,6 +19,14 @@ export type SyntheticIdentityProvider = Readonly<{
 
 const randomToken = () => randomBytes(32).toString('base64url');
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+
+// Private auth provenance never becomes a property of /auth/me or a loggable DTO.
+// A cloned/client-provided actor has no session provenance. Consumers must still
+// lock and recheck the live DB session within their own transaction.
+const sessionReferences = new WeakMap<AuthenticatedUser, string>();
+export function authenticatedProductSession(actor: AuthenticatedUser): string | null {
+  return sessionReferences.get(actor) ?? null;
+}
 
 function identityFailure(error: unknown): IdentityFailure {
   if (error instanceof IdentityFailure) return error;
@@ -185,7 +193,9 @@ export async function createProductAuthService(
         if (!actor) return null;
         // auth_mode is the deployment identity source, not permission to
         // accept mock headers. Product-session routing is a separate boundary.
-        return parseContractSchema('CurrentUserResponse', { user_id: actor.user_id, role: actor.role, auth_mode: authMode });
+        const user = parseContractSchema('CurrentUserResponse', { user_id: actor.user_id, role: actor.role, auth_mode: authMode });
+        sessionReferences.set(user, digest(token));
+        return user;
       } catch (error) {
         if (error instanceof IdentityFailure && error.reason === 'SESSION_INVALID') return null;
         throw error;

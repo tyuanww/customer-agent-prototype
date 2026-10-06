@@ -125,10 +125,12 @@ function createContractSet({
   marker = 'first',
   declaredSourceGitSha,
   intake = false,
+  usage = false,
 }: {
   marker?: string;
   declaredSourceGitSha?: string;
   intake?: boolean;
+  usage?: boolean;
 } = {}): Readonly<{
   directory: string;
   contractSetId: string;
@@ -137,11 +139,11 @@ function createContractSet({
   repositoryRoot: string;
   sourceGitSha: string;
 }> {
-  const apiVersion = intake ? '1.16.0' : '1.11.0';
-  const schemaVersion = intake ? '1.20' : '1.12';
+  const apiVersion = usage ? '1.17.0' : intake ? '1.16.0' : '1.11.0';
+  const schemaVersion = usage ? '1.21' : intake ? '1.20' : '1.12';
   const developmentRoot = 'business-docs/01-客服Agent项目/30-开发-进行中';
-  const openapiPath = intake ? `${developmentRoot}/openapi.v1.16.yaml` : OPENAPI_SOURCE_PATH;
-  const databasePath = intake ? `${developmentRoot}/schema.v1.20.sql` : DATABASE_SOURCE_PATH;
+  const openapiPath = intake || usage ? `${developmentRoot}/openapi.v${apiVersion.slice(0,-2)}.yaml` : OPENAPI_SOURCE_PATH;
+  const databasePath = intake || usage ? `${developmentRoot}/schema.v${schemaVersion}.sql` : DATABASE_SOURCE_PATH;
   const openapi = `openapi: 3.1.0\ninfo:\n  title: Synthetic contract test ${marker}\n`;
   const database = `CREATE TABLE contract_test_${marker} (id bigint PRIMARY KEY);\n`;
   const sourceRepository = createSourceRepository(openapi, database, marker, openapiPath, databasePath);
@@ -469,8 +471,8 @@ describe('customer-agent contract-set intake', () => {
     }
   });
 
-  it('accepts the reviewed P2 pair from the exact source commit and rejects mixed versions or paths', () => {
-    const source = createContractSet({ intake: true });
+  it.each([false,true])('accepts the reviewed P2 pair (usage=%s) from the exact commit and rejects mixed versions or paths', usage => {
+    const source = createContractSet({ intake: true,usage });
     const result = contractSet.ingestContractSet({ projectRoot: createProductRoot(), sourceDirectory: source.directory, sourceRepositoryRoot: source.repositoryRoot });
     expect(result).toMatchObject({ status: 'CREATED', runtime_activated: false, ddev_authorized: false });
     const manifestPath = path.join(source.directory, 'contract-set.json');
@@ -480,7 +482,7 @@ describe('customer-agent contract-set intake', () => {
     const mixed = structuredClone(original);
     mixed.database.version = 'schema.v1.19';
     mixed.database.file = 'schema-v1.19.sql';
-    mixed.contract_set_id = mixed.contract_set_id.replace('schema-1.20-', 'schema-1.19-');
+    mixed.contract_set_id = mixed.contract_set_id.replace(usage ? 'schema-1.21-' : 'schema-1.20-', 'schema-1.19-');
     writeFileSync(manifestPath, JSON.stringify(mixed));
     expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
     const wrongPath = structuredClone(original);
@@ -496,8 +498,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa',
-      source_git_sha: 'd029cb0908faf9a0d1c1ffc1c8a5fcf39784d713',
+      contract_set_id: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288',
+      source_git_sha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -507,13 +509,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      '9355557862c5a621f91ae6e106479f4b4dbe64ac07d1329f3850c630a5c539fb',
+      '718c32079c3bf350bcd52bd7d27079f1da3f1ae4eb9753a35dbeaf480ed90e33',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      '2f029b210baa27164f2fbddc237f9775ac994629f354a5307c7c9f339f72ebb2',
+      '3e0a3f122aefa0bff9c330e105f1a5cbb2b26662fd5f04db1ef3a93ac1bc1121',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.20.sql')))).toBe(
-      '1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.21.sql')))).toBe(
+      '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
     );
   });
 });

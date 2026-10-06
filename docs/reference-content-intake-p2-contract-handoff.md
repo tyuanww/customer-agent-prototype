@@ -2,7 +2,7 @@
 
 > 状态：**治理合同已提交并 export · 产品 intake / codegen / 追加迁移已验收 · 仅限合成开发 · 三方公开交付 EVD 待齐**。2026-10-06，产品依赖 P1 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`。
 > 本页把已确认需求映射到下一份正式合同需要表达的资源、约束与验收，不签发合同版本、阶段门或真实运行权限。当前任务与授权只在[需求计划 §0](plans/2026-10-03-content-intake-requirements.md)维护。
-> 当前消费仍为 1.16.0 / schema1.20；新增 1.17.0 / schema1.21 仅完成治理仓 DRAFT 候选与合成验证，未替换消费锁，见文末接续记录。
+> 当前消费已推进至 OpenAPI 1.17.0 / schema.v1.21，精确来源由消费锁与不可变 manifest 拥有；API 持久绑定与 Main 封闭消费者已接入，生产 HTTP/ACL、桌面 factory/IPC 和原生验收尚未完成。
 
 ## 1. 交接范围与基线
 
@@ -111,15 +111,15 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 ### 使用资格与目录消费
 
-封闭合成服务已有 `issueEntitlement` / `snapshot`，复用原 `snapshot_offline_leases`、`content_intake.entitlements` 和单一 current。资格存随机不透明 ID 的 SHA-256；底层租约 token 不出服务。会话/店铺/上下文代际/商品与场景选择及来源代际绑定在服务生成的租约 client identity 中；没有新的 schema 或运行 ACL。仅签当前 release；同店普通新发布不主动使旧页失效，但旧资格永远不续命，不能签历史 SOP 资格。
+封闭合成服务已有 `issueEntitlement` / `snapshot`，复用原 `snapshot_offline_leases`、`content_intake.entitlements` 和单一 current。资格存随机不透明 ID 的 SHA-256；底层租约 token 不出服务。店铺/上下文代际及期限仍由原 entitlement 拥有；0025 的 1:1 不可变 entitlement_contexts 保存认证私有会话键与排序后的商品/场景选择，租约 client identity 继续绑定来源代际。没有新增运行 ACL。仅签当前 release；同店普通新发布不主动使旧页失效，但旧资格永远不续命，不能签历史 SOP 资格。
 
 每页重验主体、业务 query、来源代际、全 release 承继审批、原来源/owner 门及最早截止；按店/独立品牌授权、商品、场景、有效期过滤后分页。内容下一次生效/失效会缩短资格，防止跨页结果随时间漂移；停用/过期行不下发，词项取材料引用的显示版本，内部/附件说明永不进入坐席合同，SOP/media 确为实际空集合。
 
-单页还受 `IntakeSnapshot.vocabulary.maxItems=100` 限制；候选单条的商品/场景去重引用总数超过 100 时以 FILE_LIMIT 阻断，发布预检也核对历史候选。跨多条累计超限自动提前分页，保持每条正文及引用完整。正式模型允许单条最多 200 引用但响应页只容 100，这个差集需所属仓协调；当前不擅自放宽响应合同。
+单页还受 `IntakeSnapshot.vocabulary.maxItems=100` 限制；候选单条的商品/场景去重引用总数超过 100 时以 FILE_LIMIT 阻断，发布预检也核对历史候选。跨多条累计超限自动提前分页，保持每条正文及引用完整。新 1.17 validator 已把启用条目的合计引用约束为 100；显式停用可处理历史超限条目。
 
-**当前消费合同差集：** `/v1/intake/snapshot` 只有 entitlementId/cursor/limit，`IntakeEntitlementRequest` 只有 shopId/contextGeneration/releaseId；未定义商品/场景选择传输和服务器会话上下文所有权。当前选择由受控合成 adapter 注入并绑定，不冒充正式 HTTP 已实现。以下治理候选已补这部分 wire/存储规范，但尚未 intake；显式 family 冲突证明、旧内容认领/初始基线、生产 ACL/HTTP、真实 transport 与 Windows 桌面现场链各有未完成条件。该目录模块不等于完整 FAQ 界面闭环。
+**当前未完成边界：** 商品/场景选择与服务器持久会话绑定的合同差集已关闭。显式 family 冲突证明、旧内容认领/初始基线、生产 ACL/HTTP、真实 transport 与 Windows 桌面现场链仍各有未完成条件。Main 模块已消费正式 wire 和实际 PG 产物，通过测试专用 loopback HTTP 和根级消费者探针验证，但尚未注册到产品 factory 或 renderer，不等于完整 FAQ 界面闭环。
 
-### 2026-10-06 治理候选接续
+### 2026-10-06 治理候选形成记录（历史）
 
 治理仓 `codex/content-intake-p2-contracts@edad9943411c2e5ca75514d85974992df563b331` 已保存 `30-开发-进行中/14-P2使用资格上下文合同候选.md` 与 OpenAPI 1.17.0 / schema.v1.21，状态 DRAFT。其 `content-intake-usage-candidate/verification.md` 拥有精确产物双哈希、8 项 schema/92 项隔离 PG、29 步 release、OCR 与本机复审证据；外部缺失覆盖保留。本仓只记录交接，不复制另一份上游合同或批准。
 
@@ -127,9 +127,15 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 候选保持 vocabulary=100，并用标准 JSON Schema 约束单条启用引用总数；历史超限行只可显式停用。前序合同、profile、批准和本仓 24 段迁移不改；后续只能通过精确版本化 export/intake 追加新迁移。该候选本地 commit 不等于冻结批准、三方公开交付 EVD 或正式运行许可。
 
+### 2026-10-06 冻结接收与持久消费
+
+用户在明确候选版本对后批准继续。治理仓 `53906e302288fe0fb70e58b24a40088ecbbd3ef6` 记录批准并冻结原字节，实际导出 `cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288`；产品既有 intake 已核验 Git blob/双哈希并生成 223 个 validator、追加 0025，消费锁仍为 VERIFIED_NOT_ACTIVATED。机器文件历史 DRAFT 注解保留，不替代独立冻结批准。三方公开交付 EVD 与运行门仍独立办理。
+
+API 现在从认证边界取得私有会话引用，逐页锁定核验，消费持久选择并在最晚提交点核验原截止。Main 的 `ContentIntakeUsage` 隐藏换店/选择取消、迟到回调、完整分页、风险提示与原文复制分离、断网截止和失效扇出；普通新发布保留原有效句柄。当前一次目录限制 500 页、累计响应 32 MiB，超限可见失败且不交出部分目录；不写磁盘、不在旧 announce 中创建第二发布指针。实际结果与限制见[本轮证据](../evidence/qa/content-intake-p2-usage-context/README.md)。
+
 ### 下一阶段入场与验收
 
-正式接线前先取得对上述精确版本对的批准，完成冻结、既有导出门扩展与不可变 export，再由产品 versioned intake/codegen/追加迁移接收。其后 API 从认证边界取得私有会话引用并消费持久上下文，Main 实现当前店/选择及迟到回调失效；换店立即撤销原结果动作，renderer 不能决定授权。
+接下来补齐封闭合成 HTTP 与桌面 factory/白名单 IPC，让两个独立产品会话完成可操作的 FAQ 界面闭环。复用本轮 Main 目录所有者；新业务范围/选择意图需窄接口，不给 renderer 身份、资格凭据或通用请求能力。生产新 ACL、正式真实运行和数据门须分别完成，不以合成直连管理员池替代。
 
 接入验收必须证明新 validator、候选合并及分页同时遵守 100 词项预算。还包括：两个独立产品会话完整“上传→校验→飞书人工审核→发布→分页 hydrate→按店检索”；跨店、会话重启及签发/注销竞争；断网至原截止、撤权/审批撤销的 Main 独立扇出；空目录替换与同店普通更新；Mac 和 Windows 原生客户端分别验证 preload/sandbox、窗口及复制。WSL 只覆盖后端，不作为后两项证据。
 

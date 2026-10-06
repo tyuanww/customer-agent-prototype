@@ -1,0 +1,24 @@
+{
+  "observationCapture": "003",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-usage.test.ts"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-usage.test.ts (13 tests) 172ms\n\n Test Files  1 passed (1)\n      Tests  13 passed (13)\n   Start at  21:46:15\n   Duration  443ms (transform 60ms, setup 87ms, collect 93ms, tests 172ms, environment 0ms, prepare 24ms)\n\n",
+  "hypothesis": "Expiry while awaiting a fresh page must be EXPIRED for that request only; all 14 consumer cases must preserve valid old qualifications.",
+  "nextCapture": "004",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-usage.test.ts"
+  ]
+}
