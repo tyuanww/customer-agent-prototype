@@ -2,6 +2,7 @@
 
 > 状态：**治理合同已提交并 export · 产品 intake / codegen / 追加迁移已验收 · 仅限合成开发 · 三方公开交付 EVD 待齐**。2026-10-06，产品依赖 P1 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`。
 > 本页把已确认需求映射到下一份正式合同需要表达的资源、约束与验收，不签发合同版本、阶段门或真实运行权限。当前任务与授权只在[需求计划 §0](plans/2026-10-03-content-intake-requirements.md)维护。
+> 当前消费仍为 1.16.0 / schema1.20；新增 1.17.0 / schema1.21 仅完成治理仓 DRAFT 候选与合成验证，未替换消费锁，见文末接续记录。
 
 ## 1. 交接范围与基线
 
@@ -116,12 +117,20 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 单页还受 `IntakeSnapshot.vocabulary.maxItems=100` 限制；候选单条的商品/场景去重引用总数超过 100 时以 FILE_LIMIT 阻断，发布预检也核对历史候选。跨多条累计超限自动提前分页，保持每条正文及引用完整。正式模型允许单条最多 200 引用但响应页只容 100，这个差集需所属仓协调；当前不擅自放宽响应合同。
 
-**剩余正式合同差集：** `/v1/intake/snapshot` 只有 entitlementId/cursor/limit，`IntakeEntitlementRequest` 只有 shopId/contextGeneration/releaseId；未定义商品/场景选择传输和服务器会话上下文所有权。当前选择由受控合成 adapter 注入并绑定，不冒充正式 HTTP 已实现。下一阶段先准备这部分所属仓版本化变更及 Main 使用资格/当前店 adapter；显式 family 冲突证明、旧内容认领/初始基线、生产 ACL/HTTP、真实 transport 与 Windows 桌面现场链各有未完成条件。该目录模块不等于完整 FAQ 界面闭环。
+**当前消费合同差集：** `/v1/intake/snapshot` 只有 entitlementId/cursor/limit，`IntakeEntitlementRequest` 只有 shopId/contextGeneration/releaseId；未定义商品/场景选择传输和服务器会话上下文所有权。当前选择由受控合成 adapter 注入并绑定，不冒充正式 HTTP 已实现。以下治理候选已补这部分 wire/存储规范，但尚未 intake；显式 family 冲突证明、旧内容认领/初始基线、生产 ACL/HTTP、真实 transport 与 Windows 桌面现场链各有未完成条件。该目录模块不等于完整 FAQ 界面闭环。
+
+### 2026-10-06 治理候选接续
+
+治理仓 `codex/content-intake-p2-contracts@edad9943411c2e5ca75514d85974992df563b331` 已保存 `30-开发-进行中/14-P2使用资格上下文合同候选.md` 与 OpenAPI 1.17.0 / schema.v1.21，状态 DRAFT。其 `content-intake-usage-candidate/verification.md` 拥有精确产物双哈希、8 项 schema/92 项隔离 PG、29 步 release、OCR 与本机复审证据；外部缺失覆盖保留。本仓只记录交接，不复制另一份上游合同或批准。
+
+候选确定把规范化 productIds/scenarioIds 放入资格申请；API 复用已认证会话，在 `entitlement_contexts` 原子保存私有会话键和选择。分页读取原绑定，逐页重验会话和原权限；删除短期会话不受历史资格 FK 阻塞。Main 独占本机当前店/选择、取消和代际，不建立全局当前选择服务。选择缺失不默认全量、旧无上下文资格不回填，会话私有键不出服务器。
+
+候选保持 vocabulary=100，并用标准 JSON Schema 约束单条启用引用总数；历史超限行只可显式停用。前序合同、profile、批准和本仓 24 段迁移不改；后续只能通过精确版本化 export/intake 追加新迁移。该候选本地 commit 不等于冻结批准、三方公开交付 EVD 或正式运行许可。
 
 ### 下一阶段入场与验收
 
-正式接线前准备所属仓变更提案（此处不批准或修改 frozen snapshot）：优先把规范化 productIds/scenarioIds 放入资格申请，由 API 绑定认证会话并持久保存选择，后续 snapshot 仅消费资格；不要求每页重传身份或让 renderer 决定授权。与另建全局“当前选择”服务相比，该方案减少可变状态和竞态；Main 仍拥有本地当前店及回调代际，换店立即撤销原结果动作。具体 wire 字段、会话绑定及 DB 存储由所属仓评审/版本化后 intake。
+正式接线前先取得对上述精确版本对的批准，完成冻结、既有导出门扩展与不可变 export，再由产品 versioned intake/codegen/追加迁移接收。其后 API 从认证边界取得私有会话引用并消费持久上下文，Main 实现当前店/选择及迟到回调失效；换店立即撤销原结果动作，renderer 不能决定授权。
 
-同时协调单条引用总量与 vocabulary 页预算：保持现行 100 上限并明确单条准入，或经版本化调整响应预算；不能只扩大一端。批准后验收至少包括：两个独立产品会话完整“上传→校验→飞书人工审核→发布→分页 hydrate→按店检索”；跨店与会话重启；断网至原截止、撤权/审批撤销的 Main 独立扇出；空目录替换与同店普通更新；Mac 和 Windows 原生客户端分别验证 preload/sandbox、窗口及复制。WSL 只覆盖后端，不作为后两项证据。
+接入验收必须证明新 validator、候选合并及分页同时遵守 100 词项预算。还包括：两个独立产品会话完整“上传→校验→飞书人工审核→发布→分页 hydrate→按店检索”；跨店、会话重启及签发/注销竞争；断网至原截止、撤权/审批撤销的 Main 独立扇出；空目录替换与同店普通更新；Mac 和 Windows 原生客户端分别验证 preload/sandbox、窗口及复制。WSL 只覆盖后端，不作为后两项证据。
 
 现场资料 B 最新版/维护人、真实租户组织字段/人工节点/附件保真属于后续真实验证；本轮未读取真实资料、员工信息或凭据，未 push、PR、merge、deploy，也未启用 v2-active。
