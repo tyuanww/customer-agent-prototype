@@ -1,0 +1,34 @@
+{
+  "observationCapture": "002",
+  "observationArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "workflow HTTP"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\nstdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > workflow HTTP publishes the uploaded material after real evidence gates and a second seat consumes that release\n{\"probe\":\"workflow-http-second-seat\",\"source\":\"uploaded-synthetic-xlsx\",\"releaseId\":\"rel_2\",\"faqRows\":3,\"multilinePreserved\":true,\"qualityTransport\":\"internal-session-required-service\",\"approvalTransport\":\"synthetic\"}\n\n ✓ tests/content-intake.integration.test.ts (114 tests | 104 skipped) 11581ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP publishes the uploaded material after real evidence gates and a second seat consumes that release  1454ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP validates exact candidate paths, complete bodies and action namespaces without trusting caller approval  1137ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP recovers an unknown provider creation with its original UUID across host restart  1174ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fails closed without an adapter and does not accept critical self-review or renew facts on provider failure  1145ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences logout during publish approval I/O  1113ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences revoke during publish approval I/O  1110ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences cancel during publish approval I/O  1126ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences source-change during publish approval I/O  1189ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP recovers a lost publish COMMIT through actor/action-scoped receipts without another publication  1106ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP preserves historical cancellation receipts and requires a live owning session to recover them  1026ms\n\n Test Files  1 passed (1)\n      Tests  10 passed | 104 skipped (114)\n   Start at  05:42:22\n   Duration  12.15s (transform 208ms, setup 0ms, collect 405ms, tests 11.58s, environment 0ms, prepare 37ms)\n\n",
+  "hypothesis": "Code review found review-package persistence before adoption has no reclamation; real HTTP concurrency and definite-failure probes should expose unreferenced disk objects despite passing receipt tests.",
+  "nextCapture": "003",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "workflow HTTP approval package cleanup"
+  ]
+}

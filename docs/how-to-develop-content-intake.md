@@ -114,7 +114,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 
 在来源、审批与候选质量通过后，用 `publish(actor,{operationId,key,baseReleaseId,sourceEvidenceVersion,approvalEvidenceVersion,title,summary})`。发布动作有独立业务授权，不隐含要求 content-manage/review。API 先锁外即时核验审批，再由私有 SQL 在内容锁/发布锁下核对当前门，签发并消费从观察开始至多 60 秒的票据。目录、公告、单 current、永久关联及原 operation 回执一起提交；最终截止还受授权、审批、继承 owner 记录期限限制。
 
-发生 `COMMIT_UNKNOWN` 时，用原 operationId 调 `publicationReceipt`，或重试原 publish 请求；成功提交后的历史回执不再触发远程观察，不产生第二个 release。相同键换载荷拒绝；新操作键不能重复发布同一候选。历史回执不代替当前使用资格。
+发生 `COMMIT_UNKNOWN` 时，用原 operationId 调 `operationReceipt(actor,operationId,'publish')`，或重试原 publish 请求；成功提交后的历史回执不再触发远程观察，不产生第二个 release。相同键换载荷拒绝；新操作键不能重复发布同一候选。历史回执不代替当前使用资格。隔离管理 HTTP 对应 `GET /v1/intake/operations/{operationId}?action=publish`；取消用 `action=cancel`，两者与当前主体共同限定命名空间。
 
 新字段保留在不可变材料，release_lineage 绑定完整候选及来源内条目；缺行继承、显式停用保留版本历史。不同来源谱系和不同域旧成员完整复制，并重新核对其审批/来源/owner 门。内部说明仍只供管理审核；封闭坐席白名单读模型见下节，生产桌面尚未接线。未支持媒体的解析规则保持阻断，非空附件说明不能被本发布入口绕过。具体映射、限制和下一切片验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
 

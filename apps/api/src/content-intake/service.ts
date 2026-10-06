@@ -8,7 +8,7 @@ import type { ContentObjectStore, PersistedContentObject } from '../content-obje
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { createIntakeTransactions, IntakeRejection, type IntakePool, type IntakeResult } from './transaction.js';
 import { authorize, changeGrant, createGrants, source } from './authority.js';
-import { cancelCandidate, freezeParsed, getJob, readCandidate, receive } from './candidate.js';
+import { cancelCandidate, cancellationReceipt, freezeParsed, getJob, readCandidate, receive } from './candidate.js';
 import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
@@ -187,9 +187,10 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       return run(actor, 'candidate', null, null, (client, who) => readCandidate(client, who,
         parseContractSchema('IntakeId', id), parseContractSchema('IntakeVersion', version)), candidate);
     },
-    cancel(actor: AuthenticatedUser, raw: unknown) {
-      return run(actor, 'cancel', json(raw), operation(raw),
+    async cancel(actor: AuthenticatedUser, raw: unknown) {
+      const result = await run(actor, 'cancel', json(raw), operation(raw),
         (client, who) => cancelCandidate(client, who, parseContractSchema('IntakeCancel', raw)), candidate);
+      return result.ok ? { ok: true as const, value: cancellationReceipt(operation(raw)!, result.value) } : result;
     },
     async parse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {
       if (parseActive) return { ok: false, code: 'OVERLOADED', reason: 'QUOTA_EXCEEDED', commit: 'rolled_back', diagnosticId: `intake_${randomUUID()}` };

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
-import { candidateContext } from './candidate.js';
+import { candidateContext, cancellationReceipt } from './candidate.js';
 import { assertSnapshotPageable } from './material.js';
 import { createIntakeTransactions, intakeReplay, IntakeRejection, type IntakeResult, type Reason } from './transaction.js';
 
@@ -59,14 +59,18 @@ export function createIntakePublication(run: Run,
         }
       },receipt);
     },
-    publicationReceipt(actor: AuthenticatedUser, operationId: unknown) {
-      return run(actor,'publication-receipt',null,null,async (client,who) => {
+    operationReceipt(actor: AuthenticatedUser, operationId: unknown, action: unknown) {
+      return run(actor,'operation-receipt',null,null,async (client,who) => {
         const op = parseContractSchema('IntakeId',operationId);
+        if (action !== 'publish' && action !== 'cancel' && action !== 'rollback') throw new IntakeRejection('FILE_INVALID','VALIDATION');
         const saved = await client.query<{ response: unknown }>(`SELECT response FROM backend_review.receipts
-          WHERE actor_user_id=$1 AND operation='intake:publish' AND request_key=$2`,[who.userId,op]);
+          WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3`,[who.userId,`intake:${action}`,op]);
         if (!saved.rows[0]) throw new IntakeRejection('COMMIT_UNKNOWN','NOT_FOUND');
-        return receipt(saved.rows[0].response);
-      },receipt);
+        const result = action === 'cancel' ? cancellationReceipt(op,saved.rows[0].response)
+          : parseContractSchema('IntakeOperationReceipt',saved.rows[0].response);
+        if (result.operationId !== op || result.action !== action) throw new IntakeRejection('COMMIT_UNKNOWN');
+        return result;
+      },value => parseContractSchema('IntakeOperationReceipt',value));
     },
   };
 }

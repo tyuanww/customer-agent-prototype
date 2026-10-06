@@ -1,0 +1,180 @@
+{
+  "date": "2026-10-07",
+  "baseline": "750d99272e1e35b26481fe5238544a7315fb316d",
+  "branch": "codex/content-intake-p2",
+  "environment": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15 (owned temporary Unix-socket clusters)"
+  },
+  "inputs": [
+    {
+      "path": "apps/api/src/content-intake/candidate.ts",
+      "sha256": "715d04a0f0ea7c7168d30d4a78a68b5ebd3a3bd38e6acaeeb8a4fe6c84a5325a"
+    },
+    {
+      "path": "apps/api/src/content-intake/evidence.ts",
+      "sha256": "da2d24954423aabd1a9a3eae34d6eb5fd2de9aba72369b581d179d0491389c71"
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "sha256": "d9656e454ecc17c00aaccc76879c32ce5bc62db45207683bde30ec4e9be2b176"
+    },
+    {
+      "path": "apps/api/src/content-intake/publication.ts",
+      "sha256": "6bb5c91cab5804976b90bb258c7475964ecc1ada055a6d1ab02b3ec9f70a0b6b"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "sha256": "6c86713866843a4aa96f7b1e679fa753e8571c654df68c1efcf522ef8743b092"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "sha256": "486f3e92e25e04e0632a25b1ee6fdb191959faff0f6a9a657b9c14e5c88c7be4"
+    }
+  ],
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "log": "lint-final.log",
+      "logSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "log": "typecheck-final.log",
+      "logSha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "log": "test-final.log",
+      "logSha256": "6567c41024f93156c654f2a16402f497f97ad034db3a8187cf3107fcb96e98e6"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "log": "build-final.log",
+      "logSha256": "ed310ff09e1aac1a72c9c71db3acd62a55da7077ea63043095a9a73e0ffd848f"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "exitCode": 0,
+      "log": "architecture-final.log",
+      "logSha256": "106d3205a48386fb6da07e2e86514939ce4f42c79e5b029437e62396a6d95288"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "log": "workspace-final.log",
+      "logSha256": "7c2121c3411ca9ec69b8803d254fae12d3d36e8552eeb36f35477ef545363f44"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "log": "docs-final.log",
+      "logSha256": "a9c998573ccf71cf3459382ddce7a2fb30302bd0efd20e9f93adbe402e40c5f5"
+    }
+  ],
+  "actualResults": {
+    "rootPassed": 1837,
+    "rootGatedSkipped": 224,
+    "pgPassed": 127,
+    "pgIntegration": 119,
+    "pgMaterial": 8,
+    "newWorkflowHttp": 15,
+    "architectureFiles": 339,
+    "architectureViolations": 0
+  },
+  "fixed": [
+    {
+      "id": "review-package-orphan",
+      "redCaptures": [
+        "003",
+        "004"
+      ],
+      "greenCaptures": [
+        "005",
+        "007",
+        "008"
+      ],
+      "effect": "Concurrent review retries retain one referenced package; definite rollback/verification failure reclaims the unused copy; unknown commit and post-adoption logout retain the referenced package."
+    }
+  ],
+  "limits": [
+    "Quality step uses the actual session-required internal service; frozen 1.17 has no quality HTTP contract.",
+    "Real Feishu/data, production factory/ACL/activation, full management UI and rollback executor not implemented by this slice.",
+    "No changed desktop/window behavior; no new Electron/package/Windows/WSL evidence claimed.",
+    "External review models disabled by continuing preference; historical missing coverage retained.",
+    "Capture 006 exceeded the single smoke clock, retained as incomplete; required exact command completed in 007, no timer reset."
+  ],
+  "cleanup": {
+    "capture": "006",
+    "ownedTemporaryCluster": "customer-agent-pg15-ELMK7V",
+    "shutdown": "pg_ctl immediate confirmed",
+    "removed": true
+  },
+  "interruptedCapture": {
+    "version": 1,
+    "id": "006",
+    "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+    "argv": [
+      "env",
+      "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+      "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+      "pnpm",
+      "--filter",
+      "@customer-agent/api",
+      "exec",
+      "vitest",
+      "run",
+      "tests/content-intake.integration.test.ts",
+      "-t",
+      "workflow HTTP"
+    ],
+    "deadline": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/.gstack/content-intake-workflow/deadline.json",
+    "timing": [
+      {
+        "guard": "qa-deadline",
+        "event": "started",
+        "version": 1,
+        "startedAt": "2026-10-06T21:41:07.596Z",
+        "deadlineAt": "2026-10-06T21:46:07.596Z",
+        "budgetMs": 300000,
+        "observedAt": "2026-10-06T21:45:48.044Z",
+        "remainingMs": 19552,
+        "expired": false
+      },
+      {
+        "guard": "qa-deadline",
+        "event": "finished",
+        "observedAt": "2026-10-06T21:46:07.601Z",
+        "deadlineAt": "2026-10-06T21:46:07.596Z",
+        "timedOut": true,
+        "exitCode": 124
+      }
+    ],
+    "startedAt": "2026-10-06T21:45:48.043Z",
+    "completedAt": "2026-10-06T21:46:07.607Z",
+    "exitCode": 124,
+    "signal": null,
+    "status": "incomplete",
+    "observation": null,
+    "publicOutput": true,
+    "stdout": {
+      "sha256": "bae81ca499dbce1a6e80ce843aabe4e90ef8ac8796ee4a1dd7d0e98ebe171b19",
+      "bytes": 535
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "functionalVerdict": {
+    "status": "pass",
+    "open": []
+  }
+}
