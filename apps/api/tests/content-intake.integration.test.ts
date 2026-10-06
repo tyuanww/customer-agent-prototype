@@ -13,7 +13,7 @@ import { createApprovalAdapter, type ApprovalTransport } from '../src/content-in
 import { syntheticApproval } from './support/intake-approval.js';
 import { digest } from '../src/content-intake/material.js';
 import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
-import type { IntakeQualityPreview } from '../src/content-intake/quality.js';
+import type { IntakeQualityPreview, IntakeQualityProgress, QualityCheck } from '../src/content-intake/quality.js';
 
 type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -130,6 +130,134 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(stored).toMatchObject({ population_manifest_hash:p.populationManifestHash,selection_manifest_hash:p.selectionManifestHash });
     return planId;
   }
+
+  function qualityChecks(p: IntakeQualityProgress, phase: 'initial' | 'expanded' = 'initial', defects = 0): QualityCheck[] {
+    const plan = p.plan!;
+    const prior = new Map(p.rounds.flatMap(r => r.checks).map(c => [c.scriptId,c]));
+    const hashes = new Map(plan.population.map(r => [r.script_id,r.content_hash]));
+    return (phase === 'initial' ? plan.initialScriptIds : plan.expandedScriptIds).map((id,index) => prior.get(id)
+      ?? { scriptId:id,contentHash:hashes.get(id)!,defect:index<defects,reason:index<defects?'合成阻断错误':'' });
+  }
+  const freezeQuality = (c: C['IntakeCandidate']) => service.freezeQuality(actor('reviewer'),{ operationId:'freeze-quality',key:c.key });
+
+  it('freezes quality before individual checks, survives service recreation and creates no approval or release', async () => {
+    const c = await routine();
+    expect(value(await service.quality(actor('enabler'),c.key)).state).toBe('not_frozen');
+    expect(await service.checkQuality(actor('enabler'),{ operationId:'before-freeze',key:c.key,phase:'initial',checks:[] })).toMatchObject({ ok:false });
+    const frozen = value(await freezeQuality(c));
+    expect(frozen.state).toBe('initial_required');
+    expect(value(await createContentIntakeService(pool,store).quality(actor('enabler'),c.key))).toEqual(frozen);
+    expect(value(await service.freezeQuality(actor('other'),{ operationId:'another-freeze',key:c.key }))).toEqual(frozen);
+    const req = { operationId:'quality-initial',key:c.key,phase:'initial',checks:qualityChecks(frozen) };
+    const checked = await service.checkQuality(actor('enabler'),req);
+    expect(checked.ok, diagnostics.map(e => e instanceof Error ? e.message : String(e)).join(' | ')).toBe(true);
+    const result = value(checked);
+    expect(result.state).toBe('passed'); // Routine self-review is allowed.
+    expect(result.rounds[0]).toMatchObject({ checkedBy:'enabler',factsVersion:1,checks:req.checks });
+    expect(value(await service.checkQuality(actor('enabler'),req))).toEqual(result);
+    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,c.key.version)).state).toBe('awaiting-evidence');
+    for (const table of ['public.content_releases','content_intake.commit_tickets','content_intake.approval_facts']) {
+      expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('0');
+    }
+    await expect(admin.query("UPDATE content_intake.quality_plans SET plan='{}'::jsonb")).rejects.toMatchObject({ code:'ZA003' });
+    await expect(admin.query('DELETE FROM content_intake.quality_rounds')).rejects.toMatchObject({ code:'ZA003' });
+  });
+
+  it('rejects omitted, invented, duplicate, changed-content and caller-supplied quality conclusions atomically', async () => {
+    const c = await routine(); const p = value(await freezeQuality(c)); const checks = qualityChecks(p);
+    const req = { operationId:'invalid-check',key:c.key,phase:'initial',checks };
+    for (const bad of [[],[...checks,...checks],[{ ...checks[0]!,contentHash:'f'.repeat(64) }],
+      [{ ...checks[0]!,scriptId:`intake_${'f'.repeat(64)}` }],[{ ...checks[0]!,defect:true,reason:'' }]]) {
+      expect(await service.checkQuality(actor('reviewer'),{ ...req,checks:bad })).toMatchObject({ ok:false,code:'VALIDATION' });
+    }
+    expect(await service.checkQuality(actor('reviewer'),{ ...req,conclusion:'passed' })).toMatchObject({ ok:false,code:'VALIDATION' });
+    expect(await service.checkQuality(actor('reviewer'),{ ...req,key:{ ...c.key,digest:'f'.repeat(64) } })).toMatchObject({ ok:false,reason:'MATERIAL_CHANGED' });
+    await expect(admin.query(`INSERT INTO content_intake.quality_rounds VALUES ($1,$2,$3,'initial','[]','reviewer',1,clock_timestamp())`,
+      [c.key.candidateId,c.key.version,c.key.digest])).rejects.toMatchObject({ message:'QUALITY_SAMPLE_MISMATCH' });
+    expect((await admin.query('SELECT count(*) FROM content_intake.quality_rounds')).rows[0].count).toBe('0');
+    expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:quality-check'")).rows[0].count).toBe('0');
+    expect(value(await service.checkQuality(actor('reviewer'),req)).state).toBe('passed');
+  });
+
+  it.each([[2,'revision_required'],[3,'expansion_required'],[5,'expansion_required'],[6,'blocked']] as const)(
+    'derives the 501-row quality state with %s initial defects as %s', async (defects,state) => {
+      const rows = Array.from({ length:501 },(_,n) => [`faq-${n}`,'合成标题','合成正文','','','分类','','启用','','','','','','','false']);
+      const req = await input('quality-rounds-large',null,rows);
+      const c = value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',req)).jobId));
+      const frozen = value(await freezeQuality(c));
+      expect(await service.checkQuality(actor('reviewer'),{ operationId:'too-early',key:c.key,phase:'expanded',checks:qualityChecks(frozen,'expanded') })).toMatchObject({ ok:false });
+      const initial = value(await service.checkQuality(actor('reviewer'),{ operationId:'initial-round',key:c.key,phase:'initial',checks:qualityChecks(frozen,'initial',defects) }));
+      expect(initial.state).toBe(state);
+      if (state === 'expansion_required') {
+        const expanded = qualityChecks(initial,'expanded');
+        const altered = expanded.map(c => ({ ...c,defect:false,reason:'' }));
+        expect(await service.checkQuality(actor('reviewer'),{ operationId:'changed-prior',key:c.key,phase:'expanded',checks:altered })).toMatchObject({ ok:false,code:'VALIDATION' });
+        const final = value(await service.checkQuality(actor('reviewer'),{ operationId:'expanded-round',key:c.key,phase:'expanded',checks:expanded }));
+        expect(final.state).toBe('revision_required');
+        expect(final.rounds).toHaveLength(2);
+      }
+      expect(await service.checkQuality(actor('reviewer'),{ operationId:'retry-new-key',key:c.key,phase:'initial',checks:qualityChecks(frozen) })).toMatchObject({ ok:false });
+    });
+
+  it('records all 5000 critical checks within the unchanged transaction budget', async () => {
+    const rows = Array.from({ length:5000 },(_,n) => [`faq-${n}`,'合成标题','合成正文','','','分类','','启用','','','','','合成风险','','false']);
+    const req = await input('quality-max-critical',null,rows);
+    const c = value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',req)).jobId));
+    const frozen = value(await freezeQuality(c));
+    expect(frozen.plan?.mandatoryCount).toBe(5000);
+    const checked = await service.checkQuality(actor('reviewer'),{ operationId:'quality-max-check',key:c.key,phase:'initial',checks:qualityChecks(frozen) });
+    expect(checked.ok,diagnostics.map(e => e instanceof Error ? e.message : String(e)).join(' | ')).toBe(true);
+    expect(value(checked).state).toBe('passed');
+    expect((await admin.query('SELECT jsonb_array_length(checks) AS count FROM content_intake.quality_rounds')).rows).toEqual([{ count:5000 }]);
+  },30_000);
+
+  it('requires a non-contributing person for critical quality and refuses reuse after revision', async () => {
+    const c = await candidate(); const frozen = value(await freezeQuality(c));
+    expect(frozen.plan?.mandatoryCount).toBe(1);
+    const req = { operationId:'critical-quality',key:c.key,phase:'initial',checks:qualityChecks(frozen) };
+    for (const id of ['enabler','other']) expect(await service.checkQuality(actor(id),req)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    expect(value(await service.checkQuality(actor('reviewer'),req)).state).toBe('passed');
+    const revision = await input('quality-revision',c.key);
+    const next = value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',revision)).jobId));
+    expect(value(await service.quality(actor('reviewer'),next.key)).state).toBe('not_frozen');
+    expect(await service.quality(actor('reviewer'),c.key)).toMatchObject({ ok:false,reason:'MATERIAL_CHANGED' });
+    expect(await service.checkQuality(actor('reviewer'),{ ...req,key:next.key,operationId:'stale-new-version' })).toMatchObject({ ok:false });
+    expect((await admin.query('SELECT count(*) FROM content_intake.quality_rounds')).rows[0].count).toBe('1');
+  });
+
+  it('rechecks scope, revocation and cancellation before recording quality', async () => {
+    const c = await routine(); const frozen = value(await freezeQuality(c));
+    const req = { operationId:'denied-quality',key:c.key,phase:'initial',checks:qualityChecks(frozen) };
+    expect(await service.checkQuality(actor('agent'),req)).toMatchObject({ ok:false });
+    value(await service.changeGrant(actor('director'),'business-reviewer-review',{ operationId:'revoke-quality',expectedVersion:1,change:'revoke',stewardPrincipalId:null,reason:'合成撤权' }));
+    expect(await service.checkQuality(actor('reviewer'),req)).toMatchObject({ ok:false });
+    value(await service.cancel(actor('enabler'),{ operationId:'cancel-quality',key:c.key }));
+    expect(await service.checkQuality(actor('enabler'),req)).toMatchObject({ ok:false });
+    expect((await admin.query('SELECT count(*) FROM content_intake.quality_rounds')).rows[0].count).toBe('0');
+  });
+
+  it('recovers a lost quality COMMIT once and rejects changed payload under the original operation', async () => {
+    const c = await routine(); const frozen = value(await freezeQuality(c));
+    let injected = false;
+    const uncertainPool = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client,{ get(target,key) {
+        if (key === 'query') return async (sql: string,values?: unknown[]) => {
+          const result = await target.query(sql,values);
+          if (sql === 'COMMIT' && !injected) { injected=true; throw new Error('synthetic quality response lost'); }
+          return result;
+        };
+        const member: unknown = Reflect.get(target,key);
+        return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const req = { operationId:'uncertain-quality',key:c.key,phase:'initial',checks:qualityChecks(frozen) };
+    expect(await createContentIntakeService(uncertainPool,store).checkQuality(actor('enabler'),req)).toMatchObject({ ok:false,commit:'unknown' });
+    expect(value(await service.checkQuality(actor('enabler'),req)).state).toBe('passed');
+    expect(await service.checkQuality(actor('enabler'),{ ...req,checks:req.checks.map(c => ({ ...c,defect:true,reason:'changed' })) }))
+      .toMatchObject({ ok:false,reason:'IDEMPOTENCY_CONFLICT' });
+    expect((await admin.query('SELECT count(*) FROM content_intake.quality_rounds')).rows[0].count).toBe('1');
+  });
 
   it('quality preview preserves the candidate and is actually consumable by the existing SQL plan freezer', async () => {
     const c = await routine();

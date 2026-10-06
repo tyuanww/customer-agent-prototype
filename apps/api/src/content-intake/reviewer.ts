@@ -3,6 +3,19 @@ import type { HumanDecision } from './approval-adapter.js';
 import type { Source } from './authority.js';
 import { IntakeRejection, type IntakeTransaction } from './transaction.js';
 
+/** Critical human decisions require a proven different person, including aliases.
+ * Used by both native-approval verification and internal quality checks. */
+export async function requireIndependentReviewer(client: IntakeTransaction,
+  material: components['schemas']['IntakeMaterial'], person: { identity_scope: string; person_key: string }): Promise<void> {
+  if (material.risk.level === 'critical') {
+    const contributors = await client.query<{ identity_scope: string; person_key: string }>(
+      'SELECT identity_scope,person_key FROM content_intake.principals WHERE principal_id=ANY($1::text[])', [material.contributors]);
+    // Different, unlinked identity namespaces do not prove a different person.
+    if (contributors.rows.length !== material.contributors.length || contributors.rows.some(c =>
+      c.identity_scope !== person.identity_scope || c.person_key === person.person_key)) throw new IntakeRejection('HUMAN_REVIEW_REQUIRED');
+  }
+}
+
 /** Proves eligibility at the human decision time from append-only history.
  * Current publish eligibility is checked separately; a later grant or role change
  * cannot retroactively qualify an earlier PASS, nor erase valid historical proof.
@@ -18,13 +31,7 @@ export async function historicalReviewer(client: IntakeTransaction, src: Source,
     [src.scope.tenantId, src.scope.appId, human.identityScope, human.personKey]);
   const person = people.rows[0];
   if (!person) throw new IntakeRejection('HUMAN_REVIEW_REQUIRED');
-  if (material.risk.level === 'critical') {
-    const contributors = await client.query<{ identity_scope: string; person_key: string }>(
-      'SELECT identity_scope,person_key FROM content_intake.principals WHERE principal_id=ANY($1::text[])', [material.contributors]);
-    // Different, unlinked identity namespaces do not prove a different person.
-    if (contributors.rows.length !== material.contributors.length || contributors.rows.some(c =>
-      c.identity_scope !== person.identity_scope || c.person_key === person.person_key)) throw new IntakeRejection('HUMAN_REVIEW_REQUIRED');
-  }
+  await requireIndependentReviewer(client, material, person);
   // Provider decisions have millisecond precision, while history has microseconds.
   // A qualification transition inside that same millisecond is ambiguous: fail
   // closed instead of selecting the earlier, potentially more privileged state.
