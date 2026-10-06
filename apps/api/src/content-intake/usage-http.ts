@@ -15,19 +15,19 @@ function failure(reply: FastifyReply, code: Failure['code'], reason: Failure['de
   const value: C['IntakeError'] = { error: { code, message: '资料请求未完成。', details: { reason, diagnosticId } } };
   return reply.code(STATUS[code]).send(value);
 }
-function send<T>(reply: FastifyReply, result: IntakeResult<T>, schema: 'IntakeEntitlement' | 'IntakeSnapshot') {
+function send(reply: FastifyReply, result: IntakeResult<unknown>, schema: 'IntakeEntitlement' | 'IntakeSnapshot' | 'IntakeAuthorization' | 'IntakeSourceList') {
   if (!result.ok) return failure(reply, result.code, result.reason, result.diagnosticId);
   return reply.send(parseContractSchema(schema, result.value));
 }
 
-/** Sealed adapter: the isolated synthetic host explicitly registers these two
+/** Sealed adapter: the isolated synthetic host explicitly registers these four
  * routes. Production app/server factories do not register it or acquire new ACL.
  * Authenticated DTO identity is retained (no spread/clone); the usage service
  * locks and rechecks its private session binding in each transaction.
  */
 export const contentIntakeUsageRoutes: FastifyPluginAsync<{
   auth: ProductAuthService;
-  usage: Pick<ReturnType<typeof createContentIntakeService>, 'issueEntitlement' | 'snapshot'>;
+  usage: Pick<ReturnType<typeof createContentIntakeService>, 'issueEntitlement' | 'snapshot' | 'authorizations' | 'sources'>;
   report?: (diagnosticId: string, error: unknown) => void;
 }> = async (app, { auth, usage, report }) => {
   const actors = new WeakMap<FastifyRequest, AuthenticatedUser>();
@@ -51,12 +51,16 @@ export const contentIntakeUsageRoutes: FastifyPluginAsync<{
     if (Object.keys(request.query as object).length) return failure(reply, 'VALIDATION', 'FILE_INVALID');
     return send(reply, await usage.issueEntitlement(actors.get(request)!, request.body), 'IntakeEntitlement');
   });
-  app.get('/v1/intake/snapshot', { exposeHeadRoute: false }, async (request, reply) => {
+  for (const [path, method, schema] of [
+    ['snapshot', 'snapshot', 'IntakeSnapshot'],
+    ['authorization', 'authorizations', 'IntakeAuthorization'],
+    ['sources', 'sources', 'IntakeSourceList'],
+  ] as const) app.get(`/v1/intake/${path}`, { exposeHeadRoute: false }, async (request, reply) => {
     // Fastify preserves repeated query parameters as arrays. Only a single
     // decimal limit is decoded; duplicates/unknown fields remain for strict
     // service validation rather than being dropped or guessed by coercion.
     const query = { ...request.query as Record<string, unknown> };
     if (typeof query.limit === 'string' && /^(?:[1-9][0-9]{0,2})$/.test(query.limit)) query.limit = Number(query.limit);
-    return send(reply, await usage.snapshot(actors.get(request)!, query), 'IntakeSnapshot');
+    return send(reply, await usage[method](actors.get(request)!, query), schema);
   });
 };

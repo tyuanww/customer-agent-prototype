@@ -120,13 +120,14 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 0023 adds two sealed quality tables, two private functions and three triggers; ACL stays identical.
 // 0024 adds one sealed native publication function, with unchanged ACL and table shapes.
 // 0025 adds immutable usage contexts and three private guards; the ACL is unchanged.
+// 0026 adds one discovery index and its five columns to the object manifest only.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
 const EXPECTED_ACL_MANIFEST_ENTRIES = 223;
 const EXPECTED_ACL_MANIFEST_SHA256 = '733889747d9dbd94c592e64bd4c9c3e69e981eb00e1fe5fdc4ea3d50f2c4ab00';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2749;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '10ddf24c1cc4efe3cfb892022413e46c2a6b4012568f0c0ac44df9c22005bc4e';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2755;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = 'f63a772d859fca57fb16ef5303c7dc74cf291f0a5151b94559e7a6435fb7914e';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 220;
 const EXPECTED_FUNCTION_SECURITY_SHA256 = 'fa97ffd2b673bc0429991598fa6517b53fa0e997f5a841ea8338dc64ca3ef729';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 82;

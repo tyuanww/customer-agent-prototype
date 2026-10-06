@@ -50,23 +50,31 @@ function samePerson(a: Principal, b: Principal): boolean {
     && a.identityScope === b.identityScope && a.personKey === b.personKey);
 }
 
+/** Allocation credentials are independent of business-role ceilings. A delegate
+ * may allocate the specified actions, but may never delegate that credential. */
+export function allocationKinds(actor: Principal, kind: 'business' | 'delegation'): ('allocation' | 'delegation')[] {
+  if (actor.role === null) return [];
+  const manager = actor.role === 'manager' || actor.role === 'director';
+  if (kind === 'delegation') return manager ? ['allocation'] : [];
+  return manager || actor.role === 'supervisor' ? ['allocation', 'delegation'] : ['delegation'];
+}
+
 async function parentAuthority(client: IntakeTransaction, issuer: Principal, kind: 'business' | 'delegation',
   action: C['IntakeAction'], scope: Scope, period?: { startsAt: string; expiresAt: string }): Promise<string> {
   if (issuer.tenantId !== scope.tenantId || issuer.appId !== scope.appId) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   requireFresh(issuer, await clock(client));
   client.validUntil(issuer.validUntil);
   if (issuer.role === null) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
-  const manager = issuer.role === 'manager' || issuer.role === 'director';
-  if (kind === 'delegation' && !manager) throw new IntakeRejection('REDELEGATION_DENIED', 'FORBIDDEN');
-  const intrinsic = manager || issuer.role === 'supervisor';
+  const kinds = allocationKinds(issuer, kind);
+  if (!kinds.length) throw new IntakeRejection('REDELEGATION_DENIED', 'FORBIDDEN');
   const id = await scopeId(client, scope);
   const { rows } = await client.query<{ grant_id: string; expires_at: Date }>(`
     SELECT grant_id,expires_at FROM content_intake.grants WHERE recipient_id=$1 AND scope_id=$2 AND action=$3
       AND (source_id IS NULL OR source_id IS NOT DISTINCT FROM $4) AND revoked_at IS NULL
       AND steward_id IS NOT NULL AND starts_at<=clock_timestamp() AND expires_at>clock_timestamp()
       AND ($5::timestamptz IS NULL OR (starts_at<=$5 AND expires_at>=$6))
-      AND ((kind='allocation' AND $7) OR (kind='delegation' AND $8)) ORDER BY grant_id LIMIT 1`,
-  [issuer.id, id, action, scope.sourceId, period?.startsAt ?? null, period?.expiresAt ?? null, intrinsic, kind === 'business']);
+      AND kind=ANY($7::text[]) ORDER BY grant_id LIMIT 1`,
+  [issuer.id, id, action, scope.sourceId, period?.startsAt ?? null, period?.expiresAt ?? null, kinds]);
   if (!rows[0]) throw new IntakeRejection('GRANT_AUTHORITY_DENIED', 'NOT_FOUND');
   client.validUntil(rows[0].expires_at.getTime());
   return rows[0].grant_id;

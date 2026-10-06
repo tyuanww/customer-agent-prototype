@@ -1,0 +1,149 @@
+{
+  "revision": "c0db575001d5b4d74a19f43b16e1206d90f3f43b",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Synthetic isolated PostgreSQL 15 and loopback HTTP; not real customer data or runtime activation.",
+    "Native reviewer tests are summary-only; parent reads full tests.",
+    "No native clipboard, IPC/renderer or Mac/Windows GUI evidence; WSL not rerun.",
+    "Formal contracts lack shop display names. Lists are expiring hints, not an atomic multi-HTTP snapshot or an entitlement.",
+    "Captures 001/002 and checkpoint 002 are pre-index history, superseded by final-input captures 003/004/005. Smoke clock was not reset; required revalidation used finite timeout-ms after expiry."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-access.test.ts",
+      "contract": "Main complete discovery menus; explicit shop scope; cancellation and session epochs; bounded bytes and pages",
+      "expected": "12 tests pass; no partial menus or invented shop access; owned listeners released",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-access.test.ts (12 tests) 38ms\n\n Test Files  1 passed (1)\n      Tests  12 passed (12)\n   Start at  23:56:59\n   Duration  336ms (transform 69ms, setup 88ms, collect 113ms, tests 38ms, environment 0ms, prepare 30ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'discovery:|usage: Main'",
+      "contract": "Actual authenticated PG discovery and HTTP ProductSession consumer; independent business/allocation rights; current signed cursor",
+      "expected": "6 tests pass (5 discovery plus actual HTTP consumer); 86 unrelated tests filtered; publication originals, cancellation, new release, revocation and empty menu consumed",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (92 tests | 86 skipped) 8535ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants  993ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation  890ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: signs paging to a live session, route, complete projection and service lifetime  882ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: handles zero scope, conflicting role, expired facts and strict query shapes without inventing access  839ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: pages more than 100 authorized sources with no loss and rejects a logged-out cursor  877ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  4055ms\n\n Test Files  1 passed (1)\n      Tests  6 passed | 86 skipped (92)\n   Start at  23:57:49\n   Duration  9.18s (transform 232ms, setup 0ms, collect 490ms, tests 8.54s, environment 0ms, prepare 46ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:db:integration",
+      "contract": "Append-only physical index migration; historical ledgers preserved; exact object/ACL/security manifests",
+      "expected": "23 PG15 tests pass, including 25-to-26 upgrade and rejection after index removal",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/packages/database\n\n ✓ tests/postgres.integration.test.ts (23 tests) 18950ms\n   ✓ PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op  1024ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.12 ledger prefix through the immutable v1.13/v1.14 suffix  830ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.16 with the deferred guard and ops-loop migrations and rejects privilege drift  867ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades the shipped nineteen-migration prefix and keeps P2 storage sealed  957ms\n   ✓ PostgreSQL 15 immutable migration gate > appends only the discovery index to the exact 25-row ledger and detects index drift  860ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints  898ms\n   ✓ PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed  851ms\n   ✓ PostgreSQL 15 immutable migration gate > appends sealed quality storage without rewriting the 22-row ledger or opening application access  861ms\n   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=false  820ms\n   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=true  787ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.17 with only the ops-loop migration  848ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact v1.15 ledger with only the backend migration  831ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.14 with only the atomic owner suffix and denies registrar/runtime privilege drift  962ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.13 ledger prefix with only the immutable v1.14 suffix  828ms\n   ✓ PostgreSQL 15 immutable migration gate > rolls back an interrupted synthetic backfill and safely retries the same migration id  630ms\n   ✓ PostgreSQL 15 immutable migration gate > keeps DDL and its immutable ledger row atomic when the ledger insert fails  644ms\n   ✓ PostgreSQL 15 immutable migration gate > reconciles an unknown COMMIT acknowledgement from the immutable ledger on a new session  829ms\n   ✓ PostgreSQL 15 immutable migration gate > serializes two independent fresh clients and applies the catalogue exactly once  861ms\n   ✓ PostgreSQL 15 immutable migration gate > rejects concurrent control-plane operations on the same client session  825ms\n   ✓ PostgreSQL 15 immutable migration gate > rejects ACL, function-security, trigger-mode, and policy-key drift by exact manifest  1065ms\n   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a table  619ms\n   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a enum  627ms\n   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a schema  626ms\n\n Test Files  1 passed (1)\n      Tests  23 passed (23)\n   Start at  00:16:24\n   Duration  19.25s (transform 115ms, setup 0ms, collect 146ms, tests 18.95s, environment 0ms, prepare 35ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/api test:intake:transactions",
+      "contract": "All content-intake authority, approval, publication, usage and discovery consumers on real isolated PG15",
+      "expected": "101 tests pass; actual ProductHttp/ProductSession consumes 5000 sources across 150 pages before facts expiry, plus full publication/revocation journey",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-material.test.ts (8 tests) 300ms\nstdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires\n{\"probe\":\"discovery-capacity\",\"sources\":5000,\"pages\":150,\"elapsedMs\":25243}\n\n ✓ tests/content-intake.integration.test.ts (93 tests) 132463ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants  934ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation  822ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: signs paging to a live session, route, complete projection and service lifetime  835ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: handles zero scope, conflicting role, expired facts and strict query shapes without inventing access  836ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: pages more than 100 authorized sources with no loss and rejects a logged-out cursor  866ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires  26467ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages  1742ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a logout session  839ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a cleanup session  838ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a disabled session  838ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a expired session  844ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: caps issuance at session expiry and reauthenticates persisted selection after a service restart  835ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: validates explicit selections by kind and scope without expanding source access  856ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (reader-first)  850ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (logout-first)  827ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  3645ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: contextless predecessor qualifications cannot be guessed or reused  854ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: shop access does not imply brand access, and brand permission alone cannot select an arbitrary shop  877ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after grant changes  1093ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after source changes  1068ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after release changes  1063ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after facts changes  1076ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-unavailable changes  1357ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-revoked changes  1069ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: a normal new publication preserves a valid old page and a fresh empty snapshot clears explicitly disabled rows  1274ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: filters product/scenario/time before paging, pins vocabulary labels and expires at the next content boundary  1081ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: does not renew or return a page after its immutable deadline, even when facts are refreshed  1993ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: consumes a maximum 5000-row native catalog within bounded transactions without duplicate or missing pages  4939ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: pages within the 100 vocabulary budget and rejects an individually unpageable candidate before review  1255ms\n   ✓ P2 sealed synthetic authority and durable candidates > publishes native material atomically without invented legacy fields, and recovers its permanent receipt  1070ms\n   ✓ P2 sealed synthetic authority and durable candidates > retains missing rows, explicit disables and versions across subsequent native releases  1245ms\n   ✓ P2 sealed synthetic authority and durable candidates > inherits another source unchanged and propagates its later approval revocation  1270ms\n   ✓ P2 sealed synthetic authority and durable candidates > copies every existing legacy field from a different domain without manufacturing review evidence  1083ms\n   ✓ P2 sealed synthetic authority and durable candidates > publication rejects quality with zero release/ticket side effects  1209ms\n   ✓ P2 sealed synthetic authority and durable candidates > publication rejects publisher-revoked with zero release/ticket side effects  1031ms\n   ✓ P2 sealed synthetic authority and durable candidates > publication rejects reviewer-revoked with zero release/ticket side effects  1041ms\n   ✓ P2 sealed synthetic authority and durable candidates > publication rejects cancelled with zero release/ticket side effects  1036ms\n   ✓ P2 sealed synthetic authority and durable candidates > publication rejects source-version with zero release/ticket side effects  1033ms\n   ✓ P2 sealed synthetic authority and durable candidates > publication rejects revoked-approval with zero release/ticket side effects  1054ms\n   ✓ P2 sealed synthetic authority and durable candidates > publication rejects suspended-source with zero release/ticket side effects  1048ms\n   ✓ P2 sealed synthetic authority and durable candidates > rolls back ticket, catalog, candidate, current and release on a late announcement failure  1066ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers a lost publication COMMIT after restart without remote I/O or a second release  1052ms\n   ✓ P2 sealed synthetic authority and durable candidates > lets cancel win while publication is observing approval without locks  1050ms\n   ✓ P2 sealed synthetic authority and durable candidates > lets revoke win while publication is observing approval without locks  1029ms\n   ✓ P2 sealed synthetic authority and durable candidates > commits once when cancellation waits behind the final publication transaction  1058ms\n   ✓ P2 sealed synthetic authority and durable candidates > requires a new candidate and approval after another candidate wins the same base  1243ms\n   ✓ P2 sealed synthetic authority and durable candidates > refuses missing bootstrap and unmapped legacy-domain rows instead of silently replacing them  1288ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects an exact but stale observation at the private commit boundary  1048ms\n   ✓ P2 sealed synthetic authority and durable candidates > freezes quality before individual checks, survives service recreation and creates no approval or release  1000ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects omitted, invented, duplicate, changed-content and caller-supplied quality conclusions atomically  1008ms\n   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 2 initial defects as revision_required  1280ms\n   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 3 initial defects as expansion_required  1398ms\n   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 5 initial defects as expansion_required  1361ms\n   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 6 initial defects as blocked  1251ms\n   ✓ P2 sealed synthetic authority and durable candidates > records all 5000 critical checks within the unchanged transaction budget  2936ms\n   ✓ P2 sealed synthetic authority and durable candidates > requires a non-contributing person for critical quality and refuses reuse after revision  1168ms\n   ✓ P2 sealed synthetic authority and durable candidates > rechecks scope, revocation and cancellation before recording quality  995ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers a lost quality COMMIT once and rejects changed payload under the original operation  1016ms\n   ✓ P2 sealed synthetic authority and durable candidates > quality preview preserves the candidate and is actually consumable by the existing SQL plan freezer  988ms\n   ✓ P2 sealed synthetic authority and durable candidates > quality SQL requires expanded review and rejects a fabricated passing conclusion  1086ms\n   ✓ P2 sealed synthetic authority and durable candidates > critical quality population requires every live entry and does not fabricate owner acceptance  1030ms\n   ✓ P2 sealed synthetic authority and durable candidates > quality preview rechecks role, current grants, the exact key and cancellation on every read  969ms\n   ✓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant  812ms\n   ✓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation  832ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes  831ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys  831ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit  1157ms\n   ✓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants  815ms\n   ✓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer  850ms\n   ✓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager  1000ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report  1136ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving  1181ms\n   ✓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate  999ms\n   ✓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock  830ms\n   ✓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result  985ms\n   ✓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot  1018ms\n   ✓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations  1111ms\n   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1036ms\n   ✓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility  1046ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed  1017ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence  1030ms\n   ✓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart  1021ms\n   ✓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O  1010ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready  1045ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  1034ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable  1018ms\n   ✓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation  1204ms\n   ✓ P2 sealed synthetic authority and durable candidates > inherits exact candidate and approval lineage and propagates later revocation to both releases  1062ms\n   ✓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider  1136ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire  1328ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled  1354ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires  1354ms\n   ✓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit  1061ms\n\n Test Files  2 passed (2)\n      Tests  101 passed (101)\n   Start at  00:17:37\n   Duration  132.98s (transform 260ms, setup 0ms, collect 683ms, tests 132.76s, environment 0ms, prepare 86ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-access.test.ts",
+      "contract": "Main returns only complete, bounded and current selection hints; cancellation/session changes remove pending results",
+      "expected": "12 tests pass on final source",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-access.test.ts (12 tests) 39ms\n\n Test Files  1 passed (1)\n      Tests  12 passed (12)\n   Start at  00:20:35\n   Duration  339ms (transform 67ms, setup 87ms, collect 114ms, tests 39ms, environment 0ms, prepare 32ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-access.test.ts"
+      ],
+      "hypothesis": "Main 的完整分页和取消断言已通过；下一步用真实会话及隔离 PG 检验范围与游标，并实际消费发布 FAQ，排除纯桩验证的缺口。",
+      "nextCapture": "002",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "discovery:|usage: Main"
+      ]
+    },
+    {
+      "observationCapture": "002",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "discovery:|usage: Main"
+      ],
+      "hypothesis": "The append-only discovery index must preserve all historical ledgers and ACL; revalidate the actual PG15 migration gate including a 25-to-26 upgrade and index drift.",
+      "nextCapture": "003",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "pnpm",
+        "test:db:integration"
+      ]
+    },
+    {
+      "observationCapture": "003",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "pnpm",
+        "test:db:integration"
+      ],
+      "hypothesis": "The physical index and consumer probe changed; rerun the full actual PG15 content-intake matrix, including 5000 sources over 150 HTTP pages and publication/revocation consumption.",
+      "nextCapture": "004",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "test:intake:transactions"
+      ]
+    },
+    {
+      "observationCapture": "004",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "test:intake:transactions"
+      ],
+      "hypothesis": "Revalidate the final Main discovery source after clarifying its non-atomic hint boundary: paging, stale sessions, cancellation and bounded responses must retain the existing behavior.",
+      "nextCapture": "005",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-access.test.ts"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

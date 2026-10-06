@@ -1,0 +1,20 @@
+{
+  "observationCapture": "003",
+  "observationArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "pnpm",
+    "test:db:integration"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/packages/database\n\n ✓ tests/postgres.integration.test.ts (23 tests) 18950ms\n   ✓ PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op  1024ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.12 ledger prefix through the immutable v1.13/v1.14 suffix  830ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.16 with the deferred guard and ops-loop migrations and rejects privilege drift  867ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades the shipped nineteen-migration prefix and keeps P2 storage sealed  957ms\n   ✓ PostgreSQL 15 immutable migration gate > appends only the discovery index to the exact 25-row ledger and detects index drift  860ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints  898ms\n   ✓ PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed  851ms\n   ✓ PostgreSQL 15 immutable migration gate > appends sealed quality storage without rewriting the 22-row ledger or opening application access  861ms\n   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=false  820ms\n   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=true  787ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.17 with only the ops-loop migration  848ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact v1.15 ledger with only the backend migration  831ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.14 with only the atomic owner suffix and denies registrar/runtime privilege drift  962ms\n   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.13 ledger prefix with only the immutable v1.14 suffix  828ms\n   ✓ PostgreSQL 15 immutable migration gate > rolls back an interrupted synthetic backfill and safely retries the same migration id  630ms\n   ✓ PostgreSQL 15 immutable migration gate > keeps DDL and its immutable ledger row atomic when the ledger insert fails  644ms\n   ✓ PostgreSQL 15 immutable migration gate > reconciles an unknown COMMIT acknowledgement from the immutable ledger on a new session  829ms\n   ✓ PostgreSQL 15 immutable migration gate > serializes two independent fresh clients and applies the catalogue exactly once  861ms\n   ✓ PostgreSQL 15 immutable migration gate > rejects concurrent control-plane operations on the same client session  825ms\n   ✓ PostgreSQL 15 immutable migration gate > rejects ACL, function-security, trigger-mode, and policy-key drift by exact manifest  1065ms\n   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a table  619ms\n   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a enum  627ms\n   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a schema  626ms\n\n Test Files  1 passed (1)\n      Tests  23 passed (23)\n   Start at  00:16:24\n   Duration  19.25s (transform 115ms, setup 0ms, collect 146ms, tests 18.95s, environment 0ms, prepare 35ms)\n\n",
+  "hypothesis": "The physical index and consumer probe changed; rerun the full actual PG15 content-intake matrix, including 5000 sources over 150 HTTP pages and publication/revocation consumption.",
+  "nextCapture": "004",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "test:intake:transactions"
+  ]
+}

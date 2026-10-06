@@ -437,6 +437,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
       return frozen;
     }),
     renderUpgradeMigration({position: 25, id: '0025_intake_usage_v1_21', version: 'schema.v1.21', ranges, sourceBody: upgradeSourceBody}, snapshot),
+    renderIntakeOverlay(projectRoot, snapshot, 26, '0026_intake_discovery_index'),
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,

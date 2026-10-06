@@ -1,0 +1,106 @@
+import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
+
+type C = components['schemas'];
+export type IntakeAccess = {
+  validUntil: string;
+  shops: string[];
+  sources: C['IntakeSource'][];
+  capabilities: C['IntakeAuthorization']['capabilities'];
+};
+
+/** Main-only discovery. All pages and both lists must agree before any menu is
+ * returned. This is an expiring selection hint, never permission to read/copy;
+ * ContentIntakeUsage must still obtain a server qualification for the selection.
+ * Shop names are not in the current contract: preserve IDs instead of inventing
+ * display names or treating a brand-wide grant as access to every shop.
+ */
+export async function loadIntakeAccess(session: IntakeUsageSession, signal?: AbortSignal): Promise<IntakeAccess> {
+  const initial = session.view(), controller = new AbortController();
+  if (!initial.signedIn) throw new IntakeUsageError('UNAUTHORIZED');
+  const abort = () => controller.abort();
+  const unsubscribe = session.subscribe(() => {
+    const current = session.view();
+    if (!current.signedIn || current.sessionEpoch !== initial.sessionEpoch) abort();
+  });
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) abort();
+  const assertActive = () => {
+    const current = session.view();
+    if (controller.signal.aborted || !current.signedIn || current.sessionEpoch !== initial.sessionEpoch) throw new IntakeUsageError('STALE');
+  };
+  let bytes = 0;
+  const MAX_BYTES = 8 * 1024 * 1024;
+  async function request(path: string, cursor: string | null) {
+    assertActive();
+    const query = new URLSearchParams({ limit: '100', ...(cursor ? { cursor } : {}) });
+    const result = await session.request(initial.sessionEpoch, `/v1/intake/${path}?${query}`, {
+      signal: controller.signal, maxResponseBytes: MAX_BYTES - bytes,
+    });
+    assertActive();
+    bytes += Buffer.byteLength(JSON.stringify(result.value) ?? '');
+    if (bytes >= MAX_BYTES) throw new IntakeUsageError('LIMIT');
+    return result.value;
+  }
+  async function authorizations() {
+    let cursor: string | null = null, meta: Omit<C['IntakeAuthorization'], 'capabilities' | 'nextCursor'> | null = null;
+    const cursors = new Set<string>(), ids = new Set<string>(), capabilities: C['IntakeAuthorization']['capabilities'] = [];
+    do {
+      if (cursors.size >= 50) throw new IntakeUsageError('LIMIT');
+      const page: C['IntakeAuthorization'] = parseContractSchema('IntakeAuthorization', await request('authorization', cursor));
+      const { capabilities: rows, nextCursor, ...header } = page;
+      if (meta && JSON.stringify(meta) !== JSON.stringify(header)) throw new IntakeUsageError('STALE');
+      meta = header;
+      for (const row of rows) {
+        const id = row.scope.sourceId;
+        if (id === null || ids.has(id) || Date.parse(row.validUntil) < Date.parse(header.validUntil)) throw new IntakeUsageError('FORBIDDEN');
+        ids.add(id); capabilities.push(row);
+      }
+      cursor = nextCursor;
+      if (cursor && (!rows.length || cursors.has(cursor))) throw new IntakeUsageError('FORBIDDEN');
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    return { ...meta!, capabilities };
+  }
+  try {
+    const before = await authorizations();
+    const deadline = performance.now() + Math.max(0, Date.parse(before.validUntil) - Date.now());
+    const sources: C['IntakeSource'][] = [], ids = new Set<string>(), cursors = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      if (cursors.size >= 50) throw new IntakeUsageError('LIMIT');
+      const page: C['IntakeSourceList'] = parseContractSchema('IntakeSourceList', await request('sources', cursor));
+      for (const src of page.items) {
+        if (ids.has(src.scope.sourceId)) throw new IntakeUsageError('FORBIDDEN');
+        ids.add(src.scope.sourceId); sources.push(src);
+      }
+      cursor = page.nextCursor;
+      if (cursor && (!page.items.length || cursors.has(cursor))) throw new IntakeUsageError('FORBIDDEN');
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    // The two frozen contracts have no common read token. A complete second
+    // authority read detects observable rights changes, not an atomic multi-HTTP
+    // snapshot. Source-only changes are rechecked when usage obtains qualification.
+    const after = await authorizations();
+    if (JSON.stringify(before) !== JSON.stringify(after)) throw new IntakeUsageError('STALE');
+    if (Date.now() >= Date.parse(after.validUntil) || performance.now() >= deadline) throw new IntakeUsageError('EXPIRED');
+    const capabilities = new Map(after.capabilities.map(c => [c.scope.sourceId, c]));
+    if (sources.length !== capabilities.size) throw new IntakeUsageError('STALE');
+    const shops = new Set<string>();
+    for (const src of sources) {
+      const cap = capabilities.get(src.scope.sourceId);
+      if (!cap || Object.entries(src.scope).some(([key, value]) => Reflect.get(cap.scope, key) !== value)) throw new IntakeUsageError('STALE');
+      if (src.contentIntakeMode === 'v2-preview' && src.scope.shopId !== null && cap.actions.includes('query')) shops.add(src.scope.shopId);
+    }
+    assertActive();
+    return { validUntil: after.validUntil, shops: [...shops].sort(), sources, capabilities: after.capabilities };
+  } catch (error) {
+    assertActive();
+    if (error instanceof IntakeUsageError) throw error;
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
+    throw new IntakeUsageError(code === 'UNAUTHORIZED' ? 'UNAUTHORIZED'
+      : code === 'UNAVAILABLE' || code === 'OVERLOADED' || code === 'RATE_LIMITED' ? 'UNAVAILABLE' : 'FORBIDDEN');
+  } finally {
+    unsubscribe(); signal?.removeEventListener('abort', abort); controller.abort();
+  }
+}
