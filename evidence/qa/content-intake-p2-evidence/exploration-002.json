@@ -1,0 +1,23 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "round-trips|keeps revoked"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (27 tests | 25 skipped) 2130ms\n   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1115ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  1015ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 25 skipped (27)\n   Start at  09:33:06\n   Duration  2.64s (transform 162ms, setup 0ms, collect 361ms, tests 2.13s, environment 0ms, prepare 46ms)\n\n",
+  "hypothesis": "Because the package round trip and terminal revocation passed, the required full transaction suite will check historical eligibility, retries, cancellation and inherited release effects.",
+  "nextCapture": "002",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "test:intake:transactions"
+  ]
+}

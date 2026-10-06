@@ -1,0 +1,257 @@
+{
+  "mode": "workspace",
+  "baseHead": "46c39ab412345791c7aff0c7f634529c0885cb91",
+  "total_files": 24,
+  "reviewable_files": 18,
+  "reviewed_files": 18,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "tool_excluded_files": 6,
+  "reviewed": [
+    {
+      "path": "apps/api/src/content-intake/candidate.ts",
+      "status": "modified",
+      "insertions": 56,
+      "deletions": 4,
+      "review": "reviewed",
+      "sha256": "2a540e7b4387900cc59fcdc559d71126daca18f13037e286e77caf8ed9437eee",
+      "basis": "source and callers reviewed under OCR TypeScript rules; current tests executed"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "insertions": 4,
+      "deletions": 1,
+      "review": "reviewed",
+      "sha256": "fd09d42506dfaaf2b26b37f4ef57081de454d8ba1167efaf1b75ee06ff030f06",
+      "basis": "source and callers reviewed under OCR TypeScript rules; current tests executed"
+    },
+    {
+      "path": "apps/api/src/content-intake/transaction.ts",
+      "status": "modified",
+      "insertions": 19,
+      "deletions": 8,
+      "review": "reviewed",
+      "sha256": "a4313c7e90b3bacf6cac567f97d2ca5e30cf85cfcc78505e25669cde2b6b541c",
+      "basis": "source and callers reviewed under OCR TypeScript rules; current tests executed"
+    },
+    {
+      "path": "apps/api/src/content-intake/approval-adapter.ts",
+      "status": "added",
+      "insertions": 122,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "4e7dc4afdd4a7169ae58ddeed67ceee4485aff8b248aac7742e68ce5e8d3136e",
+      "basis": "source and callers reviewed under OCR TypeScript rules; current tests executed"
+    },
+    {
+      "path": "apps/api/src/content-intake/evidence.ts",
+      "status": "added",
+      "insertions": 247,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "5796a717cf7e8e6b0b40a954c74e93187de46c336310e95bbea3ca192c5376b0",
+      "basis": "source and callers reviewed under OCR TypeScript rules; current tests executed"
+    },
+    {
+      "path": "apps/api/src/content-intake/reviewer.ts",
+      "status": "added",
+      "insertions": 67,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "645de7c9e5badd9f8ef2d5f90ef8075f0b95f5eb9091cf6c1c9c207489a8b209",
+      "basis": "source and callers reviewed under OCR TypeScript rules; current tests executed"
+    },
+    {
+      "path": "apps/api/tests/support/intake-approval.ts",
+      "status": "added",
+      "insertions": 45,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "d875ce89812888b6ca6bcff35865601705f0dfa3b690be9bdbc2e4565bae88cd",
+      "basis": "source and callers reviewed under OCR TypeScript rules; current tests executed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/checks.json",
+      "status": "added",
+      "insertions": 97,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "e8997556a5dfc2d8ff31b6e2608ac41e8c0c785813427f664b5566759ab6fbbb",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/evidence.json",
+      "status": "added",
+      "insertions": 183,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "08568f3c57448f0cd1e2eceb9a0eb8c95ae51bdcc7e471bde9110cd65d75eaaa",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-002.json",
+      "status": "added",
+      "insertions": 23,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "88cba31237206bdd50932f2d36c88cd73b5fd12121963894ad5c0825e6b25296",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-003.json",
+      "status": "added",
+      "insertions": 23,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "11cda875aa9861bcf2cff67fc449e2133c4d49ace3766b8ddc7816355106ed92",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-004.json",
+      "status": "added",
+      "insertions": 28,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "5f4360700df4c807b64077b34f5537ea8a728dc4e53c8f8ca1e0d0ccd0ec2892",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-005.json",
+      "status": "added",
+      "insertions": 23,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "49e1667c0cdefd5c74e7f74da2aea3eab705febbbee4d1f3c51a8966c630b77a",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-006.json",
+      "status": "added",
+      "insertions": 23,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "61b1f09bfc2f3d280e814abf30aef7ce1cd8377f1ed4646ea55d9082432225b3",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-007.json",
+      "status": "added",
+      "insertions": 28,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "3812c093d627e9ecc46aa6a8d786a66f7986418cbf5bf2551ae3b4f4d1c94c92",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/inputs.json",
+      "status": "added",
+      "insertions": 28,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "6ad9ec39aec094611f53d1cd26d7525245e3e73c0627b806dab8d5804458f29e",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/ocr-coverage.json",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": null,
+      "basis": "review index itself; schema and final preview path/status list cross-checked, no circular self-hash"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/review-attempts.json",
+      "status": "added",
+      "insertions": 183,
+      "deletions": 0,
+      "review": "reviewed",
+      "sha256": "55f454aec065304973c4ca7508cb90620ebf7d7ce031246c9527fd2ad98a8397",
+      "basis": "JSON parsed; keys checked; execution output/provenance and copied byte identity reconciled"
+    }
+  ],
+  "excluded": [
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "insertions": 342,
+      "deletions": 3,
+      "exclude_reason": "default_path",
+      "supplementalReview": "full test source and actual PG execution",
+      "sha256": "7b91f383cfd0a7c107db8eb6ff881fa92b6d71a913a0a95fc915affd6860bd0c"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "insertions": 19,
+      "deletions": 2,
+      "exclude_reason": "unsupported_ext",
+      "supplementalReview": "diff, links, scope, authorization and result consistency checked",
+      "sha256": "62251313677f4a4eb136eb5264ed7ff05646ea6d399561ad6e5727e589536e54"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext",
+      "supplementalReview": "diff, links, scope, authorization and result consistency checked",
+      "sha256": "5e6e4d85523ea4ce7208b865ef1b376647762e80895ee58a05c5292e45b5f243"
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 2,
+      "exclude_reason": "unsupported_ext",
+      "supplementalReview": "diff, links, scope, authorization and result consistency checked",
+      "sha256": "a71b896e52523cf91b08d9dabe40b6b8da6797d27c37c958176123b190f5ca71"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 2,
+      "exclude_reason": "unsupported_ext",
+      "supplementalReview": "diff, links, scope, authorization and result consistency checked",
+      "sha256": "0ae1fc09ac6867461e04ad7038a1716e40b138ca7b9f2ee6750be16f8577d9ae"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/README.md",
+      "status": "added",
+      "insertions": 56,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext",
+      "supplementalReview": "diff, links, scope, authorization and result consistency checked",
+      "sha256": "fb7cdb228fe8624c6ffc9bd8e0c4c1e083857f75f5b9b371f1c5828def22e01d"
+    }
+  ],
+  "unresolved_findings": [],
+  "fixed_findings": [
+    {
+      "path": "apps/api/src/content-intake/reviewer.ts",
+      "content": "审批毫秒区间内事实/授权失效仍可能被接受；扩展完整区间检查并由PG回归证明拒绝。",
+      "start_line": 43,
+      "category": "security",
+      "severity": "high",
+      "status": "fixed"
+    },
+    {
+      "path": "apps/api/src/content-intake/reviewer.ts",
+      "content": "事务内历史时间不证明授权已提交；以共锁审核包检查点限定正向资格，晚取得资格通过新审批恢复。",
+      "start_line": 56,
+      "category": "security",
+      "severity": "high",
+      "status": "fixed"
+    },
+    {
+      "path": "apps/api/src/content-intake/approval-adapter.ts",
+      "content": "控制字符正则触发lint；用等价字符码检查修复。",
+      "start_line": 45,
+      "category": "style",
+      "severity": "low",
+      "status": "fixed"
+    }
+  ]
+}

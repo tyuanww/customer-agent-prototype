@@ -1,0 +1,183 @@
+{
+  "revision": "46c39ab412345791c7aff0c7f634529c0885cb91",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "001/002 是修前成功历史；003/004 是四项失败的两次复现。005为修后全量，006/007以原命令复验。",
+    "初始smoke期限未重置；005/006/007是必要修复复验，不新增探索。",
+    "Node24.19.0、pnpm11.19.0、PG15.18；证据工具bun1.4.2。仅隔离合成运行，无GUI/真实Feishu/生产ACL/P2发布。",
+    "源/测试/DDL/锁文件等26项输入哈希见 ../r2-inputs.json；全仓四项真实命令结果见 ../checks-r2.json，工具本记录只评价隔离PG探针。"
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t round-trips|keeps revoked",
+      "contract": "历史审核资格/来源确认/人工证据与撤回传播；当前全量由005、精确回归由006/007覆盖",
+      "expected": "修前历史记录；源改变后不作为当前通过依据",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (27 tests | 25 skipped) 2130ms\n   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1115ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  1015ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 25 skipped (27)\n   Start at  09:33:06\n   Duration  2.64s (transform 162ms, setup 0ms, collect 361ms, tests 2.13s, environment 0ms, prepare 46ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api test:intake:transactions",
+      "contract": "历史审核资格/来源确认/人工证据与撤回传播；当前全量由005、精确回归由006/007覆盖",
+      "expected": "修前历史记录；源改变后不作为当前通过依据",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-material.test.ts (5 tests) 226ms\n ✓ tests/content-intake.integration.test.ts (27 tests) 26916ms\n   ✓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant  932ms\n   ✓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation  883ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes  816ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys  825ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit  1135ms\n   ✓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants  820ms\n   ✓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer  841ms\n   ✓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager  986ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report  1114ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving  1156ms\n   ✓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate  984ms\n   ✓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock  810ms\n   ✓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result  961ms\n   ✓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot  988ms\n   ✓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations  1086ms\n   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1036ms\n   ✓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility  1035ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed  996ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence  1028ms\n   ✓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart  991ms\n   ✓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O  994ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready  1042ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  1014ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable  1015ms\n   ✓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation  1201ms\n   ✓ P2 sealed synthetic authority and durable candidates > propagates a verified revocation to every seeded release inheriting the same approval lineage  1085ms\n   ✓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider  1140ms\n\n Test Files  2 passed (2)\n      Tests  32 passed (32)\n   Start at  09:33:48\n   Duration  27.37s (transform 178ms, setup 0ms, collect 478ms, tests 27.14s, environment 0ms, prepare 72ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t sub-millisecond|uncommitted grant",
+      "contract": "历史审核资格/来源确认/人工证据与撤回传播；当前全量由005、精确回归由006/007覆盖",
+      "expected": "修前历史记录；源改变后不作为当前通过依据",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ❯ tests/content-intake.integration.test.ts (31 tests | 4 failed | 27 skipped) 6598ms\n   ↓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant\n   ↓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation\n   ↓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes\n   ↓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys\n   ↓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit\n   ↓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants\n   ↓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer\n   ↓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager\n   ↓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report\n   ↓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving\n   ↓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate\n   ↓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock\n   ↓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result\n   ↓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot\n   ↓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations\n   ↓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review\n   ↓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility\n   ↓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed\n   ↓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence\n   ↓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart\n   ↓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O\n   ↓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready\n   ↓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service\n   ↓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable\n   ↓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation\n   ↓ P2 sealed synthetic authority and durable candidates > propagates a verified revocation to every seeded release inheriting the same approval lineage\n   ↓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider\n   × P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire 1522ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n   × P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled 1299ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n   × P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires 1807ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n   × P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit 1968ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n\n Test Files  1 failed (1)\n      Tests  4 failed | 27 skipped (31)\n   Start at  09:44:32\n   Duration  7.19s (transform 175ms, setup 0ms, collect 442ms, tests 6.60s, environment 0ms, prepare 47ms)\n\nundefined\n/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/content-intake.integration.test.ts -t 'sub-millisecond|uncommitted grant'\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t sub-millisecond|uncommitted grant",
+      "contract": "历史审核资格/来源确认/人工证据与撤回传播；当前全量由005、精确回归由006/007覆盖",
+      "expected": "修前历史记录；源改变后不作为当前通过依据",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ❯ tests/content-intake.integration.test.ts (31 tests | 4 failed | 27 skipped) 5171ms\n   ↓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant\n   ↓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation\n   ↓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes\n   ↓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys\n   ↓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit\n   ↓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants\n   ↓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer\n   ↓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager\n   ↓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report\n   ↓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving\n   ↓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate\n   ↓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock\n   ↓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result\n   ↓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot\n   ↓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations\n   ↓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review\n   ↓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility\n   ↓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed\n   ↓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence\n   ↓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart\n   ↓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O\n   ↓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready\n   ↓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service\n   ↓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable\n   ↓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation\n   ↓ P2 sealed synthetic authority and durable candidates > propagates a verified revocation to every seeded release inheriting the same approval lineage\n   ↓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider\n   × P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire 1482ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n   × P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled 1318ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n   × P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires 1317ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n   × P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit 1053ms\n     → expected { ok: true, value: { …(10) } } to match object { ok: false, …(1) }\n(11 matching properties omitted from actual)\n\n Test Files  1 failed (1)\n      Tests  4 failed | 27 skipped (31)\n   Start at  09:48:24\n   Duration  5.73s (transform 170ms, setup 0ms, collect 419ms, tests 5.17s, environment 0ms, prepare 42ms)\n\nundefined\n/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/content-intake.integration.test.ts -t 'sub-millisecond|uncommitted grant'\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api test:intake:transactions",
+      "contract": "历史审核资格/来源确认/人工证据与撤回传播；当前全量由005、精确回归由006/007覆盖",
+      "expected": "36/36 PG+材料，实际下游审核包与数据库断言通过",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-material.test.ts (5 tests) 160ms\n ✓ tests/content-intake.integration.test.ts (31 tests) 31372ms\n   ✓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant  848ms\n   ✓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation  831ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes  812ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys  806ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit  1124ms\n   ✓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants  816ms\n   ✓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer  859ms\n   ✓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager  985ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report  1114ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving  1144ms\n   ✓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate  975ms\n   ✓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock  800ms\n   ✓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result  967ms\n   ✓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot  967ms\n   ✓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations  1078ms\n   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1008ms\n   ✓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility  1014ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed  996ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence  1005ms\n   ✓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart  994ms\n   ✓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O  983ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready  1031ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  997ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable  975ms\n   ✓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation  1179ms\n   ✓ P2 sealed synthetic authority and durable candidates > propagates a verified revocation to every seeded release inheriting the same approval lineage  994ms\n   ✓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider  1091ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire  1321ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled  1329ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires  1310ms\n   ✓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit  1018ms\n\n Test Files  2 passed (2)\n      Tests  36 passed (36)\n   Start at  09:49:59\n   Duration  31.75s (transform 155ms, setup 0ms, collect 407ms, tests 31.53s, environment 0ms, prepare 67ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t sub-millisecond|uncommitted grant",
+      "contract": "历史审核资格/来源确认/人工证据与撤回传播；当前全量由005、精确回归由006/007覆盖",
+      "expected": "修后原命令回归通过且未写入无效审批事实",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (31 tests | 27 skipped) 5083ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire  1380ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled  1326ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires  1326ms\n   ✓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit  1049ms\n\n Test Files  1 passed (1)\n      Tests  4 passed | 27 skipped (31)\n   Start at  09:55:53\n   Duration  5.57s (transform 147ms, setup 0ms, collect 339ms, tests 5.08s, environment 0ms, prepare 34ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t round-trips|keeps revoked",
+      "contract": "历史审核资格/来源确认/人工证据与撤回传播；当前全量由005、精确回归由006/007覆盖",
+      "expected": "修后原命令回归通过且未写入无效审批事实",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (31 tests | 29 skipped) 2074ms\n   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1058ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  1015ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 29 skipped (31)\n   Start at  09:55:59\n   Duration  2.50s (transform 138ms, setup 0ms, collect 280ms, tests 2.07s, environment 0ms, prepare 32ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "round-trips|keeps revoked"
+      ],
+      "hypothesis": "Because the package round trip and terminal revocation passed, the required full transaction suite will check historical eligibility, retries, cancellation and inherited release effects.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "test:intake:transactions"
+      ]
+    },
+    {
+      "observationCapture": "002",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "test:intake:transactions"
+      ],
+      "hypothesis": "Because review found uncertain sub-millisecond and commit-time eligibility, the added database regressions should reject those historical approvals before repairs.",
+      "nextCapture": "003",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "sub-millisecond|uncommitted grant"
+      ]
+    },
+    {
+      "observationCapture": "004",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "sub-millisecond|uncommitted grant"
+      ],
+      "hypothesis": "Because replay confirmed eligibility defects, validate the repaired full-millisecond and committed-authority guards against all isolated intake regressions.",
+      "nextCapture": "005",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "test:intake:transactions"
+      ]
+    },
+    {
+      "observationCapture": "005",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "test:intake:transactions"
+      ],
+      "hypothesis": "Because full regression passed, replay the exact formerly failing command on repaired inputs to close its machine-verifiable evidence chain.",
+      "nextCapture": "006",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "sub-millisecond|uncommitted grant"
+      ]
+    },
+    {
+      "observationCapture": "006",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "sub-millisecond|uncommitted grant"
+      ],
+      "hypothesis": "Because the eligibility repair changed the shared approval dependency, revalidate the original success and revoke contracts on current inputs as required repair verification.",
+      "nextCapture": "007",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "round-trips|keeps revoked"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

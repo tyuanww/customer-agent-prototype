@@ -9,6 +9,8 @@ import { createIntakeTransactions, IntakeRejection, type IntakePool, type Intake
 import { authorize, changeGrant, createGrants, source } from './authority.js';
 import { cancelCandidate, freezeParsed, getJob, jobView, readCandidate, receive } from './candidate.js';
 import { digest } from './material.js';
+import type { ApprovalAdapter } from './approval-adapter.js';
+import { createIntakeEvidence } from './evidence.js';
 
 type C = components['schemas'];
 const operation = (value: unknown): string | null => typeof value === 'object' && value !== null
@@ -19,7 +21,7 @@ const json = (value: unknown): CanonicalJsonValue => value as CanonicalJsonValue
  * The authenticated actor comes from product-auth, never from a request body's userId.
  * The existing object store and isolated parser are the only file consumers. */
 export function createContentIntakeService(pool: IntakePool, store: ContentObjectStore,
-  report: (diagnosticId: string, error: unknown) => void = () => undefined) {
+  report: (diagnosticId: string, error: unknown) => void = () => undefined, approval?: ApprovalAdapter) {
   const run = createIntakeTransactions(pool, report);
   const runner = createParseRunner();
   const grantList = (v: unknown) => parseContractSchema('IntakeGrantList', v);
@@ -98,6 +100,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   }
 
   return {
+    ...createIntakeEvidence(run, store, approval, report),
     grantBatch(actor: AuthenticatedUser, raw: unknown) {
       return run(actor, 'grants', json(raw), operation(raw),
         (client, who) => createGrants(client, who, parseContractSchema('IntakeGrantBatch', raw)), grantList);
