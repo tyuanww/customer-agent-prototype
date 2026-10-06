@@ -160,5 +160,43 @@
     }
   },
   "finalTestSourceCommit": "45a533088d11af09bdf237bb87d441e3100466b3",
-  "productionSourceUnchangedAfterNativeReview": true
+  "productionSourceUnchangedAfterNativeReview": true,
+  "hostRereview": {
+    "skill": "open-code-review-delegate",
+    "completedAt": "2026-10-06T12:05:09.991122+00:00",
+    "baseCommit": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+    "reviewedHead": "2dfae0362864dc0c88b69354a7ef985178db2398",
+    "reviewedTree": "cb5d69d83ed9319819b6a348ea37f71f01d3b4be",
+    "method": "OCR deterministic preview and rule resolution; host full diff/source review including default-excluded tests and Markdown. No external model or new subagent run.",
+    "coverage": "ocr-coverage.json",
+    "total_files": 18,
+    "reviewed_files": 18,
+    "skipped_files": 0,
+    "coverage_rate": 1,
+    "findings": [],
+    "remainingConfirmedDefects": 0,
+    "focus": [
+      "session/shop/principal/source binding and per-page authority",
+      "inherited approval/source/owner gates and immutable deadlines",
+      "keyset and vocabulary-budget completeness",
+      "white-list projection and exact vocabulary display versions",
+      "failure rollback and service-restart consumption",
+      "test/log/source binding and documentation limits"
+    ],
+    "evidenceReuse": {
+      "sourceCommit": "45a533088d11af09bdf237bb87d441e3100466b3",
+      "codeTestsDependenciesUnchanged": true,
+      "verifiedInputHashes": 67,
+      "verifiedCheckLogs": 12,
+      "macPassed": 85,
+      "wslPassed": 85,
+      "newRuntimeTests": false,
+      "reason": "Only review metadata/documentation changed; immutable input and log hashes verified, including WSL cleanup."
+    },
+    "codegraph": "Index directory exists but CLI reports no usable index; targeted source reads used, no install/rebuild.",
+    "limits": [
+      "Existing external model timeouts remain missing coverage.",
+      "Native Mac/Windows Electron interaction and production integration were not tested."
+    ]
+  }
 }
