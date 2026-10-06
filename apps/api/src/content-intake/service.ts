@@ -12,6 +12,7 @@ import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
 import { createIntakePublication } from './publication.js';
+import { createIntakeUsage } from './usage.js';
 import { checkQuality, freezeQuality, previewQuality, qualityCommand, qualitySubmission, readQuality,
   type IntakeQualityPreview, type IntakeQualityProgress } from './quality.js';
 
@@ -106,6 +107,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   return {
     ...evidence,
     ...createIntakePublication(run, refreshForPublish),
+    ...createIntakeUsage(run),
     qualityPreview(actor: AuthenticatedUser, key: unknown) {
       return run(actor, 'quality-preview', null, null,
         (client, who) => previewQuality(client, who, key), value => value as IntakeQualityPreview);
