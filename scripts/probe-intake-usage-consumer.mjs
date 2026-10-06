@@ -1,44 +1,50 @@
-// Root-owned synthetic cross-application probe, invoked only by the isolated API
-// integration test. Node 24 transforms Main's TS in this test process; no runtime
-// build, API dependency on desktop, production route or private key file is added.
+// Root-owned bridge: API tests may not import desktop source. Run the existing
+// desktop test runtime against a loopback-only fixture. Credentials exist only
+// in stdin/process memory (never argv or a file), and no user profile is read.
 import assert from 'node:assert/strict';
-import { ContentIntakeUsage } from '../apps/desktop/src/main/content-intake-usage.ts';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-let input='';
+let input = '';
 for await (const chunk of process.stdin) {
-  input+=String(chunk);if(input.length>4096)throw new Error('PROBE_INPUT_LIMIT');
+  input += String(chunk);
+  if (input.length > 4096) throw new Error('PROBE_INPUT_LIMIT');
 }
-const {origin,token,releaseId}=JSON.parse(input);
-assert.match(origin,/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/);
-assert.equal(typeof token,'string');assert.equal(typeof releaseId,'string');
-async function request(path,options={}) {
-  const response=await fetch(new URL(path,origin),{method:options.body===undefined?'GET':'POST',
-    headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},
-    ...(options.body===undefined?{}:{body:JSON.stringify(options.body)}),
-    signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(5000)]):AbortSignal.timeout(5000),redirect:'error'});
-  const value=await response.json();
-  if(!response.ok)throw Object.assign(new Error('SYNTHETIC_REQUEST_FAILED'),{code:value.code,reason:value.reason});
-  return {value};
-}
-const copied=[];
-const main=new ContentIntakeUsage({view:()=>({signedIn:true,sessionEpoch:1}),subscribe:()=>()=>{},
-  request:async(epoch,path,options)=>{assert.equal(epoch,1);return request(path,options);}},text=>copied.push(text));
+const context = JSON.parse(input);
+assert.match(context.origin, /^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/);
+assert.match(context.token, /^[A-Za-z0-9_-]{43}$/);
+assert.equal(typeof context.releaseId, 'string');
+assert.ok(Number.isFinite(Date.parse(context.expiresAt)));
+const desktop = fileURLToPath(new URL('../apps/desktop/', import.meta.url));
+const require = createRequire(join(desktop, 'package.json'));
+const cli = join(dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
+const child = spawn(process.execPath, [cli, 'run', '--pool=threads', 'tests/unit/content-intake-usage-http.test.ts'], {
+  cwd: desktop, stdio: ['ignore', 'pipe', 'pipe'],
+  env: { ...process.env, CUSTOMER_AGENT_INTAKE_HTTP_PROBE: input },
+});
+let output = '', overflow = false;
+const collect = chunk => {
+  if (overflow) return;
+  output += String(chunk);
+  if (output.length > 1_048_576) { overflow = true; child.kill('SIGKILL'); }
+};
+child.stdout.on('data', collect); child.stderr.on('data', collect);
+const stop = () => child.kill('SIGKILL');
+process.once('SIGTERM', stop); process.once('SIGINT', stop);
+const deadline = setTimeout(stop, 40_000);
 try {
-  main.select({shopId:'shop-a',productIds:[],scenarioIds:[]});
-  const first=await main.refresh(), projection=first.read();
-  assert.equal(projection.releaseId,releaseId);
-  assert.equal(projection.faq[0].entry.answerText,'第一行。\n第二行。');
-  assert.equal('internalNote' in projection.faq[0].entry,false);
-  assert.equal('entitlementId' in projection,false);
-  first.copy(projection.faq[0].key);assert.deepEqual(copied,['第一行。\n第二行。']);
-  await request('/__synthetic__/expire-next',{body:{}});
-  await assert.rejects(main.refresh(),{code:'EXPIRED'});
-  assert.equal(main.current(),first);first.copy(projection.faq[0].key);assert.equal(copied.length,2);
-  await request('/__synthetic__/next-release',{body:{}});
-  const empty=await main.refresh();assert.deepEqual(empty.read().faq,[]);assert.equal(first.read().faq.length,1);
-  await request('/__synthetic__/revoke',{body:{}});
-  await assert.rejects(main.refresh(),{code:'FORBIDDEN'});
-  assert.equal(first.read(),null);assert.equal(empty.read(),null);
-  assert.throws(()=>first.copy(projection.faq[0].key),/STALE/);assert.equal(copied.length,2);
-  console.log(JSON.stringify({status:'PASS',publishedText:true,localExpiry:true,normalUpdate:true,revocationFanout:true}));
-} finally {main.dispose();}
+  const [code] = await once(child, 'close');
+  if (code !== 0 || overflow || !output.includes('INTAKE_USAGE_HTTP_PASS')) {
+    // Fixture diagnostics only, but defensively strip its token before printing.
+    process.stderr.write(output.replaceAll(context.token, '[credential]'));
+    throw new Error('INTAKE_USAGE_HTTP_PROBE_FAILED');
+  }
+  console.log(JSON.stringify({ status: 'PASS', actualSession: true, largePage: true, cancellation: true,
+    publishedText: true, localExpiry: true, normalUpdate: true, revocationFanout: true }));
+} finally {
+  clearTimeout(deadline); process.off('SIGTERM', stop); process.off('SIGINT', stop);
+  if (child.exitCode === null) child.kill('SIGKILL');
+}

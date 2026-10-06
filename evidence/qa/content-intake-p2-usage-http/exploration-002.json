@@ -1,0 +1,29 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "Main consumes actual synthetic HTTP"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (87 tests | 86 skipped) 3765ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  3765ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 86 skipped (87)\n   Start at  23:07:14\n   Duration  4.35s (transform 182ms, setup 0ms, collect 428ms, tests 3.77s, environment 0ms, prepare 38ms)\n\n",
+  "hypothesis": "Actual HTTP publication passed; adversarial review reproduced a diagnostic-sink exception escaping IntakeError. Verify the repaired sink failure, all status mappings and strict ingress.",
+  "nextCapture": "002",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake-usage-http.test.ts"
+  ]
+}
