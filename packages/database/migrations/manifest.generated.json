@@ -1,9 +1,9 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
-  "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
-  "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
-  "upgrade_source_sha256": "aad27190bd06c7e094ba32f006000c17dc857ee6ca565e85f76e82da3d4f2811",
+  "contract_set_id": "cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288",
+  "source_git_sha": "53906e302288fe0fb70e58b24a40088ecbbd3ef6",
+  "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
+  "upgrade_source_sha256": "029dc103681265237237a0b342a18605813604ff9e67e312004917cb64f42505",
   "compatibility": {
     "current": "N",
     "prior_signed_baseline": {
@@ -48,6 +48,12 @@
         "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
         "source_schema_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
         "migration_count": 19
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+        "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+        "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
+        "migration_count": 24
       }
     ]
   },
@@ -432,9 +438,9 @@
       "position": 22,
       "id": "0022_intake_legacy_fence",
       "file": "0022_intake_legacy_fence.sql",
-      "source_ranges": [],
       "sha256": "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03",
       "bytes": 12524,
+      "source_ranges": [],
       "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
       "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
       "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
@@ -443,9 +449,9 @@
       "position": 23,
       "id": "0023_intake_quality",
       "file": "0023_intake_quality.sql",
-      "source_ranges": [],
       "sha256": "c3b37131c28b76b2453e24d5f432e70329c478a7f90d34c95598518124e50136",
       "bytes": 8475,
+      "source_ranges": [],
       "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
       "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
       "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
@@ -454,12 +460,28 @@
       "position": 24,
       "id": "0024_intake_publication",
       "file": "0024_intake_publication.sql",
-      "source_ranges": [],
       "sha256": "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2",
       "bytes": 13591,
+      "source_ranges": [],
       "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
       "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
       "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
+    },
+    {
+      "position": 25,
+      "id": "0025_intake_usage_v1_21",
+      "file": "0025_intake_usage_v1_21.sql",
+      "source_ranges": [
+        {
+          "start_line": 12738,
+          "end_line": 12791
+        }
+      ],
+      "sha256": "f270f787323a65baf3727337dcc34c1ff3f7a0bac0baf79a1894a7f7ae9591f4",
+      "bytes": 3918,
+      "contract_set_id": "cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288",
+      "source_git_sha": "53906e302288fe0fb70e58b24a40088ecbbd3ef6",
+      "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013"
     }
   ]
 }

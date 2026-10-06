@@ -152,3 +152,5 @@ pnpm workspace:check
 宿主通过 `node scripts/read-g1a-delivery.mjs <manifest-sha256>` 从 stdin 读取进程输出或回读内容；输出为校验后的 JSON。落盘 JSON 回读时先加同一前缀。缺失、重复、未知版本、锚点不符、坏字段或清理失败返回1，仅输出固定错误码；合法业务 FAIL 是可保存报告，不等于进程或合同故障。该入口只读 stdin，不读真实输入包、不连接 PG、不签发批准。
 
 此格式取代旧 `G1A_E0_REPORT` 输出。仓外旧 v4 消费者冻结，不能解析此新版本；配套 v5 调用产品读取器，保留原授权、沙箱及排他保存边界。历史真实配置和报告不自动迁移；新候选合并后按具体批准绑定匹配版本。`pnpm test:g1a:e0:ci` 会在纯合成包上实跑 PG、导出、独立 CLI 消费、落盘回读及失败清理，并拒绝真实输入环境变量、零用例或跳过。
+
+P2 使用资格现已消费 OpenAPI 1.17.0 / schema.v1.21。认证模块用私有 WeakMap 保存成功认证的会话引用，DTO/响应不携带该键；`content-intake/usage.ts` 在事务内锁定并重查会话、批量核验选择范围，原子保存资格和上下文。分页只接受 entitlementId/cursor/limit，重启后从数据库重建绑定；退出、会话清理及缺失旧上下文均拒绝。`test:intake:transactions` 包含真实合成登录、PG 发布与桌面 Main 消费者经测试专用 loopback HTTP 的跨进程验证；没有生产 HTTP 注册、应用 ACL、真实飞书 transport 或原生窗口验收。证据见[使用资格持久化验收](../../evidence/qa/content-intake-p2-usage-context/README.md)。

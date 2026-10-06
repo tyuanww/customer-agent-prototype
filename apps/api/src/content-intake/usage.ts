@@ -1,38 +1,50 @@
 import { randomBytes } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
+import { authenticatedProductSession } from '../product-auth-service.js';
 import { canonical, digest, SNAPSHOT_VOCABULARY_LIMIT, snapshotVocabularyKeys } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
-/** Sealed adapter input, never a renderer-provided identity. A future production
- * adapter must supply the authenticated session and current selection. The wire
- * contract does not yet carry product/scenario selection; no HTTP route is wired.
- * A changed session/shop/generation/selection makes old pages unusable. */
-export type IntakeUsageContext = {
-  sessionId: string; shopId: string; contextGeneration: number;
+/** Immutable server-owned context, reconstructed from storage for every page.
+ * Main owns its current selection; it never resends selection with pagination. */
+type IntakeUsageContext = {
+  sessionTokenHash: string; shopId: string; contextGeneration: number;
   productIds: string[]; scenarioIds: string[];
 };
 type ScopeRow = { source_id: string; scope: C['IntakeSourceScope']; generation: string; mode_version: string; mode: string; until: Date | null };
 type Lease = { entitlement_hash: string; release_id: string; shop_id: string; context_generation: string;
-  principal_generation: string; issued_at: Date; valid_until: Date; expires_at: Date; client_id: string; source_binding_hash: string };
+  principal_generation: string; issued_at: Date; valid_until: Date; expires_at: Date; client_id: string; source_binding_hash: string;
+  product_ids: string[]; scenario_ids: string[] };
 
-function context(input: IntakeUsageContext): IntakeUsageContext {
-  if (!input || typeof input.sessionId !== 'string' || !input.sessionId.trim() || input.sessionId.length > 512) {
-    throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
-  }
-  const ids = (v: string[]) => {
-    if (!Array.isArray(v) || v.length > 100) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
-    return [...new Set(v.map(id => parseContractSchema('IntakeId', id)))].sort();
-  };
-  return { sessionId: input.sessionId, shopId: parseContractSchema('IntakeId', input.shopId),
-    contextGeneration: parseContractSchema('IntakeVersion', input.contextGeneration),
-    productIds: ids(input.productIds), scenarioIds: ids(input.scenarioIds) };
+async function session(client: IntakeTransaction, actor: AuthenticatedUser): Promise<{hash: string; validUntil: number}> {
+  const hash = authenticatedProductSession(actor);
+  if (!hash) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+  const result = await client.query<{ expires_at: Date }>(`SELECT s.expires_at
+    FROM backend_identity.sessions s JOIN backend_identity.subject_bindings b USING(binding_id)
+    WHERE s.token_hash=$1 AND b.user_id=$2 AND b.enabled AND s.revoked_at IS NULL
+      AND s.expires_at>clock_timestamp() FOR SHARE OF s,b`, [hash, actor.user_id]);
+  if (!result.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+  const validUntil=result.rows[0].expires_at.getTime();
+  client.validUntil(validUntil);
+  return {hash,validUntil};
+}
+
+async function validateSelection(client: IntakeTransaction, ctx: IntakeUsageContext, scopes: ScopeRow[]) {
+  const selected = [...ctx.productIds.map(id => ({id,kind:'product'})), ...ctx.scenarioIds.map(id => ({id,kind:'scenario'}))];
+  const result = await client.query<{ count: string }>(`SELECT count(*) FROM jsonb_to_recordset($1::jsonb) selected(id text,kind text)
+    JOIN content_intake.vocabulary v ON v.vocabulary_id=selected.id AND v.kind=selected.kind AND v.active
+    JOIN content_intake.scopes s USING(scope_id)
+    WHERE (s.shop_id=$2 OR s.shop_id IS NULL) AND EXISTS (SELECT 1 FROM jsonb_to_recordset($3::jsonb)
+      allowed("tenantId" text,"appId" text,"brandId" text,domain text)
+      WHERE s.tenant_id=allowed."tenantId" AND s.app_id=allowed."appId" AND s.brand_id=allowed."brandId" AND s.domain=allowed.domain)`,
+  [JSON.stringify(selected), ctx.shopId, JSON.stringify(scopes.map(s => s.scope))]);
+  if (Number(result.rows[0]!.count)!==selected.length) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
 }
 
 // The old lease's opaque client identity is namespaced to this server-owned
-// session/selection and the exact source generations. No bearer or session ID
-// is stored, and no legacy offline token is exposed to an intake consumer.
+// session/selection and the exact source generations. The private session hash
+// is persisted only in entitlement_contexts; no bearer/lease token is exposed.
 function binding(ctx: IntakeUsageContext, scopes: ScopeRow[]): string {
   return `intake:${digest(canonical({ ...ctx, sources: scopes.map(s =>
     [s.source_id, s.generation, s.mode_version]).sort((a,b) => a[0]! < b[0]! ? -1 : 1) }))}`;
@@ -145,18 +157,21 @@ function cursor(raw: string | undefined, hash: string): [string,string] {
  * permission cache, remote approval call, legacy read adapter or runtime ACL. */
 export function createIntakeUsage(run: ReturnType<typeof createIntakeTransactions>) {
   return {
-    issueEntitlement(actor: AuthenticatedUser, input: IntakeUsageContext, raw: unknown) {
+    issueEntitlement(actor: AuthenticatedUser, raw: unknown) {
       return run(actor,'entitlement',null,null,async (client,who) => {
-        const ctx=context(input), req=parseContractSchema('IntakeEntitlementRequest',raw);
-        if (ctx.shopId!==req.shopId || ctx.contextGeneration!==req.contextGeneration) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+        const req=parseContractSchema('IntakeEntitlementRequest',raw);
+        const {hash:sessionTokenHash,validUntil:sessionUntil}=await session(client,actor);
+        const ctx: IntakeUsageContext={sessionTokenHash,shopId:req.shopId,contextGeneration:req.contextGeneration,
+          productIds:[...req.productIds].sort(),scenarioIds:[...req.scenarioIds].sort()};
         await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
         const scopes=await scopesFor(client,who,ctx.shopId);
+        await validateSelection(client,ctx,scopes);
         const current=await client.query<{ current_release_id: string }>('SELECT current_release_id FROM public.content_current WHERE id=1');
         const release=current.rows[0]?.current_release_id;
         if (!release) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
         if (req.releaseId!==null && req.releaseId!==release) throw new IntakeRejection('BASE_CHANGED');
         const issued=await clock(client);
-        let until=Math.min(who.validUntil,issued+300_000,...scopes.map(s=>s.until!.getTime()),
+        let until=Math.min(who.validUntil,sessionUntil,issued+300_000,...scopes.map(s=>s.until!.getTime()),
           await releaseDeadline(client,release,who.tenantId),await contentDeadline(client,release,scopes,ctx,issued));
         const lease=await client.query<{ offline_lease_token: string; lease_expires_at: Date; release_id: string }>(
           'SELECT * FROM public.issue_snapshot_offline_lease($1,$2,300)',[binding(ctx,scopes),who.userId]);
@@ -174,18 +189,23 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
           SELECT $1,$2,$3,$4,$5,$6,$7,$8,0,issued_at,$9 FROM public.snapshot_offline_leases WHERE lease_token_hash=$4`,
         [hash,who.id,who.userId,leaseHash,release,ctx.shopId,ctx.contextGeneration,who.generation,new Date(until)]);
         await client.query('INSERT INTO content_intake.entitlement_scopes SELECT $1,unnest($2::text[])',[hash,scopes.map(s=>s.source_id)]);
+        await client.query(`INSERT INTO content_intake.entitlement_contexts(entitlement_hash,session_token_hash,product_ids,scenario_ids)
+          VALUES ($1,$2,$3,$4)`,[hash,sessionTokenHash,ctx.productIds,ctx.scenarioIds]);
         return { entitlementId:id,releaseId:release,shopId:ctx.shopId,contextGeneration:ctx.contextGeneration,
           revocationGeneration:who.generation,validUntil:new Date(until).toISOString(),scopes:scopes.map(s=>s.scope) };
       },v=>parseContractSchema('IntakeEntitlement',v));
     },
-    snapshot(actor: AuthenticatedUser, input: IntakeUsageContext, raw: unknown) {
+    snapshot(actor: AuthenticatedUser, raw: unknown) {
       return run(actor,'snapshot',null,null,async (client,who) => {
-        const ctx=context(input), req=page(raw), hash=digest(req.entitlementId);
-        const leases=await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash
+        const req=page(raw), hash=digest(req.entitlementId), {hash:sessionTokenHash}=await session(client,actor);
+        const leases=await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash,c.product_ids,c.scenario_ids
           FROM content_intake.entitlements e JOIN public.snapshot_offline_leases l USING(lease_token_hash)
-          WHERE e.entitlement_hash=$1 AND e.principal_id=$2 AND e.user_id=$3`,[hash,who.id,who.userId]);
+          JOIN content_intake.entitlement_contexts c USING(entitlement_hash)
+          WHERE e.entitlement_hash=$1 AND e.principal_id=$2 AND e.user_id=$3 AND c.session_token_hash=$4`,[hash,who.id,who.userId,sessionTokenHash]);
         const lease=leases.rows[0];
-        if (!lease || lease.shop_id!==ctx.shopId || Number(lease.context_generation)!==ctx.contextGeneration) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+        if (!lease) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+        const ctx: IntakeUsageContext={sessionTokenHash,shopId:lease.shop_id,contextGeneration:Number(lease.context_generation),
+          productIds:lease.product_ids,scenarioIds:lease.scenario_ids};
         if (Number(lease.principal_generation)!==who.generation) throw new IntakeRejection('PERMISSION_CHANGED','FORBIDDEN');
         if (Math.min(lease.valid_until.getTime(),lease.expires_at.getTime())<=await clock(client)) throw new IntakeRejection('LEASE_EXPIRED','FORBIDDEN');
         const scopes=await scopesFor(client,who,ctx.shopId,hash);

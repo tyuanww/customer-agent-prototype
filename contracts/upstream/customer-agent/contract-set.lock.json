@@ -1,11 +1,11 @@
 {
   "schema": "customer-agent-contract-consumption/v1",
-  "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+  "contract_set_id": "cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288",
   "source_repository": "ai-赋能立项",
-  "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
-  "manifest_sha256": "9355557862c5a621f91ae6e106479f4b4dbe64ac07d1329f3850c630a5c539fb",
-  "openapi_sha256": "2f029b210baa27164f2fbddc237f9775ac994629f354a5307c7c9f339f72ebb2",
-  "database_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
+  "source_git_sha": "53906e302288fe0fb70e58b24a40088ecbbd3ef6",
+  "manifest_sha256": "718c32079c3bf350bcd52bd7d27079f1da3f1ae4eb9753a35dbeaf480ed90e33",
+  "openapi_sha256": "3e0a3f122aefa0bff9c330e105f1a5cbb2b26662fd5f04db1ef3a93ac1bc1121",
+  "database_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "ddev_authorized": false,
   "runtime_activated": false

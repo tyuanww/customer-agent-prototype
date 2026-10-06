@@ -16,7 +16,7 @@ import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
-const EXPECTED_DATABASE_SHA256 = '1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41';
+const EXPECTED_DATABASE_SHA256 = '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013';
 const BASELINE = Object.freeze({
   contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c',
   sourceGitSha: '1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38',
@@ -191,6 +191,41 @@ const PRIOR_V1_18 = Object.freeze({
 });
 const REVIEWED_UPGRADES = Object.freeze([PRIOR_REVIEWED_UPGRADE, PRIOR_V1_14, PRIOR_V1_15, PRIOR_V1_16, PRIOR_V1_17, PRIOR_V1_18]);
 
+const PRIOR_INTAKE = Object.freeze({
+  "contractSetId": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+  "sourceGitSha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+  "sourceSchemaSha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
+  "migrationCount": 24,
+  "schemaFile": "schema-v1.20.sql"
+});
+const COMPATIBLE_UPGRADES = Object.freeze([...REVIEWED_UPGRADES, PRIOR_INTAKE]);
+const FROZEN_INTAKE_OVERLAYS = Object.freeze([
+  {
+    "position": 22,
+    "id": "0022_intake_legacy_fence",
+    "file": "0022_intake_legacy_fence.sql",
+    "sha256": "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03",
+    "bytes": 12524,
+    "source_ranges": []
+  },
+  {
+    "position": 23,
+    "id": "0023_intake_quality",
+    "file": "0023_intake_quality.sql",
+    "sha256": "c3b37131c28b76b2453e24d5f432e70329c478a7f90d34c95598518124e50136",
+    "bytes": 8475,
+    "source_ranges": []
+  },
+  {
+    "position": 24,
+    "id": "0024_intake_publication",
+    "file": "0024_intake_publication.sql",
+    "sha256": "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2",
+    "bytes": 13591,
+    "source_ranges": []
+  }
+]);
+
 function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
@@ -363,7 +398,7 @@ function renderCatalogue(manifest, migrations) {
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(REVIEWED_UPGRADES.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(COMPATIBLE_UPGRADES.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
 export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
@@ -373,19 +408,35 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (snapshot.manifest?.database?.sha256 !== EXPECTED_DATABASE_SHA256 || sha256(snapshot.database_source) !== EXPECTED_DATABASE_SHA256) {
     throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
   }
-  const slices = intakeUpgradeSlices(snapshot.database_source, projectRoot);
-  const upgradeSourceBody = slices.map(({ sourceBody }) => sourceBody).join('\n');
-  const upgrades = slices.map((slice) => renderUpgradeMigration(slice, snapshot));
-  const productOverlays = FROZEN_PRODUCT_OVERLAYS.map((descriptor) =>
-    loadFrozenProductOverlay(projectRoot, descriptor));
+  const previousPath = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_INTAKE.contractSetId, PRIOR_INTAKE.schemaFile);
+  const previous = readFileSync(previousPath, 'utf8');
+  if (sha256(previous) !== PRIOR_INTAKE.sourceSchemaSha256) throw new Error('Immutable intake predecessor digest drifted');
+  const prefix = '-- schema.v1.21 — DRAFT usage-context additive storage contract\n' + previous + '\n';
+  if (!snapshot.database_source.startsWith(prefix)) throw new Error('Usage predecessor differs from immutable v1.20');
+  const match = snapshot.database_source.slice(prefix.length).match(/^-- BEGIN INTAKE USAGE ([0-9a-f]{64})\n([\s\S]+)-- END INTAKE USAGE\n$/);
+  if (!match || sha256(match[2]) !== match[1]) throw new Error('Usage increment digest drifted');
+  const bodyLines = match[2].trimEnd().split('\n');
+  const begin = bodyLines.indexOf('BEGIN;');
+  if (begin < 0 || bodyLines.filter(line => line === 'BEGIN;').length !== 1
+    || bodyLines.at(-1) !== 'COMMIT;' || bodyLines.filter(line => line === 'COMMIT;').length !== 1) throw new Error('Usage transaction anchors drifted');
+  const offset = prefix.split('\n').length + 1;
+  const ranges = [{ start_line: offset + begin + 1, end_line: offset + bodyLines.length - 2 }];
+  const upgradeSourceBody = linesForRanges(snapshot.database_source.trimEnd().split('\n'), ranges);
+  const priorSnapshot = { contract_set_id: PRIOR_INTAKE.contractSetId, source_git_sha: PRIOR_INTAKE.sourceGitSha,
+    manifest: { database: { sha256: PRIOR_INTAKE.sourceSchemaSha256 } } };
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
-    ...REVIEWED_UPGRADES.map((p) => loadPriorReviewedUpgrade(projectRoot, p)),
-    ...productOverlays,
-    ...upgrades,
-    renderIntakeOverlay(projectRoot, snapshot, 22, '0022_intake_legacy_fence'),
-    renderIntakeOverlay(projectRoot, snapshot, 23, '0023_intake_quality'),
-    renderIntakeOverlay(projectRoot, snapshot, 24, '0024_intake_publication'),
+    ...REVIEWED_UPGRADES.map(p => loadPriorReviewedUpgrade(projectRoot, p)),
+    ...FROZEN_PRODUCT_OVERLAYS.map(descriptor => loadFrozenProductOverlay(projectRoot, descriptor)),
+    ...intakeUpgradeSlices(previous, projectRoot).map(slice => renderUpgradeMigration(slice, priorSnapshot)),
+    ...FROZEN_INTAKE_OVERLAYS.map(descriptor => {
+      const frozen = loadPriorReviewedUpgrade(projectRoot, { ...PRIOR_INTAKE, ...descriptor });
+      if (renderIntakeOverlay(projectRoot, priorSnapshot, descriptor.position, descriptor.id).sql !== frozen.sql) {
+        throw new Error(`Frozen intake overlay source drifted: ${descriptor.file}`);
+      }
+      return frozen;
+    }),
+    renderUpgradeMigration({position: 25, id: '0025_intake_usage_v1_21', version: 'schema.v1.21', ranges, sourceBody: upgradeSourceBody}, snapshot),
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
@@ -401,7 +452,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
         source_schema_sha256: BASELINE.sourceSchemaSha256,
         migration_count: BASELINE.migrationCount,
       }),
-      prior_reviewed_upgrades: Object.freeze(REVIEWED_UPGRADES.map((p) => Object.freeze({
+      prior_reviewed_upgrades: Object.freeze(COMPATIBLE_UPGRADES.map((p) => Object.freeze({
         contract_set_id: p.contractSetId, source_git_sha: p.sourceGitSha,
         source_schema_sha256: p.sourceSchemaSha256, migration_count: p.migrationCount,
       }))),
