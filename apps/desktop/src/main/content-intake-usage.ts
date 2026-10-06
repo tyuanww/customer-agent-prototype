@@ -7,7 +7,7 @@ type Selection = Pick<C['IntakeEntitlementRequest'], 'shopId' | 'productIds' | '
 export interface IntakeUsageSession {
   view(): { signedIn: boolean; sessionEpoch: number };
   subscribe(listener: () => void): () => void;
-  request(epoch: number, path: string, options: { body?: unknown; signal: AbortSignal }): Promise<{value: unknown}>;
+  request(epoch: number, path: string, options: { body?: unknown; signal: AbortSignal; maxResponseBytes?: number }): Promise<{value: unknown}>;
 }
 export class IntakeUsageError extends Error {
   constructor(readonly code: 'VALIDATION' | 'STALE' | 'EXPIRED' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'UNAVAILABLE' | 'LIMIT' | 'CLIPBOARD_FAILED') {
@@ -118,10 +118,12 @@ export class ContentIntakeUsage {
       const sourceIds = new Set(entitlement.scopes.map(s => s.sourceId));
       let cursor: string | null = null, bytes = 0;
       for (let page = 0; ; page++) {
-        if (page >= MAX_PAGES) throw new IntakeUsageError('LIMIT');
+        if (page >= MAX_PAGES || bytes >= MAX_BYTES) throw new IntakeUsageError('LIMIT');
         if (!live()) throw new IntakeUsageError('EXPIRED');
         const query = new URLSearchParams({ entitlementId: entitlement.entitlementId, limit: '100', ...(cursor === null ? {} : { cursor }) });
-        const response = await this.session.request(epoch, `/v1/intake/snapshot?${query}`, { signal: controller.signal });
+        const response = await this.session.request(epoch, `/v1/intake/snapshot?${query}`, {
+          signal: controller.signal, maxResponseBytes: MAX_BYTES - bytes,
+        });
         assertRequest();
         if (!live()) throw new IntakeUsageError('EXPIRED');
         bytes += Buffer.byteLength(JSON.stringify(response.value) ?? '');

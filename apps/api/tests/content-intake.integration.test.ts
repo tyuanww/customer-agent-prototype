@@ -1,20 +1,20 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
+import Fastify from 'fastify';
 import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { Pool, type Client, type PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createTemplate } from '@customer-agent/content-intake';
-import type { components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
+import { contentIntakeUsageRoutes } from '../src/content-intake/usage-http.js';
 import type { IntakeResult } from '../src/content-intake/transaction.js';
-import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.js';
+import { authenticateRequestHeaders, type AuthenticatedUser, type ProductAuthService } from '../src/auth-service.js';
 import { createProductAuthService, authenticatedProductSession } from '../src/product-auth-service.js';
 import type { ApiDatabaseBootstrapConfig } from '../src/runtime-config.js';
 import { createApprovalAdapter, type ApprovalTransport } from '../src/content-intake/approval-adapter.js';
@@ -42,7 +42,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   let policyVersion: number;
   let auth: ProductAuthService | undefined;
   let authConfig: ApiDatabaseBootstrapConfig;
-  const seats=new Map<string,{actor:AuthenticatedUser;token:string}>();
+  const seats=new Map<string,{actor:AuthenticatedUser;token:string;expiresAt:string}>();
   async function seat(id='agent',name='primary') {
     const key=`${id}:${name}`;
     const cached=seats.get(key);if(cached)return cached;
@@ -57,7 +57,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(session).not.toBeNull();
     const user=await auth.authenticate({authorization:`Bearer ${session!.access_token}`});
     expect(user).not.toBeNull();
-    const value={actor:user!,token:session!.access_token};seats.set(key,value);return value;
+    const value={actor:user!,token:session!.access_token,expiresAt:session!.expires_at};seats.set(key,value);return value;
   }
   const diagnostics: unknown[] = [];
   let provider: ReturnType<typeof syntheticApproval>;
@@ -347,64 +347,107 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   });
 
   it('usage: Main consumes actual synthetic HTTP pages and handles publication and revocation', async () => {
-    await publicationBase();const prepared=await publishable('main-consumer');
+    await publicationBase();
+    // The first HTTP page exceeds the legacy client's 1 MiB default. The second
+    // page proves the actual Main consumer assembles one complete qualification.
+    const rows=[['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','','','false'],
+      ...Array.from({length:100},(_,i)=>[`zz-large-${String(i).padStart(3,'0')}`,'合成长话术','合成答复'.repeat(1000),'','','分类','','启用','','','','内部说明','','','false'])];
+    const prepared=await publishable('main-consumer',rows);
     const release=value(await service.publish(actor('enabler'),prepared.request));
     const logged=await seat();
-    // Test-only loopback host. The API test has no desktop import; a root-owned
-    // consumer process crosses HTTP, preserving the application dependency boundary.
+    // Test-only loopback host. The API has no desktop import; the root-owned
+    // consumer launches the actual desktop adapters across HTTP in isolation.
     let expireNext=false;let expiring:{id:string;until:number}|null=null;
-    const server=createServer((request,response)=>{
-      void (async()=>{
-        const authorization=request.headers.authorization;
-        const current=authorization===undefined?null:await auth!.authenticate({authorization});
-        if(!current){response.writeHead(401).end(JSON.stringify({code:'UNAUTHORIZED'}));return;}
-        const url=new URL(request.url!,'http://127.0.0.1');let result;
-        if(request.method==='POST' && url.pathname==='/v1/intake/entitlements') {
-          let body='';for await(const chunk of request){body+=String(chunk);if(body.length>65536)throw new Error('BODY_LIMIT');}
+    let holdNext=false;const gate:{release:(()=>void)|null}={release:null};
+    const server=Fastify({logger:false,exposeHeadRoutes:false});
+    let child:ReturnType<typeof spawn>|undefined;let ended:Promise<unknown[]>|undefined;
+    let timeout:ReturnType<typeof setTimeout>|undefined;
+    try {
+      server.get('/v1/auth/me',async(request,reply)=>{
+        const current=await authenticateRequestHeaders(auth!,request.headers);
+        return current??reply.code(401).send({error:{code:'UNAUTHORIZED'}});
+      });
+      server.post('/v1/auth/logout',async(request,reply)=>{
+        const header=request.headers.authorization;
+        if(header?.startsWith('Bearer '))await auth!.logout(header.slice(7));
+        return reply.code(204).send();
+      });
+      await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:{
+        issueEntitlement:async(current,body)=>{
           if(expireNext) {
             await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
               clock_timestamp(),clock_timestamp()+interval '1 second',repeat('b',64))`);
             await admin.query("UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='agent'");
           }
-          result=await service.issueEntitlement(current,JSON.parse(body));
+          const result=await service.issueEntitlement(current,body);
           if(expireNext) {
             const short=value(result);expiring={id:short.entitlementId,until:Date.parse(short.validUntil)};expireNext=false;
             await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',3,ARRAY['dept-a'],'job-agent',true,
               clock_timestamp(),clock_timestamp()+interval '5 minutes',repeat('c',64))`);
             await admin.query("UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='agent'");
           }
-        } else if(request.method==='GET' && url.pathname==='/v1/intake/snapshot') {
-          if(expiring?.id===url.searchParams.get('entitlementId')) {
+          return result;
+        },
+        snapshot:async(current,query)=>{
+          if(holdNext){holdNext=false;await new Promise<void>(resolve=>{gate.release=resolve;});gate.release=null;}
+          if(expiring?.id===(query as {entitlementId:string}).entitlementId) {
             await new Promise(r=>setTimeout(r,Math.max(0,expiring!.until-Date.now())+20));expiring=null;
           }
-          result=await service.snapshot(current,{...Object.fromEntries(url.searchParams),limit:Number(url.searchParams.get('limit'))});
-        } else if(request.method==='POST' && url.pathname==='/__synthetic__/expire-next') {
-          expireNext=true;result={ok:true as const,value:null};
-        } else if(request.method==='POST' && url.pathname==='/__synthetic__/next-release') {
-          const next=await publishable('main-disable',[['faq-one','合成问题','第一行。\n第二行。','','','分类','','停用','','','','内部说明','','','false']]);
-          value(await service.publish(actor('enabler'),next.request));result={ok:true as const,value:null};
-        } else if(request.method==='POST' && url.pathname==='/__synthetic__/revoke') {
-          value(await service.changeGrant(actor('director'),'business-agent-query',
-            {operationId:'main-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));
-          result={ok:true as const,value:null};
-        } else {response.writeHead(404).end();return;}
-        response.writeHead(result.ok?200:403,{'content-type':'application/json'}).end(JSON.stringify(result.ok?result.value:{code:result.code,reason:result.reason}));
-      })().catch(()=>{response.writeHead(500).end(JSON.stringify({code:'INTERNAL_ERROR'}));});
-    });
-    server.listen(0,'127.0.0.1');await once(server,'listening');
-    const port=(server.address() as AddressInfo).port;
-    const child=spawn(process.execPath,['--experimental-transform-types',fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs',import.meta.url))],
-      {stdio:['pipe','pipe','pipe']});
-    const ended=once(child,'close');let stdout='',stderr='';
-    child.stdout.on('data',chunk=>{stdout+=String(chunk);});child.stderr.on('data',chunk=>{stderr+=String(chunk);});
-    const timeout=setTimeout(()=>child.kill('SIGKILL'),20_000);
-    child.stdin.end(JSON.stringify({origin:`http://127.0.0.1:${port}`,token:logged.token,releaseId:release.releaseId}));
-    try {
+          return service.snapshot(current,query);
+        },
+      }});
+      server.post('/__synthetic__/:action',async(request,reply)=>{
+        if(!await authenticateRequestHeaders(auth!,request.headers))return reply.code(401).send();
+        switch((request.params as {action:string}).action){
+          case 'hold-next':holdNext=true;break;
+          case 'gate':return {waiting:gate.release!==null};
+          case 'release-gate':gate.release?.();break;
+          case 'expire-next':expireNext=true;break;
+          case 'next-release':{
+            const next=await publishable('main-disable',rows.map(row=>row.map((cell,index)=>index===7?'停用':cell)));
+            value(await service.publish(actor('enabler'),next.request));break;
+          }
+          case 'revoke':
+            value(await service.changeGrant(actor('director'),'business-agent-query',
+              {operationId:'main-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));break;
+          default:return reply.code(404).send();
+        }
+        return {ok:true};
+      });
+      const origin=await server.listen({port:0,host:'127.0.0.1'});
+      for(const query of ['entitlementId=a&limit=0','entitlementId=a&limit=101','entitlementId=a&limit=1e2',
+        'entitlementId=a&limit=1&limit=2','entitlementId=a&entitlementId=b','entitlementId=a&sessionId=spoof','entitlementId=a&cursor=']) {
+        const rejected=await server.inject({url:`/v1/intake/snapshot?${query}`,headers:{authorization:`Bearer ${logged.token}`}});
+        expect(rejected.statusCode).toBe(400);expect(parseContractSchema('IntakeError',rejected.json()).error.code).toBe('VALIDATION');
+      }
+      for(const headers of [{},{authorization:`Bearer ${logged.token}`,'x-mock-user':'spoof','x-mock-role':'owner'}]) {
+        const rejected=await server.inject({url:'/v1/intake/snapshot?entitlementId=missing',headers});
+        expect(rejected.statusCode).toBe(401);expect(parseContractSchema('IntakeError',rejected.json()).error.code).toBe('UNAUTHORIZED');
+      }
+      const spoofed=await server.inject({method:'POST',url:'/v1/intake/entitlements',headers:{authorization:`Bearer ${logged.token}`},
+        payload:{...usage,releaseId:null,userId:'spoof'}});
+      expect(spoofed.statusCode).toBe(400);expect(parseContractSchema('IntakeError',spoofed.json()).error.code).toBe('VALIDATION');
+      child=spawn(process.execPath,[fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs',import.meta.url))],
+        {stdio:['pipe','pipe','pipe']});
+      ended=once(child,'close');let stdout='',stderr='';
+      child.stdout!.on('data',chunk=>{stdout+=String(chunk);});child.stderr!.on('data',chunk=>{stderr+=String(chunk);});
+      timeout=setTimeout(()=>child?.kill('SIGTERM'),45_000);
+      child.stdin!.end(JSON.stringify({origin,token:logged.token,expiresAt:logged.expiresAt,releaseId:release.releaseId}));
       expect((await ended)[0],stderr).toBe(0);
-      expect(JSON.parse(stdout)).toEqual({status:'PASS',publishedText:true,localExpiry:true,normalUpdate:true,revocationFanout:true});
-      expect(stdout).not.toContain(logged.token);expect(stdout).not.toContain(digest(logged.token));
-    }finally{clearTimeout(timeout);if(child.exitCode===null)child.kill('SIGKILL');server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
-  },30_000);
+      expect(JSON.parse(stdout)).toEqual({status:'PASS',actualSession:true,largePage:true,cancellation:true,
+        publishedText:true,localExpiry:true,normalUpdate:true,revocationFanout:true});
+      expect(stdout+stderr).not.toContain(logged.token);expect(stdout+stderr).not.toContain(digest(logged.token));
+    } finally {
+      clearTimeout(timeout);gate.release?.();
+      if(child && ended) {
+        const kill=setTimeout(()=>child?.kill('SIGKILL'),2_000);
+        if(child.exitCode===null)child.kill('SIGTERM');
+        try {await ended;} catch(error) {diagnostics.push(error);}
+        finally {clearTimeout(kill);}
+      }
+      await server.close();
+    }
+  },60_000);
 
   it('usage: contextless predecessor qualifications cannot be guessed or reused', async () => {
     await publicationBase();const ent=value(await issue());
