@@ -93,7 +93,8 @@ export async function intakeReplay<T>(client: Queryable, actor: Principal, comma
  * currently supplies this pool. New application ACL stays sealed until all P2 gates pass.
  * Every writer takes the existing global content lock first; no remote I/O in callbacks. */
 export function createIntakeTransactions(pool: IntakePool,
-  report: (diagnosticId: string, error: unknown) => void = () => undefined) {
+  report: (diagnosticId: string, error: unknown) => void = () => undefined,
+  options: { requireProductSession?: boolean } = {}) {
   return async function run<T>(actor: AuthenticatedUser, command: string,
     request: CanonicalJsonValue | null, operationId: string | null,
     work: (client: IntakeTransaction, actor: Principal) => Promise<T>,
@@ -115,6 +116,7 @@ export function createIntakeTransactions(pool: IntakePool,
           if (!Number.isFinite(until)) throw new IntakeRejection('PERMISSION_CHANGED');
           authorityDeadline = Math.min(authorityDeadline, until);
         } };
+      if (options.requireProductSession) await lockProductSession(transaction, actor);
       const who = await principal(client, { userId: actor.user_id });
       requireFresh(who, await clock(client));
       // Reuse the backend's permanent receipt namespace. Unlike the HTTP 24h
@@ -126,6 +128,9 @@ export function createIntakeTransactions(pool: IntakePool,
       if (operationId !== null && requestHash !== null) {
         const prior = await intakeReplay(client, who, command, request!, operationId, decode);
         if (prior) {
+          if (await clock(client) >= Math.min(authorityDeadline, deadline, who.validUntil)) {
+            throw new IntakeRejection('PERMISSION_CHANGED', 'FORBIDDEN');
+          }
           committing = true;
           await client.query('COMMIT');
           return { ok: true, value: prior.value };

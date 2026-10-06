@@ -1,0 +1,34 @@
+{
+  "observationCapture": "007",
+  "observationArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "management"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\nstdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS\n{\"probe\":\"management-report-consumer\",\"artifactBytes\":6615,\"sha256\":\"d730ac81f7119cacd791399cf38b1d53b563ad8b3e03b6b1d30ab86ba2979d66\",\"issueRows\":1,\"consumer\":\"ExcelJS\",\"wholeBatchBlocked\":true}\n\n ✓ tests/content-intake.integration.test.ts (104 tests | 94 skipped) 10117ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material  1236ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS  1238ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP rejects anonymous/agent/cross-shop upload and untrusted multipart or receive fields  823ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP rechecks the real session after upload I/O and cannot admit with a cloned actor  875ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP records terminal failure when session revocation happens during parser I/O  1032ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP retains a committed object after a lost response and recovers it on exact replay  1007ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP replay of a terminal failed job creates no unreferenced report objects  1006ms\n   ✓ P2 sealed synthetic authority and durable candidates > management concurrent failure finalizers keep exactly one referenced report  1014ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP bounds the queue and settles accepted jobs when its host closes  1007ms\n   ✓ P2 sealed synthetic authority and durable candidates > management session-bound parser closes an admitted job revoked before queue execution  880ms\n\n Test Files  1 passed (1)\n      Tests  10 passed | 94 skipped (104)\n   Start at  02:43:02\n   Duration  10.66s (transform 203ms, setup 0ms, collect 392ms, tests 10.12s, environment 0ms, prepare 35ms)\n\n",
+  "hypothesis": "The repaired management suite passed, so replay the original success command to bind its exact evidence to the final parser cleanup source.",
+  "nextCapture": "008",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "management HTTP uploads real bytes"
+  ]
+}

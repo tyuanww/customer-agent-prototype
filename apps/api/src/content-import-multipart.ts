@@ -66,22 +66,25 @@ function splitPart(body: Buffer, boundary: Buffer): Buffer[] {
   let offset = 0;
   while (offset < body.length) {
     const start = body.indexOf(boundary, offset);
-    if (start < 0) break;
+    if (start !== offset) throw new Error('CONTENT_UPLOAD_MULTIPART');
     const contentStart = start + boundary.length;
-    if (body.subarray(contentStart, contentStart + 2).equals(Buffer.from('--'))) break;
+    if (body.subarray(contentStart, contentStart + 2).equals(Buffer.from('--'))) {
+      const tail = body.subarray(contentStart + 2);
+      if (tail.length !== 0 && !tail.equals(Buffer.from('\r\n'))) throw new Error('CONTENT_UPLOAD_MULTIPART');
+      return parts;
+    }
     if (!body.subarray(contentStart, contentStart + 2).equals(Buffer.from('\r\n'))) {
       throw new Error('CONTENT_UPLOAD_MULTIPART');
     }
     const next = body.indexOf(boundary, contentStart);
     if (next < 0) throw new Error('CONTENT_UPLOAD_MULTIPART');
-    let part = body.subarray(contentStart + 2, next);
-    if (part.length >= 2 && part.subarray(part.length - 2).equals(Buffer.from('\r\n'))) {
-      part = part.subarray(0, part.length - 2);
-    }
+    // The delimiter already owns its leading CRLF. Any CRLF before that is
+    // file content and must participate in the original-byte digest.
+    const part = body.subarray(contentStart + 2, next);
     parts.push(part);
     offset = next;
   }
-  return parts;
+  throw new Error('CONTENT_UPLOAD_MULTIPART');
 }
 
 /**
@@ -89,26 +92,27 @@ function splitPart(body: Buffer, boundary: Buffer): Buffer[] {
  * filenames-as-paths, and Feishu JSON are rejected here so the store only sees
  * a typed byte stream and a small bindings document.
  */
-export async function parseContentImportMultipart(
+async function parseMultipart(
   stream: Readable,
   contentTypeHeader: string,
+  field: { name: string; maxBytes: number; excelOnly: boolean },
   options: Readonly<{ maxFileBytes?: number; timeoutMs?: number }> = {},
-): Promise<ParsedContentImportForm> {
+): Promise<{ file: AsyncIterable<Buffer>; sourceType: ContentSourceType; metadata: string }> {
   const boundary = parseBoundary(contentTypeHeader);
   if (!boundary) throw new Error('CONTENT_UPLOAD_MULTIPART');
   const maxFileBytes = options.maxFileBytes ?? CONTENT_UPLOAD_MAX_BYTES;
   const timeoutMs = options.timeoutMs ?? CONTENT_UPLOAD_TIMEOUT_MS;
-  const maxTotal = maxFileBytes + SOURCE_BINDINGS_MAX_BYTES + 8 * 1024;
+  const maxTotal = maxFileBytes + field.maxBytes + 8 * 1024;
   const body = await readAll(stream, maxTotal, timeoutMs);
   const delimiter = Buffer.from(`\r\n--${boundary}`);
   const framed = Buffer.concat([Buffer.from('\r\n'), body]);
   const parts = splitPart(framed, delimiter);
   let file: Buffer | undefined;
   let sourceType: ContentSourceType | undefined;
-  let sourceBindingsJson: string | undefined;
+  let metadata: string | undefined;
   for (const part of parts) {
     const headerEnd = part.indexOf('\r\n\r\n');
-    if (headerEnd < 0) throw new Error('CONTENT_UPLOAD_MULTIPART');
+    if (headerEnd < 0 || headerEnd > 8 * 1024) throw new Error('CONTENT_UPLOAD_MULTIPART');
     const headers = part.subarray(0, headerEnd).toString('latin1');
     const content = part.subarray(headerEnd + 4);
     const disposition = headerValue(headers, 'content-disposition');
@@ -117,25 +121,41 @@ export async function parseContentImportMultipart(
     if (name === 'file') {
       if (file !== undefined) throw new Error('CONTENT_UPLOAD_MULTIPART');
       const type = declaredSourceType(headerValue(headers, 'content-type'));
-      if (type === null) throw new Error('CONTENT_UPLOAD_TYPE');
+      if (type === null || (field.excelOnly && type !== 'excel')) throw new Error('CONTENT_UPLOAD_TYPE');
       if (content.length > maxFileBytes) throw new Error('CONTENT_UPLOAD_TOO_LARGE');
       file = content;
       sourceType = type;
-    } else if (name === 'source_bindings') {
-      if (sourceBindingsJson !== undefined) throw new Error('CONTENT_UPLOAD_MULTIPART');
-      if (content.length > SOURCE_BINDINGS_MAX_BYTES) throw new Error('CONTENT_UPLOAD_TOO_LARGE');
-      sourceBindingsJson = content.toString('utf8');
+    } else if (name === field.name) {
+      if (metadata !== undefined) throw new Error('CONTENT_UPLOAD_MULTIPART');
+      if (content.length > field.maxBytes) throw new Error('CONTENT_UPLOAD_TOO_LARGE');
+      metadata = content.toString('utf8');
     } else {
       throw new Error('CONTENT_UPLOAD_MULTIPART');
     }
   }
-  if (file === undefined || sourceType === undefined || sourceBindingsJson === undefined) {
+  if (file === undefined || sourceType === undefined || metadata === undefined) {
     throw new Error('CONTENT_UPLOAD_MULTIPART');
   }
   const payload = file;
   return Object.freeze({
     file: (async function* persistable() { yield payload; }()),
     sourceType,
-    sourceBindingsJson,
+    metadata,
   });
+}
+
+export async function parseContentImportMultipart(stream: Readable, contentTypeHeader: string,
+  options: Readonly<{ maxFileBytes?: number; timeoutMs?: number }> = {}): Promise<ParsedContentImportForm> {
+  const parsed = await parseMultipart(stream, contentTypeHeader,
+    { name: 'source_bindings', maxBytes: SOURCE_BINDINGS_MAX_BYTES, excelOnly: false }, options);
+  return { file: parsed.file, sourceType: parsed.sourceType, sourceBindingsJson: parsed.metadata };
+}
+
+/** The frozen intake upload accepts exactly an operation ID and one XLSX file.
+ * Client filenames and hashes never participate in storage or authorization. */
+export async function parseIntakeUploadMultipart(stream: Readable, contentTypeHeader: string,
+  options: Readonly<{ maxFileBytes?: number; timeoutMs?: number }> = {}) {
+  const parsed = await parseMultipart(stream, contentTypeHeader,
+    { name: 'operationId', maxBytes: 128, excelOnly: true }, options);
+  return { file: parsed.file, operationId: parsed.metadata };
 }

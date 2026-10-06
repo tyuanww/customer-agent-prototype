@@ -1,0 +1,320 @@
+{
+  "revision": "5e199d5aedf3f46dd2590beab7d67a498d154b13",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Functional API/worker only; browser/Electron and real data are not in this slice.",
+    "Smoke expired at 18:40:31Z; 004 onward are required defect confirmation/repair/revalidation with finite timeouts, never a reset smoke budget.",
+    "001-005 are retained history; 007 revalidates the changed failure cleanup and all adjacent management paths.",
+    "Large error-report peak RSS has not been stress-tested."
+  ],
+  "evidence": [
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP uploads real bytes'",
+      "contract": "上传、服务端摘要、幂等与材料分页",
+      "expected": "真实文件生成一个持久候选，页内容/版本一致，越会话游标拒绝",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (102 tests | 101 skipped) 1190ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material  1189ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 101 skipped (102)\n   Start at  02:35:31\n   Duration  1.72s (transform 198ms, setup 0ms, collect 383ms, tests 1.19s, environment 0ms, prepare 40ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP blocks the entire bad revision'",
+      "contract": "整批失败与 Excel 报告消费",
+      "expected": "坏修订不替换旧候选，HTTP XLSX 由独立 ExcelJS 重新打开",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\nstdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS\n{\"probe\":\"management-report-consumer\",\"artifactBytes\":6615,\"sha256\":\"3be08828836089514a60057b2ae35f961ea0208db2edb20487d6ebac705344d5\",\"issueRows\":1,\"consumer\":\"ExcelJS\",\"wholeBatchBlocked\":true}\n\n ✓ tests/content-intake.integration.test.ts (102 tests | 101 skipped) 1367ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS  1367ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 101 skipped (102)\n   Start at  02:36:41\n   Duration  1.89s (transform 196ms, setup 0ms, collect 382ms, tests 1.37s, environment 0ms, prepare 35ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP retains a committed object'",
+      "contract": "COMMIT_UNKNOWN 恢复",
+      "expected": "保留已提交对象，原键重放恢复且不重复写入",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (102 tests | 101 skipped) 1212ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP retains a committed object after a lost response and recovers it on exact replay  1211ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 101 skipped (102)\n   Start at  02:37:48\n   Duration  1.75s (transform 201ms, setup 0ms, collect 394ms, tests 1.21s, environment 0ms, prepare 36ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP replay of a terminal failed job'",
+      "contract": "终态重放磁盘幂等",
+      "expected": "只保留一个输入和一个被引用报告",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ❯ tests/content-intake.integration.test.ts (103 tests | 1 failed | 102 skipped) 1174ms\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP rejects anonymous/agent/cross-shop upload and untrusted multipart or receive fields\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP rechecks the real session after upload I/O and cannot admit with a cloned actor\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP records terminal failure when session revocation happens during parser I/O\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP retains a committed object after a lost response and recovers it on exact replay\n   × P2 sealed synthetic authority and durable candidates > management HTTP replay of a terminal failed job creates no unreferenced report objects 1173ms\n     → expected [ …(4) ] to deeply equal [ …(2) ]\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP bounds the queue and settles accepted jobs when its host closes\n   ↓ P2 sealed synthetic authority and durable candidates > management session-bound parser closes an admitted job revoked before queue execution\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: signs paging to a live session, route, complete projection and service lifetime\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: handles zero scope, conflicting role, expired facts and strict query shapes without inventing access\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: pages more than 100 authorized sources with no loss and rejects a logged-out cursor\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: folds 5000 overlapping grants without changing effective authority or exceeding the SQL deadline\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires\n   ↓ P2 sealed synthetic authority and durable candidates > usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a logout session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a cleanup session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a disabled session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a expired session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: caps issuance at session expiry and reauthenticates persisted selection after a service restart\n   ↓ P2 sealed synthetic authority and durable candidates > usage: validates explicit selections by kind and scope without expanding source access\n   ↓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (reader-first)\n   ↓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (logout-first)\n   ↓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation\n   ↓ P2 sealed synthetic authority and durable candidates > usage: contextless predecessor qualifications cannot be guessed or reused\n   ↓ P2 sealed synthetic authority and durable candidates > usage: shop access does not imply brand access, and brand permission alone cannot select an arbitrary shop\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after grant changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after source changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after release changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after facts changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-unavailable changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-revoked changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: a normal new publication preserves a valid old page and a fresh empty snapshot clears explicitly disabled rows\n   ↓ P2 sealed synthetic authority and durable candidates > usage: filters product/scenario/time before paging, pins vocabulary labels and expires at the next content boundary\n   ↓ P2 sealed synthetic authority and durable candidates > usage: does not renew or return a page after its immutable deadline, even when facts are refreshed\n   ↓ P2 sealed synthetic authority and durable candidates > usage: consumes a maximum 5000-row native catalog within bounded transactions without duplicate or missing pages\n   ↓ P2 sealed synthetic authority and durable candidates > usage: pages within the 100 vocabulary budget and rejects an individually unpageable candidate before review\n   ↓ P2 sealed synthetic authority and durable candidates > publishes native material atomically without invented legacy fields, and recovers its permanent receipt\n   ↓ P2 sealed synthetic authority and durable candidates > retains missing rows, explicit disables and versions across subsequent native releases\n   ↓ P2 sealed synthetic authority and durable candidates > inherits another source unchanged and propagates its later approval revocation\n   ↓ P2 sealed synthetic authority and durable candidates > copies every existing legacy field from a different domain without manufacturing review evidence\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects quality with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects publisher-revoked with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects reviewer-revoked with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects cancelled with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects source-version with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects revoked-approval with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects suspended-source with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > rolls back ticket, catalog, candidate, current and release on a late announcement failure\n   ↓ P2 sealed synthetic authority and durable candidates > recovers a lost publication COMMIT after restart without remote I/O or a second release\n   ↓ P2 sealed synthetic authority and durable candidates > lets cancel win while publication is observing approval without locks\n   ↓ P2 sealed synthetic authority and durable candidates > lets revoke win while publication is observing approval without locks\n   ↓ P2 sealed synthetic authority and durable candidates > commits once when cancellation waits behind the final publication transaction\n   ↓ P2 sealed synthetic authority and durable candidates > requires a new candidate and approval after another candidate wins the same base\n   ↓ P2 sealed synthetic authority and durable candidates > refuses missing bootstrap and unmapped legacy-domain rows instead of silently replacing them\n   ↓ P2 sealed synthetic authority and durable candidates > rejects an exact but stale observation at the private commit boundary\n   ↓ P2 sealed synthetic authority and durable candidates > freezes quality before individual checks, survives service recreation and creates no approval or release\n   ↓ P2 sealed synthetic authority and durable candidates > rejects omitted, invented, duplicate, changed-content and caller-supplied quality conclusions atomically\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 2 initial defects as revision_required\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 3 initial defects as expansion_required\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 5 initial defects as expansion_required\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 6 initial defects as blocked\n   ↓ P2 sealed synthetic authority and durable candidates > records all 5000 critical checks within the unchanged transaction budget\n   ↓ P2 sealed synthetic authority and durable candidates > requires a non-contributing person for critical quality and refuses reuse after revision\n   ↓ P2 sealed synthetic authority and durable candidates > rechecks scope, revocation and cancellation before recording quality\n   ↓ P2 sealed synthetic authority and durable candidates > recovers a lost quality COMMIT once and rejects changed payload under the original operation\n   ↓ P2 sealed synthetic authority and durable candidates > quality preview preserves the candidate and is actually consumable by the existing SQL plan freezer\n   ↓ P2 sealed synthetic authority and durable candidates > quality SQL requires expanded review and rejects a fabricated passing conclusion\n   ↓ P2 sealed synthetic authority and durable candidates > critical quality population requires every live entry and does not fabricate owner acceptance\n   ↓ P2 sealed synthetic authority and durable candidates > quality preview rechecks role, current grants, the exact key and cancellation on every read\n   ↓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant\n   ↓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation\n   ↓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes\n   ↓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys\n   ↓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit\n   ↓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants\n   ↓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer\n   ↓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager\n   ↓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report\n   ↓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving\n   ↓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate\n   ↓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock\n   ↓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result\n   ↓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot\n   ↓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations\n   ↓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review\n   ↓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility\n   ↓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed\n   ↓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence\n   ↓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart\n   ↓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O\n   ↓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready\n   ↓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service\n   ↓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable\n   ↓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation\n   ↓ P2 sealed synthetic authority and durable candidates > inherits exact candidate and approval lineage and propagates later revocation to both releases\n   ↓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider\n   ↓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire\n   ↓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled\n   ↓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires\n   ↓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit\n\n Test Files  1 failed (1)\n      Tests  1 failed | 102 skipped (103)\n   Start at  02:40:54\n   Duration  1.78s (transform 208ms, setup 0ms, collect 452ms, tests 1.17s, environment 0ms, prepare 40ms)\n\nundefined\n/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/content-intake.integration.test.ts -t 'management HTTP replay of a terminal failed job'\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP replay of a terminal failed job'",
+      "contract": "终态重放同命令复现",
+      "expected": "再次从同一初始夹具触发磁盘额外对象",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ❯ tests/content-intake.integration.test.ts (103 tests | 1 failed | 102 skipped) 1094ms\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP rejects anonymous/agent/cross-shop upload and untrusted multipart or receive fields\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP rechecks the real session after upload I/O and cannot admit with a cloned actor\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP records terminal failure when session revocation happens during parser I/O\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP retains a committed object after a lost response and recovers it on exact replay\n   × P2 sealed synthetic authority and durable candidates > management HTTP replay of a terminal failed job creates no unreferenced report objects 1094ms\n     → expected [ …(4) ] to deeply equal [ …(2) ]\n   ↓ P2 sealed synthetic authority and durable candidates > management HTTP bounds the queue and settles accepted jobs when its host closes\n   ↓ P2 sealed synthetic authority and durable candidates > management session-bound parser closes an admitted job revoked before queue execution\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: signs paging to a live session, route, complete projection and service lifetime\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: handles zero scope, conflicting role, expired facts and strict query shapes without inventing access\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: pages more than 100 authorized sources with no loss and rejects a logged-out cursor\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: folds 5000 overlapping grants without changing effective authority or exceeding the SQL deadline\n   ↓ P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires\n   ↓ P2 sealed synthetic authority and durable candidates > usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a logout session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a cleanup session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a disabled session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a expired session\n   ↓ P2 sealed synthetic authority and durable candidates > usage: caps issuance at session expiry and reauthenticates persisted selection after a service restart\n   ↓ P2 sealed synthetic authority and durable candidates > usage: validates explicit selections by kind and scope without expanding source access\n   ↓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (reader-first)\n   ↓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (logout-first)\n   ↓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation\n   ↓ P2 sealed synthetic authority and durable candidates > usage: contextless predecessor qualifications cannot be guessed or reused\n   ↓ P2 sealed synthetic authority and durable candidates > usage: shop access does not imply brand access, and brand permission alone cannot select an arbitrary shop\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after grant changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after source changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after release changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after facts changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-unavailable changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-revoked changes\n   ↓ P2 sealed synthetic authority and durable candidates > usage: a normal new publication preserves a valid old page and a fresh empty snapshot clears explicitly disabled rows\n   ↓ P2 sealed synthetic authority and durable candidates > usage: filters product/scenario/time before paging, pins vocabulary labels and expires at the next content boundary\n   ↓ P2 sealed synthetic authority and durable candidates > usage: does not renew or return a page after its immutable deadline, even when facts are refreshed\n   ↓ P2 sealed synthetic authority and durable candidates > usage: consumes a maximum 5000-row native catalog within bounded transactions without duplicate or missing pages\n   ↓ P2 sealed synthetic authority and durable candidates > usage: pages within the 100 vocabulary budget and rejects an individually unpageable candidate before review\n   ↓ P2 sealed synthetic authority and durable candidates > publishes native material atomically without invented legacy fields, and recovers its permanent receipt\n   ↓ P2 sealed synthetic authority and durable candidates > retains missing rows, explicit disables and versions across subsequent native releases\n   ↓ P2 sealed synthetic authority and durable candidates > inherits another source unchanged and propagates its later approval revocation\n   ↓ P2 sealed synthetic authority and durable candidates > copies every existing legacy field from a different domain without manufacturing review evidence\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects quality with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects publisher-revoked with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects reviewer-revoked with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects cancelled with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects source-version with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects revoked-approval with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > publication rejects suspended-source with zero release/ticket side effects\n   ↓ P2 sealed synthetic authority and durable candidates > rolls back ticket, catalog, candidate, current and release on a late announcement failure\n   ↓ P2 sealed synthetic authority and durable candidates > recovers a lost publication COMMIT after restart without remote I/O or a second release\n   ↓ P2 sealed synthetic authority and durable candidates > lets cancel win while publication is observing approval without locks\n   ↓ P2 sealed synthetic authority and durable candidates > lets revoke win while publication is observing approval without locks\n   ↓ P2 sealed synthetic authority and durable candidates > commits once when cancellation waits behind the final publication transaction\n   ↓ P2 sealed synthetic authority and durable candidates > requires a new candidate and approval after another candidate wins the same base\n   ↓ P2 sealed synthetic authority and durable candidates > refuses missing bootstrap and unmapped legacy-domain rows instead of silently replacing them\n   ↓ P2 sealed synthetic authority and durable candidates > rejects an exact but stale observation at the private commit boundary\n   ↓ P2 sealed synthetic authority and durable candidates > freezes quality before individual checks, survives service recreation and creates no approval or release\n   ↓ P2 sealed synthetic authority and durable candidates > rejects omitted, invented, duplicate, changed-content and caller-supplied quality conclusions atomically\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 2 initial defects as revision_required\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 3 initial defects as expansion_required\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 5 initial defects as expansion_required\n   ↓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 6 initial defects as blocked\n   ↓ P2 sealed synthetic authority and durable candidates > records all 5000 critical checks within the unchanged transaction budget\n   ↓ P2 sealed synthetic authority and durable candidates > requires a non-contributing person for critical quality and refuses reuse after revision\n   ↓ P2 sealed synthetic authority and durable candidates > rechecks scope, revocation and cancellation before recording quality\n   ↓ P2 sealed synthetic authority and durable candidates > recovers a lost quality COMMIT once and rejects changed payload under the original operation\n   ↓ P2 sealed synthetic authority and durable candidates > quality preview preserves the candidate and is actually consumable by the existing SQL plan freezer\n   ↓ P2 sealed synthetic authority and durable candidates > quality SQL requires expanded review and rejects a fabricated passing conclusion\n   ↓ P2 sealed synthetic authority and durable candidates > critical quality population requires every live entry and does not fabricate owner acceptance\n   ↓ P2 sealed synthetic authority and durable candidates > quality preview rechecks role, current grants, the exact key and cancellation on every read\n   ↓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant\n   ↓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation\n   ↓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes\n   ↓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys\n   ↓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit\n   ↓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants\n   ↓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer\n   ↓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager\n   ↓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report\n   ↓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving\n   ↓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate\n   ↓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock\n   ↓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result\n   ↓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot\n   ↓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations\n   ↓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review\n   ↓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility\n   ↓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed\n   ↓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence\n   ↓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart\n   ↓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O\n   ↓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready\n   ↓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service\n   ↓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable\n   ↓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation\n   ↓ P2 sealed synthetic authority and durable candidates > inherits exact candidate and approval lineage and propagates later revocation to both releases\n   ↓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider\n   ↓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire\n   ↓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled\n   ↓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires\n   ↓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit\n\n Test Files  1 failed (1)\n      Tests  1 failed | 102 skipped (103)\n   Start at  02:41:13\n   Duration  1.62s (transform 196ms, setup 0ms, collect 376ms, tests 1.09s, environment 0ms, prepare 37ms)\n\nundefined\n/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/content-intake.integration.test.ts -t 'management HTTP replay of a terminal failed job'\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP replay of a terminal failed job'",
+      "contract": "终态重放修复",
+      "expected": "原输入和错误报告数量保持 2",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (103 tests | 102 skipped) 1116ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP replay of a terminal failed job creates no unreferenced report objects  1115ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 102 skipped (103)\n   Start at  02:41:56\n   Duration  1.67s (transform 201ms, setup 0ms, collect 405ms, tests 1.12s, environment 0ms, prepare 41ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t management",
+      "contract": "管理接口完整相邻回归",
+      "expected": "10 项真实 PG/HTTP、注销、并发收尾、队列关闭与未知提交恢复全部通过",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\nstdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS\n{\"probe\":\"management-report-consumer\",\"artifactBytes\":6615,\"sha256\":\"d730ac81f7119cacd791399cf38b1d53b563ad8b3e03b6b1d30ab86ba2979d66\",\"issueRows\":1,\"consumer\":\"ExcelJS\",\"wholeBatchBlocked\":true}\n\n ✓ tests/content-intake.integration.test.ts (104 tests | 94 skipped) 10117ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material  1236ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS  1238ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP rejects anonymous/agent/cross-shop upload and untrusted multipart or receive fields  823ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP rechecks the real session after upload I/O and cannot admit with a cloned actor  875ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP records terminal failure when session revocation happens during parser I/O  1032ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP retains a committed object after a lost response and recovers it on exact replay  1007ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP replay of a terminal failed job creates no unreferenced report objects  1006ms\n   ✓ P2 sealed synthetic authority and durable candidates > management concurrent failure finalizers keep exactly one referenced report  1014ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP bounds the queue and settles accepted jobs when its host closes  1007ms\n   ✓ P2 sealed synthetic authority and durable candidates > management session-bound parser closes an admitted job revoked before queue execution  880ms\n\n Test Files  1 passed (1)\n      Tests  10 passed | 94 skipped (104)\n   Start at  02:43:02\n   Duration  10.66s (transform 203ms, setup 0ms, collect 392ms, tests 10.12s, environment 0ms, prepare 35ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP uploads real bytes'",
+      "contract": "上传、服务端摘要、幂等与材料分页",
+      "expected": "真实文件生成一个持久候选，页内容/版本一致，越会话游标拒绝",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (104 tests | 103 skipped) 1375ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material  1375ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 103 skipped (104)\n   Start at  02:45:24\n   Duration  1.99s (transform 225ms, setup 0ms, collect 453ms, tests 1.38s, environment 0ms, prepare 44ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP blocks the entire bad revision'",
+      "contract": "整批失败与 Excel 报告消费",
+      "expected": "坏修订不替换旧候选，HTTP XLSX 由独立 ExcelJS 重新打开",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\nstdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS\n{\"probe\":\"management-report-consumer\",\"artifactBytes\":6614,\"sha256\":\"caccc3780533426e6edb114170ad0316103756d3980a9ac27b3989e5709cedc3\",\"issueRows\":1,\"consumer\":\"ExcelJS\",\"wholeBatchBlocked\":true}\n\n ✓ tests/content-intake.integration.test.ts (104 tests | 103 skipped) 1601ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS  1600ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 103 skipped (104)\n   Start at  02:45:59\n   Duration  2.30s (transform 244ms, setup 0ms, collect 491ms, tests 1.60s, environment 0ms, prepare 41ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management HTTP retains a committed object'",
+      "contract": "COMMIT_UNKNOWN 恢复",
+      "expected": "保留已提交对象，原键重放恢复且不重复写入",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (104 tests | 103 skipped) 1166ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP retains a committed object after a lost response and recovers it on exact replay  1165ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 103 skipped (104)\n   Start at  02:46:42\n   Duration  1.70s (transform 198ms, setup 0ms, collect 385ms, tests 1.17s, environment 0ms, prepare 28ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP uploads real bytes"
+      ],
+      "hypothesis": "真实上传与候选分页已通过；检查坏修订是否整批阻断、保留旧候选，且下载的错误报告可由独立 ExcelJS 消费。",
+      "nextCapture": "002",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP blocks the entire bad revision"
+      ]
+    },
+    {
+      "observationCapture": "002",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP blocks the entire bad revision"
+      ],
+      "hypothesis": "The report consumer passed, so next check recovery after a lost commit response because upload cleanup must preserve the committed object.",
+      "nextCapture": "003",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP retains a committed object"
+      ]
+    },
+    {
+      "observationCapture": "003",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP retains a committed object"
+      ],
+      "hypothesis": "Lost-response replay preserves its object, so next verify terminal failure replay because repeated cleanup may write reports without database references.",
+      "nextCapture": "004",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP replay of a terminal failed job"
+      ]
+    },
+    {
+      "observationCapture": "006",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP replay of a terminal failed job"
+      ],
+      "hypothesis": "Terminal replay now preserves the original file count, so check all adjacent management paths because concurrent cleanup and uncertain commits must keep their distinct retention rules.",
+      "nextCapture": "007",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management"
+      ]
+    },
+    {
+      "observationCapture": "007",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management"
+      ],
+      "hypothesis": "The repaired management suite passed, so replay the original success command to bind its exact evidence to the final parser cleanup source.",
+      "nextCapture": "008",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP uploads real bytes"
+      ]
+    },
+    {
+      "observationCapture": "008",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP uploads real bytes"
+      ],
+      "hypothesis": "The original upload command passed on the repaired source, so replay the original report consumer because error finalization and file export must still agree.",
+      "nextCapture": "009",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP blocks the entire bad revision"
+      ]
+    },
+    {
+      "observationCapture": "009",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP blocks the entire bad revision"
+      ],
+      "hypothesis": "The original XLSX consumer passed after the cleanup repair, so replay commit-loss recovery to ensure definitive cleanup never reclaims an uncertain committed object.",
+      "nextCapture": "010",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management HTTP retains a committed object"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

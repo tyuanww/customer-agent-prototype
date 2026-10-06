@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import { parseContentImportMultipart } from '../src/content-import-multipart.js';
+import { parseContentImportMultipart, parseIntakeUploadMultipart } from '../src/content-import-multipart.js';
 
 const BOUNDARY = '----test-boundary';
 
@@ -65,5 +65,39 @@ describe('content import multipart', () => {
       Readable.from(form([{ name: 'file', type: 'application/pdf', body: '%PDF' }])),
       `multipart/form-data; boundary=${BOUNDARY}`,
     )).rejects.toThrow('CONTENT_UPLOAD_TYPE');
+  });
+});
+
+
+describe('frozen intake upload multipart', () => {
+  const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const parse = (body: Buffer, options = {}) => parseIntakeUploadMultipart(Readable.from(body), `multipart/form-data; boundary=${BOUNDARY}`, options);
+  const parts = (bytes = Buffer.from('PK\x03\x04\r\n')) => [
+    { name: 'operationId', body: 'synthetic-upload' }, { name: 'file', type, body: bytes },
+  ];
+  it('preserves all file bytes, including a trailing CRLF', async () => {
+    const original = Buffer.from('PK\x03\x04\r\n');
+    const result = await parse(form(parts(original)));
+    expect(result.operationId).toBe('synthetic-upload');
+    expect(await collect(result.file)).toEqual(original);
+  });
+  it.each(['extra', 'duplicate', 'csv', 'missing', 'unterminated', 'epilogue'])('rejects malformed or extra parts: %s', async mode => {
+    const p = parts();
+    if (mode === 'extra') p.push({ name: 'sha256', body: 'claimed' });
+    if (mode === 'duplicate') p.push(p[0]!);
+    if (mode === 'csv') p[1]!.type = 'text/csv';
+    if (mode === 'missing') p.pop();
+    let bytes = form(p);
+    if (mode === 'unterminated') bytes = bytes.subarray(0, bytes.length - 6);
+    if (mode === 'epilogue') bytes = Buffer.concat([bytes, Buffer.from('ignored-attacker-data')]);
+    await expect(parse(bytes)).rejects.toThrow(/^CONTENT_UPLOAD_/);
+  });
+  it('enforces file and metadata budgets and aborts a stalled stream', async () => {
+    await expect(parse(form(parts(Buffer.alloc(17))), { maxFileBytes: 16 })).rejects.toThrow('CONTENT_UPLOAD_TOO_LARGE');
+    const p = parts(); p[0]!.body = 'x'.repeat(129);
+    await expect(parse(form(p))).rejects.toThrow('CONTENT_UPLOAD_TOO_LARGE');
+    const stalled = new Readable({ read() { /* synthetic client sends no body */ } });
+    await expect(parseIntakeUploadMultipart(stalled, `multipart/form-data; boundary=${BOUNDARY}`, { timeoutMs: 10 })).rejects.toThrow('CONTENT_UPLOAD_TIMEOUT');
+    expect(stalled.destroyed).toBe(true);
   });
 });
