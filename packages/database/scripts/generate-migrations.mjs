@@ -385,6 +385,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     ...upgrades,
     renderIntakeOverlay(projectRoot, snapshot, 22, '0022_intake_legacy_fence'),
     renderIntakeOverlay(projectRoot, snapshot, 23, '0023_intake_quality'),
+    renderIntakeOverlay(projectRoot, snapshot, 24, '0024_intake_publication'),
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,

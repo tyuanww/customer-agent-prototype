@@ -1,0 +1,163 @@
+{
+  "environment": "macOS; Node 24.19.0; pnpm 11.19.0; PostgreSQL 15.18; synthetic inputs only",
+  "checks": [
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts tests/content-intake-material.test.ts",
+      "exitCode": 0,
+      "result": "72/72: 64 PG + 8 material",
+      "log": ".gstack/content-intake-p2-publication/intake-current.log",
+      "sha256": "78ced9b91375f04656bc4bb374ce3e1b0624bafe5945ab7983b2b156d209895c",
+      "outputTail": [
+        "   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire  1435ms",
+        "   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled  1338ms",
+        "   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires  1339ms",
+        "   ✓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit  1048ms",
+        "",
+        " Test Files  2 passed (2)",
+        "      Tests  72 passed (72)",
+        "   Start at  16:18:48",
+        "   Duration  72.09s (transform 254ms, setup 0ms, collect 660ms, tests 71.87s, environment 0ms, prepare 85ms)",
+        ""
+      ]
+    },
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/database exec vitest run tests/generator.test.ts tests/planner.test.ts tests/postgres.integration.test.ts",
+      "exitCode": 0,
+      "result": "36/36",
+      "log": ".gstack/content-intake-p2-publication/database-corrected.log",
+      "sha256": "507ea9ec2994cd64efe53617759ab824c255ab021be844464e4e1b12634e64aa",
+      "outputTail": [
+        "   ✓ PostgreSQL 15 immutable migration gate > rejects ACL, function-security, trigger-mode, and policy-key drift by exact manifest  1042ms",
+        "   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a table  633ms",
+        "   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a enum  635ms",
+        "   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a schema  635ms",
+        "",
+        " Test Files  3 passed (3)",
+        "      Tests  36 passed (36)",
+        "   Start at  16:11:24",
+        "   Duration  18.66s (transform 253ms, setup 0ms, collect 389ms, tests 18.33s, environment 0ms, prepare 183ms)",
+        ""
+      ]
+    },
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-release.integration.test.ts",
+      "exitCode": 0,
+      "result": "13/13",
+      "log": ".gstack/content-intake-p2-publication/legacy-release.log",
+      "sha256": "246978e9282335191b22ce207ae7f7a0a1696fa26a7263bd63951491758ff3e2",
+      "outputTail": [
+        "   ✓ content publish and rollback > serializes the earlier snapshot mutation and mode admission: snapshot-first  893ms",
+        "   ✓ content publish and rollback > publishes a staged batch, rejects non-owners, replays, and refuses current/missing rollback  941ms",
+        "   ✓ content publish and rollback > reimports identical content and rolls back to a new release sequence  946ms",
+        "   ✓ content publish and rollback > reports a stable-identity collision as a reason, not as an in-flight draft  947ms",
+        "",
+        " Test Files  1 passed (1)",
+        "      Tests  13 passed (13)",
+        "   Start at  16:11:24",
+        "   Duration  13.32s (transform 290ms, setup 0ms, collect 525ms, tests 12.54s, environment 0ms, prepare 54ms)",
+        ""
+      ]
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": ".gstack/content-intake-p2-publication/lint-current.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "outputTail": [
+        "$ eslint ."
+      ]
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": ".gstack/content-intake-p2-publication/typecheck-corrected.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08",
+      "outputTail": [
+        "$ pnpm --filter @customer-agent/contracts typecheck && pnpm --filter @customer-agent/retrieval-core typecheck && pnpm --filter @customer-agent/content-intake typecheck && pnpm --filter @customer-agent/database typecheck && pnpm --filter @customer-agent/api typecheck && pnpm --filter @customer-agent/desktop typecheck",
+        "$ tsc --noEmit",
+        "$ tsc --noEmit",
+        "$ tsc --noEmit",
+        "$ tsc --noEmit",
+        "$ node experiments/search-decision/check-generated-types.mjs && tsc --noEmit",
+        "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api/experiments/search-decision/.generated/search-decision.ts",
+        "$ tsc --noEmit"
+      ]
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "result": "PASS; opt-in PG gates separately executed",
+      "log": ".gstack/content-intake-p2-publication/test.log",
+      "sha256": "c451629abe9100df87175a87cec9bc9c694bf9169b4ec5aed058aa6e8097ddc4",
+      "outputTail": [
+        "✔ gate refuses failure, cancellation, skip and missing classifier output (0.772584ms)",
+        "✔ real git diff includes old code path of rename, deletion and new local files (124.463542ms)",
+        "ℹ tests 81",
+        "ℹ suites 14",
+        "ℹ pass 81",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 494.506375"
+      ]
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": ".gstack/content-intake-p2-publication/build.log",
+      "sha256": "0630d102c05ea90528e7e44bcb733595a322cb1778d5514f9fa26fac7a004afb",
+      "outputTail": [
+        "../../out/renderer/index.html                                        0.45 kB",
+        "../../out/renderer/assets/dashboard-fox-headset-dark-C9mwmYh5.png  655.56 kB",
+        "../../out/renderer/assets/fox-head-DuCgrBSA.png                    706.19 kB",
+        "../../out/renderer/assets/SopApp-CP028QG-.css                        2.84 kB",
+        "../../out/renderer/assets/LoginApp-v_PWWaJd.css                      3.08 kB",
+        "../../out/renderer/assets/index-Do2e7yJf.css                       154.95 kB",
+        "../../out/renderer/assets/LoginApp-7F_IPhMZ.js                       9.64 kB",
+        "../../out/renderer/assets/SopApp-De6DMNoN.js                        11.28 kB",
+        "../../out/renderer/assets/index-cpA-afEY.js                        633.44 kB",
+        "✓ built in 270ms"
+      ]
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "result": "PASS: 183 Markdown files",
+      "log": ".gstack/content-intake-p2-publication/docs-check.log",
+      "sha256": "367a9e256a0ea3a3186ef2ad572653039a032954f1b29f32655bdd374684a2d4",
+      "outputTail": [
+        "$ node scripts/check-documentation.mjs",
+        "Documentation PASS: 183 Markdown files, local links and workflow entry ownership."
+      ]
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "result": "PASS: 21.4 MiB / 32 MiB",
+      "log": ".gstack/content-intake-p2-publication/workspace-check.log",
+      "sha256": "40aaf676390e5a0875df1bf12fee23953e47bee4f6c1d412c9319080ef40ec76",
+      "outputTail": [
+        "$ node scripts/workspace-hygiene.mjs check",
+        "Workspace source budget: PASS (remainder 21.4 MiB / 32.0 MiB)",
+        "Workspace root policy: PASS"
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": ".gstack/content-intake-p2-publication/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    }
+  ],
+  "developmentFailures": {
+    "unresolvedMediaFixture": "Removed attachment from success fixture; guard unchanged.",
+    "initialDatabaseRun": "31 pass/5 fail due to old migration count expectations; current run 36/36.",
+    "initialTypecheck": "Synthetic transport missing signal; current typecheck and controlled race cases pass."
+  }
+}

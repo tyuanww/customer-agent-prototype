@@ -83,12 +83,12 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   }
   async function input(op: string, prior: C['IntakeCandidateKey'] | null = null, rows = [
     ['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','风险提示','','false'],
-  ]): Promise<C['IntakeReceive']> {
-    const bytes = await createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' }, rows);
+  ], source = 'a'): Promise<C['IntakeReceive']> {
+    const bytes = await createTemplate({ sourceId: `source-${source}`, brandId: 'brand-a', scope: `shop-${source}`, domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' }, rows);
     const obj = await store.persist((async function* () { yield bytes; })(), 'excel');
     await admin.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
-      VALUES ($1,'source-a','enabler','tenant-a','app-a',$2,$3,$4,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','input',clock_timestamp())`,
-    [obj.objectId, `intake/${obj.objectId}`, obj.sha256, obj.sizeBytes]);
+      VALUES ($1,$5,'enabler','tenant-a','app-a',$2,$3,$4,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','input',clock_timestamp())`,
+    [obj.objectId, `intake/${obj.objectId}`, obj.sha256, obj.sizeBytes,`source-${source}`]);
     return { operationId: op, objectId: obj.objectId, sourceVersion: 1, baseReleaseId: null,
       contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior };
   }
@@ -139,6 +139,270 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       ?? { scriptId:id,contentHash:hashes.get(id)!,defect:index<defects,reason:index<defects?'合成阻断错误':'' });
   }
   const freezeQuality = (c: C['IntakeCandidate']) => service.freezeQuality(actor('reviewer'),{ operationId:'freeze-quality',key:c.key });
+
+  // Explicit synthetic catalog bootstrap, outside the product service. Real legacy
+  // adoption/initial-source registration remains separately governed.
+  async function publicationBase() {
+    const domains = ['aftersale','campaign','presale','product'];
+    const sourceHash = digest(domains.map(d => `${d}:srcv_pub_${d}`).join('|'));
+    await admin.query('BEGIN');
+    await admin.query("SELECT set_config('app.publishing','on',true)");
+    for (const domain of domains) await admin.query(`INSERT INTO public.authoritative_source_versions(
+      source_version_id,source_ref,domain,upstream_version,snapshot_sha256,use_class,owner_role,approval_evd,approved_by,approved_at,review_due_at,tenant_id)
+      VALUES ($1,$3,$2,'synthetic-publication-v1',repeat('a',64),'canonical','ROLE-CONTENT-LEAD','EVD-SYNTHETIC-PUBLICATION','synthetic-owner',
+        '2020-01-01T00:00:00Z','2099-01-01T00:00:00Z','tenant-a')`,[`srcv_pub_${domain}`,domain,`SRC-SYNTH-PUB-${domain.toUpperCase()}`]);
+    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,title,status,source_binding_hash,tenant_id)
+      VALUES ('rel_native_base',1,'合成空目录基线','published',$1,'tenant-a')`,[sourceHash]);
+    for (const domain of domains) await admin.query('INSERT INTO public.release_source_bindings(release_id,domain,source_version_id) VALUES ($1,$2,$3)',
+      ['rel_native_base',domain,`srcv_pub_${domain}`]);
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ('rel_native_base','intake-v2.1')");
+    await admin.query("INSERT INTO public.content_current(id,current_release_id) VALUES (1,'rel_native_base')");
+    await admin.query("SELECT setval('public.content_release_seq',1,true)");
+    await admin.query('COMMIT');
+  }
+  async function publishable(label='one', rows=[['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','','','false']], source='a') {
+    const req = await input(`pub-input-${label}`,null,rows,source);
+    req.baseReleaseId=(await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+    const c = value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),`source-${source}`,req)).jobId));
+    value((await confirm(c,`pub-source-${label}`)).result);
+    value(await service.requestReview(actor('enabler'),reviewRequest(c,0,`pub-review-${label}`)));
+    provider.approve('reviewer');
+    value(await refresh(c,`pub-refresh-${label}`));
+    const frozen = value(await service.freezeQuality(actor('reviewer'),{ operationId:`pub-freeze-${label}`,key:c.key }));
+    value(await service.checkQuality(actor('reviewer'),{ operationId:`pub-quality-${label}`,key:c.key,phase:'initial',checks:qualityChecks(frozen) }));
+    const request: C['IntakePublish']={ operationId:`pub-${label}`,key:c.key,baseReleaseId:req.baseReleaseId,
+      sourceEvidenceVersion:1,approvalEvidenceVersion:1,title:'合成发布',summary:'合成 FAQ 更新' };
+    return { c,request };
+  }
+  async function noPublication() {
+    for (const table of ['content_intake.publications','content_intake.commit_tickets','content_intake.write_attempts','public.announcements']) {
+      expect((await admin.query(`SELECT count(*) FROM ${table} ${table.endsWith('write_attempts') ? "WHERE action='publish'" : ''}`)).rows[0].count,table).toBe('0');
+    }
+    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows).toEqual([{ current_release_id:'rel_native_base' }]);
+  }
+
+  it('publishes native material atomically without invented legacy fields, and recovers its permanent receipt', async () => {
+    await publicationBase();
+    const { c,request }=await publishable('native',[['faq-one','合成问题','多行。\n'+ '长正文'.repeat(1000),'','','分类','适用说明','启用','','','','管理内部说明','','','false']]);
+    // Publish is independently delegated; it must not require review/manage authority.
+    for (const action of ['review','content-manage']) value(await service.changeGrant(actor('director'),`business-enabler-${action}`,
+      { operationId:`remove-${action}`,expectedVersion:1,change:'revoke',reason:'合成只保留发布资格',stewardPrincipalId:null }));
+    const published = await service.publish(actor('enabler'),request);
+    expect(published.ok,JSON.stringify(diagnostics)).toBe(true);
+    const out=value(published);
+    expect(out).toMatchObject({ state:'published',action:'publish',key:c.key });
+    expect(value(await service.publicationReceipt(actor('enabler'),request.operationId))).toEqual(out);
+    expect(value(await createContentIntakeService(pool,store).publish(actor('enabler'),request))).toEqual(out);
+    expect(await service.publish(actor('enabler'),{ ...request,title:'不同载荷' })).toMatchObject({ ok:false,reason:'IDEMPOTENCY_CONFLICT' });
+    expect(await service.publish(actor('other'),{ ...request,operationId:'another-publish' })).toMatchObject({ ok:false,reason:'ALREADY_PUBLISHED' });
+    const stored=(await admin.query(`SELECT c.material->'entries' AS entries FROM content_intake.release_lineage l
+      JOIN content_intake.candidate_versions c ON c.candidate_id=l.candidate_id AND c.version=l.candidate_version WHERE l.release_id=$1`,[out.releaseId])).rows[0].entries;
+    expect(stored[0]).toMatchObject({ answerText:'多行。\n'+'长正文'.repeat(1000),internalNote:'管理内部说明',attachmentNote:'',applicabilityNote:'适用说明' });
+    expect((await admin.query('SELECT * FROM public.release_items WHERE release_id=$1',[out.releaseId])).rows).toEqual([]);
+    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(out.releaseId);
+    expect((await admin.query('SELECT release_id FROM public.announcements WHERE announcement_id=$1',[out.announcementId])).rows[0].release_id).toBe(out.releaseId);
+    expect((await admin.query("SELECT consumed_at IS NOT NULL AS used,expires_at-issued_at<=interval '60 seconds' AS bounded FROM content_intake.commit_tickets")).rows).toEqual([{ used:true,bounded:true }]);
+    await expect(admin.query('UPDATE content_intake.commit_tickets SET consumed_at=clock_timestamp()')).rejects.toMatchObject({ message:'TICKET_IMMUTABLE_OR_CONSUMED' });
+    expect(await service.cancel(actor('other'),{ operationId:'cancel-published',key:c.key })).toMatchObject({ ok:false,reason:'ALREADY_PUBLISHED' });
+  });
+
+  it('retains missing rows, explicit disables and versions across subsequent native releases', async () => {
+    await publicationBase();
+    const first=await publishable('first',[
+      ['faq-one','合成一','正文一','','','分类','','启用','','','','','','','false'],
+      ['faq-two','合成二','正文二','','','分类','','启用','','','','','','','false'],
+    ]);
+    const r1=value(await service.publish(actor('enabler'),first.request));
+    const second=await publishable('second',[['faq-one','合成一','正文一','','','分类','','停用','','','','','','','false']]);
+    const r2=value(await service.publish(actor('enabler'),second.request));
+    expect(r2.releaseId).not.toBe(r1.releaseId);
+    const entries=(await admin.query(`SELECT e FROM content_intake.release_lineage l
+      JOIN content_intake.candidate_versions c ON c.candidate_id=l.candidate_id AND c.version=l.candidate_version
+      CROSS JOIN LATERAL jsonb_array_elements(c.material->'entries') e
+      WHERE l.release_id=$1 AND e->>'businessEntryId'=l.business_entry_id ORDER BY l.business_entry_id`,[r2.releaseId])).rows;
+    expect(entries.map(r => [r.e.businessEntryId,r.e.operation,r.e.scriptVersion])).toEqual([['faq-one','disable',2],['faq-two','upsert',1]]);
+    expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('2');
+  });
+
+  it('inherits another source unchanged and propagates its later approval revocation', async () => {
+    await publicationBase();
+    // Register a separate shop's grants before either review package is frozen.
+    await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+      to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-b','scope_id','scope-b','source_id',CASE WHEN source_id IS NULL THEN NULL ELSE 'source-b' END,
+        'parent_grant_id',CASE WHEN parent_grant_id IS NULL THEN NULL ELSE parent_grant_id||'-b' END))).*
+      FROM content_intake.grants g ORDER BY (kind='allocation') DESC`);
+    const first=await publishable('shop-a');const firstInstance=provider.latest();
+    const r1=value(await service.publish(actor('enabler'),first.request));
+    const second=await publishable('shop-b',undefined,'b');
+    const r2=value(await service.publish(actor('enabler'),second.request));
+    const lineage=await admin.query(`SELECT to_jsonb(l)-'release_id' AS value FROM content_intake.release_lineage l
+      WHERE source_id='source-a' ORDER BY release_id`);
+    expect(lineage.rows).toHaveLength(2);expect(lineage.rows[0]).toEqual(lineage.rows[1]);
+    expect((await admin.query('SELECT source_id FROM content_intake.release_lineage WHERE release_id=$1 ORDER BY source_id',[r2.releaseId])).rows)
+      .toEqual([{ source_id:'source-a' },{ source_id:'source-b' }]);
+    firstInstance.state='REVOKED';
+    expect(value(await refresh(first.c,'revoke-inherited')).state).toBe('revoked');
+    expect((await admin.query('SELECT release_id FROM content_intake.release_revocations ORDER BY release_id')).rows)
+      .toEqual([r1.releaseId,r2.releaseId].sort().map(release_id=>({ release_id })));
+  });
+
+  it('copies every existing legacy field from a different domain without manufacturing review evidence', async () => {
+    await seedSyntheticG1aRelease(admin);
+    await admin.query('BEGIN');
+    await admin.query("SELECT set_config('app.publishing','on',true)");
+    // Explicit test-only native baseline: no product adoption or identity inference.
+    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,status,source_binding_hash,tenant_id)
+      SELECT 'rel_native_base',2,'published',source_binding_hash,'tenant-a' FROM public.content_releases WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query(`INSERT INTO public.release_source_bindings SELECT 'rel_native_base',domain,source_version_id
+      FROM public.release_source_bindings WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query(`INSERT INTO public.release_items SELECT (jsonb_populate_record(NULL::public.release_items,
+      to_jsonb(i)||jsonb_build_object('release_id','rel_native_base'))).* FROM public.release_items i
+      WHERE release_id='rel_synthetic_g1a_v1' AND category<>'product'`);
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ('rel_native_base','intake-v2.1')");
+    await admin.query("UPDATE public.content_current SET current_release_id='rel_native_base'");
+    await admin.query("SELECT setval('public.content_release_seq',2,true)");
+    await admin.query('COMMIT');
+    const { request }=await publishable('legacy-other-domain');
+    const out=value(await service.publish(actor('enabler'),request));
+    const before=(await admin.query("SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id='rel_native_base' ORDER BY script_id")).rows;
+    const after=(await admin.query("SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id=$1 ORDER BY script_id",[out.releaseId])).rows;
+    expect(before.length).toBeGreaterThan(0);expect(after).toEqual(before);
+    expect((await admin.query('SELECT count(*) FROM public.owner_acceptance_records')).rows[0].count).toBe('0');
+  });
+
+  it.each(['quality','publisher-revoked','reviewer-revoked','cancelled','source-version','revoked-approval','suspended-source'] as const)(
+    'publication rejects %s with zero release/ticket side effects', async gate => {
+      await publicationBase(); const { c,request }=await publishable(gate);
+      if (gate==='quality') {
+        // New material cannot borrow the already-passed plan.
+        const req=await input('unreviewed-revision',c.key);req.baseReleaseId=request.baseReleaseId;
+        const revision=value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',req)).jobId));
+        value((await confirm(revision,'revision-source')).result);
+        value(await service.requestReview(actor('enabler'),reviewRequest(revision,0,'revision-review')));
+        provider.approve('reviewer');request.key=revision.key;
+      } else if (gate==='publisher-revoked' || gate==='reviewer-revoked') {
+        const id=gate==='publisher-revoked'?'business-enabler-publish':'business-reviewer-review';
+        value(await service.changeGrant(actor('director'),id,{ operationId:'gate-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null }));
+      } else if (gate==='cancelled') value(await service.cancel(actor('other'),{ operationId:'gate-cancel',key:c.key }));
+      else if (gate==='revoked-approval') provider.latest().state='REVOKED';
+      else if (gate==='suspended-source') await admin.query("SELECT public.suspend_authoritative_source('srcv_pub_aftersale','SOURCE_REVOKED','EVD-SYNTHETIC-REVOKE','synthetic-owner','owner')");
+      else {
+        await admin.query('BEGIN');
+        await admin.query("INSERT INTO content_intake.source_mappings SELECT source_id,2,template_version,rule_version,mapping_version,structure_digest FROM content_intake.source_mappings WHERE source_id='source-a'");
+        await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
+        await admin.query('COMMIT');
+      }
+      expect(await service.publish(actor('enabler'),request)).toMatchObject({ ok:false });
+      await noPublication();
+    });
+
+  it('rolls back ticket, catalog, candidate, current and release on a late announcement failure', async () => {
+    await publicationBase();const { c,request }=await publishable();
+    await admin.query(`CREATE FUNCTION public.synthetic_announcement_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic late failure'; END $$;
+      CREATE TRIGGER synthetic_announcement_failure BEFORE INSERT ON public.announcements FOR EACH ROW EXECUTE FUNCTION public.synthetic_announcement_failure()`);
+    expect(await service.publish(actor('enabler'),request)).toMatchObject({ ok:false,commit:'rolled_back' });
+    await noPublication();
+    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,c.key.version)).state).toBe('ready');
+    await admin.query('DROP TRIGGER synthetic_announcement_failure ON public.announcements');
+    expect(value(await service.publish(actor('enabler'),request)).state).toBe('published');
+  });
+
+  it('recovers a lost publication COMMIT after restart without remote I/O or a second release', async () => {
+    await publicationBase();const { request }=await publishable();let lost=false;
+    const unreliable = { async connect() { const client=await pool.connect();let publishing=false;
+      return new Proxy(client,{ get(target,key) {
+        if (key==='query') return async (sql: string,args?: unknown[]) => {
+          if (sql.includes('content_intake.publish_candidate')) publishing=true;
+          const result=await target.query(sql,args);
+          if (sql==='COMMIT' && publishing && !lost) { lost=true;throw new Error('synthetic publication response lost'); }
+          return result;
+        };
+        return Reflect.get(target,key,target);
+      } }) as PoolClient;
+    } };
+    const first=createContentIntakeService(unreliable,store,(_id,e)=>diagnostics.push(e),createApprovalAdapter(route,provider.transport));
+    expect(await first.publish(actor('enabler'),request)).toMatchObject({ ok:false,commit:'unknown',reason:'COMMIT_UNKNOWN' });
+    const restarted=createContentIntakeService(pool,store);
+    const recovered=value(await restarted.publicationReceipt(actor('enabler'),request.operationId));
+    expect(value(await restarted.publish(actor('enabler'),request))).toEqual(recovered);
+    expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('1');
+    expect((await admin.query('SELECT count(*) FROM content_intake.commit_tickets')).rows[0].count).toBe('1');
+    expect(await restarted.publicationReceipt(actor('other'),request.operationId)).toMatchObject({ ok:false });
+  });
+
+  it.each(['cancel','revoke'] as const)('lets %s win while publication is observing approval without locks', async action => {
+    await publicationBase();const { c,request }=await publishable();
+    let reached!:()=>void;const observing=new Promise<void>(resolve=>{reached=resolve;});
+    let resume!:()=>void;const released=new Promise<void>(resolve=>{resume=resolve;});
+    const delayed=evidenceService({ ...provider.transport,async instance(b,signal) { reached();await released;return provider.transport.instance(b,signal); } });
+    const pending=delayed.publish(actor('enabler'),request);await observing;
+    try {
+      if (action==='cancel') value(await service.cancel(actor('other'),{ operationId:'racing-cancel',key:c.key }));
+      else value(await service.changeGrant(actor('director'),'business-enabler-publish',
+        { operationId:'racing-revoke',expectedVersion:1,change:'revoke',reason:'合成并发撤权',stewardPrincipalId:null }));
+    } finally { resume(); }
+    expect(await pending).toMatchObject({ ok:false });await noPublication();
+  });
+
+  it('commits once when cancellation waits behind the final publication transaction', async () => {
+    await publicationBase();const { c,request }=await publishable();
+    let reached!:()=>void;const committing=new Promise<void>(resolve=>{reached=resolve;});
+    let resume!:()=>void;const released=new Promise<void>(resolve=>{resume=resolve;});
+    let cancelledAtLock!:()=>void;const waiting=new Promise<void>(resolve=>{cancelledAtLock=resolve;});
+    let publishing=false;
+    const intercepted={ async connect() { const client=await pool.connect();return new Proxy(client,{ get(target,key) {
+      if (key==='query') return async(sql:string,args?:unknown[])=>{
+        if (publishing && sql==='SELECT backend_review.lock_content()') cancelledAtLock();
+        const result=await target.query(sql,args);
+        if (sql.includes('content_intake.publish_candidate')) { publishing=true;reached();await released; }
+        return result;
+      };
+      const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+    } }) as PoolClient; } };
+    const runner=createContentIntakeService(intercepted,store,(_id,e)=>diagnostics.push(e),createApprovalAdapter(route,provider.transport));
+    const pending=runner.publish(actor('enabler'),request);await committing;
+    const cancel=runner.cancel(actor('other'),{ operationId:'waiting-cancel',key:c.key });await waiting;resume();
+    expect(value(await pending).state).toBe('published');
+    expect(await cancel).toMatchObject({ ok:false,reason:'ALREADY_PUBLISHED' });
+  });
+
+  it('requires a new candidate and approval after another candidate wins the same base', async () => {
+    await publicationBase();const first=await publishable('base-one');const second=await publishable('base-two');
+    value(await service.publish(actor('enabler'),first.request));
+    expect(await service.publish(actor('enabler'),second.request)).toMatchObject({ ok:false,reason:'BASE_CHANGED' });
+    expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('1');
+  });
+
+  it('refuses missing bootstrap and unmapped legacy-domain rows instead of silently replacing them', async () => {
+    const empty=await publishable('no-base');
+    expect(await service.publish(actor('enabler'),empty.request)).toMatchObject({ ok:false,reason:'MODE_CONFLICT' });
+    await seedSyntheticG1aRelease(admin);
+    const base='rel_synthetic_g1a_v1';
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[base]);
+    const mixed=await publishable('legacy-members');
+    expect(await service.publish(actor('enabler'),mixed.request)).toMatchObject({ ok:false,reason:'MODE_CONFLICT' });
+    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(base);
+    expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('0');
+  });
+
+  it('rejects an exact but stale observation at the private commit boundary', async () => {
+    await publicationBase();const { c,request }=await publishable();
+    const fresh=value(await refresh(c,'before-expiry'));
+    // Append an intentionally old, otherwise valid observation. It is still
+    // inside the five-minute approval cache but outside the one-minute ticket.
+    await admin.query(`INSERT INTO content_intake.approval_facts SELECT review_request_id,facts_version+1,revocation_generation,state,
+      clock_timestamp()-interval '61 seconds',clock_timestamp()+interval '239 seconds',raw_facts_digest,package_verified_sha256,
+      human_task_id,reviewer_id,reviewer_facts_version,decided_at-interval '62 seconds'
+      FROM content_intake.approval_facts WHERE review_request_id=$1 ORDER BY facts_version DESC LIMIT 1`,[fresh.reviewRequestId]);
+    await admin.query('UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id=$1',[fresh.reviewRequestId]);
+    const old=(await admin.query('SELECT checked_at FROM content_intake.approval_facts WHERE review_request_id=$1 ORDER BY facts_version DESC LIMIT 1',[fresh.reviewRequestId])).rows[0].checked_at as Date;
+    // Use DB timestamp formatting to retain microseconds in the private probe.
+    const observed=(await admin.query(`SELECT $2::jsonb||jsonb_build_object('checkedAt',checked_at) AS value
+      FROM content_intake.approval_facts WHERE review_request_id=$1 ORDER BY facts_version DESC LIMIT 1`,[fresh.reviewRequestId,JSON.stringify({ ...fresh,checkedAt:old.toISOString() })])).rows[0].value;
+    await expect(admin.query('SELECT content_intake.publish_candidate($1,$2::jsonb,$3::jsonb)',
+      ['enabler',JSON.stringify(request),JSON.stringify(observed)])).rejects.toMatchObject({ message:'TICKET_EXPIRED' });
+    await noPublication();
+  });
 
   it('freezes quality before individual checks, survives service recreation and creates no approval or release', async () => {
     const c = await routine();
@@ -806,7 +1070,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     provider.approve('enabler');
     value(await refresh(c));
     // Seed real four-domain release rows via the existing test support. This tests
-    // revocation propagation, not the still-unimplemented P2 publish transaction.
+    // revocation propagation through the legacy writer, independently of native publication.
     await seedSyntheticG1aRelease(admin);
     const original = (await admin.query('SELECT release_id FROM public.content_releases')).rows[0].release_id as string;
     await admin.query('BEGIN');

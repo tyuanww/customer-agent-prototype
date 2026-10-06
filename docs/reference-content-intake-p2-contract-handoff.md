@@ -89,24 +89,25 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 实际验收及审查见[交接证据](../evidence/qa/content-intake-p2-handoff/README.md)：仓库 lint/typecheck/test/build、合同 19 项、接收工具 19 项、隔离 PG 17 项通过；额外启用既有 API 导入/审核/发布实库回归，21 项通过。DOMAIN 回归保留修前失败与修后拒绝证据。详细日志与 OCR 输入在 ignored `.gstack/content-intake-p2-handoff/`。本机修后审查无剩余具体缺陷；外部结构化两组完成，一组外部对抗输出未通过完成格式校验，缺口如实保留。产品 API/Main/renderer 本次未接线，仍保持既有 owner-only HTTP/桌面发布行为；SQL 合同允许的 coach 增量并不代表 UI/HTTP 已开放。
 
-接续的 API/DB 权威权限和持久候选事务已在隔离 PG 中运行，范围、实际检查与剩余门见[事务验收](../evidence/qa/content-intake-p2-transactions/README.md)。来源确认和合成人工审批证据已接续，见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。0022 已追加旧写共存门，见[旧写共存验收](../evidence/qa/content-intake-p2-legacy-fence/README.md)。下一步衔接现有质量/负责人承接门，实现 P2 原子发布，再验证另一坐席按店查询；依 §5 保留并发、未知回执和无权路径验收。生产角色 ACL、P2 HTTP、Main 与 renderer 未接线，不存在可用的新上传/审核按钮或正式飞书实例接入。
-
-下一可验收切片先明确候选材料如何投影到既有质量 population、抽检结果及 owner 承接证据，禁止伪造旧 dual-review 或直接插入 release 绕过质量门。随后在同一内容锁下消费一次票据并原子写入候选回执、release、catalog/lineage 和公告；验收须证明质量拒绝零副作用、取消/撤权先赢不发布、响应未知用原 operation 恢复且永久关联不重复发布。
+接续的 API/DB 权限、持久候选、来源确认及合成人工审批，分别见[事务验收](../evidence/qa/content-intake-p2-transactions/README.md)和[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。0022 拥有旧写共存门；0023 拥有候选质量计划与逐条检查；0024 新增内部原生发布函数，复用同一个 release/current。当前消费者仍是隔离 PG 合成执行器，生产角色 ACL、P2 HTTP、Main 与 renderer 没有接线。
 
 ### 候选到发布底座的映射差集
 
-`qualityPreview` 已实现只读的候选→质量 population/抽样投影；隔离 PG 消费它验证旧冻结与质量证据 SQL。后续 `0023` 已追加候选独立的不可变质量计划与逐条检查（内部合成接口），新发布入口仍未实现。旧函数及其合同保持不变，以下差集不得靠默认值补齐：
+采用原生材料与谱系映射，不把新候选塞进没有等价字段的旧 staging。发布接口消费已冻结正式 wire；0024 是本仓内部产品 overlay，不改写上游合同或旧函数。字段与证据的归属如下：
 
-| 边界 | 已验证的可复用部分 | 发布实现仍需完成 |
+| 边界 | 本轮实现与所有者 | 后续限制 |
 | --- | --- | --- |
-| 材料身份 | 完整候选 key；来源限定的 script ID；每条投影均绑定整份材料摘要 | 候选→质量计划/逐条人工检查已独立持久化并重验原材料；最终发布提交点仍须消费。不能把抽样 hash 当旧 governance hash |
-| 质量选样 | `qualityTargets`；DB population JCS 与排序；500/501 边界、扩样阈值、关键稿全量复核 | 冻结发生在检查前；逐条结果须覆盖精确样本；任一阻断项使整批修订。旧 SQL 的“passed 且有 quarantined 行”不能直接表示 P2 整批可发布 |
-| 停用与继承 | 缺行保留；显式停用独立列出，仍被完整 key 绑定 | 旧 population 只含 upsert；停用必须经候选整体人工审批及最终 source 内合并，不能因空 population 自动发布 |
-| 原生审批 | 固定审核包、历史人工资格、常规自审/关键他审及撤销谱系 | 新稿使用原生 review binding；不能生成伪旧 single/dual-review 主体、EVD 或 owner 记录 |
-| 负责人承接 | `assert_owner_acceptance`、`owner_acceptance_release_content_ready` 保持原用途和撤销/期限门 | 旧 `OwnerAcceptanceRecord` 的 purpose 固定 `g1a_offline_only`，四域来源和内容摘要均需包外批准；只能按其合同核对待继承的旧记录，不能由新审批追认 |
-| 检索与业务字段 | 新材料保留问法独立版本、商品/场景词项、长正文、分类与范围 | 旧 staging 要求 intent taxonomy、platform、source_ref、风险类别等；商品词项不能直接变成旧 sku/category。逐字段确定转换或新读模型，不能截断、猜默认或扩大范围 |
-| 发布集合 | 既有单 current、来源绑定完整性、质量/owner 门；0022 旧写隔离 | 增加候选/来源版本→旧 release 成员及精确谱系的映射；消耗一次票据、候选永久回执、release/catalog/公告同事务；继承旧 owner 内容需重验 |
+| 材料身份 | release_lineage 精确引用不可变 candidate/version、来源、业务 ID、稿版本及 reviewRequestId；候选摘要包含整份材料 | 不能把质量 population hash 当旧 governance hash |
+| 问法及检索字段 | 正文、独立问法版本、商品/场景词项、分类、适用说明、有效期原样留在 material；不截断或猜 platform/taxonomy/sku | 原生坐席读模型仍待实现，必须按正式 IntakePublishedEntry 白名单输出；内部说明只供管理审核，不得下发 |
+| 质量 | 最终事务要求候选绑定的质量状态为 passed；初样、扩样和逐条证据复用 0023 | 无冻结计划或新修订不能借用旧质量通过结论；旧 SQL 的 passed 不替代候选质量 |
+| 来源与审批 | 来源确认与对象 SHA 绑定；锁外即时观察原审核实例，锁内核对 exact evidenceVersion、checkedAt、generation 及双方当前资格 | 原生人工证据不生成旧 single/dual/owner 记录；真实 transport 未实现 |
+| 目录合并 | 当前来源使用完整候选（含缺行继承与显式停用）；其他来源谱系原样继承，并检查审批状态与最早期限 | 停用仍留历史谱系，读时过滤操作/有效期；显式 family 覆盖没有冲突证明时拒绝 |
+| 旧成员与来源门 | 不同域 release_items 完整复制全部字段，四域 release_source_bindings 原样继承；继承前后重新调用原 owner 门，期限进入提交截止 | 四域绑定只拥有旧来源证明；新稿以自己的来源确认/审批谱系证明，不冒用旧来源或 owner 批准 |
+| 发布与恢复 | 观察开始后至多 60 秒的一次服务器票据；候选、永久关联、release/catalog/lineage、current、公告和原 operation 回执同事务；未知提交只恢复原回执 | 回执是历史结果，不能当坐席当前使用权限；票据不外发 |
+| 初始基线 | 只接续已有 native catalog；无基线或当前目标域仍有旧成员时 MODE_CONFLICT | bootstrap、旧内容认领/迁移及真实 v2-active 启用须独立治理，不能隐式清除旧成员 |
 
-以上涉及已有正式 wire/schema 含义变化的部分，须在所属治理仓版本化后再 intake；不改变其含义的内部实现沿本仓批准的 P2 推进。候选绑定的质量持久化已覆盖“检查前冻结、扩样、任一错误整批阻断、修订旧证据不可用”。下一阶段完成发布字段/证据映射后，接票据与原子提交。生产 ACL、HTTP/Main/renderer、真实审批 transport、使用资格和第二坐席查询仍未完成。
+既有 owner 承接仍使用原 `g1a_offline_only` 合同及包外批准；新候选没有该旧身份时不伪造记录。最终事务先取得内容锁再取既有发布锁，重验 base、当前来源/发布人/审核人、材料及审批代际；继承审批和 owner 记录期限共同限制最晚提交。任何失败都不能留下票据、发布尝试或半个目录。实际验证与审查见[发布验收](../evidence/qa/content-intake-p2-publication/README.md)。
+
+下一可验收切片是封闭合成运行中的使用资格和原生按店读模型：另一坐席只能看到当前店及获准的品牌通用内容；漏项/撤权/过期/审批撤销即时失败关闭；内部说明不下发，空 SOP/media 是真实空集合；同店内容更新与权限失效分开。显式覆盖、旧数据迁移/初始基线、生产 ACL/HTTP/Main/renderer、真实 transport 和现场多端验收仍是各自未完成项。本轮不把发布服务成功称为完整 FAQ 闭环。
 
 现场资料 B 最新版/维护人、真实租户组织字段/人工节点/附件保真属于后续真实验证；本轮未读取真实资料、员工信息或凭据，未 push、PR、merge、deploy，也未启用 v2-active。

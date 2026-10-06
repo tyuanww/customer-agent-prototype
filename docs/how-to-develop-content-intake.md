@@ -1,6 +1,6 @@
 # 如何验证合成资料导入
 
-本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。完整 FAQ 产品闭环仍待真实审批 transport、发布与坐席接线。
+本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。完整 FAQ 产品闭环仍待原生坐席读模型、真实审批 transport 与产品接线。
 
 ## 运行
 
@@ -33,7 +33,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 
 服务接口只接收已验证会话和 objectId，不接文件路径、远程 URL、客户端 rows/digest 或 renderer 身份。根 allocation、身份事实、来源/词项及接收对象由测试受控登记；相关正式运维与上传 HTTP 接线仍待后续。当前任务回执复用 `backend_review.receipts` 的独立 `intake:` 命名空间，候选不依赖 24h HTTP 缓存。永久请求绑定沿用该私有回执的 SHA-256 方式，不依赖有保留期限的 HTTP HMAC 密钥。进程重启可按原 jobId 恢复解析，成功任务返回原候选；提交未知先查原 job/操作，不换键。
 
-商品/场景单元格以英文逗号分隔稳定 ID；服务端只解析同品牌/域且属于品牌通用或当前店的已登记词项。正文和问法分别分配版本，缺行继承。来源版本尚未确认时材料记为 unknown，等待独立确认；不从文件时间推断新旧。`对应通用条目` 的非空内容暂时阻断，直到跨来源覆盖与发布冲突检查完成。发布、使用资格、旧写隔离、注册生产角色与真实数据不属于这个事务切片的通过结论。
+商品/场景单元格以英文逗号分隔稳定 ID；服务端只解析同品牌/域且属于品牌通用或当前店的已登记词项。正文和问法分别分配版本，缺行继承。来源版本尚未确认时材料记为 unknown，等待独立确认；不从文件时间推断新旧。`对应通用条目` 的非空内容暂时阻断，直到跨来源覆盖与发布冲突检查完成。该事务切片的原通过结论不含发布、使用资格或产品接线；后续封闭原子发布和旧写隔离见下文，注册生产角色与真实数据仍未开放。
 
 业务授权、分配母资格和相关主体事实的截止时间由事务模块收集，在写回执后、COMMIT 前统一用数据库时钟复核；新负责人撤权/接管只检查当前资格，发新授权仍须覆盖整段期限。base 检查同时取得既有发布 advisory lock，保护尚无 current 行的首次导入；这不等于后续旧写影响集隔离已实现。
 
@@ -54,7 +54,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 
 此处比较过两种边界：为全部授权写入器增加提交后见证，以及复用现有审核包检查点。后者不新增冻结合同字段或写入生命周期，当前封闭执行器可直接验证；代价是资格晚于审核包时必须重开审批。该证明依赖所有资格写入器遵守 `lock_content()`，真实组织同步接入时必须一并验证，不得绕过锁直接写表。
 
-`ready` 不是发布回执。尚未实现 P2 原子发布、短票据、质量/负责人承接映射、使用资格和桌面接线；旧写 fence 见下方共存门，应用角色仍无新 schema 权限。后续发布必须在锁内重新验证全部门，不能信任早先 GET 或幂等回执里的 readiness。详细证据见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。
+`ready` 不是发布回执。后续内部原子发布见下文，使用资格和桌面接线仍未实现；应用角色仍无新 schema 权限。发布会在锁内重新验证全部门，不能信任早先 GET 或幂等回执里的 readiness。详细证据见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。
 
 ## P1 测量含义与未验证范围
 
@@ -106,3 +106,14 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 每轮一次原子提交完整集合；`expansion_required` 时用 `expandedScriptIds` 提交 expanded，包含原初样且其内容和结果保持不变。任一缺陷最终要求整批新版本修订；`passed` 仅表示质量门通过，不取代来源/组织审批、负责人承接或最终发布门。使用原 operation 可恢复未知 COMMIT 的历史回执；当前资格与状态要重新读取，不以历史回执发布。
 
 `0023_intake_quality` 是产品内部封闭存储，不改变正式 wire / 旧质量函数；两张表只追加，旧迁移保持原字节。状态函数从逐条检查计算结论，没有第二个可写的 passed 指针。生产应用角色仍不能访问。实库测试扩展原 `content-intake.integration.test.ts` 与数据库 `postgres.integration.test.ts`，使用上文同一命令与合成输入。
+
+
+## P2 原生候选原子发布
+
+同一个 `test:intake:transactions` 命令覆盖实际 XLSX → 来源确认 → 合成人工审批 → 质量 → 发布 → 按谱系回读材料。只有测试执行器显式建立的原生目录基线可以接续；服务不 bootstrap、不自动迁移旧同域数据、不认定显式同题覆盖已排除冲突。
+
+在来源、审批与候选质量通过后，用 `publish(actor,{operationId,key,baseReleaseId,sourceEvidenceVersion,approvalEvidenceVersion,title,summary})`。发布动作有独立业务授权，不隐含要求 content-manage/review。API 先锁外即时核验审批，再由私有 SQL 在内容锁/发布锁下核对当前门，签发并消费从观察开始至多 60 秒的票据。目录、公告、单 current、永久关联及原 operation 回执一起提交；最终截止还受授权、审批、继承 owner 记录期限限制。
+
+发生 `COMMIT_UNKNOWN` 时，用原 operationId 调 `publicationReceipt`，或重试原 publish 请求；成功提交后的历史回执不再触发远程观察，不产生第二个 release。相同键换载荷拒绝；新操作键不能重复发布同一候选。历史回执不代替当前使用资格。
+
+新字段保留在不可变材料，release_lineage 绑定完整候选及来源内条目；缺行继承、显式停用保留版本历史。不同来源谱系和不同域旧成员完整复制，并重新核对其审批/来源/owner 门。内部说明仍只供管理审核；坐席白名单读模型尚未接线。未支持媒体的解析规则保持阻断，非空附件说明不能被本发布入口绕过。具体映射、限制和下一切片验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
