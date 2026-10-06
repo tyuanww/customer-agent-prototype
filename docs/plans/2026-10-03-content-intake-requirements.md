@@ -178,6 +178,12 @@
 
 本轮检查与修复证据见[持久上下文验收](../../evidence/qa/content-intake-p2-usage-context/README.md)。OCR 父审核验修复与当前测试；gstack 三轮修复到达上限，保留未收敛记录，后续 PR 前须完成最终零修改独立复审。下一功能切片为封闭合成 HTTP、factory/白名单 IPC 和 FAQ 界面纵向接线；真实 transport/运行 ACL/数据及 Mac、Windows 原生验收各自保留门禁。旧 WSL 证据不作为新提交的平台通过记录。
 
+### 0.15 持久上下文最终复审与 HTTP 接线接续（2026-10-06）
+
+用户在 `ab2b097` 后继续推进。新的 `/review` 调用完成原提交全范围复核，修正文档旧接口说明，再以零修改独立复审收敛；未改写 §0.14 的历史三轮上限记录。40 个已审路径字节未变，Main 18 项本轮实跑通过，未变输入的全量证据精确复用；外部模型 unavailable、原生窗口未验证。详见[最终复审](../../evidence/qa/content-intake-p2-usage-context/final-review.md)。
+
+按已确认下一切片接续封闭合成 HTTP 与实际桌面会话客户端，再进入白名单 IPC/FAQ 界面。API 拥有认证后的正式请求/错误合同，ProductHttp 拥有传输预算、取消与无敏感载荷的诊断，ProductSession 独占凭据与会话代际，ContentIntakeUsage 独占店铺选择/完整目录/复制资格。继续使用合成 fixture 和隔离 PG，不注册生产入口、不增加运行 ACL。OCR → 修复 → 验证 → 本地 commit 的持续授权有效；Git 对外动作和真实运行不扩大。
+
 ## 1. 已确认的目标
 
 用户已确认本期完成“资料导入、维护、发布、坐席查询形成完整流程”。完成必须以坐席使用到正确的已发布内容为依据，不能止于后台上传成功。

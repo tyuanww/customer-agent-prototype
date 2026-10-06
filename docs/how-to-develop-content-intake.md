@@ -121,10 +121,10 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 
 ## P2 使用资格与按店目录
 
-仅受控合成执行器调用 `issueEntitlement(actor,context,request)` 和 `snapshot(actor,context,{entitlementId,cursor?,limit?})`。`context` 来自认证 adapter，包含 sessionId/shopId/contextGeneration/productIds/scenarioIds；不是来自 renderer 的身份声明。请求与返回用当前正式 validator，分页 limit 为 1–100，默认 50；整页去重词项最多 100，必要时提前分页。单条引用超出该预算在冻结/发布前返回 FILE_LIMIT，须拆分业务条件或等待正式合同调整；不截断词项。正式商品/场景上下文传输仍待版本化合同，不把内部参数塞进现有 HTTP 请求。
+受控合成执行器调用 `issueEntitlement(actor,request)` 和 `snapshot(actor,{entitlementId,cursor?,limit?})`。OpenAPI 1.17.0 的 request 显式包含 shopId/contextGeneration/productIds/scenarioIds/releaseId；身份与私有会话引用来自认证模块。API 将选择及会话绑定原子保存到 0025 的不可变上下文，每页从数据库复原选择并锁定核验当前会话，调用方不能补传 sessionId 或分页选择。请求与返回用当前正式 validator，分页 limit 为 1–100，默认 50；整页去重词项最多 100，必要时提前分页。启用单条引用合计超限在冻结/发布前返回 FILE_LIMIT，须拆分业务条件；不截断词项，历史超限条目仍可显式停用。
 
 同一资格分页须沿用相同会话和选择；换店、重新登录或改变选择后重签。新资格只能签 current，可指定 releaseId 作 CAS。普通新发布时旧页保持自己的 release；若希望展示新版，重新取资格并完成全部页面后整体替换，不能把新旧页合并。实际空目录必须能替换旧目录。游标只定位，不授予权限；每页均重验，不能把回执/旧资格/hash 当权限。
 
-资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 停止使用并处理审批；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。失败不自动恢复旧正文或延长旧资格。正式 Main 的撤文/禁复制及通知扇出属于下一 adapter 切片。
+资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 停止使用并处理审批；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。Main 的 `ContentIntakeUsage` 已拥有完整分页、当前店/选择、迟到回调、原文复制与失效通知；单资格自然到期和精确 FORBIDDEN/LEASE_EXPIRED 只影响该资格，其他有效句柄仍受自己的原截止约束，真正会话/权限/审批失效才清除全部句柄。失败不会复活或延长资格。当前仅根级合成 HTTP 探针消费该模块；产品 factory、白名单 IPC、renderer 和原生设备验收仍待接线，见[使用资格上下文验收](../evidence/qa/content-intake-p2-usage-context/README.md)。
 
 本机定向验证：`CUSTOMER_AGENT_PG15_BIN=<PG15 bin> pnpm --filter @customer-agent/api test:intake:transactions`。使用临时 Unix socket PG，不读业务数据库；原生 Windows 不能直接运行此 PG harness，WSL 可提供 Linux 后端证据。远端需独立无特权目录并遮蔽生产路径；按 [远端测试流程](how-to-remote-development-and-deployment.md) 从已审阅 Git SHA 导出，不能把它变成生产发布。
