@@ -1,0 +1,142 @@
+{
+  "skill": "open-code-review-delegate",
+  "mode": "commit",
+  "commit": "28436477945e3e5bb6dd1d7956187e05eb7181b0",
+  "total_files": 24,
+  "reviewable_files": 18,
+  "reviewed_files": 18,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "findings": [],
+  "files": [
+    {
+      "path": "apps/api/src/content-intake/approval-adapter.ts",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "apps/api/src/content-intake/candidate.ts",
+      "status": "modified",
+      "review": "reviewed"
+    },
+    {
+      "path": "apps/api/src/content-intake/evidence.ts",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "apps/api/src/content-intake/reviewer.ts",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "review": "reviewed"
+    },
+    {
+      "path": "apps/api/src/content-intake/transaction.ts",
+      "status": "modified",
+      "review": "reviewed"
+    },
+    {
+      "path": "apps/api/tests/support/intake-approval.ts",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/checks.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/evidence.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-002.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-003.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-004.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-005.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-006.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/exploration-007.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/inputs.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/ocr-coverage.json",
+      "status": "added",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/review-attempts.json",
+      "status": "added",
+      "review": "reviewed"
+    }
+  ],
+  "excluded_supplement": [
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "ocr_exclusion": "default_path",
+      "review": "reviewed as test/document evidence"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "ocr_exclusion": "unsupported_ext",
+      "review": "reviewed as test/document evidence"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "ocr_exclusion": "unsupported_ext",
+      "review": "reviewed as test/document evidence"
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "ocr_exclusion": "unsupported_ext",
+      "review": "reviewed as test/document evidence"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "ocr_exclusion": "unsupported_ext",
+      "review": "reviewed as test/document evidence"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-evidence/README.md",
+      "status": "added",
+      "ocr_exclusion": "unsupported_ext",
+      "review": "reviewed as test/document evidence"
+    }
+  ],
+  "evidence_reuse": "Prior executable inputs matched all 26 SHA-256 entries before the new legacy-fence edits. Previous external timeouts are not reclassified."
+}

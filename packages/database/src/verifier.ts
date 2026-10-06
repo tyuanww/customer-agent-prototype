@@ -116,16 +116,18 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // with its owner's privileges, so without those grants selecting the view fails with
 // 42501 even when the role holds the view. That is why the ACL entry count moves by more
 // than the four views: the definer's new table grants are part of it too.
+// 0022 adds five private policy/trigger functions and eight privileges only for cs_ai_definer.
+// No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
-const EXPECTED_ACL_MANIFEST_ENTRIES = 215;
-const EXPECTED_ACL_MANIFEST_SHA256 = 'c6be7b14238e4c6e92f9829fbd9b678c5629e802df1247719713975584d3a057';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2680;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '6decbc893186c331b69a31676068905eeb5a4d9931a04fa55c16c926b176822e';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 209;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '854697afaf4828f83bf27c295c932e35b0a3b135ea51f820f908e2b6223909a1';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 74;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = '294a8fa2df968ec428364781b1657e136398b3e6541c9c250af2ebb30fec0979';
+const EXPECTED_ACL_MANIFEST_ENTRIES = 223;
+const EXPECTED_ACL_MANIFEST_SHA256 = '733889747d9dbd94c592e64bd4c9c3e69e981eb00e1fe5fdc4ea3d50f2c4ab00';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2685;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '910a0ff887d521edaff5cb87723c12abb44341a84ef2bbb38de9c1f805e1322d';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 214;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '9f677fdab08e3f6ff8efd6c81715196b093a53542747bfb75921967c036ece0a';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 76;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = '95e5eb772a1d8a8473f8eb0ac8b0cc50eca983014c060dea038d342626449227';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -747,7 +749,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 81 || inventory.views !== 7 || inventory.functions !== 209 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 81 || inventory.views !== 7 || inventory.functions !== 214 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {

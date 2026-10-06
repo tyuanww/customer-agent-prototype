@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-06",
+  "baseHead": "28436477945e3e5bb6dd1d7956187e05eb7181b0",
+  "branch": "codex/content-intake-p2",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgresql": "15.18",
+    "bun": "1.4.2"
+  },
+  "inputs": "inputs.json",
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "result": "PASS",
+      "localLog": ".gstack/content-intake-p2-publication/final-lint-3.log",
+      "logSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "result": "PASS",
+      "localLog": ".gstack/content-intake-p2-publication/final-typecheck-3.log",
+      "logSha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "result": "PASS; root configured skips remain; selected integrations separately enabled",
+      "localLog": ".gstack/content-intake-p2-publication/final-test-2.log",
+      "logSha256": "d2fa6ede7f7530d902fe02f2a19d6a822bfb8fab63828cbc4010c959fd556f2d"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "result": "PASS",
+      "localLog": ".gstack/content-intake-p2-publication/final-build-2.log",
+      "logSha256": "f1cab39b7adca1e9446c306b2ee251c434c617a37822008b22ee8210eabe9760"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "result": "PASS",
+      "localLog": ".gstack/content-intake-p2-publication/final-workspace-2.log",
+      "logSha256": "cbf2923c96040f78f5ac622fe87fed2b30f3c6c0a85ced717df81193081b2d94"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "result": "PASS",
+      "localLog": ".gstack/content-intake-p2-publication/final-docs-2.log",
+      "logSha256": "1470036947662ae0806c4a04e50af4c62a46177af4e282e03bcca45d3343e806"
+    },
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=<PG15> pnpm --filter @customer-agent/database test:integration",
+      "exitCode": 0,
+      "result": "19/19 PASS",
+      "localLog": ".gstack/content-intake-p2-publication/final-dbpg-2.log",
+      "logSha256": "85929d988d18b568d66c3289aea28f54ae1922b9b070181537b5bee9ad546f3a"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/database build",
+      "exitCode": 0,
+      "result": "PASS; check:generated and runtime build",
+      "localLog": ".gstack/content-intake-p2-publication/build-db-cancel.log",
+      "logSha256": "b6b2b351c05cb4ed620fc8391718e798a631fc2723b25b4b0a645abb058c4d40"
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-release.integration.test.ts tests/content-intake.integration.test.ts tests/content-intake-material.test.ts tests/content-import.integration.test.ts tests/content-worker.integration.test.ts",
+      "exitCode": 0,
+      "result": "68/68 PASS: material5+intake31+release13+import14+worker5",
+      "capture": "014",
+      "receiptSha256": "bacbeef1f9ef5bb262c72b3a0cb7f21b34e3a5c0a520c3c0c43eac474a0f619f",
+      "evidence": "evidence.json"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "result": "PASS; rerun again at staging"
+    },
+    {
+      "command": "compare first21SQLbytes and manifest entries to HEAD; verify34inputSHAs",
+      "exitCode": 0,
+      "result": "PASS:21immutable migrations,34unchanged current inputs"
+    },
+    {
+      "command": "required installed-cancel-function verification",
+      "exitCode": 0,
+      "result": "PASS:0013firstlock retained beforebatchUPDATE; external finding false-positive",
+      "evidence": "outside-validation.json"
+    }
+  ],
+  "historicalFailures": [
+    {
+      "log": "fence-red.log",
+      "result": "new three fence tests failed before implementation; old3passed"
+    },
+    {
+      "captures": [
+        "001",
+        "002",
+        "005",
+        "006",
+        "007",
+        "008"
+      ],
+      "result": "probe setup errors; retained, corrected, superseded"
+    },
+    {
+      "captures": [
+        "009",
+        "010"
+      ],
+      "result": "confirmed active source snapshot bypass; repaired,011refuses"
+    },
+    {
+      "log": "cancel-red.log",
+      "result": "assertion expected admission lock holders0butgot1; repaired,014passes"
+    },
+    {
+      "logs": [
+        "test.log",
+        "test-2.log"
+      ],
+      "result": "migration count expectations required22/20pending/13suffix; final-test-2passes"
+    },
+    {
+      "log": "final-api.log",
+      "result": "source-ineligible403regressed409; preserveauditeddenial, final014passes"
+    },
+    {
+      "log": "final-typecheck-2.log",
+      "result": "new test promise overload/index typing failed; corrected, final-typecheck-3passes"
+    }
+  ]
+}

@@ -577,7 +577,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('2');
   });
 
-  it('propagates a verified revocation to every seeded release inheriting the same approval lineage', async () => {
+  it('inherits exact candidate and approval lineage and propagates later revocation to both releases', async () => {
     const c = await routine();
     value((await confirm(c)).result);
     const r = value(await service.requestReview(actor('enabler'),reviewRequest(c)));
@@ -594,10 +594,16 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query(`INSERT INTO public.release_source_bindings(release_id,domain,source_version_id)
       SELECT 'inherited-synthetic-release',domain,source_version_id FROM public.release_source_bindings WHERE release_id=$1`,[original]);
     await admin.query('COMMIT');
-    for (const release of [original,'inherited-synthetic-release']) {
-      await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[release]);
-      await admin.query(`INSERT INTO content_intake.release_lineage VALUES ($1,'source-a','faq-one',1,$2,1,$3,'2099-01-01T00:00:00Z')`,[release,c.key.candidateId,r.reviewRequestId]);
-    }
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[original]);
+    await admin.query(`INSERT INTO content_intake.release_lineage VALUES ($1,'source-a','faq-one',1,$2,1,$3,'2099-01-01T00:00:00Z')`,[original,c.key.candidateId,r.reviewRequestId]);
+    await admin.query('BEGIN');
+    await admin.query('SELECT backend_review.lock_content()');
+    await admin.query("SELECT content_intake.inherit_legacy_catalog($1,'inherited-synthetic-release')",[original]);
+    await admin.query('COMMIT');
+    const inherited = await admin.query(`SELECT to_jsonb(l)-'release_id' AS lineage
+      FROM content_intake.release_lineage l ORDER BY release_id`);
+    expect(inherited.rows).toHaveLength(2);
+    expect(inherited.rows[0]).toEqual(inherited.rows[1]);
     provider.latest().state='REVOKED';
     expect(value(await refresh(c,'cascade-revoke')).state).toBe('revoked');
     const revoked = (await admin.query('SELECT release_id,reason FROM content_intake.release_revocations ORDER BY release_id')).rows;

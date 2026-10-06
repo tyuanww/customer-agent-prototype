@@ -46,6 +46,7 @@ const challenge = sha('sha256').update(verifier).digest('base64url');
 describe.skipIf(!enabled)('content publish and rollback', () => {
   let harness: Pg15Harness;
   let admin: Client;
+  let competitor: Client;
   let app: FastifyInstance;
   let worker: ReturnType<typeof createContentWorker>;
 
@@ -54,6 +55,7 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     harness.start();
     const db = harness.createDatabase('release');
     admin = await harness.connect(db.config);
+    competitor = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
     await admin.query(`
       CREATE ROLE t4_runtime LOGIN; GRANT app_runtime TO t4_runtime;
@@ -145,6 +147,7 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     await worker?.close();
     await app?.close();
     await admin?.end();
+    await competitor?.end();
     harness?.stop();
   }, 60_000);
 
@@ -164,9 +167,10 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     return exchanged.json().access_token as string;
   }
 
-  function multipart(csv: Buffer = CSV): Buffer {
+  function multipart(csv: Buffer = CSV, domains?: readonly string[]): Buffer {
     const boundary = '----t4boundary';
-    const json = JSON.stringify(BINDINGS.map(({ domain, source_version_id }) => ({ domain, source_version_id })));
+    const json = JSON.stringify(BINDINGS.filter(b => !domains || domains.includes(b.domain))
+      .map(({ domain, source_version_id }) => ({ domain, source_version_id })));
     return Buffer.concat([
       Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="a.csv"\r\nContent-Type: text/csv\r\n\r\n`),
       csv,
@@ -174,7 +178,7 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     ]);
   }
 
-  async function stageBatch(idempotencyKey: string, csv: Buffer = CSV): Promise<string> {
+  async function stageBatch(idempotencyKey: string, csv: Buffer = CSV, domains?: readonly string[]): Promise<string> {
     const owner = await productToken('synthetic_owner');
     const imported = await app.inject({
       method: 'POST', url: '/v1/content/import',
@@ -183,13 +187,193 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
         'idempotency-key': idempotencyKey,
         'content-type': 'multipart/form-data; boundary=----t4boundary',
       },
-      payload: multipart(csv),
+      payload: multipart(csv, domains),
     });
     expect(imported.statusCode).toBe(202);
     const batchId = imported.json().import_batch_id as string;
     expect(await worker.runOnce()).toBe('finished');
     return batchId;
   }
+
+  async function intakeSource(domain: string, mode = 'v2-active') {
+    // Synthetic mode fixture only. No application role gains a mode setter.
+    await admin.query('BEGIN');
+    try {
+      await admin.query('SELECT backend_review.lock_content()');
+      await admin.query("INSERT INTO content_intake.scopes VALUES ('scope-fence','synthetic-tenant','app-fence','brand-fence','shop-fence',$1)", [domain]);
+      await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ('source-fence','scope-fence',1,$1)", [mode]);
+      await admin.query("INSERT INTO content_intake.source_mappings VALUES ('source-fence',1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))");
+      await admin.query('COMMIT');
+    } catch (error) { await admin.query('ROLLBACK'); throw error; }
+  }
+  async function publishBatch(batch: string, key: string) {
+    return app.inject({ method:'POST',url:'/v1/content/publish',
+      headers:{ authorization:`Bearer ${await productToken('synthetic_owner')}`,'idempotency-key':key },
+      payload:{ import_batch_id:batch,title:'合成隔离验证',summary:'synthetic fence' } });
+  }
+  async function clearNoopReservations(batch: string) {
+    // Fixture for the final-publish race: unchanged source hashes need no restore.
+    // This models a staged legacy batch without an outstanding snapshot mutation;
+    // real pending mutations are covered by the activation/cancellation test below.
+    await admin.query('DELETE FROM public.source_snapshot_revisions WHERE import_batch_id=$1 AND previous_sha256=new_sha256',[batch]);
+    expect((await admin.query('SELECT count(*) FROM public.source_snapshot_revisions WHERE import_batch_id=$1',[batch])).rows[0].count).toBe('0');
+  }
+
+  it('fences the entire bound domain set, including a source absent from the uploaded rows', async () => {
+    const batch = await stageBatch('fence-whole-domain');
+    await clearNoopReservations(batch);
+    await intakeSource('product'); // CSV rows are presale, but the batch binds all four domains.
+    const result = await publishBatch(batch,'fence-publish');
+    expect(result.statusCode,result.body).toBe(409);
+    expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT status FROM public.import_batches WHERE import_batch_id=$1',[batch])).rows[0].status).toBe('staged');
+  });
+
+  it('inherits the catalog on a disjoint-domain legacy publish and refuses legacy rollback through it', async () => {
+    const first = await publishBatch(await stageBatch('fence-first'),'fence-first-publish');
+    expect(first.statusCode,first.body).toBe(200);
+    const previous = first.json().release_id as string;
+    // Seeds only the new catalog shape, not a P2 publication success.
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[previous]);
+    await intakeSource('product');
+    const second = await publishBatch(await stageBatch('fence-second',CSV,['presale']),'fence-second-publish');
+    expect(second.statusCode,second.body).toBe(200);
+    expect((await admin.query('SELECT format_version,sop_nodes,sop_edges,media FROM content_intake.release_catalogs WHERE release_id=$1',[second.json().release_id])).rows)
+      .toEqual([{ format_version:'intake-v2.1',sop_nodes:[],sop_edges:[],media:[] }]);
+    const rollback = await app.inject({ method:'POST',url:'/v1/content/rollback',
+      headers:{ authorization:`Bearer ${await productToken('synthetic_owner')}`,'idempotency-key':'fence-rollback' },
+      payload:{ target_release_id:previous,title:'合成旧回退',summary:'blocked' } });
+    expect(rollback.statusCode,rollback.body).toBe(409);
+    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(second.json().release_id);
+  });
+
+  it('does not inherit a revoked catalog or leave a partial release on refusal', async () => {
+    const first = await publishBatch(await stageBatch('fence-revoked-first'),'fence-revoked-publish');
+    expect(first.statusCode,first.body).toBe(200);
+    const previous = first.json().release_id as string;
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[previous]);
+    await admin.query("INSERT INTO content_intake.release_revocations VALUES ($1,1,'APPROVAL_REVOKED',clock_timestamp())",[previous]);
+    const result = await publishBatch(await stageBatch('fence-revoked-next',CSV,['presale']),'fence-revoked-next-publish');
+    expect(result.statusCode,result.body).toBe(409);
+    expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('1');
+    expect((await admin.query('SELECT count(*) FROM public.announcements')).rows[0].count).toBe('1');
+  });
+
+  it('observes activation committed while the legacy publisher waits for the shared first lock', async () => {
+    const batch = await stageBatch('fence-mode-wins');
+    await clearNoopReservations(batch);
+    await intakeSource('product','legacy');
+    await admin.query('BEGIN');
+    let pending: ReturnType<typeof publishBatch> | undefined;
+    try {
+      await admin.query('SELECT backend_review.lock_content()');
+      pending = publishBatch(batch,'fence-mode-wins-publish');
+      await expect.poll(async () => (await admin.query("SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND classid=724019 AND objid=1 AND NOT granted")).rows[0].count).toBe('1');
+      // A waiting legacy publisher must not have acquired its second lock first.
+      await competitor.query('BEGIN');
+      try {
+        expect((await competitor.query("SELECT pg_try_advisory_xact_lock(hashtext('cs_ai_content_publish')) AS free")).rows[0].free).toBe(true);
+      } finally { await competitor.query('ROLLBACK'); }
+      await admin.query("UPDATE content_intake.sources SET mode='v2-active',mode_version=mode_version+1 WHERE source_id='source-fence'");
+      await admin.query('COMMIT');
+      const result = await pending;
+      expect(result.statusCode,result.body).toBe(409);
+      expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('0');
+    } finally { await admin.query('ROLLBACK'); await pending; }
+  });
+
+  it('holds the shared lock through publication so a queued mode CAS observes the new base', async () => {
+    const batch = await stageBatch('fence-publish-wins');
+    await clearNoopReservations(batch);
+    await intakeSource('product','legacy');
+    await admin.query('BEGIN');
+    let pending: Promise<unknown> | undefined;
+    try {
+      await admin.query('SELECT * FROM public.publish_content_release($1,$2,$3,$4,$5)',[batch,'合成','合成','usr_t4_owner','owner']);
+      // Synthetic control-plane CAS, not a production activation API.
+      pending = competitor.query(`DO $$ BEGIN
+        PERFORM backend_review.lock_content();
+        IF EXISTS (SELECT 1 FROM public.content_current WHERE current_release_id IS NOT NULL) THEN
+          RAISE EXCEPTION USING ERRCODE='ZA003',MESSAGE='MODE_BASE_CHANGED';
+        END IF;
+        UPDATE content_intake.sources SET mode='v2-active',mode_version=mode_version+1 WHERE source_id='source-fence';
+      END $$`).then(() => 'unexpected activation', error => error);
+      await expect.poll(async () => (await admin.query("SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND classid=724019 AND objid=1 AND NOT granted")).rows[0].count).toBe('1');
+      await admin.query('COMMIT');
+      expect(await pending).toMatchObject({ code:'ZA003',message:'MODE_BASE_CHANGED' });
+      expect((await admin.query("SELECT mode FROM content_intake.sources WHERE source_id='source-fence'")).rows[0].mode).toBe('legacy');
+    } finally { await admin.query('ROLLBACK'); await pending; }
+  });
+
+  it('rolls back the old release, pointer, announcement and catalog when inheritance cannot complete', async () => {
+    const first = await publishBatch(await stageBatch('fence-fault-first'),'fence-fault-first-publish');
+    expect(first.statusCode,first.body).toBe(200);
+    const previous = first.json().release_id as string;
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[previous]);
+    const batch = await stageBatch('fence-fault-next',CSV,['presale']);
+    await admin.query(`CREATE FUNCTION public.synthetic_catalog_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'synthetic catalog fault'; END $$;
+      CREATE TRIGGER synthetic_catalog_failure BEFORE INSERT ON content_intake.release_catalogs
+      FOR EACH ROW EXECUTE FUNCTION public.synthetic_catalog_failure()`);
+    const result = await publishBatch(batch,'fence-fault-next-publish');
+    expect(result.statusCode).toBe(500);
+    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(previous);
+    for (const table of ['public.content_releases','public.announcements','content_intake.release_catalogs']) {
+      expect((await admin.query(`SELECT count(*) FROM ${table}`)).rows[0].count).toBe('1');
+    }
+    expect((await admin.query('SELECT status FROM public.import_batches WHERE import_batch_id=$1',[batch])).rows[0].status).toBe('staged');
+  });
+
+  it('refuses active-domain upload before it can commit source hashes or snapshot revisions', async () => {
+    await intakeSource('product');
+    const before = (await admin.query('SELECT source_version_id,snapshot_sha256 FROM public.authoritative_source_versions ORDER BY source_version_id')).rows;
+    const changed = Buffer.from(CSV.toString().replace('您好订单将在付款后发出','合成新正文'));
+    const result = await app.inject({ method:'POST',url:'/v1/content/import',
+      headers:{ authorization:`Bearer ${await productToken('synthetic_owner')}`,'idempotency-key':'fence-upload',
+        'content-type':'multipart/form-data; boundary=----t4boundary' },payload:multipart(changed) });
+    expect(result.statusCode,result.body).toBe(409);
+    expect((await admin.query('SELECT source_version_id,snapshot_sha256 FROM public.authoritative_source_versions ORDER BY source_version_id')).rows).toEqual(before);
+    expect((await admin.query('SELECT count(*) FROM public.source_snapshot_revisions')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM public.import_batches')).rows[0].count).toBe('0');
+  });
+
+  it('keeps cancellation able to restore by refusing activation while a legacy snapshot is pending', async () => {
+    await intakeSource('product','legacy');
+    const before = (await admin.query('SELECT source_version_id,snapshot_sha256 FROM public.authoritative_source_versions ORDER BY source_version_id')).rows;
+    const changed = Buffer.from(CSV.toString().replace('您好订单将在付款后发出','合成新正文'));
+    const batch = await stageBatch('fence-pending-snapshot',changed);
+    await expect(admin.query("UPDATE content_intake.sources SET mode='v2-active',mode_version=mode_version+1 WHERE source_id='source-fence'"))
+      .rejects.toMatchObject({ code:'ZA003',message:'pending legacy snapshot restoration' });
+    await admin.query("SELECT public.cancel_content_import($1,'synthetic-cancel','usr_t4_owner','owner')",[batch]);
+    expect((await admin.query('SELECT source_version_id,snapshot_sha256 FROM public.authoritative_source_versions ORDER BY source_version_id')).rows).toEqual(before);
+    expect((await admin.query('SELECT count(*) FROM public.source_snapshot_revisions')).rows[0].count).toBe('0');
+    await admin.query("UPDATE content_intake.sources SET mode='v2-active',mode_version=mode_version+1 WHERE source_id='source-fence'");
+    expect((await admin.query("SELECT mode FROM content_intake.sources WHERE source_id='source-fence'")).rows[0].mode).toBe('v2-active');
+  });
+
+  it.each(['mode-first','snapshot-first'] as const)('serializes the earlier snapshot mutation and mode admission: %s', async order => {
+    await intakeSource('product','legacy');
+    const bindings = JSON.stringify(BINDINGS.filter(b => b.domain==='product').map(({domain,source_version_id}) => ({domain,source_version_id})));
+    const advance = (client: Client) => client.query("SELECT public.advance_source_snapshots($1::jsonb,repeat('b',64),'owner','synthetic-reservation')",[bindings]);
+    const activate = (client: Client) => client.query("UPDATE content_intake.sources SET mode='v2-active',mode_version=mode_version+1 WHERE source_id='source-fence'");
+    await admin.query('BEGIN');
+    let pending: Promise<unknown> | undefined;
+    try {
+      await (order==='mode-first' ? activate(admin) : advance(admin));
+      pending = (order==='mode-first' ? advance(competitor) : activate(competitor)).then(() => 'unexpected success',error => error);
+      await expect.poll(async () => (await admin.query("SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND classid=724019 AND objid=1 AND NOT granted")).rows[0].count).toBe('1');
+      await admin.query('COMMIT');
+      expect(await pending).toMatchObject({ code:'ZA003' });
+      const revisions = Number((await admin.query('SELECT count(*) FROM public.source_snapshot_revisions')).rows[0].count);
+      expect(revisions).toBe(order==='mode-first' ? 0 : 1);
+      if (order==='snapshot-first') {
+        await admin.query("SELECT public.restore_source_snapshots('synthetic-reservation')");
+        await activate(admin);
+      }
+      expect((await admin.query("SELECT snapshot_sha256 FROM public.authoritative_source_versions WHERE domain='product'")).rows[0].snapshot_sha256)
+        .toBe(sha('sha256').update(CSV).digest('hex'));
+    } finally { await admin.query('ROLLBACK'); await pending; }
+  });
 
   it('publishes a staged batch, rejects non-owners, replays, and refuses current/missing rollback', async () => {
     const batchId = await stageBatch('idem-t4-a');

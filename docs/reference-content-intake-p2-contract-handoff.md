@@ -72,7 +72,7 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 | 不可变交接 | 来源 Git SHA、contract_set_id、manifest、OpenAPI/DDL 双哈希与字节数可核验 | 治理 commit `d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713` 已导出，产品通过来源 Git blob、manifest 与成对字节核验 |
 | 产品 intake | 用 `pnpm contracts:intake` 接收；verify、codegen 与追加 migration 检查通过；消费锁记录确切来源 | 已接收新 contract set；222 schema、追加 0020/0021，前 19 段不变；验收记录见 §6 |
 | 权限与持久状态 | 目标服务赋能师/获授权管理者能完成；普通坐席与跨店写拒绝；撤权/接管和历史资格有 PG 证据 | 权限/分配/撤权接管、持久候选与报告见事务验收；人工审批历史资格、附件与撤销传播见审批证据验收，真实 transport 待后续 |
-| 并发与恢复 | PG 双会话：发布/撤权、发布/取消、同 base 竞争、模式启用/旧写两种顺序；响应未知、过 24h 重试不重复发布 | 已验证并发修订、admission、解析中撤权、原操作恢复；发布/取消、模式/旧写及续租矩阵仍待实现 |
+| 并发与恢复 | PG 双会话：发布/撤权、发布/取消、同 base 竞争、模式启用/旧写两种顺序；响应未知、过 24h 重试不重复发布 | 已验证并发修订、admission、解析中撤权、原操作恢复；旧写共存门覆盖模式/旧写与上传/批量取消竞争，新候选发布/取消及续租矩阵仍待实现 |
 | 完整 FAQ 消费 | 两管理会话交接；第二坐席按店查询/复制；新增、修改、显式停用、缺行保留与纠正回退 | 待 API/Main/renderer 纵向接线 |
 | 下游实物与平台 | Excel 与错误报告往返；Main/API 同输入复算；包内解析进程可启动/取消；版本更新与失效分别正确 | P1 Node/Excel 证据可复用；Electron 和目标平台未验证 |
 | 业务退出 | 非开发维护者编号回填/修错演练；两无关来源的 CAS 重审次数与等待记录 | 待演练，不由工程自测代填 |
@@ -89,6 +89,8 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 实际验收及审查见[交接证据](../evidence/qa/content-intake-p2-handoff/README.md)：仓库 lint/typecheck/test/build、合同 19 项、接收工具 19 项、隔离 PG 17 项通过；额外启用既有 API 导入/审核/发布实库回归，21 项通过。DOMAIN 回归保留修前失败与修后拒绝证据。详细日志与 OCR 输入在 ignored `.gstack/content-intake-p2-handoff/`。本机修后审查无剩余具体缺陷；外部结构化两组完成，一组外部对抗输出未通过完成格式校验，缺口如实保留。产品 API/Main/renderer 本次未接线，仍保持既有 owner-only HTTP/桌面发布行为；SQL 合同允许的 coach 增量并不代表 UI/HTTP 已开放。
 
-接续的 API/DB 权威权限和持久候选事务已在隔离 PG 中运行，范围、实际检查与剩余门见[事务验收](../evidence/qa/content-intake-p2-transactions/README.md)。来源确认和合成人工审批证据已接续，见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。下一步衔接现有质量/负责人承接门，实现 P2 原子发布与旧写隔离，再验证另一坐席按店查询；依 §5 保留并发、未知回执和无权路径验收。生产角色 ACL、HTTP、Main 与 renderer 未接线，不存在可用的新上传/审核按钮或正式飞书实例接入。
+接续的 API/DB 权威权限和持久候选事务已在隔离 PG 中运行，范围、实际检查与剩余门见[事务验收](../evidence/qa/content-intake-p2-transactions/README.md)。来源确认和合成人工审批证据已接续，见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。0022 已追加旧写共存门，见[旧写共存验收](../evidence/qa/content-intake-p2-legacy-fence/README.md)。下一步衔接现有质量/负责人承接门，实现 P2 原子发布，再验证另一坐席按店查询；依 §5 保留并发、未知回执和无权路径验收。生产角色 ACL、P2 HTTP、Main 与 renderer 未接线，不存在可用的新上传/审核按钮或正式飞书实例接入。
+
+下一可验收切片先明确候选材料如何投影到既有质量 population、抽检结果及 owner 承接证据，禁止伪造旧 dual-review 或直接插入 release 绕过质量门。随后在同一内容锁下消费一次票据并原子写入候选回执、release、catalog/lineage 和公告；验收须证明质量拒绝零副作用、取消/撤权先赢不发布、响应未知用原 operation 恢复且永久关联不重复发布。
 
 现场资料 B 最新版/维护人、真实租户组织字段/人工节点/附件保真属于后续真实验证；本轮未读取真实资料、员工信息或凭据，未 push、PR、merge、deploy，也未启用 v2-active。

@@ -1,0 +1,65 @@
+{
+  "purpose": "Required outside finding triage; supplements the frozen14captureevidence report",
+  "capture": "015",
+  "receipt": {
+    "version": 1,
+    "id": "015",
+    "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+    "argv": [
+      "env",
+      "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+      "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+      "node",
+      ".gstack/content-intake-p2-publication/verify-cancel-entry.mjs"
+    ],
+    "deadline": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/.gstack/content-intake-p2-publication/.qa-evidence/015/deadline.json",
+    "timing": [
+      {
+        "guard": "qa-deadline",
+        "event": "started",
+        "version": 1,
+        "startedAt": "2026-10-06T03:02:55.389Z",
+        "deadlineAt": "2026-10-06T03:04:55.389Z",
+        "budgetMs": 120000,
+        "observedAt": "2026-10-06T03:02:55.390Z",
+        "remainingMs": 119999,
+        "expired": false
+      },
+      {
+        "guard": "qa-deadline",
+        "event": "finished",
+        "observedAt": "2026-10-06T03:02:56.213Z",
+        "deadlineAt": "2026-10-06T03:04:55.389Z",
+        "timedOut": false,
+        "exitCode": 0
+      }
+    ],
+    "startedAt": "2026-10-06T03:02:55.390Z",
+    "completedAt": "2026-10-06T03:02:56.214Z",
+    "exitCode": 0,
+    "signal": null,
+    "status": "complete",
+    "observation": {
+      "sha256": "53106be349cd8453425c7e730b9eb11a280a3bbd36c1e502d40c8b3f579f57eb",
+      "bytes": 339
+    },
+    "publicOutput": true,
+    "stdout": {
+      "sha256": "c7bb61ff0f9a1ea1f063f00ce1f038ddbb37cf2f5439323c3908fa8d6d4417cc",
+      "bytes": 314
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "observed": {
+    "status": "PASS",
+    "signature": "public.cancel_content_import(text,text,text,text)",
+    "sha256": "c59cc62a538b35dad808325adce1bd9bab62d827feb83c669bf2b4824ae6e183",
+    "firstStatement": "PERFORM backend_review.lock_content();",
+    "lockBeforeBatchUpdate": true,
+    "provenance": "0013 predecessor surgery; never replaced by0016or0022"
+  },
+  "receiptSha256": "bb533ce9ffe00fa5990deb170025e98b1caa19700c6784162948c17a53d33af2"
+}

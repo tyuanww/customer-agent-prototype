@@ -334,6 +334,24 @@ function renderUpgradeMigration(descriptor, snapshot) {
     source_schema_sha256: snapshot.manifest.database.sha256, sql });
 }
 
+// New product overlays are appended after the frozen contract increments. Their
+// provenance stays tied to this intake; old overlay headers are never restamped.
+function renderIntakeFence(projectRoot, snapshot) {
+  const id = '0022_intake_legacy_fence';
+  const sql = [
+    `-- ${GENERATED_HEADER}`,
+    `-- ${id}; product overlay (not a frozen contract snapshot slice)`,
+    `-- contract_set_id=${snapshot.contract_set_id}`,
+    `-- source_git_sha=${snapshot.source_git_sha}`,
+    `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
+    readFileSync(path.join(projectRoot, 'packages/database/overlays', `${id}.sql`), 'utf8').trimEnd(), '',
+  ].join('\n');
+  return Object.freeze({ position: 22, id, file: `${id}.sql`, source_ranges: [],
+    sha256: sha256(sql), bytes: Buffer.byteLength(sql),
+    contract_set_id: snapshot.contract_set_id, source_git_sha: snapshot.source_git_sha,
+    source_schema_sha256: snapshot.manifest.database.sha256, sql });
+}
+
 function renderCatalogue(manifest, migrations) {
   const migrationEntries = migrations.map((migration) => `  Object.freeze({
     position: ${migration.position},
@@ -366,6 +384,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     ...REVIEWED_UPGRADES.map((p) => loadPriorReviewedUpgrade(projectRoot, p)),
     ...productOverlays,
     ...upgrades,
+    renderIntakeFence(projectRoot, snapshot),
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
