@@ -151,6 +151,14 @@
       "testsFailed": 2,
       "logSha256": "da7a96516d53bb59ec38e9dba5130799fff6996c94c01c6061cf68cee2d64acd"
     },
-    "nativeScope": "Native source review remains applicable; test payloads stayed summary-only."
-  }
+    "nativeScope": "Native source review remains applicable; test payloads stayed summary-only.",
+    "final": {
+      "macPassed": 85,
+      "wslPassed": 85,
+      "apiTypecheckAndBuildOnWsl": "passed",
+      "ownedRemoteStateRemoved": true
+    }
+  },
+  "finalTestSourceCommit": "45a533088d11af09bdf237bb87d441e3100466b3",
+  "productionSourceUnchangedAfterNativeReview": true
 }

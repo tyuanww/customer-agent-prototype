@@ -1,13 +1,6 @@
 {
   "baseCommit": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
-  "testedSourceCommit": "c97dc801d19b9c4589e43a781320f4d15345c848",
-  "environment": {
-    "platform": "macOS",
-    "node": "24.19.0",
-    "pnpm": "11.19.0",
-    "postgres": "15.18",
-    "data": "synthetic only"
-  },
+  "testedSourceCommit": "45a533088d11af09bdf237bb87d441e3100466b3",
   "files": {
     "apps/api/package.json": "de0173d2485485c01dc99e9d10ca1fbe6bd93f05f451e32906d5c02ae2dfb36b",
     "apps/api/src/content-intake/approval-adapter.ts": "4e7dc4afdd4a7169ae58ddeed67ceee4485aff8b248aac7742e68ce5e8d3136e",
@@ -24,7 +17,7 @@
     "apps/api/src/content-normalize.ts": "2fdb1e8eca5efdbcca393dc7dd2da03ffd522635d0613e857bc4a3765e5589da",
     "apps/api/src/idempotency.ts": "ae73f6bca4997490a8649f1d3d7724e2ef3ed3eee7b15987029b3d28ab91b13e",
     "apps/api/tests/content-intake-material.test.ts": "d65a3be5c903f5fdb97d9d617f693dbb57c5d7c5a5ee887bd11d1fafa2431658",
-    "apps/api/tests/content-intake.integration.test.ts": "64834649457b9addf7fff4c1c23666e04c39053c906e724fdb3b8ff6b0456709",
+    "apps/api/tests/content-intake.integration.test.ts": "ab529985b6393a5929fd040185633e8a3bb43a6cd2ac312b6a9f5714c8bf5552",
     "apps/api/tests/support/intake-approval.ts": "d875ce89812888b6ca6bcff35865601705f0dfa3b690be9bdbc2e4565bae88cd",
     "apps/api/tests/support/synthetic-g1a.ts": "490dd562d31842c22c6311aa24ab459e18ad47e123f85fecd2ce11c50b12ca6c",
     "contracts/upstream/customer-agent/contract-set.lock.json": "8bf5e217339c6f894ba6d41b8f668f1dfb200a66611f4d8246b5202aa94761e7",
@@ -33,7 +26,7 @@
     "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa/schema-v1.20.sql": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
     "docs/how-to-develop-content-intake.md": "d0a13d8635ad0632378de98c340edc7406d8b3f4eb4ba94f190690211e2dd1b1",
     "docs/plans/2026-10-03-content-intake-requirements.md": "b50fc61e4d6d82913207d500b078ba089149039fa7e1588303eb104825ae206c",
-    "docs/reference-content-intake-p2-contract-handoff.md": "473636ee107da960bfd3e0f85e2fa405378dc4ffd1eaa5ea60ad41cf908008d4",
+    "docs/reference-content-intake-p2-contract-handoff.md": "0dcbab31f241d47b77858f29607ea2869f24f714072bb5383f2f27530c37e99e",
     "docs/reference-project-architecture.md": "b9f541c748eb302eac26dffabc877f9809bb26fd2e5fe1117ac47b5a5e3a6c03",
     "package.json": "89c15dd870721678541cbf45904f391f6425c972bfe82438c6f32b54fad21b5f",
     "packages/content-intake/src/archive.ts": "9d477f89275892cc41fea14001d8269f95ee6322c312305085773e6935a6322f",
@@ -76,5 +69,21 @@
     "packages/database/tests/planner.test.ts": "c82760d42766bdcd2e1bd78bb0720a57d2ab23137da3a86372d6f510aaba63ea",
     "packages/database/tests/postgres.integration.test.ts": "7cfebb5f986cddf72e9599051e8b46718f21e35bf5f3ad297d71c2d3274ca933",
     "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78"
-  }
+  },
+  "previousSourceCommit": "c97dc801d19b9c4589e43a781320f4d15345c848",
+  "environments": [
+    {
+      "platform": "macOS",
+      "node": "24.19.0",
+      "pnpm": "11.19.0",
+      "postgres": "15.18",
+      "data": "synthetic only"
+    },
+    {
+      "host": "Hangzhou Windows host, WSL2 Linux guest",
+      "node": "24.21.0",
+      "pnpm": "11.19.0",
+      "postgres": "15.19"
+    }
+  ]
 }
