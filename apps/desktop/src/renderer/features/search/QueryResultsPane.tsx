@@ -4,7 +4,8 @@ import type { OverlayPhase } from '@shared/overlay-machine';
 import { SOP_ENTRY_BUTTON, SOP_ENTRY_HINT, SOP_RESUME_BUTTON } from '@shared/sop-window';
 import { ScriptCard } from './ScriptCard';
 import type { HelpStatus } from '@shared/product-help';
-import type { RankedScript } from './types';
+import { isIntakeRow, type QueryResult, type RankedScript } from './types';
+import { IntakeFaqCard } from './IntakeFaqCard';
 
 type QueryResultsPaneProps = {
   contextControls?: ReactNode;
@@ -13,7 +14,7 @@ type QueryResultsPaneProps = {
   statusBannerRef: Ref<HTMLDivElement>;
   resultContentRef: Ref<HTMLDivElement>;
   errorMessage: string;
-  results: RankedScript[];
+  results: QueryResult[];
   copying: boolean;
   copiedRank: 1 | 2 | 3 | null;
   helpStatus?: HelpStatus;
@@ -23,7 +24,7 @@ type QueryResultsPaneProps = {
   sopEntryResume?: boolean;
   onOpenSop?: () => void;
   onRetry: () => void;
-  onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
+  onCopy: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
   reportedScriptIds?: ReadonlySet<string>;
   onReportInaccuracy?: (script: RankedScript) => void;
   onCopyContact?: () => void;
@@ -123,7 +124,10 @@ export function QueryResultsPane({
                       ) : null}
                     </div>
                   ) : null}
-                  {results.map((script) => (
+                  {results.map((script) => isIntakeRow(script) ? (
+                    <IntakeFaqCard key={script.key} row={script} copying={copying || phase === 'COPIED'}
+                      copied={copiedRank === script.rank} onCopy={onCopy} />
+                  ) : (
                     <ScriptCard
                       key={script.scriptId}
                       script={script}

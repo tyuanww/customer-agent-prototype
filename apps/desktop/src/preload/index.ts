@@ -15,6 +15,7 @@ import {
 } from '../shared/product-notice';
 import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { contextBridge, ipcRenderer } from 'electron';
+import { intakeQuery } from './content-intake-query';
 import {
   IPC_CHANNELS,
   isOpenDashboardResult,
@@ -143,6 +144,7 @@ function parseSopWindowOpenResult(value: unknown):
   return null;
 }
 const api: CustomerAgentApi = {
+  intakeQuery,
   productSearch: {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
     copyAdopt: request => queryInvoke(IPC_CHANNELS.PRODUCT_COPY_ADOPT, request) as Promise<ProductCopyResult>,

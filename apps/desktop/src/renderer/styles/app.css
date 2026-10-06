@@ -2402,3 +2402,13 @@ html[data-role='fox'] #root {
 .product-query-context label { display: flex; align-items: center; gap: 6px; }
 .product-query-context input, .product-query-context select { max-width: 220px; min-height: 32px; color: inherit; background: var(--query-glass-solid); border: 1px solid var(--hairline); border-radius: 6px; }
 .catalog-scope-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; line-height: 16px; }
+
+/* Narrow shop IDs are the only labels in the intake contract. Keep the full ID
+   in the native select without growing the fixed-width query capsule. */
+.intake-shop-control { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 11px; }
+.intake-shop-control label { white-space: nowrap; color: var(--muted); }
+.intake-shop-control select { min-width: 60px; max-width: 105px; color: var(--text); background: var(--query-control); border: 1px solid var(--hairline); border-radius: 6px; }
+.intake-shop-control .retry-btn { white-space: nowrap; padding: 3px 5px; font-size: 11px; }
+.intake-shop-control [role="alert"] { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.intake-faq-card .answer-text { white-space: pre-wrap; }

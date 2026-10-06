@@ -1,4 +1,11 @@
 export const IPC_CHANNELS = {
+  INTAKE_QUERY_MODE: 'intake-query:mode',
+  INTAKE_QUERY_ACCESS: 'intake-query:access',
+  INTAKE_QUERY_SELECT: 'intake-query:select-shop',
+  INTAKE_QUERY_SEARCH: 'intake-query:search',
+  INTAKE_QUERY_COPY: 'intake-query:copy',
+  INTAKE_QUERY_CANCEL: 'intake-query:cancel',
+  INTAKE_QUERY_INVALIDATED: 'intake-query:invalidated',
   PRODUCT_SEARCH: 'product:search',
   PRODUCT_CANCEL_SEARCH: 'product:cancel-search',
   PRODUCT_COPY_ADOPT: 'product:copy-adopt',

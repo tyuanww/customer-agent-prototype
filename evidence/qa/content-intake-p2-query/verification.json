@@ -1,0 +1,123 @@
+{
+  "baseline": "a995ac14bdca458a6122f256c0c4a039f5a5d2fa",
+  "branch": "codex/content-intake-p2",
+  "recordedAt": "2026-10-06T18:07:43.864259+00:00",
+  "runtime": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "host": "macOS",
+    "fixture": "isolated synthetic loopback HTTP wire and Electron userData"
+  },
+  "sourceInputs": {
+    "apps/desktop/src/main/content-intake-query-ipc.ts": "f84e030d470572ce271d9ccb21f028e52a77b78ef0b333ce2178b75e8bee5cdf",
+    "apps/desktop/src/main/content-intake-query.ts": "6f4ec0b5c2488e9b4e728daa839de6f31a25de1e1f9e8ae603824af2c4791ef6",
+    "apps/desktop/src/preload/content-intake-query.ts": "1a3df6cca08ce025d1ff5d7fbe2798eefa731f1ce66d61d9a6eac11ea53f19cb",
+    "apps/desktop/src/renderer/features/search/IntakeFaqCard.tsx": "3ca8348b710a38d624319f964561646864170159be119c15b5f9150324d08ff5",
+    "apps/desktop/src/renderer/features/search/use-intake-shops.ts": "3c6957178d573b212f4344f957a5b4fd518ea3fdccb7f2401964f1e1d9e8371b",
+    "apps/desktop/src/shared/content-intake-query.ts": "4fe59cd6c91a7169a131615c0382742cbfdb3299b790c5029f816403784f33db",
+    "apps/desktop/tests/e2e/content-intake-query.spec.ts": "92e6db08b6d36598d908a28282b3a22d8f211df6fba8c966e33558f026b2898e",
+    "apps/desktop/tests/fixtures/intake-query-data.ts": "cd9b79403b077132829441a8dd9a277d06aeaf90d1795148ae647c7836b78bff",
+    "apps/desktop/tests/unit/content-intake-query-ipc.test.ts": "d3c4ba80161c3876e67bbbdf1a7a260b04c48eefb3e628403482ecfcb9fdcc54",
+    "apps/desktop/tests/unit/content-intake-query.test.ts": "f4732b54bf7f553e3d7ba82b1679e9dbd87b53565a6e1b9d9cbd2fc7a53e5329",
+    "apps/desktop/src/main/content-intake-access.ts": "aaff28fe21d3d7e69f858e7e2aeb473c47a26dfcbebdb1bdc9223fafe6145c22",
+    "apps/desktop/src/main/content-intake-usage.ts": "e14b98d622c3f96be63b45ce205d619edebb79df1892c77f4651838d62eaacc0",
+    "apps/desktop/src/main/desktop-lifecycle.ts": "20c8eeb16c920fee0c02d3e8fdec213a870d1f64c8e912465be317b3441e3e66",
+    "apps/desktop/src/main/desktop-menu-model.ts": "3b148c19c96634a50e5fa084ec9fe35b207c2da488b3462028180164bbb237cc",
+    "apps/desktop/src/main/desktop-shell.ts": "09f675f3ed58291eb209d1d42ed9aa110740e4a241285e0c42b5d9c0840acb19",
+    "apps/desktop/src/main/main.ts": "e03d64b80c97472002d9b90f5772e5e57491cf6e1459a92c43dfc3577c979f52",
+    "apps/desktop/src/main/overlay-controller.ts": "9f5acce53f990f41fdbc4565e06186984bbd93a1a66e8cc7ff01d070a3d82680",
+    "apps/desktop/src/main/product-http.ts": "d77adaa621bddce39470ddbdaec1e1a9ca7f2dd46135fe2cce3308436e89ed03",
+    "apps/desktop/src/main/product-runtime-config.ts": "202e8b513e052bc2dfb1d07e8d0db23fff807a5db8320a8fbe7a34712970e7fd",
+    "apps/desktop/src/main/product-session.ts": "516e5e83337a1194c42815ffd7f0e5315217e88b441623b9f5182894ec3c39c0",
+    "apps/desktop/src/main/sender-guard.ts": "8a647cde6abdf4327642b263c9065a455293bb83b6d87e1767784f7922cc146b",
+    "apps/desktop/src/preload/index.ts": "2f67c566abee6ac40ff1b78dee58e70c9a77f2b0433164b4ba6bed22c10e9ab6",
+    "apps/desktop/src/renderer/App.tsx": "0640c390b2cac52fbc7bc5666333bdd298096422bfd0b316c24c644415e08526",
+    "apps/desktop/src/renderer/QueryApp.tsx": "681decc422e2f034f1e05d1a31c535969476a3730e4e99e62d2044030b9ed809",
+    "apps/desktop/src/renderer/features/search/QueryCapsule.tsx": "749017b3c41c95d970fc2a6ca2dd41ae42e9c34efaae67993ff61829a9c6e8dc",
+    "apps/desktop/src/renderer/features/search/QueryResultsPane.tsx": "e76155c596fe502e20d8c482177008ff3b6b803065644c4c60e7f2e15df7e02f",
+    "apps/desktop/src/renderer/features/search/types.ts": "3c5219bb362a9b6ba1616ee3e447fdc898b42994cc6a494c4ad5447359145d00",
+    "apps/desktop/src/renderer/styles/app.css": "f700200b8e3d94fd6ae5c84623d079f1ffd526ec215cf1a2e55abd1953cd02b2",
+    "apps/desktop/src/shared/contracts.ts": "108f84f3536594aadbcaf63ecef04d9825f43f710807f98dfc12039f27ca6e44",
+    "apps/desktop/src/shared/ipc-channels.ts": "546e07e187dc50151652ba3c5507075e0f958f92d0101448fac268d66abe23a0",
+    "apps/desktop/tests/component/QueryApp.test.tsx": "192c5911fb5046fe99e1bd6e148a3268e5a9b3a4d3472b0ac8af5e25b81bf01f",
+    "apps/desktop/tests/component/QueryResultsPane.test.tsx": "9ee8a4ebe015cf85b641adb7a05d8443bc318fee308eaa680c45f6a9634b08f0",
+    "apps/desktop/tests/unit/contracts.test.ts": "07170ab8f68bd77ae7ed62706194b92436b591a4eab264d19f74650fefbf3adc",
+    "apps/desktop/tests/unit/desktop-lifecycle.test.ts": "3c3e01c316c864b28ebb21fa2b893e30ff573573157e8ec03a6d8ecc472f0571",
+    "apps/desktop/tests/unit/desktop-menu-model.test.ts": "05958c1cf8c64071f4aa1d33298108a5c4fbe1716b3d9a934ee1d761812606c8",
+    "apps/desktop/tests/unit/product-runtime-config.test.ts": "cb20b171679e9da9bb5332516a657e6916a3270b479f35914d3a52f7fff19b63",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "24b4d68d72b55db78bfe6fb0451e6476f4067c066b9c4a1fae04bffd3867a630",
+    "package.json": "89c15dd870721678541cbf45904f391f6425c972bfe82438c6f32b54fad21b5f",
+    "packages/retrieval-core/src/bm25.ts": "4aa67ec54ab5258e5792653b359e22db01567a1665cc6dab5b332fc404f479bf",
+    "packages/retrieval-core/src/fusion.ts": "f2db4e02233c571e5d0a0347a7abf9b6f00dd8ebad1aeb455546fac2f95a5976",
+    "packages/retrieval-core/src/index.ts": "8cd75dc875fc0c61427c93ddbfd1bbadbc3453d254b5bd0dfabd6cd6c40233f0",
+    "packages/retrieval-core/src/similarity.ts": "18a6c276cc80a1a5fe1da6d541091991d21d4f63d0f7f1d2bd72171b489ce716",
+    "packages/retrieval-core/src/threshold.ts": "ced0905c013ecf1f42b1beded1a1c18dc15c8fa3b292d6c12b5548e9cd1a6136",
+    "packages/retrieval-core/src/tokenize.ts": "6839137fdf0f8fc004296717be64f1f672968443f224fe8fab63214e55aa2bd4",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78"
+  },
+  "commands": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "seconds": 3.39,
+      "log": ".gstack/content-intake-query/lint-final.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "seconds": 6.49,
+      "log": ".gstack/content-intake-query/typecheck-final.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "seconds": 81.37,
+      "log": ".gstack/content-intake-query/test-final.log",
+      "sha256": "7d0941fa1328126909ee831e42d8a4a341f54b9cb172aa75a0ae80ae28b993c5"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "seconds": 6.34,
+      "log": ".gstack/content-intake-query/build-final.log",
+      "sha256": "19fd2a646af59a042994c87274d710fdc9b085ee6aa497d26412028129abbc78"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-query/architecture-final.log",
+      "sha256": "7e030345eb5e2d2b1073a63e02ca7b9cf8de78a2ea3ebff3fa5a20174f58cfa9"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-query/workspace-final.log",
+      "sha256": "51a33dd73e577de83c0a620eb1da67181baaaeafb244656789484a884af0c3ed"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-query/docs-final.log",
+      "sha256": "f85dcc1095c8761a8ea14c6c1477eb7d7f5e451df1c7c5ae2d2a63553c1e177f"
+    }
+  ],
+  "testCounts": {
+    "default": {
+      "passed": 1829,
+      "gatedSkipped": 199
+    },
+    "desktop": {
+      "passed": 1151,
+      "gatedSkipped": 3
+    }
+  },
+  "unchangedVerificationInputs": true,
+  "limitations": [
+    "HTTP wire double only in this slice; no fresh actual API/PostgreSQL integration evidence.",
+    "Windows GUI, WSL, signed/package distribution, production factory/ACL/activation and real Feishu/customer data not validated.",
+    "Native activate events and actual Electron clipboard do not prove manual Dock, Stage Manager or cross-application focus behavior.",
+    "Outside model review not run; historical timeouts and output validation failures remain missing coverage."
+  ]
+}

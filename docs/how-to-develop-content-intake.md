@@ -142,4 +142,21 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 
 Main `loadIntakeAccess(session,signal?)` 收齐两张列表并再次完整核对权限，返回 `{validUntil,shops,sources,capabilities}`；只作过期即失效的选择提示，不能拿它查询/复制。复读核对可见的权限变化，并非跨 HTTP 原子快照；来源独立更新及读完后的变更由后续资格签发重新核验。沿用 `ContentIntakeUsage.select/refresh` 签发当前店资格。发现读取最多每张表 50 页、三次列表读取合计 8 MiB；达到预算显式失败，不保证所有字段均取最大长度时可容纳 5000 个来源。取消、会话变更、重复分页、错范围和读间撤权均不输出部分菜单。品牌通用范围不是可选店，未获 query 资格的分配者也不会获得可查询店铺。
 
-当前合同没有店铺展示名；Main 保留真实的合成店铺 ID，UI 的正式命名目录尚待合同接入。生产工厂和 renderer 仍未注册新能力。实库及实际桌面会话消费通过既有 `test:intake:transactions` 入口运行，详见[本轮验收](../evidence/qa/content-intake-p2-discovery/README.md)。
+当前合同没有店铺展示名；Main 保留真实的合成店铺 ID，UI 的正式命名目录尚待合同接入。生产工厂仍未注册新能力；仅下述显式 loopback 合成 profile 接入了 Main/renderer。实库及实际桌面会话消费通过既有 `test:intake:transactions` 入口运行，详见[本轮验收](../evidence/qa/content-intake-p2-discovery/README.md)。
+
+## P2 桌面 Query 合成入口
+
+该切片连接“合成会话 → 授权店铺 → 已发布通用 FAQ → 原文复制”。开发态设置 `CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2`，同时提供不同端口的 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`（只能是 `http://127.0.0.1:<port>`）。然后运行 `pnpm dev`。未配置 flag 维持既有行为；flag 拼错、缺 origin 或使用远程 origin 都拒绝启动。
+
+打包配置解析器支持在 `synthetic-stack.json` 的 `synthetic-local` 对象中添加 `"contentIntake":"faq-v2"`，但本轮没有打包态验收。标准 synthetic-stack 服务尚未注册新四条路由，不能只加 flag 就声称完整服务可用；需要已经登记合成来源/权限/发布物的隔离宿主和已批准会话入口。可复现原生验收用下述仓库测试，它自己创建两个 loopback 合成 wire 服务与独立 userData，退出清理，不访问生产服务：
+
+```sh
+pnpm --filter @customer-agent/desktop build
+pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts
+```
+
+Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `ContentIntakeUsage` 重新取得完整资格快照。`productIds/scenarioIds` 暂为空数组，按冻结合同只取不限商品/场景条目；界面明确显示“店铺通用 FAQ”。检索复用 retrieval-core，标题/启用问法权重 3，正文 1，固定 BM25 k1=1.2、b=0.75；按快照顺序稳定破同分。暂不接外部模型、反馈写回或 SOP。最多 5000 条、2 MiB 检索字段输入；超限整次返回 LIMIT，不交付截断结果。计算后让出事件循环，再复核原资格，不能把计算期间到期的正文投影出来。
+
+`cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单和托盘隐藏工作台入口，Dock 激活转到 Query；Main 也拒绝直接打开工作台。FAQ 正文展示和复制均保留原换行。
+
+本轮测试的 HTTP 是冻结合同 wire double，不能替代真实 API/PG 证据；此前封闭 PG → HTTP → Main 探针证据独立保留。剩余项包括商品/场景筛选、正式店铺显示名合同、上传/校验/飞书审核/发布管理闭环，以及安装包 Mac/Windows 人工交互。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。

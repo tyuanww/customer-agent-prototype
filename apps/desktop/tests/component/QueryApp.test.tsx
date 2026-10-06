@@ -2507,4 +2507,49 @@ describe('QueryApp', () => {
     expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
     raf.mockRestore();
   });
+  it('keeps FAQ notice visible, ignores stale results and lets a fresh query survive old expiry', async () => {
+    const user = userEvent.setup();
+    const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
+      userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
+      expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
+    const menu = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<import('../../src/shared/content-intake-query').IntakeQueryContext>>();
+    const search = vi.fn().mockResolvedValue({ ok: true, rows: [] });
+    let invalidate: (reason: 'expired' | 'invalidated') => void = () => {};
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn().mockResolvedValue(session), logout: vi.fn(), onSessionChanged: () => () => {},
+      currentNotice: vi.fn().mockResolvedValue({ ok: true, sessionEpoch: 1, decision: null, decided_at: null,
+        notice: { version: 'v1', content: '合成告知', content_hash: 'a'.repeat(64), published_at: '2026-01-01T00:00:00Z' } }),
+      decideNotice: vi.fn().mockResolvedValue({ ok: true, sessionEpoch: 1, version: 'v1', decision: 'accepted', decided_at: '2026-01-01T00:00:00Z' }),
+    };
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }), access: vi.fn().mockReturnValue(menu.promise),
+      selectShop: vi.fn().mockResolvedValue({ ok: true, shops: ['shop-a'], shopId: 'shop-a' }), search,
+      copy: vi.fn().mockResolvedValue({ ok: true, copied: true }), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }),
+      onInvalidated: listener => { invalidate = listener; return () => {}; },
+    };
+    render(<QueryApp intake />); activateQuery();
+    await screen.findByTestId('notice-accept');
+    await act(async () => menu.resolve({ ok: true, shops: ['shop-a'], shopId: null }));
+    expect(screen.getByTestId('notice-accept')).toBeVisible();
+    await user.click(screen.getByTestId('notice-accept'));
+    await user.selectOptions(screen.getByRole('combobox', { name: '当前店铺' }), 'shop-a');
+    await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('shop-a'));
+    const pending = deferred<unknown>(); search.mockReturnValueOnce(pending.promise);
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '洁面' } });
+    await user.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '已改变的问题' } });
+    await act(async () => pending.resolve({ ok: true, rows: [{ kind: 'intake', key: 'old', rank: 1, title: '过期回调', answerText: '不应展示',
+      applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] }));
+    expect(screen.queryByText('不应展示')).not.toBeInTheDocument();
+    const fresh = deferred<unknown>(); search.mockReturnValueOnce(fresh.promise);
+    await user.click(screen.getByTestId('search-button'));
+    act(() => invalidate('expired'));
+    await act(async () => fresh.resolve({ ok: true, rows: [{ kind: 'intake', key: 'fresh', rank: 1, title: '新资格', answerText: '新的合成话术',
+      applicabilityNote: '', riskNote: '', releaseId: 'r2', validUntil: '2099-01-01T00:00:00Z' }] }));
+    await user.click(await screen.findByTestId('copy-button-1'));
+    expect(window.customerAgent!.intakeQuery!.copy).toHaveBeenCalledWith({ key: 'fresh' });
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
 });

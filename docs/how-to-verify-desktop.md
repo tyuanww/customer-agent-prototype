@@ -441,3 +441,15 @@ node scripts/synthetic-stack/anomaly-check.ts
 | 回退后桌面 `ProductSearch.copy` 对旧候选返回 `STALE`（`announce.allows()`） | 裸 `POST /v1/events/adoption` 拒绝旧 release；Mac 人工复制手感 |
 
 人工注入命令：`stack.ts anomaly status|session-revoke|source-suspend <id>`。`source-suspend` 的 id 是 argv[4]。暂停后不得靠 `start` 重新播种恢复。
+
+## FAQ P2 Query 接线
+
+入口及实际能力限制见[资料导入开发说明](how-to-develop-content-intake.md#p2-桌面-query-合成入口)。定向验证：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-query.test.ts tests/unit/content-intake-query-ipc.test.ts tests/unit/content-intake-usage.test.ts tests/unit/product-runtime-config.test.ts tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx
+pnpm --filter @customer-agent/desktop build
+pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts
+```
+
+前者验证 Main 资格、取消、超限与 renderer 告知/迟到结果；后者使用真实 Electron Main/preload、登录窗口和系统剪贴板，HTTP 为自有合成 wire。新 profile 的 Windows GUI、安装包和真实飞书未因此获得证据。

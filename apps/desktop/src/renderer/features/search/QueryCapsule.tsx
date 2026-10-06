@@ -11,6 +11,8 @@ import {
 
 type QueryCapsuleProps = {
   productControl?: React.ReactNode;
+  scopeControl?: React.ReactNode;
+  intake?: boolean;
   foxVisualState: QueryFoxVisualState;
   foxDrag: ReturnType<typeof useWindowDrag>;
   deepThinkingDescription: string;
@@ -35,6 +37,8 @@ type QueryCapsuleProps = {
 
 export function QueryCapsule({
   productControl,
+  scopeControl,
+  intake = false,
   foxVisualState,
   foxDrag,
   deepThinkingDescription,
@@ -130,7 +134,7 @@ export function QueryCapsule({
               ) : null}
               <div className="capsule-tools">
                 {productControl}
-                <button
+                {!intake ? <button
                   type="button"
                   className="dashboard-entry"
                   data-testid="open-dashboard"
@@ -148,8 +152,8 @@ export function QueryCapsule({
                     <path d="M3 7.25h14M7.25 7.5v9" />
                     <path d="M10 10.25h4.5M10 13.25h3" />
                   </svg>
-                </button>
-                <div className="capsule-tools-end">
+                </button> : null}
+                {intake ? scopeControl : <div className="capsule-tools-end">
                   <span className="smart-retrieval-label" aria-hidden="true">智能检索</span>
                   <button
                     type="button"
@@ -164,7 +168,7 @@ export function QueryCapsule({
                   >
                     <span className="smart-toggle-thumb" aria-hidden="true" />
                   </button>
-                </div>
+                </div>}
               </div>
             </div>
           </div>

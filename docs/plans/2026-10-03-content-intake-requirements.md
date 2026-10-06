@@ -204,6 +204,14 @@
 - Main 收齐权限与来源后再完整复读权限以检查两次读取的一致性；50 页/列表及总 8 MiB 预算、不交付半菜单、取消/注销/重登隔离、零店空集合。只把具备 query 的 v2-preview 非空 shopId 作为本阶段可选店铺；完整资格仍由 API 签发。合同只有店铺 ID，展示名称需后续登记合同提供，不能自行虚构。
 - 复用已批准 E0–E18 和模块归属，不新增合同字段/生产授权。复审实测 5000 个独立来源授权导致全量扫描约 3.9s/页；选择追加 `0026_intake_discovery_index` 物理索引，而不缓存权限或复制授权 SQL，旧 0001–0025 原字节不变。后续对抗复审确认同来源 5000 条重叠授权会重复调用正式谓词并触发 5s 超时，改为按动作/种类聚合后仅调用一次，保留相同授权语义。实际验证、修复与未验证项见[授权发现验收](../../evidence/qa/content-intake-p2-discovery/README.md)。下一步仍是合成 profile 的 Main factory/白名单 IPC/FAQ 界面；完整管理闭环与原生 Mac/Windows 各有尚未完成的验收。
 
+### 0.18 桌面 Query 原生接线（2026-10-07）
+
+用户继续推进，沿用 OCR → 修复 → 验证 → 本地 commit 的持续授权。本轮在既有 worktree 交付显式 loopback 合成 profile：授权店铺选择 → 店铺通用 FAQ 检索 → 原文复制 → 取消/资格失效。没有商品/场景选择时按冻结合同只取不限商品/场景条目，界面明确标注，不声称覆盖全部 FAQ。商品/场景筛选、管理完整闭环、真实接入及 Git 对外动作仍各有后续验收。
+
+比较 A 把新 FAQ 转成旧 RankedScript 并向 renderer 暴露资格，和 B Main 管理独立 Query 上下文、窄 IPC 投影真实字段并复用窗口外壳。选择 B，避免虚构平台/风险等级及第二份授权逻辑。Main 的 ContentIntakeUsage 继续拥有资格与完整快照，ContentIntakeQuery 只拥有检索和当前展示的复制句柄；renderer 仅提交店铺、查询文本和不透明复制 key。关闭窗口注销拥有的任务，Fox/Dashboard/子 frame 不可调用。
+
+最小接口为 mode/access/selectShop/search/copy/cancel 与只含失效原因的事件；普通新发布不主动撤销仍有效结果，换店/注销/到期/权威拒绝则撤正文与动作。新 profile 不装配旧 announce/hydrate/检索/后台路径，默认及远程 profile 不启用新能力。验证覆盖 profile 拒绝、窗口身份门禁、Top 3 原文复制、跨店与迟到结果隔离、空店/无命中/失败恢复，另跑真实 Electron preload/Main/剪贴板及根级四项检查。合成 HTTP 端到端测试与实际 PG 既有证据分别标注，不冒充真实飞书、签名包或 Windows 合成器验收。 实际修改、修复与验证见[本轮验收](../../evidence/qa/content-intake-p2-query/README.md)。
+
 ## 1. 已确认的目标
 
 用户已确认本期完成“资料导入、维护、发布、坐席查询形成完整流程”。完成必须以坐席使用到正确的已发布内容为依据，不能止于后台上传成功。

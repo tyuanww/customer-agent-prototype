@@ -1,0 +1,24 @@
+{
+  "observationCapture": "006",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/content-intake-query.spec.ts"
+  ],
+  "observed": "\nRunning 1 test using 1 worker\n\n  ✓  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (5.7s)\n\n  1 passed (5.9s)\n",
+  "hypothesis": "Verify the repaired native entry boundary and preserved FAQ line breaks, plus login/search/copy/expiry/revocation in Electron.",
+  "nextCapture": "007",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/content-intake-query.spec.ts"
+  ]
+}

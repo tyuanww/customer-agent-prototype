@@ -1,6 +1,8 @@
 import type { OpenDashboardResult } from '../shared/dashboard-access';
 
 export type DesktopLifecycleController = {
+  readonly dashboardEnabled?: boolean;
+  openSearch(): void;
   openDashboard(): Promise<OpenDashboardResult> | OpenDashboardResult;
   activateExisting(): void;
 };
@@ -44,6 +46,7 @@ export function handleDesktopActivate(
     return;
   }
   options.focusApp?.();
+  if (controller.dashboardEnabled === false) { controller.openSearch(); return; }
   void Promise.resolve(controller.openDashboard()).then((result) => {
     if (!result || result.ok !== true) {
       options.onFailure?.(result);

@@ -11,18 +11,22 @@ import { OPEN_DASHBOARD_FAILURE_MESSAGE } from '../../src/shared/dashboard-acces
 function createHost(options: {
   shuttingDown?: boolean;
   ready?: boolean;
+  dashboardEnabled?: boolean;
 } = {}): DesktopLifecycleHost & {
   openDashboard: ReturnType<typeof vi.fn>;
+  openSearch: ReturnType<typeof vi.fn>;
   activateExisting: ReturnType<typeof vi.fn>;
 } {
+  const openSearch = vi.fn();
   const openDashboard = vi.fn().mockResolvedValue({ ok: true });
   const activateExisting = vi.fn();
   return {
     openDashboard,
+    openSearch,
     activateExisting,
     isShuttingDown: () => options.shuttingDown === true,
     isControllerReady: () => options.ready !== false,
-    getController: () => ({ openDashboard, activateExisting }),
+    getController: () => ({ openDashboard, openSearch, activateExisting, dashboardEnabled: options.dashboardEnabled }),
   };
 }
 
@@ -99,4 +103,10 @@ describe('desktop lifecycle activate and second-instance', () => {
     expect(host.activateExisting).toHaveBeenCalledOnce();
     expect(setPending).not.toHaveBeenCalled();
   });
+});
+
+it('activates Query when the selected profile has no Dashboard capability', () => {
+  const host = createHost({ dashboardEnabled: false });
+  handleDesktopActivate(host);
+  expect(host.openSearch).toHaveBeenCalledOnce(); expect(host.openDashboard).not.toHaveBeenCalled();
 });

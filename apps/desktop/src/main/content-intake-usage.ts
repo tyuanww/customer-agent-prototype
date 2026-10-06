@@ -25,8 +25,8 @@ const MAX_PAGES = 500;
 const MAX_BYTES = 32 * 1024 * 1024;
 
 /** Owns current shop/selection, cancellation, complete-page assembly and native copy.
- * Currently consumed by the sealed synthetic runner only. The existing product
- * factory, legacy announce/current and renderer IPC are deliberately not activated.
+ * Consumed by sealed runners and the explicit loopback FAQ Query profile.
+ * Legacy announce/current remains a separate contract.
  * A normal new release does not revoke handles already shown in this context;
  * selection/session changes and definitive permission failures revoke them all.
  */
@@ -79,6 +79,8 @@ export class ContentIntakeUsage {
     }
     return this.catalog;
   }
+  /** Stop incomplete work without extending or revoking completed qualifications. */
+  cancelRefresh() { this.request?.abort(); this.request = null; }
   /** No partial snapshot escapes. Failure remains visible; an offline failure may
    * retain a previously completed handle only until its original deadline. */
   async refresh(): Promise<IntakeCatalog> {
