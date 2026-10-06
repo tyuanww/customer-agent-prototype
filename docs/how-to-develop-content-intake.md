@@ -88,3 +88,13 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 旧 owner 上传会在 enqueue 前修改来源指纹，因此 0022 同时保护 `advance_source_snapshots` / `restore_source_snapshots`，并修正 actor admission 与组织审核 worker 的首锁。存在未完成的旧 snapshot reservation 时，来源不能进入 active；先取消并恢复后才可继续。此存储门不代替未来正式启用 API 的批准、base CAS 或使用资格检查。
 
 批量取消与上传都由 SQL 入口先取内容锁、再取 actor admission 锁；API 不单独取得次级锁。并发回归在 `content-import.integration.test.ts`，验证取消完成后下一次上传成功，并检查阻塞期间的实际 PG 锁集合。
+
+## P2 候选质量预览与 SQL 消费探针
+
+`test:intake:transactions` 同时验证内部 `qualityPreview(actor,key)`。它只读冻结材料，每次按 `review` 动作重验资格、完整键、来源、base 与候选状态；不会缓存权限或写质量/发布回执。普通稿复用既有 `qualityTargets`，数据库继续拥有 population 摘要和 `sha256-ranked-v1` 选样。关键稿所有启用条目进入强制复核集合。稳定 ID 由来源和业务 ID 共同生成；完整候选摘要绑定问法、词项、说明和显式停用，避免旧 population 忽略停用时丢失材料身份。
+
+该结果明确标注 `synthetic-quality-preview`，不是持久冻结的质量计划，也不是质量通过证据。`population[].content_hash` 只是抽样投影摘要，不能写进要求 governance hash 的旧 staging。`has_conflict=false` 用于抽样分组，不证明跨来源业务冲突已排除；正式发布还须独立校验。当前预览允许审批前检查材料，不能据此签发发布票据。
+
+实库测试单独创建合成旧批次和 worker lease，将预览原样送入 `freeze_content_quality_review_plan`，回读冻结的目标数量、population/selection hash；再调用 `record_content_quality_review_evidence` 验证缺扩样、伪造通过、关键稿漏审的拒绝和合法结论落盘。这个消费探针只存在于测试；不会在产品服务中创建旧批次或伪造 owner/dual-review。
+
+旧 `OwnerAcceptanceRecord` 只允许 `g1a_offline_only`，原生人工审批不可转换成该记录。实库验证人工审批已通过、质量结论通过仍不能调用未登记的 owner 承接。完整字段差集与下一步验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。

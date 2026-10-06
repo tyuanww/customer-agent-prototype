@@ -1,0 +1,111 @@
+{
+  "mode": "workspace",
+  "head": "789ce58",
+  "total_files": 15,
+  "reviewed_files": 8,
+  "skipped_files": 0,
+  "coverage_rate": 100,
+  "supplemental_reviewed_files": 7,
+  "files": [
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    },
+    {
+      "path": "apps/api/src/content-intake/quality.ts",
+      "status": "added",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-quality/checks.json",
+      "status": "added",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-quality/evidence.json",
+      "status": "added",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-quality/exploration-002.json",
+      "status": "added",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-quality/inputs.json",
+      "status": "added",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-quality/ocr-coverage.json",
+      "status": "added",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-quality/review.json",
+      "status": "added",
+      "review": "reviewed",
+      "rule": "OCR resolved rules; full source or JSON provenance checked"
+    }
+  ],
+  "supplements": [
+    {
+      "path": "apps/api/tests/content-intake-material.test.ts",
+      "status": "modified",
+      "exclude_reason": "default_path",
+      "review": "reviewed",
+      "method": "full test diff, execution evidence, documentation consistency and links"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "exclude_reason": "default_path",
+      "review": "reviewed",
+      "method": "full test diff, execution evidence, documentation consistency and links"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "exclude_reason": "unsupported_ext",
+      "review": "reviewed",
+      "method": "full test diff, execution evidence, documentation consistency and links"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "exclude_reason": "unsupported_ext",
+      "review": "reviewed",
+      "method": "full test diff, execution evidence, documentation consistency and links"
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "exclude_reason": "unsupported_ext",
+      "review": "reviewed",
+      "method": "full test diff, execution evidence, documentation consistency and links"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "exclude_reason": "unsupported_ext",
+      "review": "reviewed",
+      "method": "full test diff, execution evidence, documentation consistency and links"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-quality/README.md",
+      "status": "added",
+      "exclude_reason": "unsupported_ext",
+      "review": "reviewed",
+      "method": "full test diff, execution evidence, documentation consistency and links"
+    }
+  ],
+  "remainingConfirmedDefects": 0
+}

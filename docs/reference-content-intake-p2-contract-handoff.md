@@ -93,4 +93,20 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 下一可验收切片先明确候选材料如何投影到既有质量 population、抽检结果及 owner 承接证据，禁止伪造旧 dual-review 或直接插入 release 绕过质量门。随后在同一内容锁下消费一次票据并原子写入候选回执、release、catalog/lineage 和公告；验收须证明质量拒绝零副作用、取消/撤权先赢不发布、响应未知用原 operation 恢复且永久关联不重复发布。
 
+### 候选到发布底座的映射差集
+
+`qualityPreview` 已实现只读的候选→质量 population/抽样投影；隔离 PG 消费它验证旧冻结与质量证据 SQL。这不等于产品质量计划已持久化或新发布入口已实现。旧函数及其合同保持不变，以下差集不得靠默认值补齐：
+
+| 边界 | 已验证的可复用部分 | 发布实现仍需完成 |
+| --- | --- | --- |
+| 材料身份 | 完整候选 key；来源限定的 script ID；每条投影均绑定整份材料摘要 | 独立持久化候选→质量计划/逐条人工检查，提交时比对原材料。不能把抽样 hash 当旧 governance hash |
+| 质量选样 | `qualityTargets`；DB population JCS 与排序；500/501 边界、扩样阈值、关键稿全量复核 | 冻结发生在检查前；逐条结果须覆盖精确样本；任一阻断项使整批修订。旧 SQL 的“passed 且有 quarantined 行”不能直接表示 P2 整批可发布 |
+| 停用与继承 | 缺行保留；显式停用独立列出，仍被完整 key 绑定 | 旧 population 只含 upsert；停用必须经候选整体人工审批及最终 source 内合并，不能因空 population 自动发布 |
+| 原生审批 | 固定审核包、历史人工资格、常规自审/关键他审及撤销谱系 | 新稿使用原生 review binding；不能生成伪旧 single/dual-review 主体、EVD 或 owner 记录 |
+| 负责人承接 | `assert_owner_acceptance`、`owner_acceptance_release_content_ready` 保持原用途和撤销/期限门 | 旧 `OwnerAcceptanceRecord` 的 purpose 固定 `g1a_offline_only`，四域来源和内容摘要均需包外批准；只能按其合同核对待继承的旧记录，不能由新审批追认 |
+| 检索与业务字段 | 新材料保留问法独立版本、商品/场景词项、长正文、分类与范围 | 旧 staging 要求 intent taxonomy、platform、source_ref、风险类别等；商品词项不能直接变成旧 sku/category。逐字段确定转换或新读模型，不能截断、猜默认或扩大范围 |
+| 发布集合 | 既有单 current、来源绑定完整性、质量/owner 门；0022 旧写隔离 | 增加候选/来源版本→旧 release 成员及精确谱系的映射；消耗一次票据、候选永久回执、release/catalog/公告同事务；继承旧 owner 内容需重验 |
+
+以上涉及已有正式 wire/schema 含义变化的部分，须在所属治理仓版本化后再 intake；不改变其含义的内部实现沿本仓批准的 P2 推进。下一阶段先实现与候选绑定的不可变质量计划和逐条检查持久化，验证“检查前冻结、扩样、任一错误整批阻断、修订旧证据不可用”，再接票据与原子提交。生产 ACL、HTTP/Main/renderer、真实审批 transport、使用资格和第二坐席查询仍未完成。
+
 现场资料 B 最新版/维护人、真实租户组织字段/人工节点/附件保真属于后续真实验证；本轮未读取真实资料、员工信息或凭据，未 push、PR、merge、deploy，也未启用 v2-active。
