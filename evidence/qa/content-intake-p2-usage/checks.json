@@ -1,0 +1,123 @@
+[
+  {
+    "name": "mac-intake",
+    "command": [
+      "pnpm",
+      "--filter",
+      "@customer-agent/api",
+      "test:intake:transactions"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 91.727,
+    "log": ".gstack/content-intake-p2-usage/mac-intake-final.log",
+    "logSha256": "8bc5eb02b1b56ce96f7130418445b1c111338c77bb8ad9af44741fa424acee3d"
+  },
+  {
+    "name": "lint",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 3.319,
+    "log": ".gstack/content-intake-p2-usage/lint-final.log",
+    "logSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+  },
+  {
+    "name": "typecheck",
+    "command": [
+      "pnpm",
+      "typecheck"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 6.414,
+    "log": ".gstack/content-intake-p2-usage/typecheck-final.log",
+    "logSha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+  },
+  {
+    "name": "test",
+    "command": [
+      "pnpm",
+      "test"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 78.308,
+    "log": ".gstack/content-intake-p2-usage/test-final.log",
+    "logSha256": "2b1bc791de01e93e7229efb69db370832168932466ea4179c88f6c2ca73cf4a5"
+  },
+  {
+    "name": "build",
+    "command": [
+      "pnpm",
+      "build"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 6.216,
+    "log": ".gstack/content-intake-p2-usage/build-final.log",
+    "logSha256": "37c785313f57b0942c59d6de8e2d7f9875dbc301b82e64006a01445022e1654b"
+  },
+  {
+    "name": "docs",
+    "command": [
+      "pnpm",
+      "docs:check"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 0.306,
+    "log": ".gstack/content-intake-p2-usage/docs-final.log",
+    "logSha256": "367a9e256a0ea3a3186ef2ad572653039a032954f1b29f32655bdd374684a2d4"
+  },
+  {
+    "name": "workspace",
+    "command": [
+      "pnpm",
+      "workspace:check"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 0.666,
+    "log": ".gstack/content-intake-p2-usage/workspace-final.log",
+    "logSha256": "ed981a6f27ad19dfdcd27ea78d5a9a5d59d4d03485e907faa3200a0ff6ab0c52"
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 0.024,
+    "log": ".gstack/content-intake-p2-usage/diff-final.log",
+    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "mac-portability",
+    "command": [
+      "pnpm",
+      "--filter",
+      "@customer-agent/api",
+      "exec",
+      "vitest",
+      "run",
+      "tests/content-intake.integration.test.ts",
+      "-t",
+      "usage: does not renew|rejects an exact but stale",
+      "--reporter=dot"
+    ],
+    "exitCode": 0,
+    "log": ".gstack/content-intake-p2-usage/mac-portability.log",
+    "logSha256": "e13d585920bc0ad54842d0ef84cf9df1ff5ea76bd6ef55555310bb135e1627f8"
+  },
+  {
+    "name": "portability-typecheck",
+    "command": [
+      "pnpm",
+      "--filter",
+      "@customer-agent/api",
+      "typecheck"
+    ],
+    "exitCode": 0,
+    "log": ".gstack/content-intake-p2-usage/portability-typecheck.log",
+    "logSha256": "c77cb16c9b4aa550cfa64a69d9962c74773a323bd22a8abb487d3a27136e1c47"
+  }
+]

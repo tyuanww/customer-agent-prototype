@@ -1,0 +1,156 @@
+{
+  "baseCommit": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+  "testedSourceCommit": "c97dc801d19b9c4589e43a781320f4d15345c848",
+  "core": {
+    "remainingConfirmedDefects": 0,
+    "scope": "Current usage increment; unchanged dependencies reviewed as context. No schema/ACL/HTTP/Main change."
+  },
+  "native": {
+    "agent": "usage_review",
+    "source": "in-host",
+    "initial": "one vocabulary-budget defect",
+    "final": "no confirmed remaining defects",
+    "fixtureMode": "summary-only",
+    "independentTests": false
+  },
+  "fixes": [
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "category": "bug",
+      "severity": "medium",
+      "content": "Formal snapshot vocabulary maxItems=100 could be exceeded by valid entries; consumer now shortens pages at vocabulary budget, producer admission and publication preflight reject an individually unpageable row without truncation.",
+      "redLogSha256": "7defebc2a77fc8d4fbc5f2da2aef47885a2403710ded9751fa795e00bfb85442",
+      "greenLogSha256": "45cdc9f39364f51e56e18540d581838f843a086469e5d6923e1b0037d29bb8ad"
+    }
+  ],
+  "developmentCorrections": [
+    "Preserve underlying lease issued_at microseconds in SQL instead of truncating through JS Date.",
+    "Correct synthetic ISO time precision, test wrapper candidate reference and loop type annotation."
+  ],
+  "outside": {
+    "status": "unavailable",
+    "attemptedThisIncrement": false,
+    "reason": "Historical two 540000ms timeouts retained; no model/configuration switch or blind retry.",
+    "priorEvidence": "../content-intake-p2-publication/review.json"
+  },
+  "bindings": [
+    {
+      "skill": "adversarial-review",
+      "status": "issues_found",
+      "source": "in-host",
+      "host": "codex",
+      "outside_provider": "claude-code",
+      "outside_status": "unavailable",
+      "phase": "adversarial",
+      "tier": "always",
+      "gate": "informational",
+      "commit": "bfa68aa",
+      "completed": true,
+      "converged": false,
+      "issues_found": 1,
+      "commit_full": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+      "tree": "618c90fd4cc5bce2969fb49941157918541639ec",
+      "dirty": true,
+      "review_binding": {
+        "state": "incomplete",
+        "start_wtree": "990e05330ec2691c76afe1b2948aeea3768c9051",
+        "end_wtree": "990e05330ec2691c76afe1b2948aeea3768c9051",
+        "started_at": "2026-10-06T08:42:24.974Z",
+        "branch_id": "3885072cb85d971632e015c5ff854fdcb89b1fe7206a3a23dce57a196a04d5e8"
+      }
+    },
+    {
+      "skill": "review",
+      "status": "issues_found",
+      "issues_found": 1,
+      "critical": 1,
+      "informational": 0,
+      "commit": "bfa68aa",
+      "completed": false,
+      "converged": false,
+      "cycles": 1,
+      "commit_full": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+      "tree": "618c90fd4cc5bce2969fb49941157918541639ec",
+      "dirty": true,
+      "review_binding": {
+        "state": "incomplete",
+        "start_wtree": "990e05330ec2691c76afe1b2948aeea3768c9051",
+        "end_wtree": "990e05330ec2691c76afe1b2948aeea3768c9051",
+        "started_at": "2026-10-06T08:42:24.818Z",
+        "branch_id": "3885072cb85d971632e015c5ff854fdcb89b1fe7206a3a23dce57a196a04d5e8"
+      }
+    },
+    {
+      "skill": "adversarial-review",
+      "status": "clean",
+      "source": "in-host",
+      "host": "codex",
+      "outside_provider": "claude-code",
+      "outside_status": "unavailable",
+      "phase": "adversarial",
+      "tier": "always",
+      "gate": "informational",
+      "commit": "bfa68aa",
+      "completed": true,
+      "converged": true,
+      "issues_found": 0,
+      "commit_full": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+      "tree": "618c90fd4cc5bce2969fb49941157918541639ec",
+      "dirty": true,
+      "review_binding": {
+        "state": "verified",
+        "start_wtree": "202774207606e090a8a64b8b9c3f262c9edaaf7a",
+        "end_wtree": "202774207606e090a8a64b8b9c3f262c9edaaf7a",
+        "started_at": "2026-10-06T08:48:11.478Z",
+        "branch_id": "3885072cb85d971632e015c5ff854fdcb89b1fe7206a3a23dce57a196a04d5e8"
+      },
+      "wtree": "202774207606e090a8a64b8b9c3f262c9edaaf7a"
+    },
+    {
+      "skill": "review",
+      "status": "clean",
+      "issues_found": 1,
+      "critical": 1,
+      "informational": 0,
+      "quality_score": 9,
+      "specialists": [],
+      "findings": [
+        {
+          "severity": "medium",
+          "status": "fixed",
+          "description": "Snapshot vocabulary budget now bounds producer admission and pagination; actual red/green PG regression verified."
+        }
+      ],
+      "commit": "bfa68aa",
+      "completed": true,
+      "converged": true,
+      "cycles": 2,
+      "commit_full": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+      "tree": "618c90fd4cc5bce2969fb49941157918541639ec",
+      "dirty": true,
+      "review_binding": {
+        "state": "verified",
+        "start_wtree": "202774207606e090a8a64b8b9c3f262c9edaaf7a",
+        "end_wtree": "202774207606e090a8a64b8b9c3f262c9edaaf7a",
+        "started_at": "2026-10-06T08:48:11.325Z",
+        "branch_id": "3885072cb85d971632e015c5ff854fdcb89b1fe7206a3a23dce57a196a04d5e8"
+      },
+      "wtree": "202774207606e090a8a64b8b9c3f262c9edaaf7a",
+      "shared_libs_coverage_version": 1
+    }
+  ],
+  "remoteBase": {
+    "latestRemoteHeadVerified": false,
+    "cachedOriginMain": "8ab309fcd9c494b7343ed88bacb253205d36575f"
+  },
+  "portabilityFollowup": {
+    "scope": "Two SQL fixture expressions only; no production code or constraints changed.",
+    "hostReview": "Both endpoints in the same SQL statement now share one timestamp.",
+    "remoteInitial": {
+      "testsPassed": 83,
+      "testsFailed": 2,
+      "logSha256": "da7a96516d53bb59ec38e9dba5130799fff6996c94c01c6061cf68cee2d64acd"
+    },
+    "nativeScope": "Native source review remains applicable; test payloads stayed summary-only."
+  }
+}
