@@ -9,6 +9,10 @@ import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
 import type { IntakeResult } from '../src/content-intake/transaction.js';
 import type { AuthenticatedUser } from '../src/auth-service.js';
+import { createApprovalAdapter, type ApprovalTransport } from '../src/content-intake/approval-adapter.js';
+import { syntheticApproval } from './support/intake-approval.js';
+import { digest } from '../src/content-intake/material.js';
+import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
 
 type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -28,6 +32,11 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   let store: ReturnType<typeof createContentObjectStore>;
   let policyVersion: number;
   const diagnostics: unknown[] = [];
+  let provider: ReturnType<typeof syntheticApproval>;
+  const route = { tenantId:'tenant-a',appId:'app-a',definitionId:'synthetic-definition',nodeId:'manual-node' };
+  function evidenceService(transport: ApprovalTransport = provider.transport) {
+    return createContentIntakeService(pool,store,(_id,error) => diagnostics.push(error),createApprovalAdapter(route,transport));
+  }
 
   beforeEach(async () => {
     harness = new Pg15Harness(); harness.start();
@@ -36,10 +45,11 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await applyDatabaseMigrations(admin);
     pool = new Pool({ ...db.config, max: 4 });
     store = createContentObjectStore(path.join(harness.root, db.name));
-    service = createContentIntakeService(pool, store, (_id, error) => diagnostics.push(error));
+    provider = syntheticApproval();
+    service = evidenceService();
     diagnostics.length = 0;
     await admin.query('BEGIN');
-    for (const [id, role] of [['director','director'], ['manager','manager'], ['supervisor','supervisor'], ['enabler','enabler'], ['other','enabler'], ['agent','agent']] as const) {
+    for (const [id, role] of [['director','director'], ['manager','manager'], ['supervisor','supervisor'], ['enabler','enabler'], ['other','enabler'], ['reviewer','enabler'], ['agent','agent']] as const) {
       await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
         VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('a',64),true,'owner')`, [id, `user-${id}`]);
       await admin.query(`INSERT INTO content_intake.principals VALUES ($1,$2,'tenant-a','app-a','confirmed-synthetic',$1,1,0)`, [id, `user-${id}`]);
@@ -56,7 +66,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     for (const action of actions) {
       await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
         VALUES ($1,'allocation','director','director','tenant-a','app-a','scope-a',$2,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 day','合成根资格','director')`, [`root-${action}`, action]);
-      for (const recipient of ['enabler', 'other', ...(action === 'query' ? ['agent'] : [])]) {
+      for (const recipient of ['enabler', 'other', 'reviewer', ...(action === 'query' ? ['agent'] : [])]) {
         await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
           VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '10 minutes',clock_timestamp()+interval '1 hour','合成业务授权','director',$4)`, [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
       }
@@ -87,6 +97,19 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     if (!parsed.ok) throw new Error(JSON.stringify({ parsed, diagnostics, report: await service.job(actor('enabler'), received.jobId) }));
     return value(parsed);
   }
+  async function routine() {
+    const req = await input('routine',null,[['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','','','false']]);
+    return value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',req)).jobId));
+  }
+  async function confirm(c: C['IntakeCandidate'], op = 'source-confirm-one', expected = 0) {
+    const material = (await admin.query('SELECT material FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2',[c.key.candidateId,c.key.version])).rows[0].material as C['IntakeMaterial'];
+    const req: C['IntakeSourceConfirmation'] = { operationId:op,key:c.key,expectedEvidenceVersion:expected,
+      confirmedVersionKind:'opaque',confirmedVersionValue:'synthetic-export-one',acquisition:'controlled-synthetic-export',objectSha256:material.object.sha256,reason:'合成人工确认来源' };
+    return { req,result:await service.confirmSource(actor('enabler'),req) };
+  }
+  const reviewRequest = (c: C['IntakeCandidate'], expected = 0, op = 'review-one'): C['IntakeReviewRequest'] =>
+    ({ operationId:op,key:c.key,expectedEvidenceVersion:expected });
+  const refresh = (c: C['IntakeCandidate'], op = 'refresh-one', expected = 1) => service.refreshReview(actor('other'),reviewRequest(c,expected,op));
 
   it('ignores the login owner label; enabler needs an exact shop/source business grant', async () => {
     value(await service.authorization(actor('enabler'), 'source-a', 'import'));
@@ -338,5 +361,321 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query('COMMIT');
     expect(await waiting).toMatchObject({ ok: false, reason: 'ORG_FACTS_UNAVAILABLE' });
     expect((await admin.query("SELECT count(*) FROM content_intake.grants WHERE recipient_id='manager'")).rows[0].count).toBe('0');
+  });
+
+  it('round-trips the full review package and reaches ready with independent source confirmation and routine self-review', async () => {
+    const c = await routine();
+    const before = (await admin.query('SELECT canonical_material FROM content_intake.candidate_versions')).rows[0].canonical_material;
+    const r = value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    const bytes = await store.readPayload(r.reviewPackageObjectId);
+    expect(digest(bytes)).toBe(r.reviewPackageSha256);
+    const actual = JSON.parse(provider.packages.get(provider.latest().attachmentFileCode)!.toString());
+    expect(actual).toMatchObject({ format:'intake-review-package-v1',key:c.key,material:{ contributors:['enabler','other'],
+      entries:[{ answerText:'第一行。\n第二行。',internalNote:'内部说明' }],risk:{ level:'routine' } } });
+    expect(actual.material.differences).toHaveLength(1);
+    provider.approve('enabler');
+    expect(value(await refresh(c)).state).toBe('approved');
+    expect(value(await service.candidate(actor('other'),c.key.candidateId,1)).readinessReasons).toEqual(['SOURCE_CONFIRMATION_REQUIRED']);
+    const confirmation = await confirm(c);
+    expect(value(confirmation.result)).toMatchObject({ state:'ready',sourceEvidenceVersion:1,approvalEvidenceVersion:1,key:c.key });
+    expect(value(await service.confirmSource(actor('enabler'),confirmation.req)).state).toBe('ready');
+    expect((await admin.query('SELECT canonical_material FROM content_intake.candidate_versions')).rows[0].canonical_material).toBe(before);
+    expect((await admin.query("SELECT response->>'reason' AS reason FROM backend_review.receipts WHERE operation='intake:source-confirm'")).rows[0].reason).toBe('合成人工确认来源');
+    expect((await admin.query('SELECT count(*) FROM public.import_batches')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('0');
+  });
+
+  it('requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility', async () => {
+    const c = await candidate();
+    value((await confirm(c)).result);
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    for (const contributor of ['enabler','other']) {
+      provider.approve(contributor);
+      expect(await refresh(c,`self-${contributor}`)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    }
+    provider.approve('reviewer');
+    expect(value(await refresh(c)).state).toBe('approved');
+    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,1)).state).toBe('ready');
+    value(await service.changeGrant(actor('director'),'business-reviewer-review',
+      { operationId:'revoke-reviewer',expectedVersion:1,change:'revoke',stewardPrincipalId:null,reason:'合成审核者撤权' }));
+    // Historical PASS stays valid; it cannot authorize a new publication by an ineligible reviewer.
+    expect(value(await refresh(c,'after-revocation')).state).toBe('approved');
+    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,1))).toMatchObject({ state:'awaiting-evidence',readinessReasons:['PERMISSION_CHANGED'] });
+  });
+
+  it('rejects a historical PASS before the review grant or before the qualifying role existed', async () => {
+    const c = await routine();
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    const old = new Date(Date.now()-30_000).toISOString();
+    provider.approve('reviewer',old);
+    expect(await refresh(c)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    const beforeGrant = new Date((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time).toISOString();
+    value(await service.grantBatch(actor('director'),batch('manager','review','business','late-review-grant')));
+    provider.approve('manager',beforeGrant);
+    expect(await refresh(c,'before-grant')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-enabler',2,'agent') ON CONFLICT (tenant_id,app_id,department_id,job_id) DO UPDATE SET role='agent',policy_version=2");
+    const duringAgentRole = new Date((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time).toISOString();
+    await admin.query("UPDATE content_intake.role_rules SET role='enabler',policy_version=3 WHERE job_id='job-enabler'");
+    provider.approve('reviewer',duringAgentRole);
+    expect(await refresh(c,'before-role')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
+  });
+
+  it('rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence', async () => {
+    const c = await routine();
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('enabler');
+    const r = value(await refresh(c));
+    const instance = provider.latest();
+    const original = structuredClone(instance);
+    for (const [field,wrong] of [['tenantId','tenant-b'],['appId','app-b'],['nodeId','auto-node'],['createUuid','wrong-uuid'],['instanceCode','wrong-instance']] as const) {
+      instance[field]=wrong;
+      expect(await refresh(c,`wrong-${field}`)).toMatchObject({ ok:false,reason:'APPROVAL_BINDING' });
+      Object.assign(instance,structuredClone(original));
+    }
+    instance.form.key.digest='b'.repeat(64);
+    expect(await refresh(c,'wrong-form')).toMatchObject({ ok:false,reason:'APPROVAL_BINDING' });
+    Object.assign(instance,structuredClone(original));
+    instance.task!.kind='AUTO_PASS';
+    expect(await refresh(c,'auto-pass')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    Object.assign(instance,structuredClone(original));
+    instance.timeline[0]!.taskId='different-task';
+    expect(await refresh(c,'wrong-timeline')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    Object.assign(instance,structuredClone(original));
+    const bytes = provider.packages.get(instance.attachmentFileCode)!;
+    const corrupt = Buffer.from(bytes); corrupt[corrupt.length-2]=33;
+    provider.packages.set(instance.attachmentFileCode,corrupt);
+    expect(await refresh(c,'wrong-attachment')).toMatchObject({ ok:false,reason:'ATTACHMENT_UNVERIFIED' });
+    expect(value(await service.review(actor('other'),c.key)).validUntil).toBe(r.validUntil);
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('1');
+    expect(await service.refreshReview(actor('enabler'),{ ...reviewRequest(c,1,'forged-json'),approved:true })).toMatchObject({ ok:false,code:'VALIDATION' });
+  });
+
+  it('persists creation before I/O and recovers a lost provider response with one UUID across restart', async () => {
+    const c = await routine();
+    let lose = true;
+    const transport: ApprovalTransport = { ...provider.transport,async create(b,bytes,signal) {
+      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings WHERE create_uuid=$1',[b.createUuid])).rows[0].count).toBe('1');
+      await admin.query('BEGIN');
+      try { expect((await admin.query('SELECT pg_try_advisory_xact_lock(724019,1) AS unlocked')).rows[0].unlocked).toBe(true); }
+      finally { await admin.query('ROLLBACK'); }
+      const result = await provider.transport.create(b,bytes,signal);
+      if (lose) { lose=false; throw new Error('synthetic provider lost creation response'); }
+      return result;
+    } };
+    const req = reviewRequest(c);
+    const first = value(await evidenceService(transport).requestReview(actor('enabler'),req));
+    expect(first.state).toBe('creating');
+    expect(await service.requestReview(actor('enabler'),reviewRequest(c,1,'new-key'))).toMatchObject({ ok:false,reason:'COMMIT_UNKNOWN' });
+    const recovered = value(await evidenceService(transport).requestReview(actor('enabler'),req));
+    expect(recovered).toMatchObject({ reviewRequestId:first.reviewRequestId,evidenceVersion:1,reviewPackageSha256:first.reviewPackageSha256 });
+    expect(recovered.instanceCode).not.toBeNull();
+    expect(provider.instances.size).toBe(1);
+    value(await evidenceService(transport).requestReview(actor('enabler'),req));
+    expect(provider.calls()).toBe(2);
+    expect(await service.requestReview(actor('enabler'),{ ...req,expectedEvidenceVersion:1 })).toMatchObject({ ok:false,reason:'IDEMPOTENCY_CONFLICT' });
+  });
+
+  it('invalidates approval work when cancellation or source evidence wins during external I/O', async () => {
+    const c = await routine();
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('enabler');
+    let during: () => Promise<void> = async () => { value((await confirm(c)).result); };
+    const delayed = evidenceService({ ...provider.transport,async instance(b,signal) {
+      const snapshot = await provider.transport.instance(b,signal);
+      await during(); return snapshot;
+    } });
+    expect(await delayed.refreshReview(actor('other'),reviewRequest(c,1,'source-race'))).toMatchObject({ ok:false,reason:'APPROVAL_CHANGED' });
+    during = async () => { value(await service.cancel(actor('other'),{ operationId:'cancel-during-review',key:c.key })); };
+    expect(await delayed.refreshReview(actor('other'),reviewRequest(c,1,'cancel-race'))).toMatchObject({ ok:false,reason:'MATERIAL_CHANGED' });
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
+  });
+
+  it('serializes concurrent review replacement and prevents old evidence from marking the candidate ready', async () => {
+    const c = await routine();
+    value((await confirm(c)).result);
+    const requests = await Promise.all([service.requestReview(actor('enabler'),reviewRequest(c)),
+      evidenceService().requestReview(actor('other'),reviewRequest(c,0,'other-request'))]);
+    expect(requests.filter(r => r.ok)).toHaveLength(1);
+    expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('1');
+    provider.approve('enabler');
+    value(await refresh(c));
+    value(await service.requestReview(actor('enabler'),reviewRequest(c,1,'replace')));
+    expect(await refresh(c,'old-evidence')).toMatchObject({ ok:false,reason:'APPROVAL_CHANGED' });
+    expect(value(await service.candidate(actor('other'),c.key.candidateId,1)).state).toBe('awaiting-evidence');
+    expect((await admin.query('SELECT digest FROM content_intake.candidate_versions')).rows[0].digest).toBe(c.key.digest);
+  });
+
+  it('keeps revoked evidence terminal and rejects a late approved response from another service', async () => {
+    const c = await routine();
+    value((await confirm(c)).result);
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('enabler');
+    value(await refresh(c));
+    const delayed = evidenceService({ ...provider.transport,async instance(b,signal) {
+      const snapshot = await provider.transport.instance(b,signal);
+      provider.latest().state='REVOKED';
+      expect(value(await refresh(c,'revoke')).state).toBe('revoked');
+      return snapshot;
+    } });
+    const late = await delayed.refreshReview(actor('other'),reviewRequest(c,1,'late-approval'));
+    expect(late,JSON.stringify(diagnostics.map(e => e instanceof Error ? e.message : e))).toMatchObject({ ok:false,reason:'APPROVAL_CHANGED' });
+    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,1)).readinessReasons).toEqual(['APPROVAL_REVOKED']);
+    provider.approve('enabler');
+    expect(await refresh(c,'resurrect')).toMatchObject({ ok:false,reason:'APPROVAL_REVOKED' });
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('2');
+  });
+
+  it('recovers an approval COMMIT with the original operation even when the provider is now unavailable', async () => {
+    const c = await routine();
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('enabler');
+    let finishing = false;
+    let lost = false;
+    const uncertain = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client,{ get(target,key) {
+        if (key === 'query') return async (sql: string,values?: unknown[]) => {
+          const result = await target.query(sql,values);
+          if (sql.startsWith('INSERT INTO content_intake.approval_facts')) finishing=true;
+          if (sql === 'COMMIT' && finishing && !lost) { lost=true; throw new Error('synthetic lost approval COMMIT'); }
+          return result;
+        };
+        const member: unknown = Reflect.get(target,key);
+        return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const req = reviewRequest(c,1,'unknown-refresh');
+    expect(await createContentIntakeService(uncertain,store,undefined,createApprovalAdapter(route,provider.transport)).refreshReview(actor('other'),req))
+      .toMatchObject({ ok:false,commit:'unknown' });
+    const after = evidenceService({ ...provider.transport,async instance() { throw new Error('must replay without provider'); } });
+    expect(value(await after.refreshReview(actor('other'),req)).state).toBe('approved');
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('1');
+  });
+
+  it('projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation', async () => {
+    const c = await routine();
+    const confirmed = await confirm(c);
+    value(confirmed.result);
+    expect(await service.confirmSource(actor('enabler'),{ ...confirmed.req,operationId:'stale-source' })).toMatchObject({ ok:false,reason:'SOURCE_MISMATCH' });
+    expect(await service.confirmSource(actor('enabler'),{ ...confirmed.req,operationId:'wrong-file',expectedEvidenceVersion:1,objectSha256:'b'.repeat(64) })).toMatchObject({ ok:false,reason:'SOURCE_MISMATCH' });
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('enabler');
+    value(await refresh(c));
+    await admin.query(`INSERT INTO content_intake.approval_facts SELECT review_request_id,2,revocation_generation,state,
+      statement_timestamp()-interval '299 seconds',statement_timestamp()+interval '0.1 seconds',raw_facts_digest,
+      package_verified_sha256,human_task_id,reviewer_id,reviewer_facts_version,statement_timestamp()-interval '299 seconds'
+      FROM content_intake.approval_facts WHERE facts_version=1`);
+    await admin.query('UPDATE content_intake.approval_current SET facts_version=2');
+    await admin.query('SELECT pg_sleep(0.15)');
+    const old = value(await service.review(actor('other'),c.key));
+    expect(old.state).toBe('unavailable');
+    expect(value(await service.candidate(actor('other'),c.key.candidateId,1))).toMatchObject({ state:'awaiting-evidence',readinessReasons:['APPROVAL_UNAVAILABLE'] });
+    const calls = provider.instanceCalls();
+    value(await service.review(actor('other'),c.key));
+    expect(provider.instanceCalls()).toBe(calls);
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('2');
+  });
+
+  it('propagates a verified revocation to every seeded release inheriting the same approval lineage', async () => {
+    const c = await routine();
+    value((await confirm(c)).result);
+    const r = value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('enabler');
+    value(await refresh(c));
+    // Seed real four-domain release rows via the existing test support. This tests
+    // revocation propagation, not the still-unimplemented P2 publish transaction.
+    await seedSyntheticG1aRelease(admin);
+    const original = (await admin.query('SELECT release_id FROM public.content_releases')).rows[0].release_id as string;
+    await admin.query('BEGIN');
+    await admin.query("SELECT set_config('app.publishing','on',true)");
+    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,status,source_binding_hash)
+      SELECT 'inherited-synthetic-release',2,'published',source_binding_hash FROM public.content_releases WHERE release_id=$1`,[original]);
+    await admin.query(`INSERT INTO public.release_source_bindings(release_id,domain,source_version_id)
+      SELECT 'inherited-synthetic-release',domain,source_version_id FROM public.release_source_bindings WHERE release_id=$1`,[original]);
+    await admin.query('COMMIT');
+    for (const release of [original,'inherited-synthetic-release']) {
+      await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[release]);
+      await admin.query(`INSERT INTO content_intake.release_lineage VALUES ($1,'source-a','faq-one',1,$2,1,$3,'2099-01-01T00:00:00Z')`,[release,c.key.candidateId,r.reviewRequestId]);
+    }
+    provider.latest().state='REVOKED';
+    expect(value(await refresh(c,'cascade-revoke')).state).toBe('revoked');
+    const revoked = (await admin.query('SELECT release_id,reason FROM content_intake.release_revocations ORDER BY release_id')).rows;
+    expect(revoked).toEqual([original,'inherited-synthetic-release'].sort().map(release_id => ({ release_id,reason:'APPROVAL_REVOKED' })));
+    value(await refresh(c,'repeated-revoke'));
+    expect((await admin.query('SELECT count(*) FROM content_intake.release_revocations')).rows[0].count).toBe('2');
+  });
+
+  it('binds evidence freshness to verification start and leaves no locks held while reading the provider', async () => {
+    const c = await routine();
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    provider.approve('enabler');
+    let finished = 0;
+    const delayed = evidenceService({ ...provider.transport,async instance(b,signal) {
+      await admin.query('BEGIN');
+      try {
+        expect((await admin.query('SELECT pg_try_advisory_xact_lock(724019,1) AS unlocked')).rows[0].unlocked).toBe(true);
+        await admin.query('SELECT pg_sleep(0.1)');
+        finished = new Date((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time).getTime();
+      } finally { await admin.query('ROLLBACK'); }
+      return provider.transport.instance(b,signal);
+    } });
+    const r = value(await delayed.refreshReview(actor('other'),reviewRequest(c,1,'slow-verification')));
+    expect(Date.parse(r.validUntil!)-Date.parse(r.checkedAt!)).toBe(300_000);
+    expect(finished-Date.parse(r.checkedAt!)).toBeGreaterThanOrEqual(90);
+  });
+
+  it.each(['facts-expire','facts-disabled','grant-expires'] as const)('rejects ambiguous sub-millisecond eligibility: %s', async kind => {
+    const c = await routine();
+    const at = new Date(Date.now()+250).toISOString();
+    if (kind === 'grant-expires') {
+      await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成精度边界' WHERE grant_id='business-reviewer-review'");
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id,steward_id)
+        VALUES ('fractional-expiry','business','director','reviewer','tenant-a','app-a','scope-a','source-a','review',clock_timestamp(),$1::timestamptz+interval '0.2 milliseconds','合成自然到期','root-review','director')`,[at]);
+    } else {
+      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',2,ARRAY['dept-a'],'job-enabler',$2,
+        $1::timestamptz+CASE WHEN $2 THEN interval '-10 milliseconds' ELSE interval '0.2 milliseconds' END,
+        $1::timestamptz+CASE WHEN $2 THEN interval '0.2 milliseconds' ELSE interval '1 minute' END,repeat('b',64))`,[at,kind === 'facts-expire']);
+      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',3,ARRAY['dept-a'],'job-enabler',true,
+        $1::timestamptz+interval '1 millisecond',$1::timestamptz+interval '1 minute',repeat('c',64))`,[at]);
+      await admin.query("UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='reviewer'");
+    }
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    await admin.query('SELECT pg_sleep(0.3)');
+    provider.approve('reviewer',at);
+    expect(await refresh(c)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
+  });
+
+  it('does not backdate authority from an uncommitted grant and recovers with a new review after commit', async () => {
+    const c = await routine();
+    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
+    let reached!: () => void;
+    const written = new Promise<void>(resolve => { reached=resolve; });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release=resolve; });
+    const paused = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client,{ get(target,key) {
+        if (key === 'query') return async (sql: string,values?: unknown[]) => {
+          const result = await target.query(sql,values);
+          if (sql.startsWith('INSERT INTO backend_review.receipts') && values?.[1] === 'intake:grants') { reached(); await gate; }
+          return result;
+        };
+        const member: unknown = Reflect.get(target,key);
+        return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const pending = createContentIntakeService(paused,store).grantBatch(actor('director'),batch('manager','review'));
+    await written;
+    try {
+      await admin.query('SELECT pg_sleep(0.01)');
+      provider.approve('manager');
+    } finally { release(); }
+    value(await pending);
+    expect(await refresh(c)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
+    value(await service.requestReview(actor('enabler'),reviewRequest(c,1,'after-grant-commit')));
+    provider.approve('manager');
+    expect(value(await refresh(c,'qualified-later',2)).state).toBe('approved');
   });
 });

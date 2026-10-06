@@ -58,6 +58,21 @@ export function requireFresh(p: Principal, now: number): void {
   }
 }
 
+const requestDigest = (request: CanonicalJsonValue): string =>
+  `intake-request-v1:${createHash('sha256').update(canonicalJson(request)).digest('hex')}`;
+
+/** Multi-phase commands consult the same durable receipt before doing external I/O.
+ * Call under lock_content; a receipt recovers the original result, never authorizes a new write. */
+export async function intakeReplay<T>(client: Queryable, actor: Principal, command: string,
+  request: CanonicalJsonValue, operationId: string, decode: (value: unknown) => T): Promise<{ value: T } | null> {
+  const prior = await client.query<{ request_hash: string; response: unknown }>(
+    'SELECT request_hash,response FROM backend_review.receipts WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3',
+    [actor.userId, `intake:${command}`, operationId]);
+  if (!prior.rows[0]) return null;
+  if (prior.rows[0].request_hash !== requestDigest(request)) throw new IntakeRejection('IDEMPOTENCY_CONFLICT');
+  return { value: decode(prior.rows[0].response) };
+}
+
 /** No connection string or production registration: only the isolated synthetic runner
  * currently supplies this pool. New application ACL stays sealed until all P2 gates pass.
  * Every writer takes the existing global content lock first; no remote I/O in callbacks. */
@@ -91,17 +106,13 @@ export function createIntakeTransactions(pool: IntakePool,
       const operation = `intake:${command}`;
       // These permanent, server-private command bindings follow the existing
       // backend_review SHA-256 receipts; they must outlive HTTP HMAC key rotation.
-      const requestHash = request === null ? null : `intake-request-v1:${createHash('sha256').update(canonicalJson(request)).digest('hex')}`;
+      const requestHash = request === null ? null : requestDigest(request);
       if (operationId !== null && requestHash !== null) {
-        const prior = await client.query<{ request_hash: string; response: unknown }>(
-          'SELECT request_hash,response FROM backend_review.receipts WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3',
-          [who.userId, operation, operationId]);
-        if (prior.rows[0]) {
-          if (prior.rows[0].request_hash !== requestHash) throw new IntakeRejection('IDEMPOTENCY_CONFLICT');
-          const value = decode(prior.rows[0].response);
+        const prior = await intakeReplay(client, who, command, request!, operationId, decode);
+        if (prior) {
           committing = true;
           await client.query('COMMIT');
-          return { ok: true, value };
+          return { ok: true, value: prior.value };
         }
       }
       const value = decode(await work(transaction, who));

@@ -95,9 +95,7 @@ export async function readCandidate(client: IntakeTransaction, actor: Principal,
   action: C['IntakeAction'] = 'content-manage'): Promise<C['IntakeCandidate']> {
   const { rows } = await client.query<{ source_id: string; value: unknown }>(`SELECT c.source_id,jsonb_build_object(
     'key',jsonb_build_object('candidateId',c.candidate_id,'version',c.version,'digest',c.digest),
-    'sourceId',c.source_id,'state',c.state,'readinessReasons',CASE WHEN c.state='awaiting-evidence' THEN '[]'::jsonb ||
-      CASE WHEN c.source_evidence_version=0 THEN '["SOURCE_CONFIRMATION_REQUIRED"]'::jsonb ELSE '[]'::jsonb END ||
-      CASE WHEN c.approval_evidence_version=0 THEN '["AWAITING_APPROVAL"]'::jsonb ELSE '[]'::jsonb END ELSE '[]'::jsonb END,
+    'sourceId',c.source_id,'state',c.state,'readinessReasons','[]'::jsonb,
     'sourceEvidenceVersion',c.source_evidence_version,'approvalEvidenceVersion',c.approval_evidence_version,
     'revocationGeneration',c.revocation_generation,'createdAt',c.created_at,'updatedAt',c.updated_at,
     'publishedReleaseId',p.release_id) AS value FROM content_intake.candidate_versions c
@@ -105,7 +103,61 @@ export async function readCandidate(client: IntakeTransaction, actor: Principal,
     WHERE c.candidate_id=$1 AND c.version=$2`, [id, version]);
   if (!rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   await authorize(client, actor, action, await source(client, rows[0].source_id));
-  return parseContractSchema('IntakeCandidate', rows[0].value);
+  const view = parseContractSchema('IntakeCandidate', rows[0].value);
+  if (!['awaiting-evidence', 'ready'].includes(view.state)) return view;
+  // Readiness is a projection of current evidence, never a cached permission.
+  // Merely reading it does not renew approval validity or change its history.
+  const facts = (await client.query<{ source_ok: boolean; base_ok: boolean; approval_state: string | null;
+    fresh: boolean | null; reviewer_until: Date | null; reviewer_enabled: boolean | null }>(`SELECT
+      s.current_mapping_version=c.source_version AND s.mode='v2-preview' AS source_ok,
+      c.base_release_id IS NOT DISTINCT FROM (SELECT current_release_id FROM public.content_current WHERE id=1) AS base_ok,
+      f.state AS approval_state, f.checked_at<=clock_timestamp() AND clock_timestamp()<f.valid_until AS fresh,
+      content_intake.authorization_deadline(f.reviewer_id,'review',c.scope_id,c.source_id,clock_timestamp()) AS reviewer_until,
+      b.enabled AS reviewer_enabled
+      FROM content_intake.candidate_versions c JOIN content_intake.sources s USING(source_id)
+      LEFT JOIN content_intake.review_bindings r ON r.candidate_id=c.candidate_id AND r.candidate_version=c.version AND r.evidence_version=c.approval_evidence_version
+      LEFT JOIN content_intake.approval_current p USING(review_request_id)
+      LEFT JOIN content_intake.approval_facts f ON f.review_request_id=p.review_request_id AND f.facts_version=p.facts_version
+      LEFT JOIN content_intake.principals reviewer ON reviewer.principal_id=f.reviewer_id
+      LEFT JOIN backend_identity.subject_bindings b ON b.user_id=reviewer.user_id
+      WHERE c.candidate_id=$1 AND c.version=$2`, [id, version])).rows[0]!;
+  const reasons: string[] = [];
+  if (!facts.source_ok) reasons.push('SOURCE_MISMATCH');
+  if (!facts.base_ok) reasons.push('BASE_CHANGED');
+  if (view.sourceEvidenceVersion === 0) reasons.push('SOURCE_CONFIRMATION_REQUIRED');
+  if (facts.approval_state === 'revoked') reasons.push('APPROVAL_REVOKED');
+  else if (!facts.fresh) reasons.push(view.approvalEvidenceVersion ? 'APPROVAL_UNAVAILABLE' : 'AWAITING_APPROVAL');
+  else if (facts.approval_state !== 'approved') reasons.push('AWAITING_APPROVAL');
+  else if (!facts.reviewer_until || !facts.reviewer_enabled) reasons.push('PERMISSION_CHANGED');
+  return { ...view, state: reasons.length ? 'awaiting-evidence' : 'ready', readinessReasons: reasons };
+}
+
+/** Exact key and source authorization before any material or review package leaves the DB. */
+export async function candidateContext(client: IntakeTransaction, actor: Principal, key: C['IntakeCandidateKey'],
+  action: C['IntakeAction'], mutable = false) {
+  const view = await readCandidate(client, actor, key.candidateId, key.version, action);
+  if (view.key.digest !== key.digest) throw new IntakeRejection('MATERIAL_CHANGED');
+  if (mutable && !['awaiting-evidence','ready'].includes(view.state)) throw new IntakeRejection(view.state === 'published' ? 'ALREADY_PUBLISHED' : 'MATERIAL_CHANGED');
+  const row = (await client.query<{ material: unknown }>('SELECT material FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2',
+    [key.candidateId, key.version])).rows[0]!;
+  const material = parseContractSchema('IntakeMaterial', row.material);
+  const src = await source(client, view.sourceId);
+  if (mutable) {
+    if (src.mode !== 'v2-preview' || src.version !== material.sourceVersion) throw new IntakeRejection('SOURCE_MISMATCH');
+    await currentBase(client, material.baseReleaseId);
+    const pending = await client.query(`SELECT 1 FROM content_intake.write_attempts WHERE candidate_id=$1 AND candidate_version=$2
+      AND action='publish' AND state IN ('pending','unknown')`, [key.candidateId, key.version]);
+    if (pending.rowCount) throw new IntakeRejection('COMMIT_UNKNOWN');
+  }
+  return { view, material, src };
+}
+
+/** Evidence writers persist the current projection; GET still recomputes time-dependent gates. */
+export async function syncCandidateReadiness(client: IntakeTransaction, actor: Principal, key: C['IntakeCandidateKey'], action: C['IntakeAction']) {
+  const view = await readCandidate(client, actor, key.candidateId, key.version, action);
+  if (['awaiting-evidence','ready'].includes(view.state)) await client.query(`UPDATE content_intake.candidate_versions
+    SET state=$3,updated_at=clock_timestamp() WHERE candidate_id=$1 AND version=$2`, [key.candidateId, key.version, view.state]);
+  return readCandidate(client, actor, key.candidateId, key.version, action);
 }
 
 export async function freezeParsed(client: IntakeTransaction, actor: Principal, job: Job, src: Source, parsed: ParseResult): Promise<C['IntakeCandidate']> {

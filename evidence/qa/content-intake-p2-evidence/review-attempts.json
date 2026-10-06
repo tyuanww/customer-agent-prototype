@@ -1,0 +1,183 @@
+{
+  "scope": "HEAD46c39ab worktree diff including untracked source; prior unchanged history evidence reused",
+  "fixCycles": 1,
+  "finalRecords": [
+    {
+      "skill": "adversarial-review",
+      "timestamp": "2026-10-06T02:02:15.365551+00:00",
+      "status": "clean",
+      "source": "in-host",
+      "host": "codex",
+      "outside_provider": "claude-code",
+      "outside_status": "skipped",
+      "phase": "adversarial",
+      "tier": "always",
+      "gate": "informational",
+      "commit": "46c39ab",
+      "completed": true,
+      "converged": true
+    },
+    {
+      "skill": "adversarial-review",
+      "timestamp": "2026-10-06T02:02:15.365551+00:00",
+      "status": "clean",
+      "source": "claude-code",
+      "host": "codex",
+      "outside_provider": "claude-code",
+      "outside_status": "completed",
+      "phase": "adversarial",
+      "tier": "always",
+      "gate": "informational",
+      "commit": "46c39ab",
+      "completed": true,
+      "converged": true,
+      "modelUsage": {
+        "claude-opus-5": {
+          "inputTokens": 50974,
+          "outputTokens": 27898,
+          "cacheReadInputTokens": 512,
+          "cacheCreationInputTokens": 0,
+          "webSearchRequests": 0,
+          "costUSD": 0.9525760000000001,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 0,
+          "canonicalModel": "claude-opus-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      }
+    },
+    {
+      "skill": "adversarial-review",
+      "timestamp": "2026-10-06T02:02:15.365551+00:00",
+      "status": "unavailable",
+      "source": "outside-unavailable",
+      "host": "codex",
+      "outside_provider": "claude-code",
+      "outside_status": "unavailable",
+      "phase": "structured",
+      "tier": "always",
+      "gate": "informational",
+      "commit": "46c39ab",
+      "completed": false,
+      "converged": false
+    },
+    {
+      "skill": "review",
+      "timestamp": "2026-10-06T02:02:15.365551+00:00",
+      "status": "clean",
+      "issues_found": 0,
+      "critical": 0,
+      "informational": 0,
+      "quality_score": 10,
+      "specialists": {},
+      "findings": [
+        {
+          "fingerprint": "apps/api/src/content-intake/reviewer.ts:40:time-window",
+          "severity": "CRITICAL",
+          "action": "fixed"
+        },
+        {
+          "fingerprint": "apps/api/src/content-intake/reviewer.ts:41:commit-authority",
+          "severity": "CRITICAL",
+          "action": "fixed"
+        },
+        {
+          "fingerprint": "apps/api/src/content-intake/approval-adapter.ts:45:lint",
+          "severity": "INFORMATIONAL",
+          "action": "auto-fixed"
+        }
+      ],
+      "commit": "46c39ab",
+      "completed": true,
+      "converged": true,
+      "cycles": 1
+    }
+  ],
+  "nativeFirstAttempt": "FIXABLE P1: reviewer.ts millisecond history guards omit principal facts and natural expiration. INVESTIGATE P1: grant/role recorded_at is an in-transaction time, not proof of committed authority. Full non-test source reviewed; tests summary only. Recommendation: fix the millisecond eligibility gap and investigate commit-time ordering before commit because historical approval eligibility is not yet reliably bounded in time.\n",
+  "nativeFinalAttempt": "NO_FINDINGS。已完整只读复核 46c39ab 后本轮非测试源码及新增模块，未发现剩余可由当前接口触发的具体缺陷。\n\n毫秒完整区间、审核包检查点与角色/grant 历史提交约束已闭合此前问题。\n原 UUID/永久回执恢复、取消与换证据竞争、撤回终态及继承 release 传播保持一致。\n组织事实写入器尚未接入；真实同步的事实真实性与提交时序仍属于后续验收条件。\n\n测试覆盖缩减为 SUMMARY/stat，未读取测试 payload、未执行测试或修改文件。复用父级报告的 36/36（31 PG＋5 材料）及全仓四项 PASS；未宣称重审全部历史基线。\n\nRecommendation: accept this synthetic approval-evidence slice because the two prior defects are closed and no remaining actionable finding was identified within the reviewed scope.\n",
+  "outside": {
+    "adversarial-result.json": {
+      "status": "unavailable",
+      "provider": "claude-code",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "exit_code": null
+    },
+    "structured-result.json": {
+      "status": "unavailable",
+      "provider": "claude-code",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "exit_code": null
+    },
+    "adversarial-r2-result.json": {
+      "status": "completed",
+      "provider": "claude-code",
+      "result": "## 范围与覆盖缩减\n\n只审本切片：来源确认、不可变审核包、严格合成人工证据、历史资格、readiness、撤回传播。不把 `46c39ab` 及更早事务证据当成整支新审查。测试源码未读，仅用摘要排除已覆盖回归（含毫秒区间、grant 未提交 PASS、撤权不复活、UUID 恢复、附件 SHA 等）；覆盖因此降为「实现对照 + 已声明 36/36 PASS」，不是测试证据复审。无生产路由 / 飞书原生 transport / ACL / P2 发布。Frozen DDL 未改。\n\n## 检查点设计（不默许）\n\n`historicalReviewer` 用审核包 `objects.received_at`（同一 `lock_content()` 临界区）约束 **role 最新事件** 与 **grant v1 `recorded_at`**，再用 `[T,T+1ms)` 覆盖 facts/role/grant 变迁与过期。这证明的是「资格写入已提交」，不是把 `grant_history.recorded_at` 当成提交时刻。\n\n在本切片内成立：`createGrants` / `changeGrant` / 审核包登记都先拿同一把内容锁；未提交行在 READ COMMITTED 下不可见；后取得的资格必须换新审核实例。恢复路径是替换审核，而不是把新 grant 倒算进旧 PASS。残留条件已写明：未来组织同步若绕开 `lock_content()` 直写 `role_rules`/`grants`，证明失效——当前无该写入器，应用角色也无 schema 权限。\n\n轮询时 `checkedAt` 取 prepare 时钟且 DDL 要求 `decided_at<=checked_at`，可能导致「PASS 落在本次 observe 窗口内」的第一次 refresh 失败；失败闭、重试可过，不构成误授。孤儿包 / creating 卡住 / 配额只计已登记对象均为已文档化的容量与恢复限制，不是静默成功。\n\n## NO_FINDINGS\n\n未发现可达到的授权绕过、TOCTOU 误授、撤回复活、附件/绑定伪造被接受，或把 provider 失败当成已批准。Adapter 对路由/表单/任务/单条 PASS/字节与 SHA 失败闭合；`refreshReview` 对 facts 代际与 `revocationGeneration` CAS；revoked 在视图与 readiness 上粘滞，且同事务写入 `release_revocations`（含共享 `review_request_id` 的继承 lineage）。Readiness 是当前投影，不续期、不代替发布锁内复检。\n\nRecommendation: accept because lock-ordered package checkpoint plus [T,T+1ms) history checks close the recorded_at/commit gap without false-accept, and remaining residuals are documented future lock discipline rather than reachable synthetic-slice bypasses.",
+      "session_id": "5aa8befa-244f-4d1d-bb88-702ed200cc16",
+      "usage": {
+        "input_tokens": 50974,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 512,
+        "output_tokens": 27898,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "",
+        "iterations": [],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5": {
+          "inputTokens": 50974,
+          "outputTokens": 27898,
+          "cacheReadInputTokens": 512,
+          "cacheCreationInputTokens": 0,
+          "webSearchRequests": 0,
+          "costUSD": 0.9525760000000001,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 0,
+          "canonicalModel": "claude-opus-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      },
+      "exit_code": 0
+    },
+    "structured-r2-result.json": {
+      "status": "unavailable",
+      "provider": "claude-code",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "exit_code": null
+    }
+  },
+  "baseRefresh": {
+    "initialOriginMain": "8ab309fcd9c494b7343ed88bacb253205d36575f",
+    "finalAttempt": "network timeout",
+    "scopeBase": "46c39ab412345791c7aff0c7f634529c0885cb91",
+    "delivery": "local commit only"
+  }
+}
