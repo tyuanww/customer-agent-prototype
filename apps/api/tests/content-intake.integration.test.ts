@@ -143,6 +143,162 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     ({ operationId:op,key:c.key,expectedEvidenceVersion:expected });
   const refresh = (c: C['IntakeCandidate'], op = 'refresh-one', expected = 1) => service.refreshReview(actor('other'),reviewRequest(c,expected,op));
 
+  async function grantQuerySources(ids: string[]) {
+    for (const id of ids) {
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+        SELECT 'root-discovery-'||source_id,'allocation','director','director','tenant-a','app-a',scope_id,'query',
+          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成发现根范围','director'
+        FROM content_intake.sources WHERE source_id=$1`,[id]);
+      const req=batch('agent','query','business',`discover-grant-${id}`);
+      req.items[0]!.scope={...scope,sourceId:id,shopId:id==='source-brand'?null:'shop-b'};
+      value(await service.grantBatch(actor('director'),req));
+    }
+  }
+
+  it('discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants', async () => {
+    const user=(await seat()).actor;
+    const first=value(await service.authorizations(user,{}));
+    expect(first.capabilities.map(c=>[c.scope.sourceId,c.actions,c.mayAllocate,c.mayDelegate])).toEqual([['source-a',['query'],[],[]]]);
+    expect(value(await service.sources(user,{})).items.map(s=>s.scope.sourceId)).toEqual(['source-a']);
+    await grantQuerySources(['source-b','source-brand']);
+    await admin.query(`BEGIN;
+      INSERT INTO content_intake.scopes VALUES ('other-scope','other-tenant','other-app','other-brand','other-shop','product');
+      INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version) VALUES ('other-source','other-scope',1);
+      INSERT INTO content_intake.source_mappings VALUES ('other-source',1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64)); COMMIT`);
+    const current=value(await service.authorizations(user,{}));
+    expect(current.capabilities.map(c=>c.scope.shopId)).toEqual(['shop-a','shop-b',null]);
+    expect(value(await service.sources(user,{})).items.map(s=>s.scope.sourceId)).toEqual(['source-a','source-b','source-brand']);
+    for (const invalid of [actor('agent'),{...user}]) {
+      expect(await service.authorizations(invalid,{})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+      expect(await service.sources(invalid,{})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+    }
+    await auth!.logout((await seat()).token);
+    expect(await service.authorizations(user,{})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+  });
+
+  it('discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation', async () => {
+    const director=value(await service.authorizations((await seat('director')).actor,{})).capabilities[0]!;
+    expect(director.actions).toEqual([]);expect(director.mayAllocate).toHaveLength(8);expect(director.mayDelegate).toHaveLength(8);
+    value(await service.grantBatch(actor('director'),batch('agent','publish','delegation','discovery-delegation')));
+    const agent=value(await service.authorizations((await seat()).actor,{})).capabilities[0]!;
+    expect(agent.actions).toEqual(['query']);expect(agent.mayAllocate).toEqual(['publish']);expect(agent.mayDelegate).toEqual([]);
+    expect(await service.authorization((await seat()).actor,'source-a','publish')).toMatchObject({ok:false});
+    expect(value(await service.authorizations((await seat('supervisor')).actor,{})).capabilities).toEqual([]);
+  });
+
+  it('discovery: signs paging to a live session, route, complete projection and service lifetime', async () => {
+    await grantQuerySources(['source-b','source-brand']);
+    const user=(await seat()).actor;
+    const first=value(await service.authorizations(user,{limit:1}));expect(first.nextCursor).not.toBeNull();
+    expect(value(await service.authorizations(user,{limit:1,cursor:first.nextCursor})).capabilities[0]!.scope.sourceId).toBe('source-b');
+    const sourcePage=value(await service.sources(user,{limit:1}));
+    expect(await service.sources(user,{cursor:first.nextCursor})).toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
+    expect(await service.authorizations((await seat('agent','second')).actor,{cursor:first.nextCursor})).toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
+    expect(await evidenceService().authorizations(user,{cursor:first.nextCursor})).toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
+    expect(await service.authorizations(user,{cursor:first.nextCursor!.replace(/^./,c=>c==='a'?'b':'a')})).toMatchObject({ok:false});
+    await admin.query("UPDATE content_intake.sources SET mode='legacy',mode_version=mode_version+1 WHERE source_id='source-b'");
+    expect(await service.sources(user,{cursor:sourcePage.nextCursor})).toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
+    const current=value(await service.authorizations(user,{limit:1}));
+    value(await service.changeGrant(actor('director'),'business-agent-query',{operationId:'discovery-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));
+    expect(await service.authorizations(user,{cursor:current.nextCursor})).toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
+  });
+
+  it('discovery: handles zero scope, conflicting role, expired facts and strict query shapes without inventing access', async () => {
+    const user=(await seat('supervisor')).actor;
+    expect(value(await service.authorizations(user,{})).capabilities).toEqual([]);
+    expect(value(await service.sources(user,{})).items).toEqual([]);
+    for (const raw of [null,[],{limit:null},{limit:0},{limit:101},{limit:'1'},{limit:[1,2]},{cursor:''},{cursor:'x'.repeat(513)},{userId:'agent'},{shopId:'shop-a'}]) {
+      expect(await service.authorizations(user,raw)).toMatchObject({ok:false,code:'VALIDATION'});
+      expect(await service.sources(user,raw)).toMatchObject({ok:false,code:'VALIDATION'});
+    }
+    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-agent',1,'agent') ON CONFLICT DO NOTHING");
+    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-b','job-agent',1,'enabler')");
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a','dept-b'],'job-agent',true,
+      clock_timestamp(),clock_timestamp()+interval '1 minute',repeat('b',64)); UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='agent'`);
+    expect(value(await service.authorizations((await seat()).actor,{})).capabilities).toEqual([]);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',3,ARRAY['dept-a'],'job-agent',true,
+      clock_timestamp()-interval '2 minutes',clock_timestamp()-interval '1 minute',repeat('c',64)); UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='agent'`);
+    expect(await service.sources((await seat()).actor,{})).toMatchObject({ok:false,reason:'ORG_FACTS_UNAVAILABLE'});
+  });
+
+  it('discovery: pages more than 100 authorized sources with no loss and rejects a logged-out cursor', async () => {
+    await admin.query(`BEGIN;
+      INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
+        SELECT 'page-'||lpad(i::text,3,'0'),'scope-a',1,'v2-preview' FROM generate_series(1,101) i;
+      INSERT INTO content_intake.source_mappings SELECT source_id,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64)
+        FROM content_intake.sources WHERE source_id LIKE 'page-%'; COMMIT`);
+    const req=batch('agent','query','business','discovery-whole-scope');req.items[0]!.scope={...scope,sourceId:null};
+    value(await service.grantBatch(actor('director'),req));
+    const user=(await seat()).actor;
+    const first=value(await service.sources(user,{limit:100}));expect(first.items).toHaveLength(100);
+    const second=value(await service.sources(user,{cursor:first.nextCursor}));expect(second.items).toHaveLength(2);expect(second.nextCursor).toBeNull();
+    expect(new Set([...first.items,...second.items].map(s=>s.scope.sourceId)).size).toBe(102);
+    await auth!.logout((await seat()).token);
+    expect(await service.sources(user,{cursor:first.nextCursor})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
+  });
+
+  it('discovery: folds 5000 overlapping grants without changing effective authority or exceeding the SQL deadline', async () => {
+    await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+      SELECT 'overlap-'||i,'business','director','agent','tenant-a','app-a','scope-a','source-a','query',
+        clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成重叠授权','director','root-query'
+      FROM generate_series(1,5000) i;
+      ANALYZE content_intake.grants`);
+    const user = (await seat()).actor, started = performance.now();
+    const rights = value(await service.authorizations(user,{}));
+    expect(rights.capabilities).toHaveLength(1);
+    expect(rights.capabilities[0]).toMatchObject({scope,actions:['query'],mayAllocate:[],mayDelegate:[]});
+    expect(value(await service.sources(user,{})).items.map(s => s.scope.sourceId)).toEqual(['source-a']);
+    expect(await service.authorization(user,'source-a','query')).toMatchObject({ok:true});
+    expect(await service.authorization(user,'source-a','publish')).toMatchObject({ok:false});
+    console.log(JSON.stringify({probe:'discovery-overlap',additionalGrants:5000,elapsedMs:Math.round(performance.now()-started)}));
+  });
+
+  it('discovery: completes the 5000-source menu through real HTTP and Main before authority expires', async () => {
+    await admin.query(`BEGIN;
+      INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
+        SELECT 'capacity-'||lpad(i::text,4,'0'),'scope-a',1,'v2-preview' FROM generate_series(1,4999) i;
+      INSERT INTO content_intake.source_mappings SELECT source_id,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64)
+        FROM content_intake.sources WHERE source_id LIKE 'capacity-%';
+      INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+        SELECT 'grant-'||source_id,'business','director','agent','tenant-a','app-a','scope-a',source_id,'query',
+          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成独立来源授权','director','root-query'
+        FROM content_intake.sources WHERE source_id LIKE 'capacity-%'; COMMIT;
+      ANALYZE content_intake.sources; ANALYZE content_intake.source_mappings; ANALYZE content_intake.grants`);
+    const logged = await seat();
+    const server = Fastify({logger:false,exposeHeadRoutes:false});
+    let pages = 0, child: ReturnType<typeof spawn> | undefined, ended: Promise<unknown[]> | undefined;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      server.get('/v1/auth/me', async (request,reply) => (await authenticateRequestHeaders(auth!,request.headers)) ?? reply.code(401).send());
+      server.addHook('onResponse', async request => { if(request.url.startsWith('/v1/intake/')) pages++; });
+      await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:service});
+      const origin = await server.listen({port:0,host:'127.0.0.1'});
+      child = spawn(process.execPath,[fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs',import.meta.url))],{stdio:['pipe','pipe','pipe']});
+      ended = once(child,'close'); let stdout = '', stderr = '';
+      const collect = (chunk: Buffer, error = false) => {
+        if(stdout.length + stderr.length > 1_048_576) { child?.kill('SIGKILL'); return; }
+        if(error) stderr += String(chunk); else stdout += String(chunk);
+      };
+      child.stdout!.on('data',collect); child.stderr!.on('data',chunk => collect(chunk,true));
+      timeout = setTimeout(() => child?.kill('SIGTERM'),120_000);
+      const started = performance.now();
+      child.stdin!.end(JSON.stringify({origin,token:logged.token,expiresAt:logged.expiresAt,releaseId:'',discoverySources:5000}));
+      expect((await ended)[0],stderr).toBe(0);
+      expect(JSON.parse(stdout)).toEqual({status:'PASS',actualSession:true,discovery:true,sourceCount:5000});
+      expect(pages).toBe(150);
+      expect(stdout + stderr).not.toContain(logged.token);
+      console.log(JSON.stringify({probe:'discovery-capacity',sources:5000,pages,elapsedMs:Math.round(performance.now()-started)}));
+    } finally {
+      clearTimeout(timeout);
+      if(child && ended) {
+        const kill = setTimeout(() => child?.kill('SIGKILL'),2000);
+        if(child.exitCode===null) child.kill('SIGTERM');
+        try { await ended; } finally { clearTimeout(kill); }
+      }
+      await server.close();
+    }
+  },150_000);
+
   // A consumer probe, not a production bridge: synthetic legacy batch/lease only.
   // No staging, native review-to-owner conversion, publication or mode activation.
   async function freezeQualityProbe(p: IntakeQualityPreview, label = 'one') {
@@ -373,6 +529,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         return reply.code(204).send();
       });
       await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:{
+        authorizations:service.authorizations,sources:service.sources,
         issueEntitlement:async(current,body)=>{
           if(expireNext) {
             await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
@@ -434,7 +591,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       timeout=setTimeout(()=>child?.kill('SIGTERM'),45_000);
       child.stdin!.end(JSON.stringify({origin,token:logged.token,expiresAt:logged.expiresAt,releaseId:release.releaseId}));
       expect((await ended)[0],stderr).toBe(0);
-      expect(JSON.parse(stdout)).toEqual({status:'PASS',actualSession:true,largePage:true,cancellation:true,
+      expect(JSON.parse(stdout)).toEqual({status:'PASS',actualSession:true,discovery:true,largePage:true,cancellation:true,
         publishedText:true,localExpiry:true,normalUpdate:true,revocationFanout:true});
       expect(stdout+stderr).not.toContain(logged.token);expect(stdout+stderr).not.toContain(digest(logged.token));
     } finally {

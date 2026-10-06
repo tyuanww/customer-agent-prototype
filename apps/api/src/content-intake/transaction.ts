@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { ContractValidationError, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
+import { authenticatedProductSession } from '../product-auth-service.js';
 import { canonicalJson, type CanonicalJsonValue } from '../idempotency.js';
 
 export type Reason = components['schemas']['IntakeFailure']['details']['reason'];
@@ -24,6 +25,21 @@ export type Principal = {
   factsVersion: number; generation: number; enabled: boolean; checkedAt: number; validUntil: number;
   role: 'agent' | 'enabler' | 'lead' | 'supervisor' | 'manager' | 'director' | null;
 };
+
+/** Lock the authentication module's private session reference until this read or
+ * write commits. An actor-shaped DTO, including a clone, is not a session. */
+export async function lockProductSession(client: IntakeTransaction, actor: AuthenticatedUser): Promise<{hash: string; validUntil: number}> {
+  const hash = authenticatedProductSession(actor);
+  if (!hash) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+  const result = await client.query<{ expires_at: Date }>(`SELECT s.expires_at
+    FROM backend_identity.sessions s JOIN backend_identity.subject_bindings b USING(binding_id)
+    WHERE s.token_hash=$1 AND b.user_id=$2 AND b.enabled AND s.revoked_at IS NULL
+      AND s.expires_at>clock_timestamp() FOR SHARE OF s,b`, [hash, actor.user_id]);
+  if (!result.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+  const validUntil = result.rows[0].expires_at.getTime();
+  client.validUntil(validUntil);
+  return { hash, validUntil };
+}
 
 export async function clock(client: Queryable): Promise<number> {
   const { rows } = await client.query<{ time: Date }>('SELECT clock_timestamp() AS time');

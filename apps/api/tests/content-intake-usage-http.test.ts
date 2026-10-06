@@ -18,10 +18,14 @@ async function host(result: IntakeResult<C['IntakeEntitlement']> = { ok: true, v
   const issueEntitlement = vi.fn(async () => result);
   const snapshot = vi.fn(async (): Promise<IntakeResult<C['IntakeSnapshot']>> => ({ ok: false,
     code: 'VALIDATION', reason: 'FILE_INVALID', commit: 'rolled_back', diagnosticId: 'synthetic-diagnostic' }));
+  const authorizations = vi.fn(async (): Promise<IntakeResult<C['IntakeAuthorization']>> => ({ ok: true, value: {
+    factsVersion: 1, revocationGeneration: 0, policyVersion: 1, validUntil: new Date(Date.now()+60_000).toISOString(), capabilities: [], nextCursor: null,
+  } }));
+  const sources = vi.fn(async (): Promise<IntakeResult<C['IntakeSourceList']>> => ({ ok: true, value: { items: [], nextCursor: null } }));
   const report = vi.fn();
   const app = Fastify({ logger: false, exposeHeadRoutes: false }); apps.push(app);
-  await app.register(contentIntakeUsageRoutes, { auth, usage: { issueEntitlement, snapshot }, report });
-  return { app, auth, issueEntitlement, snapshot, report };
+  await app.register(contentIntakeUsageRoutes, { auth, usage: { issueEntitlement, snapshot, authorizations, sources }, report });
+  return { app, auth, issueEntitlement, snapshot, authorizations, sources, report };
 }
 const headers = { authorization: 'Bearer synthetic-token' };
 
@@ -84,3 +88,18 @@ it('rejects extra POST query parameters rather than silently dropping them', asy
   expect(response.statusCode).toBe(400); expect(validateContractSchema('IntakeError', response.json()).ok).toBe(true);
   expect(f.issueEntitlement).not.toHaveBeenCalled();
 });
+
+
+it.each([['authorization', 'authorizations', 'IntakeAuthorization'], ['sources', 'sources', 'IntakeSourceList']] as const)(
+  'serves the sealed %s list with the same authenticated identity and strict query handoff', async (route, method, schema) => {
+    const f = await host();
+    expect((await f.app.inject({ url: `/v1/intake/${route}` })).statusCode).toBe(401);
+    expect(f[method]).not.toHaveBeenCalled();
+    const response = await f.app.inject({ url: `/v1/intake/${route}?limit=1&cursor=test`, headers });
+    expect(response.statusCode).toBe(200); expect(response.headers['cache-control']).toBe('no-store');
+    expect(validateContractSchema(schema, response.json()).ok).toBe(true);
+    expect((f[method].mock.calls as unknown[][])[0]).toEqual([actor, { limit: 1, cursor: 'test' }]);
+    await f.app.inject({ url: `/v1/intake/${route}?limit=1&limit=2&userId=spoof`, headers });
+    expect((f[method].mock.calls as unknown[][])[1]).toEqual([actor, { limit: ['1', '2'], userId: 'spoof' }]);
+    expect((await f.app.inject({ method: 'HEAD', url: `/v1/intake/${route}`, headers })).statusCode).toBe(404);
+  });

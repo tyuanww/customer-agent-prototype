@@ -1,9 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
-import { authenticatedProductSession } from '../product-auth-service.js';
 import { canonical, digest, SNAPSHOT_VOCABULARY_LIMIT, snapshotVocabularyKeys } from './material.js';
-import { clock, createIntakeTransactions, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
+import { clock, createIntakeTransactions, lockProductSession, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
 /** Immutable server-owned context, reconstructed from storage for every page.
@@ -16,19 +15,6 @@ type ScopeRow = { source_id: string; scope: C['IntakeSourceScope']; generation: 
 type Lease = { entitlement_hash: string; release_id: string; shop_id: string; context_generation: string;
   principal_generation: string; issued_at: Date; valid_until: Date; expires_at: Date; client_id: string; source_binding_hash: string;
   product_ids: string[]; scenario_ids: string[] };
-
-async function session(client: IntakeTransaction, actor: AuthenticatedUser): Promise<{hash: string; validUntil: number}> {
-  const hash = authenticatedProductSession(actor);
-  if (!hash) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
-  const result = await client.query<{ expires_at: Date }>(`SELECT s.expires_at
-    FROM backend_identity.sessions s JOIN backend_identity.subject_bindings b USING(binding_id)
-    WHERE s.token_hash=$1 AND b.user_id=$2 AND b.enabled AND s.revoked_at IS NULL
-      AND s.expires_at>clock_timestamp() FOR SHARE OF s,b`, [hash, actor.user_id]);
-  if (!result.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
-  const validUntil=result.rows[0].expires_at.getTime();
-  client.validUntil(validUntil);
-  return {hash,validUntil};
-}
 
 async function validateSelection(client: IntakeTransaction, ctx: IntakeUsageContext, scopes: ScopeRow[]) {
   const selected = [...ctx.productIds.map(id => ({id,kind:'product'})), ...ctx.scenarioIds.map(id => ({id,kind:'scenario'}))];
@@ -160,7 +146,7 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
     issueEntitlement(actor: AuthenticatedUser, raw: unknown) {
       return run(actor,'entitlement',null,null,async (client,who) => {
         const req=parseContractSchema('IntakeEntitlementRequest',raw);
-        const {hash:sessionTokenHash,validUntil:sessionUntil}=await session(client,actor);
+        const {hash:sessionTokenHash,validUntil:sessionUntil}=await lockProductSession(client,actor);
         const ctx: IntakeUsageContext={sessionTokenHash,shopId:req.shopId,contextGeneration:req.contextGeneration,
           productIds:[...req.productIds].sort(),scenarioIds:[...req.scenarioIds].sort()};
         await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
@@ -197,7 +183,7 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
     },
     snapshot(actor: AuthenticatedUser, raw: unknown) {
       return run(actor,'snapshot',null,null,async (client,who) => {
-        const req=page(raw), hash=digest(req.entitlementId), {hash:sessionTokenHash}=await session(client,actor);
+        const req=page(raw), hash=digest(req.entitlementId), {hash:sessionTokenHash}=await lockProductSession(client,actor);
         const leases=await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash,c.product_ids,c.scenario_ids
           FROM content_intake.entitlements e JOIN public.snapshot_offline_leases l USING(lease_token_hash)
           JOIN content_intake.entitlement_contexts c USING(entitlement_hash)
