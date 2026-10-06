@@ -1,0 +1,110 @@
+{
+  "total_files": 17,
+  "reviewed_files": 17,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "files": [
+    {
+      "path": "apps/api/src/content-intake/material.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/src/content-intake/publication.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/checks.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/evidence.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/exploration-002.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/inputs.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/ocr-coverage.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/review.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/README.md",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/charter.md",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    }
+  ]
+}

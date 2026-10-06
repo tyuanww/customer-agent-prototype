@@ -118,4 +118,10 @@ P2 的结果是合成 FAQ 文件经过服务端复算、持久候选、合成人
 
 **剩余正式合同差集：** `/v1/intake/snapshot` 只有 entitlementId/cursor/limit，`IntakeEntitlementRequest` 只有 shopId/contextGeneration/releaseId；未定义商品/场景选择传输和服务器会话上下文所有权。当前选择由受控合成 adapter 注入并绑定，不冒充正式 HTTP 已实现。下一阶段先准备这部分所属仓版本化变更及 Main 使用资格/当前店 adapter；显式 family 冲突证明、旧内容认领/初始基线、生产 ACL/HTTP、真实 transport 与 Windows 桌面现场链各有未完成条件。该目录模块不等于完整 FAQ 界面闭环。
 
+### 下一阶段入场与验收
+
+正式接线前准备所属仓变更提案（此处不批准或修改 frozen snapshot）：优先把规范化 productIds/scenarioIds 放入资格申请，由 API 绑定认证会话并持久保存选择，后续 snapshot 仅消费资格；不要求每页重传身份或让 renderer 决定授权。与另建全局“当前选择”服务相比，该方案减少可变状态和竞态；Main 仍拥有本地当前店及回调代际，换店立即撤销原结果动作。具体 wire 字段、会话绑定及 DB 存储由所属仓评审/版本化后 intake。
+
+同时协调单条引用总量与 vocabulary 页预算：保持现行 100 上限并明确单条准入，或经版本化调整响应预算；不能只扩大一端。批准后验收至少包括：两个独立产品会话完整“上传→校验→飞书人工审核→发布→分页 hydrate→按店检索”；跨店与会话重启；断网至原截止、撤权/审批撤销的 Main 独立扇出；空目录替换与同店普通更新；Mac 和 Windows 原生客户端分别验证 preload/sandbox、窗口及复制。WSL 只覆盖后端，不作为后两项证据。
+
 现场资料 B 最新版/维护人、真实租户组织字段/人工节点/附件保真属于后续真实验证；本轮未读取真实资料、员工信息或凭据，未 push、PR、merge、deploy，也未启用 v2-active。

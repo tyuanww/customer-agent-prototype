@@ -309,7 +309,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query("UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='agent'");
     const ent=value(await issue());
     await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',3,ARRAY['dept-a'],'job-agent',true,
-      clock_timestamp(),clock_timestamp()+interval '5 minutes',repeat('c',64))`);
+      statement_timestamp(),statement_timestamp()+interval '5 minutes',repeat('c',64))`);
     await admin.query("UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='agent'");
     const slow={async connect() {const client=await pool.connect();return new Proxy(client,{get(target,key) {
       if (key==='query') return async(sql:string,args?:unknown[])=>{
@@ -569,7 +569,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     // Append an intentionally old, otherwise valid observation. It is still
     // inside the five-minute approval cache but outside the one-minute ticket.
     await admin.query(`INSERT INTO content_intake.approval_facts SELECT review_request_id,facts_version+1,revocation_generation,state,
-      clock_timestamp()-interval '61 seconds',clock_timestamp()+interval '239 seconds',raw_facts_digest,package_verified_sha256,
+      statement_timestamp()-interval '61 seconds',statement_timestamp()+interval '239 seconds',raw_facts_digest,package_verified_sha256,
       human_task_id,reviewer_id,reviewer_facts_version,decided_at-interval '62 seconds'
       FROM content_intake.approval_facts WHERE review_request_id=$1 ORDER BY facts_version DESC LIMIT 1`,[fresh.reviewRequestId]);
     await admin.query('UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id=$1',[fresh.reviewRequestId]);
