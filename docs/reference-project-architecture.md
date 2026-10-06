@@ -87,6 +87,9 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
 | `docs/`、`evidence/qa/` | 可读合同、教程、验证方法和冻结证据 | 可执行源码、运行时缓存 |
 
+产品迁移 `0022_intake_legacy_fence` 在既有数据库发布入口内拥有旧整域写影响集、统一首锁及目录/谱系继承；API 不自行复制该判断。内部 helper 只供现有 definer，应用 schema 继续封闭。边界与验证见[资料导入开发说明](how-to-develop-content-intake.md#p2-旧发布入口共存门)。
+
+
 ### 依赖方向门
 
 `pnpm check:architecture` 读取源码和 workspace 的 package 依赖，不启动应用，也不改运行时行为。失败时退出码非零，并打印文件、规则和修复方向。别名只认 `apps/desktop/tsconfig.json` 的 `paths`（与桌面 bundler 使用的是同一张表）。

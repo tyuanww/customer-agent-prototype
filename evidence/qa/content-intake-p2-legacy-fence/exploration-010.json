@@ -1,0 +1,34 @@
+{
+  "observationCapture": "009",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/source-bypass.mjs"
+  ],
+  "observed": {
+    "rejection": null,
+    "actual": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "revisions": 1,
+    "hashes": [
+      {
+        "proname": "advance_source_snapshots",
+        "sha256": "dd7f9f859ade82e0b746adc151996415bb0effc481fa8175ba39398ab15a6096"
+      },
+      {
+        "proname": "restore_source_snapshots",
+        "sha256": "cf09f5d33725bbf344725d11993c4a2b98c58cadc286a82d38b35ff9493a4755"
+      }
+    ]
+  },
+  "hypothesis": "Replay the same native command and initial fixture to confirm active-source mutation persists before any repair.",
+  "nextCapture": "010",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/source-bypass.mjs"
+  ]
+}

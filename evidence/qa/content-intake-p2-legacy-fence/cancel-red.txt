@@ -1,0 +1,50 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api
+
+ ❯ tests/content-import.integration.test.ts (14 tests | 1 failed | 13 skipped) 952ms
+   ↓ persistent content import receive > returns 202 only after durable persist and enqueue commit, then serves status and cancel
+   ↓ persistent content import receive > refuses a cancel sweep with nothing in flight instead of reporting a phantom success
+   ↓ persistent content import receive > still cancels a real in-flight batch through the sentinel and audits it once
+   ↓ persistent content import receive > rolls the idempotency claim back with the empty sweep instead of leasing the key
+   ↓ persistent content import receive > keeps the sweep honest when a different actor enqueues while this actor sweeps
+   × persistent content import receive > serializes actor cancellation and upload on the same first lock without taking the admission lock early 951ms
+     → expected 1 to be +0 // Object.is equality
+   ↓ persistent content import receive > waits on the enqueue lock so a concurrent enqueue cannot slip past the sweep
+   ↓ persistent content import receive > refuses the sweep for an actor with nothing in flight without touching another actor batch
+   ↓ persistent content import receive > refuses the cancel sweep for an agent instead of reporting an empty sweep
+   ↓ persistent content import receive > accepts a declared XLSX payload after persist and digest verification
+   ↓ persistent content import receive > rejects oversized, truncated, unauthenticated, agent, and Feishu JSON uploads without creating a batch
+   ↓ persistent content import receive > audits ineligible and mismatched sources after rolling back enqueue
+   ↓ persistent content import receive > reclaims the object after a known database enqueue failure
+   ↓ persistent content import receive > replays the same idempotency key and rejects a different body
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/content-import.integration.test.ts > persistent content import receive > serializes actor cancellation and upload on the same first lock without taking the admission lock early
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ tests/content-import.integration.test.ts:372:158
+    370|       void pending[1].then(() => undefined);
+    371|       await waitForContentWaiters(2);
+    372|       expect((await admin.query("SELECT count(*)::int AS n FROM pg_loc…
+       |                                                                                                                                                              ^
+    373|       await holder.query('COMMIT');
+    374|       const [cancelled, uploaded] = await Promise.all(pending);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  10:51:08
+   Duration  1.40s (transform 176ms, setup 0ms, collect 297ms, tests 952ms, environment 0ms, prepare 27ms)
+
+undefined
+/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/content-import.integration.test.ts -t 'serializes actor cancellation'

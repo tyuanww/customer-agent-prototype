@@ -1,0 +1,94 @@
+{
+  "observationCapture": "003",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/inspect.mjs"
+  ],
+  "observed": {
+    "status": "PASS",
+    "installed": [
+      "0001_extensions",
+      "0002_identity_and_content",
+      "0003_events_and_metrics",
+      "0004_import_release_announce",
+      "0005_idempotency_rate_limit_outbox",
+      "0006_definer_functions_and_triggers",
+      "0007_search_bigram",
+      "0008_runtime_acl",
+      "0009_phase1_policy_seed",
+      "0010_search_projection_v1_13",
+      "0011_search_no_hit_context_v1_14",
+      "0012_owner_acceptance_v1_15",
+      "0013_backend_identity_content_v1_16",
+      "0014_release_deferred_guard_v1_17",
+      "0015_ops_loop_v1_18",
+      "0016_office_owner_publish",
+      "0017_rollback_previous_target",
+      "0018_owner_read_views",
+      "0019_candidate_client_snapshot",
+      "0020_coach_publish_v1_19",
+      "0021_content_intake_v1_20",
+      "0022_intake_legacy_fence"
+    ],
+    "verification": {
+      "status": "PASS",
+      "migrationCount": 22,
+      "inventory": {
+        "tables": 81,
+        "views": 7,
+        "functions": 211,
+        "pgcrypto": "1.3",
+        "pgTrgm": "1.6"
+      },
+      "capabilityRoles": {
+        "total": 10,
+        "safe": 10,
+        "memberships": 0
+      },
+      "acl": {
+        "runtimeReleaseItemsRead": false,
+        "runtimeBackingViewRead": false,
+        "runtimeControlledSearchExecute": true,
+        "publicLedgerSchemaUsage": false,
+        "publicLedgerRead": false
+      },
+      "phase1PolicyHardOff": true,
+      "compatibility": {
+        "current": "N",
+        "priorSignedBaseline": {
+          "contractSetId": "cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c",
+          "sourceGitSha": "1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38",
+          "sourceSchemaSha256": "47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801",
+          "migrationCount": 9
+        },
+        "priorUpgrade": "SUPPORTED · immutable 9-migration baseline → 13-migration current suffix"
+      }
+    },
+    "deniedHelpers": [
+      "app_content_admin",
+      "app_runtime",
+      "app_backend_review"
+    ],
+    "releaseCount": 0
+  },
+  "hypothesis": "Installation and sealed helper access pass. Exercise the real API producer and database consumer for disjoint catalog inheritance and a forced post-write failure.",
+  "nextCapture": "004",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-release.integration.test.ts",
+    "-t",
+    "inherits the catalog|inheritance cannot complete"
+  ]
+}

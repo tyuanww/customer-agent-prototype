@@ -1,0 +1,34 @@
+{
+  "observationCapture": "011",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/source-bypass.mjs"
+  ],
+  "observed": {
+    "rejection": "ZA003",
+    "actual": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "revisions": 0,
+    "hashes": [
+      {
+        "proname": "advance_source_snapshots",
+        "sha256": "5a7423426c85eb7cdd1c697d0f037b0775f52761fef2ce07da2bd7bc42ac2df7"
+      },
+      {
+        "proname": "restore_source_snapshots",
+        "sha256": "b03a5e8bb19db8a50ddc7148bd835b8d8c830b4c66ec61778f67464764f56b6e"
+      }
+    ]
+  },
+  "hypothesis": "Snapshot refusal now passes; revalidate the final migration manifest and application denial after the cancellation lock-order repair changed installed function bodies.",
+  "nextCapture": "012",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/inspect.mjs"
+  ]
+}

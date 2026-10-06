@@ -54,7 +54,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 
 此处比较过两种边界：为全部授权写入器增加提交后见证，以及复用现有审核包检查点。后者不新增冻结合同字段或写入生命周期，当前封闭执行器可直接验证；代价是资格晚于审核包时必须重开审批。该证明依赖所有资格写入器遵守 `lock_content()`，真实组织同步接入时必须一并验证，不得绕过锁直接写表。
 
-`ready` 不是发布回执。尚未实现 P2 原子发布、短票据、质量/负责人承接映射、旧写 fence、使用资格和桌面接线；应用角色仍无新 schema 权限。后续发布必须在锁内重新验证全部门，不能信任早先 GET 或幂等回执里的 readiness。详细证据见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。
+`ready` 不是发布回执。尚未实现 P2 原子发布、短票据、质量/负责人承接映射、使用资格和桌面接线；旧写 fence 见下方共存门，应用角色仍无新 schema 权限。后续发布必须在锁内重新验证全部门，不能信任早先 GET 或幂等回执里的 readiness。详细证据见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。
 
 ## P1 测量含义与未验证范围
 
@@ -71,3 +71,20 @@ P1 探针本身未验证：CSV 规范入口、SOP 图与媒体导入、商品/�
 P2 已覆盖的词项、版本、候选与 PG 场景见[事务验收](../evidence/qa/content-intake-p2-transactions/README.md)，不沿用 P1 的零数据库查询结论。
 
 实际运行结果链接由[执行计划 §0](plans/2026-10-03-content-intake-requirements.md)维护。
+
+## P2 旧发布入口共存门
+
+追加产品迁移 0022 在既有 SQL 发布/回退入口内统一取得 `backend_review.lock_content()`，再进入原发布锁和既有门禁。旧请求只有域，因此按整个绑定域的全部登记来源判定；与 active 或当前新谱系相交时拒绝。不同域发布必须在同一事务继承新目录、统一空 SOP/media 及原审批谱系，不能丢失目录。旧全量回退没有 P2 审批计划，触及新目录或 active 来源时拒绝。
+
+该门没有开放新 schema 的应用权限，也没有提供生产 mode 设置或候选发布接口。现有旧 API 返回 409 冲突；P2 专用恢复原因与 UI 接线仍待后续。来源 mode 与目录由隔离测试 fixture 登记，测试成功不代表真实 active 放行。
+
+```sh
+CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @customer-agent/database test:integration
+CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-release.integration.test.ts
+```
+
+执行 API 实库命令前，按已有 `test:intake:transactions` 配方构建 contracts/database/content-intake runtime。数据库检查覆盖从 21 段账本追加、前序定义漂移拒绝和 ACL；API 检查实际消费者及两会话锁序。逐条谱系继承、后续审批撤销传播沿用 `test:intake:transactions`。证据与剩余发布依赖见[旧写共存验收](../evidence/qa/content-intake-p2-legacy-fence/README.md)。
+
+旧 owner 上传会在 enqueue 前修改来源指纹，因此 0022 同时保护 `advance_source_snapshots` / `restore_source_snapshots`，并修正 actor admission 与组织审核 worker 的首锁。存在未完成的旧 snapshot reservation 时，来源不能进入 active；先取消并恢复后才可继续。此存储门不代替未来正式启用 API 的批准、base CAS 或使用资格检查。
+
+批量取消与上传都由 SQL 入口先取内容锁、再取 actor admission 锁；API 不单独取得次级锁。并发回归在 `content-import.integration.test.ts`，验证取消完成后下一次上传成功，并检查阻塞期间的实际 PG 锁集合。

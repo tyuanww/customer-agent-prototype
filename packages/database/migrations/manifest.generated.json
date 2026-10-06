@@ -427,6 +427,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
       "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
       "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
+    },
+    {
+      "position": 22,
+      "id": "0022_intake_legacy_fence",
+      "file": "0022_intake_legacy_fence.sql",
+      "source_ranges": [],
+      "sha256": "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03",
+      "bytes": 12524,
+      "contract_set_id": "cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa",
+      "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
+      "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41"
     }
   ]
 }

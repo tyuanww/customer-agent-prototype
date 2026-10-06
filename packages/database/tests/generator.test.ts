@@ -82,11 +82,11 @@ function prepareExistingPublication(root: string): void {
 }
 
 describe('database migration generator', () => {
-  it('preserves nineteen immutable migrations and appends only the two reviewed contract increments', () => {
+  it('preserves nineteen immutable migrations and appends two reviewed contract increments and the legacy fence', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());
 
-    expect(first.migrations).toHaveLength(21);
+    expect(first.migrations).toHaveLength(22);
     expect(first.migrations.map(({ id }) => id)).toEqual([
       '0001_extensions',
       '0002_identity_and_content',
@@ -106,7 +106,7 @@ describe('database migration generator', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence',
     ]);
     expect([...first.outputs]).toEqual([...second.outputs]);
     expect(first.migrations.slice(0, 9).map(({ sha256 }) => sha256)).toEqual([

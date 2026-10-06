@@ -1,0 +1,20 @@
+{
+  "observationCapture": "002",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/inspect.mjs"
+  ],
+  "observed": "",
+  "hypothesis": "Both failures are confined to the owned inspector import path. Correct it to the repository runtime and verify real migration artifacts plus denied application access.",
+  "nextCapture": "003",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/inspect.mjs"
+  ]
+}
