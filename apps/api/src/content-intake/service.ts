@@ -11,7 +11,8 @@ import { cancelCandidate, freezeParsed, getJob, jobView, readCandidate, receive 
 import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
-import { previewQuality, type IntakeQualityPreview } from './quality.js';
+import { checkQuality, freezeQuality, previewQuality, qualityCommand, qualitySubmission, readQuality,
+  type IntakeQualityPreview, type IntakeQualityProgress } from './quality.js';
 
 type C = components['schemas'];
 const operation = (value: unknown): string | null => typeof value === 'object' && value !== null
@@ -105,6 +106,17 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     qualityPreview(actor: AuthenticatedUser, key: unknown) {
       return run(actor, 'quality-preview', null, null,
         (client, who) => previewQuality(client, who, key), value => value as IntakeQualityPreview);
+    },
+    quality(actor: AuthenticatedUser, key: unknown) {
+      return run(actor, 'quality', null, null, (client, who) => readQuality(client, who, key), value => value as IntakeQualityProgress);
+    },
+    freezeQuality(actor: AuthenticatedUser, raw: unknown) {
+      return run(actor, 'quality-freeze', json(raw), operation(raw),
+        (client, who) => freezeQuality(client, who, qualityCommand(raw)), value => value as IntakeQualityProgress);
+    },
+    checkQuality(actor: AuthenticatedUser, raw: unknown) {
+      return run(actor, 'quality-check', json(raw), operation(raw),
+        (client, who) => checkQuality(client, who, qualitySubmission(raw)), value => value as IntakeQualityProgress);
     },
     grantBatch(actor: AuthenticatedUser, raw: unknown) {
       return run(actor, 'grants', json(raw), operation(raw),

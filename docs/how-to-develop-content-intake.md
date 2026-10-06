@@ -98,3 +98,11 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 实库测试单独创建合成旧批次和 worker lease，将预览原样送入 `freeze_content_quality_review_plan`，回读冻结的目标数量、population/selection hash；再调用 `record_content_quality_review_evidence` 验证缺扩样、伪造通过、关键稿漏审的拒绝和合法结论落盘。这个消费探针只存在于测试；不会在产品服务中创建旧批次或伪造 owner/dual-review。
 
 旧 `OwnerAcceptanceRecord` 只允许 `g1a_offline_only`，原生人工审批不可转换成该记录。实库验证人工审批已通过、质量结论通过仍不能调用未登记的 owner 承接。完整字段差集与下一步验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
+
+### P2 冻结质量计划与逐条检查
+
+在现有隔离 PG / 合成执行器中，先 `freezeQuality(actor,{operationId,key})` 冻结，再 `quality(actor,key)` 读回计划，按返回的精确 `initialScriptIds` 提交 `checkQuality(actor,{operationId,key,phase:'initial',checks})`。每条检查是 `{scriptId,contentHash,defect,reason}`；缺陷必须填写原因，不接受汇总计数或调用方结论。常规稿可自检，关键稿须未参与材料的有权人员。
+
+每轮一次原子提交完整集合；`expansion_required` 时用 `expandedScriptIds` 提交 expanded，包含原初样且其内容和结果保持不变。任一缺陷最终要求整批新版本修订；`passed` 仅表示质量门通过，不取代来源/组织审批、负责人承接或最终发布门。使用原 operation 可恢复未知 COMMIT 的历史回执；当前资格与状态要重新读取，不以历史回执发布。
+
+`0023_intake_quality` 是产品内部封闭存储，不改变正式 wire / 旧质量函数；两张表只追加，旧迁移保持原字节。状态函数从逐条检查计算结论，没有第二个可写的 passed 指针。生产应用角色仍不能访问。实库测试扩展原 `content-intake.integration.test.ts` 与数据库 `postgres.integration.test.ts`，使用上文同一命令与合成输入。

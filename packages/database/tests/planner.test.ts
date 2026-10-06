@@ -30,7 +30,7 @@ describe('database migration planner', () => {
     const partial = deriveMigrationStatus([ledgerRow(0), ledgerRow(1)], generatedMigrationCatalogue);
     expect(partial.state).toBe('PARTIAL');
     expect(partial.pending[0]?.id).toBe('0003_events_and_metrics');
-    expect(planMigrationCatalogue(partial).migrations).toHaveLength(20);
+    expect(planMigrationCatalogue(partial).migrations).toHaveLength(21);
 
     const complete = deriveMigrationStatus(
       generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)),
@@ -39,7 +39,7 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 13-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 14-migration current suffix',
     );
   });
 
@@ -62,7 +62,7 @@ describe('database migration planner', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality',
     ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
@@ -136,7 +136,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(22);
+    expect(status.pending).toHaveLength(23);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });

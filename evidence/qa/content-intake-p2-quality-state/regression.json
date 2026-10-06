@@ -1,0 +1,26 @@
+{
+  "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'all 5000 critical checks'",
+  "before": [
+    {
+      "log": ".gstack/content-intake-p2-quality-state/max-before.log",
+      "sha256": "9d117877c9f9ebe7c2489d6b867c82f0dc18bea05a29f8a73d9599f0f5560fd8",
+      "exitCode": 1,
+      "observed": "canceling statement due to statement timeout"
+    },
+    {
+      "log": ".gstack/content-intake-p2-quality-state/max-before-replay.log",
+      "sha256": "79b9bdea12dc9bf16031df5aa3f741cc3f6d363c2d5dc69e93b4dc3d3da89249",
+      "exitCode": 1,
+      "observed": "canceling statement due to statement timeout"
+    }
+  ],
+  "after": {
+    "log": ".gstack/content-intake-p2-quality-state/max-after.log",
+    "sha256": "cdce5f60115ad7f66414bb7159f323fed5ddda6b2351e9bfdaef7260f4d1839e",
+    "exitCode": 0,
+    "testDurationMs": 2911,
+    "statementBudgetMs": 5000,
+    "transactionBudgetMs": 5000
+  },
+  "limit": "Synthetic small cells at maximum row count; not every maximum byte/row combination or production concurrency profile."
+}

@@ -117,17 +117,18 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 42501 even when the role holds the view. That is why the ACL entry count moves by more
 // than the four views: the definer's new table grants are part of it too.
 // 0022 adds five private policy/trigger functions and eight privileges only for cs_ai_definer.
+// 0023 adds two sealed quality tables, two private functions and three triggers; ACL stays identical.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
 const EXPECTED_ACL_MANIFEST_ENTRIES = 223;
 const EXPECTED_ACL_MANIFEST_SHA256 = '733889747d9dbd94c592e64bd4c9c3e69e981eb00e1fe5fdc4ea3d50f2c4ab00';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2685;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '910a0ff887d521edaff5cb87723c12abb44341a84ef2bbb38de9c1f805e1322d';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 214;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '9f677fdab08e3f6ff8efd6c81715196b093a53542747bfb75921967c036ece0a';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 76;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = '95e5eb772a1d8a8473f8eb0ac8b0cc50eca983014c060dea038d342626449227';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2731;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = 'a61774c0f28ee00f6b85cc21469b5d8748522f52cb6bf01f60ddfb851b3b79f5';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 216;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '33e7dffc7e7b8e7923a67db2966b909e6401d6c1594f43f2b06206c8fb122aed';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 79;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'd995a1e42c0f6433b25fd8d03d803d2dc6637a80437f1ddefbc0015d363c853f';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -749,7 +750,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 81 || inventory.views !== 7 || inventory.functions !== 214 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 83 || inventory.views !== 7 || inventory.functions !== 216 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {
