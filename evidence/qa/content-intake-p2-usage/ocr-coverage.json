@@ -112,5 +112,9 @@
       "review": "reviewed",
       "method": "Host full source/diff and validation against completed WSL logs, cleanup output and source hashes."
     }
-  ]
+  ],
+  "baseCommit": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+  "reviewedHead": "2dfae0362864dc0c88b69354a7ef985178db2398",
+  "ocrReviewableFiles": 11,
+  "defaultExcludedFilesReviewed": 7
 }
