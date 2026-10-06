@@ -1,0 +1,322 @@
+{
+  "scope": "workspace delta from 5e199d5; previous committed Query proof reused",
+  "preview": {
+    "schema_version": "1",
+    "mode": "workspace",
+    "repository": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+    "total_files": 24,
+    "reviewable_count": 19,
+    "excluded_count": 5,
+    "total_insertions": 1860,
+    "total_deletions": 111,
+    "reviewable_files": [
+      {
+        "path": "apps/api/src/content-import-multipart.ts",
+        "status": "modified",
+        "insertions": 39,
+        "deletions": 19
+      },
+      {
+        "path": "apps/api/src/content-intake/service.ts",
+        "status": "modified",
+        "insertions": 55,
+        "deletions": 42
+      },
+      {
+        "path": "apps/api/src/content-intake/transaction.ts",
+        "status": "modified",
+        "insertions": 6,
+        "deletions": 1
+      },
+      {
+        "path": "apps/api/src/content-intake/usage-http.ts",
+        "status": "modified",
+        "insertions": 7,
+        "deletions": 45
+      },
+      {
+        "path": "apps/api/src/content-intake/files.ts",
+        "status": "added",
+        "insertions": 169,
+        "deletions": 0
+      },
+      {
+        "path": "apps/api/src/content-intake/http-boundary.ts",
+        "status": "added",
+        "insertions": 52,
+        "deletions": 0
+      },
+      {
+        "path": "apps/api/src/content-intake/management-http.ts",
+        "status": "added",
+        "insertions": 84,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-002.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-003.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-004.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-005.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-006.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-007.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-008.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-009.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/exploration-010.json",
+        "status": "added",
+        "insertions": 34,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/functional-evidence.json",
+        "status": "added",
+        "insertions": 320,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/review-coverage.json",
+        "status": "added",
+        "insertions": 310,
+        "deletions": 0
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/verification.json",
+        "status": "added",
+        "insertions": 113,
+        "deletions": 0
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "apps/api/tests/content-import-multipart.test.ts",
+        "status": "modified",
+        "insertions": 35,
+        "deletions": 1,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "apps/api/tests/content-intake.integration.test.ts",
+        "status": "modified",
+        "insertions": 288,
+        "deletions": 2,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+        "status": "modified",
+        "insertions": 8,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "docs/reference-project-architecture.md",
+        "status": "modified",
+        "insertions": 2,
+        "deletions": 1,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-management/README.md",
+        "status": "added",
+        "insertions": 66,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      }
+    ]
+  },
+  "total_files": 24,
+  "reviewed_files": 19,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "checklist": [
+    {
+      "path": "apps/api/src/content-import-multipart.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "sha256": "be755329280c46bb7403a24830ad52a75359373f3fa42d31d4381a3ba37a91ed"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "sha256": "5137fa9458e75b29554d7648196f4759d3f29b4d47803724947adad98d098552"
+    },
+    {
+      "path": "apps/api/src/content-intake/transaction.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "sha256": "9b884123bf0f222b6011b103480f154bce8d093f8c43c428185e092a24b33cfe"
+    },
+    {
+      "path": "apps/api/src/content-intake/usage-http.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "sha256": "845ab385b6021f88911c4ef4c34206a492bff6e7c5941dfbe5637732765f053c"
+    },
+    {
+      "path": "apps/api/src/content-intake/files.ts",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "421163fd11903b23ce71aa3b7dc46ee7cf407aecfc38b6fc780087053906d3a8"
+    },
+    {
+      "path": "apps/api/src/content-intake/http-boundary.ts",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "9a28642f997e5d01fd57b672fa316ca3beb026006346c74cf7d65fcac8be737b"
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "24098d8e9e874b479f098e75743734fcfd7f014850b1a2bbbf82edab0470896f"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-002.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "de430d073a997274ff040070594aeef83101228c2c3a775b68cd81b0df660192"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-003.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "64aaa3d1acc401e773c5a40327ee6e209d3fe33306216b806d8ef713f8b72a21"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-004.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "f1874161f27eea0d19cdd63dd1d9990e9f07bdf2d272429ef964ce020971c8c4"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-005.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "19196e5662d10fb0afef855f6dd0acfa37f5d6a1498802a97376eee6ee6fd77f"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-006.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "a46bb7bd01b9e4d3d1458a41360c03da159657e2f8e88b3d579bf62b49feec20"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-007.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "2f19971eb8b3d33402c972e863ee3e275ce440032d611c67375a26981a0f90cf"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-008.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "0ec8c89441eb515b3e1ccd6140cdeba91b59802225b46941134263e60e387cb6"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-009.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "b195ed53aaaa7905787cd26b67d9c7f9df5981fc96f25882d0daaba2d8c56e5b"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/exploration-010.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "83e8c60fed24053803f4d9585ccc85df6d79a359badedc9515394fff2983e971"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/functional-evidence.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "ccbe49068265a34d4fd75040aa7291886555e7398b07170bcfd95becf88f0c1a"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/review-coverage.json",
+      "status": "added",
+      "review": "reviewed",
+      "selfIndex": true
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/verification.json",
+      "status": "added",
+      "review": "reviewed",
+      "sha256": "f7d3144471e27538087ba8fda80fc502d8e8d69c33954a11ae5dec43e60d0c55"
+    }
+  ],
+  "manuallyReviewedExcluded": [
+    {
+      "path": "apps/api/tests/content-import-multipart.test.ts",
+      "status": "modified",
+      "review": "reviewed"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "review": "reviewed"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "review": "reviewed"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "review": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-management/README.md",
+      "status": "added",
+      "review": "reviewed"
+    }
+  ],
+  "rules": "OCR deterministic system rule group + repository AGENTS + gstack checklist",
+  "nativeAdversarial": {
+    "sourceFiles": 7,
+    "testMode": "summary only",
+    "confirmedFinding": "terminal-job replay creates unreferenced reports",
+    "disposition": "fixed; red twice, green and concurrent finalizer proof passed"
+  },
+  "outsideModel": "not run; disabled by user preference",
+  "coverageRecordSelf": "This generated index is checked for consistency separately; it does not hash itself."
+}

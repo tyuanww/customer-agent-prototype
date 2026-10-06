@@ -1,0 +1,34 @@
+{
+  "observationCapture": "002",
+  "observationArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "management HTTP blocks the entire bad revision"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\nstdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS\n{\"probe\":\"management-report-consumer\",\"artifactBytes\":6615,\"sha256\":\"3be08828836089514a60057b2ae35f961ea0208db2edb20487d6ebac705344d5\",\"issueRows\":1,\"consumer\":\"ExcelJS\",\"wholeBatchBlocked\":true}\n\n ✓ tests/content-intake.integration.test.ts (102 tests | 101 skipped) 1367ms\n   ✓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS  1367ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 101 skipped (102)\n   Start at  02:36:41\n   Duration  1.89s (transform 196ms, setup 0ms, collect 382ms, tests 1.37s, environment 0ms, prepare 35ms)\n\n",
+  "hypothesis": "The report consumer passed, so next check recovery after a lost commit response because upload cleanup must preserve the committed object.",
+  "nextCapture": "003",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "management HTTP retains a committed object"
+  ]
+}

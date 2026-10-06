@@ -1,6 +1,7 @@
 import path from 'node:path';
+import { readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import Fastify from 'fastify';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +14,8 @@ import { parseContractSchema, type components } from '@customer-agent/contracts'
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
 import { contentIntakeUsageRoutes } from '../src/content-intake/usage-http.js';
-import type { IntakeResult } from '../src/content-intake/transaction.js';
+import { contentIntakeManagementRoutes } from '../src/content-intake/management-http.js';
+import type { IntakePool, IntakeResult } from '../src/content-intake/transaction.js';
 import { authenticateRequestHeaders, type AuthenticatedUser, type ProductAuthService } from '../src/auth-service.js';
 import { createProductAuthService, authenticatedProductSession } from '../src/product-auth-service.js';
 import type { ApiDatabaseBootstrapConfig } from '../src/runtime-config.js';
@@ -123,6 +125,290 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     return { operationId: op, objectId: obj.objectId, sourceVersion: 1, baseReleaseId: null,
       contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior };
   }
+  async function managementHost(customStore = store, hostPool: IntakePool = pool) {
+    const logged = await seat('enabler');
+    const app = Fastify();
+    await app.register(contentIntakeManagementRoutes, { auth: auth!, pool: hostPool, store: customStore,
+      report: (_id, error) => diagnostics.push(error) });
+    const origin = await app.listen({ host: '127.0.0.1', port: 0 });
+    const headers = { authorization: `Bearer ${logged.token}` };
+    async function upload(bytes: Buffer, operationId = 'http-upload', sourceId = 'source-a') {
+      const form = new FormData();
+      form.set('operationId', operationId);
+      form.set('file', new Blob([new Uint8Array(bytes)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), '../../synthetic.xlsx');
+      return fetch(`${origin}/v1/intake/sources/${sourceId}/objects`, { method: 'POST', headers, body: form });
+    }
+    async function receive(objectId: string, operationId = 'http-receive', prior: C['IntakeCandidateKey'] | null = null) {
+      return app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/candidates', headers,
+        payload: { operationId, objectId, sourceVersion: 1, baseReleaseId: null,
+          contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior } });
+    }
+    async function settled(id: string) {
+      const deadline = Date.now() + 15_000;
+      for (;;) {
+        const response = await app.inject({ url: `/v1/intake/parse-jobs/${id}`, headers });
+        expect(response.statusCode, response.body).toBe(200);
+        const job = parseContractSchema('IntakeParseJob', response.json());
+        if (job.state !== 'reading' && job.state !== 'parsing') return job;
+        if (Date.now() >= deadline) throw new Error('HTTP_PARSE_DID_NOT_SETTLE');
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+    return { app, origin, headers, upload, receive, settled, logged };
+  }
+  const httpWorkbook = (bodies = ['第一行。\n第二行。', '合成第二条。', '合成第三条。']) => createTemplate(
+    { sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' },
+    bodies.map((body, index) => [`faq-${index}`, `合成问题${index}`, body, '', '', '分类', '', '启用', '', '', '', '合成内部说明', '', '', 'false']));
+
+  it('management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material', async () => {
+    const host = await managementHost();
+    try {
+      const bytes = await httpWorkbook();
+      const first = await host.upload(bytes);
+      expect(first.status).toBe(201);
+      const object = parseContractSchema('IntakeObject', await first.json());
+      expect(object).toMatchObject({ sha256: digest(bytes), bytes: bytes.length, sourceId: 'source-a' });
+      expect(await (await host.upload(bytes)).json()).toEqual(object);
+      expect((await admin.query("SELECT count(*) FROM content_intake.objects WHERE purpose='input'")).rows[0].count).toBe('1');
+      const changed = await host.upload(await httpWorkbook(['另一份合成文件。']));
+      expect(changed.status).toBe(409);
+      expect(await changed.json()).toMatchObject({ error: { details: { reason: 'IDEMPOTENCY_CONFLICT' } } });
+      const received = await host.receive(object.objectId);
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state).toBe('validated');
+      const candidatePath = `/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
+      const candidateResponse = await host.app.inject({ url: candidatePath, headers: host.headers });
+      expect(candidateResponse.statusCode).toBe(200);
+      const candidate = parseContractSchema('IntakeCandidate', candidateResponse.json());
+      const page = parseContractSchema('IntakeCandidatePage', (await host.app.inject({ url: `${candidatePath}/material?limit=2`, headers: host.headers })).json());
+      expect(page.key).toEqual(candidate.key);
+      expect(page.entries).toHaveLength(2);
+      expect(page.entries[0]!.answerText).toBe('第一行。\n第二行。');
+      expect(page.materialHeader.object.sha256).toBe(object.sha256);
+      expect(page.nextCursor).not.toBeNull();
+      const nextPath = `${candidatePath}/material?limit=2&cursor=${encodeURIComponent(page.nextCursor!)}`;
+      const next = parseContractSchema('IntakeCandidatePage', (await host.app.inject({ url: nextPath, headers: host.headers })).json());
+      expect(next.entries).toHaveLength(1);
+      expect(next.nextCursor).toBeNull();
+      expect(next.materialHeader).toEqual(page.materialHeader);
+      const secondSession = await seat('enabler', 'another-session');
+      expect((await host.app.inject({ url: nextPath, headers: { authorization: `Bearer ${secondSession.token}` } })).statusCode).toBe(409);
+      const agent = await seat('agent');
+      expect((await host.app.inject({ url: candidatePath, headers: { authorization: `Bearer ${agent.token}` } })).statusCode).toBe(404);
+      expect((await host.app.inject({ url: `${candidatePath}/material?limit=2&limit=3`, headers: host.headers })).statusCode).toBe(400);
+      expect((await host.app.inject({ url: candidatePath.replace('/versions/1', '/versions/01'), headers: host.headers })).statusCode).toBe(400);
+      expect((await host.app.inject({ url: `/v1/intake/parse-jobs/${job.jobId}/report`, headers: host.headers })).statusCode).toBe(404);
+      expect((await host.receive(object.objectId)).json()).toEqual(received.json());
+      expect((await admin.query('SELECT count(*) FROM content_intake.candidate_versions')).rows[0].count).toBe('1');
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  it('management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS', async () => {
+    const old = await candidate();
+    const host = await managementHost();
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(await httpWorkbook(['', '合成有效行。']))).json());
+      const received = await host.receive(object.objectId, 'bad-revision', old.key);
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state).toBe('failed');
+      expect(job.candidateId).toBeNull();
+      expect(job.issues.some(i => i.location.sheet === 'FAQ' && i.location.row === 2)).toBe(true);
+      const download = await fetch(`${host.origin}/v1/intake/parse-jobs/${job.jobId}/report`, { headers: host.headers });
+      expect(download.status).toBe(200);
+      expect(download.headers.get('content-type')).toContain('spreadsheetml.sheet');
+      const bytes = Buffer.from(await download.arrayBuffer());
+      // A separate downstream process loads the actual HTTP artifact using the
+      // parser package's installed mature dependency, not our report writer.
+      const consumer = execFileSync(process.execPath, ['--input-type=module', '-e', `
+        import ExcelJS from 'exceljs'; import {readFileSync} from 'node:fs';
+        const book=new ExcelJS.Workbook(); await book.xlsx.load(readFileSync(0));
+        console.log(JSON.stringify({sheet:book.worksheets[0].name, rows:book.worksheets[0].getSheetValues()}));
+      `], { cwd: fileURLToPath(new URL('../../../packages/content-intake/', import.meta.url)), input: bytes, timeout: 30_000 });
+      const report = JSON.parse(consumer.toString()) as { sheet: string; rows: unknown[] };
+      expect(report.sheet).toBe('校验问题');
+      expect(report.rows).toHaveLength(job.totalIssues + 2);
+      expect(JSON.stringify(report)).toContain('FAQ');
+      expect(JSON.stringify(report)).not.toContain('合成有效行。');
+      expect((await admin.query('SELECT count(*) FROM content_intake.candidate_versions')).rows[0].count).toBe('1');
+      expect(value(await service.candidate(actor('enabler'), old.key.candidateId, old.key.version)).state).toBe('awaiting-evidence');
+      console.log(JSON.stringify({ probe: 'management-report-consumer', artifactBytes: bytes.length, sha256: digest(bytes), issueRows: job.totalIssues, consumer: 'ExcelJS', wholeBatchBlocked: true }));
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  it('management HTTP rejects anonymous/agent/cross-shop upload and untrusted multipart or receive fields', async () => {
+    const host = await managementHost();
+    try {
+      expect((await host.app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/objects' })).statusCode).toBe(401);
+      expect((await host.upload(await httpWorkbook(), 'cross-shop', 'source-b')).status).toBe(404);
+      const agent = await seat('agent');
+      const boundary = 'management-invalid';
+      const multipart = (extra: string, type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') => Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="operationId"\r\n\r\ninvalid-test\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"\r\nContent-Type: ${type}\r\n\r\nPK00\r\n${extra}--${boundary}--\r\n`);
+      const headers = { ...host.headers, 'content-type': `multipart/form-data; boundary=${boundary}` };
+      expect((await host.app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/objects', headers: { ...headers, authorization: `Bearer ${agent.token}` }, payload: multipart('') })).statusCode).toBe(404);
+      for (const payload of [multipart(`--${boundary}\r\nContent-Disposition: form-data; name="sha256"\r\n\r\nclaimed\r\n`), multipart('', 'text/csv'), multipart('')]) {
+        expect((await host.app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/objects', headers, payload })).statusCode).toBe(400);
+      }
+      expect((await host.app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/candidates', headers: host.headers,
+        payload: { rows: [{ body: '客户端伪造正文' }], userId: 'user-director' } })).statusCode).toBe(400);
+      expect((await host.app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/candidates', headers, payload: multipart('') })).statusCode).toBe(400);
+      expect((await admin.query('SELECT count(*) FROM content_intake.objects')).rows[0].count).toBe('0');
+    } finally { await host.app.close(); }
+  }, 30_000);
+
+  it('management HTTP rechecks the real session after upload I/O and cannot admit with a cloned actor', async () => {
+    const logged = await seat('enabler');
+    const host = await managementHost({ ...store, async persist(...args) {
+      const object = await store.persist(...args);
+      await admin.query('UPDATE backend_identity.sessions SET revoked_at=clock_timestamp() WHERE token_hash=$1', [authenticatedProductSession(logged.actor)]);
+      return object;
+    } });
+    try {
+      const uploaded = await host.upload(await httpWorkbook());
+      expect(uploaded.status).toBe(401);
+      expect((await admin.query('SELECT count(*) FROM content_intake.objects')).rows[0].count).toBe('0');
+      const required = createContentIntakeService(pool, store, undefined, undefined, { requireProductSession: true });
+      const req = await input('forged-receive');
+      expect(await required.receive({ ...logged.actor }, 'source-a', req)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+      expect((await admin.query('SELECT count(*) FROM content_intake.parse_jobs')).rows[0].count).toBe('0');
+    } finally { await host.app.close(); }
+  }, 30_000);
+
+  it('management HTTP records terminal failure when session revocation happens during parser I/O', async () => {
+    const logged = await seat('enabler');
+    let revoke = true;
+    const host = await managementHost({ ...store, async readPayload(id) {
+      const bytes = await store.readPayload(id);
+      if (revoke) {
+        revoke = false;
+        await admin.query('UPDATE backend_identity.sessions SET revoked_at=clock_timestamp() WHERE token_hash=$1', [authenticatedProductSession(logged.actor)]);
+      }
+      return bytes;
+    } });
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(await httpWorkbook())).json());
+      const received = await host.receive(object.objectId);
+      expect(received.statusCode).toBe(202);
+      const jobId = received.json<C['IntakeParseJob']>().jobId;
+      const deadline = Date.now() + 15_000;
+      while (['reading', 'parsing'].includes((await admin.query('SELECT state FROM content_intake.parse_jobs WHERE job_id=$1', [jobId])).rows[0].state)) {
+        if (Date.now() > deadline) throw new Error('REVOKED_PARSE_DID_NOT_SETTLE');
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect((await admin.query('SELECT state,report_object_id FROM content_intake.parse_jobs WHERE job_id=$1', [jobId])).rows[0]).toMatchObject({ state: 'failed', report_object_id: expect.any(String) });
+      expect((await admin.query('SELECT count(*) FROM content_intake.candidate_versions')).rows[0].count).toBe('0');
+      expect(value(await service.job(actor('other'), jobId)).issues.length).toBeGreaterThan(0);
+    } finally { await host.app.close(); }
+  }, 30_000);
+
+  it('management HTTP retains a committed object after a lost response and recovers it on exact replay', async () => {
+    let lost = false;
+    const uncertainPool = { async connect() {
+      const client = await pool.connect();
+      let registering = false;
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, values?: unknown[]) => {
+          if (sql.includes('INSERT INTO content_intake.objects')) registering = true;
+          const result = await target.query(sql, values);
+          if (sql === 'COMMIT' && registering && !lost) { lost = true; throw new Error('synthetic upload COMMIT response lost'); }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, key);
+        return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const host = await managementHost(store, uncertainPool);
+    try {
+      const bytes = await httpWorkbook();
+      const failed = await host.upload(bytes);
+      expect(failed.status).toBe(503);
+      expect(await failed.json()).toMatchObject({ error: { details: { reason: 'COMMIT_UNKNOWN' } } });
+      const stored = (await admin.query('SELECT object_id,sha256,bytes FROM content_intake.objects')).rows[0];
+      expect(await store.verify(stored.object_id, stored.sha256, Number(stored.bytes))).toBe(true);
+      const recovered = parseContractSchema('IntakeObject', await (await host.upload(bytes)).json());
+      expect(recovered.objectId).toBe(stored.object_id);
+      expect((await admin.query('SELECT count(*) FROM content_intake.objects')).rows[0].count).toBe('1');
+      const receive = await host.receive(recovered.objectId);
+      expect((await host.settled(receive.json<C['IntakeParseJob']>().jobId)).state).toBe('validated');
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  // Value: protects=terminal receive replay has no new disk effect;
+  // fails_when=worker persists reports for already-terminal jobs;
+  // why_new=previous idempotency checks counted DB rows only; seam=none.
+  it('management HTTP replay of a terminal failed job creates no unreferenced report objects', async () => {
+    const host = await managementHost();
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(await httpWorkbook(['']))).json());
+      const received = await host.receive(object.objectId);
+      expect((await host.settled(received.json<C['IntakeParseJob']>().jobId)).state).toBe('failed');
+      const before = (await readdir(path.join(store.rootDirectory, 'objects'))).sort();
+      expect(before).toHaveLength(2); // uploaded workbook + authoritative error report
+      for (let i = 0; i < 3; i++) expect((await host.receive(object.objectId)).json()).toEqual(received.json());
+      await host.app.close();
+      expect((await readdir(path.join(store.rootDirectory, 'objects'))).sort()).toEqual(before);
+      expect((await admin.query('SELECT count(*) FROM content_intake.objects')).rows[0].count).toBe('2');
+      expect((await admin.query('SELECT count(*) FROM content_intake.parse_jobs')).rows[0].count).toBe('1');
+    } finally { await host.app.close(); }
+  }, 30_000);
+
+  it('management concurrent failure finalizers keep exactly one referenced report', async () => {
+    const logged = await seat('enabler');
+    let arriving = 0;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const sharedStore = { ...store, async persist(...args: Parameters<typeof store.persist>) {
+      if (args[1] === 'csv') { if (++arriving === 2) release(); await gate; }
+      return store.persist(...args);
+    } };
+    const first = createContentIntakeService(pool, sharedStore, undefined, undefined, { requireProductSession: true });
+    const second = createContentIntakeService(pool, sharedStore, undefined, undefined, { requireProductSession: true });
+    const req = await input('concurrent-errors', null, [['faq-one', '合成问题', '', '', '', '', '', '启用', '', '', '', '', '', '', 'false']]);
+    const job = value(await first.receive(logged.actor, 'source-a', req));
+    const result = await Promise.all([first.parse(logged.actor, job.jobId), second.parse(logged.actor, job.jobId)]);
+    expect(result.every(r => !r.ok)).toBe(true);
+    expect(arriving).toBe(2);
+    expect((await readdir(path.join(store.rootDirectory, 'objects'))).length).toBe(2);
+    expect((await admin.query('SELECT count(*) FROM content_intake.objects')).rows[0].count).toBe('2');
+    expect(value(await first.job(logged.actor, job.jobId)).state).toBe('failed');
+  }, 30_000);
+
+  it('management HTTP bounds the queue and settles accepted jobs when its host closes', async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const reading = new Promise<void>(resolve => { entered = resolve; });
+    let first = true;
+    const host = await managementHost({ ...store, async readPayload(id) {
+      if (first) { first = false; entered(); await gate; }
+      return store.readPayload(id);
+    } });
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(await httpWorkbook())).json());
+      expect((await host.receive(object.objectId, 'queue-0')).statusCode).toBe(202);
+      await reading;
+      for (let i = 1; i < 10; i++) expect((await host.receive(object.objectId, `queue-${i}`)).statusCode).toBe(202);
+      expect((await host.receive(object.objectId, 'queue-full')).statusCode).toBe(503);
+      const closing = host.app.close(); release(); await closing;
+      const rows = (await admin.query('SELECT state FROM content_intake.parse_jobs')).rows as {state:string}[];
+      expect(rows).toHaveLength(10);
+      expect(rows.every(row => row.state === 'cancelled' || row.state === 'validated')).toBe(true);
+    } finally { release(); await host.app.close(); }
+  }, 40_000);
+
+  it('management session-bound parser closes an admitted job revoked before queue execution', async () => {
+    const logged = await seat('enabler');
+    const required = createContentIntakeService(pool, store, undefined, undefined, { requireProductSession: true });
+    const received = value(await required.receive(logged.actor, 'source-a', await input('queued-revocation')));
+    await admin.query('UPDATE backend_identity.sessions SET revoked_at=clock_timestamp() WHERE token_hash=$1', [authenticatedProductSession(logged.actor)]);
+    expect(await required.parse(logged.actor, received.jobId)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    const terminal = value(await service.job(actor('other'), received.jobId));
+    expect(terminal).toMatchObject({ state: 'failed', candidateId: null });
+    expect(terminal.issues[0]!.code).toBe('SCOPE_DENIED');
+  }, 30_000);
+
   async function candidate(op = 'receive-one') {
     const received = value(await service.receive(actor('enabler'), 'source-a', await input(op)));
     const parsed = await service.parse(actor('enabler'), received.jobId);
