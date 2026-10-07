@@ -1958,7 +1958,7 @@
         "stage": "license-consent-pending"
       }
     },
-    "latestFollowup": "installerAcceptance20261008",
+    "latestFollowup": "defaultShortcutAcceptance20261008",
     "installerAcceptance20261008": {
       "status": "PASS for scoped current-user install/start/quit/uninstall; broader platform acceptance remains partial",
       "productBaseline": "be1383a2336ddd8b359cd47108752a64a54fc581",
@@ -2059,12 +2059,106 @@
         "externalModel": false,
         "unresolvedFindings": []
       }
+    },
+    "defaultShortcutAcceptance20261008": {
+      "status": "PASS scoped unchanged-shortcut first startup with fresh synthetic default-path profile; broader acceptance partial",
+      "localHead": "ecb6e03e0483cf39e4c214431ba46d051c99e0db",
+      "productBaseline": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "installerSha256": "86f263baaf27cb5a60a9ef0f3631ce307a29eae0cd8cc0aa9af4239588df1514",
+      "evidenceDirectory": ".gstack/qa-reports/content-intake-native-cancel-r2-20261008",
+      "evidenceSha256": {
+        "shortcut-prepare.json": "f88bd7409acb8cc3caa8c6ba99f727dc19738e81df8aeaf8cf73acd966ab2afd",
+        "shortcut-launch.json": "04f28a65ce07a2c4558abe192687bb89d809da66eff1e169d676030438888a65",
+        "shortcut-running.json": "66cfed676b42ddf4a72106014d8937fab8f71ea32d76b9f90348870a9d295a1d",
+        "shortcut-restored.json": "c2a2e313a581bf57925ce281936e4023e45381029ed5bb9878b945adb41c341d",
+        "shortcut-uninstall-r2.json": "237a08cc7a7967483ba886a5a0f2580a404011451f06fca88bf76831a3d988d0",
+        "shortcut-cleanup.json": "130fe65470b4470d2e06633b540a1bcee7bef6e4d7a3ea85d31178e7d1d9c56f",
+        "shortcut-ui-observations.json": "11270df600595c0941f0477866af692decec535bd76af403e1d95759f3f8736a"
+      },
+      "launch": {
+        "originalCreationTicks": 639256559945246597,
+        "original": "C:\\Users\\Administrator\\AppData\\Roaming\\客服话术浮窗 Demo",
+        "target": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-shortcut-p2\\客服话术浮窗 Demo.exe",
+        "at": "2026-10-07T18:58:36.7037975Z",
+        "shortcut": "C:\\Users\\Administrator\\Desktop\\客服话术浮窗 Demo.lnk",
+        "backup": "C:\\Users\\Administrator\\AppData\\Roaming\\客服话术浮窗 Demo.cai-p2-backup-ecb6e03",
+        "arguments": "",
+        "originalLastWriteTicks": 639264121026582220,
+        "originalContentsRead": false
+      },
+      "config": {
+        "mode": "synthetic-offline"
+      },
+      "mainCommandLine": "\"C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-shortcut-p2\\客服话术浮窗 Demo.exe\" ",
+      "restore": {
+        "ownedActiveProcesses": 0,
+        "termination": "owned main PID taskkill /T /F for cleanup; not a normal-exit assertion",
+        "originalRestored": true,
+        "at": "2026-10-07T19:03:16.4186024Z",
+        "killResult": "SUCCESS: The process with PID 14276 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 20460 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 18660 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 18728 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 23624 (child process of PID 23848) has been terminated.\r\n",
+        "backupAbsent": true,
+        "mainPid": [
+          23624
+        ],
+        "quarantine": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\shortcut-synthetic-profile-ecb6e03",
+        "originalContentsRead": false
+      },
+      "uninstall": {
+        "exitCode": 0,
+        "completed": true,
+        "registryPath": "Microsoft.PowerShell.Core\\Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\3c3477e7-e0e9-546b-8d76-b17fd4621d73",
+        "uninstaller": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-shortcut-p2\\Uninstall 客服话术浮窗 Demo.exe",
+        "at": "2026-10-07T19:04:14.9761552Z"
+      },
+      "cleanup": {
+        "ownedSyntheticProfileRemoved": true,
+        "installerRetained": true,
+        "registryEntries": [],
+        "shortcuts": [],
+        "activeProcesses": [],
+        "at": "2026-10-07T19:04:43.8855654Z",
+        "originalRestored": true,
+        "backupAbsent": true,
+        "ownedInstallRootRemoved": true,
+        "installedFilesAfterUninstall": [],
+        "originalContentsRead": false
+      },
+      "ui": {
+        "date": "2026-10-08",
+        "transport": "UU 人事-台式 via CUA",
+        "foxVisible": true,
+        "clickVerification": "UNCONFIRMED: cua click returned noWindowsAvailable twice; no successful input assertion",
+        "launchMethod": "Windows Shell Start-Process on unchanged installer-created desktop .lnk, empty arguments",
+        "cleanupMethod": "Owned main PID taskkill /T /F; silent owned uninstaller exit 0. Not a normal GUI-exit assertion.",
+        "limits": [
+          "fresh synthetic default-path profile, not existing-profile upgrade",
+          "no ordinary OS account",
+          "native drag unconfirmed",
+          "machine network not disconnected"
+        ],
+        "probeFailure": "Initial uninstall path probe incorrectly included /currentuser in filename; Test-Path rejected before uninstall. Corrected quoted command parsing and rerun exit 0."
+      },
+      "review": {
+        "skill": "open-code-review-delegate",
+        "externalModel": false,
+        "total_files": 3,
+        "reviewed_files": 3,
+        "skipped_files": 0,
+        "coverage_rate": 1,
+        "unresolvedFindings": [],
+        "checks": [
+          "7 evidence hashes and JSON readback PASS",
+          "docs:check 204 Markdown PASS",
+          "git diff --check PASS"
+        ],
+        "scope": "OCR JSON plus both default-excluded Markdown files; evidence attribution, cleanup, limitations and Git state"
+      }
     }
   },
   "limits": [
     "WSL backend, native Windows contract-double tests, Mac actual-stack tests and Windows-to-WSL native partial acceptance are distinct evidence layers.",
     "Synthetic approval transport does not prove actual Feishu tenant integration.",
-    "Only test code and evidence/plan documents changed after 732ca7b; product baseline remains be1383a. See windows.latestFollowup for current test revisions and acceptance. No external-model review, new commit, push, PR, merge or deployment."
+    "Reviewed test fixes and prior evidence committed locally as ecb6e03; default-shortcut followup and remaining-work preparation are documented in plan sections 0.41–0.42. Product baseline remains be1383a. No external-model review, push, PR, merge or deployment."
   ],
   "cleanup": {
     "status": "CONFIRMED",

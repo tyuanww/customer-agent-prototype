@@ -2,7 +2,7 @@
 
 产品基线提交：`be1383a2336ddd8b359cd47108752a64a54fc581`。WSL 使用该精确提交；Windows 最终复跑和 Mac 回归使用该产品基线加本轮四个测试文件的修复，精确哈希见验证清单。本轮只做已授权的合成验收，不接真实飞书或客户/员工数据，不改变生产服务、系统 PostgreSQL 或正式运行批准。
 
-最新进展见[Windows安装与卸载验收](#windows-安装启动与卸载验收2026-10-08)：Administrator当前用户安装、隔离profile启动、快捷键打开查询、正常退出及卸载已通过。有效会话取消与打包态实际栈闭环见前一节；普通OS账号、原生拖动和完整离线场景仍未确认。各节保留当时状态，最新进展以验证清单 `windows.latestFollowup` 为准。
+最新进展见[默认快捷方式补验](#windows-默认快捷方式首次启动补验2026-10-08)：此前6项修复和证据已提交为 `ecb6e03`，本次补齐未修改桌面快捷方式的默认路径首次启动。Administrator安装生命周期、原生保存取消与打包态实际栈闭环已取得分层证据；普通OS账号、原生拖动和完整离线仍未确认。历史各节保留当时状态，以验证清单 `windows.latestFollowup` 为准。
 
 ## 版本与隔离
 
@@ -209,3 +209,18 @@ Windows官方 `pnpm package:win` 退出0（106.712秒），打包前后workspace
 5份新证据为 `installed-prelaunch.json`、`installed-running.json`、`installed-exit-uninstall.json`、`installed-cleanup.json` 和 `installed-ui-observations.json`，保存在前节同一仓外目录，逐文件哈希见 `installed-evidence-manifest.json` 与验证清单。GUI观察来源为CUA记录，未将包含其他应用的整屏截图持久化。02:45:56的最终回读确认自有安装根目录/profile已删除、原默认数据仍在；前节许可等待记录保留为历史，已不再阻塞。
 
 本轮只接续更新既有3份计划/证据文档，按open-code-review-delegate复核全部3项；此前3个测试文件按精确哈希复用审查及实机回归，无新增已确认代码问题。文档引用/一致性与git diff检查通过，不重复未变化的代码测试。全部未提交变更仍为6个文件，HEAD仍732ca7b；未commit/push/PR/merge/deploy。余项是普通Windows OS账号、可靠原生拖动及完整离线验收；真实飞书/数据/正式运行继续沿各自批准。
+
+
+## Windows 默认快捷方式首次启动补验（2026-10-08）
+
+先将此前审查通过的3项测试文件与3份文档提交为 `ecb6e03`（`test: verify Windows packaged intake and native process teardown`），提交后工作树干净。随后用同一0.3.26安装包在自有 `installed-shortcut-p2` 目录静默重装，退出0，沿用用户已明确接受的同一MIT许可；产品与测试代码未改。
+
+北京时间02:58，经Windows Shell启动安装器创建的原样桌面快捷方式，其Arguments为空，实际主进程也没有 `--user-data-dir` 或测试参数。为保护已有数据，先将默认userData原位改名备份，并持久保存恢复凭据；应用在默认路径新建合成profile，自动配置精确为 `{"mode":"synthetic-offline"}`，UU可见紫色狐狸。通过的是默认路径首次启动，不是旧profile升级或真实数据兼容测试。原目录内容始终未读取。
+
+CUA点击两次报 `noWindowsAvailable`，本轮未取得点击后的界面证据；上一轮快捷键、Esc及菜单退出的证据仍独立保留。清理时按本轮EXE路径核对主PID，仅结束其进程树，不将强制清理写成正常退出通过。将本轮合成profile移回自有测试根目录后恢复原数据目录，创建与修改时间ticks均与原记录相同；再静默卸载本轮安装，退出0。首次卸载探针错误地把注册命令的 `/currentuser` 当成路径一部分，Test-Path在执行前拒绝；修正引号解析后完成卸载。
+
+03:04:43最终回读确认：原数据目录已恢复、备份不存在；本轮活动进程、安装文件、卸载注册项、桌面/开始菜单快捷方式均为空；本轮新合成profile和安装目录已删除。既有安装包、工具、源码保留。7份新证据及逐文件哈希位于前述仓外目录的 `shortcut-evidence-manifest.json`，具体字段见验证清单。未保存包含其他应用的整屏截图。
+
+普通Windows OS账号仍不可用；可靠原生拖动及整机断网验收仍待现场条件。不关闭承载UU/SSH的网络，不代填人工签名。后续只补这3份计划/证据文档，未再次修改测试或产品代码；未push/PR/merge/deploy。正式飞书、真实数据和上线继续按原批准边界推进。
+
+本次open-code-review-delegate审查覆盖3/3文档、0跳过，无剩余已确认问题；7份原始证据逐文件哈希及JSON回读通过，`pnpm docs:check`（204篇）和`git diff --check`通过。没有新增代码差异，复用此前测试结果，不重复全量代码验证。
