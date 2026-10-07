@@ -6,7 +6,7 @@ import { IntakeRejection, type IntakeTransaction } from './transaction.js';
 /** Critical human decisions require a proven different person, including aliases.
  * Used by both native-approval verification and internal quality checks. */
 export async function requireIndependentReviewer(client: IntakeTransaction,
-  material: components['schemas']['IntakeMaterial'], person: { identity_scope: string; person_key: string }): Promise<void> {
+  material: { risk: Pick<components['schemas']['IntakeMaterial']['risk'], 'level'>; contributors: string[] }, person: { identity_scope: string; person_key: string }): Promise<void> {
   if (material.risk.level === 'critical') {
     const contributors = await client.query<{ identity_scope: string; person_key: string }>(
       'SELECT identity_scope,person_key FROM content_intake.principals WHERE principal_id=ANY($1::text[])', [material.contributors]);
@@ -22,7 +22,7 @@ export async function requireIndependentReviewer(client: IntakeTransaction,
  * Positive role/grant authority must predate the committed review-package checkpoint:
  * history timestamps alone cannot prove when an authorization transaction committed. */
 export async function historicalReviewer(client: IntakeTransaction, src: Source,
-  material: components['schemas']['IntakeMaterial'], human: HumanDecision, checkedAt: string, authorityCheckpoint: string,
+  material: { risk: Pick<components['schemas']['IntakeMaterial']['risk'], 'level'>; contributors: string[] }, human: HumanDecision, checkedAt: string, authorityCheckpoint: string,
 ): Promise<{ id: string; factsVersion: number }> {
   if (Date.parse(human.decidedAt) > Date.parse(checkedAt)) throw new IntakeRejection('HUMAN_REVIEW_REQUIRED');
   const people = await client.query<{ principal_id: string; identity_scope: string; person_key: string }>(

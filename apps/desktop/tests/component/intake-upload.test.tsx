@@ -19,7 +19,7 @@ function upload(overrides: Partial<IntakeUploadView> = {}): IntakeUploadView {
     canSaveReport: false, canOpen: false, canReset: true, notice: null, ...overrides };
 }
 function management(state: IntakeUploadView): IntakeManagementView {
-  return { signedIn: true, displayName: '合成上传人', authorized: true, validUntil: state.validUntil,
+  return { rollback: { available: false, impact: null, review: null, pending: null, result: null, hasReview: false, canExecute: false }, signedIn: true, displayName: '合成上传人', authorized: true, validUntil: state.validUntil,
     candidates: [], moreCandidates: false, selected: null, material: null, canReview: false, quality: null, hasDraft: false,
     canConfirmSource: false, canPublish: false, canRevise: false, canCancel: false, review: null, workflowResult: null, pending: null, receipt: null, upload: state };
 }

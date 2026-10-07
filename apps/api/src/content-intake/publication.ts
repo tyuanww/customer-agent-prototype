@@ -51,7 +51,16 @@ export function createIntakePublication(run: Run,
             'SELECT content_intake.publish_candidate($1,$2::jsonb,$3::jsonb) AS value',
             [who.id,JSON.stringify(req),JSON.stringify(observed.value)]);
           client.validUntil(Date.parse(result.rows[0]!.value.validUntil));
-          return receipt(result.rows[0]!.value.receipt);
+          const published = receipt(result.rows[0]!.value.receipt);
+          // The additive rollback lineage is checked by the DB publication trigger.
+          // Preserve its shortest approval deadline through the final COMMIT too.
+          const inherited = await client.query<{ until: Date | null }>(`SELECT min(f.valid_until) AS until
+            FROM content_intake.release_rollback_lineage l
+            JOIN content_intake.approval_current c USING(review_request_id)
+            JOIN content_intake.approval_facts f USING(review_request_id,facts_version)
+            WHERE l.release_id=$1`, [published.releaseId]);
+          if (inherited.rows[0]?.until) client.validUntil(inherited.rows[0].until.getTime());
+          return published;
         } catch (error) {
           if (error instanceof Error && 'code' in error && (error.code==='ZA003' || error.code==='ZA005')
             && denials.has(error.message as Reason)) throw new IntakeRejection(error.message as Reason,error.code==='ZA005'?'FORBIDDEN':'CONFLICT');

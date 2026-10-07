@@ -12,6 +12,7 @@ import { cancelCandidate, cancellationReceipt, freezeParsed, getJob, readCandida
 import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
+import { createIntakeRollback } from './rollback.js';
 import { createIntakePublication } from './publication.js';
 import { createIntakeUsage } from './usage.js';
 import { createIntakeDiscovery, type IntakePrincipalLabels } from './discovery.js';
@@ -146,6 +147,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
 
   return {
     ...evidence,
+    ...createIntakeRollback(run, store, approval, report),
     ...createIntakePublication(run, refreshForPublish),
     ...createIntakeUsage(run),
     ...createIntakeDiscovery(run, options.principalLabels),

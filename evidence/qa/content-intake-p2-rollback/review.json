@@ -1,0 +1,185 @@
+{
+  "mode": "workspace",
+  "base": "e28b1d49a85381f3cb35ac20254b097b6a3f2674",
+  "method": "open-code-review-delegate: deterministic OCR selection/rules + host review; independent in-host source audit and zero-edit fix verification",
+  "externalModelCoverage": "not run; no claim of external approval",
+  "total_files": 20,
+  "reviewed_files": 20,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "files": [
+    {
+      "path": "apps/api/src/content-intake/approval-adapter.ts",
+      "status": "modified",
+      "insertions": 12,
+      "deletions": 5,
+      "reviewStatus": "reviewed",
+      "sha256": "9dc0a4683341f16ca5417472a4f7295d53f3d3fec6e3fab4a51ee1e8f4d7d3ce"
+    },
+    {
+      "path": "apps/api/src/content-intake/evidence.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 2,
+      "reviewStatus": "reviewed",
+      "sha256": "e0e37a25202de817b2f98c9adee4c612db83d011e2d95f9bd61ec33f01302d86"
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "status": "modified",
+      "insertions": 17,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "750293e29f7ed75027573cebc1e088b4ab61f3fd2966fadab7cd815743aa9d76"
+    },
+    {
+      "path": "apps/api/src/content-intake/publication.ts",
+      "status": "modified",
+      "insertions": 10,
+      "deletions": 1,
+      "reviewStatus": "reviewed",
+      "sha256": "0d6a8a7b04109dc7d1872008b12e132856a4bbed151b679ed9a1e7694250af27"
+    },
+    {
+      "path": "apps/api/src/content-intake/reviewer.ts",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 2,
+      "reviewStatus": "reviewed",
+      "sha256": "cd13027e899c38947564ec676791b6e424a98234a46d6d8320352067865906bd"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "8fc4dc12f0c4a9cf66d3192055f25cbe97b659982f4a48be9431a874eaac35d6"
+    },
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 2,
+      "reviewStatus": "reviewed",
+      "sha256": "222fc4718bcf4eb2c91c0ec6056675ad94b65e3431a31bb51a9e0bb9194cc1e2"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management-ipc.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "fadc1ea37e734f4fd63fadcbb1d8b788d66c429c044449d720e649e8d11a3d0a"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management.ts",
+      "status": "modified",
+      "insertions": 18,
+      "deletions": 8,
+      "reviewStatus": "reviewed",
+      "sha256": "8718a8f15e23d4f4057b9bfe2193dbe17e89b98275aba9defbc5d0df9aef7bca"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 2,
+      "reviewStatus": "reviewed",
+      "sha256": "34b37f55fc6894f2899220bd583f1343d485978cfb329996dd2853b0367dcf7f"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-management.ts",
+      "status": "modified",
+      "insertions": 16,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "1272833929f49ecc622e9b29e11d26b7f1b961e4a4e6e3367d00f9dfb1c97b48"
+    },
+    {
+      "path": "package.json",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1,
+      "reviewStatus": "reviewed",
+      "sha256": "0938118eec06a03f3cfc375d02b88215d8dfb525a9e6eb14774c1feca637fdf1"
+    },
+    {
+      "path": "packages/database/scripts/generate-migrations.mjs",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "4b35a7d0da10efd5f5c07c9e2bbad5afe1444436b954091d6ae7a953e908be78"
+    },
+    {
+      "path": "packages/database/src/planner.ts",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 3,
+      "reviewStatus": "reviewed",
+      "sha256": "e8132d30307984715c77529ed5fc2f553e81f087c683d7f738174b14f064d853"
+    },
+    {
+      "path": "packages/database/src/verifier.ts",
+      "status": "modified",
+      "insertions": 12,
+      "deletions": 10,
+      "reviewStatus": "reviewed",
+      "sha256": "ea69b1bfd5488f862e15336cccb3e9cd283e063c4a3acd5c636dd91172f805f0"
+    },
+    {
+      "path": "apps/api/src/content-intake/rollback.ts",
+      "status": "added",
+      "insertions": 237,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "15126e552d7e62712d5c020d5f4efc9bfdb8bf9c75bb78bff99c6a0d6cc4f7d4"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-rollback.ts",
+      "status": "added",
+      "insertions": 133,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "f3569a7ac6008f2d23457a7c3116d44cf3655780fb10162a462c60b38cd05eb8"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeRollback.tsx",
+      "status": "added",
+      "insertions": 53,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "ece1966d744f3d744c72e0ca42994e978614a5b6c154a4587c08de776b7509e5"
+    },
+    {
+      "path": "packages/database/migrations/0027_intake_rollback.sql",
+      "status": "added",
+      "insertions": 283,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "da90dd3eaa366037fbbe71f4296697fdf3f9f788954119731926e6500df55e98"
+    },
+    {
+      "path": "packages/database/overlays/0027_intake_rollback.sql",
+      "status": "added",
+      "insertions": 279,
+      "deletions": 0,
+      "reviewStatus": "reviewed",
+      "sha256": "8a974cc5b510b57caa92073d9035093553bae8557cad05b6d5dca2d16765e541"
+    }
+  ],
+  "supplemental": {
+    "tests": "host reviewed behavior/assertions and actual commands; independent reviewer summary-only",
+    "generated": "deterministic generation and migration consumer checks",
+    "docs": "references and implementation consistency",
+    "screenshots": "light/dark and ordinary-seat visual inspection"
+  },
+  "closed_findings": [
+    "candidate generation is not revocation",
+    "strict receipt fields",
+    "grant deadline preserved to COMMIT",
+    "known obsolete review plan terminates recovery fence"
+  ],
+  "remaining_confirmed_findings": []
+}

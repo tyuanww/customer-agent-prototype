@@ -152,6 +152,23 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
     if (Object.keys(query).length !== 1 || !('action' in query)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
     return sendIntake(reply, await service.qualityOperationReceipt(actor(request), params(request).operationId!, query.action), 'IntakeQualityReceipt');
   });
+  for (const [suffix,method,schema,status] of [
+    ['/preview','rollbackPreview','IntakeRollbackImpact',200],
+    ['','rollback','IntakeRollbackReceipt',202],
+  ] as const) app.post(`/v1/intake/rollback${suffix}`,{bodyLimit:65_536},async(request,reply)=>{
+    if(!noQuery(request)||(request.headers['content-type']??'').split(';')[0]?.trim().toLowerCase()!=='application/json')return intakeFailure(reply,'VALIDATION','FILE_INVALID');
+    return sendIntake(reply,await service[method](actor(request),request.body),schema,status);
+  });
+  for (const [suffix,method] of [['','requestRollbackReview'],['/refresh','refreshRollbackReview']] as const)
+    app.post(`/v1/intake/rollback/:rollbackPlanId/review${suffix}`,{bodyLimit:65_536},async(request,reply)=>{
+      if(!noQuery(request)||(request.headers['content-type']??'').split(';')[0]?.trim().toLowerCase()!=='application/json')return intakeFailure(reply,'VALIDATION','FILE_INVALID');
+      return sendIntake(reply,await service[method](actor(request),params(request).rollbackPlanId!,request.body),'IntakeRollbackReview',202);
+    });
+  app.get('/v1/intake/rollback/:rollbackPlanId/review',{exposeHeadRoute:false},async(request,reply)=>{
+    if(!noQuery(request)||request.body!==undefined||request.headers['transfer-encoding']!==undefined
+      ||(request.headers['content-length']!==undefined&&request.headers['content-length']!=='0'))return intakeFailure(reply,'VALIDATION','FILE_INVALID');
+    return sendIntake(reply,await service.rollbackReview(actor(request),params(request).rollbackPlanId!),'IntakeRollbackReview');
+  });
   app.get('/v1/intake/operations/:operationId', { exposeHeadRoute: false }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     if (Object.keys(query).length !== 1 || !('action' in query)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');

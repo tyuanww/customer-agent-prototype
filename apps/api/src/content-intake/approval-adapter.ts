@@ -4,13 +4,16 @@ import { canonical, digest } from './material.js';
 import { IntakeRejection } from './transaction.js';
 
 type Key = components['schemas']['IntakeCandidateKey'];
-export type ReviewBinding = {
-  reviewRequestId: string; key: Key; evidenceVersion: number; tenantId: string; appId: string;
+type BindingBase = {
+  reviewRequestId: string; evidenceVersion: number; tenantId: string; appId: string;
   definitionId: string; nodeId: string; createUuid: string;
   packageObjectId: string; packageSha256: string; packageBytes: number;
   createdAt: string;
   instanceCode: string | null; attachmentFileCode: string | null;
 };
+export type CandidateReviewBinding = BindingBase & { key: Key };
+export type RollbackReviewBinding = BindingBase & { rollbackPlanId: string; impactDigest: string };
+export type ReviewBinding = CandidateReviewBinding | RollbackReviewBinding;
 export type ReviewRoute = Pick<ReviewBinding, 'tenantId' | 'appId' | 'definitionId' | 'nodeId'>;
 export type HumanDecision = { identityScope: string; personKey: string; taskId: string; decidedAt: string };
 export type ApprovalObservation = { state: 'pending' | 'approved' | 'rejected' | 'revoked';
@@ -49,7 +52,9 @@ function fileCode(raw: unknown): string {
 }
 
 export function reviewForm(binding: ReviewBinding) {
-  return { reviewRequestId: binding.reviewRequestId, key: binding.key, packageSha256: binding.packageSha256 };
+  return 'key' in binding
+    ? { reviewRequestId: binding.reviewRequestId, key: binding.key, packageSha256: binding.packageSha256 }
+    : { reviewRequestId: binding.reviewRequestId, rollbackPlanId: binding.rollbackPlanId, impactDigest: binding.impactDigest, packageSha256: binding.packageSha256 };
 }
 
 /** Hides provider I/O, strict binding validation and streamed attachment verification.
@@ -88,8 +93,10 @@ export function createApprovalAdapter(route: ReviewRoute, transport: ApprovalTra
         for (const key of ['tenantId','appId','definitionId','nodeId','createUuid','instanceCode','attachmentFileCode'] as const) {
           if (raw[key] !== binding[key]) throw new IntakeRejection('APPROVAL_BINDING');
         }
-        const form = record(raw.form,['reviewRequestId','key','packageSha256']);
-        parseContractSchema('IntakeCandidateKey',form.key);
+        const form = record(raw.form, 'key' in binding ? ['reviewRequestId','key','packageSha256']
+          : ['reviewRequestId','rollbackPlanId','impactDigest','packageSha256']);
+        if ('key' in binding) parseContractSchema('IntakeCandidateKey',form.key);
+        else { id(form.rollbackPlanId); parseContractSchema('IntakeDigest',form.impactDigest); }
         if (canonical(form as Parameters<typeof canonical>[0]) !== canonical(reviewForm(binding))) throw new IntakeRejection('APPROVAL_BINDING');
         if (!['PENDING','APPROVED','REJECTED','REVOKED'].includes(String(raw.state))) throw new IntakeRejection('HUMAN_REVIEW_REQUIRED');
         const rawDigest = digest(canonical(raw as Parameters<typeof canonical>[0]));

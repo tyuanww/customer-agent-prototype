@@ -7,7 +7,7 @@ import type { CanonicalJsonValue } from '../idempotency.js';
 import { candidateContext, syncCandidateReadiness } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, intakeReplay, IntakeRejection, type IntakeResult, type IntakeTransaction } from './transaction.js';
-import type { ApprovalAdapter, ReviewBinding } from './approval-adapter.js';
+import type { ApprovalAdapter, CandidateReviewBinding as ReviewBinding } from './approval-adapter.js';
 import { historicalReviewer } from './reviewer.js';
 
 type C = components['schemas'];
@@ -112,7 +112,10 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
         await client.query(`UPDATE content_intake.candidate_versions SET revocation_generation=revocation_generation+1,
           updated_at=clock_timestamp() WHERE candidate_id=$1 AND version=$2`,[req.key.candidateId,req.key.version]);
         if (invalidates || revoked) await client.query(`INSERT INTO content_intake.release_revocations(release_id,generation,reason,revoked_at)
-          SELECT DISTINCT release_id,$2::bigint,$3::text,clock_timestamp() FROM content_intake.release_lineage WHERE review_request_id=$1
+          SELECT release_id,$2::bigint,$3::text,clock_timestamp() FROM (
+            SELECT release_id FROM content_intake.release_lineage WHERE review_request_id=$1
+            UNION SELECT release_id FROM content_intake.release_rollback_lineage WHERE review_request_id=$1
+          ) dependencies
           ON CONFLICT(release_id) DO NOTHING`,[b.reviewRequestId,nextGeneration,revoked ? 'APPROVAL_REVOKED' : 'APPROVAL_CHANGED']);
         await syncCandidateReadiness(client,who,req.key,action);
         return reviewView(client,b);

@@ -16,7 +16,7 @@
     "dev:api": "pnpm --filter @customer-agent/api dev",
     "dev:intake:synthetic": "pnpm build:services && node scripts/intake-synthetic/run.ts",
     "test:intake:synthetic": "pnpm build:services && CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts",
-    "test:intake:desktop": "pnpm build && CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts",
+    "test:intake:desktop": "pnpm build && CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts",
     "lint": "eslint .",
     "typecheck": "pnpm --filter @customer-agent/contracts typecheck && pnpm --filter @customer-agent/retrieval-core typecheck && pnpm --filter @customer-agent/content-intake typecheck && pnpm --filter @customer-agent/database typecheck && pnpm --filter @customer-agent/api typecheck && pnpm --filter @customer-agent/desktop typecheck",
     "test": "pnpm build:services && pnpm test:built",

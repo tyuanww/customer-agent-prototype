@@ -1,0 +1,135 @@
+{
+  "base": "e28b1d49a85381f3cb35ac20254b097b6a3f2674",
+  "environment": {
+    "os": "macOS 26.5.2 arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18"
+  },
+  "inputSha256": {
+    "apps/api/src/content-intake/approval-adapter.ts": "9dc0a4683341f16ca5417472a4f7295d53f3d3fec6e3fab4a51ee1e8f4d7d3ce",
+    "apps/api/src/content-intake/evidence.ts": "e0e37a25202de817b2f98c9adee4c612db83d011e2d95f9bd61ec33f01302d86",
+    "apps/api/src/content-intake/management-http.ts": "750293e29f7ed75027573cebc1e088b4ab61f3fd2966fadab7cd815743aa9d76",
+    "apps/api/src/content-intake/publication.ts": "0d6a8a7b04109dc7d1872008b12e132856a4bbed151b679ed9a1e7694250af27",
+    "apps/api/src/content-intake/reviewer.ts": "cd13027e899c38947564ec676791b6e424a98234a46d6d8320352067865906bd",
+    "apps/api/src/content-intake/rollback.ts": "15126e552d7e62712d5c020d5f4efc9bfdb8bf9c75bb78bff99c6a0d6cc4f7d4",
+    "apps/api/src/content-intake/service.ts": "8fc4dc12f0c4a9cf66d3192055f25cbe97b659982f4a48be9431a874eaac35d6",
+    "apps/api/src/content-intake/usage.ts": "222fc4718bcf4eb2c91c0ec6056675ad94b65e3431a31bb51a9e0bb9194cc1e2",
+    "apps/api/tests/content-intake.integration.test.ts": "a88139a82b001951fd90d28251ce49185f232ad4548678f9fa07196d7c27e3b8",
+    "apps/desktop/src/main/content-intake-management-ipc.ts": "fadc1ea37e734f4fd63fadcbb1d8b788d66c429c044449d720e649e8d11a3d0a",
+    "apps/desktop/src/main/content-intake-management.ts": "8718a8f15e23d4f4057b9bfe2193dbe17e89b98275aba9defbc5d0df9aef7bca",
+    "apps/desktop/src/main/content-intake-rollback.ts": "f3569a7ac6008f2d23457a7c3116d44cf3655780fb10162a462c60b38cd05eb8",
+    "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx": "34b37f55fc6894f2899220bd583f1343d485978cfb329996dd2853b0367dcf7f",
+    "apps/desktop/src/renderer/features/dashboard/IntakeRollback.tsx": "ece1966d744f3d744c72e0ca42994e978614a5b6c154a4587c08de776b7509e5",
+    "apps/desktop/src/shared/content-intake-management.ts": "1272833929f49ecc622e9b29e11d26b7f1b961e4a4e6e3367d00f9dfb1c97b48",
+    "apps/desktop/tests/component/intake-rollback.test.tsx": "c6c5d00d4015f16875638c011fa80c4b6a7ff880dd0a74399e950237d95fa85d",
+    "apps/desktop/tests/component/intake-upload.test.tsx": "8d5c624e76763cf098cfd69e862adc42d5950b589407b79cd7415e65423490db",
+    "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts": "d2d74fa421ce7ebd6ed44ec30144aa954a5d756c391d9d3835ce64cbb4e808e9",
+    "apps/desktop/tests/unit/content-intake-management.test.ts": "2f48bf891403bcd6d9d0f866f93c9ca7555d705a74b5ce2827de020df38d2656",
+    "apps/desktop/tests/unit/content-intake-rollback.test.ts": "975954a44cce2fdeede67151e83ddf86d87ed76121d3a3d6dd008b1c51735332",
+    "package.json": "0938118eec06a03f3cfc375d02b88215d8dfb525a9e6eb14774c1feca637fdf1",
+    "packages/database/README.md": "4948dea1fbbbbf0b7b4d26299c333a9b887e43ffa7b810ce29a266a7e849f476",
+    "packages/database/migrations/0027_intake_rollback.sql": "da90dd3eaa366037fbbe71f4296697fdf3f9f788954119731926e6500df55e98",
+    "packages/database/migrations/manifest.generated.json": "8da601379ff993d3bdff18d5882bbf959a2ff67bc05d13dba42687e6c9539fc4",
+    "packages/database/overlays/0027_intake_rollback.sql": "8a974cc5b510b57caa92073d9035093553bae8557cad05b6d5dca2d16765e541",
+    "packages/database/scripts/generate-migrations.mjs": "4b35a7d0da10efd5f5c07c9e2bbad5afe1444436b954091d6ae7a953e908be78",
+    "packages/database/src/generated/migrations.generated.ts": "d3ec30cc61e2966ea9ad8e99504767b738d7c9848689ccf0ab195d082c4d8c31",
+    "packages/database/src/planner.ts": "e8132d30307984715c77529ed5fc2f553e81f087c683d7f738174b14f064d853",
+    "packages/database/src/verifier.ts": "ea69b1bfd5488f862e15336cccb3e9cd283e063c4a3acd5c636dd91172f805f0",
+    "packages/database/tests/generator.test.ts": "770b2669df0b82551762e5d7edab819a0953e5c94492f19287d936478a2c1562",
+    "packages/database/tests/planner.test.ts": "6c4c50711ee9896cbed52af6977e415aca172411856c540e6eb09e9245c5e14c",
+    "packages/database/tests/postgres.integration.test.ts": "e6c0d0aa19918009a86325468066693ac62b450d389d5c5236b7ffd73a4e35dc"
+  },
+  "artifactSha256": {
+    "api-http-final.log": "6cb4ee0ee9449221f27ec681ba0d9f7cd73f74423ee844088b5be1f6e05eae90",
+    "api-pg.log": "85cc9f593ee2a25d0e1692c3877c7f682f5ba84a2ed94848f606be7fd9504a59",
+    "api-rollback.log": "cf22dc2383a9f811b39b3d7a54a8e63a9c7ccf0266bcf8c2adf396a0d55a4ba3",
+    "electron.log": "f9928b8a45af0c01b08372afadf777b1f9e0851d7d3c6483afdce7898ed82d94",
+    "lint.log": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+    "rollback-dark.png": "187ad0b347c34aacddbe9f9af5c9578b7d25b497d0526b3359a2111710c001f3",
+    "rollback-light.png": "d69163176898c68854ed9329a39740f5bfd6df46c19077af25b84611e1425c62",
+    "rollback-ordinary-seat.png": "37bd4c187a48f63080a78f64d3be2898dcad67b2d1c32fe122c714f8953f5a9a",
+    "typecheck.log": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08",
+    "workspace-test.log": "b3518ff6cc11d59d448665c858380181258a1ba6142e6f00e8eea8efbb954c48"
+  },
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "result": "PASS",
+      "log": "lint.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS",
+      "log": "typecheck.log"
+    },
+    {
+      "command": "pnpm test",
+      "result": "PASS",
+      "log": "workspace-test.log",
+      "note": "before final localized Main recovery fix; final targeted checks and built E2E cover that fix"
+    },
+    {
+      "command": "pnpm test:intake:desktop",
+      "result": "PASS",
+      "tests": 2,
+      "includes": "pnpm build",
+      "log": "electron.log"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts",
+      "result": "PASS",
+      "tests": 158,
+      "log": "api-pg.log"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'rollback:'",
+      "result": "PASS",
+      "tests": 14,
+      "log": "api-rollback.log"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'rollback: HTTP'",
+      "result": "PASS",
+      "tests": 1,
+      "log": "api-http-final.log"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/database exec vitest run tests/postgres.integration.test.ts",
+      "result": "PASS",
+      "tests": 25,
+      "toolOutput": "session50583/chunk2126ce",
+      "rawLogFile": null
+    },
+    {
+      "command": "pnpm --filter @customer-agent/database test",
+      "result": "PASS",
+      "unitTests": 27,
+      "compiledConsumerTests": 1,
+      "toolOutput": "session5836/chunkd19550",
+      "rawLogFile": null
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-rollback.test.ts tests/unit/content-intake-management.test.ts tests/unit/content-intake-management-ipc.test.ts tests/component/intake-rollback.test.tsx tests/component/intake-management.test.tsx",
+      "result": "PASS",
+      "tests": 62,
+      "toolOutput": "session93132/chunkf2b4d4",
+      "rawLogFile": null
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/component/intake-rollback.test.tsx",
+      "result": "PASS",
+      "tests": 3,
+      "toolOutput": "session60816/chunk5d17ad",
+      "rawLogFile": null
+    }
+  ],
+  "unverified": [
+    "real Feishu",
+    "production ACL/factory",
+    "new Windows/WSL build",
+    "onsite drag/offline",
+    "full P2 family and operational readiness"
+  ],
+  "evidenceNormalization": "Only trailing whitespace and terminal blank lines removed from archived text logs; code final cleanup is whitespace-only."
+}

@@ -420,3 +420,37 @@ it('clears local revision preparation offline after its access projection expire
     expect(f.main.closeRisk()).toBeNull();
   } finally { clock.mockRestore(); f.main.dispose(); }
 });
+it('keeps rollback recovery isolated from candidate writes, clears readable plans on failure and forgets operations on logout', async () => {
+  const f = fixture(), original = f.request.getMockImplementation()!;
+  const plan = { rollbackPlanId: 'rollback-a', impactDigest: 'a'.repeat(64), baseReleaseId: 'rel_2', targetReleaseId: 'rel_1',
+    scopes: [f.data.material.materialHeader.scope], requiresCorrectiveCandidate: false, approvalEvidenceVersion: 0 };
+  f.request.mockImplementation(async (...args) => {
+    if (args[1].endsWith('/rollback/preview')) return { status: 200, value: plan };
+    if (args[1].endsWith('/rollback/rollback-a/review')) throw new ProductHttpError('UNAVAILABLE');
+    const reply = await original(...args);
+    if (args[1].includes('/authorization?')) (reply.value as { capabilities: { actions: string[] }[] }).capabilities.forEach(c => c.actions.push('rollback'));
+    return reply;
+  });
+  try {
+    await f.select(); await f.main.command({ action: 'rollback-preview', baseReleaseId: 'rel_2', targetReleaseId: 'rel_1' });
+    await expect(f.main.command({ action: 'rollback-request-review' })).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+    expect(f.main.view().rollback).toMatchObject({ impact: null, review: null, pending: { action: 'review-request', recovery: 'retry' } });
+    expect(f.main.closeRisk()).toBe('pending');
+    for (const action of ['request-review','discard','cancel-candidate'] as const) await expect(f.main.command({ action })).rejects.toMatchObject({ code: 'CONFLICT' });
+    f.logout(); expect(f.main.view().rollback.pending).toBeNull(); expect(f.main.closeRisk()).toBeNull();
+  } finally { f.main.dispose(); }
+});
+it('returns a corrective-only rollback to the existing upload path by closing the selected candidate', async () => {
+  const f = fixture(), original = f.request.getMockImplementation()!;
+  f.request.mockImplementation(async (...args) => {
+    if (args[1].endsWith('/rollback/preview')) return { status: 200, value: { rollbackPlanId: 'rollback-a', impactDigest: 'a'.repeat(64), baseReleaseId: 'rel_2', targetReleaseId: 'rel_1', scopes: [], requiresCorrectiveCandidate: true, approvalEvidenceVersion: 0 } };
+    const reply = await original(...args);
+    if (args[1].includes('/authorization?')) (reply.value as { capabilities: { actions: string[] }[] }).capabilities.forEach(c => c.actions.push('rollback'));
+    return reply;
+  });
+  try {
+    await f.select(); await f.main.command({ action: 'rollback-preview', baseReleaseId: 'rel_2', targetReleaseId: 'rel_1' });
+    const result = await f.main.command({ action: 'rollback-correct' });
+    expect(result.selected).toBeNull(); expect(result.rollback.impact).toBeNull();
+  } finally { f.main.dispose(); }
+});
