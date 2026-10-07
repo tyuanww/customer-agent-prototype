@@ -64,13 +64,16 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     // The shared Fox reads the legacy projection; FAQ must return unavailable
     // without a missing-handler error or creating a legacy announce service.
     expect(await fox.evaluate(() => window.customerAgent!.productAnnounce!.unread!())).toMatchObject({ ok: false, unread: false });
-    async function login() {
+    async function openQuery() {
       // The app may launch behind another native window. Exercise the ordinary
       // open handoff only after activating this owned test app, then wait for it.
       await app!.evaluate(({ app }) => app.focus({ steal: true }));
       await query.evaluate(() => window.customerAgent!.openSearch());
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    }
+    async function login() {
+      await openQuery();
       await query.getByRole('button', { name: '登录', exact: true }).click();
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
       await app!.windows().find(w => w.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();
@@ -113,11 +116,17 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     await appearance('light'); await captureWorkspace('dashboard-intake-light');
     await appearance('dark'); await captureWorkspace('dashboard-intake-dark');
     const nativeDashboard = await app.browserWindow(dashboard);
-    await nativeDashboard.evaluate(win => win.setSize(980, 680));
-    await expect.poll(() => dashboard.evaluate(() => innerWidth)).toBe(980);
+    async function resizeDashboard(width: number, height: number) {
+      await nativeDashboard.evaluate((win, size) => win.setSize(size.width, size.height), { width, height });
+      await expect.poll(() => nativeDashboard.evaluate(win => win.getSize())).toEqual([width, height]);
+      // Windows native borders occupy part of the outer size. Compare the
+      // renderer to Electron's content width while retaining the outer-size gate.
+      const contentWidth = await nativeDashboard.evaluate(win => win.getContentSize()[0]);
+      await expect.poll(() => dashboard.evaluate(() => innerWidth)).toBe(contentWidth);
+    }
+    await resizeDashboard(980, 680);
     await captureWorkspace('dashboard-intake-minimum-dark');
-    await nativeDashboard.evaluate(win => win.setSize(1180, 760));
-    await expect.poll(() => dashboard.evaluate(() => innerWidth)).toBe(1180);
+    await resizeDashboard(1180, 760);
     await appearance('light');
     expect(sourceChoice).toBeTruthy(); await sources.selectOption(sourceChoice!);
     async function selectAndSubmit(filename: string) {
@@ -263,7 +272,7 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     await dashboard.getByRole('button', { name: '关闭当前候选', exact: true }).click();
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.close());
     host.selectIdentity('agent');
-    await query.evaluate(() => window.customerAgent!.openSearch());
+    await openQuery();
     await query.getByRole('button', { name: / · 退出$/ }).click();
     await expect(query.getByRole('button', { name: '登录', exact: true })).toBeVisible();
     await login();
@@ -271,6 +280,10 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     const shops = query.getByRole('combobox', { name: '当前店铺' });
     await expect(shops.locator('option')).toHaveCount(2);
     await shops.selectOption('shop-a');
+    // Selecting the menu starts an IPC authorization read. Wait for its
+    // confirmed context before searching; selection alone only records intent.
+    await expect(shops).toBeEnabled();
+    await expect(shops).toHaveValue('shop-a');
     await query.getByTestId('question-input').fill('洁面');
     await query.getByTestId('search-button').click();
     await expect(query.getByTestId('answer-text-1')).toBeVisible();
