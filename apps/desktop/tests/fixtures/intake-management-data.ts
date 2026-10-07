@@ -7,16 +7,61 @@ export function intakeManagementData(count = 2) {
   const candidate: C['IntakeCandidate'] = { key, sourceId: scope.sourceId, state: 'awaiting-evidence', readinessReasons: ['AWAITING_APPROVAL'], sourceEvidenceVersion: 0, approvalEvidenceVersion: 0, revocationGeneration: 0, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', publishedReleaseId: null };
   const status: C['IntakeQualityStatus'] = { key, viewHash: 'b'.repeat(64), state: 'not_frozen', frozen: null, rounds: [], plan: { policyVersion: 'intake-quality-v1', ordinaryCount: count, mandatoryCount: 0, withdrawalCount: 0, initialTarget: count, expandedTarget: count, initialCount: count, expandedCount: count, seedHash: 'a'.repeat(64), populationManifestHash: 'b'.repeat(64), selectionManifestHash: 'c'.repeat(64) } };
   const samples: C['IntakeQualitySample'][] = Array.from({ length: count }, (_, i) => ({ scriptId: `intake_${i.toString(16).padStart(64,'0')}`, contentHash: 'c'.repeat(64), mandatory: false, check: null, entry: { ...entry, operation: 'upsert', businessEntryId: `faq-${i}`, title: `合成洁面 ${i + 1}` } }));
-  const state = { allowed: true, reviewer: true, ttl: 60_000 };
+  const state = { allowed: true, reviewer: true, confirmer: true, publisher: true, creating: false, ttl: 60_000 };
+  const material: C['IntakeCandidatePage'] = { key, entries: [entry], differences: [], nextCursor: null,
+    materialHeader: { canonicalEncodingVersion: 'candidate-p1.1', scope, sourceVersion: 1,
+      sourceClaim: { versionKind: 'opaque', versionValue: 'export-v1', acquisition: 'controlled-synthetic-export', fileSha256: 'd'.repeat(64) },
+      templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'mapping-p1.1', selectedSheets: ['FAQ话术'],
+      object: { objectId: 'object-a', sha256: 'd'.repeat(64), bytes: 1000, mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sourceId: scope.sourceId },
+      contributors: ['preparer-a'], risk: { policyVersion: 'risk-p1.1', level: 'routine', reasons: [], explicitDisableCount: 0, sameSourceDisabledLast24Hours: 0, evaluatedAt: '2026-01-01T00:00:00Z' },
+      baseReleaseId: 'rel_1', media: [] } };
+  let review: C['IntakeReview'] | null = null;
+  const workflowReceipts = new Map<string, unknown>();
+  const sync = () => { if (candidate.state === 'published') return;
+    candidate.state = candidate.sourceEvidenceVersion > 0 && review?.state === 'approved' && status.state === 'passed' ? 'ready' : 'awaiting-evidence';
+    candidate.readinessReasons = candidate.state === 'ready' ? [] : ['AWAITING_APPROVAL']; };
   const receipts = new Map<string, C['IntakeQualityReceipt']>();
   let validUntil = new Date(Date.now()+state.ttl).toISOString();
   const respond = (path: string, body?: unknown): unknown => {
     const u = new URL(path, 'http://127.0.0.1');
     if (u.pathname.endsWith('/authorization')) return { factsVersion: 1, revocationGeneration: 0, policyVersion: 1, validUntil, nextCursor: null,
-      capabilities: [{ scope, actions: state.allowed ? ['content-manage', ...(state.reviewer ? ['review'] : [])] : ['query'], mayAllocate: [], mayDelegate: [], validUntil }] };
+      capabilities: [{ scope, actions: state.allowed ? ['content-manage', ...(state.reviewer ? ['review'] : []), ...(state.confirmer ? ['source-confirm'] : []), ...(state.publisher ? ['publish'] : [])] : ['query'], mayAllocate: [], mayDelegate: [], validUntil }] };
     if (u.pathname.endsWith('/sources')) return { items: [{ scope, version: 1, templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'mapping-p1.1', structureDigest: 'a'.repeat(64), contentIntakeMode: 'v2-preview', modeVersion: 1 }], nextCursor: null };
     if (!state.allowed) throw new Error('FORBIDDEN');
     if (u.pathname === '/v1/intake/candidates') return { items: [candidate], nextCursor: null };
+    if (u.pathname.endsWith('/material')) return material;
+    if (u.pathname.endsWith('/source-confirmation')) {
+      const req = body as C['IntakeSourceConfirmation'];
+      if (workflowReceipts.has(req.operationId)) return workflowReceipts.get(req.operationId);
+      candidate.sourceEvidenceVersion++; sync();
+      const result = structuredClone(candidate); workflowReceipts.set(req.operationId, result); return result;
+    }
+    if (u.pathname.endsWith('/review') && body) {
+      const req = body as C['IntakeReviewRequest'];
+      const prior = workflowReceipts.get(req.operationId) as C['IntakeReview'] | undefined;
+      if (prior) { if (!state.creating) { prior.state = 'pending'; prior.instanceCode = 'synthetic-instance'; } return prior; }
+      candidate.approvalEvidenceVersion++;
+      review = { key, reviewRequestId: 'review-a', instanceCode: state.creating ? null : 'synthetic-instance', evidenceVersion: candidate.approvalEvidenceVersion,
+        revocationGeneration: 0, state: state.creating ? 'creating' : 'pending', checkedAt: null, validUntil: null,
+        reviewPackageObjectId: 'review-object-a', reviewPackageSha256: 'e'.repeat(64) };
+      workflowReceipts.set(req.operationId, review); return review;
+    }
+    if (u.pathname.endsWith('/review/refresh')) {
+      const req = body as C['IntakeReviewRequest'];
+      if (workflowReceipts.has(req.operationId)) return workflowReceipts.get(req.operationId);
+      if (!review) throw new Error('NO_REVIEW');
+      review.state = 'approved'; review.checkedAt = new Date().toISOString(); review.validUntil = new Date(Date.now()+300000).toISOString(); sync();
+      const result = structuredClone(review); workflowReceipts.set(req.operationId, result); return result;
+    }
+    if (u.pathname.endsWith('/review')) { if (!review) throw new Error('NO_REVIEW'); return review; }
+    if (u.pathname.endsWith('/publish')) {
+      const req = body as C['IntakePublish'];
+      if (workflowReceipts.has(req.operationId)) return workflowReceipts.get(req.operationId);
+      candidate.state = 'published'; candidate.publishedReleaseId = 'rel_2';
+      const result: C['IntakeReceipt'] = { key, action: 'publish', operationId: req.operationId, state: 'published', releaseId: 'rel_2', announcementId: 'announcement-2', reason: null };
+      workflowReceipts.set(req.operationId, result); return result;
+    }
+    if (u.pathname.startsWith('/v1/intake/operations/')) { const receipt = workflowReceipts.get(u.pathname.split('/').at(-1)!); if (!receipt) throw new Error('NOT_FOUND'); return receipt; }
     if (u.pathname.endsWith('/quality/freeze') || u.pathname.endsWith('/quality/checks')) {
       const req = body as C['IntakeQualitySubmission'];
       const action = u.pathname.endsWith('/freeze') ? 'quality-freeze' : 'quality-check';
@@ -25,7 +70,7 @@ export function intakeManagementData(count = 2) {
       status.frozen = { principalId: 'reviewer', factsVersion: 1, recordedAt: '2026-01-01T00:00:00Z' };
       if (action === 'quality-check') { for (const sample of samples) sample.check = req.checks.find(c => c.scriptId === sample.scriptId)!; }
       const receipt: C['IntakeQualityReceipt'] = { key, operationId: req.operationId, action, state: status.state, phase: action === 'quality-freeze' ? null : req.phase };
-      receipts.set(req.operationId, receipt); return receipt;
+      receipts.set(req.operationId, receipt); sync(); return receipt;
     }
     if (u.pathname.includes('/quality/operations/')) { const r = receipts.get(u.pathname.split('/').at(-1)!); if (!r) throw new Error('NOT_FOUND'); return r; }
     if (u.pathname.endsWith('/quality/samples')) return { key, viewHash: status.viewHash, selectionManifestHash: status.plan.selectionManifestHash, phase: u.searchParams.get('phase'), items: samples, nextCursor: null };
@@ -33,5 +78,5 @@ export function intakeManagementData(count = 2) {
     if (u.pathname.endsWith('/versions/1')) return candidate;
     throw new Error(`Unexpected route ${u.pathname}`);
   };
-  return { respond, state, samples, candidate, receipts, status, expireAt: (ttl: number) => { validUntil = new Date(Date.now()+ttl).toISOString(); } };
+  return { respond, state, samples, candidate, receipts, workflowReceipts, material, status, expireAt: (ttl: number) => { validUntil = new Date(Date.now()+ttl).toISOString(); } };
 }

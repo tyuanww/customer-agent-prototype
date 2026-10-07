@@ -3,7 +3,7 @@
 .intake-management h1 { margin: 4px 0; font-size: 30px; } .intake-management h2 { font-size: 20px; margin-top: 28px; }
 .intake-eyebrow { color: #665380; font-size: 12px; letter-spacing: 2px; }
 .intake-toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
-.intake-management button, .intake-management select, .intake-management textarea { font: inherit; border: 1px solid #ccc5d9; border-radius: 8px; padding: 8px 14px; background: white; color: #302739; }
+.intake-management button, .intake-management select, .intake-management textarea, .intake-management input { font: inherit; border: 1px solid #ccc5d9; border-radius: 8px; padding: 8px 14px; background: white; color: #302739; }
 .intake-management button:not(:disabled) { cursor: pointer; } .intake-management button:disabled { opacity: .5; }
 .intake-management :focus-visible { outline: 3px solid #8763b7; outline-offset: 3px; }
 .intake-candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
@@ -14,3 +14,5 @@
 .intake-management pre { font-size: 12px; padding: 16px; background: #efedf4; max-height: 380px; overflow: auto; }
 .intake-management label { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0; }
 .intake-management textarea { flex: 1; min-height: 70px; } .intake-management fieldset { border: 0; padding: 12px 0 0; }
+
+.intake-management input { flex: 1; min-width: 0; }
