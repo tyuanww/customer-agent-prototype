@@ -1,3 +1,4 @@
+import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
 import { registerProductSearchIpc } from './product-search-ipc';
 import { ProductHttp } from './product-http';
@@ -90,6 +91,7 @@ if (!gotLock) {
   let controllerReady = false;
   let productSession: ProductSession | null = null;
   let productAnnounce: ProductAnnounce | null = null;
+  let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
   let disposeIntakeQuery: (() => void) | null = null;
   let pendingSecondInstance = false;
 
@@ -122,6 +124,7 @@ if (!gotLock) {
   };
 
   const beginShutdown = (): void => {
+    intakeManagement?.dispose(); intakeManagement = null;
     disposeIntakeQuery?.(); disposeIntakeQuery = null;
     void productSession?.shutdown();
     shuttingDown.begin();
@@ -191,7 +194,7 @@ if (!gotLock) {
       },
     });
     const next = new OverlayController({
-      dashboardEnabled: !productProfile?.contentIntake,
+      dashboardEnabled: true,
       fence: shuttingDown,
       rendererDevServerUrl,
       ...(testAccelerator ? { accelerator: testAccelerator } : {}),
@@ -245,6 +248,8 @@ if (!gotLock) {
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => [controller?.dashboardWebContents() ?? null]);
+    intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl);
@@ -345,7 +350,10 @@ if (!gotLock) {
     }
   });
 
-  app.on('before-quit', beginShutdown);
+  app.on('before-quit', event => {
+    if (intakeManagement && !intakeManagement.allowClose()) { event.preventDefault(); return; }
+    beginShutdown();
+  });
   app.on('will-quit', beginShutdown);
 
   app.on('window-all-closed', () => {

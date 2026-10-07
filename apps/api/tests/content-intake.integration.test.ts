@@ -129,6 +129,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const logged = await seat('enabler');
     const app = Fastify();
     app.get('/v1/auth/me', async (request, reply) => (await authenticateRequestHeaders(auth!, request.headers)) ?? reply.code(401).send());
+    await app.register(contentIntakeUsageRoutes, { auth: auth!, usage: service });
     await app.register(contentIntakeManagementRoutes, { auth: auth!, pool: hostPool, store: customStore,
       ...(transport ? { approval: createApprovalAdapter(route, transport) } : {}),
       report: (_id, error) => diagnostics.push(error) });
@@ -987,6 +988,40 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       value(await service.grantBatch(actor('director'),req));
     }
   }
+
+  it('candidate discovery: session and scope bound keyset paging with live state filters', async () => {
+    const one = await candidate('menu-one'), two = await candidate('menu-two');
+    const user = (await seat('enabler')).actor;
+    expect(value(await service.candidates((await seat()).actor, {})).items).toEqual([]);
+    expect(await service.candidates(user, { sourceId: 'source-b' })).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    expect(await service.candidates(user, { unknown: 'x' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+    const first = value(await service.candidates(user, { limit: 1 }));
+    const second = value(await service.candidates(user, { limit: 1, cursor: first.nextCursor }));
+    expect(new Set([...first.items, ...second.items].map(c => c.key.candidateId))).toEqual(new Set([one.key.candidateId, two.key.candidateId]));
+    expect(second.nextCursor).toBeNull();
+    expect(await service.candidates((await seat('enabler','other-session')).actor, { cursor: first.nextCursor })).toMatchObject({ ok: false });
+    expect(await service.candidates(user, { cursor: first.nextCursor, state: 'published' })).toMatchObject({ ok: false });
+    // Persisted ready is not authoritative after the reviewer loses qualification.
+    for (const c of [one, two]) {
+      value((await confirm(c, `menu-confirm-${c.key.candidateId}`)).result);
+      value(await service.requestReview(actor('enabler'), reviewRequest(c, 0, `menu-review-${c.key.candidateId}`)));
+      provider.approve('reviewer');
+      value(await service.refreshReview(actor('enabler'), reviewRequest(c, 1, `menu-refresh-${c.key.candidateId}`)));
+    }
+    value(await service.changeGrant(actor('director'), 'business-reviewer-review', { operationId: 'menu-revoke-reviewer', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+    expect(value(await service.candidates(user, { state: 'ready', limit: 1 }))).toMatchObject({ items: [], nextCursor: expect.any(String) });
+    expect(value(await service.candidates(user, { state: 'awaiting-evidence' })).items).toHaveLength(2);
+    const host = await managementHost();
+    try {
+      const response = await host.app.inject({ url: '/v1/intake/candidates?limit=1', headers: host.headers });
+      expect(response.statusCode, response.body).toBe(200); parseContractSchema('IntakeCandidateList', response.json());
+      value(await service.changeGrant(actor('director'), 'business-enabler-content-manage', { operationId: 'menu-revoke-enabler', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+      expect(await service.candidates(user, { cursor: first.nextCursor })).toMatchObject({ ok: false });
+      expect(value(await service.candidates(user, {})).items).toEqual([]);
+      await auth!.logout((await seat('enabler')).token);
+      expect(await service.candidates(user, {})).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    } finally { await host.app.close(); }
+  }, 30_000);
 
   it('discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants', async () => {
     const user=(await seat()).actor;

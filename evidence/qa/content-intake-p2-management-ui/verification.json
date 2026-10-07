@@ -1,0 +1,111 @@
+{
+  "scope": "synthetic P2 candidate and manual-quality Dashboard",
+  "baseCommit": "19eefc4db852a2106bc9b44432aaa3ef306d6e2b",
+  "branch": "codex/content-intake-p2",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "macOS": "26.5.2",
+    "arch": "arm64",
+    "PostgreSQL": "15.18"
+  },
+  "codeInputs": {
+    "apps/api/src/content-intake/discovery.ts": "050c3b105a8d3b1c53de8223f1a9cd8074ec041f5ef5d946d2fa686d1a5c1c3d",
+    "apps/api/src/content-intake/management-http.ts": "20aa1eb6c7fbc1c26bd1505d84bec8093e4271c18d9d2680f68a5750222c8c80",
+    "apps/api/tests/content-intake.integration.test.ts": "caf2acddaf5a57da8896cfa0c87f28b1976d6c2ec45ad944fc02e2c69da674a8",
+    "apps/desktop/src/main/content-intake-management-ipc.ts": "9173cd0f8ba91d98187dae6c4b0c0cb5a6d3be7825b80f9a26bec60f5bb6921c",
+    "apps/desktop/src/main/content-intake-management.ts": "ed3150482bf2633b1a13f7fd820f7c1e7e4b49e08b289ed3d1671718155e1968",
+    "apps/desktop/src/main/content-intake-quality.ts": "8b741a98fa9ab4f53861b50049c4eea4de2250fb387f3d227a04a566eb2bc54e",
+    "apps/desktop/src/main/main.ts": "5bbbb6ec640ea75fed6e773cd3bc99103241887c1c6a7116f7a351aa4ec7489c",
+    "apps/desktop/src/preload/dashboard.ts": "fae975058b90f896a78a10a7caa150f73b74055ef65c894078b595f111e7a3f1",
+    "apps/desktop/src/preload/global.d.ts": "74696277aa0eb40cc9a96f93513c11a243245aff2867abf793a8dadf90f06164",
+    "apps/desktop/src/renderer/DashboardApp.tsx": "85bc35f7031b9c74264675be19c655215ee045e1ba417ef1776007e5889aee19",
+    "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx": "95c96a7531d05f3a8081dd8a2070e3b064d46a4551683c92134b5b40a5eb27b3",
+    "apps/desktop/src/renderer/features/dashboard/intake-management.css": "cb87e365026146953e9524a15d533fe3db95dea98841d2598324dd3c52fdde32",
+    "apps/desktop/src/shared/content-intake-management.ts": "61e5f613d98efeefcae8336a23295fc8b6c3abc26444804cd3d96b998a79c678",
+    "apps/desktop/tests/component/intake-management.test.tsx": "2db91e4cbcea48ac735969d59e9025c7d1759b21276cd40c3b232617b87f9bc7",
+    "apps/desktop/tests/e2e/content-intake-management.spec.ts": "73b16232f734846b8e9b34280b306b01f9b684b736fe948afcbb316fdded9c03",
+    "apps/desktop/tests/e2e/content-intake-query.spec.ts": "d44bbf7a84172768e0d5382161befe7c851359a56b41cf50a84054150d6fbb81",
+    "apps/desktop/tests/fixtures/intake-management-data.ts": "87c97d25f250ccc0ca465c823f818be9e5f9f7fec43dc5eab507f7a91bb9d998",
+    "apps/desktop/tests/unit/content-intake-management-ipc.test.ts": "5467a454ec4904af1043ba3f8c7384d82062f6c5154a039e794312e8e88346db",
+    "apps/desktop/tests/unit/content-intake-management.test.ts": "ebddac3393bb82e99c7b70dfeb68d6fe3638fbc2f38274804c80d651e92448f0",
+    "apps/desktop/tests/unit/content-intake-quality-http.test.ts": "16e26021a4404b111db49ae1ce99adce3beb1b2994ae2daaa6077f250a8bb58a",
+    "apps/desktop/tests/unit/contracts.test.ts": "8e0109b6dd5acb9202aa4cf5200091062a3ea0191ad83e2ba3b14315c20c7c2f",
+    "apps/desktop/tests/unit/shutdown-fence.test.ts": "6bb7684bf0039d7dab8f36031804680332de9a876b927c0a80f615055a7d75d3"
+  },
+  "results": [
+    {
+      "command": "pnpm lint",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management/lint-r3.log",
+      "logSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management/typecheck-r3.log",
+      "logSha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management/test-final-r3.log",
+      "logSha256": "7ac9779fc7cb3ddfefc8eb1fa3f5316de184b79efffc631dab1f17f1fb506477"
+    },
+    {
+      "command": "pnpm build",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management/build-final-r3.log",
+      "logSha256": "7dd0a30ce4fb30da53bfbcda324f78db2a7ad6ebc910a6e46a08643581f9074d"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management/workspace-final.log",
+      "logSha256": "96cbe2f2d3ad70c5419bb3e7677c7739103b89d8557cdc4dbba659c7003fb3bc"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management/pg-all.log",
+      "logSha256": "f900baed28902606513aa2fb16b6d665d054063754d544da3619a47ac93a9a0a"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-management.test.ts tests/unit/content-intake-management-ipc.test.ts tests/unit/content-intake-quality.test.ts tests/component/intake-management.test.tsx",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management/targeted-final.log",
+      "logSha256": "ac0d078a2d397959a815a3311a80bd967bfbedbc1dddd1ab3b06a066d0303105"
+    }
+  ],
+  "counts": {
+    "targeted": 31,
+    "postgresIntegration": 126,
+    "electron": 2,
+    "desktopDefault": 1184
+  },
+  "finalQA": {
+    "producerEvidenceSha256": "07bb1496d33f1acdf8fa2356dbd223070bda86bf605dec44e27eb9269a3d30e5",
+    "report": ".gstack/qa-reports/content-intake-management/report.md",
+    "captures": [
+      "001",
+      "002"
+    ],
+    "status": "PASS"
+  },
+  "review": {
+    "mode": "OCR delegate + host + native in-host",
+    "externalModels": "disabled",
+    "fixedFindings": 5,
+    "remainingConfirmedFindings": 0,
+    "ocrSourceFiles": 12,
+    "nativeFixtureMode": "summary only; host fully reviewed tests"
+  },
+  "limits": [
+    "synthetic approval transport only",
+    "no production factory/ACL/activation",
+    "Windows and WSL not tested in this run",
+    "native close/quit choices automated, not human acceptance",
+    "fresh upload/source-confirmation/organizational approval/publication UI still incomplete"
+  ],
+  "gitAuthorization": "local commit only; no push/PR/merge/deploy"
+}

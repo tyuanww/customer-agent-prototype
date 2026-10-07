@@ -41,6 +41,8 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
 }> = async (app, { auth, pool, store, approval, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
   const service = createContentIntakeService(pool, store, report, approval, { requireProductSession: true });
+  app.get('/v1/intake/candidates', { exposeHeadRoute: false }, async (request, reply) =>
+    sendIntake(reply, await service.candidates(actor(request), intakePageQuery(request)), 'IntakeCandidateList'));
   const stopping = new AbortController();
   let pending = 0;
   let tail = Promise.resolve();

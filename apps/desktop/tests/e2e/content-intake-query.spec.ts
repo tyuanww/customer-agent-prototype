@@ -90,13 +90,17 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     expect(await fox.evaluate(() => window.customerAgent!.intakeQuery!.access())).toMatchObject({ code: 'FORBIDDEN' });
     expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'other-shop' }))).toMatchObject({ code: 'FORBIDDEN' });
     expect(await query.evaluate(() => window.customerAgent!.copyText('forged'))).toMatchObject({ ok: false });
-    expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: false });
+    expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
+    await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
+    const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
+    await expect(dashboard.getByText('当前没有可用的资料管理权限，请确认登录身份与店铺授权。')).toBeVisible();
+    await expect(dashboard.getByRole('button', { name: '冻结本次抽样' })).toHaveCount(0);
     const nativeMenu = await app.evaluate(({ app: nativeApp, Menu, BrowserWindow }) => {
       nativeApp.emit('activate');
       return { labels: Menu.getApplicationMenu()?.getMenuItemById('customer-agent-menu')?.submenu?.items.map(i => i.label),
         dashboardCount: BrowserWindow.getAllWindows().filter(w => w.webContents.getURL().includes('role=dashboard')).length };
     });
-    expect(nativeMenu.labels).not.toContain('打开运营工作台'); expect(nativeMenu.dashboardCount).toBe(0);
+    expect(nativeMenu.labels).toContain('打开运营工作台'); expect(nativeMenu.dashboardCount).toBe(1);
 
     expect(await query.evaluate(() => ({ node: typeof window.require, process: typeof window.process }))).toEqual({ node: 'undefined', process: 'undefined' });
     expect(requests.some(p => p.startsWith('/v1/announce') || p === '/v1/search')).toBe(false);

@@ -1,3 +1,4 @@
+import { transpileModule, ModuleKind } from 'typescript';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -129,7 +130,10 @@ describe('IPC whitelist', () => {
   });
 
   it('keeps the dashboard wording preload free of shared overlay modules', () => {
-    expect(dashboardPreload).not.toContain("from '../shared/");
+    // Type-only references disappear before bundling; runtime shared imports
+    // would create a chunk that Electron's Windows sandbox cannot load.
+    const runtime = transpileModule(dashboardPreload, { compilerOptions: { module: ModuleKind.ESNext } }).outputText;
+    expect(runtime).not.toMatch(/(?:from|import)\s*['"]\.\.\/shared\//);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_WORDING_LIST}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_SESSION}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PARSE}'`);

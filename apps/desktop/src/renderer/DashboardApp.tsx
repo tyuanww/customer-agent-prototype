@@ -1,3 +1,4 @@
+import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
   useMemo,
@@ -73,6 +74,19 @@ type NavTooltipState = {
 };
 
 export function DashboardApp() {
+  const [mode, setMode] = useState<'loading' | 'legacy' | 'intake' | 'failed'>(window.dashboardIntake ? 'loading' : 'legacy');
+  useEffect(() => {
+    if (!window.dashboardIntake) return;
+    let active = true;
+    void window.dashboardIntake.mode().then(r => { if (active) setMode(r.ok ? r.enabled ? 'intake' : 'legacy' : 'failed'); })
+      .catch(() => { if (active) setMode('failed'); });
+    return () => { active = false; };
+  }, []);
+  if (mode === 'intake') return <IntakeManagement />;
+  if (mode !== 'legacy') return <p role="status">{mode === 'loading' ? '正在读取管理模式…' : '管理模式不可用，请重新打开窗口。'}</p>;
+  return <LegacyDashboardApp />;
+}
+function LegacyDashboardApp() {
   const [active, setActive] = useState<DashboardModuleId>('overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
