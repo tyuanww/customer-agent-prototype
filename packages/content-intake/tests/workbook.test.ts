@@ -21,6 +21,52 @@ describe('P1 mature XLSX parser and real output roundtrip', () => {
     expect(result.rows[0]!.body).toBe(sampleRows[0]![2]);
     expect(result.excluded.map((s) => s.sheet)).toEqual(['说明', '虚构示例']);
   });
+  it('roundtrips the explicit family syntax through the template and isolated parser', async () => {
+    const shop = { ...context, scope: 'shop-a' };
+    const row = [...sampleRows[0]!]; row[10] = 'brand-source/entry:root-1';
+    const bytes = await createTemplate(shop, [row]);
+    const result = await parseWorkbook(bytes, shop);
+    expect(result.ok).toBe(true); expect(result.rows[0]!.values[10]).toBe(row[10]);
+    expect((await createParseRunner().parse(bytes, shop)).result).toEqual(result);
+    const book = new ExcelJS.Workbook(); await book.xlsx.load(bytes as unknown as ExcelJS.Buffer);
+    expect(book.getWorksheet('说明')!.getCell('A2').text).toContain('sourceId/businessEntryId');
+    expect(book.getWorksheet('说明')!.getCell('A2').text).toContain('留空表示无关联');
+  });
+  it.each(['root', 'root/', '/entry', 'root/entry/extra', ' root/entry', 'root/entry ', 'root/条目',
+    'EXAMPLE_source/entry', 'root/EXAMPLE_entry', `${'a'.repeat(129)}/entry`, `root/${'a'.repeat(129)}`, `${context.sourceId}/entry`])(
+    'blocks the whole workbook with a K coordinate for invalid family %s', async (family) => {
+      const shop = { ...context, scope: 'shop-a' }, rows = sampleRows.map(row => [...row]); rows[0]![10] = family;
+      const result = await parseWorkbook(await createTemplate(shop, rows), shop);
+      expect(result.ok).toBe(false); expect(result.rows).toEqual([]); expect(result.questions).toEqual([]);
+      expect(result.issues).toContainEqual(expect.objectContaining({ code: 'INVALID_FAMILY', sheet: 'FAQ', row: 2, column: 'K' }));
+    });
+  it('rejects a brand source association and accepts empty K in either scope', async () => {
+    const row = [...sampleRows[0]!]; row[10] = 'other-source/entry';
+    const brand = { ...context, scope: 'brand', scopeKind: 'brand' as const };
+    const blocked = await parseWorkbook(await createTemplate(brand, [row]), brand);
+    expect(blocked.rows).toEqual([]);
+    expect(blocked.issues).toContainEqual(expect.objectContaining({ code: 'INVALID_FAMILY', column: 'K' }));
+    row[10] = '';
+    for (const scope of ['brand', 'shop-a']) {
+      const selected = { ...context, scope, scopeKind: scope === 'brand' ? 'brand' as const : 'shop' as const };
+      expect((await parseWorkbook(await createTemplate(selected, [row]), selected)).ok).toBe(true);
+    }
+  });
+  it('distinguishes a registered shop named brand from a brand-wide source', async () => {
+    const shop = { ...context, scope: 'brand', scopeKind: 'shop' as const };
+    const row = [...sampleRows[0]!]; row[10] = 'generic-source/entry';
+    const bytes = await createTemplate(shop, [row]);
+    expect((await createParseRunner().parse(bytes, shop)).result.ok).toBe(true);
+    const book = new ExcelJS.Workbook(); await book.xlsx.load(bytes as unknown as ExcelJS.Buffer);
+    expect(book.getWorksheet('来源')!.getCell('D2').text).toBe('brand');
+    row[10] = ''; row[14] = 'true';
+    const protectedBytes = await createTemplate(shop, [row]);
+    const blocked = await parseWorkbook(protectedBytes, shop);
+    expect(blocked.rows).toEqual([]);
+    expect(blocked.issues).toContainEqual(expect.objectContaining({ code: 'BRAND_OVERRIDE', column: 'O' }));
+    expect((await parseWorkbook(protectedBytes, { ...shop, scopeKind: 'brand' })).ok).toBe(true);
+    expect((await parseWorkbook(bytes, { ...shop, scopeKind: undefined } as unknown as typeof shop)).issues[0]?.code).toBe('INVALID_CONTEXT');
+  });
   it('only missing C3 yields one actionable error; report reopens and fixing the workbook succeeds', async () => {
     const result = await parseWorkbook(await fixture({ missingC3: true }), context);
     expect(result.rows).toEqual([]);

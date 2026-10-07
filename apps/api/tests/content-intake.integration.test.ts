@@ -124,7 +124,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   async function input(op: string, prior: C['IntakeCandidateKey'] | null = null, rows = [
     ['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','风险提示','','false'],
   ], source = 'a'): Promise<C['IntakeReceive']> {
-    const bytes = await createTemplate({ sourceId: `source-${source}`, brandId: 'brand-a', scope: source==='brand' ? 'brand' : `shop-${source}`, domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' }, rows);
+    const registered = (await admin.query<{ brand_id: string; shop_id: string | null; domain: C['IntakeScope']['domain'] }>(
+      'SELECT brand_id,shop_id,domain FROM content_intake.sources JOIN content_intake.scopes USING(scope_id) WHERE source_id=$1', [`source-${source}`])).rows[0]!;
+    const bytes = await createTemplate({ sourceId: `source-${source}`, brandId: registered.brand_id, scope: registered.shop_id ?? 'brand', domain: registered.domain, sheet: 'FAQ', templateVersion: 'faq-p1.1' }, rows);
     const obj = await store.persist((async function* () { yield bytes; })(), 'excel');
     await admin.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
       VALUES ($1,$5,'enabler','tenant-a','app-a',$2,$3,$4,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','input',clock_timestamp())`,
@@ -1690,6 +1692,256 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         'parent_grant_id',CASE WHEN parent_grant_id IS NULL THEN NULL ELSE parent_grant_id||'-'||$1 END))).*
       FROM content_intake.grants g WHERE scope_id='scope-a' ORDER BY (kind='allocation') DESC`,[suffix]);
   }
+
+  // Family scenarios use the public workbook grammar and ordinary approval flow;
+  // only organization/source registration is synthetic setup.
+  function familyRow(id: string, options: { family?: string; body?: string; title?: string; products?: string; scenarios?: string;
+    from?: string; to?: string; disabled?: boolean; protected?: boolean } = {}) {
+    return [id, options.title ?? '合成相同问题标题', options.body ?? `${id} 第一行。\n第二行。`, options.products ?? '', options.scenarios ?? '',
+      '分类', '', options.disabled ? '停用' : '启用', options.from ?? '', options.to ?? '', options.family ?? '', '仅管理内部说明', '', '', String(options.protected ?? false)];
+  }
+  async function familySource(suffix: string, shopId: string | null, brandId = 'brand-a', domain: C['IntakeScope']['domain'] = 'product') {
+    await admin.query('BEGIN');
+    await admin.query('INSERT INTO content_intake.scopes VALUES ($1,\'tenant-a\',\'app-a\',$2,$3,$4)', [`scope-${suffix}`,brandId,shopId,domain]);
+    await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ($1,$2,1,'v2-preview')", [`source-${suffix}`,`scope-${suffix}`]);
+    await admin.query("INSERT INTO content_intake.source_mappings VALUES ($1,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))", [`source-${suffix}`]);
+    await cloneScopeGrants(suffix);
+    await admin.query('COMMIT');
+  }
+  async function familySiblingSource() {
+    await admin.query('BEGIN');
+    await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ('source-a-second','scope-a',1,'v2-preview')");
+    await admin.query("INSERT INTO content_intake.source_mappings VALUES ('source-a-second',1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))");
+    await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+      to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-second','source_id','source-a-second'))).*
+      FROM content_intake.grants g WHERE source_id='source-a' AND kind='business'`);
+    await admin.query('COMMIT');
+  }
+  async function familyPublish(label: string, rows: string[][], source = 'a') {
+    const prepared = await publishable(label,rows,source);
+    return { ...prepared, receipt: value(await service.publish(actor('enabler'),prepared.request)) };
+  }
+  async function familySnapshot(context = usage, limit = 1) {
+    const entitlement = value(await issue(context));
+    const entries: C['IntakeSnapshot']['faq'] = [];
+    const pageSizes: number[] = [];
+    let cursor: string | null = null;
+    do {
+      const page: C['IntakeSnapshot'] = value(await snapshot(entitlement.entitlementId,{limit,...(cursor ? {cursor} : {})}));
+      expect(page.releaseId).toBe(entitlement.releaseId);
+      entries.push(...page.faq);pageSizes.push(page.faq.length);cursor=page.nextCursor;
+    } while(cursor);
+    expect(new Set(entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).size).toBe(entries.length);
+    return {entries,pageSizes,entitlement};
+  }
+  async function familyVocabulary() {
+    for (const [id,kind] of [['product-one','product'],['product-two','product'],['scenario-one','scenario'],['scenario-two','scenario']]) {
+      await admin.query("INSERT INTO content_intake.vocabulary VALUES ($1,'scope-brand',$2,repeat('a',64),true)",[id,kind]);
+      await admin.query("INSERT INTO content_intake.vocabulary_displays VALUES ($1,1,'合成适用词项')",[id]);
+    }
+  }
+
+  it('family: explicit source/entry roots select each shop override before pagination without merging equal titles', async()=>{
+    await publicationBase();await cloneScopeGrants('brand');await cloneScopeGrants('b');
+    await familyPublish('family-roots',[familyRow('root'),familyRow('unrelated',{body:'同名独立通用条目'})],'brand');
+    await familyPublish('family-shop-a',[familyRow('local',{family:'source-brand/root',body:'A店第一行。\nA店第二行。'})]);
+    await familyPublish('family-shop-b',[familyRow('local',{family:'source-brand/root',body:'B店专用原文'})],'b');
+    const a=await familySnapshot();
+    expect(a.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).toEqual(['source-a/local','source-brand/unrelated']);
+    expect(a.pageSizes).toEqual([1,1]);
+    expect(a.entries.map(e=>e.entry.answerText)).toEqual(['A店第一行。\nA店第二行。','同名独立通用条目']);
+    expect(JSON.stringify(a.entries)).not.toContain('仅管理内部说明');
+    const b=await familySnapshot({...usage,shopId:'shop-b'});
+    expect(b.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual(['source-b/local','source-brand/unrelated']);
+    expect(b.entries.find(e=>e.sourceId==='source-b')!.entry.answerText).toBe('B店专用原文');
+    const material=(await admin.query('SELECT material FROM content_intake.candidate_versions WHERE source_id=\'source-a\'')).rows[0].material;
+    expect(material.entries[0]).toMatchObject({familySourceId:'source-brand',familyBusinessEntryId:'root'});
+  },60_000);
+
+  it('family: inapplicable time, product and scenario overrides fall back to their exact generic roots', async()=>{
+    await publicationBase();await cloneScopeGrants('brand');await familyVocabulary();
+    const roots=['future','expired','product','scenario','combined'];
+    await familyPublish('fallback-roots',roots.map(id=>familyRow(id)),'brand');
+    await familyPublish('fallback-overrides',[
+      familyRow('future-local',{family:'source-brand/future',from:'2098-01-01T00:00:00Z'}),
+      familyRow('expired-local',{family:'source-brand/expired',from:'2020-01-01T00:00:00Z',to:'2021-01-01T00:00:00Z'}),
+      familyRow('product-local',{family:'source-brand/product',products:'product-one'}),
+      familyRow('scenario-local',{family:'source-brand/scenario',scenarios:'scenario-one'}),
+      familyRow('combined-local',{family:'source-brand/combined',products:'product-one',scenarios:'scenario-one'}),
+    ]);
+    const without=await familySnapshot();
+    expect(without.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual(roots.map(id=>`source-brand/${id}`).sort());
+    expect(without.pageSizes).toEqual([1,1,1,1,1]);
+    const matched=await familySnapshot({...usage,productIds:['product-one'],scenarioIds:['scenario-one']},2);
+    expect(matched.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual([
+      'source-a/combined-local','source-a/product-local','source-a/scenario-local','source-brand/expired','source-brand/future']);
+    expect(matched.pageSizes).toEqual([2,2,1]);
+    const productOnly=await familySnapshot({...usage,productIds:['product-one']});
+    expect(productOnly.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual([
+      'source-a/product-local','source-brand/combined','source-brand/expired','source-brand/future','source-brand/scenario']);
+  },60_000);
+
+  it('family: actual HTTP and Main query/copy consume shop overrides and another shop generic fallback',async()=>{
+    await publicationBase();await cloneScopeGrants('brand');await cloneScopeGrants('b');
+    const generic='品牌通用第一行。\n品牌通用第二行。',local='A店专用第一行。\nA店专用第二行。',independent='相同标题但独立的合成答案。';
+    await familyPublish('main-family-root',[familyRow('root',{body:generic}),familyRow('unrelated',{body:independent})],'brand');
+    const published=await familyPublish('main-family-local',[familyRow('local',{family:'source-brand/root',body:local})]);
+    const logged=await seat(),server=Fastify({logger:false,exposeHeadRoutes:false});
+    let child:ReturnType<typeof spawn>|undefined,ended:Promise<unknown[]>|undefined,timeout:ReturnType<typeof setTimeout>|undefined;
+    try {
+      server.get('/v1/auth/me',async(request,reply)=>(await authenticateRequestHeaders(auth!,request.headers))??reply.code(401).send());
+      server.post('/v1/auth/logout',async(request,reply)=>{
+        const header=request.headers.authorization;if(header?.startsWith('Bearer '))await auth!.logout(header.slice(7));
+        return reply.code(204).send();
+      });
+      await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:service});
+      const origin=await server.listen({host:'127.0.0.1',port:0});
+      child=spawn(process.execPath,[fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs',import.meta.url))],{stdio:['pipe','pipe','pipe']});
+      ended=once(child,'close');let stdout='',stderr='';
+      child.stdout!.on('data',chunk=>{stdout+=String(chunk);});child.stderr!.on('data',chunk=>{stderr+=String(chunk);});
+      timeout=setTimeout(()=>child?.kill('SIGTERM'),45_000);
+      child.stdin!.end(JSON.stringify({origin,token:logged.token,expiresAt:logged.expiresAt,releaseId:published.receipt.releaseId,family:true,
+        cases:[{shopId:'shop-a',answers:[local,independent]},{shopId:'shop-b',answers:[generic,independent]}]}));
+      expect((await ended)[0],stderr).toBe(0);
+      expect(JSON.parse(stdout)).toEqual({status:'PASS',actualSession:true,family:true,shopFallback:true,publishedText:true,queryCopy:true});
+      expect(stdout+stderr).not.toContain(logged.token);
+    } finally {
+      clearTimeout(timeout);
+      if(child&&ended) {
+        const kill=setTimeout(()=>child?.kill('SIGKILL'),2_000);
+        if(child.exitCode===null)child.kill('SIGTERM');
+        try {await ended;} finally {clearTimeout(kill);}
+      }
+      await server.close();
+    }
+  },60_000);
+
+  it.each(['missing-root','foreign-brand','foreign-domain','linked-root','same-shop-overlap','cross-source-overlap','protected-root'] as const)(
+    'family: publication rejects %s atomically after actual parsing and human review',async conflict=>{
+      await publicationBase();await cloneScopeGrants('brand');
+      let target='source-brand/root';
+      if(conflict==='foreign-brand'||conflict==='foreign-domain') {
+        await familySource('foreign',null,conflict==='foreign-brand'?'brand-b':'brand-a',conflict==='foreign-domain'?'campaign':'product');
+        await familyPublish('foreign-root',[familyRow('root',{to:'2098-01-01T00:00:00Z'})],'foreign');target='source-foreign/root';
+      } else if(conflict!=='missing-root') {
+        await familyPublish('conflict-root',[familyRow('root',{protected:conflict==='protected-root'})],'brand');
+      }
+      let source='a';
+      if(conflict==='linked-root') {
+        await familyPublish('linked-root',[familyRow('child',{family:target})]);
+        await cloneScopeGrants('b');source='b';target='source-a/child';
+      }
+      if(conflict==='cross-source-overlap') {
+        await familyPublish('first-source-override',[familyRow('override-one',{family:target})]);
+        await familySiblingSource();source='a-second';
+      }
+      const rows=[familyRow('override-one',{family:target})];
+      if(conflict==='same-shop-overlap') rows.push(familyRow('override-two',{family:target}));
+      const prepared=await publishable(`conflict-${conflict}`,rows,source);
+      const before=(await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id;
+      const published=(await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count;
+      const announcements=(await admin.query('SELECT count(*) FROM public.announcements')).rows[0].count;
+      expect(await service.publish(actor('enabler'),prepared.request)).toMatchObject({ok:false,reason:'SOURCE_MISMATCH'});
+      expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(before);
+      expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe(published);
+      expect((await admin.query('SELECT count(*) FROM public.announcements')).rows[0].count).toBe(announcements);
+      expect(value(await service.candidate(actor('enabler'),prepared.c.key.candidateId,prepared.c.key.version)).state).not.toBe('published');
+    },60_000);
+
+  it.each(['products','scenarios','half-open-time'] as const)('family: nonoverlapping %s allow two same-shop overrides',async dimension=>{
+    await publicationBase();await cloneScopeGrants('brand');await familyVocabulary();
+    await familyPublish('disjoint-root',[familyRow('root')],'brand');
+    const first={family:'source-brand/root'},second={family:'source-brand/root'};
+    const conditions=dimension==='products'?[{products:'product-one'},{products:'product-two'}]
+      :dimension==='scenarios'?[{scenarios:'scenario-one'},{scenarios:'scenario-two'}]
+        :[{from:'2020-01-01T00:00:00Z',to:'2021-01-01T00:00:00Z'},{from:'2021-01-01T00:00:00Z'}];
+    await familyPublish(`disjoint-${dimension}`,[familyRow('first',{...first,...conditions[0]}),familyRow('second',{...second,...conditions[1]})]);
+    const selected=dimension==='products'?{...usage,productIds:['product-two']}:dimension==='scenarios'?{...usage,scenarioIds:['scenario-two']}:usage;
+    expect((await familySnapshot(selected)).entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).toEqual(['source-a/second']);
+  },60_000);
+
+  it('family: a disabled override does not block later explicit disable of its generic root',async()=>{
+    await publicationBase();await cloneScopeGrants('brand');
+    await familyPublish('disable-root',[familyRow('root')],'brand');
+    await familyPublish('disable-child',[familyRow('child',{family:'source-brand/root'})]);
+    await familyPublish('disable-child-next',[familyRow('child',{family:'source-brand/root',disabled:true})]);
+    expect((await familySnapshot()).entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).toEqual(['source-brand/root']);
+    await familyPublish('disable-root-next',[familyRow('root',{disabled:true})],'brand');
+    expect((await familySnapshot()).entries).toEqual([]);
+  },60_000);
+
+  it('family: multiple selections retain every uncovered root cell and suppress only complete override coverage',async()=>{
+    await publicationBase();await cloneScopeGrants('brand');await familyVocabulary();
+    await familyPublish('multiselect-roots',[
+      familyRow('protected',{products:'product-one',protected:true}),familyRow('wildcard'),
+      familyRow('restricted',{products:'product-one,product-two'}),familyRow('covered'),familyRow('cross-gap'),
+    ],'brand');
+    await familyPublish('multiselect-children',[
+      familyRow('protected-two',{family:'source-brand/protected',products:'product-two'}),
+      familyRow('wildcard-one',{family:'source-brand/wildcard',products:'product-one'}),
+      familyRow('restricted-one',{family:'source-brand/restricted',products:'product-one'}),
+      familyRow('covered-one',{family:'source-brand/covered',products:'product-one',scenarios:'scenario-one,scenario-two'}),
+      familyRow('covered-two',{family:'source-brand/covered',products:'product-two',scenarios:'scenario-one,scenario-two'}),
+      familyRow('cross-one',{family:'source-brand/cross-gap',products:'product-one',scenarios:'scenario-one'}),
+      familyRow('cross-two',{family:'source-brand/cross-gap',products:'product-two',scenarios:'scenario-two'}),
+    ]);
+    const context={...usage,productIds:['product-one','product-two'],scenarioIds:['scenario-one','scenario-two']};
+    const result=await familySnapshot(context,3);
+    expect(result.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual([
+      'source-a/covered-one','source-a/covered-two','source-a/cross-one','source-a/cross-two',
+      'source-a/protected-two','source-a/restricted-one','source-a/wildcard-one',
+      'source-brand/cross-gap','source-brand/protected','source-brand/restricted','source-brand/wildcard']);
+    expect(result.pageSizes).toEqual([3,3,3,2]);
+    expect((await familySnapshot({...context,productIds:['product-one'],scenarioIds:['scenario-one']},3)).entries
+      .filter(e=>e.sourceId==='source-brand').map(e=>e.entry.businessEntryId)).toEqual(['protected']);
+  },60_000);
+
+  it('family: a historical catalog guard rejection fails closed for issuance and every existing snapshot page',async()=>{
+    await publicationBase();await cloneScopeGrants('brand');
+    await familyPublish('guard-root',[familyRow('root')],'brand');
+    await familyPublish('guard-child',[familyRow('child',{family:'source-brand/root'})]);
+    const entitlement=value(await issue()),logged=await seat();
+    const count=(await admin.query('SELECT count(*) FROM content_intake.entitlements')).rows[0].count;
+    // Fault injection at the shared SQL guard models a historical catalog which
+    // no longer satisfies the invariant, without editing immutable evidence.
+    let rejected=0;
+    const guarded:IntakePool={async connect(){
+      const client=await pool.connect();return new Proxy(client,{get(target,key){
+        if(key==='query')return async(sql:string,args?:unknown[])=>{
+          if(sql==='SELECT content_intake.assert_family_catalog($1::text)') {
+            rejected++;throw Object.assign(new Error('SOURCE_MISMATCH'),{code:'ZA003'});
+          }
+          return target.query(sql,args);
+        };
+        const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+      }}) as PoolClient;
+    }};
+    const reader=createContentIntakeService(guarded,store);
+    const expected={ok:false,code:'FORBIDDEN',reason:'SOURCE_MISMATCH',commit:'rolled_back'};
+    expect(await reader.issueEntitlement(logged.actor,{...usage,releaseId:null})).toMatchObject(expected);
+    expect(await reader.snapshot(logged.actor,{entitlementId:entitlement.entitlementId,limit:1})).toMatchObject(expected);
+    expect(rejected).toBe(2);
+    expect((await admin.query('SELECT count(*) FROM content_intake.entitlements')).rows[0].count).toBe(count);
+  },60_000);
+
+  it('family: use qualifications expire at both override boundaries before switching generic and shop answers',async()=>{
+    await publicationBase();await cloneScopeGrants('brand');
+    await familyPublish('lease-root',[familyRow('root',{body:'边界外的通用答案'})],'brand');
+    const starts=Math.floor(Date.now()/1000)*1000+8000,ends=starts+2000;
+    const startText=new Date(starts).toISOString(),endText=new Date(ends).toISOString();
+    await familyPublish('lease-child',[familyRow('child',{family:'source-brand/root',body:'边界内的店铺答案',
+      from:startText.replace('.000Z','Z'),to:endText.replace('.000Z','Z')})]);
+    const before=value(await issue());expect(before.validUntil).toBe(startText);
+    expect(value(await snapshot(before.entitlementId)).faq.map(e=>e.entry.answerText)).toEqual(['边界外的通用答案']);
+    await new Promise(resolve=>setTimeout(resolve,Math.max(0,starts-Date.now())+30));
+    expect(await snapshot(before.entitlementId)).toMatchObject({ok:false,reason:'LEASE_EXPIRED'});
+    const active=value(await issue());expect(active.validUntil).toBe(endText);
+    expect(value(await snapshot(active.entitlementId)).faq.map(e=>e.entry.answerText)).toEqual(['边界内的店铺答案']);
+    await new Promise(resolve=>setTimeout(resolve,Math.max(0,ends-Date.now())+30));
+    expect(await snapshot(active.entitlementId)).toMatchObject({ok:false,reason:'LEASE_EXPIRED'});
+    const after=value(await issue());
+    expect(value(await snapshot(after.entitlementId)).faq.map(e=>e.entry.answerText)).toEqual(['边界外的通用答案']);
+  },60_000);
 
   async function rollbackPair() {
     await publicationBase();

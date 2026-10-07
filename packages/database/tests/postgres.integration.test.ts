@@ -11,6 +11,7 @@ import type {
 } from '../src/types.js';
 import { verifyDatabaseMigrations } from '../src/verifier.js';
 import { Pg15Harness } from '../src/testkit/index.js';
+import { familyCatalog, type FamilyEntry } from './support/family-catalog.js';
 
 interface CountRow extends QueryResultRow { count: number }
 interface TextRow extends QueryResultRow { value: string }
@@ -145,13 +146,197 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
   beforeEach(() => { harness = new Pg15Harness(); harness.start(); }, 60_000);
   afterEach(() => harness.stop(), 60_000);
 
+  it('upgrades the unchanged 27-row prefix and keeps family policy private', async () => {
+    const database=harness.createDatabase('family_upgrade'); const client=await harness.connect(database.config);
+    try {
+      await applyMigrationCatalogue(client,{...generatedMigrationCatalogue,migrations:generatedMigrationCatalogue.migrations.slice(0,27)});
+      const before=await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position');
+      const definition=(await client.query<{definition:string}>("SELECT pg_get_functiondef('content_intake.publish_candidate(text,jsonb,jsonb)'::regprocedure) definition")).rows[0]!.definition;
+      await client.query(definition.replace('BEGIN\n','BEGIN\n  -- simulated predecessor drift\n'));
+      await expect(applyDatabaseMigrations(client)).rejects.toThrow(/Migration 0028_intake_family failed/);
+      expect((await client.query("SELECT to_regprocedure('content_intake.assert_family_catalog(text)') guard")).rows[0].guard).toBeNull();
+      await client.query(definition);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0028_intake_family']);
+      expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=27 ORDER BY position')).rows).toEqual(before.rows);
+      for (const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker']) {
+        await expectSqlState(client,"SELECT content_intake.assert_family_catalog('missing')",'42501',undefined,role);
+      }
+      await expectVerificationFailureAfterMutation(client,'GRANT EXECUTE ON FUNCTION content_intake.assert_family_catalog(TEXT) TO app_runtime');
+      await expectVerificationFailureAfterMutation(client,'ALTER TABLE content_intake.publications DISABLE TRIGGER publication_family_guard');
+      await expectVerificationFailureAfterMutation(client,'ALTER FUNCTION content_intake.assert_family_catalog(TEXT) SECURITY DEFINER');
+    } finally { await client.end(); }
+  });
+
+  it('checks explicit roots and all three applicability dimensions on the complete catalog', async () => {
+    const database=harness.createDatabase('family_policy'); const client=await harness.connect(database.config);
+    const root:FamilyEntry={source:'brand-source',id:'root'};
+    const child:FamilyEntry={source:'shop-source',id:'child',shop:'shop-one',familySourceId:root.source,familyBusinessEntryId:root.id};
+    const second:FamilyEntry={...child,source:'other-source',id:'second'};
+    const cases:readonly [string,FamilyEntry[],boolean][] = [
+      ['root and override',[root,child],true],
+      ['same title no relation',[root,{...child,familySourceId:null,familyBusinessEntryId:null},second],true],
+      ['two shop overrides',[root,child,second],false],
+      ['different shops',[root,child,{...second,shop:'shop-two'}],true],
+      ['disjoint products',[root,{...child,products:['p1']},{...second,products:['p2']}],true],
+      ['disjoint scenarios',[root,{...child,scenarios:['s1']},{...second,scenarios:['s2']}],true],
+      ['wildcard intersects',[root,child,{...second,products:['p2'],scenarios:['s2']}],false],
+      ['half-open adjacency',[root,{...child,to:'2026-02-01T00:00:00Z'},{...second,from:'2026-02-01T00:00:00Z'}],true],
+      ['brand mandatory',[{...root,brandNonOverridable:true},child],false],
+      ['brand mandatory outside products',[{...root,brandNonOverridable:true,products:['p1']},{...child,products:['p2']}],true],
+      ['shop cannot mandate',[root,{...child,brandNonOverridable:true}],false],
+      ['root missing',[child],false],
+      ['root disabled',[{...root,operation:'disable'},child],false],
+      ['both disabled tombstones',[{...root,operation:'disable'},{...child,operation:'disable'}],true],
+      ['root in other brand',[root,{...child,brand:'other-brand'}],false],
+      ['root in other tenant',[root,{...child,tenant:'other-tenant'}],false],
+      ['root in other app',[root,{...child,app:'other-app'}],false],
+      ['root in other domain',[root,{...child,domain:'campaign'}],false],
+      ['root is shop',[{...root,shop:'shop-two'},child],false],
+      ['root has parent',[{...root,familySourceId:child.source,familyBusinessEntryId:child.id},child],false],
+      ['incomplete key',[root,{...child,familyBusinessEntryId:null}],false],
+      ['expired root remains structural',[{...root,to:'2025-02-01T00:00:00Z',from:'2025-01-01T00:00:00Z'},child],true],
+    ];
+    try {
+      await applyDatabaseMigrations(client);
+      for (const [label,entries,allowed] of cases) {
+        await client.query('BEGIN');
+        try {
+          await familyCatalog(client,entries);
+          const result=client.query("SELECT content_intake.assert_family_catalog('family-release')");
+          if (allowed) await expect(result,label).resolves.toMatchObject({rowCount:1});
+          else await expect(result,label).rejects.toMatchObject({code:'ZA003',message:'SOURCE_MISMATCH'});
+        } finally { await client.query('ROLLBACK'); }
+      }
+      await client.query('BEGIN');
+      try {
+        await familyCatalog(client,[root,child]);
+        await client.query('SET LOCAL ROLE cs_ai_definer');
+        await expect(client.query("SELECT content_intake.inherit_legacy_catalog('family-release','next')"))
+          .rejects.toMatchObject({code:'ZA003',message:'legacy publisher cannot inherit explicit family'});
+      } finally { await client.query('ROLLBACK'); }
+    } finally { await client.end(); }
+  });
+
+  it('validates 5000 entries with grouped expansion under a bounded PG budget', async () => {
+    const database=harness.createDatabase('family_scale'); const client=await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client); await client.query('BEGIN');
+      try {
+        const entries:FamilyEntry[]=[];
+        for(let i=0;i<2500;i++) entries.push({source:'brand-source',id:`root-${i}`},
+          {source:'shop-source',id:`child-${i}`,shop:'shop-one',familySourceId:'brand-source',familyBusinessEntryId:`root-${i}`});
+        await familyCatalog(client,entries);
+        // Ten times as many historical entries must not be expanded by the guard.
+        await client.query('SET LOCAL session_replication_role=replica');
+        await client.query(`INSERT INTO content_intake.candidate_versions(candidate_id,version,source_id,scope_id,source_version,object_id,
+          file_sha256,actor_id,base_release_id,canonical_encoding,canonical_material,material,risk,explicit_disable_count,state,created_at,updated_at)
+          SELECT candidate_id,historical,source_id,scope_id,source_version,object_id,file_sha256,actor_id,base_release_id,
+            canonical_encoding,canonical_material,material,risk,explicit_disable_count,'invalidated',created_at,updated_at
+          FROM content_intake.candidate_versions CROSS JOIN generate_series(2,11) historical WHERE version=1`);
+        await client.query('SET LOCAL session_replication_role=origin');
+        await client.query("SET LOCAL statement_timeout='5s'");
+        await expect(client.query("SELECT content_intake.assert_family_catalog('family-release')")).resolves.toMatchObject({rowCount:1});
+      } finally { await client.query('ROLLBACK'); }
+    } finally { await client.end(); }
+  });
+
+  it('keeps fifty usage-page guard checks on 5000 unassociated rows within five seconds', async () => {
+    const database=harness.createDatabase('family_unassociated_pages');const client=await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client);await client.query('BEGIN');
+      try {
+        await familyCatalog(client,Array.from({length:5000},(_,i)=>({source:'brand-source',id:`entry-${i}`})));
+        await client.query("SET LOCAL statement_timeout='5s'");
+        // One statement budgets the complete repeated work, rather than granting
+        // each page its own five seconds and hiding a fifty-fold regression.
+        await expect(client.query(`DO $$ BEGIN FOR page IN 1..50 LOOP
+          PERFORM content_intake.assert_family_catalog('family-release');
+        END LOOP; END $$`)).resolves.toMatchObject({command:'DO'});
+      } finally {await client.query('ROLLBACK');}
+    } finally {await client.end();}
+  });
+
+  it.each(['products','scenarios','half-open-time'] as const)('validates a dense 5000-entry family with disjoint %s under five seconds', async dimension => {
+    const database=harness.createDatabase(`family_dense_${dimension.replaceAll('-','_')}`); const client=await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client);await client.query('BEGIN');
+      try {
+        const entries:FamilyEntry[]=[{source:'brand-source',id:'root'}];
+        for(let i=0;i<4999;i++) {
+          const from=new Date(Date.UTC(2020,0,1)+i*60_000).toISOString(),to=new Date(Date.UTC(2020,0,1)+(i+1)*60_000).toISOString();
+          entries.push({source:'shop-source',id:`child-${i}`,shop:'shop-one',familySourceId:'brand-source',familyBusinessEntryId:'root',
+            ...(dimension==='products'?{products:[`product-${i}`],scenarios:['common-scenario']}
+              :dimension==='scenarios'?{products:['common-product'],scenarios:[`scenario-${i}`]}:{from,to})});
+        }
+        await familyCatalog(client,entries);
+        await client.query("SET LOCAL statement_timeout='5s'");
+        await expect(client.query("SELECT content_intake.assert_family_catalog('family-release')")).resolves.toMatchObject({rowCount:1});
+      } finally {await client.query('ROLLBACK');}
+    } finally {await client.end();}
+  });
+
+  it('matches a fixed-seed pairwise applicability oracle across wildcard and interval-chain catalogs', async () => {
+    const database=harness.createDatabase('family_oracle');const client=await harness.connect(database.config);
+    let seed=0x5eed0028;
+    const random=(limit:number)=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%limit;};
+    const terms=(prefix:string)=>Array.from(new Set(Array.from({length:random(4)},()=>`${prefix}-${random(5)}`)));
+    const overlaps=(a:FamilyEntry,b:FamilyEntry)=> {
+      const intersects=(left:string[]=[],right:string[]=[])=>!left.length||!right.length||left.some(id=>right.includes(id));
+      return intersects(a.products,b.products)&&intersects(a.scenarios,b.scenarios)
+        && Math.max(Date.parse(a.from??'2026-01-01T00:00:00Z'),Date.parse(b.from??'2026-01-01T00:00:00Z'))
+          <Math.min(a.to?Date.parse(a.to):Infinity,b.to?Date.parse(b.to):Infinity);
+    };
+    const allowed=(rows:FamilyEntry[])=> {
+      const active=rows.filter(row=>row.operation!=='disable'&&row.familySourceId);
+      return !active.some((a,i)=>{
+        const root=rows.find(row=>row.source===a.familySourceId&&row.id===a.familyBusinessEntryId)!;
+        return (root.brandNonOverridable&&overlaps(root,a))||active.slice(i+1).some(b=>
+          a.familySourceId===b.familySourceId&&a.familyBusinessEntryId===b.familyBusinessEntryId&&a.shop===b.shop&&overlaps(a,b));
+      });
+    };
+    const time=(n:number)=>new Date(Date.UTC(2026,0,1)+n*60_000).toISOString();
+    const root:FamilyEntry={source:'brand-source',id:'root'};
+    const child=(id:string,from:number,to:number,products:string[],scenarios:string[]):FamilyEntry=>({source:'shop-source',id,shop:'shop-one',
+      familySourceId:root.source,familyBusinessEntryId:root.id,from:time(from),to:time(to),products,scenarios});
+    // Long A bridges B/C; direct half-open adjacency alone cannot split that component.
+    const matrices:FamilyEntry[][]=[
+      [root,child('a',0,10,['p1'],[]),child('b',1,2,['p2'],[]),child('c',3,4,['p1'],[])],
+      [root,child('a',0,2,[],[]),child('b',2,4,[],[]),child('c',4,6,[],[])],
+      [root,child('a',0,10,['p1','p2'],['s1']),child('b',0,10,['p2','p3'],['s2'])],
+      [root,child('a',0,10,[],['s1']),child('b',0,10,['p2'],['s1','s2'])],
+      [root,child('a',0,10,['p1'],[]),child('b',0,10,[],['s2'])],
+    ];
+    for(let sample=0;sample<80;sample++) {
+      const roots:FamilyEntry[]=[root,{...root,id:'root-two',brandNonOverridable:random(5)===0,products:terms('p'),scenarios:terms('s')}];
+      const rows=[...roots];
+      for(let n=0;n<2+random(12);n++) {
+        const from=random(12),shop=`shop-${random(2)}`;
+        rows.push({...child(`row-${n}`,from,from+1+random(8),terms('p'),terms('s')),source:`source-${shop}`,shop,
+          familyBusinessEntryId:roots[random(2)]!.id,operation:random(8)===0?'disable':'upsert',...(random(6)===0?{to:null}:{})});
+      }
+      matrices.push(rows);
+    }
+    try {
+      await applyDatabaseMigrations(client);
+      for(const [index,rows] of matrices.entries()) {
+        await client.query('BEGIN');
+        try {
+          await familyCatalog(client,rows);
+          const result=client.query("SELECT content_intake.assert_family_catalog('family-release')");
+          if(allowed(rows))await expect(result,`seed=0x5eed0028 matrix=${index}`).resolves.toMatchObject({rowCount:1});
+          else await expect(result,`seed=0x5eed0028 matrix=${index}`).rejects.toMatchObject({code:'ZA003',message:'SOURCE_MISMATCH'});
+        } finally {await client.query('ROLLBACK');}
+      }
+    } finally {await client.end();}
+  });
+
   it('installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op', async () => {
     const database = harness.createDatabase('clean_install');
     const client = await harness.connect(database.config);
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(27);
+      expect(fresh.pending).toHaveLength(28);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -163,12 +348,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 27,
-        inventory: { tables: 85, views: 7, functions: 223 },
+        migrationCount: 28,
+        inventory: { tables: 85, views: 7, functions: 225 },
         capabilityRoles: { total: 10, safe: 10, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 18-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 19-migration current suffix',
         },
       });
 
@@ -249,7 +434,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
   it.each([
     { version: 'usage', contractSetId: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288', sourceGitSha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6' },
     { version: 'quality', contractSetId: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1', sourceGitSha: '18297cf802b195d8ff4e9f625143e50bff169418' },
-  ])('upgrades the existing 26-row $version ledger with only the rollback overlay', async prior => {
+  ])('upgrades the existing 26-row $version ledger with the rollback and family overlays', async prior => {
     const database = harness.createDatabase(`${prior.version}_wire_only`);
     const client = await harness.connect(database.config);
     try {
@@ -262,7 +447,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect((await applyMigrationCatalogue(client, oldCatalogue)).applied).toHaveLength(26);
       const ledger = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       expect((await inspectDatabaseMigrations(client)).state).toBe('PARTIAL');
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0027_intake_rollback']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0027_intake_rollback', '0028_intake_family']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=26 ORDER BY position')).rows).toEqual(ledger);
     } finally { await client.end(); }
   }, 60_000);
@@ -291,7 +476,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       '0015_ops_loop_v1_18', '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family',
       ]);
 
       const upgraded = await applyDatabaseMigrations(client);
@@ -304,7 +489,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       '0015_ops_loop_v1_18', '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family',
       ]);
       const afterProjection = await client.query<TextRow>(`
         SELECT pg_get_function_result(
@@ -315,7 +500,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 27,
+        migrationCount: 28,
       });
     } finally {
       await client.end();
@@ -338,7 +523,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         '0015_ops_loop_v1_18', '0016_office_owner_publish',
         '0017_rollback_previous_target',
         '0018_owner_read_views',
-        '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback',
+        '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family',
       ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM release_source_bindings', '42501', undefined, 'app_content_admin');
@@ -359,7 +544,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       await applyMigrationCatalogue(client, baseline);
       const before = await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position');
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       const after = await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position <= 19 ORDER BY position');
       expect(after.rows).toEqual(before.rows);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
@@ -387,7 +572,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client, frozenIntakePrefix(25));
       const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0026_intake_discovery_index', '0027_intake_rollback']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=25 ORDER BY position')).rows).toEqual(before);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectVerificationFailureAfterMutation(client,'DROP INDEX content_intake.grants_recipient_scope_source');
@@ -399,7 +584,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client,frozenIntakePrefix(24));
       const before=(await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=24 ORDER BY position')).rows).toEqual(before);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       for(const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read']) {
@@ -418,7 +603,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client,frozenIntakePrefix(23));
       const before=(await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=23 ORDER BY position')).rows).toEqual(before);
       for (const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker']) {
         await expectSqlState(client,"SELECT content_intake.publish_candidate('synthetic','{}','{}')",'42501',undefined,role);
@@ -435,7 +620,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       await applyMigrationCatalogue(client,frozenIntakePrefix(22));
       const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(m => m.id)).toEqual(['0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect(upgraded.applied.map(m => m.id)).toEqual(['0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=22 ORDER BY position')).rows).toEqual(before);
       for (const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_review','app_backend_worker']) {
         await expectSqlState(client,'SELECT * FROM content_intake.quality_plans','42501',undefined,role);
@@ -468,7 +653,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         expect((await client.query("SELECT to_regprocedure('content_intake.guard_legacy_write(text,text)') AS helper")).rows[0].helper).toBeNull();
       } else {
         const result = await applyDatabaseMigrations(client);
-        expect(result.applied.map(m => m.id)).toEqual(['0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+        expect(result.applied.map(m => m.id)).toEqual(['0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
         expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=21 ORDER BY position')).rows).toEqual(before);
         expect((await identities()).rows).toEqual(functions);
       }
@@ -486,7 +671,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 14) };
       await applyMigrationCatalogue(client, baseline);
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM ops_loop.inaccuracy_reports', '42501', undefined, 'app_runtime');
     } finally { await client.end(); }
@@ -503,9 +688,9 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 12) };
       await applyMigrationCatalogue(client, baseline);
       expect((await inspectDatabaseMigrations(client)).pending.map(({ id }) => id))
-        .toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+        .toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM backend_identity.sessions', '42501', undefined, 'app_backend_auth');
       await expectSqlState(client, 'SELECT * FROM backend_review.waits', '42501', undefined, 'app_backend_review');
@@ -523,14 +708,14 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 11) };
       await applyMigrationCatalogue(client, baseline);
       const plan = await inspectDatabaseMigrations(client);
-      expect(plan.pending.map(({ id }) => id)).toEqual(['0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect(plan.pending.map(({ id }) => id)).toEqual(['0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       await client.query('CREATE ROLE app_owner_acceptance_registrar NOLOGIN');
       await expect(applyDatabaseMigrations(client)).rejects.toMatchObject({ code: 'MIGRATION_APPLY_FAILED' });
       expect((await inspectDatabaseMigrations(client)).applied).toHaveLength(11);
       expect((await client.query("SELECT to_regclass('public.owner_acceptance_records') AS relation")).rows[0].relation).toBeNull();
       await client.query('DROP ROLE app_owner_acceptance_registrar');
       await applyDatabaseMigrations(client);
-      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(27);
+      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(28);
       await expectSqlState(client, 'SELECT * FROM owner_acceptance_records', '42501', undefined, 'app_runtime');
       await expectSqlState(client, "SELECT register_owner_acceptance('synthetic','{}','bad','bad')", '42501', undefined, 'app_runtime');
       await expectVerificationFailureAfterMutation(client, 'ALTER ROLE app_owner_acceptance_registrar LOGIN');
@@ -559,10 +744,10 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
 
       const pending = await inspectDatabaseMigrations(client);
       expect(pending.state).toBe('PARTIAL');
-      expect(pending.pending.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect(pending.pending.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
 
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family']);
       const afterNoHitContext = await client.query<TextRow>(`
         SELECT pg_get_function_result(
           'public.search_recommendable_scripts(text,text,text)'::regprocedure
@@ -571,7 +756,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 27,
+        migrationCount: 28,
       });
     } finally {
       await client.end();
@@ -728,12 +913,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         applyDatabaseMigrations(firstClient),
         applyDatabaseMigrations(secondClient),
       ]);
-      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 27]);
+      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 28]);
       expect(results.every(({ after }) => after.state === 'COMPLETE')).toBe(true);
       const ledger = await firstClient.query<CountRow>(`
         SELECT count(*)::int AS count FROM customer_agent_meta.schema_migrations
       `);
-      expect(ledger.rows[0]?.count).toBe(27);
+      expect(ledger.rows[0]?.count).toBe(28);
     } finally {
       await firstClient.end();
       secondClient.release();

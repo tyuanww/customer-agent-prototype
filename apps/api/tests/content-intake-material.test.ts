@@ -8,7 +8,7 @@ import { qualityPopulation } from '../src/content-intake/quality.js';
 const now = Date.parse('2026-10-06T00:00:00Z');
 const source: Source = { scopeId: 'scope', scope: { tenantId: 't', appId: 'a', brandId: 'b', shopId: 'shop', domain: 'product', sourceId: 'source' },
   version: 1, templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'm1', mode: 'v2-preview' };
-const context = { sourceId: 'source', brandId: 'b', scope: 'shop', domain: 'product' as const, sheet: 'FAQ' as const, templateVersion: 'faq-p1.1' as const };
+const context = { sourceId: 'source', brandId: 'b', scope: 'shop', scopeKind: 'shop' as const, domain: 'product' as const, sheet: 'FAQ' as const, templateVersion: 'faq-p1.1' as const };
 const row = (id = 'entry-a', body = '合成回答', state = '启用') => [id, '合成标题', body, '', '', '分类', '', state, '', '', '', '内部说明', '', '', 'false'];
 async function input(rows = [row()]) {
   const bytes = await createTemplate(context, rows);
@@ -96,7 +96,7 @@ describe('formal candidate material from independently parsed workbook', () => {
     expect(removed.risk.level).toBe('critical');
   });
 
-  it('rejects unknown vocabulary, cross-entry question identity and unsupported override materials', async () => {
+  it('rejects unknown vocabulary and cross-entry question identity', async () => {
     const vocabularyRow = row(); vocabularyRow[3] = 'missing-product';
     const vocabulary = await input([vocabularyRow]);
     expect(() => materialFromParse(vocabulary)).toThrow('SOURCE_MISMATCH');
@@ -105,9 +105,52 @@ describe('formal candidate material from independently parsed workbook', () => {
     const next = await input([row('entry-b')]);
     expect(() => materialFromParse({ ...next, previous: first.entries, parsed: { ...next.parsed,
       questions: [{ entryId: 'entry-b', id: 'q1', text: '合成问法', state: '启用' }] } })).toThrow('MATERIAL_CHANGED');
-    const override = row(); override[10] = 'brand-source/entry';
-    const overrideInput = await input([override]);
-    expect(() => materialFromParse(overrideInput)).toThrow('SOURCE_MISMATCH');
+  });
+
+  it('binds a family as a pair, versions association changes and clears only explicitly uploaded associations', async () => {
+    const first = materialFromParse(await input([row(), row('entry-b')]));
+    const associatedRow = row(); associatedRow[10] = 'brand-source/root-a';
+    const associated = materialFromParse({ ...await input([associatedRow]), previous: first.entries });
+    expect(associated.entries[0]).toMatchObject({ familySourceId: 'brand-source', familyBusinessEntryId: 'root-a', scriptVersion: 2 });
+    expect(associated.differences[0]).toMatchObject({ change: 'modify', previousVersion: 1, nextVersion: 2 });
+    expect(associated.differences[0]!.beforeDigest).not.toBe(associated.differences[0]!.afterDigest);
+    const same = materialFromParse({ ...await input([associatedRow]), previous: associated.entries });
+    expect(same.entries).toEqual(associated.entries); expect(same.differences).toEqual([]);
+    const missing = materialFromParse({ ...await input([row('entry-b')]), previous: associated.entries });
+    expect(missing.entries).toEqual(associated.entries); expect(missing.differences).toEqual([]);
+    associatedRow[10] = 'other-brand-source/root-b';
+    const changed = materialFromParse({ ...await input([associatedRow]), previous: associated.entries });
+    expect(changed.entries[0]).toMatchObject({ familySourceId: 'other-brand-source', familyBusinessEntryId: 'root-b', scriptVersion: 3 });
+    expect(digest(canonical(changed))).not.toBe(digest(canonical(associated)));
+    const cleared = materialFromParse({ ...await input(), previous: changed.entries });
+    expect(cleared.entries[0]).toMatchObject({ familySourceId: null, familyBusinessEntryId: null, scriptVersion: 4 });
+    expect(cleared.differences[0]).toMatchObject({ change: 'modify', previousVersion: 3, nextVersion: 4 });
+    expect(cleared.entries[1]).toEqual(first.entries[1]);
+  });
+
+  it.each(['root/', '/entry', 'root/entry/extra', 'EXAMPLE_root/entry', 'root/EXAMPLE_entry', 'source/entry']) (
+    'rechecks malformed family %s even when a parsed DTO claims success', async (family) => {
+      const prepared = await input();
+      const forged = structuredClone(prepared.parsed); (forged.rows[0]!.values as string[])[10] = family;
+      expect(() => materialFromParse({ ...prepared, parsed: forged })).toThrow('FILE_INVALID');
+    });
+  it('uses the registered source to reject brand and self-source associations', async () => {
+    const associatedRow = row(); associatedRow[10] = 'brand-source/root';
+    const prepared = await input([associatedRow]);
+    expect(prepared.parsed.ok).toBe(true);
+    expect(() => materialFromParse({ ...prepared, source: { ...source, scope: { ...source.scope, shopId: null } } })).toThrow('FILE_INVALID');
+    expect(() => materialFromParse({ ...prepared, source: { ...source, scope: { ...source.scope, sourceId: 'brand-source' } } })).toThrow('FILE_INVALID');
+  });
+  it('allows a shop ID literally named brand without granting brand-only authority', async () => {
+    const associatedRow = row(); associatedRow[10] = 'generic-source/root';
+    const shopContext = { ...context, scope: 'brand' };
+    const bytes = await createTemplate(shopContext, [associatedRow]);
+    const parsed = await parseWorkbook(bytes, shopContext);
+    expect(parsed.ok).toBe(true);
+    const prepared = { ...await input(), parsed, source: { ...source, scope: { ...source.scope, shopId: 'brand' } } };
+    expect(materialFromParse(prepared).entries[0]).toMatchObject({ familySourceId: 'generic-source', familyBusinessEntryId: 'root', brandNonOverridable: false });
+    const forged = structuredClone(parsed); (forged.rows[0]!.values as string[])[14] = 'true';
+    expect(() => materialFromParse({ ...prepared, parsed: forged })).toThrow('SCOPE_DENIED');
   });
 
   it('produces canonical bytes accepted by the formal schema and rejects invalid Unicode', async () => {

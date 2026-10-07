@@ -71,6 +71,16 @@ async function releaseDeadline(client: IntakeTransaction, releaseId: string, ten
   if (!release.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   if (release.rows[0].revoked) throw new IntakeRejection('APPROVAL_REVOKED', 'FORBIDDEN');
   if (!release.rows[0].ready) throw new IntakeRejection('SOURCE_MISMATCH', 'FORBIDDEN');
+  // Shared with both publication writers: old catalogs cannot bypass the full
+  // family/root proof simply because their candidate predates this reader.
+  try {
+    await client.query('SELECT content_intake.assert_family_catalog($1::text)', [releaseId]);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SOURCE_MISMATCH') {
+      throw new IntakeRejection('SOURCE_MISMATCH', 'FORBIDDEN');
+    }
+    throw error;
+  }
   const facts = await client.query<{ invalid: boolean; until: Date | null }>(`SELECT
     coalesce(bool_or(f.state IS DISTINCT FROM 'approved' OR f.checked_at>clock_timestamp()
       OR f.valid_until<=clock_timestamp() OR f.package_verified_sha256 IS DISTINCT FROM r.package_sha256),false) AS invalid,
@@ -105,15 +115,13 @@ const applies = `e->>'operation'='upsert'
   AND (jsonb_array_length(e->'scenarioRefs')=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'scenarioRefs') ref WHERE ref->>'id'=ANY($5::text[])))`;
 
 async function contentDeadline(client: IntakeTransaction, release: string, scopes: ScopeRow[], ctx: IntakeUsageContext, now: number): Promise<number> {
-  const { rows } = await client.query<{ unsupported: boolean; until: Date | null }>(`WITH entries AS (${entries}) SELECT
-    coalesce(bool_or(e->>'familySourceId' IS NOT NULL OR e->>'familyBusinessEntryId' IS NOT NULL),false) AS unsupported,
+  const { rows } = await client.query<{ until: Date | null }>(`WITH entries AS (${entries}) SELECT
     min(CASE WHEN (e->>'effectiveFrom')::timestamptz>$3 THEN (e->>'effectiveFrom')::timestamptz
       ELSE (e->>'effectiveTo')::timestamptz END) FILTER (WHERE ${applies}
       AND ((e->>'effectiveTo') IS NULL OR (e->>'effectiveTo')::timestamptz>$3)) AS until FROM entries`,
   [release, scopes.map(s => s.source_id), new Date(now), ctx.productIds, ctx.scenarioIds]);
-  // Publication already refuses explicit families. Never silently implement an
-  // unreviewed override policy if another writer introduces one into the catalog.
-  if (rows[0]!.unsupported) throw new IntakeRejection('MODE_CONFLICT', 'FORBIDDEN');
+  // Include starts/ends of currently hidden overrides: a lease must expire
+  // before its shop choice would switch to/from the generic family root.
   return rows[0]!.until?.getTime() ?? Infinity;
 }
 
@@ -204,9 +212,45 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         client.validUntil(until);
         await contentDeadline(client,lease.release_id,scopes,ctx,lease.issued_at.getTime());
         const after=cursor(req.cursor,hash);
-        const result=await client.query<{ source_id: string; business_entry_id: string; e: C['IntakeEntry'] }>(`WITH entries AS (${entries})
-          SELECT * FROM entries WHERE ${applies} AND (e->>'effectiveFrom')::timestamptz<=$3
-            AND ((e->>'effectiveTo') IS NULL OR (e->>'effectiveTo')::timestamptz>$3)
+        // Resolve the complete authorized set BEFORE pagination. Each selected
+        // product/scenario gets an integer slot (one unrestricted slot if empty).
+        // Multiranges union scenario coverage per product without expanding the
+        // full product x scenario Cartesian set for every family and every page.
+        const result=await client.query<{ source_id: string; business_entry_id: string; e: C['IntakeEntry'] }>(`WITH entries AS (${entries}),
+          products AS MATERIALIZED (SELECT id,(n-1)::int slot FROM unnest(
+            CASE WHEN cardinality($4::text[])=0 THEN ARRAY[NULL::text] ELSE $4 END) WITH ORDINALITY p(id,n)),
+          scenarios AS MATERIALIZED (SELECT id,(n-1)::int slot FROM unnest(
+            CASE WHEN cardinality($5::text[])=0 THEN ARRAY[NULL::text] ELSE $5 END) WITH ORDINALITY s(id,n)),
+          eligible AS MATERIALIZED (SELECT * FROM entries WHERE ${applies} AND (e->>'effectiveFrom')::timestamptz<=$3
+            AND ((e->>'effectiveTo') IS NULL OR (e->>'effectiveTo')::timestamptz>$3)),
+          contexts AS MATERIALIZED (SELECT *,
+            CASE WHEN jsonb_array_length(e->'productRefs')=0
+              THEN int4multirange(int4range(0,greatest(cardinality($4::text[]),1)))
+              ELSE (SELECT range_agg(int4range(p.slot,p.slot+1)) FROM products p
+                WHERE p.id=ANY(ARRAY(SELECT ref->>'id' FROM jsonb_array_elements(e->'productRefs') ref))) END product_mask,
+            CASE WHEN jsonb_array_length(e->'scenarioRefs')=0
+              THEN int4multirange(int4range(0,greatest(cardinality($5::text[]),1)))
+              ELSE (SELECT range_agg(int4range(s.slot,s.slot+1)) FROM scenarios s
+                WHERE s.id=ANY(ARRAY(SELECT ref->>'id' FROM jsonb_array_elements(e->'scenarioRefs') ref))) END scenario_mask
+            FROM eligible),
+          cells AS (
+            SELECT source_id::text,business_entry_id::text,p.slot,scenario_mask required,NULL::int4multirange covered
+              FROM contexts JOIN products p ON product_mask @> p.slot WHERE e->>'familySourceId' IS NULL
+            UNION ALL
+            SELECT e->>'familySourceId',e->>'familyBusinessEntryId',p.slot,NULL::int4multirange,scenario_mask
+              FROM contexts JOIN products p ON product_mask @> p.slot WHERE e->>'familySourceId' IS NOT NULL),
+          coverage AS (SELECT source_id,business_entry_id,slot,range_agg(required) required,range_agg(covered) covered
+            FROM cells GROUP BY 1,2,3),
+          choices AS (SELECT source_id,business_entry_id,bool_and(coalesce(covered @> required,false)) hide
+            FROM coverage WHERE required IS NOT NULL GROUP BY 1,2),
+          -- Materialize once: a nested-loop plan must not recompute this aggregate per entry.
+          hidden AS MATERIALIZED (SELECT coalesce(jsonb_object_agg(jsonb_build_array(source_id,business_entry_id)::text,true)
+            FILTER(WHERE hide),'{}'::jsonb) keys FROM choices)
+          -- Grouping tagged requirements and coverage avoids a quadratic CTE
+          -- join when PG estimates JSON expansion as one row. The final lookup
+          -- contains only hidden keys, never another catalog or persisted state.
+          SELECT eligible.* FROM eligible CROSS JOIN hidden
+          WHERE NOT hidden.keys ? jsonb_build_array(source_id,business_entry_id)::text
             AND (source_id COLLATE "C",business_entry_id COLLATE "C")>($6::text COLLATE "C",$7::text COLLATE "C")
           ORDER BY source_id COLLATE "C",business_entry_id COLLATE "C" LIMIT $8`,
         [lease.release_id,scopes.map(s=>s.source_id),lease.issued_at,ctx.productIds,ctx.scenarioIds,...after,req.limit+1]);

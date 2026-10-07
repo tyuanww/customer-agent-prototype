@@ -19,6 +19,8 @@ export const SOURCE_HEADERS = ['sourceId', 'templateVersion', 'brandId', 'scope'
 export const TEMPLATE_VERSION = 'faq-p1.1';
 export type ParseContext = Readonly<{
   sourceId: string; brandId: string; scope: string; domain: 'product' | 'campaign' | 'presale' | 'aftersale';
+  /** Registered source category, independent of the worksheet's scope label/shop ID. */
+  scopeKind: 'brand' | 'shop';
   sheet: 'FAQ'; templateVersion: typeof TEMPLATE_VERSION;
 }>;
 export type Issue = Readonly<{ code: string; sheet: string; row: number; column: string; fix: string }>;

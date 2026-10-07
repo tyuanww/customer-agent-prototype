@@ -122,6 +122,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) throw new Error('OBJECT_CHANGED');
       const scope = prepared.value.source.scope;
       parsed = (await runner.parse(bytes, { sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? 'brand',
+        scopeKind: scope.shopId === null ? 'brand' : 'shop',
         domain: scope.domain, sheet: 'FAQ', templateVersion: TEMPLATE_VERSION }, signal ? { signal } : {})).result;
     } catch {
       parsed = { ok: false, policyVersion: INTAKE_POLICY.version, rows: [], questions: [], excluded: [], expandedBytes: 0, mediaCount: 0,

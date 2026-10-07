@@ -12,7 +12,7 @@ import { createTemplate, FAQ_HEADERS, INTAKE_POLICY, isParseResult, parseWorkboo
 const output = resolve(process.argv[2] ?? fileURLToPath(new URL(
   `../../../.gstack/content-intake-issue-report/${new Date().toISOString().replace(/[:.]/g, '-')}/`, import.meta.url)));
 await mkdir(output, { recursive: true });
-const context = { sourceId: 'synthetic-budget-source', brandId: 'synthetic-brand', scope: 'shop-a',
+const context = { sourceId: 'synthetic-budget-source', brandId: 'synthetic-brand', scope: 'shop-a', scopeKind: 'shop',
   domain: 'campaign', sheet: 'FAQ', templateVersion: 'faq-p1.1' };
 const reportBudget = 8 * 1024 * 1024;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');

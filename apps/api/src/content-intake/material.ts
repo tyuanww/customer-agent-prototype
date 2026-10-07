@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import type { ParseResult } from '@customer-agent/content-intake';
+import { parseFamilyReference, type ParseResult } from '@customer-agent/content-intake';
 import { canonicalJson, type CanonicalJsonValue } from '../idempotency.js';
 import { IntakeRejection } from './transaction.js';
 import type { Source } from './authority.js';
@@ -80,9 +80,10 @@ export function materialFromParse(input: {
       questions.set(q.id, { id: q.id, version, text: q.text, active });
     }
     const values = row.values;
-    // Family override needs a cross-source overlap proof at publication. Until that
-    // slice exists, explicit family input is rejected, never guessed from a title.
-    if (values[10]) throw new IntakeRejection('SOURCE_MISMATCH', 'VALIDATION');
+    // Recheck the parser boundary using registered scope; only publication may
+    // prove the target's existence, brand and conflict-free applicability.
+    const family = parseFamilyReference(values[10]!, { sourceId: source.scope.sourceId, scopeKind: source.scope.shopId === null ? 'brand' : 'shop' });
+    if (!family) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     const operation = row.state === '停用' ? 'disable' : 'upsert';
     const productRefs = refs(values[3]!, 'product'), scenarioRefs = refs(values[4]!, 'scenario');
     assertSnapshotPageable([{operation,productRefs,scenarioRefs}]);
@@ -93,7 +94,7 @@ export function materialFromParse(input: {
       productRefs, scenarioRefs,
       effectiveFrom: values[8] ? new Date(values[8]).toISOString() : old?.effectiveFrom ?? new Date(now).toISOString(),
       effectiveTo: values[9] ? new Date(values[9]).toISOString() : null,
-      applicabilityNote: values[6], familySourceId: null, familyBusinessEntryId: null,
+      applicabilityNote: values[6], ...family,
       brandNonOverridable: values[14] === 'true', category: values[5], internalNote: values[11],
       riskNote: values[12], attachmentNote: values[13],
     });

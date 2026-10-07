@@ -103,6 +103,8 @@ OpenAPI1.19 管理上下文没有新增 DDL；26段 SQL 的来源和校验和保
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
 
+产品迁移 `0028_intake_family` 拥有完整原生目录的显式家族关系与冲突证明，正常发布/回退通过同一 publications 触发器执行；usage在签资格和每页读取时复用私有校验。解析包只解释K列显式编号，API材料保存合同字段；usage按授权、时间、商品/场景先筛选，再以选中组合的完整覆盖选择店铺稿/通用回落，最后分页。没有renderer规则副本、标题推断或第二current；旧发布遇family明确拒绝，应用ACL仍关闭。
+
 产品迁移 `0024_intake_publication` 拥有原生候选最终门、一次票据、永久发布身份及 release/catalog/lineage/current/公告的原子写入；旧成员完整继承，复核原 source/owner 门。仅 security-invoker 私有函数，应用无 EXECUTE；API 事务 owner 同时写永久回执并复核最早截止。字段/证据映射见[P2 交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
 
 产品迁移 `0023_intake_quality` 拥有不可变候选质量计划/逐条检查及质量状态投影，不签发发布资格，应用 ACL 不变。

@@ -53,9 +53,9 @@ describe('database migration planner', () => {
   it('preserves the exact wire-only predecessor while planning its new implementation suffix', () => {
     expect(() => assertMigrationCatalogue(generatedMigrationCatalogue)).not.toThrow();
     const prior = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;
-    expect(prior.migrationCount).toBe(generatedMigrationCatalogue.migrations.length - 1);
+    expect(prior.migrationCount).toBe(generatedMigrationCatalogue.migrations.length - 2);
     const prefix = deriveMigrationStatus(generatedMigrationCatalogue.migrations.slice(0,26).map((_,index)=>ledgerRow(index)),generatedMigrationCatalogue);
-    expect(prefix.pending.map(m=>m.id)).toEqual(['0027_intake_rollback']);
+    expect(prefix.pending.map(m=>m.id)).toEqual(['0027_intake_rollback', '0028_intake_family']);
     for (const change of [{ sourceSchemaSha256: 'f'.repeat(64) }, { contractSetId: generatedMigrationCatalogue.contractSetId }, { migrationCount: generatedMigrationCatalogue.migrations.length + 1 }]) {
       const invalid = { ...generatedMigrationCatalogue, compatibility: { ...generatedMigrationCatalogue.compatibility,
         priorReviewedUpgrades: [...generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1), { ...prior, ...change }] } };
@@ -76,7 +76,7 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 18-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 19-migration current suffix',
     );
   });
 
@@ -99,7 +99,7 @@ describe('database migration planner', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family',
     ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
@@ -173,7 +173,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(27);
+    expect(status.pending).toHaveLength(28);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });

@@ -445,6 +445,11 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   ];
   const usageHashes = ['f270f787323a65baf3727337dcc34c1ff3f7a0bac0baf79a1894a7f7ae9591f4', 'c96e289e3ae19d600913b80796f3051eb7c19c5f544e1b8b9e17d5f5f1cd911f'];
   if (usageMigrations.some((m, i) => m.sha256 !== usageHashes[i])) throw new Error('Frozen usage migration source drifted');
+  const rollbackSnapshot = { contract_set_id: 'cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8',
+    source_git_sha: '240ae98a47d8b9432559c298f60af6fdc9ba8c4e',
+    manifest: { database: { sha256: PRIOR_USAGE.sourceSchemaSha256 } } };
+  const rollbackMigration = renderIntakeOverlay(projectRoot, rollbackSnapshot, 27, '0027_intake_rollback');
+  if (rollbackMigration.sha256 !== 'da90dd3eaa366037fbbe71f4296697fdf3f9f788954119731926e6500df55e98') throw new Error('Frozen rollback migration source drifted');
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
     ...REVIEWED_UPGRADES.map(p => loadPriorReviewedUpgrade(projectRoot, p)),
@@ -458,7 +463,8 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
       return frozen;
     }),
     ...usageMigrations,
-    renderIntakeOverlay(projectRoot, snapshot, 27, '0027_intake_rollback'),
+    rollbackMigration,
+    renderIntakeOverlay(projectRoot, snapshot, 28, '0028_intake_family'),
   ]);
   // A predecessor must precede this snapshot; the current contract is never its own upgrade.
   const currentIndex = COMPATIBLE_UPGRADES.findIndex(p => p.contractSetId === snapshot.contract_set_id);
