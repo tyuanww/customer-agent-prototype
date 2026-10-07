@@ -124,7 +124,7 @@ async function readBounded(response: Response, maxBytes = 1_048_576): Promise<st
   return Buffer.concat(chunks).toString('utf8');
 }
 async function mapFailure(response: Response): Promise<{ code: ProductErrorCode; reason?: string }> {
-  const codes: Record<number, ProductErrorCode> = { 400: 'VALIDATION', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'GONE', 409: 'CONFLICT', 410: 'GONE', 429: 'RATE_LIMITED', 503: 'OVERLOADED' };
+  const codes: Record<number, ProductErrorCode> = { 400: 'VALIDATION', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'GONE', 409: 'CONFLICT', 410: 'GONE', 413: 'VALIDATION', 429: 'RATE_LIMITED', 503: 'OVERLOADED' };
   let mapped = codes[response.status] ?? 'UNAVAILABLE';
   let reason: string | undefined;
   try {

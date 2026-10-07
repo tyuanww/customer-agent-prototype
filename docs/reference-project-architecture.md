@@ -100,6 +100,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 `apps/api/src/content-intake/quality-access.ts` 拥有质量 HTTP 的有界摘要、完整样本分页、进程/会话/事实/授权/候选/阶段绑定游标及精简历史回执；`quality.ts` 继续拥有内部计划与阶段提交，复用合同 validator，写前用 PostgreSQL 实际 jsonb 文本检查字节预算。两者均复用同一事务与永久回执，不新增质量引擎。OpenAPI1.18 仅改 HTTP，生成器固定全部 26 条旧迁移的来源与校验和；规划器只在相同 DDL 哈希时允许完整旧目录作为已审前序。
 
+`apps/desktop/src/main/content-intake-quality.ts` 拥有 Main 内存中的候选键、完整质量样本、人工检查草稿和未知写入恢复。复用 ProductSession 的身份与传输，当前只由隔离合成根探针消费；没有 renderer/IPC/生产入口。每页 8 MiB、最多 500 页且合计 32 MiB，不交部分数据；历史回执只解决原操作结果，当前状态须重新读取。
+
 产品迁移 `0022_intake_legacy_fence` 在既有数据库发布入口内拥有旧整域写影响集、统一首锁及目录/谱系继承；API 不自行复制该判断。内部 helper 只供现有 definer，应用 schema 继续封闭。边界与验证见[资料导入开发说明](how-to-develop-content-intake.md#p2-旧发布入口共存门)。
 
 
