@@ -4,6 +4,7 @@ import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 import { isTrustedMainFrameSender } from './sender-guard';
 import { ContentIntakeManagement } from './content-intake-management';
+import { createIntakeNativeFiles } from './content-intake-native-files';
 const CHANNELS = ['dashboard:intake-mode', 'dashboard:intake-current', 'dashboard:intake-command'] as const;
 /** Only the explicit synthetic profile provides a session. No legacy product
  * capability is mounted in FAQ Dashboard, and no renderer supplies an identity. */
@@ -27,6 +28,8 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     APPROVAL_CHANGED: '审批证据已改变，请刷新候选并读取最新审批状态。',
     AWAITING_APPROVAL: '组织审批尚未通过，请完成审批后刷新结果。',
     HUMAN_REVIEW_REQUIRED: '需要具备资格的人员完成审核后再发布。',
+    FILE_LIMIT: '文件超过限制。请选择不大于 10 MiB 的合成 XLSX 工作簿，并整批修正后重新上传。',
+    FILE_INVALID: '文件格式或内容无效，请重新导出标准 XLSX 模板。',
     APPROVAL_REVOKED: '组织审批已撤回，请核对后重新发起审批。',
   };
   const failure = (code: string, manager?: ContentIntakeManagement, reason?: string): IntakeManagementReply => ({ ok: false, code,
@@ -42,8 +45,10 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     if (!session) return failure('UNAVAILABLE');
     let manager = windows.get(wc);
     if (!manager) {
-      manager = new ContentIntakeManagement(session); windows.set(wc, manager);
-      const owned = manager, win = BrowserWindow.fromWebContents(wc);
+      const win = BrowserWindow.fromWebContents(wc);
+      if (!win || win.isDestroyed()) return failure('FORBIDDEN');
+      manager = new ContentIntakeManagement(session, createIntakeNativeFiles(win)); windows.set(wc, manager);
+      const owned = manager;
       const close = (event: { preventDefault(): void }) => { if (!allowClose(owned)) event.preventDefault(); };
       win?.on('close', close);
       owned.subscribe(() => { if (!wc.isDestroyed()) wc.send('dashboard:intake-invalidated'); });

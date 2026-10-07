@@ -17,3 +17,13 @@ export async function fixture(options: { missingC3?: boolean; count?: number; ri
   for (let i = 0; i < 8; i++) internal.addImage(imageId, { tl: { col: i % 4, row: Math.floor(i / 4) + 2 }, ext: { width: 1, height: 1 } });
   return Buffer.from(await book.xlsx.writeBuffer());
 }
+
+/** Read the actual XLSX artifact in consumer tests without adding ExcelJS to desktop. */
+export async function readIssueReport(bytes: Buffer) {
+  const book = new ExcelJS.Workbook(); await book.xlsx.load(bytes as unknown as ExcelJS.Buffer);
+  const sheet = book.getWorksheet('校验问题');
+  if (!sheet) throw new Error('Expected issue-report worksheet');
+  const rows: ExcelJS.CellValue[][] = [];
+  sheet.eachRow(row => rows.push(Array.from({ length: 5 }, (_, index) => row.getCell(index + 1).value)));
+  return rows;
+}

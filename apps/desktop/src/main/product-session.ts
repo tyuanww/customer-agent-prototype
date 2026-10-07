@@ -112,7 +112,7 @@ export class ProductSession {
   }
   /** Main-only capability. Credentials remain private; late responses cannot cross identities. */
   async request(epoch: number, path: string, options: {
-    body?: unknown; form?: FormData; signal?: AbortSignal; method?: string; timeoutMs?: number; maxResponseBytes?: number;
+    body?: unknown; form?: FormData; signal?: AbortSignal; method?: string; timeoutMs?: number; maxResponseBytes?: number; responseType?: 'xlsx';
     headers?: Partial<Record<'x-client-id' | 'x-snapshot-lease' | 'if-none-match' | 'idempotency-key', string>>;
   } = {}) {
     if (!this.view().signedIn || !this.token) throw new ProductHttpError('UNAUTHORIZED');

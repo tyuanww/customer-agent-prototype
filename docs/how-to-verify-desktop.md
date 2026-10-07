@@ -453,3 +453,16 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 ```
 
 前者验证 Main 资格、取消、超限与 renderer 告知/迟到结果；后者使用真实 Electron Main/preload、登录窗口和系统剪贴板，HTTP 为自有合成 wire。新 profile 的 Windows GUI、安装包和真实飞书未因此获得证据。
+
+
+## FAQ 原生上传与报告
+
+只使用 FAQ loopback 合成 profile；按以下入口验证上传生命周期与实际消费者：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-upload.test.ts tests/unit/content-intake-native-files.test.ts tests/unit/content-intake-management.test.ts tests/unit/content-intake-management-ipc.test.ts tests/unit/product-http.test.ts tests/component/intake-management.test.tsx tests/component/intake-upload.test.tsx
+node packages/content-intake/scripts/probe-issue-report.mjs
+pnpm test:intake:desktop
+```
+
+原生文件选择和保存由 Main 拥有。单元测试覆盖有界文件/报告、停止等待、迟到响应与原操作恢复；真实 Electron E2E 从工作簿选择、阻断报告落盘回读、整批更正直到审批发布与坐席查询。原生对话框使用受控选择替身，文件/API/数据库实际执行；不计作人工 macOS 文件对话框或 Windows GUI 实机验收。报告预算 probe 只证明其记录的合成规模，不能将实测最大样例冒充所有可能 XLSX 的数学上界。跨边界改动仍须运行根 lint/typecheck/test/build。

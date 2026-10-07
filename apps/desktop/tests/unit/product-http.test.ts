@@ -4,6 +4,43 @@ import { ProductHttp } from '../../src/main/product-http';
 
 afterEach(() => vi.restoreAllMocks());
 
+describe('authenticated bounded XLSX report reads', () => {
+  const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2]);
+  it('keeps binary bytes exact and still uses the authenticated HTTP boundary', async () => {
+    const transport = vi.fn(async () => new Response(bytes, { headers: { 'content-type': mime } }));
+    const result = await new ProductHttp('http://127.0.0.1:4100', transport).request('/v1/intake/parse-jobs/job/report', {
+      responseType: 'xlsx', token: 'synthetic-token', maxResponseBytes: bytes.length,
+    });
+    expect(result.value).toEqual(Buffer.from(bytes));
+    expect(transport).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({
+      redirect: 'error', headers: { authorization: 'Bearer synthetic-token' },
+    }));
+  });
+  it('rejects MIME mismatch, non-archive content and over-budget streaming responses', async () => {
+    for (const response of [new Response(bytes, { headers: { 'content-type': 'text/html' } }),
+      new Response('not an archive', { headers: { 'content-type': mime } }), new Response(bytes, { headers: { 'content-type': mime } })]) {
+      await expect(new ProductHttp('http://127.0.0.1:4100', async () => response).request('/v1/intake/parse-jobs/job/report', {
+        responseType: 'xlsx', maxResponseBytes: 5,
+      })).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+    }
+  });
+  it('stops a stalled body when cancelled and never returns late binary data', async () => {
+    const controller = new AbortController(), cancel = vi.fn();
+    const http = new ProductHttp('http://127.0.0.1:4100', async () => new Response(new ReadableStream({
+      start(stream) { stream.enqueue(bytes); }, cancel,
+    }), { headers: { 'content-type': mime } }));
+    const result = http.request('/v1/intake/parse-jobs/job/report', { responseType: 'xlsx', signal: controller.signal });
+    const rejected = expect(result).rejects.toMatchObject({ code: 'CANCELLED' });
+    await Promise.resolve(); await Promise.resolve(); controller.abort(); await rejected;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+  it('decodes a JSON authority rejection on a binary request', async () => {
+    const http = new ProductHttp('http://127.0.0.1:4100', async () => Response.json({ error: { details: { reason: 'SCOPE_DENIED' } } }, { status: 403 }));
+    await expect(http.request('/v1/intake/parse-jobs/job/report', { responseType: 'xlsx' })).rejects.toMatchObject({ code: 'FORBIDDEN', reason: 'SCOPE_DENIED' });
+  });
+});
+
 describe('product HTTP form upload', () => {
   it('sends multipart without JSON-encoding the body', async () => {
     const transport = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => Response.json(
