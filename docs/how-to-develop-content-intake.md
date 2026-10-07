@@ -159,7 +159,7 @@ Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `Content
 
 `cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单、托盘和 Dock 现在可进入 FAQ 专用资料审核页；没有 content-manage 权限时只显示无管理权限，不装配旧管理适配器。FAQ 正文展示和复制均保留原换行。
 
-本轮测试的 HTTP 是冻结合同 wire double，不能替代真实 API/PG 证据；此前封闭 PG → HTTP → Main 探针证据独立保留。剩余项包括商品/场景筛选、正式店铺显示名合同、上传/校验/飞书审核/发布管理闭环，以及安装包 Mac/Windows 人工交互。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
+上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。剩余项包括商品/场景筛选、正式店铺显示名合同、新上传/校验管理入口、真实飞书审批 adapter，以及安装包 Mac/Windows 人工交互。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
 
 ## P2 管理候选与人工质量检查
 
@@ -170,4 +170,39 @@ pnpm --filter @customer-agent/desktop build
 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-management.spec.ts tests/e2e/content-intake-query.spec.ts
 ```
 
-新上传仍缺确切当前基线及已确认参与人选择合同；不能默认空基线或从登录 userId 推断 principalId。来源确认、组织审批、发布 UI 尚待接线，现有合成 API/PG 工作流证据继续独立有效。冻结抽样和“质量检查通过”均不等于组织审批或发布许可。
+已有候选现在支持来源版本确认、组织审批发起/读取/刷新和发布。Main 从已读取材料和候选构造摘要、基线、证据版本和操作编号；renderer 只传人填写的版本、原因、标题和摘要。来源/审批丢响应时重放同一 POST，发布可查询原操作回执。已确认发布后读取失败不会回退为未知写入。创建审批可能已提交审核包，即便随后返回权限错误也保留原操作，不能改用新编号猜测重试。
+
+未保存质量判断与工作流表单互斥；重新发起审批须明确确认；审批显示的是最近一次观察，发布时 API 仍须重新核验。退出登录或强制关闭会丢弃内存恢复信息，界面/原生关闭提示不等于服务端撤销，也不承诺跨重启恢复。冻结抽样和“质量检查通过”均不等于组织审批或发布许可。
+
+新上传不能默认空基线或从登录 userId 推断 principalId。最小管理上下文候选合同尚待逐项批准与版本化 intake；参与人目录合同已在 1.16 冻结，应实现和消费原有 `GET /v1/intake/principals`，不另建一份目录。
+
+
+## P2 独立 API/PG 与桌面合成联调
+
+运行入口使用全新临时 PostgreSQL 15、冻结迁移、实际身份/资料 HTTP 模块和三条合成多行 FAQ；不读取 `api.env`、`content.env`、`feishu.env` 或已有业务库。仅两个随机 loopback 端口。临时来源、身份、空发布基线只由 test-support 引导，不注册生产 factory，不放开应用 ACL。宿主实际执行上传/接收/解析准备已有候选；桌面本轮从该候选开始，不能据此称上传 UI 已完成。
+
+需要 Node 24、锁定 pnpm、可用 PG15 和已安装的 Electron。Mac 可运行完整桌面；WSL 可运行后端专项，Windows 原生窗口/安装包仍须分别实测。
+
+```sh
+pnpm build
+pnpm dev:intake:synthetic
+```
+
+保持此终端前台运行，另一个终端执行 READY 输出中的桌面启动命令。它指定独立 userData 和本次随机 API/身份端口，不修改日常开发配置。
+
+1. 以初始 enabler 合成身份登录，从菜单打开资料审核，选择已有候选、查看材料并确认来源版本。
+2. 发起组织审批。创建实例后还没有审批观察时显示「尚未核验审批结果」；点「刷新审批结果」可看到等待状态。
+3. 在宿主终端输入 `approve`，显式推进唯一待办的合成审批；回到工作台刷新结果。发起请求本身不会自动批准。
+4. 读取初检、冻结抽样、逐条保存人工判断并提交。刷新候选状态，填写发布标题/摘要，再发布。
+5. 终端输入 `identity agent`，桌面退出登录后重新登录。选择 shop-a、查询「洁面」，核对新发布的多行原文和复制结果。切换命令只影响下一次登录。
+
+`status` 输出合成状态；`quit`、EOF、退出信号或约5分钟事实到期会停止宿主。宿主只清理自己创建的 PG/对象目录；另起 Electron 的 userData 在独立目录，退出 Electron 后按输出路径手动清理。不要延长事实 TTL 绕过到期检查。杭州机器需按本仓说明独立准备运行环境，本轮不包含远程部署或 Windows/WSL 实机结果。
+
+专项验收：
+
+```sh
+pnpm test:intake:synthetic
+pnpm test:intake:desktop
+```
+
+前者包含真实 HTTP/PG 产物消费及 CLI 子进程的启动、固定命令、EOF 和清理边界；后者需要 Mac 图形桌面，使用同一宿主验证 renderer → preload → Main → HTTP → PG，发布后换坐席查询并复制。截图保存在 ignored `.gstack/intake-synthetic/`。这些是合成联调证据，真实飞书审批、生产激活、安装包、Windows 合成器和 macOS 人工窗口体验仍分别验收。

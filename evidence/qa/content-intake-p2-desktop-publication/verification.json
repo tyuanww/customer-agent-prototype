@@ -1,0 +1,208 @@
+{
+  "schema": "intake-workflow-verification/v1",
+  "date": "2026-10-07",
+  "baseCommit": "951269e4bab146f0e37102a09cc01d9a575fb5fd",
+  "environment": {
+    "os": "macOS 26.5.2 arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "electron": "43.4.0",
+    "postgres": "15.18"
+  },
+  "contractDraftCommit": "63e7130",
+  "consumedContract": "OpenAPI 1.18.0 / schema.v1.21",
+  "scope": "existing candidate workflow and isolated synthetic host; no upload UI, real Feishu or production activation",
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm check:architecture",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/dev-help.mjs --check",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "targeted Main/Quality/IPC/component vitest",
+      "passed": 48
+    },
+    {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts",
+      "passed": 5
+    },
+    {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-management.spec.ts tests/e2e/content-intake-query.spec.ts",
+      "passed": 3
+    }
+  ],
+  "defaultSuiteCoverage": {
+    "desktop": {
+      "passed": 1201,
+      "skipped": 4
+    },
+    "api": {
+      "passed": 476,
+      "skipped": 228
+    }
+  },
+  "review": {
+    "mode": "OCR delegate plus parent and independent in-host review",
+    "externalModelsCalled": false,
+    "repairs": [
+      "rejected review restart",
+      "quality dirty blocks workflow",
+      "workflow dirty blocks quality edits/freeze",
+      "unobserved approval label",
+      "repeat confirmation keyed by operation identity",
+      "CLI-owned cleanup versus desktop profile",
+      "EOF queue drain",
+      "startup SIGTERM/SIGINT cleanup"
+    ],
+    "independentTests": "summary only; parent read complete test sources",
+    "finalReviewRecord": "gstack review logger / ignored local QA evidence"
+  },
+  "evidenceReuse": "After full root checks, only synthetic CLI and its tests changed; runtime API/Desktop/build inputs unchanged. Revalidated CLI5, script ESLint/strict TypeScript; final docs/diff rechecked. No claim that default skipped gates passed.",
+  "files": [
+    {
+      "path": "apps/api/tests/support/intake-synthetic-host.ts",
+      "sha256": "96b82079b2931d2fb8662c008f8f1cdaf9e14b0f808f2ac26be931a82bebeb20"
+    },
+    {
+      "path": "apps/api/tests/support/intake-synthetic-seed.ts",
+      "sha256": "c9325115456355a71f2611e9b65b4120e620bbdbd96be5f8cf2c341f9479a399"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management-ipc.ts",
+      "sha256": "062c59093d924fe26c84af39702c68bcd834e8db6bb88d7b073377a4c7ef9843"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management.ts",
+      "sha256": "9873c231fc288ef7ac129a10f989ed38b2bcbbfcede14d31143af3b39c3e7ff9"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "sha256": "d6b94a98da65eeca4f54ab5572ca07c7903ffb8070f022b51e52eeea3274f1f3"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/intake-management.css",
+      "sha256": "663b6d67d9bce757fdbabc569d2b2f88f479665963dc7bd666641984425eb234"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-management.ts",
+      "sha256": "d43812cd5d4bef14a6bf5b46cde683dacaf1be78624e32e58bd785e95157fb7e"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-management.test.tsx",
+      "sha256": "2321d4e64db65dc973af716d1133787369dc89f0a053045e15edc63c7ed4fc23"
+    },
+    {
+      "path": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+      "sha256": "cd10744833c0b1949c5512f62c2792de31b18108d9bc69bbea499a84fa228a22"
+    },
+    {
+      "path": "apps/desktop/tests/fixtures/intake-management-data.ts",
+      "sha256": "410e263215abbc86d872303990c08bcdf426ef88f5672ce06d35de04a9a96f5d"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management.test.ts",
+      "sha256": "adcb33fc1877e8073875885d5e1fc79f06832dc7cef4bc90462b48192b34931d"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "sha256": "19b0fb4ea5442a17aa48a8a5674251a8f8fe701b5d6c5fe6728f6bbbba6521c3"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "sha256": "eb0d871931a5b78effcef529508462fcc1427bf183a3313e69fdc25ba1fd6c0e"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "sha256": "7a6a846a41697e2fc8bbfb29f51124355161490f1ca44e5eeace8f5219ebf682"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-desktop-publication/README.md",
+      "sha256": "8f339ef807ef99b4ca7c5086fe68811a807e89a84ec76c0cae1fbf08b188adec"
+    },
+    {
+      "path": "package.json",
+      "sha256": "667a3528001af0f4c4e511dd64a47ee8125c27f2168433ff146b02e00e2bd94b"
+    },
+    {
+      "path": "scripts/dev-help.mjs",
+      "sha256": "357f9ff2a92a807a0ca1e3a78289b76472a0e4e5c7a78eff62afa85439ee2000"
+    },
+    {
+      "path": "scripts/intake-synthetic/cli.test.ts",
+      "sha256": "db60afe9794492b9b8c317d3734016e969dc7a2f3f901376f81622b448953a77"
+    },
+    {
+      "path": "scripts/intake-synthetic/host.test.ts",
+      "sha256": "d5e4afb92f637da4736a83fe0a3a3cdaa04377557aeca965132724374ca0fb67"
+    },
+    {
+      "path": "scripts/intake-synthetic/run.ts",
+      "sha256": "10f0e8a09e8171cb797dc9c46b52fe8afc6013abdc616760ba169859c09a4491"
+    }
+  ],
+  "logs": [
+    {
+      "path": ".gstack/qa-reports/content-intake-workflow-20261007/root-test.log",
+      "sha256": "42d75f5b572839734a016c46e1cdd96d97e91f5595cbc5a723236049a5b98c85"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-workflow-20261007/root-lint.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-workflow-20261007/root-typecheck.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-workflow-20261007/root-build.log",
+      "sha256": "890392e1031abcbab9042dcde5a6ca6b50504f55b82670d5a0dd94a48aa3b393"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-workflow-20261007/startup-signal-before.log",
+      "sha256": "f9225a0f8d3d8d1f5b36986787fb65a4d688700e4bc8fa35a8e1dc69a7620f21"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-workflow-20261007/startup-signal-after.log",
+      "sha256": "3078f8603c49a7cf3ee08e4aaefffa268d323e3da23b81587071f205d9cfdbd0"
+    }
+  ],
+  "localEvidence": ".gstack/qa-reports/content-intake-workflow-20261007",
+  "limits": [
+    "Windows/WSL not run",
+    "real Feishu and employee/customer data not used",
+    "packaging/manual OS behavior not checked",
+    "five-minute natural expiry not waited out",
+    "memory recovery does not survive logout/force-close"
+  ]
+}

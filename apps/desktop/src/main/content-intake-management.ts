@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import type { IntakeManagementCommand, IntakeManagementView } from '../shared/content-intake-management';
+import { isIntakeManagementCommand, type IntakeManagementCommand, type IntakeManagementView } from '../shared/content-intake-management';
 import { loadIntakeAccess, type IntakeAccess } from './content-intake-access';
 import { ContentIntakeQuality } from './content-intake-quality';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 type C = components['schemas'];
 type Session = Pick<ProductSession, 'view' | 'subscribe' | 'request'>;
+type WorkflowOperation =
+  | { action: 'source-confirm'; body: C['IntakeSourceConfirmation'] }
+  | { action: 'review-request' | 'review-refresh'; body: C['IntakeReviewRequest'] }
+  | { action: 'publish'; body: C['IntakePublish'] };
+type Request = (path: string, body?: unknown) => Promise<unknown>;
 const sameKey = (a: C['IntakeCandidateKey'], b: C['IntakeCandidateKey']) => a.candidateId === b.candidateId && a.version === b.version && a.digest === b.digest;
 const reject = (code: 'FORBIDDEN' | 'STALE' | 'CONFLICT' | 'VALIDATION'): never => { throw new ProductHttpError(code); };
 
@@ -22,6 +27,9 @@ export class ContentIntakeManagement {
   private material: C['IntakeCandidatePage'] | null = null;
   private receipt: C['IntakeQualityReceipt'] | null = null;
   private offset = 0;
+  private review: C['IntakeReview'] | null = null;
+  private workflowResult: IntakeManagementView['workflowResult'] = null;
+  private workflowPending: WorkflowOperation | null = null;
   private active: AbortController | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private deadline = 0;
@@ -34,14 +42,14 @@ export class ContentIntakeManagement {
     this.quality = new ContentIntakeQuality(session);
     this.unsubscribe = session.subscribe(() => {
       if (!session.view().signedIn || session.view().sessionEpoch !== this.epoch) {
-        this.epoch = session.view().sessionEpoch; this.invalidate(); this.selected = null; this.receipt = null;
+        this.epoch = session.view().sessionEpoch; this.workflowPending = null; this.invalidate(); this.clearSelection();
       }
     });
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private invalidate() {
     this.active?.abort(); this.access = null; this.rows = []; this.cursor = null; this.material = null;
-    this.quality.cancelRead();
+    this.quality.cancelRead(); this.review = null;
     if (this.timer) clearTimeout(this.timer); this.timer = null;
     for (const listener of this.listeners) listener();
   }
@@ -52,9 +60,19 @@ export class ContentIntakeManagement {
   private can(action: C['IntakeAction'], sourceId?: string) {
     return this.validAccess()?.capabilities.some(c => (!sourceId || c.scope.sourceId === sourceId) && c.actions.includes(action)) ?? false;
   }
+  private clearSelection() {
+    this.quality.cancelRead(); this.selected = null; this.material = null; this.receipt = null;
+    this.review = null; this.workflowResult = null; this.offset = 0;
+  }
+  private unresolved(): IntakeManagementView['pending'] {
+    if (this.workflowPending) return { action: this.workflowPending.action, operationId: this.workflowPending.body.operationId,
+      recovery: this.workflowPending.action === 'publish' ? 'receipt' : 'retry' };
+    const quality = this.quality.unresolved();
+    return quality ? { ...quality, recovery: 'receipt' } : null;
+  }
   /** Native close/quit guard: never dispose an unknown write without a visible warning. */
   closeRisk(): 'pending' | 'editing' | null {
-    if (this.active || (this.session.view().signedIn && this.quality.unresolved())) return 'pending';
+    if (this.active || (this.session.view().signedIn && this.unresolved())) return 'pending';
     return this.selected ? 'editing' : null;
   }
   view(): IntakeManagementView {
@@ -65,7 +83,10 @@ export class ContentIntakeManagement {
       authorized, validUntil: access?.validUntil ?? null, candidates: this.rows, moreCandidates: this.cursor !== null,
       selected: canRead ? this.selected : null, material: canRead ? this.material : null,
       canReview, quality: canReview ? this.quality.page(this.offset) : null, hasDraft: canReview && this.quality.hasDraft(),
-      pending: session.signedIn ? this.quality.unresolved() : null, receipt: canRead ? this.receipt : null });
+      canConfirmSource: canRead && this.can('source-confirm', this.selected!.sourceId),
+      canPublish: canRead && this.can('publish', this.selected!.sourceId),
+      review: canRead ? this.review : null, workflowResult: canRead ? this.workflowResult : null,
+      pending: session.signedIn ? this.unresolved() : null, receipt: canRead ? this.receipt : null });
   }
   private async refreshAccess(signal: AbortSignal) {
     const access = await loadIntakeAccess(this.session, signal);
@@ -74,6 +95,7 @@ export class ContentIntakeManagement {
     this.timer = setTimeout(() => this.invalidate(), Math.max(0, Date.parse(access.validUntil) - Date.now()));
   }
   async command(c: IntakeManagementCommand): Promise<IntakeManagementView> {
+    if (!isIntakeManagementCommand(c)) return reject('VALIDATION');
     if (this.disposed || !this.session.view().signedIn) throw new ProductHttpError('UNAUTHORIZED');
     if (this.active) return reject('CONFLICT');
     const controller = new AbortController(), epoch = this.epoch;
@@ -81,16 +103,23 @@ export class ContentIntakeManagement {
     const assertActive = () => {
       if (controller.signal.aborted || this.epoch !== epoch || this.disposed) return reject('STALE');
     };
-    const request = async (path: string) => {
-      const r = await this.session.request(epoch, path, { signal: controller.signal, maxResponseBytes: 8 * 1024 * 1024 });
+    const request: Request = async (path, body) => {
+      const r = await this.session.request(epoch, path, { ...(body !== undefined ? { body } : {}), signal: controller.signal, maxResponseBytes: 8 * 1024 * 1024 });
       assertActive(); return r.value;
     };
     try {
       if (c.action === 'recover' || c.action === 'retry') {
-        this.receipt = await this.quality[c.action](); assertActive();
-        this.material = null; this.offset = 0;
+        if (this.workflowPending) {
+          const operation = this.workflowPending;
+          if (c.action === 'recover') {
+            if (operation.action !== 'publish') return reject('VALIDATION');
+            this.acceptWorkflow(await request(`/v1/intake/operations/${encodeURIComponent(operation.body.operationId)}?action=publish`), operation);
+          } else await this.transmitWorkflow(request, false);
+          if (!this.workflowPending && this.selected) await this.readCandidate(request);
+        } else { this.receipt = await this.quality[c.action](); this.material = null; this.offset = 0; }
+        assertActive();
       } else {
-        if (this.quality.unresolved()) return reject('CONFLICT');
+        if (this.unresolved()) return reject('CONFLICT');
         if (c.action === 'list') {
           const cursor = c.next ? this.cursor : null;
           if (c.next && !cursor) return reject('STALE');
@@ -99,7 +128,7 @@ export class ContentIntakeManagement {
           this.rows = []; this.cursor = null;
           await this.refreshAccess(controller.signal); assertActive();
           if (this.selected && !this.can('content-manage', this.selected.sourceId)) {
-            this.quality.cancelRead(); this.selected = null; this.material = null; this.receipt = null; this.offset = 0;
+            this.clearSelection();
           } else if (this.selected && !this.can('review', this.selected.sourceId)) this.quality.cancelRead();
           if (this.can('content-manage')) {
             const q = new URLSearchParams({ limit: '20', ...(cursor ? { cursor } : {}) });
@@ -108,18 +137,51 @@ export class ContentIntakeManagement {
             this.rows = page.items.map(candidate => ({ selection: randomUUID(), candidate })); this.cursor = page.nextCursor;
           } else { this.rows = []; this.cursor = null; this.selected = null; this.quality.cancelRead(); }
         } else if (c.action === 'discard') {
-          this.quality.cancelRead(); this.selected = null; this.material = null; this.offset = 0; this.receipt = null;
+          this.clearSelection();
         } else if (c.action === 'select') {
           if (this.quality.hasDraft()) return reject('CONFLICT');
           const row = this.rows.find(r => r.selection === c.selection);
           if (!row || !this.can('content-manage', row.candidate.sourceId)) return reject('FORBIDDEN');
           const v = parseContractSchema('IntakeCandidate', await request(this.address(row.candidate)));
           if (!sameKey(v.key, row.candidate.key) || v.sourceId !== row.candidate.sourceId) return reject('STALE');
-          this.quality.select(v.key); this.selected = v; this.material = null; this.receipt = null; this.offset = 0;
+          this.clearSelection(); this.quality.select(v.key); this.selected = v;
         } else {
           const selected = this.selected;
           if (!selected || !this.can('content-manage', selected.sourceId)) return reject('FORBIDDEN');
-          if (c.action === 'material') {
+          if (c.action === 'refresh-candidate') {
+            await this.readCandidate(request);
+          } else if (c.action === 'read-review') {
+            await this.readCandidate(request);
+            this.review = null;
+            const review = parseContractSchema('IntakeReview', await request(`${this.address(selected)}/review`));
+            if (!sameKey(review.key, selected.key) || review.evidenceVersion !== this.selected!.approvalEvidenceVersion) return reject('STALE');
+            this.review = review;
+          } else if (c.action === 'confirm-source' || c.action === 'request-review' || c.action === 'refresh-review' || c.action === 'publish') {
+            if (this.quality.hasDraft()) return reject('CONFLICT');
+            const key = structuredClone(selected.key), operationId = randomUUID();
+            if (c.action === 'confirm-source') {
+              if (!this.can('source-confirm', selected.sourceId)) return reject('FORBIDDEN');
+              if (!this.material) return reject('VALIDATION');
+              const header = this.material.materialHeader;
+              this.workflowPending = { action: 'source-confirm', body: parseContractSchema('IntakeSourceConfirmation', { operationId, key,
+                expectedEvidenceVersion: selected.sourceEvidenceVersion, confirmedVersionKind: c.versionKind,
+                confirmedVersionValue: c.versionValue, reason: c.reason, acquisition: header.sourceClaim.acquisition, objectSha256: header.object.sha256 }) };
+            } else if (c.action === 'publish') {
+              if (!this.can('publish', selected.sourceId)) return reject('FORBIDDEN');
+              if (!this.material || selected.state !== 'ready' || selected.sourceEvidenceVersion < 1 || selected.approvalEvidenceVersion < 1) return reject('CONFLICT');
+              this.workflowPending = { action: 'publish', body: parseContractSchema('IntakePublish', { operationId, key,
+                baseReleaseId: this.material.materialHeader.baseReleaseId, sourceEvidenceVersion: selected.sourceEvidenceVersion,
+                approvalEvidenceVersion: selected.approvalEvidenceVersion, title: c.title, summary: c.summary }) };
+            } else {
+              if (c.action === 'refresh-review' && selected.approvalEvidenceVersion < 1) return reject('CONFLICT');
+              this.workflowPending = { action: c.action === 'request-review' ? 'review-request' : 'review-refresh',
+                body: parseContractSchema('IntakeReviewRequest', { operationId, key, expectedEvidenceVersion: selected.approvalEvidenceVersion }) };
+            }
+            this.workflowResult = null; this.review = null;
+            await this.transmitWorkflow(request, true);
+            // A successful response or historical replay is not a current status.
+            if (!this.workflowPending) await this.readCandidate(request);
+          } else if (c.action === 'material') {
             if (c.next && !this.material?.nextCursor) return reject('STALE');
             const q = new URLSearchParams({ limit: '20', ...(c.next && this.material?.nextCursor ? { cursor: this.material.nextCursor } : {}) });
             const page = parseContractSchema('IntakeCandidatePage', await request(`${this.address(selected)}/material?${q}`));
@@ -144,8 +206,57 @@ export class ContentIntakeManagement {
       throw error;
     } finally { if (this.active === controller) this.active = null; }
   }
-  private address(candidate: C['IntakeCandidate']) {
+  private async readCandidate(request: Request) {
+    const selected = this.selected;
+    if (!selected) return reject('STALE');
+    const next = parseContractSchema('IntakeCandidate', await request(this.address(selected)));
+    if (!sameKey(next.key, selected.key) || next.sourceId !== selected.sourceId) return reject('STALE');
+    if (next.approvalEvidenceVersion !== this.review?.evidenceVersion) this.review = null;
+    this.selected = next;
+  }
+  /** Source/review have no public operation-receipt route. Their original POST
+   * is the recovery protocol; only publication supports a separate receipt GET.
+   * Request-review can commit a package before a later provider/authority error,
+   * so even an explicit rejection cannot discard that operation's create UUID. */
+  private async transmitWorkflow(request: Request, firstAttempt: boolean) {
+    const operation = this.workflowPending;
+    if (!operation) return reject('STALE');
+    const suffix = { 'source-confirm': 'source-confirmation', 'review-request': 'review', 'review-refresh': 'review/refresh', publish: 'publish' }[operation.action];
+    let raw: unknown;
+    try { raw = await request(`${this.address({ key: operation.body.key })}/${suffix}`, operation.body); }
+    catch (error) {
+      if (firstAttempt && operation.action !== 'review-request' && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
+        && ['VALIDATION','FORBIDDEN','UNAUTHORIZED','CONFLICT','GONE'].includes(error.code) && this.workflowPending === operation) this.workflowPending = null;
+      throw error;
+    }
+    this.acceptWorkflow(raw, operation);
+  }
+  private acceptWorkflow(raw: unknown, operation: WorkflowOperation) {
+    let result: NonNullable<IntakeManagementView['workflowResult']>, unresolved = false;
+    if (operation.action === 'publish') {
+      const receipt = parseContractSchema('IntakeReceipt', raw);
+      if (receipt.action !== 'publish' || receipt.operationId !== operation.body.operationId || !sameKey(receipt.key, operation.body.key)
+        || (receipt.state === 'published' && (!receipt.releaseId || !receipt.announcementId))) return reject('STALE');
+      result = { operationId: operation.body.operationId, action: operation.action, state: receipt.state, releaseId: receipt.releaseId };
+      unresolved = receipt.state === 'pending' || receipt.state === 'unknown';
+    } else if (operation.action === 'source-confirm') {
+      const candidate = parseContractSchema('IntakeCandidate', raw);
+      if (!sameKey(candidate.key, operation.body.key) || candidate.sourceId !== this.selected?.sourceId
+        || candidate.sourceEvidenceVersion !== operation.body.expectedEvidenceVersion + 1) return reject('STALE');
+      result = { operationId: operation.body.operationId, action: operation.action, state: 'confirmed', releaseId: null };
+    } else {
+      const review = parseContractSchema('IntakeReview', raw);
+      const expected = operation.body.expectedEvidenceVersion + Number(operation.action === 'review-request');
+      if (!sameKey(review.key, operation.body.key) || review.evidenceVersion !== expected) return reject('STALE');
+      this.review = review;
+      result = { operationId: operation.body.operationId, action: operation.action, state: review.state, releaseId: null };
+      unresolved = operation.action === 'review-request' && (review.state === 'creating' || !review.instanceCode);
+    }
+    this.workflowResult = result;
+    if (!unresolved) this.workflowPending = null;
+  }
+  private address(candidate: Pick<C['IntakeCandidate'], 'key'>) {
     return `/v1/intake/candidates/${encodeURIComponent(candidate.key.candidateId)}/versions/${candidate.key.version}`;
   }
-  dispose() { this.disposed = true; this.unsubscribe(); this.invalidate(); this.quality.dispose(); this.listeners.clear(); }
+  dispose() { this.disposed = true; this.unsubscribe(); this.invalidate(); this.quality.dispose(); this.workflowPending = null; this.listeners.clear(); }
 }

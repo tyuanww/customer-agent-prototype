@@ -17,14 +17,22 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     if (!risk) return true;
     const choice = dialog.showMessageBoxSync({ type: 'warning', title: '关闭资料审核',
       message: risk === 'pending' ? '操作结果尚未确定或请求仍在处理。' : '关闭后会丢失未提交的人工判断。',
-      detail: risk === 'pending' ? '建议留在页面查询原操作回执。强制关闭不会撤销服务端操作，重新打开后须核对候选状态。' : '已经提交到服务端的记录仍会保留。',
+      detail: risk === 'pending' ? '建议留在页面按提示确认原操作结果。强制关闭不会撤销服务端操作，重新打开后须核对候选状态。' : '已经提交到服务端的记录仍会保留。',
       buttons: ['继续检查', '仍然关闭'], defaultId: 0, cancelId: 0, noLink: true });
     return choice === 1;
   };
-  const failure = (code: string, manager?: ContentIntakeManagement): IntakeManagementReply => ({ ok: false, code,
-    message: code === 'VALIDATION' ? '请检查输入。缺陷必须填写原因，每条原因最多 1000 字。'
+  const reasonMessages: Record<string, string> = {
+    BASE_CHANGED: '发布基线已改变，请重新导入形成新候选后再审核发布。',
+    SOURCE_MISMATCH: '来源证据已改变，请刷新候选和材料后重新核对。',
+    APPROVAL_CHANGED: '审批证据已改变，请刷新候选并读取最新审批状态。',
+    AWAITING_APPROVAL: '组织审批尚未通过，请完成审批后刷新结果。',
+    HUMAN_REVIEW_REQUIRED: '需要具备资格的人员完成审核后再发布。',
+    APPROVAL_REVOKED: '组织审批已撤回，请核对后重新发起审批。',
+  };
+  const failure = (code: string, manager?: ContentIntakeManagement, reason?: string): IntakeManagementReply => ({ ok: false, code,
+    message: (reason && Object.hasOwn(reasonMessages, reason) ? reasonMessages[reason] : undefined) ?? (code === 'VALIDATION' ? '请检查输入。确认来源须填写版本与说明，发布须填写标题和摘要，缺陷须说明原因。请遵守各输入长度提示。'
       : code === 'CONFLICT' ? '请先处理未完成操作或明确放弃尚未提交的判断。'
-        : code === 'UNAUTHORIZED' ? '请先在查询窗口登录。' : '请求未完成或权限已改变。请刷新候选；结果不明时先查询原操作回执。',
+        : code === 'UNAUTHORIZED' ? '请先在查询窗口登录。' : '请求未完成或权限已改变。请刷新候选；结果不明时按页面提示确认原操作结果。'),
     view: manager?.view() ?? null });
   for (const channel of CHANNELS) ipcMain.handle(channel, async (event, ...args: unknown[]) => {
     const wc = dashboard();
@@ -43,7 +51,7 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     }
     try {
       return { ok: true, view: channel === 'dashboard:intake-current' ? manager.view() : await manager.command(args[0] as Parameters<ContentIntakeManagement['command']>[0]) };
-    } catch (error) { return failure(error instanceof ProductHttpError ? error.code : 'UNAVAILABLE', manager); }
+    } catch (error) { return failure(error instanceof ProductHttpError ? error.code : 'UNAVAILABLE', manager, error instanceof ProductHttpError ? error.reason : undefined); }
   });
   return { allowClose: () => { if (!allowClose()) return false; closing = true; return true; }, dispose: () => {
     closing = true; for (const m of windows.values()) m.dispose(); windows.clear();
