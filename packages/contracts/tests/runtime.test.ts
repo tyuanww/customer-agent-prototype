@@ -46,9 +46,9 @@ describe('generated customer-agent runtime contracts', () => {
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
-      contract_set_id: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1',
-      source_git_sha: '18297cf802b195d8ff4e9f625143e50bff169418',
-      openapi_sha256: '7982b5b05b1e686e446544db092e6c73325ad0386a1772e2b004e282ff792664',
+      contract_set_id: 'cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8',
+      source_git_sha: '240ae98a47d8b9432559c298f60af6fdc9ba8c4e',
+      openapi_sha256: 'ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38',
       database_sha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
@@ -56,8 +56,8 @@ describe('generated customer-agent runtime contracts', () => {
     const runtimeDefinitions = (OPENAPI_RUNTIME_SCHEMA_DOCUMENT as {
       $defs: Record<string, unknown>;
     }).$defs;
-    expect(contractSchemaNames).toHaveLength(233);
-    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(233);
+    expect(contractSchemaNames).toHaveLength(234);
+    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(234);
     expect(Object.keys(runtimeDefinitions)).toEqual([...contractSchemaNames]);
     expect(runtimeDefinitions).toMatchObject({
       FileImportRequest: {
@@ -78,6 +78,17 @@ describe('generated customer-agent runtime contracts', () => {
         validateContractSchema(name, null);
       }
     }).not.toThrow();
+  });
+
+  it('requires the exact management context with an explicit nullable base and server-owned identity', () => {
+    const context = { sourceId: 'source-a', sourceVersion: 1, baseReleaseId: null,
+      principalId: 'principal-a', factsVersion: 2, validUntil: '2026-10-07T09:00:00Z' };
+    expect(parseContractSchema('IntakeManagementContext', context)).toEqual(context);
+    expect(validateContractSchema('IntakeManagementContext', { ...context, baseReleaseId: 'release-a' }).ok).toBe(true);
+    for (const change of [{ baseReleaseId: undefined }, { sourceVersion: 0 }, { factsVersion: Number.MAX_SAFE_INTEGER + 1 },
+      { principalId: '' }, { validUntil: 'later' }, { userId: 'forged' }]) {
+      expect(validateContractSchema('IntakeManagementContext', { ...context, ...change }).ok).toBe(false);
+    }
   });
 
   it('rejects repeated quality identities while allowing distinct tuples', () => {

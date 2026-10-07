@@ -238,17 +238,19 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     }
   }, 180_000);
 
-  it('accepts the existing 26-row usage ledger after the quality HTTP-only intake without executing SQL', async () => {
-    const database = harness.createDatabase('quality_wire_only');
+  it.each([
+    { version: 'usage', contractSetId: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288', sourceGitSha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6' },
+    { version: 'quality', contractSetId: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1', sourceGitSha: '18297cf802b195d8ff4e9f625143e50bff169418' },
+  ])('accepts the existing 26-row $version ledger after a wire-only intake without executing SQL', async prior => {
+    const database = harness.createDatabase(`${prior.version}_wire_only`);
     const client = await harness.connect(database.config);
     try {
-      const prior = { contractSetId: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288',
-        sourceGitSha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6',
-        sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013' };
+      const predecessors = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades;
+      const priorIndex = predecessors.findIndex(p => p.contractSetId === prior.contractSetId);
       const oldCatalogue = { ...generatedMigrationCatalogue, contractSetId: prior.contractSetId,
-        sourceGitSha: prior.sourceGitSha, sourceSchemaSha256: prior.sourceSchemaSha256,
+        sourceGitSha: prior.sourceGitSha, sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
         compatibility: { ...generatedMigrationCatalogue.compatibility,
-          priorReviewedUpgrades: generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1) } };
+          priorReviewedUpgrades: priorIndex < 0 ? predecessors : predecessors.slice(0, priorIndex) } };
       expect((await applyMigrationCatalogue(client, oldCatalogue)).applied).toHaveLength(26);
       const ledger = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       expect((await inspectDatabaseMigrations(client)).state).toBe('COMPLETE');

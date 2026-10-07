@@ -174,7 +174,7 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 未保存质量判断与工作流表单互斥；重新发起审批须明确确认；审批显示的是最近一次观察，发布时 API 仍须重新核验。退出登录或强制关闭会丢弃内存恢复信息，界面/原生关闭提示不等于服务端撤销，也不承诺跨重启恢复。冻结抽样和“质量检查通过”均不等于组织审批或发布许可。
 
-新上传不能默认空基线或从登录 userId 推断 principalId。最小管理上下文候选合同尚待逐项批准与版本化 intake；参与人目录复用 1.16 已冻结的 `GET /v1/intake/principals`，本轮隔离宿主和 Main 合成探针已实现消费，不另建一份目录。
+新上传不能默认空基线或从登录 userId 推断 principalId。最小管理上下文已按 OpenAPI1.19.0 / schema.v1.21 冻结接收，隔离 API 和 Main 实际会话探针已消费；参与人目录复用 1.16 已冻结的 `GET /v1/intake/principals`，本轮隔离宿主和 Main 合成探针已实现消费，不另建一份目录。
 
 ### P2 已确认参与人目录
 
@@ -184,8 +184,16 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 运行上文 `test:intake:transactions` 可验证完整实库矩阵；仅目录用例使用 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'principals:'`。其中根桥接器实际调用 Desktop ProductHttp/ProductSession，验证分页、取消及注销后迟到响应；普通根 test 中该外部宿主用例会跳过，不能将跳过写成通过。合成宿主引用 API 的构建产物，源码接口变化后先 `pnpm build:services` 再运行 typecheck 或宿主，避免旧 dist 类型/实现被消费。
 
-本切片没有新增 Dashboard 人员选择或上传控件。后续由完整上传流程消费该目录，仍等待最小管理上下文合同正式接收。详见[目录验收](../evidence/qa/content-intake-p2-principals/README.md)。
+本切片没有新增 Dashboard 人员选择或上传控件。后续完整上传流程同时消费该目录与已接收的最小管理上下文。详见[目录验收](../evidence/qa/content-intake-p2-principals/README.md)。
 
+
+## P2 管理上下文与新接收输入
+
+`GET /v1/intake/sources/{sourceId}/management-context` 在有效产品会话和当前来源 import 权限下，返回 `sourceId/sourceVersion/baseReleaseId/principalId/factsVersion/validUntil` 六字段。只有数据库确实尚未发布时 base 才为 null；principal 来自认证的组织主体，不能使用登录 userId 替代。读操作不创建回执、候选、租约或 ACK，未知/跨范围/无 import 的来源统一不可见；不接受 query、body 或 HEAD。
+
+API 在既有内容事务及发布锁内取得同一时点的来源和基线，并在结束前复核会话、事实与 import 的最早截止。返回后变化仍可能发生；receive 必须重新验权和 CAS，`BASE_CHANGED` 或 `SOURCE_MISMATCH` 要求重新读上下文并让用户重新核对，不能以 null 或新编号静默重试。现有合成宿主路由允许合同规定的128字符 ID，超长值仍拒绝。
+
+Main 探针通过实际 ProductSession/ProductHttp 读取上下文、提交已有合成对象、等待解析并读取候选，同时验证取消和注销迟到响应。它不是已经接线的上传 UI。专项使用 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management context:'`，需要 PG15；完整入口仍为 `test:intake:transactions`。结果与限制见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
 
 ## P2 独立 API/PG 与桌面合成联调
 

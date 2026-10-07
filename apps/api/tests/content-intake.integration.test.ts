@@ -135,7 +135,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   async function managementHost(customStore = store, hostPool: IntakePool = pool, transport: ApprovalTransport | null = provider.transport,
     labels: IntakePrincipalLabels = label) {
     const logged = await seat('enabler');
-    const app = Fastify();
+    const app = Fastify({ routerOptions: { maxParamLength: 128 } });
     app.get('/v1/auth/me', async (request, reply) => (await authenticateRequestHeaders(auth!, request.headers)) ?? reply.code(401).send());
     app.post('/v1/auth/logout', async (request, reply) => {
       const header = request.headers.authorization;
@@ -1017,6 +1017,221 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     principalLabels.set(id, options.display ?? '合成已登记参与人');
   }
   const directoryQuery = { sourceId: 'source-a', purpose: 'contributor' };
+
+
+  it('management context: real HTTP exposes only source, current base and authenticated principal with no business writes or leases', async () => {
+    const host = await managementHost();
+    const snapshot = async () => {
+      const rows = [];
+      for (const table of ['content_intake.entitlements', 'content_intake.entitlement_contexts', 'content_intake.grants',
+        'content_intake.principals', 'content_intake.parse_jobs', 'content_intake.candidate_versions', 'content_intake.objects',
+        'backend_review.receipts', 'public.content_current', 'public.snapshot_offline_leases', 'public.client_sync_state']) {
+        rows.push((await admin.query(`SELECT to_jsonb(t) AS value FROM ${table} t ORDER BY to_jsonb(t)::text`)).rows);
+      }
+      return rows;
+    };
+    try {
+      // An unrelated query grant must not shorten an import-only projection.
+      await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成无关短资格' WHERE grant_id='business-enabler-query'");
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+        VALUES ('short-context-query','business','director','enabler','tenant-a','app-a','scope-a','source-a','query',
+        clock_timestamp()-interval '1 second',clock_timestamp()+interval '5 seconds','合成无关短资格','director','root-query')`);
+      const deadline = (await admin.query("UPDATE backend_identity.sessions SET expires_at=clock_timestamp()+interval '180 seconds' WHERE token_hash=$1 RETURNING expires_at", [authenticatedProductSession(host.logged.actor)])).rows[0].expires_at as Date;
+      let before = await snapshot();
+      const response = await fetch(`${host.origin}/v1/intake/sources/source-a/management-context`, { headers: host.headers });
+      expect(response.status).toBe(200); expect(response.headers.get('cache-control')).toBe('no-store');
+      const text = await response.text(), context = parseContractSchema('IntakeManagementContext', JSON.parse(text));
+      expect(context).toEqual({ sourceId: 'source-a', sourceVersion: 1, baseReleaseId: null,
+        principalId: 'enabler', factsVersion: 1, validUntil: deadline.toISOString() });
+      expect(context.principalId).not.toBe(host.logged.actor.user_id);
+      expect(Buffer.byteLength(text)).toBeLessThanOrEqual(65_536);
+      expect(await snapshot()).toEqual(before);
+      await publicationBase();
+      await admin.query(`INSERT INTO content_intake.source_mappings SELECT source_id,2,template_version,rule_version,mapping_version,structure_digest
+        FROM content_intake.source_mappings WHERE source_id='source-a';
+        UPDATE content_intake.sources SET current_mapping_version=2,mode='legacy',mode_version=2 WHERE source_id='source-a'`);
+      before = await snapshot();
+      const latest = await fetch(`${host.origin}/v1/intake/sources/source-a/management-context`, { headers: host.headers });
+      expect(latest.status).toBe(200);
+      expect(parseContractSchema('IntakeManagementContext', await latest.json())).toMatchObject({ sourceVersion: 2, baseReleaseId: 'rel_native_base' });
+      expect(await snapshot()).toEqual(before);
+    } finally { await host.app.close(); }
+  });
+
+  it('management context: import scope and the private session reject other permissions, tenants, apps, missing sessions and actor clones', async () => {
+    const host = await managementHost();
+    try {
+      for (const [id, tenant, app] of [['foreign-tenant', 'tenant-b', 'app-a'], ['foreign-app', 'tenant-a', 'app-b']] as const) {
+        await admin.query("INSERT INTO content_intake.scopes VALUES ($1,$2,$3,'brand-a','shop-a','product')", [`scope-${id}`, tenant, app]);
+        await admin.query('BEGIN');
+        await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ($1,$2,1,'v2-preview')", [id, `scope-${id}`]);
+        await admin.query("INSERT INTO content_intake.source_mappings VALUES ($1,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))", [id]);
+        await admin.query('COMMIT');
+        await registerDirectoryIdentity(id, { tenant, app });
+        const foreign = await seat(id);
+        const denied = await host.app.inject({ url: '/v1/intake/sources/source-a/management-context', headers: { authorization: `Bearer ${foreign.token}` } });
+        expect(denied.statusCode).toBe(404);
+      }
+      for (const id of ['source-b', 'missing', 'foreign-tenant', 'foreign-app']) {
+        const denied = await host.app.inject({ url: `/v1/intake/sources/${id}/management-context`, headers: host.headers });
+        expect(denied.statusCode).toBe(404); expect(parseContractSchema('IntakeError', denied.json()).error.details.reason).toBe('SCOPE_DENIED');
+      }
+      for (const id of ['agent', 'director']) {
+        const logged = await seat(id);
+        expect((await host.app.inject({ url: '/v1/intake/sources/source-a/management-context', headers: { authorization: `Bearer ${logged.token}` } })).statusCode).toBe(404);
+      }
+      expect((await host.app.inject({ url: '/v1/intake/sources/source-a/management-context' })).statusCode).toBe(401);
+      expect(await service.managementContext(actor('enabler'), 'source-a')).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+      expect(await service.managementContext({ ...host.logged.actor }, 'source-a')).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+      value(await service.changeGrant(actor('director'), 'business-enabler-import', { operationId: 'context-revoke-import', expectedVersion: 1,
+        change: 'revoke', reason: '合成取消导入权限', stewardPrincipalId: null }));
+      expect((await host.app.inject({ url: '/v1/intake/sources/source-a/management-context', headers: host.headers })).statusCode).toBe(404);
+      value(await service.authorization(actor('enabler'), 'source-a', 'content-manage'));
+    } finally { await host.app.close(); }
+  });
+
+  it.each(['session', 'grant', 'facts'] as const)('management context: slow current read cannot borrow time beyond its original %s deadline', async kind => {
+    let delayed = false;
+    const slow: IntakePool = { connect: async () => {
+      const client = await pool.connect();
+      return { query: async (sql: string, parameters?: unknown[]) => {
+        const result = await client.query(sql, parameters);
+        if (sql === 'SELECT current_release_id FROM public.content_current WHERE id=1') {
+          delayed = true; await new Promise(resolve => setTimeout(resolve, 350));
+        }
+        return result;
+      }, release: (broken?: boolean) => client.release(broken) } as PoolClient;
+    } };
+    const host = await managementHost(store, slow);
+    try {
+      if (kind === 'session') await admin.query("UPDATE backend_identity.sessions SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE token_hash=$1", [authenticatedProductSession(host.logged.actor)]);
+      if (kind === 'grant') {
+        value(await service.changeGrant(actor('director'), 'business-enabler-import', { operationId: 'short-context-grant', expectedVersion: 1,
+          change: 'revoke', reason: '合成短期授权替代', stewardPrincipalId: null }));
+        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+          VALUES ('short-context-import','business','director','enabler','tenant-a','app-a','scope-a','source-a','import',
+          clock_timestamp()-interval '1 second',clock_timestamp()+interval '250 milliseconds','合成短期导入权','director','root-import')`);
+      }
+      if (kind === 'facts') await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-enabler',true,
+        clock_timestamp(),clock_timestamp()+interval '250 milliseconds',repeat('b',64)); UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='enabler'`);
+      const response = await fetch(`${host.origin}/v1/intake/sources/source-a/management-context`, { headers: host.headers });
+      expect(response.status).toBe(403); parseContractSchema('IntakeError', await response.json());
+      expect(delayed).toBe(true);
+      expect((await admin.query('SELECT count(*) FROM backend_review.receipts')).rows[0].count).toBe(kind === 'grant' ? '1' : '0');
+    } finally { await host.app.close(); }
+  });
+
+  it('management context: waits for the existing publication lock and reads the committed current pointer', async () => {
+    let reached!: () => void;
+    const atLock = new Promise<void>(resolve => { reached = resolve; });
+    const observing: IntakePool = { connect: async () => {
+      const client = await pool.connect();
+      return { query: async (sql: string, parameters?: unknown[]) => {
+        if (sql === "SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))") reached();
+        return client.query(sql, parameters);
+      }, release: (broken?: boolean) => client.release(broken) } as PoolClient;
+    } };
+    const host = await managementHost(store, observing);
+    const publisher = await pool.connect();
+    let reading: Promise<Response> | undefined;
+    try {
+      await publisher.query('BEGIN');
+      await publisher.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
+      reading = fetch(`${host.origin}/v1/intake/sources/source-a/management-context`, { headers: host.headers });
+      await atLock;
+      // Explicit synthetic bootstrap stands in for the legacy writer, which takes
+      // this publication lock but does not participate in lock_content().
+      await publicationBase();
+      await publisher.query('COMMIT');
+      const response = await reading; expect(response.status).toBe(200);
+      expect(parseContractSchema('IntakeManagementContext', await response.json()).baseReleaseId).toBe('rel_native_base');
+    } finally {
+      await publisher.query('ROLLBACK'); publisher.release();
+      await reading; await host.app.close();
+    }
+  });
+
+  it('management context: real publication and source remapping invalidate stale receive hints without admitting a job or receipt', async () => {
+    await publicationBase();
+    const ready = await publishable('context-race'), host = await managementHost();
+    try {
+      const first = await fetch(`${host.origin}/v1/intake/sources/source-a/management-context`, { headers: host.headers });
+      const context = parseContractSchema('IntakeManagementContext', await first.json());
+      const object = parseContractSchema('IntakeObject', await (await host.upload(await httpWorkbook(), 'context-stale-upload')).json());
+      const request: C['IntakeReceive'] = { operationId: 'context-stale-receive', objectId: object.objectId,
+        sourceVersion: context.sourceVersion, baseReleaseId: context.baseReleaseId, expectedPriorKey: null,
+        contributorDeclaration: { preparerPrincipalId: context.principalId, editorPrincipalIds: [context.principalId], confirmed: true } };
+      const jobsBefore = (await admin.query('SELECT count(*) FROM content_intake.parse_jobs')).rows[0].count;
+      const published = value(await service.publish(actor('enabler'), ready.request));
+      expect(published.releaseId).not.toBe(context.baseReleaseId);
+      const stale = await host.app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/candidates', headers: host.headers, payload: request });
+      expect(stale.statusCode).toBe(409); expect(parseContractSchema('IntakeError', stale.json()).error.details.reason).toBe('BASE_CHANGED');
+      const current = parseContractSchema('IntakeManagementContext', await (await fetch(`${host.origin}/v1/intake/sources/source-a/management-context`, { headers: host.headers })).json());
+      await admin.query(`INSERT INTO content_intake.source_mappings SELECT source_id,2,template_version,rule_version,mapping_version,structure_digest
+        FROM content_intake.source_mappings WHERE source_id='source-a'; UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'`);
+      const remapped = await host.app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/candidates', headers: host.headers,
+        payload: { ...request, operationId: 'context-remapped-receive', baseReleaseId: current.baseReleaseId } });
+      expect(remapped.statusCode).toBe(409); expect(parseContractSchema('IntakeError', remapped.json()).error.details.reason).toBe('SOURCE_MISMATCH');
+      expect((await admin.query('SELECT count(*) FROM content_intake.parse_jobs')).rows[0].count).toBe(jobsBefore);
+      expect((await admin.query("SELECT request_key FROM backend_review.receipts WHERE request_key IN ('context-stale-receive','context-remapped-receive')")).rows).toEqual([]);
+    } finally { await host.app.close(); }
+  });
+
+  it('management context: strict GET rejects every query or body and accepts the maximum legal source id over HTTP', async () => {
+    const id = 's'.repeat(128);
+    await admin.query('BEGIN');
+    await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ($1,'scope-a',1,'v2-preview')", [id]);
+    await admin.query("INSERT INTO content_intake.source_mappings VALUES ($1,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))", [id]);
+    await admin.query('COMMIT');
+    await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+      to_jsonb(g)||jsonb_build_object('grant_id','context-max-id','source_id',$1::text))).* FROM content_intake.grants g WHERE grant_id='business-enabler-import'`, [id]);
+    const host = await managementHost();
+    try {
+      const valid = await fetch(`${host.origin}/v1/intake/sources/${id}/management-context`, { headers: host.headers });
+      expect(valid.status).toBe(200); expect(parseContractSchema('IntakeManagementContext', await valid.json()).sourceId).toBe(id);
+      const url = '/v1/intake/sources/source-a/management-context';
+      for (const query of ['?sourceVersion=1', '?limit=1', '?sourceId=source-a', '?x=1&x=2', '?=']) {
+        const response = await host.app.inject({ url: url + query, headers: host.headers });
+        expect(response.statusCode).toBe(400); expect(parseContractSchema('IntakeError', response.json()).error.details.reason).toBe('FILE_INVALID');
+      }
+      for (const headers of [{ 'content-type': 'application/json', 'content-length': '2' }, { 'transfer-encoding': 'chunked' }]) {
+        const response = await host.app.inject({ method: 'GET', url, headers: { ...host.headers, ...headers }, payload: '{}' });
+        expect(response.statusCode).toBe(400);
+      }
+      expect((await host.app.inject({ method: 'HEAD', url, headers: host.headers })).statusCode).toBe(404);
+      expect((await host.app.inject({ url: '/v1/intake/sources/bad%20id/management-context', headers: host.headers })).statusCode).toBe(400);
+      expect(await service.managementContext(host.logged.actor, 's'.repeat(129))).toMatchObject({ ok: false, code: 'VALIDATION' });
+    } finally { await host.app.close(); }
+  });
+
+  it('management context: actual Main ProductHttp/ProductSession uses context to receive and parse, then rejects cancelled and logged-out responses', async () => {
+    const host = await managementHost(), logged = host.logged;
+    let child: ReturnType<typeof spawn> | undefined, ended: Promise<unknown[]> | undefined, timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(await httpWorkbook(), 'context-main-upload')).json());
+      child = spawn(process.execPath, [fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs', import.meta.url))], { stdio: ['pipe', 'pipe', 'pipe'] });
+      ended = once(child, 'close'); let stdout = '', stderr = '';
+      child.stdout!.on('data', chunk => { stdout += String(chunk); }); child.stderr!.on('data', chunk => { stderr += String(chunk); });
+      timeout = setTimeout(() => child?.kill('SIGTERM'), 45_000);
+      child.stdin!.end(JSON.stringify({ origin: host.origin, token: logged.token, expiresAt: logged.expiresAt,
+        releaseId: 'not-used-by-management-context', managementContext: true, objectId: object.objectId }));
+      expect((await ended)[0], stderr).toBe(0);
+      expect(JSON.parse(stdout)).toEqual({ status: 'PASS', actualSession: true, managementContext: true, receive: true, cancellation: true, logoutLateResponse: true });
+      expect(stdout + stderr).not.toContain(logged.token);
+      const jobs = (await admin.query('SELECT actor_id,contributor_ids::text[] AS contributor_ids,source_version,base_release_id,state FROM content_intake.parse_jobs WHERE object_id=$1', [object.objectId])).rows;
+      expect(jobs).toEqual([{ actor_id: 'enabler', contributor_ids: ['enabler'], source_version: '1', base_release_id: null, state: 'validated' }]);
+      const received = (await admin.query("SELECT response FROM backend_review.receipts WHERE operation='intake:receive' AND request_key='context-main-receive'")).rows;
+      expect(received).toHaveLength(1);
+    } finally {
+      clearTimeout(timeout);
+      if (child && ended) {
+        const kill = setTimeout(() => child?.kill('SIGKILL'), 2_000);
+        if (child.exitCode === null) child.kill('SIGTERM');
+        try { await ended; } finally { clearTimeout(kill); }
+      }
+      await host.app.close();
+    }
+  }, 60_000);
 
   it('principals: HTTP only exposes scoped confirmed identities, including disabled or ungranted contributors, with no write side effects', async () => {
     await registerDirectoryIdentity('external-app', { app: 'app-b' });

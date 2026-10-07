@@ -1,6 +1,26 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
 export interface paths {
+    "/v1/intake/sources/{sourceId}/management-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取创建候选所需的来源与当前主体事实
+         * @description 只允许目标来源当前 import 权限。认证主体由 ProductSession 解析，principalId 不能用产品 userId 或客户端输入替代。sourceVersion 来自既有来源映射；baseReleaseId 来自唯一 content_current 指针，尚无发布时为 null。字段在同一受保护读取中取值，validUntil 为会话、主体事实、授权期限最早值；该响应不是授权、租约或提交票据。读取不刷新远端组织、不创建查询资格、不确认公告、不改变当前发布。后续 receive 仍逐次重新授权并 CAS sourceVersion/baseReleaseId。只接收 sourceId 路径参数；未知或重复 query、GET body 拒绝。无来源或无权统一 404，不返回其他来源正文、提供方身份或真实员工信息。参见 16-P2管理上下文合同候选.md。
+         */
+        get: operations["getIntakeManagementContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/intake/quality/operations/{operationId}": {
         parameters: {
             query?: never;
@@ -1705,6 +1725,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description 服务端已认证主体的已确认 principal 映射。validUntil 不是离线授权；Main 在创建候选前重读并保留原操作的精确输入进行不确定结果恢复。参与人目录复用 IntakePrincipalPage；本对象不包含展示名或整份权限。 */
+        IntakeManagementContext: {
+            sourceId: components["schemas"]["IntakeId"];
+            sourceVersion: components["schemas"]["IntakeVersion"];
+            baseReleaseId: components["schemas"]["IntakeId"] | null;
+            principalId: components["schemas"]["IntakeId"];
+            factsVersion: components["schemas"]["IntakeVersion"];
+            /** Format: date-time */
+            validUntil: string;
+        };
         /** @description 永久操作的精简历史结果，不含正文、逐条原因、权限或新的使用资格。只有当前有效会话的原主体能恢复；不将历史 state 当成当前状态。 */
         IntakeQualityReceipt: {
             operationId: components["schemas"]["IntakeId"];
@@ -4021,6 +4051,102 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getIntakeManagementContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: components["schemas"]["IntakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前来源及认证主体的最小管理上下文；Cache-Control: no-store。 */
+            200: {
+                headers: {
+                    /** @description 含认证主体事实的读取不得缓存。 */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeManagementContext"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或失效，重新登录；不披露资源存在性。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
     getIntakeQualityOperation: {
         parameters: {
             query: {
