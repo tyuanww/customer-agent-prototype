@@ -41,6 +41,14 @@ describe('product HTTP form upload', () => {
 });
 
 describe('product HTTP qualification boundary', () => {
+  it('maps a rejected quality payload to correctable validation rather than uncertain transport', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const http = new ProductHttp('http://127.0.0.1:4100', async () => Response.json({
+      error: { code: 'VALIDATION', details: { reason: 'FILE_LIMIT' } },
+    }, { status: 413 }));
+    await expect(http.request('/v1/intake/candidates/c/versions/1/quality/checks', { body: {} }))
+      .rejects.toMatchObject({ code: 'VALIDATION', reason: 'FILE_LIMIT' });
+  });
   it('preserves the formal reason but never logs path, query or response text', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const http = new ProductHttp('http://127.0.0.1:4100', async () => Response.json({

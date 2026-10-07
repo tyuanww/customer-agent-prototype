@@ -128,6 +128,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   async function managementHost(customStore = store, hostPool: IntakePool = pool, transport: ApprovalTransport | null = provider.transport) {
     const logged = await seat('enabler');
     const app = Fastify();
+    app.get('/v1/auth/me', async (request, reply) => (await authenticateRequestHeaders(auth!, request.headers)) ?? reply.code(401).send());
     await app.register(contentIntakeManagementRoutes, { auth: auth!, pool: hostPool, store: customStore,
       ...(transport ? { approval: createApprovalAdapter(route, transport) } : {}),
       report: (_id, error) => diagnostics.push(error) });
@@ -418,7 +419,17 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(provider.instanceCalls()).toBe(observations);
       expect((await f.post('publish', f.publish)).status).toBe(409); // ready is not quality-passed
       await noPublication();
-      await httpQuality(host, f.c);
+      const qualitySeat = await seat('reviewer');
+      const child = spawn(process.execPath, [fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs', import.meta.url))], { stdio: ['pipe', 'pipe', 'pipe'] });
+      const ended = once(child, 'close'); let output = '';
+      const collect = (chunk: Buffer) => { output += String(chunk); if (output.length > 1_048_576) child.kill('SIGKILL'); };
+      child.stdout!.on('data', collect); child.stderr!.on('data', collect);
+      const deadline = setTimeout(() => child.kill('SIGKILL'), 45_000);
+      try {
+        child.stdin!.end(JSON.stringify({ origin: host.origin, token: qualitySeat.token, expiresAt: qualitySeat.expiresAt, releaseId: '', qualityKey: f.c.key }));
+        expect((await ended)[0], output.replaceAll(qualitySeat.token, '[credential]')).toBe(0);
+        expect(JSON.parse(output)).toEqual({ status: 'PASS', actualSession: true, quality: true, unknownCommitRecovery: true });
+      } finally { clearTimeout(deadline); if (child.exitCode === null) { child.kill('SIGKILL'); await ended; } }
       const published = await f.post('publish', f.publish);
       expect(published.status, await published.clone().text()).toBe(202);
       const receipt = parseContractSchema('IntakeReceipt', await published.json());
@@ -441,7 +452,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(snapshot.faq[0]!.entry.answerText).toBe('第一行。\n第二行。');
       expect(JSON.stringify(snapshot)).not.toContain('合成内部说明');
       console.log(JSON.stringify({ probe: 'workflow-http-second-seat', source: 'uploaded-synthetic-xlsx', releaseId: receipt.releaseId,
-        faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'HTTP', approvalTransport: 'synthetic' }));
+        faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'Main-ProductSession-HTTP', approvalTransport: 'synthetic' }));
     } finally { await reader.close(); await host.app.close(); }
   }, 40_000);
 

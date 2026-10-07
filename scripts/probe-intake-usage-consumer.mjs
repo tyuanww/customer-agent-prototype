@@ -20,10 +20,18 @@ assert.equal(typeof context.releaseId, 'string');
 assert.ok(Number.isFinite(Date.parse(context.expiresAt)));
 const capacity = context.discoverySources === 5000;
 assert.ok(context.discoverySources === undefined || capacity);
+const quality = context.qualityKey !== undefined;
+if (quality) {
+  assert.equal(capacity, false);
+  assert.match(context.qualityKey.candidateId, /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
+  assert.ok(Number.isSafeInteger(context.qualityKey.version) && context.qualityKey.version > 0);
+  assert.match(context.qualityKey.digest, /^[0-9a-f]{64}$/);
+}
 const desktop = fileURLToPath(new URL('../apps/desktop/', import.meta.url));
 const require = createRequire(join(desktop, 'package.json'));
 const cli = join(dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
-const child = spawn(process.execPath, [cli, 'run', '--pool=threads', 'tests/unit/content-intake-usage-http.test.ts'], {
+const testFile = quality ? 'tests/unit/content-intake-quality-http.test.ts' : 'tests/unit/content-intake-usage-http.test.ts';
+const child = spawn(process.execPath, [cli, 'run', '--pool=threads', testFile], {
   cwd: desktop, stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, CUSTOMER_AGENT_INTAKE_HTTP_PROBE: input },
 });
@@ -39,13 +47,14 @@ process.once('SIGTERM', stop); process.once('SIGINT', stop);
 const deadline = setTimeout(stop, capacity ? 110_000 : 40_000);
 try {
   const [code] = await once(child, 'close');
-  const marker = capacity ? 'INTAKE_DISCOVERY_CAPACITY_PASS' : 'INTAKE_USAGE_HTTP_PASS';
+  const marker = quality ? 'INTAKE_QUALITY_HTTP_PASS' : capacity ? 'INTAKE_DISCOVERY_CAPACITY_PASS' : 'INTAKE_USAGE_HTTP_PASS';
   if (code !== 0 || overflow || !output.includes(marker)) {
     // Fixture diagnostics only, but defensively strip its token before printing.
     process.stderr.write(output.replaceAll(context.token, '[credential]'));
     throw new Error('INTAKE_USAGE_HTTP_PROBE_FAILED');
   }
-  console.log(JSON.stringify(capacity
+  console.log(JSON.stringify(quality ? { status: 'PASS', actualSession: true, quality: true, unknownCommitRecovery: true }
+    : capacity
     ? { status: 'PASS', actualSession: true, discovery: true, sourceCount: context.discoverySources }
     : { status: 'PASS', actualSession: true, discovery: true, largePage: true, cancellation: true,
       publishedText: true, localExpiry: true, normalUpdate: true, revocationFanout: true }));
