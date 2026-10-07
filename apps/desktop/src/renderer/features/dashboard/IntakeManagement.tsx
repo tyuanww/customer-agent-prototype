@@ -1,6 +1,7 @@
 import type { components } from '@customer-agent/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import { IntakeUpload } from './IntakeUpload';
 import './intake-management.css';
 const states: Record<string, string> = { 'awaiting-evidence': '等待补证', ready: '候选就绪', publishing: '发布中', published: '已发布', cancelled: '已取消', invalidated: '已失效',
   confirmed: '来源已确认', creating: '审批创建结果待确认', pending: '等待组织审批', approved: '组织审批已通过', rejected: '组织审批未通过', revoked: '组织审批已撤回', unavailable: '审批服务暂不可用', unknown: '操作结果待确认', failed: '操作失败', not_frozen: '待冻结抽样', revision_required: '需要修订后重新检查', initial_required: '等待初检', expansion_required: '等待扩检', passed: '质量检查通过', blocked: '质量检查未通过' };
@@ -111,23 +112,70 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
 }
 export function IntakeManagement() {
   const [view, setView] = useState<IntakeManagementView | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const generation = useRef(0), pending = useRef(false);
+  const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
+  const generation = useRef(0), pending = useRef<number | null>(null);
+  const stopPending = useRef(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(() => new Set());
   const onDirty = useCallback((id: string, dirty: boolean) => setDirtyIds(previous => {
     if (previous.has(id) === dirty) return previous;
     const next = new Set(previous); if (dirty) next.add(id); else next.delete(id); return next;
   }), []);
   const apply = async (command?: IntakeManagementCommand) => {
-    if (pending.current) return;
-    pending.current = true; setBusy(true); setError(''); const gen = ++generation.current;
+    if (command?.action === 'upload-stop') {
+      if (stopPending.current) return;
+      stopPending.current = true; setStopping(true); const gen = ++generation.current;
+      try {
+        const reply = await window.dashboardIntake!.command(command);
+        if (generation.current === gen) { setView(reply.view); setError(reply.ok ? '' : reply.message); }
+      } catch { if (generation.current === gen) setError('停止请求尚未确认，请重新读取当前状态。服务器可能仍在处理原任务。'); }
+      finally {
+        // Main's stop acknowledgement releases local waiting. A late original
+        // response must neither replace this view nor unlock a newer request.
+        pending.current = null; setBusy(false); setUploadRequest(false);
+        stopPending.current = false; setStopping(false);
+      }
+      return;
+    }
+    if (pending.current !== null || stopPending.current) return;
+    setBusy(true); setError(''); const gen = ++generation.current; pending.current = gen;
+    const uploading = command?.action.startsWith('upload-') ?? false; setUploadRequest(uploading);
     try {
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
       if (generation.current !== gen) return;
       setView(reply.view); if (!reply.ok) setError(reply.message);
-    } catch { if (generation.current === gen) { setView(null); setError('管理服务不可用，请刷新。'); } }
-    finally { pending.current = false; setBusy(false); }
+    } catch {
+      if (generation.current !== gen) return;
+      if (uploading) {
+        // Re-read Main's access-filtered projection before keeping form input.
+        // A failed IPC reply alone cannot prove either success or revocation.
+        try {
+          const reply = await window.dashboardIntake!.current();
+          if (generation.current === gen) { setView(reply.view); setError(reply.ok ? '本次操作未完整返回，已重新读取当前状态。请按当前提示继续。' : reply.message); }
+        } catch { if (generation.current === gen) { setView(null); setError('管理服务不可用，请重新读取当前状态。'); } }
+      } else { setView(null); setError('管理服务不可用，请刷新。'); }
+    } finally {
+      if (pending.current === gen) { pending.current = null; setBusy(false); setUploadRequest(false); }
+    }
   };
+  useEffect(() => {
+    if (!busy || !uploadRequest) return;
+    let active = true, reading = false;
+    const gen = generation.current;
+    // current() projects Main memory only. Keep stop/progress visible while the
+    // original command is pending; never start overlapping HTTP refresh writes.
+    const read = async () => {
+      if (reading) return;
+      reading = true;
+      try {
+        const reply = await window.dashboardIntake!.current();
+        if (active && generation.current === gen && reply.view) setView(reply.view);
+      } catch { /* The original command owns its visible transport outcome. */ }
+      finally { reading = false; }
+    };
+    void read(); const timer = window.setInterval(() => void read(), 250);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [busy, uploadRequest]);
   useEffect(() => {
     const api = window.dashboardIntake!;
     const off = api.onInvalidated(() => {
@@ -140,7 +188,9 @@ export function IntakeManagement() {
     const invalidate = () => { generation.current++; };
     return () => { invalidate(); off(); };
   }, []);
-  const disabled = busy || !!view?.pending;
+  const upload = view?.upload;
+  const disabled = busy || stopping || !!view?.pending || !!upload?.busy || !!upload?.pending;
+  const uploadDraft = !!upload?.file && upload.phase !== 'validated';
   const quality = view?.quality;
   const dirty = dirtyIds.size > 0;
   const qualityDirty = [...dirtyIds].some(id => id !== 'workflow-source' && id !== 'workflow-publish');
@@ -148,20 +198,24 @@ export function IntakeManagement() {
   const editable = quality?.status.state === (quality?.phase === 'initial' ? 'initial_required' : 'expansion_required');
   return <main className="intake-management">
     <header><div><p className="intake-eyebrow">PILOT-S0 · SYNTHETIC</p><h1>资料审核</h1><p>核对候选材料、确认来源、完成质量检查并审核发布</p></div><span>{view?.displayName ?? '正在读取会话'}</span></header>
-    {error && <p role="alert">{error}</p>}
+    {error && <div><p role="alert">{error}</p><button disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</button></div>}
+    {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy} stopping={stopping}
+      blocked={dirty || view.hasDraft || !!view.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
+    {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <button disabled={busy || stopping}
+      onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</button>}
     {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2>操作结果待确认</h2>
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
       <div>{view.pending.recovery === 'receipt' && <button disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</button>}
         <button disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</button></div></section>}
-    <div className="intake-toolbar"><button disabled={disabled || dirty} onClick={() => void apply({ action: 'list', next: false })}>刷新候选</button>
-      <button disabled={disabled || dirty || !view?.moreCandidates} onClick={() => void apply({ action: 'list', next: true })}>下一页候选</button>
+    <div className="intake-toolbar"><button disabled={disabled || dirty || uploadDraft} onClick={() => void apply({ action: 'list', next: false })}>刷新候选</button>
+      <button disabled={disabled || dirty || uploadDraft || !view?.moreCandidates} onClick={() => void apply({ action: 'list', next: true })}>下一页候选</button>
       {view?.selected && <button disabled={disabled} onClick={() => { if (window.confirm('放弃尚未提交的判断并关闭当前候选？')) void apply({ action: 'discard' }); }}>关闭当前候选</button>}</div>
     {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
     {view?.signedIn && !view.authorized && !view.pending && <p>当前没有可用的资料管理权限，请确认登录身份与店铺授权。</p>}
     {view?.authorized && <>
       <section aria-label="候选列表"><h2>有权范围内的候选</h2>
         {!view.candidates.length && <p>这一页没有候选。</p>}
-        <div className="intake-candidates">{view.candidates.map(row => <button key={row.selection} disabled={disabled || dirty || view.hasDraft}
+        <div className="intake-candidates">{view.candidates.map(row => <button key={row.selection} disabled={disabled || dirty || view.hasDraft || uploadDraft}
           onClick={() => void apply({ action: 'select', selection: row.selection })}>
           <strong>{row.candidate.sourceId}</strong><span>{states[row.candidate.state]} · 版本 {row.candidate.key.version}</span><small>{row.candidate.key.candidateId}</small>
         </button>)}</div></section>

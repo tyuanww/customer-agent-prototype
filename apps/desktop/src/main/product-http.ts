@@ -49,7 +49,7 @@ export class ProductHttp {
   /** Bounded response and deadline. No retries: mutations may have committed. */
   async request(path: string, options: {
     body?: unknown; form?: FormData; token?: string; signal?: AbortSignal; method?: string;
-    timeoutMs?: number; maxResponseBytes?: number;
+    timeoutMs?: number; maxResponseBytes?: number; responseType?: 'xlsx';
     headers?: Partial<Record<(typeof EXTRA_HEADERS)[number], string>>;
   } = {}): Promise<ProductHttpResult> {
     if (!path.startsWith('/v1/') || path.includes('..') || path.includes('://') || path.includes('\\')) throw new ProductHttpError('VALIDATION');
@@ -92,6 +92,17 @@ export class ProductHttp {
         throw new ProductHttpError(failure.code, failure.reason);
       }
       if (response.status === 204) return { status: 204, value: null, ...meta };
+      if (options.responseType === 'xlsx') {
+        if (response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+          !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+          await response.body?.cancel(); throw new ProductHttpError('UNAVAILABLE');
+        }
+        const value = await readBytes(response, maxResponseBytes, signal);
+        signal.throwIfAborted();
+        // A report is an XLSX archive, never HTML or JSON renamed by the server.
+        if (value.length < 4 || value.readUInt32LE(0) !== 0x04034b50) throw new ProductHttpError('UNAVAILABLE');
+        return { status: response.status, value, ...meta };
+      }
       return { status: response.status, value: JSON.parse(await readBounded(response, maxResponseBytes)), ...meta };
     } catch (error) {
       if (error instanceof ProductHttpError) throw error;
@@ -110,18 +121,26 @@ export class ProductHttp {
   }
 }
 async function readBounded(response: Response, maxBytes = 1_048_576): Promise<string> {
+  return (await readBytes(response, maxBytes)).toString('utf8');
+}
+async function readBytes(response: Response, maxBytes: number, signal?: AbortSignal): Promise<Buffer> {
   if (!response.body) throw new ProductHttpError('UNAVAILABLE');
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = []; let bytes = 0;
+  // Fetch normally cancels its body on abort; this also bounds injected/native
+  // transports whose stream does not itself listen to the request signal.
+  const cancel = () => { void reader.cancel().catch(() => undefined); };
+  signal?.addEventListener('abort', cancel, { once: true });
   try {
+    signal?.throwIfAborted();
     for (;;) {
-      const chunk = await reader.read(); if (chunk.done) break;
+      const chunk = await reader.read(); signal?.throwIfAborted(); if (chunk.done) break;
       bytes += chunk.value.byteLength;
       if (bytes > maxBytes) { await reader.cancel(); throw new ProductHttpError('UNAVAILABLE'); }
       chunks.push(chunk.value);
     }
-  } finally { reader.releaseLock(); }
-  return Buffer.concat(chunks).toString('utf8');
+  } finally { signal?.removeEventListener('abort', cancel); reader.releaseLock(); }
+  return Buffer.concat(chunks);
 }
 async function mapFailure(response: Response): Promise<{ code: ProductErrorCode; reason?: string }> {
   const codes: Record<number, ProductErrorCode> = { 400: 'VALIDATION', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'GONE', 409: 'CONFLICT', 410: 'GONE', 413: 'VALIDATION', 429: 'RATE_LIMITED', 503: 'OVERLOADED' };

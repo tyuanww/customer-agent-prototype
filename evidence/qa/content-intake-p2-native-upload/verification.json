@@ -1,0 +1,272 @@
+{
+  "schema": "content-intake-native-upload-verification/v1",
+  "recordedAt": "2026-10-07T09:30:26.189Z",
+  "baseCommit": "65048872fd725f41ad059903f23216fa71d8adc6",
+  "governanceCommit": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
+  "environment": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "macOS": "26.5.2",
+    "postgres": "15.18",
+    "postgresBin": "/Users/hutou/homebrew/opt/postgresql@15/bin"
+  },
+  "mode": "SYNTHETIC_ONLY",
+  "inputBinding": "Final frozen runtime/test files match final lint/typecheck/test/build and capture005. Documentation receives separate reference/diff validation. Evidence files excluded to avoid self-referential hashes.",
+  "inputs": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "8657d3cb861f799e2f6ed0984e5c751e59d04f453e5e6909b8103ef03c358d04"
+    },
+    {
+      "path": "apps/api/tests/support/intake-synthetic-host.ts",
+      "sha256": "8c65e53008209d69cc22055d5c22e9bcfde6d2c7bc2e5e72e5511303d40b7c2b"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management-ipc.ts",
+      "sha256": "9766fcda1bb299146af6d43e7925c0559db8e301dfd67f55e8b46da4746ee5fe"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management.ts",
+      "sha256": "76565cd5766691690d25cca4fc35038ac9067e783c158b4fb2e59f36aed77f53"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-native-files.ts",
+      "sha256": "20a7cd9abb4dc43b194394c368a4b29557b58b19c9d05a2e9c9f6f85a583d58f"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-upload.ts",
+      "sha256": "f81ddb984d6964ba40bd1d418c1fdeee9a0492d12eda43bcb4ed9b4915bd71e6"
+    },
+    {
+      "path": "apps/desktop/src/main/product-http.ts",
+      "sha256": "e7820373387a7e1f9bb088502b2612a9204599ed18fe52cc48cc43e78962c53f"
+    },
+    {
+      "path": "apps/desktop/src/main/product-session.ts",
+      "sha256": "17e1e55c33d88abf8cd2b8ac2a4921bf3154163e7c6d735696d36a7dfb8b77f8"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "sha256": "7096ffa6d7da878c64271dbaf52d71065a92013dd62f5b8c6149c9f7b9f534b1"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx",
+      "sha256": "0718039420599a019ce422748352eed1236cd15654c7a4b8fb2a0d5ca845626b"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/intake-management.css",
+      "sha256": "584820658c8c9c7aea08b7e80159fd9a7aff16e54d6b9c3ffe27a7bd976eb7aa"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-management.ts",
+      "sha256": "96e170959e13a565f0e822a1bc2577a7f3d71ea65c850be76c18482d5a4ef072"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-upload.ts",
+      "sha256": "e31feba925f8b847f7d2967d3d18d20fd362011877f720d4888722a0028128a3"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-upload.test.tsx",
+      "sha256": "6e3929d876b293441ac9e0a5182dc82fc7e538436c2f7d3a35fac31553c63a27"
+    },
+    {
+      "path": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+      "sha256": "0080b53fc8f2346472a3723ea6461fa1ce028f4c53e40918f1832b2ffe178b9d"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management-ipc.test.ts",
+      "sha256": "361a97287ad97d951e140e3ee12d2553e8ba25e9d2955b5fa39c3c4c98339678"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management.test.ts",
+      "sha256": "4c560ae9711ec164551ed85b2a4f20d684d7ba13e8e02937b3b85935e9c8e6c0"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-native-files.test.ts",
+      "sha256": "a12644f0aba71bfcb660450e455eb5656ee37e49397e6914315dfa215a4c521a"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-upload.test.ts",
+      "sha256": "1b6d3d1d81ea899278afa648dc1a4594f81e8dcd7e85510ea43606ae80a240ce"
+    },
+    {
+      "path": "apps/desktop/tests/unit/product-http.test.ts",
+      "sha256": "8394ab73df9d4f138f09f22142a1506841331e1ac95ac882ab027fc4d7c7630b"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "sha256": "94a60b9fea3f9b25e56f21bad8ce276a8b61d3f4c678444137b7a0f7af81046c"
+    },
+    {
+      "path": "docs/how-to-verify-desktop.md",
+      "sha256": "b3c84207addee94284f5b2022cdccc91b8f0f501180e5796326999046c2038f2"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "sha256": "e93f690baac087691a7ff93aa2f5c561a03f18b826801172959578a6b13a2f81"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "sha256": "d3ace164c703620d8447a7ed210084ece284dc11d6e2bc149c00dc88f7aa0a0b"
+    },
+    {
+      "path": "packages/content-intake/scripts/probe-issue-report.mjs",
+      "sha256": "47c59895790729de589eac12e140d92615920d1fd6b331c2a84a1fac520d22e6"
+    },
+    {
+      "path": "packages/content-intake/tests/fixtures.ts",
+      "sha256": "3fdbf0f7c5fa21d3f5de9d17201f954fda1f926171db0ef8febd7d03943939a9"
+    }
+  ],
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/root-lint-final.log",
+      "logSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/root-typecheck-final.log",
+      "logSha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/root-test-final.log",
+      "logSha256": "dc831cd1bef05c5b77b41621ff98b6de2f7963b4c6bb8dc14afd013f5c3d2a98"
+    },
+    {
+      "command": "pnpm build",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/root-build-final.log",
+      "logSha256": "99c6beb7044fc1fab8eb382148a0d254eb805c59a30c7c5dffe8f8f9899aeda7"
+    },
+    {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/host-cli-final.log",
+      "logSha256": "f987137d580db594f9928376a3f19454fa8d1fc9cf0ab118731d1750c7a99920"
+    },
+    {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/e2e-capture005.log",
+      "logSha256": "dff7a1287e9246510b35f7d325b9ed4d8f0804d6f5cf8499a970276b032b99fa"
+    },
+    {
+      "command": "pnpm docs:check",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/docs-final.log",
+      "logSha256": "dd46c4a7e0afb5357a08b2df4fa36c200a31a2d76ca86f8953cb7d42322bd833"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/workspace-final.log",
+      "logSha256": "6ae306149e426e56e226644133c84c3a8c71a72fbe0fc1690c22eac2b9e1c8be"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/architecture-final.log",
+      "logSha256": "39ed4bc0e8c2899acfeffc5ce7faa574955382e7d10bbccca03b15037eb5a9d7"
+    }
+  ],
+  "counts": {
+    "desktop": {
+      "pass": 1260,
+      "skip": 6
+    },
+    "apiDefault": {
+      "pass": 476,
+      "skip": 247
+    },
+    "hostCli": {
+      "pass": 5,
+      "skip": 0
+    },
+    "electronRealStack": {
+      "pass": 1,
+      "seconds": 9.8
+    }
+  },
+  "screenshots": [
+    {
+      "path": ".gstack/qa-reports/content-intake-native-upload-20261007/capture005/dashboard-approved.png",
+      "sha256": "31b56e65cdb6595b2c544e466e5ad25ea75a51e9d9c166195d7605b62e8e70af"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-native-upload-20261007/capture005/dashboard-published.png",
+      "sha256": "ae1566b657e8fadd5372550282a17788c10624aa400722fd2406b93faef1d802"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-native-upload-20261007/capture005/dashboard-upload-error-report.png",
+      "sha256": "9173f0bd76133c1f10aad394fc1100d837f4b3d2bd5ca3652d1a89be0b462e90"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-native-upload-20261007/capture005/dashboard-uploaded-material.png",
+      "sha256": "bd8a5bc62de8a9696f8e023ab34076244b3372d948b05aee75bed4cc61e1b508"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-native-upload-20261007/capture005/query-published-faq.png",
+      "sha256": "af8faede60e4f4c332040c5d4355883b498a270e9a7ff0abac6a332ef67b7b48"
+    }
+  ],
+  "review": {
+    "mode": "OCR delegate plus in-host review",
+    "externalModel": "not invoked; previous missing external coverage retained",
+    "fixedFindings": [
+      {
+        "id": "historical-contributor-expiry",
+        "severity": "P1",
+        "red": ".gstack/qa-reports/intake-upload-history-20261007/red.log",
+        "green": ".gstack/qa-reports/intake-upload-history-20261007/green.log",
+        "redSha256": "3fffd6ad85099ce1e69dd4ae7ca97bc85c6d6dd978be894338e000d9ed47776c",
+        "greenSha256": "00389131e744689f0a7703fcc423ccba7a8cf3f0afdca6902051001c4748cc6c"
+      },
+      {
+        "id": "historical-upload-replaces-selected-candidate",
+        "severity": "P1",
+        "red": ".gstack/qa-reports/content-intake-native-upload-20261007/candidate-handoff-red.log",
+        "green": ".gstack/qa-reports/content-intake-native-upload-20261007/candidate-handoff-green.log",
+        "uiRed": ".gstack/upload-ui-review/history-refresh-red.log",
+        "uiGreen": ".gstack/upload-ui-review/history-refresh-green.log",
+        "redSha256": "1a22876a12a7408cdbdbbc9ac82bb374e0ae56d756332a57f1a8155ed6f6cdbf",
+        "greenSha256": "c92203f74c074ecb646494bb694ac41621407496926c45658fdc4b7af7d77102",
+        "uiRedSha256": "11086e06f40c3cda052f37916635e5e249325d02bd71a93db0327f5b31062b25",
+        "uiGreenSha256": "87672b383f98a788d08ff2b914537bbe7e0c3b3297b4ee2b7481707a7d80ed77"
+      }
+    ],
+    "finalReadOnlyPassArtifacts": ".gstack/qa-reports/content-intake-native-upload-20261007/review-final.json"
+  },
+  "superseded": [
+    {
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/root-test.log",
+      "reason": "Existing generated-types test exceeded 5 seconds under initial concurrency; unchanged isolated case and final complete run passed."
+    },
+    {
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/e2e-capture001.log",
+      "reason": "Column test expected C instead of contract numeric column 3."
+    },
+    {
+      "log": ".gstack/qa-reports/content-intake-native-upload-20261007/e2e-capture003.log",
+      "reason": "Query was still parked during login setup; fixed test activation/ready wait, later complete runs passed."
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-native-upload-20261007/.qa-evidence/001",
+      "reason": "Initial smoke predates review fixes; final checks supersede affected evidence without resetting smoke budget."
+    }
+  ],
+  "notRun": [
+    "Manual macOS open/save dialog",
+    "Windows GUI/WSL on Hangzhou host",
+    "Signed/packaged application",
+    "Real Feishu transport or real staff/customer inputs",
+    "Production activation/deployment",
+    "Full 145-test intake PG transaction matrix (API/DDL unchanged; prior evidence retained)"
+  ]
+}

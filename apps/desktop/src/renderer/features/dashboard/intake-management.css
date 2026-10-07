@@ -16,3 +16,19 @@
 .intake-management textarea { flex: 1; min-height: 70px; } .intake-management fieldset { border: 0; padding: 12px 0 0; }
 
 .intake-management input { flex: 1; min-width: 0; }
+.intake-upload { border-bottom: 1px solid #dcd8e5; padding-bottom: 24px; }
+.intake-upload select { max-width: 100%; min-width: 0; }
+.intake-upload input[type=checkbox] { flex: 0 0 auto; margin-top: 6px; width: 18px; height: 18px; accent-color: #6e4e9a; }
+.intake-upload .intake-primary { background: #6a4892; color: white; border-color: #6a4892; }
+.intake-upload .intake-primary:not(:disabled):hover { background: #593b7e; }
+.intake-contributors { max-height: 260px; overflow-y: auto; padding: 0 4px; }
+.intake-contributors label { margin: 8px 0; }
+.intake-file { overflow-wrap: anywhere; }
+.intake-upload-state { font-weight: 600; }
+.intake-issues { max-width: 100%; overflow-x: auto; }
+.intake-issues table { width: 100%; border-collapse: collapse; table-layout: fixed; text-align: left; }
+.intake-issues th, .intake-issues td { border-bottom: 1px solid #dcd8e5; padding: 10px 8px; overflow-wrap: anywhere; vertical-align: top; }
+.intake-issues th:first-child { width: 22%; }
+.intake-issues th:nth-child(2) { width: 18%; }
+.intake-issues caption { text-align: left; padding: 12px 8px; font-weight: 600; }
+@media (forced-colors: active) { .intake-upload .intake-primary { background: ButtonFace; color: ButtonText; border-color: ButtonText; } }

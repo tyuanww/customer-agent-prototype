@@ -1,6 +1,6 @@
 # 如何验证合成资料导入
 
-本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。已有候选的合成审批发布与坐席查询已接通；新上传原生入口、真实审批 transport 及正式运行接入仍待完成。
+本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。FAQ 原生文件选择、参与人确认、上传校验、报告保存、合成审批发布与坐席查询已接通；真实审批 transport、原生设备人工验收及正式运行接入仍待完成。
 
 ## 运行
 
@@ -184,7 +184,7 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 运行上文 `test:intake:transactions` 可验证完整实库矩阵；仅目录用例使用 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'principals:'`。其中根桥接器实际调用 Desktop ProductHttp/ProductSession，验证分页、取消及注销后迟到响应；普通根 test 中该外部宿主用例会跳过，不能将跳过写成通过。合成宿主引用 API 的构建产物，源码接口变化后先 `pnpm build:services` 再运行 typecheck 或宿主，避免旧 dist 类型/实现被消费。
 
-本切片没有新增 Dashboard 人员选择或上传控件。后续完整上传流程同时消费该目录与已接收的最小管理上下文。详见[目录验收](../evidence/qa/content-intake-p2-principals/README.md)。
+目录最初交付不包含 Dashboard 控件；下述原生上传现在同时消费该目录与已接收的最小管理上下文。详见[目录验收](../evidence/qa/content-intake-p2-principals/README.md)。
 
 
 ## P2 管理上下文与新接收输入
@@ -193,11 +193,11 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 API 在既有内容事务及发布锁内取得同一时点的来源和基线，并在结束前复核会话、事实与 import 的最早截止。返回后变化仍可能发生；receive 必须重新验权和 CAS，`BASE_CHANGED` 或 `SOURCE_MISMATCH` 要求重新读上下文并让用户重新核对，不能以 null 或新编号静默重试。现有合成宿主路由允许合同规定的128字符 ID，超长值仍拒绝。
 
-Main 探针通过实际 ProductSession/ProductHttp 读取上下文、提交已有合成对象、等待解析并读取候选，同时验证取消和注销迟到响应。它不是已经接线的上传 UI。专项使用 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management context:'`，需要 PG15；完整入口仍为 `test:intake:transactions`。结果与限制见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
+Main 探针通过实际 ProductSession/ProductHttp 读取上下文、提交已有合成对象、等待解析并读取候选，同时验证取消和注销迟到响应。该探针独立验证接口；下述原生上传 UI 复用同一真实输入。专项使用 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'management context:'`，需要 PG15；完整入口仍为 `test:intake:transactions`。结果与限制见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
 
 ## P2 独立 API/PG 与桌面合成联调
 
-运行入口使用全新临时 PostgreSQL 15、冻结迁移、实际身份/资料 HTTP 模块和三条合成多行 FAQ；不读取 `api.env`、`content.env`、`feishu.env` 或已有业务库。仅两个随机 loopback 端口。临时来源、身份、空发布基线只由 test-support 引导，不注册生产 factory，不放开应用 ACL。宿主实际执行上传/接收/解析准备已有候选；桌面本轮从该候选开始，不能据此称上传 UI 已完成。
+运行入口使用全新临时 PostgreSQL 15、冻结迁移、实际身份/资料 HTTP 模块和三条合成多行 FAQ；不读取 `api.env`、`content.env`、`feishu.env` 或已有业务库。仅两个随机 loopback 端口。临时来源、身份、空发布基线只由 test-support 引导，不注册生产 factory，不放开应用 ACL。手动宿主默认执行上传/接收/解析准备已有候选；原生上传 E2E 明确以空候选宿主启动，再从工作台选择文件贯穿整条链路。
 
 需要 Node 24、锁定 pnpm、可用 PG15 和已安装的 Electron。Mac 可运行完整桌面；WSL 可运行后端专项，Windows 原生窗口/安装包仍须分别实测。
 
@@ -223,4 +223,15 @@ pnpm test:intake:synthetic
 pnpm test:intake:desktop
 ```
 
-前者包含真实 HTTP/PG 产物消费及 CLI 子进程的启动、固定命令、EOF 和清理边界；后者需要 Mac 图形桌面，使用同一宿主验证 renderer → preload → Main → HTTP → PG，发布后换坐席查询并复制。截图保存在 ignored `.gstack/intake-synthetic/`。这些是合成联调证据，真实飞书审批、生产激活、安装包、Windows 合成器和 macOS 人工窗口体验仍分别验收。
+前者包含真实 HTTP/PG 产物消费及 CLI 子进程的启动、固定命令、EOF 和清理边界；后者需要 Mac 图形桌面，使用空候选宿主验证原生选择坏 XLSX → renderer/preload/Main → HTTP/PG解析失败 → 完整报告落盘并由 ExcelJS 回读 → 整批更正重传 → 审核发布 → 换坐席查询并复制。OS 对话框只替换路径选择，其余链路实际执行。截图保存在 ignored `.gstack/intake-synthetic/`。这些是合成联调证据，真实飞书审批、生产激活、安装包、Windows 合成器和 macOS 人工窗口体验仍分别验收。
+
+
+## P2 FAQ 原生上传
+
+Dashboard 使用既有窄 `dashboard:intake-command` 接口。选择有 import 权限的来源，再选择不超过 10 MiB 的统一模板 XLSX。界面必须明确确认整理责任人及所有实际改稿人；本人制作也须显式勾选本人，已确认的历史/禁用参与人可列入贡献声明，其身份事实不授予当前权限。来源、发布基线或当前主体事实变化时，重新展示声明并要求确认。
+
+Main 保留原始字节、服务端对象、parse job 和上传/接收的原操作编号。结果不明时「按原请求重试上传」先重新核对权限，再重放原字节或正文；「刷新上传权限」不会丢弃未知操作。「停止本机等待」只中止本地等待，不撤销服务端解析或候选。没有公开 parse-job cancel 路由。已打开另一个候选时，上传历史不能替换其选择和未提交输入。
+
+解析进度按用户刷新读取。阻断错误不形成可审批候选；界面展示 totalIssues 和最多 100 条问题。完整 XLSX 报告通过认证会话、MIME、8 MiB 字节预算及 30 秒限时下载，由原生保存框原子写入；下载/保存失败不能显示成功。修正全部问题后重新选择整个工作簿。解析成功自动接入已有候选审核流程，不因缺行推断删除；修订既有候选和真正取消候选的管理界面仍为后续事项。
+
+报告容量实测、有限文件读写、停止/恢复与完整消费的命令见[原生上传验证](how-to-verify-desktop.md#faq-原生上传与报告)。该切片没有新增生产 API 注册、真实飞书 transport 或运行 ACL。手动测试模板须为当前登记来源的合成资料；不得选择客户工作簿或员工文件。

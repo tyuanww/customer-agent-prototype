@@ -1,8 +1,10 @@
 import type { components } from '@customer-agent/contracts';
 import { exactKeys } from './product-session';
+import { isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadView } from './content-intake-upload';
 type C = components['schemas'];
 /** UI supplies intent only: no HTTP path, actor, candidate digest, grant or operation ID. */
 export type IntakeManagementCommand =
+  | IntakeUploadCommand
   | { action: 'list'; next: boolean }
   | { action: 'select'; selection: string }
   | { action: 'material'; next: boolean }
@@ -17,6 +19,7 @@ export type QualityPage = {
   samples: (C['IntakeQualitySample'] & { draft: C['IntakeQualityCheck'] | null })[];
 };
 export type IntakeManagementView = {
+  upload: IntakeUploadView;
   signedIn: boolean; displayName: string; authorized: boolean; validUntil: string | null;
   candidates: { selection: string; candidate: C['IntakeCandidate'] }[]; moreCandidates: boolean;
   selected: C['IntakeCandidate'] | null; material: C['IntakeCandidatePage'] | null;
@@ -36,6 +39,7 @@ export type IntakeManagementApi = {
   onInvalidated(listener: () => void): () => void;
 };
 export function isIntakeManagementCommand(raw: unknown): raw is IntakeManagementCommand {
+  if (isIntakeUploadCommand(raw)) return true;
   if (!raw || typeof raw !== 'object' || !('action' in raw)) return false;
   const r = raw as Record<string, unknown>;
   if (r.action === 'list' || r.action === 'material') return exactKeys(r, ['action','next']) && typeof r.next === 'boolean';

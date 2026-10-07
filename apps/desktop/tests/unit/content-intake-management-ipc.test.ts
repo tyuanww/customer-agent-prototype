@@ -18,6 +18,12 @@ it('rejects non-Dashboard, child frames and extra intent fields before touching 
       expect(await invoke(event(dashboard), ...args)).toMatchObject(name.endsWith('mode') ? { enabled: false } : { code: 'UNAVAILABLE' });
     }
     expect(await handlers.get('dashboard:intake-command')!(event(dashboard), { action: 'freeze', operationId: 'forged' })).toMatchObject({ code: 'VALIDATION' });
+    for (const command of [
+      { action: 'upload-choose', path: '/private/arbitrary.xlsx' },
+      { action: 'upload-save-report', url: 'https://outside.example/report' },
+      { action: 'upload-submit', preparerSelection: 'choice', editorSelections: ['choice'], confirmed: true, actor: 'forged' },
+      { action: 'upload-retry', operationId: 'replace-original' },
+    ]) expect(await handlers.get('dashboard:intake-command')!(event(dashboard), command)).toMatchObject({ code: 'VALIDATION' });
   } finally { owned.dispose(); }
   expect(handlers.size).toBe(0);
 });

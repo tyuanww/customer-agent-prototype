@@ -1,19 +1,81 @@
 // @vitest-environment node
 import { expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { ContentIntakeManagement } from '../../src/main/content-intake-management';
+import { ContentIntakeUpload } from '../../src/main/content-intake-upload';
 import type { ProductSession } from '../../src/main/product-session';
 import { ProductHttpError } from '../../src/main/product-http';
 import { isIntakeManagementCommand } from '../../src/shared/content-intake-management';
 import { intakeManagementData } from '../fixtures/intake-management-data';
-function fixture(count = 2) {
+function fixture(count = 2, files?: ConstructorParameters<typeof ContentIntakeManagement>[1]) {
   const data = intakeManagementData(count); let epoch = 1, signedIn = true;
   const listeners = new Set<Parameters<ProductSession['subscribe']>[0]>();
   const view: ProductSession['view'] = () => signedIn ? { ok: true, enabled: true, signedIn, sessionEpoch: epoch, userId: 'synthetic', role: 'agent', authMode: 'mock', expiresAt: '2099-01-01T00:00:00Z', displayName: '合成管理人' } : { ok: true, enabled: true, signedIn: false, sessionEpoch: epoch, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
   const request = vi.fn(async (_epoch: number, path: string, options: Parameters<ProductSession['request']>[2] = {}) => ({ status: 200, value: structuredClone(data.respond(path, options.body)) }));
-  const main = new ContentIntakeManagement({ view, request, subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } });
+  const main = new ContentIntakeManagement({ view, request, subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } }, files);
   const select = async () => { const listed = await main.command({ action: 'list', next: false }); return main.command({ action: 'select', selection: listed.candidates[0].selection }); };
   return { data, main, request, select, logout: () => { signedIn = false; epoch++; listeners.forEach(f => f(view())); } };
 }
+it.each(['lost', 'stop-late'] as const)('recovers an uncertain upload across the manager boundary (%s), retaining original identity', async kind => {
+  const bytes = Buffer.from('504b030401020304', 'hex');
+  const f = fixture(2, { chooseWorkbook: async () => ({ name: 'synthetic.xlsx', bytes }), saveReport: async () => true });
+  const original = f.request.getMockImplementation()!;
+  const validUntil = new Date(Date.now() + 60_000).toISOString();
+  const job = { jobId: 'job-a', generation: 1, state: 'reading', candidateId: null, candidateVersion: null,
+    issues: [], totalIssues: 0, excludedSheetCount: 0, excludedMediaCount: 0, reportObjectId: null };
+  let attempts = 0, late!: () => void;
+  const operations: FormData[] = [];
+  f.request.mockImplementation(async (...args) => {
+    const path = args[1];
+    if (path.endsWith('/management-context')) return { status: 200, value: { sourceId: 'source-a', sourceVersion: 1,
+      baseReleaseId: 'rel_1', principalId: 'principal-a', factsVersion: 1, validUntil } };
+    if (path.includes('/principals?')) return { status: 200, value: { items: [{ principalId: 'principal-a', displayLabel: '合成整理人', enabled: true, factsVersion: 1, validUntil }], nextCursor: null } };
+    if (path.endsWith('/objects')) {
+      operations.push(args[2]!.form!);
+      if (++attempts === 1) {
+        if (kind === 'stop-late') await new Promise<void>(resolve => { late = resolve; });
+        throw new ProductHttpError('UNAVAILABLE');
+      }
+      return { status: 201, value: { sourceId: 'source-a', objectId: 'object-a', bytes: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex'), mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } };
+    }
+    if (path === '/v1/intake/sources/source-a/candidates') return { status: 202, value: job };
+    const result = await original(...args);
+    if (path.includes('/authorization?')) {
+      const value = result.value as { capabilities: { actions: string[] }[] };
+      value.capabilities.forEach(c => c.actions.push('import'));
+    }
+    return result;
+  });
+  try {
+    const listed = await f.main.command({ action: 'list', next: false });
+    await f.main.command({ action: 'upload-source', selection: listed.upload.sources[0].selection });
+    const chosen = await f.main.command({ action: 'upload-choose' });
+    const person = chosen.upload.principals[0].selection;
+    const pending = f.main.command({ action: 'upload-submit', preparerSelection: person, editorSelections: [person], confirmed: true });
+    const failed = expect(pending).rejects.toMatchObject({ code: kind === 'stop-late' ? 'STALE' : 'UNAVAILABLE' });
+    await vi.waitFor(() => expect(attempts).toBe(1));
+    if (kind === 'stop-late') await f.main.command({ action: 'upload-stop' }); else await failed;
+    expect(f.main.view().upload).toMatchObject({ pending: 'upload', canRetry: true });
+    await expect(f.main.command({ action: 'select', selection: listed.candidates[0].selection })).rejects.toMatchObject({ code: 'CONFLICT' });
+    const recovered = await f.main.command({ action: 'upload-retry' });
+    expect(recovered.upload).toMatchObject({ phase: 'parsing', pending: null });
+    expect(operations[1].get('operationId')).toEqual(operations[0].get('operationId'));
+    if (kind === 'stop-late') { late(); await failed; }
+    expect(f.main.view()).toMatchObject({ authorized: true, upload: { phase: 'parsing', pending: null, job: { state: 'reading' } } });
+    expect(f.request.mock.calls.filter(c => c[1] === '/v1/intake/sources/source-a/candidates')).toHaveLength(1);
+  } finally { f.main.dispose(); }
+});
+it('does not replace an opened candidate when an older upload refresh returns another candidate', async () => {
+  const f = fixture();
+  const other = structuredClone(f.data.candidate); other.key.candidateId = 'other-upload-candidate';
+  const upload = vi.spyOn(ContentIntakeUpload.prototype, 'command').mockResolvedValue(other);
+  try {
+    await f.select();
+    await expect(f.main.command({ action: 'upload-refresh' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(f.main.view().selected?.key).toEqual(f.data.candidate.key);
+  } finally { upload.mockRestore(); f.main.dispose(); }
+});
 it('uses scoped capabilities instead of legacy role; freezes, preserves per-page human drafts and submits', async () => {
   const f = fixture(21);
   try {

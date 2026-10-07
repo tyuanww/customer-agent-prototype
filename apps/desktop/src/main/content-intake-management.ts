@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { isIntakeManagementCommand, type IntakeManagementCommand, type IntakeManagementView } from '../shared/content-intake-management';
+import { isIntakeUploadCommand } from '../shared/content-intake-upload';
+import { ContentIntakeUpload } from './content-intake-upload';
 import { loadIntakeAccess, type IntakeAccess } from './content-intake-access';
 import { ContentIntakeQuality } from './content-intake-quality';
 import { ProductHttpError } from './product-http';
@@ -20,6 +22,7 @@ const reject = (code: 'FORBIDDEN' | 'STALE' | 'CONFLICT' | 'VALIDATION'): never 
  * while an unknown mutation keeps its exact Main-owned body for recovery. */
 export class ContentIntakeManagement {
   private readonly quality: ContentIntakeQuality;
+  private readonly upload: ContentIntakeUpload;
   private access: IntakeAccess | null = null;
   private rows: IntakeManagementView['candidates'] = [];
   private cursor: string | null = null;
@@ -31,18 +34,23 @@ export class ContentIntakeManagement {
   private workflowResult: IntakeManagementView['workflowResult'] = null;
   private workflowPending: WorkflowOperation | null = null;
   private active: AbortController | null = null;
+  private activeUpload: AbortController | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private deadline = 0;
   private epoch: number;
   private disposed = false;
   private listeners = new Set<() => void>();
   private unsubscribe: () => void;
-  constructor(private readonly session: Session) {
+  constructor(private readonly session: Session, nativeFiles?: ConstructorParameters<typeof ContentIntakeUpload>[1]) {
     this.epoch = session.view().sessionEpoch;
     this.quality = new ContentIntakeQuality(session);
+    this.upload = new ContentIntakeUpload(session, nativeFiles ?? {
+      chooseWorkbook: async () => { throw new ProductHttpError('UNAVAILABLE'); },
+      saveReport: async () => { throw new ProductHttpError('UNAVAILABLE'); },
+    });
     this.unsubscribe = session.subscribe(() => {
       if (!session.view().signedIn || session.view().sessionEpoch !== this.epoch) {
-        this.epoch = session.view().sessionEpoch; this.workflowPending = null; this.invalidate(); this.clearSelection();
+        this.epoch = session.view().sessionEpoch; this.workflowPending = null; this.upload.invalidate(true); this.invalidate(); this.clearSelection();
       }
     });
   }
@@ -50,6 +58,7 @@ export class ContentIntakeManagement {
   private invalidate() {
     this.active?.abort(); this.access = null; this.rows = []; this.cursor = null; this.material = null;
     this.quality.cancelRead(); this.review = null;
+    this.upload.invalidate(false);
     if (this.timer) clearTimeout(this.timer); this.timer = null;
     for (const listener of this.listeners) listener();
   }
@@ -72,8 +81,8 @@ export class ContentIntakeManagement {
   }
   /** Native close/quit guard: never dispose an unknown write without a visible warning. */
   closeRisk(): 'pending' | 'editing' | null {
-    if (this.active || (this.session.view().signedIn && this.unresolved())) return 'pending';
-    return this.selected ? 'editing' : null;
+    if (this.active || (this.session.view().signedIn && this.unresolved()) || this.upload.closeRisk() === 'pending') return 'pending';
+    return this.selected ? 'editing' : this.upload.closeRisk();
   }
   view(): IntakeManagementView {
     const session = this.session.view(), access = this.validAccess(), authorized = this.can('content-manage');
@@ -86,10 +95,11 @@ export class ContentIntakeManagement {
       canConfirmSource: canRead && this.can('source-confirm', this.selected!.sourceId),
       canPublish: canRead && this.can('publish', this.selected!.sourceId),
       review: canRead ? this.review : null, workflowResult: canRead ? this.workflowResult : null,
-      pending: session.signedIn ? this.unresolved() : null, receipt: canRead ? this.receipt : null });
+      pending: session.signedIn ? this.unresolved() : null, receipt: canRead ? this.receipt : null, upload: this.upload.view(access) });
   }
   private async refreshAccess(signal: AbortSignal) {
     const access = await loadIntakeAccess(this.session, signal);
+    if (signal.aborted) return reject('STALE');
     this.access = access; this.deadline = performance.now() + Math.max(0, Date.parse(access.validUntil) - Date.now());
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.invalidate(), Math.max(0, Date.parse(access.validUntil) - Date.now()));
@@ -97,9 +107,20 @@ export class ContentIntakeManagement {
   async command(c: IntakeManagementCommand): Promise<IntakeManagementView> {
     if (!isIntakeManagementCommand(c)) return reject('VALIDATION');
     if (this.disposed || !this.session.view().signedIn) throw new ProductHttpError('UNAUTHORIZED');
+    // Stopping a read/write wait must work while the original IPC is pending.
+    // It does not cancel a server job or discard a retained operation identity.
+    if (c.action === 'upload-stop') {
+      const active = this.activeUpload;
+      if (active && this.active === active) { active.abort(); this.active = null; this.activeUpload = null; }
+      await this.upload.command(c, this.validAccess()); return this.view();
+    }
     if (this.active) return reject('CONFLICT');
+    const upload = this.upload.view(this.validAccess());
+    if (!isIntakeUploadCommand(c) && upload.pending && c.action !== 'list') return reject('CONFLICT');
+    if (c.action === 'select' && upload.file && upload.phase !== 'validated') return reject('CONFLICT');
     const controller = new AbortController(), epoch = this.epoch;
     this.active = controller;
+    if (isIntakeUploadCommand(c)) this.activeUpload = controller;
     const assertActive = () => {
       if (controller.signal.aborted || this.epoch !== epoch || this.disposed) return reject('STALE');
     };
@@ -108,7 +129,22 @@ export class ContentIntakeManagement {
       assertActive(); return r.value;
     };
     try {
-      if (c.action === 'recover' || c.action === 'retry') {
+      if (isIntakeUploadCommand(c)) {
+        if (this.unresolved() || this.quality.hasDraft()) return reject('CONFLICT');
+        if (this.selected && ['upload-source','upload-choose','upload-submit','upload-open'].includes(c.action)) return reject('CONFLICT');
+        if (!this.validAccess()) { await this.refreshAccess(controller.signal); assertActive(); }
+        const candidate = await this.upload.command(c, this.validAccess(), controller.signal); assertActive();
+        if (candidate) {
+          if (!this.can('content-manage', candidate.sourceId)) return reject('FORBIDDEN');
+          // A historical upload can still be refreshed after opening another
+          // candidate. Never replace that selection or its renderer-only draft.
+          if (this.selected && !sameKey(candidate.key, this.selected.key)) return reject('CONFLICT');
+          if (!this.selected) {
+            this.clearSelection(); this.quality.select(candidate.key);
+          }
+          this.selected = candidate;
+        }
+      } else if (c.action === 'recover' || c.action === 'retry') {
         if (this.workflowPending) {
           const operation = this.workflowPending;
           if (c.action === 'recover') {
@@ -202,9 +238,9 @@ export class ContentIntakeManagement {
     } catch (error) {
       // First validation refusal preserves correctable human work. All other
       // failures revoke displayed materials; uncertain bodies remain recoverable.
-      if (!(error instanceof ProductHttpError && ['VALIDATION','CONFLICT'].includes(error.code))) this.invalidate();
+      if (this.active === controller && !(error instanceof ProductHttpError && ['VALIDATION','CONFLICT'].includes(error.code))) this.invalidate();
       throw error;
-    } finally { if (this.active === controller) this.active = null; }
+    } finally { if (this.active === controller) this.active = null; if (this.activeUpload === controller) this.activeUpload = null; }
   }
   private async readCandidate(request: Request) {
     const selected = this.selected;
@@ -258,5 +294,5 @@ export class ContentIntakeManagement {
   private address(candidate: Pick<C['IntakeCandidate'], 'key'>) {
     return `/v1/intake/candidates/${encodeURIComponent(candidate.key.candidateId)}/versions/${candidate.key.version}`;
   }
-  dispose() { this.disposed = true; this.unsubscribe(); this.invalidate(); this.quality.dispose(); this.workflowPending = null; this.listeners.clear(); }
+  dispose() { this.disposed = true; this.unsubscribe(); this.invalidate(); this.quality.dispose(); this.upload.dispose(); this.workflowPending = null; this.listeners.clear(); }
 }

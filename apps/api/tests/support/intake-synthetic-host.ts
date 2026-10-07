@@ -30,11 +30,26 @@ export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面保存', answer: '合成洁面示例：置于阴凉处。\n使用后盖好瓶盖。' },
 ]);
 
+/** Workbook bytes for native file-picker journeys; all text is synthetic. */
+export function createIntakeSyntheticWorkbook({ missingAnswer = false } = {}) {
+  return createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' },
+    INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, missingAnswer && i === 1 ? '' : faq.answer,
+      '', '', '合成分类', '', '启用', '', '', '', '合成内部说明', '', '', 'false']));
+}
+
+type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
+type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
+export function createIntakeSyntheticHost(options: { prepareCandidate: false }): Promise<HostState>;
+export function createIntakeSyntheticHost(): Promise<PreparedHost>;
+export function createIntakeSyntheticHost(options?: { prepareCandidate: false }): Promise<HostState> {
+  return startIntakeSyntheticHost(options?.prepareCandidate !== false);
+}
+
 /** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
  * files, existing DB, production factory or real provider is ever consumed.
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Data and approval attachments disappear on close. */
-export async function createIntakeSyntheticHost() {
+async function startIntakeSyntheticHost(prepareCandidate: boolean) {
   const pg = new Pg15Harness();
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
   let pool: Pool | undefined;
@@ -154,33 +169,37 @@ export async function createIntakeSyntheticHost() {
       principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
         ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2] ?? null : null });
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
-    const workbook = await createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' },
-      INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, faq.answer, '', '', '合成分类', '', '启用', '', '', '', '合成内部说明', '', '', 'false']));
-    const form = new FormData(); form.set('operationId', 'synthetic-prepare-upload'); form.set('file', new Blob([new Uint8Array(workbook)], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    }), 'synthetic-faq.xlsx');
-    const checkedJson = async (response: Response, label: string) => {
-      const body: unknown = await response.json();
-      if (!response.ok) throw new Error(`Synthetic ${label} failed (${response.status}): ${JSON.stringify(body)}`);
-      return body;
-    };
-    const uploaded = parseContractSchema('IntakeObject', await checkedJson(await requestAs('enabler', '/v1/intake/sources/source-a/objects', { method: 'POST', body: form }), 'upload'));
-    const receive = await requestAs('enabler', '/v1/intake/sources/source-a/candidates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-      operationId: 'synthetic-prepare-receive', objectId: uploaded.objectId, sourceVersion: 1, baseReleaseId: 'rel_native_base',
-      contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['enabler'], confirmed: true }, expectedPriorKey: null,
-    }) });
-    let job = parseContractSchema('IntakeParseJob', await checkedJson(receive, 'receive'));
-    const deadline = Date.now() + 20_000;
-    while (job.state === 'reading' || job.state === 'parsing') {
-      if (Date.now() >= deadline) throw new Error('Synthetic parser did not settle');
-      await new Promise(resolve => setTimeout(resolve, 20));
-      job = parseContractSchema('IntakeParseJob', await checkedJson(await requestAs('enabler', `/v1/intake/parse-jobs/${job.jobId}`), 'parse'));
+    let prepared: { candidate: C['IntakeCandidate']; object: C['IntakeObject'] } | null = null;
+    if (prepareCandidate) {
+      const workbook = await createIntakeSyntheticWorkbook();
+      const form = new FormData(); form.set('operationId', 'synthetic-prepare-upload'); form.set('file', new Blob([new Uint8Array(workbook)], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }), 'synthetic-faq.xlsx');
+      const checkedJson = async (response: Response, label: string) => {
+        const body: unknown = await response.json();
+        if (!response.ok) throw new Error(`Synthetic ${label} failed (${response.status}): ${JSON.stringify(body)}`);
+        return body;
+      };
+      const uploaded = parseContractSchema('IntakeObject', await checkedJson(await requestAs('enabler', '/v1/intake/sources/source-a/objects', { method: 'POST', body: form }), 'upload'));
+      const receive = await requestAs('enabler', '/v1/intake/sources/source-a/candidates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+        operationId: 'synthetic-prepare-receive', objectId: uploaded.objectId, sourceVersion: 1, baseReleaseId: 'rel_native_base',
+        contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['enabler'], confirmed: true }, expectedPriorKey: null,
+      }) });
+      let job = parseContractSchema('IntakeParseJob', await checkedJson(receive, 'receive'));
+      const deadline = Date.now() + 20_000;
+      while (job.state === 'reading' || job.state === 'parsing') {
+        if (Date.now() >= deadline) throw new Error('Synthetic parser did not settle');
+        await new Promise(resolve => setTimeout(resolve, 20));
+        job = parseContractSchema('IntakeParseJob', await checkedJson(await requestAs('enabler', `/v1/intake/parse-jobs/${job.jobId}`), 'parse'));
+      }
+      if (job.state !== 'validated') throw new Error(`Synthetic parsing failed: ${JSON.stringify(job.issues)}`);
+      const candidate = parseContractSchema('IntakeCandidate', await checkedJson(await requestAs('enabler', `/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`), 'candidate'));
+      prepared = { candidate, object: uploaded };
     }
-    if (job.state !== 'validated') throw new Error(`Synthetic parsing failed: ${JSON.stringify(job.issues)}`);
-    const candidate = parseContractSchema('IntakeCandidate', await checkedJson(await requestAs('enabler', `/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`), 'candidate'));
     const facts = await admin.query('SELECT min(valid_until) AS expires FROM content_intake.principal_facts');
     return {
-      apiOrigin, identityOrigin, root: pg.root, expiresAt: (facts.rows[0].expires as Date).toISOString(), candidate, object: uploaded, requestAs,
+      apiOrigin, identityOrigin, root: pg.root, expiresAt: (facts.rows[0].expires as Date).toISOString(),
+      candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       selectIdentity(value: IntakeSyntheticIdentity) {
         if (!['enabler', 'reviewer', 'agent'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
