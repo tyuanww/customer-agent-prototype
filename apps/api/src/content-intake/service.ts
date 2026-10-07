@@ -14,7 +14,7 @@ import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
 import { createIntakePublication } from './publication.js';
 import { createIntakeUsage } from './usage.js';
-import { createIntakeDiscovery } from './discovery.js';
+import { createIntakeDiscovery, type IntakePrincipalLabels } from './discovery.js';
 import { createIntakeQualityAccess } from './quality-access.js';
 import { createIntakeFiles } from './files.js';
 import { checkQuality, freezeQuality, previewQuality, qualityCommand, qualitySubmission, readQuality,
@@ -30,7 +30,7 @@ const json = (value: unknown): CanonicalJsonValue => value as CanonicalJsonValue
  * The existing object store and isolated parser are the only file consumers. */
 export function createContentIntakeService(pool: IntakePool, store: ContentObjectStore,
   report: (diagnosticId: string, error: unknown) => void = () => undefined, approval?: ApprovalAdapter,
-  options: { requireProductSession?: boolean } = {}) {
+  options: { requireProductSession?: boolean; principalLabels?: IntakePrincipalLabels } = {}) {
   const run = createIntakeTransactions(pool, report, options);
   const runner = createParseRunner();
   const grantList = (v: unknown) => parseContractSchema('IntakeGrantList', v);
@@ -148,7 +148,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     ...evidence,
     ...createIntakePublication(run, refreshForPublish),
     ...createIntakeUsage(run),
-    ...createIntakeDiscovery(run),
+    ...createIntakeDiscovery(run, options.principalLabels),
     ...createIntakeQualityAccess(run),
     ...createIntakeFiles(run, store, report),
     qualityPreview(actor: AuthenticatedUser, key: unknown) {

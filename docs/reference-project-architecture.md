@@ -88,6 +88,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/src/main/content-intake-query.ts` / `content-intake-query-ipc.ts` | 单个可信 Query 的独立发现/查询任务、BM25 Top 3、当前展示句柄及窗口销毁；查询取消不取消店铺发现，使用资格仍由 usage 拥有；IPC 验证 main-frame/role/exact payload | 仅显式 loopback FAQ profile；不接旧 announce/hydrate、模型、管理写口；不扩大正式 ACL，索引超预算整次失败 |
 | `apps/desktop/src/main/content-intake-management.ts` / `content-intake-management-ipc.ts` | Dashboard 候选与材料选择、来源级权限提示、限时可读投影和关闭提醒；Main 保管来源确认、审批请求/刷新和发布的原操作正文与证据版本；人工检查复用 `ContentIntakeQuality`；发布查询原回执，来源/审批仅重放原 POST，成功后独立读取当前状态 | 仅 FAQ loopback 合成 profile；窄命令不接受 actor/key/操作 ID/URL；来源失权和会话变化清空材料；未知提交不默默重试 |
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
+| `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；合成宿主显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；标签不由账号推导，缺失整页失败；目录不是授权或同一时刻快照，不新增姓名表或真实员工读取 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
 | `packages/database/` | 在同一已验证快照内确定性生成 migration（当前二十六段，含四个历史产品 overlay、三段 P2 合同增量及四个 P2 内部产品 overlay）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
