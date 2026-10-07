@@ -81,7 +81,12 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       || !HASH_PATTERN.test(upgrade.sourceSchemaSha256)
       || !Number.isSafeInteger(upgrade.migrationCount)
       || upgrade.migrationCount <= precedingMigrationCount
-      || upgrade.migrationCount >= catalogue.migrations.length
+      || upgrade.migrationCount > catalogue.migrations.length
+      // A reviewed HTTP-only contract may retain the complete SQL catalogue.
+      // Equal counts are safe only for the identical DDL and a distinct source
+      // contract; every migration still has its original provenance/hash below.
+      || (upgrade.migrationCount === catalogue.migrations.length
+        && (upgrade.sourceSchemaSha256 !== catalogue.sourceSchemaSha256 || upgrade.contractSetId === catalogue.contractSetId))
     ) {
       catalogueError('Migration catalogue reviewed-upgrade metadata is invalid');
     }

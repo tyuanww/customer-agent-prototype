@@ -4,6 +4,10 @@ import { parseContractSchema, type ContractSchemaName, type components } from '@
 import { authenticateRequestHeaders, type AuthenticatedUser, type ProductAuthService } from '../auth-service.js';
 import type { IntakeResult } from './transaction.js';
 
+declare module 'fastify' {
+  interface FastifyContextConfig { intakeFileLimitStatus?: 413 }
+}
+
 type Failure = components['schemas']['IntakeFailure'];
 const STATUS: Record<Failure['code'], number> = {
   VALIDATION: 400, UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404,
@@ -11,7 +15,9 @@ const STATUS: Record<Failure['code'], number> = {
 };
 export function intakeFailure(reply: FastifyReply, code: Failure['code'], reason: Failure['details']['reason'], diagnosticId: string = randomUUID()) {
   const value: components['schemas']['IntakeError'] = { error: { code, message: '资料请求未完成。', details: { reason, diagnosticId } } };
-  return reply.code(STATUS[code]).send(value);
+  // Only the new quality contract opts into 413; preserve predecessor error wire.
+  const status = code === 'VALIDATION' && reason === 'FILE_LIMIT' ? reply.request.routeOptions.config.intakeFileLimitStatus ?? STATUS[code] : STATUS[code];
+  return reply.code(status).send(value);
 }
 export function sendIntake(reply: FastifyReply, result: IntakeResult<unknown>, schema: ContractSchemaName, status = 200) {
   if (!result.ok) return intakeFailure(reply, result.code, result.reason, result.diagnosticId);

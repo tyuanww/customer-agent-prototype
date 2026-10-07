@@ -2,7 +2,7 @@
 
 > 状态：**治理合同已提交并 export · 产品 intake / codegen / 追加迁移已验收 · 仅限合成开发 · 三方公开交付 EVD 待齐**。2026-10-06，产品依赖 P1 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`。
 > 本页把已确认需求映射到下一份正式合同需要表达的资源、约束与验收，不签发合同版本、阶段门或真实运行权限。当前任务与授权只在[需求计划 §0](plans/2026-10-03-content-intake-requirements.md)维护。
-> 当前消费已推进至 OpenAPI 1.17.0 / schema.v1.21，精确来源由消费锁与不可变 manifest 拥有；API 持久绑定、管理 HTTP 与 Main/Query 已由显式合成消费者接入，生产 HTTP/ACL、完整管理界面和原生验收尚未完成。质量 HTTP 缺口见末节。
+> 当前消费已推进至 OpenAPI 1.18.0 / schema.v1.21，精确来源由消费锁与不可变 manifest 拥有；API 持久绑定、管理 HTTP 与 Main/Query 已由显式合成消费者接入，生产 HTTP/ACL、完整管理界面和原生验收尚未完成。质量 HTTP 接入进展见末节。
 
 ## 1. 交接范围与基线
 
@@ -168,3 +168,14 @@ API 现在从认证边界取得私有会话引用，逐页锁定核验，消费�
 产品接入必须补齐现有 `reason.length` 与code point语义差异、数据库写前字节门、精简回执投影、当前摘要/样本分页和状态一致性检查。治理候选的schema/容量测试不能冒充这些运行验收。下一门是审阅精确版本对后冻结、增加独立导出门并export/intake，再接实际质量HTTP与Main管理端。真实飞书、生产factory/ACL、初始目录治理、Mac/Windows现场验收仍各有未完成条件。
 
 候选14项专项与 machine-contracts 通过，release前31项及264单元通过；完整命令因最后 npm audit 网络错误退出1，独立审计经现有系统代理补验通过、0漏洞，保留失败记录。OCR和最终核心/原生复审完成，三项响应约束缺陷及一处说明已修复，无剩余确认缺陷。产品运行输入未变，未将本候选的schema证据升级为HTTP或原生平台通过。
+
+
+### 2026-10-07 质量 HTTP 冻结、接收与运行切片
+
+用户已批准精确版本对。治理仓 `18297cf802b195d8ff4e9f625143e50bff169418` 冻结并导出 `cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1`，产品通过原 intake 接收并生成 233 个 runtime schema；仍为 VERIFIED_NOT_ACTIVATED。DDL 原字节不变，全部26条 migration 的 SQL/来源/校验和保持既有值。只更新 catalogue 的消费 provenance，不创建虚假的新增迁移；原账本无 SQL 升级验收已有 PG 回归。
+
+五条质量路径已接入封闭管理 HTTP 插件。质量状态、抽样与事务仍由原模块拥有；新 access 模块只拥有有界 wire、完整条目分页、游标绑定及精简回执。实际合成 Excel→质量 HTTP→组织证据核验→发布→第二坐席 HTTP 读取原文已经贯通，审批 transport 仍为内存合成提供方。先前“内部质量服务准备”的证据保留其历史时点；当前流程测试已替换为真实质量 HTTP。
+
+重点验收包括：0条样本显式初样提交、5,000条关键检查、Unicode原因保真、HTTP与数据库独立8MiB门、扩样历史不可修改、会话/权限/阶段/重启游标失效、原键未知提交恢复。已有迁移测试发现生成器会随新HTTP来源改写旧迁移头，已在生成所有者固定旧来源，并为相同DDL的完整前序目录补失败关闭判定。实际检查与审查结果记录在[本切片验收](../evidence/qa/content-intake-p2-quality-http/README.md)。
+
+接续事项是 Main 持有候选/原操作键/逐条草稿，管理界面经最小 preload 提交意图，继续复用现有 ProductSession/ProductHttp、来源发现和API模块；真实飞书、生产factory/ACL、v2-active、外发、Mac/Windows现场证明仍不由本切片放行。

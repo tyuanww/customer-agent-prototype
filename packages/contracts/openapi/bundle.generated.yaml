@@ -3,7 +3,7 @@ openapi: 3.1.1
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: CS-AI-C11 Customer Service Agent API
-  version: 1.17.0
+  version: 1.18.0
   license:
     name: Proprietary - internal use only
     identifier: LicenseRef-Proprietary
@@ -233,6 +233,480 @@ security:
   - mockUser: []
     mockRole: []
 paths:
+  /v1/intake/quality/operations/{operationId}:
+    get:
+      operationId: getIntakeQualityOperation
+      summary: 恢复原质量操作的精简回执
+      description: 仅接受 action=quality-freeze|quality-check；命名空间为认证主体+action+operationId。重验会话和主体事实，读取原永久回执，不读取当前材料或授予新资格。业务 review 撤销后原主体仍可恢复无正文的历史回执；注销/禁用/事实过期拒绝。无权、错误命名空间和不存在统一404/COMMIT_UNKNOWN；404不能证明未提交，仍用原键及原载荷重试。不得复用 publish/cancel/rollback 路由。
+      tags:
+        - content-intake
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+        - name: action
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - quality-freeze
+              - quality-check
+      responses:
+        "200":
+          description: 恢复原质量操作的精简回执
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeQualityReceipt"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 原操作不存在、其他主体或错误命名空间均返回 error.code=NOT_FOUND、details.reason=COMMIT_UNKNOWN。404不能证明未提交，使用原键原载荷恢复。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "413":
+          description: 请求或持久检查集合超出字节预算；VALIDATION / FILE_LIMIT。整次拒绝，不留下部分结果；须缩短原因后使用新操作键提交。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      x-max-response-bytes: 65536
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/quality/checks:
+    post:
+      operationId: checkIntakeQuality
+      summary: 原子提交完整阶段检查
+      description: 认证后严格校验未知/重复参数。每次读取和首次写入按当前会话、review 权限、来源/base 和完整候选键重验；无权与不存在统一404。所有地址字段必须与正文 key 一致。常规稿允许自审；关键稿排除贡献人及同人别名。服务端判定阶段精确集合、hash、原结果不可改及2%/5%阈值；客户端不能提交通过结论。checks 的 PostgreSQL jsonb::text UTF-8 另限8388608字节，事务内写入前超限返回413/FILE_LIMIT。相同操作重放返回历史回执，unknown 用原操作恢复，禁止拆阶段或截断。
+      tags:
+        - content-intake
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      responses:
+        "200":
+          description: 原子提交完整阶段检查
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeQualityReceipt"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "413":
+          description: 请求或持久检查集合超出字节预算；VALIDATION / FILE_LIMIT。整次拒绝，不留下部分结果；须缩短原因后使用新操作键提交。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      x-max-response-bytes: 65536
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeQualitySubmission"
+      x-max-request-bytes: 8388608
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/quality/freeze:
+    post:
+      operationId: freezeIntakeQuality
+      summary: 冻结服务端质量计划
+      description: 认证后严格校验未知/重复参数。每次读取和首次写入按当前会话、review 权限、来源/base 和完整候选键重验；无权与不存在统一404。所有地址字段必须与正文 key 一致。由服务端选样并保存完整计划；已冻结时不重置检查。请求只有 operationId/key，不接受 seed、样本或状态。相同主体/动作/键相同载荷返回原精简回执；不同载荷409/IDEMPOTENCY_CONFLICT。
+      tags:
+        - content-intake
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+      responses:
+        "200":
+          description: 冻结服务端质量计划
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeQualityReceipt"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "413":
+          description: 请求或持久检查集合超出字节预算；VALIDATION / FILE_LIMIT。整次拒绝，不留下部分结果；须缩短原因后使用新操作键提交。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      x-max-response-bytes: 65536
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeQualityCommand"
+      x-max-request-bytes: 65536
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/quality/samples:
+    get:
+      operationId: getIntakeQualitySamples
+      summary: 分页读取阶段样本与已有检查
+      description: 认证后严格校验未知/重复参数。每次读取和首次写入按当前会话、review 权限、来源/base 和完整候选键重验；无权与不存在统一404。所有地址字段必须与正文 key 一致。viewHash 必须等于刚读取的 quality 摘要；状态变化或游标失效返回409/MATERIAL_CHANGED，从摘要及第一页重读。游标绑定认证会话、当前事实/授权、完整 key、viewHash、phase、limit、最早截止和路径；不续权。服务重启后失效。
+      tags:
+        - content-intake
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+        - name: digest
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: ^[0-9a-f]{64}$
+            minLength: 64
+            maxLength: 64
+        - name: viewHash
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: ^[0-9a-f]{64}$
+            minLength: 64
+            maxLength: 64
+        - name: phase
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - initial
+              - expanded
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: 分页读取阶段样本与已有检查
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeQualitySamplePage"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "413":
+          description: 请求或持久检查集合超出字节预算；VALIDATION / FILE_LIMIT。整次拒绝，不留下部分结果；须缩短原因后使用新操作键提交。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      x-max-response-bytes: 8388608
+      security:
+        - ProductSession: []
+  /v1/intake/candidates/{candidateId}/versions/{version}/quality:
+    get:
+      operationId: getIntakeQuality
+      summary: 读取质量预览或当前质量摘要
+      description: 认证后严格校验未知/重复参数。每次读取和首次写入按当前会话、review 权限、来源/base 和完整候选键重验；无权与不存在统一404。所有地址字段必须与正文 key 一致。不产生计划、审批或回执；冻结后的计划与预览不一致必须拒绝。
+      tags:
+        - content-intake
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+        - name: version
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeVersion"
+        - name: digest
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: ^[0-9a-f]{64}$
+            minLength: 64
+            maxLength: 64
+      responses:
+        "200":
+          description: 读取质量预览或当前质量摘要
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeQualityStatus"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "413":
+          description: 请求或持久检查集合超出字节预算；VALIDATION / FILE_LIMIT。整次拒绝，不留下部分结果；须缩短原因后使用新操作键提交。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      x-max-response-bytes: 65536
+      security:
+        - ProductSession: []
   /v1/intake/rollback/{rollbackPlanId}/review/refresh:
     post:
       operationId: refreshIntakeRollbackReview
@@ -6738,6 +7212,454 @@ components:
                   code: INTERNAL
                   message: 服务内部错误
   schemas:
+    IntakeQualityReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - action
+        - key
+        - state
+        - phase
+      properties:
+        operationId:
+          $ref: "#/components/schemas/IntakeId"
+        action:
+          type: string
+          enum:
+            - quality-freeze
+            - quality-check
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        state:
+          type: string
+          enum:
+            - initial_required
+            - expansion_required
+            - passed
+            - revision_required
+            - blocked
+        phase:
+          oneOf:
+            - type: string
+              enum:
+                - initial
+                - expanded
+            - type: "null"
+      if:
+        properties:
+          action:
+            const: quality-freeze
+      then:
+        properties:
+          phase:
+            type: "null"
+      else:
+        properties:
+          phase:
+            type: string
+            enum:
+              - initial
+              - expanded
+          state:
+            type: string
+            enum:
+              - expansion_required
+              - passed
+              - revision_required
+              - blocked
+      description: 永久操作的精简历史结果，不含正文、逐条原因、权限或新的使用资格。只有当前有效会话的原主体能恢复；不将历史 state 当成当前状态。
+      allOf:
+        - if:
+            properties:
+              phase:
+                const: expanded
+          then:
+            properties:
+              state:
+                type: string
+                enum:
+                  - passed
+                  - revision_required
+                  - blocked
+    IntakeQualitySamplePage:
+      type: object
+      additionalProperties: false
+      required:
+        - key
+        - viewHash
+        - phase
+        - selectionManifestHash
+        - items
+        - nextCursor
+      properties:
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        viewHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        phase:
+          type: string
+          enum:
+            - initial
+            - expanded
+        selectionManifestHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeQualitySample"
+          minItems: 0
+          maxItems: 100
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 512
+      description: 按服务端冻结抽样顺序分页；entry 完整保真且只可 upsert，check 的 ID/hash 必须与所在 sample 一致。每页 8 MiB 上限可提前截页，但不得截断单条、漏行或返回有 nextCursor 的空页。
+      if:
+        properties:
+          nextCursor:
+            type: string
+      then:
+        properties:
+          items:
+            type: array
+            minItems: 1
+    IntakeQualitySample:
+      type: object
+      additionalProperties: false
+      required:
+        - scriptId
+        - contentHash
+        - mandatory
+        - entry
+        - check
+      properties:
+        scriptId:
+          type: string
+          pattern: ^intake_[0-9a-f]{64}$
+          minLength: 71
+          maxLength: 71
+        contentHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        mandatory:
+          type: boolean
+        entry:
+          allOf:
+            - $ref: "#/components/schemas/IntakeEntry"
+            - type: object
+              properties:
+                operation:
+                  const: upsert
+        check:
+          oneOf:
+            - $ref: "#/components/schemas/IntakeQualityCheck"
+            - type: "null"
+    IntakeQualityStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - key
+        - viewHash
+        - state
+        - plan
+        - frozen
+        - rounds
+      properties:
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        viewHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        state:
+          type: string
+          enum:
+            - not_frozen
+            - initial_required
+            - expansion_required
+            - passed
+            - revision_required
+            - blocked
+        plan:
+          $ref: "#/components/schemas/IntakeQualityPlan"
+        frozen:
+          oneOf:
+            - $ref: "#/components/schemas/IntakeQualityAttribution"
+            - type: "null"
+        rounds:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeQualityRound"
+          minItems: 0
+          maxItems: 2
+          allOf:
+            - contains:
+                type: object
+                properties:
+                  phase:
+                    const: initial
+                required:
+                  - phase
+              minContains: 0
+              maxContains: 1
+            - contains:
+                type: object
+                properties:
+                  phase:
+                    const: expanded
+                required:
+                  - phase
+              minContains: 0
+              maxContains: 1
+      if:
+        properties:
+          state:
+            const: not_frozen
+      then:
+        properties:
+          frozen:
+            type: "null"
+          rounds:
+            type: array
+            maxItems: 0
+      else:
+        properties:
+          frozen:
+            type: object
+      description: 当前重新授权的有界摘要，not_frozen 的 plan 仅是服务端预览。viewHash 绑定 key/plan/state/frozen/rounds（不含自己）的规范 JSON SHA-256。passed 不是组织审批或发布许可。
+      allOf:
+        - if:
+            properties:
+              state:
+                enum:
+                  - initial_required
+          then:
+            properties:
+              rounds:
+                type: array
+                maxItems: 0
+        - if:
+            properties:
+              state:
+                enum:
+                  - expansion_required
+          then:
+            properties:
+              rounds:
+                type: array
+                minItems: 1
+                maxItems: 1
+                contains:
+                  type: object
+                  properties:
+                    phase:
+                      const: initial
+                  required:
+                    - phase
+        - if:
+            properties:
+              state:
+                enum:
+                  - passed
+                  - revision_required
+                  - blocked
+          then:
+            properties:
+              rounds:
+                type: array
+                minItems: 1
+                contains:
+                  type: object
+                  properties:
+                    phase:
+                      const: initial
+                  required:
+                    - phase
+    IntakeQualityRound:
+      type: object
+      additionalProperties: false
+      required:
+        - phase
+        - reviewer
+        - checkedCount
+        - defectCount
+      properties:
+        phase:
+          type: string
+          enum:
+            - initial
+            - expanded
+        reviewer:
+          $ref: "#/components/schemas/IntakeQualityAttribution"
+        checkedCount:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        defectCount:
+          type: integer
+          minimum: 0
+          maximum: 5000
+    IntakeQualityAttribution:
+      type: object
+      additionalProperties: false
+      required:
+        - principalId
+        - factsVersion
+        - recordedAt
+      properties:
+        principalId:
+          $ref: "#/components/schemas/IntakeId"
+        factsVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        recordedAt:
+          type: string
+          format: date-time
+          maxLength: 35
+    IntakeQualityPlan:
+      type: object
+      additionalProperties: false
+      required:
+        - policyVersion
+        - ordinaryCount
+        - mandatoryCount
+        - withdrawalCount
+        - initialTarget
+        - expandedTarget
+        - initialCount
+        - expandedCount
+        - seedHash
+        - populationManifestHash
+        - selectionManifestHash
+      properties:
+        policyVersion:
+          type: string
+          const: intake-quality-v1
+        ordinaryCount:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        mandatoryCount:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        withdrawalCount:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        initialTarget:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        expandedTarget:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        initialCount:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        expandedCount:
+          type: integer
+          minimum: 0
+          maximum: 5000
+        seedHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        populationManifestHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        selectionManifestHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+    IntakeQualitySubmission:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - key
+        - phase
+        - checks
+      properties:
+        operationId:
+          $ref: "#/components/schemas/IntakeId"
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+        phase:
+          type: string
+          enum:
+            - initial
+            - expanded
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeQualityCheck"
+          minItems: 0
+          maxItems: 5000
+      description: 完整阶段一次原子提交，scriptId 唯一且集合精确匹配服务端冻结样本；扩样原结果不可改。空集合仅在服务端阶段样本实际为空时合法。未知字段拒绝；不接受审核人、抽样参数或结论。
+    IntakeQualityCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - key
+      properties:
+        operationId:
+          $ref: "#/components/schemas/IntakeId"
+        key:
+          $ref: "#/components/schemas/IntakeCandidateKey"
+    IntakeQualityCheck:
+      type: object
+      additionalProperties: false
+      required:
+        - scriptId
+        - contentHash
+        - defect
+        - reason
+      properties:
+        scriptId:
+          type: string
+          pattern: ^intake_[0-9a-f]{64}$
+          minLength: 71
+          maxLength: 71
+        contentHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          minLength: 64
+          maxLength: 64
+        defect:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 1000
+          pattern: ^[^\u0000\uD800-\uDFFF]*$
+      if:
+        properties:
+          defect:
+            const: true
+      then:
+        properties:
+          reason:
+            type: string
+            pattern: \S
+      description: 原因按 Unicode code point 计数；禁止 NUL 和未配对代理项。缺陷必须有非空白原因；单轮和请求还受字节预算约束。
     IntakeSelectionIds:
       type: array
       items:
@@ -15302,6 +16224,11 @@ x-content-intake-development:
   transactionImplementationRequired: true
   minimumSnapshotFormat: intake-v2.1
 x-content-intake-usage-development:
+  status: DRAFT
+  runtime_activated: false
+  sqlContract: schema.v1.21
+  transactionImplementationRequired: true
+x-content-intake-quality-development:
   status: DRAFT
   runtime_activated: false
   sqlContract: schema.v1.21

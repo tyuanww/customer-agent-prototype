@@ -7,6 +7,9 @@ import { IntakeRejection, type IntakeTransaction, type Principal } from './trans
 
 type C = components['schemas'];
 
+/** Frozen 1.18 wire/storage budgets; limits apply to complete values, never truncation. */
+export const QUALITY_LIMITS = Object.freeze({ commandBytes: 65_536, checksBytes: 8_388_608, summaryBytes: 65_536, sampleBytes: 8_388_608 });
+
 /** Sampling tuples only, NOT staging rows or legacy governance content hashes.
  * The key binds the complete material, including internal notes, questions,
  * vocabulary versions and disables which the legacy population omits. */
@@ -85,43 +88,26 @@ export async function previewQuality(client: IntakeTransaction, actor: Principal
 }
 
 type Phase = 'initial' | 'expanded';
-export type QualityCheck = { scriptId: string; contentHash: string; defect: boolean; reason: string };
+export type QualityCheck = C['IntakeQualityCheck'];
 type FrozenPlan = Pick<IntakeQualityPreview, 'population' | 'ordinaryCount' | 'mandatoryCount' | 'initialTarget' | 'expandedTarget'
   | 'seedHash' | 'populationManifestHash' | 'selectionManifestHash' | 'initialScriptIds' | 'expandedScriptIds'>;
 export type IntakeQualityProgress = {
   purpose: 'synthetic-quality-review'; key: C['IntakeCandidateKey'];
   state: 'not_frozen' | 'initial_required' | 'expansion_required' | 'passed' | 'revision_required' | 'blocked';
-  plan: FrozenPlan | null; frozenBy: string | null; frozenAt: string | null;
+  plan: FrozenPlan | null; frozenBy: string | null; frozenAt: string | null; frozenFactsVersion: number | null;
   rounds: { phase: Phase; checks: QualityCheck[]; checkedBy: string; factsVersion: number; recordedAt: string }[];
 };
-type QualityCommand = { operationId: string; key: C['IntakeCandidateKey'] };
-type QualitySubmission = QualityCommand & { phase: Phase; checks: QualityCheck[] };
+type QualityCommand = C['IntakeQualityCommand'];
+type QualitySubmission = C['IntakeQualitySubmission'];
 const invalid = (): never => { throw new IntakeRejection('FILE_INVALID', 'VALIDATION'); };
-function fields(value: unknown, expected: string[]): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return invalid();
-  const keys = Object.keys(value);
-  if (keys.length !== expected.length || keys.some(k => !expected.includes(k))) return invalid();
-  return value as Record<string, unknown>;
-}
-/** Internal commands only. No caller-supplied actor, plan, counts or conclusion. */
+/** The intake validator owns Unicode code point limits and database-safe strings. */
 export function qualityCommand(raw: unknown): QualityCommand {
-  const input = fields(raw, ['operationId', 'key']);
-  return { operationId: parseContractSchema('IntakeId', input.operationId), key: parseContractSchema('IntakeCandidateKey', input.key) };
+  return parseContractSchema('IntakeQualityCommand', raw);
 }
 export function qualitySubmission(raw: unknown): QualitySubmission {
-  const input = fields(raw, ['operationId', 'key', 'phase', 'checks']);
-  if (input.phase !== 'initial' && input.phase !== 'expanded') return invalid();
-  if (!Array.isArray(input.checks) || input.checks.length > 5000) return invalid();
-  const checks = input.checks.map((raw): QualityCheck => {
-    const c = fields(raw, ['scriptId', 'contentHash', 'defect', 'reason']);
-    if (typeof c.scriptId !== 'string' || !/^intake_[0-9a-f]{64}$/.test(c.scriptId)
-      || typeof c.contentHash !== 'string' || !/^[0-9a-f]{64}$/.test(c.contentHash)
-      || typeof c.defect !== 'boolean' || typeof c.reason !== 'string' || c.reason.length > 1000
-      || (c.defect && c.reason.trim() === '')) return invalid();
-    return { scriptId: c.scriptId, contentHash: c.contentHash, defect: c.defect, reason: c.reason };
-  });
-  if (new Set(checks.map(c => c.scriptId)).size !== checks.length) return invalid();
-  return { ...qualityCommand({ operationId: input.operationId, key: input.key }), phase: input.phase, checks };
+  const request = parseContractSchema('IntakeQualitySubmission', raw);
+  if (new Set(request.checks.map(c => c.scriptId)).size !== request.checks.length) return invalid();
+  return request;
 }
 function frozenPlan(p: IntakeQualityPreview): FrozenPlan {
   const { population, ordinaryCount, mandatoryCount, initialTarget, expandedTarget, seedHash,
@@ -132,19 +118,25 @@ function frozenPlan(p: IntakeQualityPreview): FrozenPlan {
 
 /** Rechecks current authority/material before exposing durable quality evidence.
  * A passed quality state is never an approval, ticket or permission to publish. */
-export async function readQuality(client: IntakeTransaction, actor: Principal, rawKey: unknown): Promise<IntakeQualityProgress> {
+export async function readQualityView(client: IntakeTransaction, actor: Principal, rawKey: unknown): Promise<{ preview: IntakeQualityPreview; progress: IntakeQualityProgress }> {
   const preview = await previewQuality(client, actor, rawKey);
   const key = preview.key;
   const args = [key.candidateId, key.version, key.digest];
-  const stored = (await client.query<{ plan: FrozenPlan; frozen_by: string; frozen_at: Date }>(
-    'SELECT plan,frozen_by,frozen_at FROM content_intake.quality_plans WHERE candidate_id=$1 AND candidate_version=$2 AND candidate_digest=$3', args)).rows[0];
+  const stored = (await client.query<{ plan: FrozenPlan; frozen_by: string; frozen_at: Date; facts_version: string }>(
+    'SELECT plan,frozen_by,frozen_at,facts_version FROM content_intake.quality_plans WHERE candidate_id=$1 AND candidate_version=$2 AND candidate_digest=$3', args)).rows[0];
   if (stored && canonical(stored.plan) !== canonical(frozenPlan(preview))) throw new IntakeRejection('MATERIAL_CHANGED');
   const rounds = await client.query<{ phase: Phase; checks: QualityCheck[]; checked_by: string; facts_version: string; recorded_at: Date }>(
     'SELECT * FROM content_intake.quality_rounds WHERE candidate_id=$1 AND candidate_version=$2 AND candidate_digest=$3 ORDER BY recorded_at,phase', args);
   const state = (await client.query<{ state: IntakeQualityProgress['state'] }>('SELECT content_intake.quality_state($1,$2) AS state', args.slice(0, 2))).rows[0]!.state;
-  return { purpose: 'synthetic-quality-review', key, state, plan: stored?.plan ?? null,
+  const progress: IntakeQualityProgress = { purpose: 'synthetic-quality-review', key, state, plan: stored?.plan ?? null,
+    frozenFactsVersion: stored ? Number(stored.facts_version) : null,
     frozenBy: stored?.frozen_by ?? null, frozenAt: stored?.frozen_at.toISOString() ?? null,
     rounds: rounds.rows.map(r => ({ phase: r.phase, checks: r.checks, checkedBy: r.checked_by, factsVersion: Number(r.facts_version), recordedAt: r.recorded_at.toISOString() })) };
+  return { preview, progress };
+}
+
+export async function readQuality(client: IntakeTransaction, actor: Principal, rawKey: unknown): Promise<IntakeQualityProgress> {
+  return (await readQualityView(client, actor, rawKey)).progress;
 }
 
 export async function freezeQuality(client: IntakeTransaction, actor: Principal, request: QualityCommand): Promise<IntakeQualityProgress> {
@@ -169,8 +161,13 @@ export async function checkQuality(client: IntakeTransaction, actor: Principal, 
   const prior = new Map(progress.rounds.flatMap(r => r.checks).map(c => [c.scriptId, c]));
   if (request.checks.length !== ids.length || request.checks.some(c => !selected.has(c.scriptId) || expected.get(c.scriptId) !== c.contentHash
     || (prior.has(c.scriptId) && canonical(prior.get(c.scriptId)!) !== canonical(c)))) return invalid();
+  // PostgreSQL jsonb adds its own escaping/spacing. Check that representation
+  // under the same transaction before either a round or receipt can be written.
+  const encoded = JSON.stringify(request.checks);
+  const size = await client.query<{ bytes: number }>('SELECT octet_length($1::jsonb::text) AS bytes', [encoded]);
+  if (size.rows[0]!.bytes > QUALITY_LIMITS.checksBytes) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
   await client.query(`INSERT INTO content_intake.quality_rounds(candidate_id,candidate_version,candidate_digest,phase,checks,checked_by,facts_version)
     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7)`, [request.key.candidateId, request.key.version, request.key.digest,
-    request.phase, JSON.stringify(request.checks), actor.id, actor.factsVersion]);
+    request.phase, encoded, actor.id, actor.factsVersion]);
   return readQuality(client, actor, request.key);
 }

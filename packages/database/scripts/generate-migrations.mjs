@@ -198,7 +198,14 @@ const PRIOR_INTAKE = Object.freeze({
   "migrationCount": 24,
   "schemaFile": "schema-v1.20.sql"
 });
-const COMPATIBLE_UPGRADES = Object.freeze([...REVIEWED_UPGRADES, PRIOR_INTAKE]);
+// A wire-only intake must not rewrite already applied SQL provenance/checksums.
+const PRIOR_USAGE = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288',
+  sourceGitSha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6',
+  sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
+  migrationCount: 26,
+});
+const COMPATIBLE_UPGRADES = Object.freeze([...REVIEWED_UPGRADES, PRIOR_INTAKE, PRIOR_USAGE]);
 const FROZEN_INTAKE_OVERLAYS = Object.freeze([
   {
     "position": 22,
@@ -424,6 +431,14 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const upgradeSourceBody = linesForRanges(snapshot.database_source.trimEnd().split('\n'), ranges);
   const priorSnapshot = { contract_set_id: PRIOR_INTAKE.contractSetId, source_git_sha: PRIOR_INTAKE.sourceGitSha,
     manifest: { database: { sha256: PRIOR_INTAKE.sourceSchemaSha256 } } };
+  const usageSnapshot = { contract_set_id: PRIOR_USAGE.contractSetId, source_git_sha: PRIOR_USAGE.sourceGitSha,
+    manifest: { database: { sha256: PRIOR_USAGE.sourceSchemaSha256 } } };
+  const usageMigrations = [
+    renderUpgradeMigration({position: 25, id: '0025_intake_usage_v1_21', version: 'schema.v1.21', ranges, sourceBody: upgradeSourceBody}, usageSnapshot),
+    renderIntakeOverlay(projectRoot, usageSnapshot, 26, '0026_intake_discovery_index'),
+  ];
+  const usageHashes = ['f270f787323a65baf3727337dcc34c1ff3f7a0bac0baf79a1894a7f7ae9591f4', 'c96e289e3ae19d600913b80796f3051eb7c19c5f544e1b8b9e17d5f5f1cd911f'];
+  if (usageMigrations.some((m, i) => m.sha256 !== usageHashes[i])) throw new Error('Frozen usage migration source drifted');
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
     ...REVIEWED_UPGRADES.map(p => loadPriorReviewedUpgrade(projectRoot, p)),
@@ -436,8 +451,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
       }
       return frozen;
     }),
-    renderUpgradeMigration({position: 25, id: '0025_intake_usage_v1_21', version: 'schema.v1.21', ranges, sourceBody: upgradeSourceBody}, snapshot),
-    renderIntakeOverlay(projectRoot, snapshot, 26, '0026_intake_discovery_index'),
+    ...usageMigrations,
   ]);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
