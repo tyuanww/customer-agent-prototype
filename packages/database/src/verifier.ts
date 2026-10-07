@@ -123,17 +123,19 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 0026 adds one discovery index and its five columns to the object manifest only.
 // 0027 adds a private rollback review lineage, two guards and three private functions.
 // The legacy non-login definer receives SELECT on that table only to refuse unsafe inheritance.
+// 0028 adds the complete family guard and publication trigger, and grants the
+// non-login definer candidate SELECT only to refuse legacy family inheritance.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
-const EXPECTED_ACL_MANIFEST_ENTRIES = 224;
-const EXPECTED_ACL_MANIFEST_SHA256 = '5480b366b50e1fdfdb330e8551397a597593f1180202fb6c46f4204766782b80';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2772;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '749b17c9201bfe6ecdbea21f735681221e9c494405e99091418e057b6451a7ab';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 223;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = 'f6991d0c9bdec1960691784f158818841a1ec4bfe0924367901fb54bb757bdcd';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 84;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'd3fe648f5fff06adefb428906cf6caa1d039fc8b0608c2a09cd93a210bb567b6';
+const EXPECTED_ACL_MANIFEST_ENTRIES = 225;
+const EXPECTED_ACL_MANIFEST_SHA256 = '6128b6cc566759e78dd15f876411458ff79bda7205c2c6dbaf0cce9c8d0d67da';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2774;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = 'aa8481403c6235f773a02f244d64322fc84a8e8223c3eaa856f36f2857ea1ea5';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 225;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '249c3c82b181f07af04d56d648af84d4711e3da154a6a5d8ba79603f35f72d30';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 85;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = '075d4d3d5f0fae41b8d9c7be5c83c2c59da0f775aa85161c7b9217fbefc693a9';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -755,7 +757,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 85 || inventory.views !== 7 || inventory.functions !== 223 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 85 || inventory.views !== 7 || inventory.functions !== 225 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {

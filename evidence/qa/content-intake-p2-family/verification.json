@@ -1,0 +1,147 @@
+{
+  "baseline": "bad169cf7bbc33424400b2fa6b44d596235a5de9",
+  "branch": "codex/content-intake-family",
+  "date": "2026-10-08",
+  "environment": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18 Homebrew",
+    "os": "macOS",
+    "data": "synthetic only"
+  },
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "status": "PASS",
+      "log": "lint.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "log": "typecheck.log"
+    },
+    {
+      "command": "pnpm test",
+      "status": "PASS",
+      "log": "test.log"
+    },
+    {
+      "command": "pnpm build",
+      "status": "PASS",
+      "log": "build.log"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/database test:all",
+      "status": "PASS",
+      "unit": 27,
+      "package": 1,
+      "pg": 33,
+      "log": "database.log"
+    },
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'family:|usage:'",
+      "status": "PASS",
+      "passed": 40,
+      "filteredOut": 136,
+      "log": "usage.log",
+      "inputs": "pg-inputs.json"
+    },
+    {
+      "command": "node scripts/probe-intake-family-sql.mjs --output .gstack/family-sql-final.json",
+      "status": "PASS",
+      "passed": 114,
+      "result": "sql-probe.json"
+    },
+    {
+      "command": "pnpm docs:check",
+      "status": "PASS",
+      "result": "206 Markdown files, links, ownership"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "status": "PASS",
+      "result": "30.0 MiB / 32.0 MiB; root policy PASS"
+    }
+  ],
+  "historicalFailures": [
+    {
+      "log": "integration-before-performance-fix.log",
+      "passed": 192,
+      "failed": 1,
+      "resolution": "50-page maximum catalog timeout fixed; all affected 40 cases rerun and passed; not a new full 193/193 run"
+    },
+    {
+      "log": "/tmp/p2-family-integration-mixed-build.log",
+      "sha256": "37b1cedc4f411e7d8f3e7d96f0cfdc9a8ab3c2c499f885884cdf1984391af3c8",
+      "resolution": "Mixed runtime build invalidated the run; stable build used for subsequent verification"
+    }
+  ],
+  "inputsSha256": {
+    "apps/api/src/content-intake/material.ts": "c635b152e23f757885e47d57b4c5bde578fa82de9ec615bd35b5a8979db1bd1a",
+    "apps/api/src/content-intake/service.ts": "7eac4221559dac6c475d5812febbf77faab8b4c3a92c627e9b25837c663126cb",
+    "apps/api/src/content-intake/usage.ts": "3085ee36b4a052a54f2b928680ca7c4e6347fcee50e7d87de3b4b3b03ec3aebf",
+    "apps/api/tests/content-intake-material.test.ts": "73cc9a16d2f8162725e88a0929d68608b7a585bef8dae63a5122fba564c78f11",
+    "apps/api/tests/content-intake.integration.test.ts": "d963b5ff3131ad13e7336fdf36dd8c95c5081f8cf8e9924178a87d50e599eab9",
+    "apps/desktop/tests/unit/content-intake-family-http.test.ts": "4c624fffb4a25807da64cc4e47a176d8c50debd47b1ea2c6864bf7fa02a13208",
+    "docs/how-to-develop-content-intake.md": "156f334fdb53297abe942c3975d3dbd947e4d7c1e61e51240bb6e5e0105857c0",
+    "docs/plans/2026-10-03-content-intake-requirements.md": "1ecce05dd83b0b77201413977ed7ac757795793ad00249fe651a2bbef2c0fe75",
+    "docs/reference-project-architecture.md": "51af546fd975ddff5cc1fb14074e8aaf74dced30194b089091e68914396521e7",
+    "packages/content-intake/scripts/probe-issue-report.mjs": "608b56737a88e9a76ef6a3df7f4a733f052edb0de0df794aa16153af06b1e5b9",
+    "packages/content-intake/src/policy.ts": "bb5598b55ff267e77824e1c84ecf3c7be1f4cf855706d58ba448aa28a27755d7",
+    "packages/content-intake/src/workbook.ts": "37c233b43b1736ec7b5dc3d1df66d41e0004addee21f2e6dfe3e2fe5d3a96312",
+    "packages/content-intake/tests/fixtures.ts": "91bda45e71c33f5e3844063a7d99392023167bf34542c858253303c967d0d793",
+    "packages/content-intake/tests/workbook.test.ts": "a5ecc439e52fe39a4ee652f418ff1162cbdd8775ad475522ee355800e262ce40",
+    "packages/database/README.md": "dba86e8b543cd9da2b6a678d68fc307fc432eb265b4ae5833c16d78d1a550d11",
+    "packages/database/migrations/0028_intake_family.sql": "8b241e1b5f808c2278b53351a0d3cbee56f4ac23ca16c65736ba45ace859382e",
+    "packages/database/migrations/manifest.generated.json": "b1032b455a4275090ba75b0fdb7d325365357b2dec91f2ff1fcc7028723f3695",
+    "packages/database/overlays/0028_intake_family.sql": "c9ee31814b6c611dbb98e83ddf1fa5a9a0c92eeba58415ba394186f346ec5c7e",
+    "packages/database/scripts/generate-migrations.mjs": "8290775439392ef03cdcb1515338a98e28fc89a4c641b1ffa1ed1b7546bfe6ae",
+    "packages/database/src/generated/migrations.generated.ts": "9b95e698727b37e8281fb5196956fcfcd4e1e9a7c599a6018a63c812ff229689",
+    "packages/database/src/verifier.ts": "ec55fe89732b19c041ae420729d5589ab347287bcb44c4472e3b0a2c006b2a90",
+    "packages/database/tests/generator.test.ts": "61c710511fe592e1531e7052dc3ed6a9b8f5fb857d733bb9d232d2944d67bee9",
+    "packages/database/tests/planner.test.ts": "72e09f20d43e697b09ad8d0c5152ac5bdbb39ed31c9d021ee25e45906f24e73e",
+    "packages/database/tests/postgres.integration.test.ts": "b634fe8ea0296eee1ef8c9dcdde234752bf668410a2690b42d10baef313f197b",
+    "packages/database/tests/support/family-catalog.ts": "f6e517b08c5a6c77869a8fbe244f179319e692e81dfb38d0f2d4ea633da55a3c",
+    "scripts/probe-intake-family-sql.mjs": "d1e4ecdb61f1b0f5e71e7bab5c3abddab4d2230bb5295bebd5911a745780a812",
+    "scripts/probe-intake-usage-consumer.mjs": "448c642c12423ecbfcd75b262a5c8691edb88eb539abc4a9393d24e1a8a36e22"
+  },
+  "artifactsSha256": {
+    "build.log": "c8913a5d486d1a4cd5bf1f59a50b79f9df0f17a81300944abf895e419e902809",
+    "database.log": "15bfd026a82d74282581612f6e0e5add967cd9bee3bb0d67a091c75be3acdff4",
+    "guard-explain-after.json": "9dda1f782b7064bd4789c1de1c2c94eb124db633e7d1670c043278a548cfd660",
+    "guard-explain-before.json": "453000dfc738207665625ca56ddc141462fac861f6b8d24f227ef0b835106993",
+    "integration-before-performance-fix.log": "06a5ecb975e7080f1d2d04352ec3e2a91d78e47c3dc4197c03f1aeff425d8044",
+    "lint.log": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+    "pg-inputs.json": "5adc02559a2e91e4ae172a059dfb589944add3a7254ca2f37f3c13e3f23c592f",
+    "pg-verification.json": "d923736ef3d847400355c2c073b95010fa3a0f351d03fa2441f838a3a07ead6a",
+    "sql-probe.json": "157a33876c4e8fbc62852317933e92041fd996625a7ae869c9780bb338c2589a",
+    "test.log": "ce889445344aa6df5508e64e59fc6eb93f75c130add79891834fe0ed4b60873f",
+    "typecheck.log": "1093c10cd1526687466926c8c4d9b5148c0e8a6c45f7b9e5129da53bce4c5d5b",
+    "usage.log": "43337180ece003cc64f5fa37849cb3c100099453eeaad4cce184a86ec4bba5cb"
+  },
+  "limits": [
+    "No real data or Feishu credentials",
+    "No production factory/ACL activation",
+    "No native Electron/system clipboard measurement this turn",
+    "No Windows non-admin/drag/full-machine offline acceptance",
+    "No complete 10x-history storage/review/receipt/object capacity proof",
+    "No push/PR/merge/deploy"
+  ],
+  "logNormalization": {
+    "usage.log": {
+      "rawSha256": "43976074a8a585225334a9a0c7b40bc3a86af934b26c6483426b6b1f7010b345",
+      "storedSha256": "43337180ece003cc64f5fa37849cb3c100099453eeaad4cce184a86ec4bba5cb",
+      "transformation": "Trailing whitespace and terminal blank lines only; raw original retained in /tmp"
+    },
+    "database.log": {
+      "rawSha256": "3381e07f2bea12546d17c5eee20cb661edc73b17715589921836723d462e3d53",
+      "storedSha256": "15bfd026a82d74282581612f6e0e5add967cd9bee3bb0d67a091c75be3acdff4",
+      "transformation": "Trailing whitespace and terminal blank lines only; raw original retained in /tmp"
+    },
+    "integration-before-performance-fix.log": {
+      "rawSha256": "ba818a1c34883bbd63b5e81ce0c8fdf8b4c03d07a66494b70a6444a73fac64a9",
+      "storedSha256": "06a5ecb975e7080f1d2d04352ec3e2a91d78e47c3dc4197c03f1aeff425d8044",
+      "transformation": "Trailing whitespace and terminal blank lines only; raw original retained in /tmp"
+    }
+  }
+}

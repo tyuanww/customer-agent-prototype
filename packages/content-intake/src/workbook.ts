@@ -6,6 +6,18 @@ export { FAQ_HEADERS, QUESTION_HEADERS, SOURCE_HEADERS, TEMPLATE_VERSION, INTAKE
   isParseResult, type ParseResult, type Issue, type FaqRow } from './policy.js';
 
 const stableId = (value: string) => /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/u.test(value) && !value.startsWith('EXAMPLE_');
+type FamilyReference = { familySourceId: string; familyBusinessEntryId: string }
+  | { familySourceId: null; familyBusinessEntryId: null };
+/** K accepts exactly sourceId/businessEntryId, without trimming or alternate separators.
+ * Empty text clears both fields. Null means invalid syntax or local source scope;
+ * target existence, brand and overlap are checked by the publication owner. */
+export function parseFamilyReference(value: string, context: Pick<ParseContext, 'sourceId' | 'scopeKind'>): FamilyReference | null {
+  if (context.scopeKind !== 'brand' && context.scopeKind !== 'shop') return null;
+  if (value === '') return { familySourceId: null, familyBusinessEntryId: null };
+  const parts = value.split('/');
+  if (context.scopeKind !== 'shop' || parts.length !== 2 || !parts.every(stableId) || parts[0] === context.sourceId) return null;
+  return { familySourceId: parts[0]!, familyBusinessEntryId: parts[1]! };
+}
 function validTime(value: string): boolean {
   const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:Z|([+-])(\d{2}):(\d{2}))$/u.exec(value);
   if (!parts || !Number.isFinite(Date.parse(value))) return false;
@@ -23,6 +35,7 @@ function validTime(value: string): boolean {
 export async function parseWorkbook(bytes: Buffer, context: ParseContext): Promise<ParseResult> {
   try {
     if (!context || context.sheet !== 'FAQ' || context.templateVersion !== TEMPLATE_VERSION
+      || !['brand', 'shop'].includes(context.scopeKind) || (context.scopeKind === 'brand' && context.scope !== 'brand')
       || !['product', 'campaign', 'presale', 'aftersale'].includes(context.domain)
       || ![context.sourceId, context.brandId, context.scope].every((s) => typeof s === 'string' && /^[a-zA-Z0-9_.:-]{1,128}$/u.test(s))) return failedParse('INVALID_CONTEXT');
     const { resourceSheets, ...archive } = await inspectArchive(bytes);
@@ -85,7 +98,8 @@ export async function parseWorkbook(bytes: Buffer, context: ParseContext): Promi
       }
       if (context.domain === 'campaign' && !values[9]) issue('EXPIRY_REQUIRED', context.sheet, number, 'J', '活动必须填写失效时间');
       if (values[8] && values[9] && Date.parse(values[8]) >= Date.parse(values[9])) issue('INVALID_WINDOW', context.sheet, number, 'J', '失效时间须晚于生效时间');
-      if (![ '', 'true', 'false'].includes(values[14]!) || (values[14] === 'true' && context.scope !== 'brand')) issue('BRAND_OVERRIDE', context.sheet, number, 'O', '只有品牌通用来源可设置不可覆盖');
+      if (!parseFamilyReference(values[10]!, context)) issue('INVALID_FAMILY', context.sheet, number, 'K', '仅店铺来源可填写其他来源的 sourceId/businessEntryId；两段须为合法非示例稳定编号，留空取消关联');
+      if (![ '', 'true', 'false'].includes(values[14]!) || (values[14] === 'true' && context.scopeKind !== 'brand')) issue('BRAND_OVERRIDE', context.sheet, number, 'O', '只有品牌通用来源可设置不可覆盖');
       if ([title, body].some((value) => value.includes('过敏')) && (!body.includes('停手') || !body.includes('确认'))) issue('ALLERGY_BODY', context.sheet, number, 'C', '正文同时包含停手与确认；标题不代替正文');
       if (values[13]) issue('UNRESOLVED_MEDIA', context.sheet, number, 'N', '明确必要文字与媒体；P1 不认定附件已导入');
       rows.push({ id, title, body, state: state === '停用' ? '停用' : '启用', values });
@@ -110,10 +124,12 @@ export async function parseWorkbook(bytes: Buffer, context: ParseContext): Promi
 }
 
 /** Produces a real workbook, with examples kept outside selected business sheets. */
-export async function createTemplate(context: ParseContext, rows: readonly (readonly string[])[] = []): Promise<Buffer> {
+export async function createTemplate(context: Omit<ParseContext, 'scopeKind'>, rows: readonly (readonly string[])[] = []): Promise<Buffer> {
   const book = new ExcelJS.Workbook();
   book.created = new Date('2026-10-04T00:00:00Z'); book.modified = book.created;
-  book.addWorksheet('说明').addRow(['P1 合成模板；来源范围由服务端登记；任何缺行都不代表下架。']);
+  const instructions = book.addWorksheet('说明');
+  instructions.addRow(['P1 合成模板；来源范围由服务端登记；任何缺行都不代表下架。']);
+  instructions.addRow(['K列“对应通用条目”：仅店铺来源可填写 sourceId/businessEntryId，用一个 / 分隔其他通用来源编号和条目编号；品牌来源须留空。两段均以英文字母或数字开头，最多128字符，仅含英文字母、数字、_、.、:、-，不得使用 EXAMPLE_ 示例编号或空格。留空表示无关联（已有条目则取消关联）；缺行仍保留原条目。目标是否存在及发布冲突由服务端核验。']);
   const source = book.addWorksheet('来源'); source.addRow([...SOURCE_HEADERS]);
   source.addRow([context.sourceId, context.templateVersion, context.brandId, context.scope, context.domain]);
   const faq = book.addWorksheet('FAQ'); faq.addRow([...FAQ_HEADERS]);

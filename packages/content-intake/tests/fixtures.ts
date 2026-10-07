@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { createTemplate, TEMPLATE_VERSION, type ParseContext } from '@customer-agent/content-intake';
-export const context: ParseContext = { sourceId: 'synthetic-source', brandId: 'synthetic-brand', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: TEMPLATE_VERSION };
+export const context: ParseContext = { sourceId: 'synthetic-source', brandId: 'synthetic-brand', scope: 'shop-a', scopeKind: 'shop', domain: 'product', sheet: 'FAQ', templateVersion: TEMPLATE_VERSION };
 export const sampleRows = [
   ['faq-001', '合成快捷短语一', '第一行：核对合成资料。\n第二行：由坐席人工选择。', '', '', '合成分类', '', '启用', '', '', '', '', '', '', 'false'],
   ['faq-002', '合成快捷短语二', '请确认合成示例说明。', '', '', '合成分类', '', '启用', '', '', '', '', '', '', 'false'],

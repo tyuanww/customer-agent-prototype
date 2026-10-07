@@ -14,10 +14,12 @@ pnpm test:db                 # database 全门禁，含隔离 PG15
 pnpm test:db:integration     # 仅隔离 PG15 集成门禁
 ```
 
-PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前验证 `schema.v1.21` 全迁移安装及各已接入历史 ledger 的精确前缀升级；已发 0001–0026 的字节与来源不变；0025 是使用上下文合同增量，0026 仅追加按来源检索授权的物理索引，不改变合同、判定或 ACL。0027 不改变冻结 wire/DDL 表形状，追加私有回退审批谱系；既有不可登录 `cs_ai_definer` 仅获该表 SELECT，用于拒绝旧发布路径丢失回退审批的继承，应用 runtime/admin/worker/auth/review 角色仍无新表或函数访问权。回退事务重验上一版本、实际影响范围、独立人工审批及 60 秒提交截止，并原子写入新 release、公告、指针和永久回执；后续原生发布继承回退审批，失效时拒绝。未知、缺失、改写或额外 ledger 仍失败关闭。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
+PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前验证 `schema.v1.21` 全迁移安装及各已接入历史 ledger 的精确前缀升级；已发 0001–0027 的字节与来源不变；0025 是使用上下文合同增量，0026 仅追加按来源检索授权的物理索引，不改变合同、判定或 ACL。0027 不改变冻结 wire/DDL 表形状，追加私有回退审批谱系；既有不可登录 `cs_ai_definer` 仅获该表 SELECT，用于拒绝旧发布路径丢失回退审批的继承，应用 runtime/admin/worker/auth/review 角色仍无新表或函数访问权。回退事务重验上一版本、实际影响范围、独立人工审批及 60 秒提交截止，并原子写入新 release、公告、指针和永久回执；后续原生发布继承回退审批，失效时拒绝。未知、缺失、改写或额外 ledger 仍失败关闭。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
 
 仓内其它 package 若需复用同一临时 PG15 证据面，只能以 devDependency 导入显式 `@customer-agent/database/testkit` 子入口；它不属于 migration/runtime 公共入口，也不得进入生产请求链。
 
 负责人承接迁移保留 0001–0011 的原字节与来源，将完整新合同的六段增量按来源行号提取为单个事务，最后更新 schema marker。`app_owner_acceptance_registrar` 为未绑定登录的 NOLOGIN 能力角色；合同要求安装时不存在同名角色，遇到既有角色即回滚本段并保留可追踪的旧账本前缀。因此隔离测试各自使用独立 cluster，不向共享 cluster 重复安装。runtime 无登记、撤销或登记表读取权限，当前不授权真实装载。
 
 历史 overlay 源与冻结 SQL 必须逐字节对应，修改旧源会失败关闭；新的产品事务必须追加 migration。P2 新命名空间纳入 ACL、对象/owner、DOMAIN 定义和 CHECK、函数和触发器的精确后验，应用角色仍无访问权；存储安装不代表新事务或正式激活已完成。
+
+`0028_intake_family` 仅追加产品 overlay，不改冻结合同或旧迁移字节。私有 `content_intake.assert_family_catalog(releaseId)` 对完整目录验证显式通用根、同租户/应用/品牌/域、店铺不可自设品牌强制及商品/场景/半开时间三维交集；标题不建立关系。启用店铺稿要求根启用；停用历史保留引用，可同时停用根与店铺稿。根仍参与结构校验，即使它的生效时间已经结束。正常发布和纠正回退在既有内容锁与 current 事务内通过 publication trigger 共用校验；API 签发/续签资格复用该私有函数。旧发布入口遇显式家族目录明确拒绝继承，不丢失关系；只有既有不可登录 definer 获 candidate_versions SELECT 用于此拒绝，应用角色 ACL 保持关闭。真实 PG 门禁覆盖 27→28 精确前缀、冲突矩阵、ACL/trigger 篡改，以及 5,000 条完整目录与 50,000 条未引用历史条目的有界验证；另覆盖同一家族 1 个根与 4,999 个覆盖的商品互斥、场景互斥、全不限半开时间不交叠三种稠密合法目录。区间以 running-max 结束时间划分相交分量，每分量按商品或场景倒排桶预计配对数选择更稀疏的一维，wildcard 单独处理；最后仍验证真实三维交集。无关联条目的本地字段检查不进入根关联扫描，品牌根物化后供结构/品牌强制复用；5,000 条无关联目录连续 50 次逐页 guard 共享 5 秒数据库预算，避免把家族判定成本施加到普通分页。固定 seed `0x5eed0028` 的 85 个目录与独立朴素逐对 oracle 比对，覆盖长区间桥接、空集、多词项和停用。
