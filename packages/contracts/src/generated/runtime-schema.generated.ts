@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.17.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.18.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -85,6 +85,16 @@ export const COMPONENT_SCHEMA_NAMES = [
   "IntakePrincipalPage",
   "IntakePublish",
   "IntakePublishedEntry",
+  "IntakeQualityAttribution",
+  "IntakeQualityCheck",
+  "IntakeQualityCommand",
+  "IntakeQualityPlan",
+  "IntakeQualityReceipt",
+  "IntakeQualityRound",
+  "IntakeQualitySample",
+  "IntakeQualitySamplePage",
+  "IntakeQualityStatus",
+  "IntakeQualitySubmission",
   "IntakeQuestion",
   "IntakeReceipt",
   "IntakeReceive",
@@ -230,7 +240,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.17.0:components",
+  "$id": "urn:customer-agent:openapi:1.18.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -8022,6 +8032,673 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           }
         }
       ]
+    },
+    "IntakeQualityAttribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "principalId",
+        "factsVersion",
+        "recordedAt"
+      ],
+      "properties": {
+        "principalId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "factsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "recordedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        }
+      }
+    },
+    "IntakeQualityCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scriptId",
+        "contentHash",
+        "defect",
+        "reason"
+      ],
+      "properties": {
+        "scriptId": {
+          "type": "string",
+          "pattern": "^intake_[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "defect": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 1000,
+          "pattern": "^[^\\u0000\\uD800-\\uDFFF]*$"
+        }
+      },
+      "if": {
+        "properties": {
+          "defect": {
+            "const": true
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeQualityCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        }
+      }
+    },
+    "IntakeQualityPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyVersion",
+        "ordinaryCount",
+        "mandatoryCount",
+        "withdrawalCount",
+        "initialTarget",
+        "expandedTarget",
+        "initialCount",
+        "expandedCount",
+        "seedHash",
+        "populationManifestHash",
+        "selectionManifestHash"
+      ],
+      "properties": {
+        "policyVersion": {
+          "type": "string",
+          "const": "intake-quality-v1"
+        },
+        "ordinaryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "mandatoryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "withdrawalCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "initialTarget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "expandedTarget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "initialCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "expandedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "seedHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "populationManifestHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "selectionManifestHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "IntakeQualityReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "action",
+        "key",
+        "state",
+        "phase"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "quality-freeze",
+            "quality-check"
+          ]
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "initial_required",
+            "expansion_required",
+            "passed",
+            "revision_required",
+            "blocked"
+          ]
+        },
+        "phase": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "initial",
+                "expanded"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "action": {
+            "const": "quality-freeze"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "phase": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "else": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "initial",
+              "expanded"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "expansion_required",
+              "passed",
+              "revision_required",
+              "blocked"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "expanded"
+              }
+            },
+            "type": "object"
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "passed",
+                  "revision_required",
+                  "blocked"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        }
+      ]
+    },
+    "IntakeQualityRound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "reviewer",
+        "checkedCount",
+        "defectCount"
+      ],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "expanded"
+          ]
+        },
+        "reviewer": {
+          "$ref": "#/$defs/IntakeQualityAttribution"
+        },
+        "checkedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "defectCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "IntakeQualitySample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scriptId",
+        "contentHash",
+        "mandatory",
+        "entry",
+        "check"
+      ],
+      "properties": {
+        "scriptId": {
+          "type": "string",
+          "pattern": "^intake_[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "mandatory": {
+          "type": "boolean"
+        },
+        "entry": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/IntakeEntry"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "const": "upsert"
+                }
+              }
+            }
+          ]
+        },
+        "check": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IntakeQualityCheck"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "IntakeQualitySamplePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "viewHash",
+        "phase",
+        "selectionManifestHash",
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "viewHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "expanded"
+          ]
+        },
+        "selectionManifestHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeQualitySample"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      },
+      "if": {
+        "properties": {
+          "nextCursor": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "type": "array",
+            "minItems": 1
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeQualityStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "viewHash",
+        "state",
+        "plan",
+        "frozen",
+        "rounds"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "viewHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "not_frozen",
+            "initial_required",
+            "expansion_required",
+            "passed",
+            "revision_required",
+            "blocked"
+          ]
+        },
+        "plan": {
+          "$ref": "#/$defs/IntakeQualityPlan"
+        },
+        "frozen": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IntakeQualityAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeQualityRound"
+          },
+          "minItems": 0,
+          "maxItems": 2,
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "phase": {
+                    "const": "initial"
+                  }
+                },
+                "required": [
+                  "phase"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "phase": {
+                    "const": "expanded"
+                  }
+                },
+                "required": [
+                  "phase"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "not_frozen"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "frozen": {
+            "type": "null"
+          },
+          "rounds": {
+            "type": "array",
+            "maxItems": 0
+          }
+        },
+        "type": "object"
+      },
+      "else": {
+        "properties": {
+          "frozen": {
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "initial_required"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "then": {
+            "properties": {
+              "rounds": {
+                "type": "array",
+                "maxItems": 0
+              }
+            },
+            "type": "object"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "expansion_required"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "then": {
+            "properties": {
+              "rounds": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "phase": {
+                      "const": "initial"
+                    }
+                  },
+                  "required": [
+                    "phase"
+                  ]
+                }
+              }
+            },
+            "type": "object"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "passed",
+                  "revision_required",
+                  "blocked"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "then": {
+            "properties": {
+              "rounds": {
+                "type": "array",
+                "minItems": 1,
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "phase": {
+                      "const": "initial"
+                    }
+                  },
+                  "required": [
+                    "phase"
+                  ]
+                }
+              }
+            },
+            "type": "object"
+          }
+        }
+      ]
+    },
+    "IntakeQualitySubmission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "phase",
+        "checks"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "expanded"
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeQualityCheck"
+          },
+          "minItems": 0,
+          "maxItems": 5000
+        }
+      }
     },
     "IntakeQuestion": {
       "type": "object",

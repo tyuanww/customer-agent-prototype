@@ -1,7 +1,7 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288",
-  "source_git_sha": "53906e302288fe0fb70e58b24a40088ecbbd3ef6",
+  "contract_set_id": "cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1",
+  "source_git_sha": "18297cf802b195d8ff4e9f625143e50bff169418",
   "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
   "upgrade_source_sha256": "029dc103681265237237a0b342a18605813604ff9e67e312004917cb64f42505",
   "compatibility": {
@@ -54,6 +54,12 @@
         "source_git_sha": "d029cb0908faf9a0d1c1ffc1c8a5fcf39784d713",
         "source_schema_sha256": "1418537f66274657f8221896387933b4a00a15c23253993541c3bb0ca8964d41",
         "migration_count": 24
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288",
+        "source_git_sha": "53906e302288fe0fb70e58b24a40088ecbbd3ef6",
+        "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
+        "migration_count": 26
       }
     ]
   },

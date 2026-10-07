@@ -132,10 +132,10 @@ async function expectVerificationFailureAfterMutation(client: Client, sql: strin
 // Reconstruct the exact pre-intake catalogue provenance, including partial
 // product overlays; truncating the new catalogue would falsely relabel old SQL.
 function frozenIntakePrefix(count: number) {
-  const prior=generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;
+  const prior=generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.find(p => p.migrationCount >= count)!;
   return {...generatedMigrationCatalogue,...prior,
     compatibility:{...generatedMigrationCatalogue.compatibility,
-      priorReviewedUpgrades:generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0,-1)},
+      priorReviewedUpgrades:generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.filter(p => p.migrationCount < count)},
     migrations:generatedMigrationCatalogue.migrations.slice(0,count)};
 }
 
@@ -237,6 +237,25 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       await client.end();
     }
   }, 180_000);
+
+  it('accepts the existing 26-row usage ledger after the quality HTTP-only intake without executing SQL', async () => {
+    const database = harness.createDatabase('quality_wire_only');
+    const client = await harness.connect(database.config);
+    try {
+      const prior = { contractSetId: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288',
+        sourceGitSha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6',
+        sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013' };
+      const oldCatalogue = { ...generatedMigrationCatalogue, contractSetId: prior.contractSetId,
+        sourceGitSha: prior.sourceGitSha, sourceSchemaSha256: prior.sourceSchemaSha256,
+        compatibility: { ...generatedMigrationCatalogue.compatibility,
+          priorReviewedUpgrades: generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1) } };
+      expect((await applyMigrationCatalogue(client, oldCatalogue)).applied).toHaveLength(26);
+      const ledger = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
+      expect((await inspectDatabaseMigrations(client)).state).toBe('COMPLETE');
+      expect((await applyDatabaseMigrations(client)).applied).toEqual([]);
+      expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows).toEqual(ledger);
+    } finally { await client.end(); }
+  }, 60_000);
 
   it('upgrades an exact v1.12 ledger prefix through the immutable v1.13/v1.14 suffix', async () => {
     const database = harness.createDatabase('upgrade_v1_12_to_v1_14');
@@ -356,7 +375,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
   it('appends only the discovery index to the exact 25-row ledger and detects index drift', async () => {
     const database = harness.createDatabase('discovery_prefix'), client = await harness.connect(database.config);
     try {
-      await applyMigrationCatalogue(client, {...generatedMigrationCatalogue, migrations: generatedMigrationCatalogue.migrations.slice(0,25)});
+      await applyMigrationCatalogue(client, frozenIntakePrefix(25));
       const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0026_intake_discovery_index']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=25 ORDER BY position')).rows).toEqual(before);

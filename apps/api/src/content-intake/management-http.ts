@@ -1,3 +1,6 @@
+import { validateContractSchema } from '@customer-agent/contracts';
+import { qualityReceipt } from './quality-access.js';
+import { QUALITY_LIMITS } from './quality.js';
 import type { Readable } from 'node:stream';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import type { ProductAuthService } from '../auth-service.js';
@@ -109,6 +112,26 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
     // Versioned material is immutable. Both reads authorize independently; this
     // address-to-key lookup cannot carry authority across a logout/revocation.
     return sendIntake(reply, await service.review(actor(request), candidate.value.key), 'IntakeReview');
+  });
+  for (const [suffix, method, schema] of [
+    ['', 'qualityStatus', 'IntakeQualityStatus'],
+    ['/samples', 'qualitySamples', 'IntakeQualitySamplePage'],
+  ] as const) app.get(`/v1/intake/candidates/:candidateId/versions/:version/quality${suffix}`, { exposeHeadRoute: false }, async (request, reply) =>
+    sendIntake(reply, await service[method](actor(request), params(request).candidateId!, version(request), intakePageQuery(request)), schema));
+  for (const [suffix, method, schema, action, bodyLimit] of [
+    ['freeze', 'freezeQuality', 'IntakeQualityCommand', 'quality-freeze', QUALITY_LIMITS.commandBytes],
+    ['checks', 'checkQuality', 'IntakeQualitySubmission', 'quality-check', QUALITY_LIMITS.checksBytes],
+  ] as const) app.post(`/v1/intake/candidates/:candidateId/versions/:version/quality/${suffix}`, { bodyLimit, config: { intakeFileLimitStatus: 413 } }, async (request, reply) => {
+    if (!candidateCommand(request) || request.headers['content-encoding'] !== undefined) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    const parsed = validateContractSchema(schema, request.body);
+    if (!parsed.ok) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    const result = await service[method](actor(request), parsed.value);
+    return sendIntake(reply, result.ok ? { ok: true, value: qualityReceipt(parsed.value.operationId, action, result.value) } : result, 'IntakeQualityReceipt');
+  });
+  app.get('/v1/intake/quality/operations/:operationId', { exposeHeadRoute: false }, async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    if (Object.keys(query).length !== 1 || !('action' in query)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    return sendIntake(reply, await service.qualityOperationReceipt(actor(request), params(request).operationId!, query.action), 'IntakeQualityReceipt');
   });
   app.get('/v1/intake/operations/:operationId', { exposeHeadRoute: false }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;

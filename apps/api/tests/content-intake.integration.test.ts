@@ -186,15 +186,216 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(started.status, await started.clone().text()).toBe(202);
     return parseContractSchema('IntakeReview', await started.json());
   }
-  async function internalHttpQuality(c: C['IntakeCandidate']) {
-    // The frozen wire contract has no quality routes yet. This explicit fixture
-    // step uses the real quality service with a product session, never a SQL PASS.
-    const quality = createContentIntakeService(pool, store, undefined, undefined, { requireProductSession: true });
-    const reviewer = (await seat('reviewer')).actor;
-    const frozen = value(await quality.freezeQuality(reviewer, { operationId: `quality-${c.key.candidateId}`, key: c.key }));
-    expect(value(await quality.checkQuality(reviewer, { operationId: `checks-${c.key.candidateId}`, key: c.key,
-      phase: 'initial', checks: qualityChecks(frozen) })).state).toBe('passed');
+  async function httpQuality(host: Awaited<ReturnType<typeof managementHost>>, c: C['IntakeCandidate']) {
+    const headers = { authorization: `Bearer ${(await seat('reviewer')).token}`, 'content-type': 'application/json' };
+    const url = `${host.origin}/v1/intake/candidates/${c.key.candidateId}/versions/${c.key.version}/quality`;
+    const frozen = await fetch(`${url}/freeze`, { method: 'POST', headers, body: JSON.stringify({ operationId: `quality-${c.key.candidateId}`, key: c.key }) });
+    expect(frozen.status, await frozen.clone().text()).toBe(200);
+    const status = parseContractSchema('IntakeQualityStatus', await (await fetch(`${url}?digest=${c.key.digest}`, { headers })).json());
+    const checks: C['IntakeQualityCheck'][] = [];
+    let cursor: string | null = null;
+    do {
+      const q: URLSearchParams = new URLSearchParams({ digest: c.key.digest, viewHash: status.viewHash, phase: 'initial', limit: '2', ...(cursor ? { cursor } : {}) });
+      const page: C['IntakeQualitySamplePage'] = parseContractSchema('IntakeQualitySamplePage', await (await fetch(`${url}/samples?${q}`, { headers })).json());
+      checks.push(...page.items.map(i => ({ scriptId: i.scriptId, contentHash: i.contentHash, defect: false, reason: '' })));
+      cursor = page.nextCursor;
+    } while (cursor);
+    const checked = await fetch(`${url}/checks`, { method: 'POST', headers, body: JSON.stringify({ operationId: `checks-${c.key.candidateId}`, key: c.key, phase: 'initial', checks }) });
+    expect(checked.status, await checked.clone().text()).toBe(200);
+    expect(parseContractSchema('IntakeQualityReceipt', await checked.json()).state).toBe('passed');
   }
+
+  async function qualityWire(host: Awaited<ReturnType<typeof managementHost>>, c: C['IntakeCandidate'], id = 'enabler', session = 'primary') {
+    const logged = await seat(id, session), headers = { authorization: `Bearer ${logged.token}`, 'content-type': 'application/json' };
+    const url = `/v1/intake/candidates/${c.key.candidateId}/versions/${c.key.version}/quality`;
+    const get = (query = `digest=${c.key.digest}`) => host.app.inject({ url: `${url}?${query}`, headers });
+    const status = async () => {
+      const r = await get(); expect(r.statusCode, r.body).toBe(200); return parseContractSchema('IntakeQualityStatus', r.json());
+    };
+    const page = (s: C['IntakeQualityStatus'], phase = 'initial', cursor?: string, limit = 2) => host.app.inject({
+      url: `${url}/samples?${new URLSearchParams({ digest: c.key.digest, viewHash: s.viewHash, phase, limit: String(limit), ...(cursor ? { cursor } : {}) })}`, headers });
+    const samples = async (s: C['IntakeQualityStatus'], phase = 'initial', limit = 100) => {
+      const items: C['IntakeQualitySample'][] = []; let cursor: string | undefined;
+      do {
+        const r = await page(s, phase, cursor, limit); expect(r.statusCode, r.body).toBe(200);
+        expect(Buffer.byteLength(r.body)).toBeLessThanOrEqual(8_388_608);
+        const body: C['IntakeQualitySamplePage'] = parseContractSchema('IntakeQualitySamplePage', r.json());
+        items.push(...body.items); cursor = body.nextCursor ?? undefined;
+      } while (cursor);
+      expect(new Set(items.map(i => i.scriptId)).size).toBe(items.length);
+      return items;
+    };
+    const post = (suffix: 'freeze' | 'checks', payload: unknown, extra: Record<string, string> = {}) => host.app.inject({ method: 'POST', url: `${url}/${suffix}`, headers: { ...headers, ...extra }, payload: JSON.stringify(payload) });
+    const receipt = (op: string, action = 'quality-check') => host.app.inject({ url: `/v1/intake/quality/operations/${op}?action=${action}`, headers });
+    return { url, headers, logged, get, status, page, samples, post, receipt };
+  }
+  const wireChecks = (items: C['IntakeQualitySample'][]) => items.map(i => i.check ?? ({ scriptId: i.scriptId, contentHash: i.contentHash, defect: false, reason: '' }));
+
+  it('quality HTTP requires an explicit empty initial round when all entries are withdrawn', async () => {
+    await publicationBase();
+    const base = await publishable('zero-base');
+    const published = value(await service.publish(actor('enabler'), base.request));
+    const req = await input('withdrawn-only', null, [['faq-one', '合成标题', '合成正文', '', '', '分类', '', '停用', '', '', '', '', '', '', 'false']]);
+    req.baseReleaseId = published.releaseId;
+    const c = value(await service.parse(actor('enabler'), value(await service.receive(actor('enabler'), 'source-a', req)).jobId));
+    const host = await managementHost();
+    try {
+      const q = await qualityWire(host, c);
+      expect((await q.status()).plan).toMatchObject({ initialCount: 0, expandedCount: 0, withdrawalCount: 1 });
+      expect(await q.samples(await q.status())).toEqual([]);
+      expect((await q.post('checks', { operationId: 'before-zero-freeze', key: c.key, phase: 'initial', checks: [] })).statusCode).toBe(409);
+      expect((await q.post('freeze', { operationId: 'zero-freeze', key: c.key })).json().state).toBe('initial_required');
+      const done = await q.post('checks', { operationId: 'zero-check', key: c.key, phase: 'initial', checks: [] });
+      expect(done.statusCode, done.body).toBe(200); expect(done.json().state).toBe('passed');
+      expect((await q.status()).rounds[0]).toMatchObject({ phase: 'initial', checkedCount: 0, defectCount: 0 });
+      expect((await admin.query('SELECT jsonb_array_length(checks) AS count FROM content_intake.quality_rounds WHERE candidate_id=$1', [c.key.candidateId])).rows).toEqual([{ count: 0 }]);
+    } finally { await host.app.close(); }
+  });
+
+  it('quality HTTP strictly binds inputs, preserves text and returns compact historical receipts', async () => {
+    const host = await managementHost();
+    try {
+      const f = await httpCandidate(host, 'wire'); const q = await qualityWire(host, f.c);
+      const preview = await q.status();
+      expect(preview).toMatchObject({ state: 'not_frozen', frozen: null, rounds: [], plan: { initialCount: 3, ordinaryCount: 3 } });
+      expect(JSON.stringify(preview)).not.toMatch(/staging_id|internalNote|合成内部说明/);
+      for (const query of ['', `digest=${f.c.key.digest}&digest=${f.c.key.digest}`, `digest=${f.c.key.digest}&userId=enabler`]) expect((await q.get(query)).statusCode).toBe(400);
+      const command = { operationId: 'wire-freeze', key: f.c.key };
+      for (const bad of [{ ...command, actor: 'enabler' }, { ...command, key: { ...f.c.key, version: 2 } }]) expect((await q.post('freeze', bad)).statusCode).toBe(400);
+      expect((await q.post('freeze', command, { 'content-encoding': 'gzip' })).statusCode).toBe(400);
+      const frozen = await q.post('freeze', command); expect(frozen.statusCode, frozen.body).toBe(200);
+      const s = await q.status(); expect(s.frozen).toMatchObject({ principalId: 'enabler', factsVersion: 1 });
+      expect((await q.page(preview)).statusCode).toBe(409);
+      const items = await q.samples(s, 'initial', 2); expect(items).toHaveLength(3);
+      expect(items.map(i => i.entry.answerText)).toContain('第一行。\n第二行。');
+      expect(items.every(i => i.entry.internalNote === '合成内部说明' && i.check === null)).toBe(true);
+      const checks = wireChecks(items), req = { operationId: 'wire-check', key: f.c.key, phase: 'initial', checks };
+      for (const bad of [[], [...checks, checks[0]!], checks.map(c => ({ ...c, contentHash: 'f'.repeat(64) }))]) expect((await q.post('checks', { ...req, checks: bad })).statusCode).toBe(400);
+      for (const reason of ['\u0000', '\ud800', '🙂'.repeat(1001)]) expect((await q.post('checks', { ...req, checks: checks.map(c => ({ ...c, reason })) })).statusCode).toBe(400);
+      const accepted = { ...req, checks: checks.map(c => ({ ...c, reason: '🙂'.repeat(1000) })) };
+      const done = await q.post('checks', accepted); expect(done.statusCode, done.body).toBe(200);
+      expect(Object.keys(done.json()).sort()).toEqual(['action', 'key', 'operationId', 'phase', 'state']);
+      expect(done.json()).toMatchObject({ state: 'passed', phase: 'initial' });
+      expect((await q.post('checks', accepted)).json()).toEqual(done.json());
+      expect((await q.receipt(req.operationId)).json()).toEqual(done.json());
+      expect((await q.receipt(command.operationId, 'quality-freeze')).json()).toEqual(frozen.json());
+      expect((await q.post('checks', req)).statusCode).toBe(409);
+      expect((await q.page(s)).statusCode).toBe(409);
+      const current = await q.status(); expect(current.rounds[0]).toMatchObject({ checkedCount: 3, defectCount: 0 });
+      expect((await q.samples(current))[0]!.check?.reason).toBe('🙂'.repeat(1000));
+      expect((await admin.query('SELECT count(*) FROM content_intake.quality_rounds')).rows[0].count).toBe('1');
+    } finally { await host.app.close(); }
+  });
+
+  it('quality HTTP cursors expire across sessions, phase, limit, restart and current authorization changes', async () => {
+    const host = await managementHost(); let restarted: Awaited<ReturnType<typeof managementHost>> | undefined;
+    try {
+      const f = await httpCandidate(host, 'cursor'); const q = await qualityWire(host, f.c);
+      const s = await q.status(), first = await q.page(s); expect(first.statusCode).toBe(200);
+      const cursor = first.json<C['IntakeQualitySamplePage']>().nextCursor!; expect(cursor).toBeTruthy();
+      const other = await qualityWire(host, f.c, 'enabler', 'another');
+      for (const r of [await other.page(s, 'initial', cursor), await q.page(s, 'expanded', cursor), await q.page(s, 'initial', cursor, 3), await q.page(s, 'initial', `${cursor}x`)]) expect(r.statusCode).toBe(409);
+      const agent = await qualityWire(host, f.c, 'agent'); expect((await agent.get()).statusCode).toBe(404);
+      const b = await input('other-shop-quality', null, undefined, 'b');
+      expect(await service.receive(actor('enabler'), 'source-b', b)).toMatchObject({ ok: false, reason: 'SCOPE_DENIED' });
+      restarted = await managementHost(); const restart = await qualityWire(restarted, f.c);
+      expect((await restart.page(s, 'initial', cursor)).statusCode).toBe(409);
+      value(await service.changeGrant(actor('director'), 'business-enabler-review', { operationId: 'quality-revoke', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+      expect((await q.get()).statusCode).toBe(404); expect((await q.page(s, 'initial', cursor)).statusCode).toBe(404);
+      expect((await q.post('freeze', { operationId: 'denied-freeze', key: f.c.key })).statusCode).toBe(404);
+      await auth!.logout(q.logged.token); expect((await q.get()).statusCode).toBe(401);
+    } finally { await restarted?.app.close(); await host.app.close(); }
+  });
+
+  it('quality HTTP recovers a lost COMMIT after restart and review revocation without disclosing check reasons', async () => {
+    const c = await routine(); let lost = false;
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect(); let writes = false;
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql.includes('INSERT INTO content_intake.quality_rounds')) writes = true;
+          if (sql === 'COMMIT' && writes && !lost) { lost = true; throw new Error('synthetic quality COMMIT response lost'); }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, key); return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const host = await managementHost(store, uncertain); let second: Awaited<ReturnType<typeof managementHost>> | undefined;
+    try {
+      const q = await qualityWire(host, c); expect((await q.post('freeze', { operationId: 'uncertain-freeze', key: c.key })).statusCode).toBe(200);
+      const checks = wireChecks(await q.samples(await q.status())).map(c => ({ ...c, reason: '合成保密质量原因' }));
+      const request = { operationId: 'uncertain-check', key: c.key, phase: 'initial', checks };
+      const result = await q.post('checks', request); expect(result.statusCode, result.body).toBe(503); expect(result.json().error.details.reason).toBe('COMMIT_UNKNOWN');
+      await host.app.close(); second = await managementHost();
+      const recovered = await qualityWire(second, c);
+      value(await service.changeGrant(actor('director'), 'business-enabler-review', { operationId: 'revoke-recover', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+      expect((await recovered.get()).statusCode).toBe(404);
+      const receipt = await recovered.receipt(request.operationId); expect(receipt.statusCode, receipt.body).toBe(200);
+      expect(receipt.json()).toMatchObject({ state: 'passed', phase: 'initial' }); expect(receipt.body).not.toMatch(/checks|reason|population|合成保密/);
+      expect((await recovered.post('checks', request)).json()).toEqual(receipt.json());
+      expect((await recovered.post('checks', { ...request, operationId: 'new-after-revoke' })).statusCode).toBe(404);
+      const other = await qualityWire(second, c, 'other');
+      expect((await other.receipt(request.operationId)).statusCode).toBe(404);
+      expect((await recovered.receipt('missing')).json().error.details.reason).toBe('COMMIT_UNKNOWN');
+      expect((await recovered.receipt(request.operationId, 'publish')).statusCode).toBe(400);
+      await auth!.logout(recovered.logged.token); expect((await recovered.receipt(request.operationId)).statusCode).toBe(401);
+      expect((await admin.query('SELECT count(*) FROM content_intake.quality_rounds')).rows[0].count).toBe('1');
+      expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:quality-check'")).rows[0].count).toBe('1');
+    } finally { await second?.app.close(); await host.app.close(); }
+  });
+
+  it('quality HTTP rejects raw and PostgreSQL byte excess atomically, then accepts all 5000 critical checks', async () => {
+    const rows = Array.from({ length: 5000 }, (_, n) => [`faq-${n}`, '合成标题', '合成正文', '', '', '分类', '', '启用', '', '', '', '', '合成风险', '', 'false']);
+    const req = await input('wire-capacity', null, rows);
+    const c = value(await service.parse(actor('enabler'), value(await service.receive(actor('enabler'), 'source-a', req)).jobId));
+    const host = await managementHost();
+    try {
+      const q = await qualityWire(host, c, 'reviewer');
+      expect((await q.post('freeze', { operationId: 'capacity-freeze', key: c.key })).statusCode).toBe(200);
+      const s = await q.status(); expect(s.plan.initialCount).toBe(5000);
+      const items = await q.samples(s); expect(items).toHaveLength(5000); expect(items.every(i => i.mandatory)).toBe(true);
+      const checks = wireChecks(items), request = { operationId: 'capacity-check', key: c.key, phase: 'initial', checks };
+      const contributor = await qualityWire(host, c);
+      expect((await contributor.post('checks', request)).json().error.details.reason).toBe('HUMAN_REVIEW_REQUIRED');
+      const rawExcess = { ...request, checks: checks.map(c => ({ ...c, reason: '🙂'.repeat(1000) })) };
+      expect((await q.post('checks', rawExcess)).statusCode).toBe(413);
+      // Pick a valid code-point count whose compact HTTP body fits but whose
+      // PostgreSQL jsonb spaces push it beyond the independently owned limit.
+      const databaseExcess = { ...request, checks: checks.map(c => ({ ...c, reason: '🙂'.repeat(370) })) };
+      const httpBytes = Buffer.byteLength(JSON.stringify(databaseExcess));
+      const pgBytes = Number((await admin.query('SELECT octet_length($1::jsonb::text) AS bytes', [JSON.stringify(databaseExcess.checks)])).rows[0].bytes);
+      expect(httpBytes).toBeLessThanOrEqual(8_388_608); expect(pgBytes).toBeGreaterThan(8_388_608);
+      const over = await q.post('checks', databaseExcess); expect(over.statusCode, over.body).toBe(413); expect(over.json().error.details.reason).toBe('FILE_LIMIT');
+      expect((await admin.query('SELECT count(*) FROM content_intake.quality_rounds')).rows[0].count).toBe('0');
+      expect((await q.receipt(request.operationId)).statusCode).toBe(404);
+      const result = await q.post('checks', request); expect(result.statusCode, result.body).toBe(200); expect(result.json().state).toBe('passed');
+      console.log(JSON.stringify({ probe: 'quality-http-capacity', samples: items.length, httpBytes, pgBytes, limit: 8_388_608, rowsCommitted: 5000 }));
+    } finally { await host.app.close(); }
+  }, 60_000);
+
+  it('quality HTTP expands from immutable initial checks and rejects old keys after revision', async () => {
+    const rows = Array.from({ length: 501 }, (_, n) => [`faq-${n}`, '合成标题', '合成正文', '', '', '分类', '', '启用', '', '', '', '', '', '', 'false']);
+    const request = await input('http-expanded', null, rows);
+    const c = value(await service.parse(actor('enabler'), value(await service.receive(actor('enabler'), 'source-a', request)).jobId));
+    const host = await managementHost();
+    try {
+      const q = await qualityWire(host, c);
+      expect((await q.post('freeze', { operationId: 'expanded-freeze', key: c.key })).statusCode).toBe(200);
+      const s = await q.status(), initial = wireChecks(await q.samples(s)).map((c, i) => ({ ...c, defect: i < 3, reason: i < 3 ? '合成缺陷' : '' }));
+      expect((await q.post('checks', { operationId: 'expanded-initial', key: c.key, phase: 'initial', checks: initial })).json().state).toBe('expansion_required');
+      const next = await q.status(); expect((await q.page(s, 'expanded')).statusCode).toBe(409);
+      const expanded = wireChecks(await q.samples(next, 'expanded'));
+      expect(expanded.filter(c => c.defect)).toHaveLength(3);
+      const submit = { operationId: 'expanded-complete', key: c.key, phase: 'expanded', checks: expanded };
+      expect((await q.post('checks', { ...submit, checks: expanded.map(c => ({ ...c, defect: false, reason: '' })) })).statusCode).toBe(400);
+      expect((await q.post('checks', submit)).json()).toMatchObject({ state: 'revision_required', phase: 'expanded' });
+      expect((await q.receipt(submit.operationId)).json()).toMatchObject({ state: 'revision_required', phase: 'expanded' });
+      const revision = await input('http-quality-revision', c.key, rows);
+      value(await service.parse(actor('enabler'), value(await service.receive(actor('enabler'), 'source-a', revision)).jobId));
+      expect((await q.get()).statusCode).toBe(409);
+    } finally { await host.app.close(); }
+  }, 30_000);
 
   it('workflow HTTP publishes the uploaded material after real evidence gates and a second seat consumes that release', async () => {
     await publicationBase();
@@ -217,7 +418,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(provider.instanceCalls()).toBe(observations);
       expect((await f.post('publish', f.publish)).status).toBe(409); // ready is not quality-passed
       await noPublication();
-      await internalHttpQuality(f.c);
+      await httpQuality(host, f.c);
       const published = await f.post('publish', f.publish);
       expect(published.status, await published.clone().text()).toBe(202);
       const receipt = parseContractSchema('IntakeReceipt', await published.json());
@@ -240,7 +441,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(snapshot.faq[0]!.entry.answerText).toBe('第一行。\n第二行。');
       expect(JSON.stringify(snapshot)).not.toContain('合成内部说明');
       console.log(JSON.stringify({ probe: 'workflow-http-second-seat', source: 'uploaded-synthetic-xlsx', releaseId: receipt.releaseId,
-        faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'internal-session-required-service', approvalTransport: 'synthetic' }));
+        faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'HTTP', approvalTransport: 'synthetic' }));
     } finally { await reader.close(); await host.app.close(); }
   }, 40_000);
 
@@ -338,7 +539,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } });
     try {
       const f = await httpCandidate(host);
-      await httpReview(f); provider.approve('reviewer'); await internalHttpQuality(f.c);
+      await httpReview(f); provider.approve('reviewer'); await httpQuality(host, f.c);
       armed = true;
       const pending = f.post('publish', f.publish); await entered;
       if (change === 'logout') await auth!.logout(host.logged.token);
@@ -375,7 +576,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const host = await managementHost(store, uncertain);
     try {
       const f = await httpCandidate(host);
-      await httpReview(f); provider.approve('reviewer'); await internalHttpQuality(f.c);
+      await httpReview(f); provider.approve('reviewer'); await httpQuality(host, f.c);
       const first = await f.post('publish', f.publish);
       expect(first.status).toBe(503);
       expect(await first.json()).toMatchObject({ error: { details: { reason: 'COMMIT_UNKNOWN' } } });

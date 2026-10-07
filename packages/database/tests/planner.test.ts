@@ -26,6 +26,17 @@ function ledgerRow(index: number) {
 }
 
 describe('database migration planner', () => {
+  it('allows a complete prior catalogue only when the wire-only intake retains its exact DDL', () => {
+    expect(() => assertMigrationCatalogue(generatedMigrationCatalogue)).not.toThrow();
+    const prior = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;
+    expect(prior.migrationCount).toBe(generatedMigrationCatalogue.migrations.length);
+    for (const change of [{ sourceSchemaSha256: 'f'.repeat(64) }, { contractSetId: generatedMigrationCatalogue.contractSetId }, { migrationCount: prior.migrationCount + 1 }]) {
+      const invalid = { ...generatedMigrationCatalogue, compatibility: { ...generatedMigrationCatalogue.compatibility,
+        priorReviewedUpgrades: [...generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1), { ...prior, ...change }] } };
+      expect(() => assertMigrationCatalogue(invalid)).toThrow(/reviewed-upgrade metadata/);
+    }
+  });
+
   it('plans only the missing suffix for partial and complete ledgers', () => {
     const partial = deriveMigrationStatus([ledgerRow(0), ledgerRow(1)], generatedMigrationCatalogue);
     expect(partial.state).toBe('PARTIAL');
