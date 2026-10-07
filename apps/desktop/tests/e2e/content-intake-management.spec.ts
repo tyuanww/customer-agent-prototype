@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
 import { intakeManagementData } from '../fixtures/intake-management-data';
+import { closeOwnedElectron } from '../support/owned-electron';
 
 /** Actual Electron / preload / Main / HTTP / clipboard. The loopback service is
  * a contract wire double; actual PostgreSQL publication has separate evidence. */
@@ -82,7 +83,8 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     await dashboard.evaluate(() => window.scrollTo(0, 0));
     if (process.env.INTAKE_MANAGEMENT_SCREENSHOT) await dashboard.screenshot({ path: process.env.INTAKE_MANAGEMENT_SCREENSHOT, fullPage: true });
     await dashboard.getByRole('button', { name: '提交本轮人工检查' }).click();
-    await expect(dashboard.getByRole('status')).toContainText('质量检查通过');
+    await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })
+      .getByRole('status').filter({ hasText: /^操作回执：/ })).toContainText('质量检查通过');
     expect(wire.receipts.size).toBe(2);
     expect(requests.filter(p => p.endsWith('/quality/freeze'))).toHaveLength(1);
     expect(await dashboard.evaluate(() => ({ node: typeof (window as unknown as { require?: unknown }).require, overlay: !!window.customerAgent }))).toEqual({ node: 'undefined', overlay: false });
@@ -100,8 +102,11 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     });
     expect(confirmedClose).toEqual(['关闭后会丢失未提交的人工判断。']);
   } finally {
-    await app?.close(); api.closeAllConnections(); identity.closeAllConnections();
-    await Promise.all([new Promise<void>(r => api.close(() => r())), new Promise<void>(r => identity.close(() => r()))]);
-    rmSync(directory, { recursive: true, force: true });
+    try { if (app) await closeOwnedElectron(app); }
+    finally {
+      api.closeAllConnections(); identity.closeAllConnections();
+      await Promise.all([new Promise<void>(r => api.close(() => r())), new Promise<void>(r => identity.close(() => r()))]);
+      rmSync(directory, { recursive: true, force: true });
+    }
   }
 });
