@@ -45,9 +45,15 @@ async function scopeId(client: IntakeTransaction, scope: Scope): Promise<string>
   return rows[0].scope_id;
 }
 
-function samePerson(a: Principal, b: Principal): boolean {
+export function samePerson(a: Principal, b: Principal): boolean {
   return a.id === b.id || (a.tenantId === b.tenantId && a.appId === b.appId
     && a.identityScope === b.identityScope && a.personKey === b.personKey);
+}
+
+/** The directory and the grant transaction share this role ceiling. A directory
+ * choice is only a hint; createGrants still rechecks identity, facts and scope. */
+export function recipientRoleAllows(role: Principal['role'], kind: 'business' | 'delegation', action: C['IntakeAction']): boolean {
+  return role !== null && !(kind === 'business' && role === 'agent' && action !== 'query');
 }
 
 /** Allocation credentials are independent of business-role ceilings. A delegate
@@ -104,7 +110,7 @@ export async function createGrants(client: IntakeTransaction, issuer: Principal,
     if (issuer.tenantId !== recipient.tenantId || issuer.appId !== recipient.appId) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
     if (samePerson(issuer, recipient)) throw new IntakeRejection('SELF_ESCALATION', 'FORBIDDEN');
     if (recipient.factsVersion !== item.recipientFactsVersion) throw new IntakeRejection('PERMISSION_CHANGED');
-    if (recipient.role === null || (item.kind === 'business' && recipient.role === 'agent' && item.action !== 'query')) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
+    if (!recipientRoleAllows(recipient.role, item.kind, item.action)) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
     if (!item.reason.trim() || Date.parse(item.expiresAt) <= Math.max(Date.parse(item.startsAt), await clock(client))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     const parent = await parentAuthority(client, issuer, item.kind, item.action, item.scope, item);
     const id = `grant_${randomUUID()}`;

@@ -1,6 +1,6 @@
 # 如何验证合成资料导入
 
-本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。完整 FAQ 产品闭环仍待原生坐席读模型、真实审批 transport 与产品接线。
+本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。已有候选的合成审批发布与坐席查询已接通；新上传原生入口、真实审批 transport 及正式运行接入仍待完成。
 
 ## 运行
 
@@ -174,7 +174,17 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 未保存质量判断与工作流表单互斥；重新发起审批须明确确认；审批显示的是最近一次观察，发布时 API 仍须重新核验。退出登录或强制关闭会丢弃内存恢复信息，界面/原生关闭提示不等于服务端撤销，也不承诺跨重启恢复。冻结抽样和“质量检查通过”均不等于组织审批或发布许可。
 
-新上传不能默认空基线或从登录 userId 推断 principalId。最小管理上下文候选合同尚待逐项批准与版本化 intake；参与人目录合同已在 1.16 冻结，应实现和消费原有 `GET /v1/intake/principals`，不另建一份目录。
+新上传不能默认空基线或从登录 userId 推断 principalId。最小管理上下文候选合同尚待逐项批准与版本化 intake；参与人目录复用 1.16 已冻结的 `GET /v1/intake/principals`，本轮隔离宿主和 Main 合成探针已实现消费，不另建一份目录。
+
+### P2 已确认参与人目录
+
+现有隔离宿主已接入 `GET /v1/intake/principals?sourceId=source-a&purpose=contributor&limit=50`。contributor 要求当前来源 import；grant-recipient 要求分配资格。只返回同 tenant/app 的已登记主键、显式合成标签和事实版本/有效期/启用状态。不会从登录 userId 或显示名推断 actor，也不要求首次授权对象先有业务 grant。已禁用或事实过期的已确认贡献人仍可被声明；其旧事实不构成当前授权。
+
+每页最多扫描 limit 个身份（另加1条后续判断），排序使用 ASCII，筛选后可空页但仍有 nextCursor。调用方必须跟到 nextCursor=null，不能把空页当结束。游标绑定会话、来源、用途、limit、调用者权限及截止；变化后从第一页重读。响应上限262,144字节，标签缺失或无效整页失败，不截断或回退到账号。最终授权写入仍按 factsVersion CAS 重验。
+
+运行上文 `test:intake:transactions` 可验证完整实库矩阵；仅目录用例使用 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'principals:'`。其中根桥接器实际调用 Desktop ProductHttp/ProductSession，验证分页、取消及注销后迟到响应；普通根 test 中该外部宿主用例会跳过，不能将跳过写成通过。合成宿主引用 API 的构建产物，源码接口变化后先 `pnpm build:services` 再运行 typecheck 或宿主，避免旧 dist 类型/实现被消费。
+
+本切片没有新增 Dashboard 人员选择或上传控件。后续由完整上传流程消费该目录，仍等待最小管理上下文合同正式接收。详见[目录验收](../evidence/qa/content-intake-p2-principals/README.md)。
 
 
 ## P2 独立 API/PG 与桌面合成联调

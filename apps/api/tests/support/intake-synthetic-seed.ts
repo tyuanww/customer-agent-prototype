@@ -1,12 +1,17 @@
 import { createHash } from 'node:crypto';
 import type { Client } from 'pg';
 
+export const INTAKE_SYNTHETIC_IDENTITIES = [
+  ['director', 'director', '合成总监'], ['enabler', 'enabler', '合成整理人'],
+  ['reviewer', 'enabler', '合成复核人'], ['agent', 'agent', '合成坐席'],
+] as const;
+
 /** Explicit throwaway bootstrap. These synthetic identities and the empty
  * intake catalog are never adopted by a production factory or an existing DB. */
 export async function seedIntakeSyntheticHost(admin: Client) {
   await admin.query('BEGIN');
   try {
-    for (const [id, role] of [['director', 'director'], ['enabler', 'enabler'], ['reviewer', 'enabler'], ['agent', 'agent']]) {
+    for (const [id, role] of INTAKE_SYNTHETIC_IDENTITIES) {
       await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
         VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('a',64),true,$3)`, [id, `user-${id}`, id === 'agent' ? 'agent' : 'owner']);
       await admin.query(`INSERT INTO content_intake.principals VALUES ($1,$2,'tenant-a','app-a','confirmed-synthetic',$1,1,0)`, [id, `user-${id}`]);

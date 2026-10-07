@@ -8,6 +8,7 @@ import { CONTENT_UPLOAD_MAX_BYTES, type ContentObjectStore } from '../content-ob
 import { createContentIntakeService } from './service.js';
 import type { IntakePool } from './transaction.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
+import type { IntakePrincipalLabels } from './discovery.js';
 import { intakeFailure, intakeHttpBoundary, intakePageQuery, sendIntake } from './http-boundary.js';
 
 const MAX_PENDING_PARSE = 10;
@@ -37,10 +38,19 @@ function candidateCommand(request: FastifyRequest): boolean {
 export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   auth: ProductAuthService; pool: IntakePool; store: ContentObjectStore;
   approval?: ApprovalAdapter;
+  principalLabels?: IntakePrincipalLabels;
   report?: (diagnosticId: string, error: unknown) => void;
-}> = async (app, { auth, pool, store, approval, report }) => {
+}> = async (app, { auth, pool, store, approval, principalLabels, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
-  const service = createContentIntakeService(pool, store, report, approval, { requireProductSession: true });
+  const service = createContentIntakeService(pool, store, report, approval,
+    { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}) });
+  app.get('/v1/intake/principals', { exposeHeadRoute: false }, async (request, reply) => {
+    if (request.body !== undefined || request.headers['transfer-encoding'] !== undefined
+      || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) {
+      return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    }
+    return sendIntake(reply, await service.principals(actor(request), intakePageQuery(request)), 'IntakePrincipalPage');
+  });
   app.get('/v1/intake/candidates', { exposeHeadRoute: false }, async (request, reply) =>
     sendIntake(reply, await service.candidates(actor(request), intakePageQuery(request)), 'IntakeCandidateList'));
   const stopping = new AbortController();

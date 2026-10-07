@@ -20,7 +20,7 @@ import { contentIntakeManagementRoutes } from '../../dist/content-intake/managem
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 import { IntakeRejection } from '../../dist/content-intake/transaction.js';
 import { createApprovalAdapter, reviewForm, type ApprovalTransport, type ReviewBinding } from '../../dist/content-intake/approval-adapter.js';
-import { seedIntakeSyntheticHost } from './intake-synthetic-seed.ts';
+import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-synthetic-seed.ts';
 
 type C = components['schemas'];
 export type IntakeSyntheticIdentity = 'enabler' | 'reviewer' | 'agent';
@@ -150,7 +150,9 @@ export async function createIntakeSyntheticHost() {
     const approval = createApprovalAdapter({ tenantId: 'tenant-a', appId: 'app-a', definitionId: 'synthetic-definition', nodeId: 'manual-node' }, transport);
     const usage = createContentIntakeService(pool, store, report, approval, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
-    await app.register(contentIntakeManagementRoutes, { auth, pool, store, approval, report });
+    await app.register(contentIntakeManagementRoutes, { auth, pool, store, approval, report,
+      principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
+        ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2] ?? null : null });
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
     const workbook = await createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' },
       INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, faq.answer, '', '', '合成分类', '', '启用', '', '', '', '合成内部说明', '', '', 'false']));

@@ -16,6 +16,7 @@ import { createContentIntakeService } from '../src/content-intake/service.js';
 import { contentIntakeUsageRoutes } from '../src/content-intake/usage-http.js';
 import { contentIntakeManagementRoutes } from '../src/content-intake/management-http.js';
 import type { IntakePool, IntakeResult } from '../src/content-intake/transaction.js';
+import type { IntakePrincipalLabels } from '../src/content-intake/discovery.js';
 import { authenticateRequestHeaders, type AuthenticatedUser, type ProductAuthService } from '../src/auth-service.js';
 import { createProductAuthService, authenticatedProductSession } from '../src/product-auth-service.js';
 import type { ApiDatabaseBootstrapConfig } from '../src/runtime-config.js';
@@ -62,10 +63,13 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const value={actor:user!,token:session!.access_token,expiresAt:session!.expires_at};seats.set(key,value);return value;
   }
   const diagnostics: unknown[] = [];
+  const principalLabels = new Map<string, string>();
+  const label: IntakePrincipalLabels = ({ principalId, tenantId, appId }) =>
+    tenantId === 'tenant-a' && appId === 'app-a' ? principalLabels.get(principalId) ?? null : null;
   let provider: ReturnType<typeof syntheticApproval>;
   const route = { tenantId:'tenant-a',appId:'app-a',definitionId:'synthetic-definition',nodeId:'manual-node' };
   function evidenceService(transport: ApprovalTransport = provider.transport) {
-    return createContentIntakeService(pool,store,(_id,error) => diagnostics.push(error),createApprovalAdapter(route,transport));
+    return createContentIntakeService(pool,store,(_id,error) => diagnostics.push(error),createApprovalAdapter(route,transport), { principalLabels: label });
   }
 
   beforeEach(async () => {
@@ -83,7 +87,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     service = evidenceService();
     diagnostics.length = 0;
     await admin.query('BEGIN');
-    for (const [id, role] of [['director','director'], ['manager','manager'], ['supervisor','supervisor'], ['enabler','enabler'], ['other','enabler'], ['reviewer','enabler'], ['agent','agent']] as const) {
+    principalLabels.clear();
+    for (const [id, role, display] of [['director','director','合成总监'], ['manager','manager','合成经理'], ['supervisor','supervisor','合成主管'],
+      ['enabler','enabler','合成整理人'], ['other','enabler','合成其他贡献人'], ['reviewer','enabler','合成复核人'], ['agent','agent','合成坐席']] as const) {
+      principalLabels.set(id, display);
       await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
         VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('a',64),true,'owner')`, [id, `user-${id}`]);
       await admin.query(`INSERT INTO content_intake.principals VALUES ($1,$2,'tenant-a','app-a','confirmed-synthetic',$1,1,0)`, [id, `user-${id}`]);
@@ -125,14 +132,20 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     return { operationId: op, objectId: obj.objectId, sourceVersion: 1, baseReleaseId: null,
       contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior };
   }
-  async function managementHost(customStore = store, hostPool: IntakePool = pool, transport: ApprovalTransport | null = provider.transport) {
+  async function managementHost(customStore = store, hostPool: IntakePool = pool, transport: ApprovalTransport | null = provider.transport,
+    labels: IntakePrincipalLabels = label) {
     const logged = await seat('enabler');
     const app = Fastify();
     app.get('/v1/auth/me', async (request, reply) => (await authenticateRequestHeaders(auth!, request.headers)) ?? reply.code(401).send());
+    app.post('/v1/auth/logout', async (request, reply) => {
+      const header = request.headers.authorization;
+      if (header?.startsWith('Bearer ')) await auth!.logout(header.slice(7));
+      return reply.code(204).send();
+    });
     await app.register(contentIntakeUsageRoutes, { auth: auth!, usage: service });
     await app.register(contentIntakeManagementRoutes, { auth: auth!, pool: hostPool, store: customStore,
       ...(transport ? { approval: createApprovalAdapter(route, transport) } : {}),
-      report: (_id, error) => diagnostics.push(error) });
+      principalLabels: labels, report: (_id, error) => diagnostics.push(error) });
     const origin = await app.listen({ host: '127.0.0.1', port: 0 });
     const headers = { authorization: `Bearer ${logged.token}` };
     async function upload(bytes: Buffer, operationId = 'http-upload', sourceId = 'source-a') {
@@ -988,6 +1001,215 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       value(await service.grantBatch(actor('director'),req));
     }
   }
+
+  async function registerDirectoryIdentity(id: string, options: { tenant?: string; app?: string; enabled?: boolean; role?: string; display?: string } = {}) {
+    const tenant = options.tenant ?? 'tenant-a', app = options.app ?? 'app-a';
+    const userId = `directory-${digest(id).slice(0, 32)}`;
+    await admin.query('BEGIN');
+    try {
+      await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+        VALUES ($1,'synthetic',$2,$1,$3,repeat('a',64),true,'agent')`, [id, tenant, userId]);
+      await admin.query(`INSERT INTO content_intake.principals VALUES ($1,$2,$3,$4,'confirmed-synthetic',$1,1,0)`, [id, userId, tenant, app]);
+      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ($1,1,ARRAY['dept-a'],$2,$3,
+        statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`, [id, `job-${options.role ?? 'enabler'}`, options.enabled ?? true]);
+      await admin.query('COMMIT');
+    } catch (error) { await admin.query('ROLLBACK'); throw error; }
+    principalLabels.set(id, options.display ?? '合成已登记参与人');
+  }
+  const directoryQuery = { sourceId: 'source-a', purpose: 'contributor' };
+
+  it('principals: HTTP only exposes scoped confirmed identities, including disabled or ungranted contributors, with no write side effects', async () => {
+    await registerDirectoryIdentity('external-app', { app: 'app-b' });
+    await registerDirectoryIdentity('external-tenant', { tenant: 'tenant-b' });
+    await admin.query("UPDATE backend_identity.subject_bindings SET enabled=false WHERE user_id='user-reviewer'");
+    const host = await managementHost();
+    const tables = ['content_intake.entitlements', 'content_intake.entitlement_contexts', 'content_intake.grants',
+      'content_intake.principals', 'backend_review.receipts', 'public.content_current', 'public.snapshot_offline_leases', 'public.client_sync_state'];
+    const snapshot = async () => {
+      const rows = [];
+      // One pg Client owns this snapshot; queue queries sequentially rather than
+      // relying on the driver's deprecated implicit concurrent-query queue.
+      for (const table of tables) rows.push((await admin.query(`SELECT to_jsonb(t) AS value FROM ${table} t ORDER BY to_jsonb(t)::text`)).rows);
+      return rows;
+    };
+    try {
+      const before = await snapshot();
+      const response = await fetch(`${host.origin}/v1/intake/principals?${new URLSearchParams(directoryQuery)}`, { headers: host.headers });
+      expect(response.status).toBe(200); expect(response.headers.get('cache-control')).toBe('no-store');
+      const page = parseContractSchema('IntakePrincipalPage', await response.json());
+      expect(page.items.map(item => item.principalId)).toEqual(['agent', 'director', 'enabler', 'manager', 'other', 'reviewer', 'supervisor']);
+      expect(page.items.find(item => item.principalId === 'reviewer')).toMatchObject({ enabled: false, displayLabel: '合成复核人' });
+      expect(page.items.find(item => item.principalId === 'manager')).toMatchObject({ factsVersion: 1 });
+      expect(page.items.every(item => Object.keys(item).sort().join(',') === 'displayLabel,enabled,factsVersion,principalId,validUntil')).toBe(true);
+      expect(await snapshot()).toEqual(before);
+      for (const sourceId of ['source-b', 'missing']) {
+        const denied = await host.app.inject({ url: `/v1/intake/principals?sourceId=${sourceId}&purpose=contributor`, headers: host.headers });
+        expect(denied.statusCode).toBe(404); expect(parseContractSchema('IntakeError', denied.json()).error.details.reason).toBe('SCOPE_DENIED');
+      }
+      const ordinary = await seat('agent');
+      expect((await host.app.inject({ url: '/v1/intake/principals?sourceId=source-a&purpose=contributor', headers: { authorization: `Bearer ${ordinary.token}` } })).statusCode).toBe(404);
+      expect((await host.app.inject({ url: '/v1/intake/principals?sourceId=source-a&purpose=contributor' })).statusCode).toBe(401);
+      expect(await service.principals(actor('enabler'), directoryQuery)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+      expect(await service.principals({ ...(await seat('enabler')).actor }, directoryQuery)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+    } finally { await host.app.close(); }
+  });
+
+  it('principals: grant recipients include first-time targets, exclude stale/ineligible/self identities and advance an empty filtered page', async () => {
+    await registerDirectoryIdentity('A-disabled', { enabled: false });
+    await registerDirectoryIdentity('B-unmapped', { role: 'unmapped' });
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',2,ARRAY['dept-a'],'job-enabler',true,
+      clock_timestamp()-interval '2 minutes',clock_timestamp()-interval '1 minute',repeat('b',64));
+      UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='reviewer'`);
+    const logged = await seat('director'), query = { sourceId: 'source-a', purpose: 'grant-recipient', limit: 1 };
+    const first = value(await service.principals(logged.actor, query));
+    expect(first.items).toEqual([]); expect(first.nextCursor).toEqual(expect.any(String));
+    const second = value(await service.principals(logged.actor, { ...query, cursor: first.nextCursor }));
+    expect(second.items).toEqual([]); expect(second.nextCursor).not.toBe(first.nextCursor);
+    const all = value(await service.principals(logged.actor, { ...query, limit: 100 }));
+    expect(all.items.map(item => item.principalId)).toEqual(['agent', 'enabler', 'manager', 'other', 'supervisor']);
+    expect(value(await service.principals((await seat('enabler')).actor, directoryQuery)).items.find(item => item.principalId === 'reviewer')?.validUntil).toBeDefined();
+    expect(await service.principals((await seat('enabler')).actor, query)).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    // Choice does not create a grant; the existing transaction accepts a fresh
+    // first-time manager using its returned factsVersion, then CAS rejects stale.
+    const recipient = all.items.find(item => item.principalId === 'manager')!;
+    const request = batch(recipient.principalId, 'import'); request.items[0]!.recipientFactsVersion = recipient.factsVersion;
+    expect(value(await service.grantBatch(logged.actor, request)).items).toHaveLength(1);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('manager',2,ARRAY['dept-a'],'job-manager',true,
+      clock_timestamp(),clock_timestamp()+interval '1 minute',repeat('b',64));
+      UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='manager'`);
+    expect(await service.grantBatch(logged.actor, { ...request, operationId: 'stale-directory-selection' })).toMatchObject({ ok: false, reason: 'PERMISSION_CHANGED' });
+  });
+
+  it('principals: strict HTTP queries reject unknowns, duplicates, noncanonical limits, body and oversize cursor', async () => {
+    const host = await managementHost();
+    try {
+      for (const query of ['sourceId=source-a', 'purpose=contributor', 'sourceId=source-a&sourceId=source-b&purpose=contributor',
+        'sourceId=source-a&purpose=contributor&purpose=grant-recipient', 'sourceId=source-a&purpose=contributor&actor=enabler',
+        ...['0', '101', '1e2', '01', '1.0', ''].map(limit => `sourceId=source-a&purpose=contributor&limit=${limit}`),
+        'sourceId=source-a&purpose=other', 'sourceId=source-a&purpose=contributor&limit=1&limit=2',
+        'sourceId=source-a&purpose=contributor&cursor=', `sourceId=source-a&purpose=contributor&cursor=${'a'.repeat(513)}`]) {
+        const response = await host.app.inject({ url: `/v1/intake/principals?${query}`, headers: host.headers });
+        expect(response.statusCode, query).toBe(400); parseContractSchema('IntakeError', response.json());
+      }
+      const body = await host.app.inject({ method: 'GET', url: '/v1/intake/principals?sourceId=source-a&purpose=contributor',
+        headers: { ...host.headers, 'content-type': 'application/json' }, payload: '{}' });
+      expect(body.statusCode).toBe(400);
+      expect((await host.app.inject({ method: 'HEAD', url: '/v1/intake/principals', headers: host.headers })).statusCode).toBe(404);
+    } finally { await host.app.close(); }
+  });
+
+  it('principals: 100 maximum Unicode labels survive standard HTTP JSON, keyset scans are bounded and use ASCII order', async () => {
+    for (let i = 0; i < 101; i++) await registerDirectoryIdentity(`A${String(i).padStart(3, '0')}${'x'.repeat(124)}`, { display: '😀'.repeat(256) });
+    const scans: { limit: number; count: number }[] = [];
+    let identityQueries = 0;
+    const observed: IntakePool = { connect: async () => {
+      const client = await pool.connect();
+      return { query: async (sql: string, parameters?: unknown[]) => {
+        const result = await client.query(sql, parameters);
+        if (sql.includes('WITH registered AS MATERIALIZED')) scans.push({ limit: Number(parameters?.[3]), count: result.rowCount ?? 0 });
+        if (sql.includes('JOIN content_intake.principal_facts')) identityQueries++;
+        return result;
+      }, release: (broken?: boolean) => client.release(broken) } as PoolClient;
+    } };
+    const host = await managementHost(store, observed);
+    try {
+      const response = await fetch(`${host.origin}/v1/intake/principals?${new URLSearchParams({ ...directoryQuery, limit: '100' })}`, { headers: host.headers });
+      expect(response.status).toBe(200);
+      const text = await response.text(), page = parseContractSchema('IntakePrincipalPage', JSON.parse(text));
+      expect(page.items).toHaveLength(100); expect(page.items.every(item => item.displayLabel === '😀'.repeat(256))).toBe(true);
+      expect(Buffer.byteLength(text)).toBeLessThanOrEqual(262_144); expect(page.nextCursor!.length).toBeLessThanOrEqual(512);
+      expect(scans).toEqual([{ limit: 101, count: 101 }]); expect(identityQueries).toBe(3); // actor, bulk page, final actor
+      const next = await fetch(`${host.origin}/v1/intake/principals?${new URLSearchParams({ ...directoryQuery, limit: '100', cursor: page.nextCursor! })}`, { headers: host.headers });
+      const second = parseContractSchema('IntakePrincipalPage', await next.json());
+      expect(second.items).toHaveLength(8); expect(second.nextCursor).toBeNull();
+      const ids = [...page.items, ...second.items].map(item => item.principalId);
+      expect(new Set(ids).size).toBe(108); expect(ids).toEqual([...ids].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))));
+      console.log(JSON.stringify({ probe: 'principals-capacity', items: ids.length, firstPageBytes: Buffer.byteLength(text), cursorLength: page.nextCursor!.length, scans }));
+    } finally { await host.app.close(); }
+  }, 60_000);
+
+  it('principals: cursors bind session, source, purpose, limit, authority and service lifetime', async () => {
+    const logged = await seat('enabler'), query = { ...directoryQuery, limit: 1 };
+    const first = value(await service.principals(logged.actor, query)), cursor = first.nextCursor!;
+    for (const changed of [{ limit: 2 }, { sourceId: 'source-b' }, { purpose: 'grant-recipient' }]) {
+      expect(await service.principals(logged.actor, { ...query, cursor, ...changed })).toMatchObject({ ok: false });
+    }
+    expect(await service.principals((await seat('enabler', 'second')).actor, { ...query, cursor })).toMatchObject({ ok: false });
+    expect(await evidenceService().principals(logged.actor, { ...query, cursor })).toMatchObject({ ok: false });
+    const parts = cursor.split('.'); parts[0] = (parts[0]![0] === 'a' ? 'b' : 'a') + parts[0]!.slice(1);
+    expect(await service.principals(logged.actor, { ...query, cursor: parts.join('.') })).toMatchObject({ ok: false });
+    value(await service.changeGrant(actor('director'), 'business-enabler-review', { operationId: 'directory-change', expectedVersion: 1,
+      change: 'revoke', reason: '合成权限版本变更', stewardPrincipalId: null }));
+    expect(await service.principals(logged.actor, { ...query, cursor })).toMatchObject({ ok: false, reason: 'PERMISSION_CHANGED' });
+    const refreshed = value(await service.principals(logged.actor, query));
+    value(await service.changeGrant(actor('director'), 'business-enabler-import', { operationId: 'directory-revoke', expectedVersion: 1,
+      change: 'revoke', reason: '合成来源撤权', stewardPrincipalId: null }));
+    expect(await service.principals(logged.actor, { ...query, cursor: refreshed.nextCursor })).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    await auth!.logout(logged.token);
+    expect(await service.principals(logged.actor, query)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+  });
+
+  it('principals: missing, unavailable and invalid labels fail the whole page without guessing or disclosing label content', async () => {
+    const logged = await seat('enabler');
+    expect(await createContentIntakeService(pool, store).principals(logged.actor, directoryQuery)).toMatchObject({ ok: false, reason: 'ORG_FACTS_UNAVAILABLE' });
+    for (const supplied of [() => null, () => '', () => 'x'.repeat(257)]) {
+      const host = await managementHost(store, pool, provider.transport, supplied);
+      try {
+        const response = await host.app.inject({ url: '/v1/intake/principals?sourceId=source-a&purpose=contributor', headers: host.headers });
+        expect(response.statusCode).toBe(503); expect(parseContractSchema('IntakeError', response.json()).error.details.reason).toBe('ORG_FACTS_UNAVAILABLE');
+        expect(response.body).not.toContain('items'); expect(response.body).not.toContain('x'.repeat(257));
+      } finally { await host.app.close(); }
+    }
+  });
+
+  it.each(['session', 'grant', 'facts'] as const)('principals: slow bulk read cannot outlive the original %s deadline', async kind => {
+    const logged = await seat('enabler');
+    if (kind === 'session') await admin.query("UPDATE backend_identity.sessions SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE token_hash=$1", [authenticatedProductSession(logged.actor)]);
+    if (kind === 'grant') {
+      value(await service.changeGrant(actor('director'), 'business-enabler-import', { operationId: 'short-directory-grant', expectedVersion: 1,
+        change: 'revoke', reason: '合成短期授权替代', stewardPrincipalId: null }));
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+        VALUES ('short-directory-import','business','director','enabler','tenant-a','app-a','scope-a','source-a','import',
+        clock_timestamp()-interval '1 second',clock_timestamp()+interval '250 milliseconds','合成短期导入权','director','root-import')`);
+    }
+    if (kind === 'facts') await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-enabler',true,
+      clock_timestamp(),clock_timestamp()+interval '250 milliseconds',repeat('b',64)); UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='enabler'`);
+    let delayed = false;
+    const slow: IntakePool = { connect: async () => {
+      const client = await pool.connect();
+      return { query: async (sql: string, parameters?: unknown[]) => {
+        const result = await client.query(sql, parameters);
+        if (sql.includes('WITH registered AS MATERIALIZED')) { delayed = true; await new Promise(resolve => setTimeout(resolve, 300)); }
+        return result;
+      }, release: (broken?: boolean) => client.release(broken) } as PoolClient;
+    } };
+    const reading = createContentIntakeService(slow, store, undefined, undefined, { principalLabels: label });
+    expect(await reading.principals(logged.actor, directoryQuery)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    expect(delayed).toBe(true);
+  });
+
+  it('principals: actual Main ProductHttp/ProductSession consumes every page and discards cancelled or logged-out responses', async () => {
+    const host = await managementHost(), logged = await seat('enabler');
+    let child: ReturnType<typeof spawn> | undefined, ended: Promise<unknown[]> | undefined, timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      child = spawn(process.execPath, [fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs', import.meta.url))], { stdio: ['pipe', 'pipe', 'pipe'] });
+      ended = once(child, 'close'); let stdout = '', stderr = '';
+      child.stdout!.on('data', chunk => { stdout += String(chunk); }); child.stderr!.on('data', chunk => { stderr += String(chunk); });
+      timeout = setTimeout(() => child?.kill('SIGTERM'), 45_000);
+      child.stdin!.end(JSON.stringify({ origin: host.origin, token: logged.token, expiresAt: logged.expiresAt, releaseId: 'not-used-by-principals', principals: true }));
+      expect((await ended)[0], stderr).toBe(0);
+      expect(JSON.parse(stdout)).toEqual({ status: 'PASS', actualSession: true, principals: true, pagination: true, cancellation: true, logoutLateResponse: true });
+      expect(stdout + stderr).not.toContain(logged.token);
+    } finally {
+      clearTimeout(timeout);
+      if (child && ended) {
+        const kill = setTimeout(() => child?.kill('SIGKILL'), 2_000);
+        if (child.exitCode === null) child.kill('SIGTERM');
+        try { await ended; } finally { clearTimeout(kill); }
+      }
+      await host.app.close();
+    }
+  }, 60_000);
 
   it('candidate discovery: session and scope bound keyset paging with live state filters', async () => {
     const one = await candidate('menu-one'), two = await candidate('menu-two');

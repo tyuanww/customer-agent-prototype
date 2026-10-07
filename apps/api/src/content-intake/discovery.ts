@@ -1,15 +1,19 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
-import { allocationKinds } from './authority.js';
+import { allocationKinds, recipientRoleAllows, samePerson } from './authority.js';
 import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
-import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, type IntakeTransaction, type Principal } from './transaction.js';
+import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, registeredPrincipalPage, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
 type Capability = C['IntakeAuthorization']['capabilities'][number];
 type Kind = 'authorization' | 'sources';
 type Page = { limit: number; cursor?: string };
+/** Already-authorized identity projection, synchronous and without remote I/O.
+ * The synthetic host supplies explicitly registered labels. Missing labels fail
+ * the whole page; never derive names from user/provider IDs or create a new store. */
+export type IntakePrincipalLabels = (identity: Readonly<{ principalId: string; tenantId: string; appId: string }>) => string | null;
 // Discovery is a bounded menu, never a grant or a cached authorization decision.
 const MAX_SOURCES = 5_000;
 function page(raw: unknown): Page {
@@ -87,7 +91,7 @@ async function discover(client: IntakeTransaction, who: Principal, sessionUntil:
  * its signed cursor; callers restart at page one instead of merging revisions.
  * The process-local signing key deliberately expires cursors on service restart.
  */
-export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransactions>) {
+export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransactions>, labels?: IntakePrincipalLabels) {
   const secret = randomBytes(32);
   const signature = (body: string, sessionHash: string) => createHmac('sha256', secret).update(`${sessionHash}\0${body}`).digest();
   async function read<S extends 'IntakeAuthorization' | 'IntakeSourceList'>(actor: AuthenticatedUser, raw: unknown, kind: Kind, schema: S) {
@@ -121,6 +125,69 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
     }, value => parseContractSchema(schema, value));
   }
   return {
+    /** Bounded registered-identity scan. Targets need no existing business grant;
+     * contributors may be disabled, while grant recipients must be eligible now.
+     * Filtered empty pages still advance. No snapshot, grant, lease or write. */
+    principals(actor: AuthenticatedUser, raw: unknown) {
+      return run(actor, 'discover-principals', null, null, async (client, who) => {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        const { sourceId, purpose, ...paging } = raw as Record<string, unknown>;
+        const id = parseContractSchema('IntakeId', sourceId), request = page(paging);
+        if (purpose !== 'contributor' && purpose !== 'grant-recipient') throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        const session = await lockProductSession(client, actor), access = await discover(client, who, session.validUntil);
+        const capability = access.capabilities.find(c => c.scope.sourceId === id);
+        if (!capability || (purpose === 'contributor' ? !capability.actions.includes('import') : !capability.mayAllocate.length)) {
+          throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+        }
+        const binding = digest(canonical([access.revision, who.id, who.tenantId, who.appId, id, purpose, request.limit]));
+        let after = '', until = Date.parse(access.meta.validUntil);
+        if (request.cursor) {
+          const parts = request.cursor.split('.');
+          if (parts.length !== 2 || !parts.every(s => /^[A-Za-z0-9_-]+$/.test(s))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+          const mac = Buffer.from(parts[1]!, 'base64url'), expected = signature(parts[0]!, session.hash);
+          if (mac.length !== expected.length || !timingSafeEqual(mac, expected)) throw new IntakeRejection('PERMISSION_CHANGED');
+          let tuple: unknown;
+          try { tuple = JSON.parse(Buffer.from(parts[0]!, 'base64url').toString()); } catch { throw new IntakeRejection('FILE_INVALID', 'VALIDATION'); }
+          if (!Array.isArray(tuple) || tuple.length !== 4 || tuple[0] !== binding || typeof tuple[1] !== 'string'
+            || typeof tuple[2] !== 'number' || !Number.isFinite(tuple[2]) || tuple[3] !== 'principals' || await clock(client) >= tuple[2]) {
+            throw new IntakeRejection('PERMISSION_CHANGED');
+          }
+          after = parseContractSchema('IntakeId', tuple[1]); until = Math.min(until, tuple[2]);
+        }
+        client.validUntil(until);
+        // Scan registered identities first, before eligibility filtering. Limiting
+        // after filtering would make sparse directories an unbounded scan.
+        const rows = await registeredPrincipalPage(client, who, after, request.limit);
+        const scanned = rows.slice(0, request.limit), items: C['IntakePrincipalPage']['items'] = [];
+        const now = await clock(client);
+        for (const target of scanned) {
+          if (purpose === 'grant-recipient') {
+            try { requireFresh(target, now); }
+            catch (error) {
+              if (error instanceof IntakeRejection && error.reason === 'ORG_FACTS_UNAVAILABLE') continue;
+              throw error;
+            }
+            if (samePerson(who, target) || !(capability.mayAllocate.some(action => recipientRoleAllows(target.role, 'business', action))
+              || capability.mayDelegate.some(action => recipientRoleAllows(target.role, 'delegation', action)))) continue;
+            client.validUntil(target.validUntil);
+          }
+          const displayLabel = labels?.({ principalId: target.id, tenantId: target.tenantId, appId: target.appId });
+          if (typeof displayLabel !== 'string' || !displayLabel.trim() || [...displayLabel].length > 256) {
+            throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'OVERLOADED');
+          }
+          items.push({ principalId: target.id, displayLabel, factsVersion: target.factsVersion,
+            validUntil: new Date(target.validUntil).toISOString(), enabled: target.enabled });
+        }
+        let nextCursor: string | null = null;
+        if (rows.length > request.limit) {
+          const body = Buffer.from(JSON.stringify([binding, scanned.at(-1)!.id, until, 'principals'])).toString('base64url');
+          nextCursor = `${body}.${signature(body, session.hash).toString('base64url')}`;
+        }
+        const result = parseContractSchema('IntakePrincipalPage', { items, nextCursor });
+        if (Buffer.byteLength(JSON.stringify(result)) > 262_144) throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
+        return result;
+      }, value => parseContractSchema('IntakePrincipalPage', value));
+    },
     /** Recovery menu, not a point-in-time snapshot. Scan at most limit versions
      * per page and project readiness through the command owner's predicate.
      * A state-filtered page may be empty with a next cursor. Every page rechecks

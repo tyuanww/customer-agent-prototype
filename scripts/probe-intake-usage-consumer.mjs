@@ -21,6 +21,9 @@ assert.ok(Number.isFinite(Date.parse(context.expiresAt)));
 const capacity = context.discoverySources === 5000;
 assert.ok(context.discoverySources === undefined || capacity);
 const quality = context.qualityKey !== undefined;
+const principals = context.principals === true;
+assert.ok(context.principals === undefined || principals);
+assert.ok(!principals || (!quality && !capacity));
 if (quality) {
   assert.equal(capacity, false);
   assert.match(context.qualityKey.candidateId, /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
@@ -30,8 +33,16 @@ if (quality) {
 const desktop = fileURLToPath(new URL('../apps/desktop/', import.meta.url));
 const require = createRequire(join(desktop, 'package.json'));
 const cli = join(dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
-const testFile = quality ? 'tests/unit/content-intake-quality-http.test.ts' : 'tests/unit/content-intake-usage-http.test.ts';
-const child = spawn(process.execPath, [cli, 'run', '--pool=threads', testFile], {
+let probe = { file: 'tests/unit/content-intake-usage-http.test.ts', marker: 'INTAKE_USAGE_HTTP_PASS',
+  result: { status: 'PASS', actualSession: true, discovery: true, largePage: true, cancellation: true,
+    publishedText: true, localExpiry: true, normalUpdate: true, revocationFanout: true } };
+if (principals) probe = { file: 'tests/unit/content-intake-principals-http.test.ts', marker: 'INTAKE_PRINCIPALS_HTTP_PASS',
+  result: { status: 'PASS', actualSession: true, principals: true, pagination: true, cancellation: true, logoutLateResponse: true } };
+else if (quality) probe = { file: 'tests/unit/content-intake-quality-http.test.ts', marker: 'INTAKE_QUALITY_HTTP_PASS',
+  result: { status: 'PASS', actualSession: true, quality: true, unknownCommitRecovery: true } };
+else if (capacity) probe = { file: 'tests/unit/content-intake-usage-http.test.ts', marker: 'INTAKE_DISCOVERY_CAPACITY_PASS',
+  result: { status: 'PASS', actualSession: true, discovery: true, sourceCount: context.discoverySources } };
+const child = spawn(process.execPath, [cli, 'run', '--pool=threads', probe.file], {
   cwd: desktop, stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, CUSTOMER_AGENT_INTAKE_HTTP_PROBE: input },
 });
@@ -47,17 +58,12 @@ process.once('SIGTERM', stop); process.once('SIGINT', stop);
 const deadline = setTimeout(stop, capacity ? 110_000 : 40_000);
 try {
   const [code] = await once(child, 'close');
-  const marker = quality ? 'INTAKE_QUALITY_HTTP_PASS' : capacity ? 'INTAKE_DISCOVERY_CAPACITY_PASS' : 'INTAKE_USAGE_HTTP_PASS';
-  if (code !== 0 || overflow || !output.includes(marker)) {
+  if (code !== 0 || overflow || !output.includes(probe.marker)) {
     // Fixture diagnostics only, but defensively strip its token before printing.
     process.stderr.write(output.replaceAll(context.token, '[credential]'));
     throw new Error('INTAKE_USAGE_HTTP_PROBE_FAILED');
   }
-  console.log(JSON.stringify(quality ? { status: 'PASS', actualSession: true, quality: true, unknownCommitRecovery: true }
-    : capacity
-    ? { status: 'PASS', actualSession: true, discovery: true, sourceCount: context.discoverySources }
-    : { status: 'PASS', actualSession: true, discovery: true, largePage: true, cancellation: true,
-      publishedText: true, localExpiry: true, normalUpdate: true, revocationFanout: true }));
+  console.log(JSON.stringify(probe.result));
 } finally {
   clearTimeout(deadline); process.off('SIGTERM', stop); process.off('SIGINT', stop);
   if (child.exitCode === null) child.kill('SIGKILL');
