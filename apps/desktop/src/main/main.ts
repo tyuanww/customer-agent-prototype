@@ -253,14 +253,16 @@ if (!gotLock) {
     disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl);
+    // The shared Fox still reads unread in FAQ mode. A null service supplies the
+    // existing unavailable projection without creating legacy I/O or missing IPC.
+    registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
+      () => controller?.dashboardWebContents() ?? null);
     // The FAQ profile has no legacy hydrate, remote model, catalog or admin adapter.
     if (!productProfile?.contentIntake) {
       registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
         contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
         identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
-      registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
-        contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
-        () => controller?.dashboardWebContents() ?? null);
       registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
         contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
       registerDashboardWordingIpc(

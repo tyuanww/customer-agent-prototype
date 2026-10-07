@@ -45,13 +45,15 @@ it('returns an explicit empty selection when the subject has no scope',async()=>
 it.each(['permission-change','scope-mismatch','missing-source','duplicate-source','cyclic-cursor','expired'])(
   'rejects %s without returning a partial menu',async failure=>{
     const f=fixture();let authReads=0;
+    // Both reads represent the same expired authority, not a changed deadline.
+    const expiredUntil=new Date(Date.now()-10_000).toISOString();
     vi.mocked(f.session.request).mockImplementation(async(...args)=>{
       const result=f.respond(...args);const isAuth=args[1].includes('/authorization?');
       if(isAuth) {
         authReads++;
         const page=result.value as C['IntakeAuthorization'];
         if(failure==='permission-change'&&authReads===2)page.revocationGeneration++;
-        if(failure==='expired') { page.validUntil=new Date(Date.now()-10_000).toISOString(); page.capabilities[0].validUntil=page.validUntil; }
+        if(failure==='expired') { page.validUntil=expiredUntil; page.capabilities[0].validUntil=page.validUntil; }
       } else {
         const page=result.value as C['IntakeSourceList'];
         if(failure==='scope-mismatch')page.items[0]={...page.items[0],scope:{...page.items[0].scope,shopId:'other-shop'}};

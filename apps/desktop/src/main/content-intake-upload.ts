@@ -35,6 +35,7 @@ export class ContentIntakeUpload {
   private active: AbortController | null = null;
   private sources = new Map<string, string>();
   private sourceId: string | null = null;
+  private priorKey: C['IntakeCandidateKey'] | null = null;
   private file: Workbook | null = null;
   private context: C['IntakeManagementContext'] | null = null;
   private principals: Principal[] = [];
@@ -69,12 +70,20 @@ export class ContentIntakeUpload {
   }
   invalidate(reset: boolean) {
     this.active?.abort(); this.active = null;
-    if (reset) { this.clearDraft(); this.sources.clear(); this.sourceId = null; this.phase = 'idle'; }
+    if (reset) { this.clearDraft(); this.priorKey = null; this.sources.clear(); this.sourceId = null; this.phase = 'idle'; }
     else this.phase = this.pending ? 'unknown' : this.phase;
   }
   closeRisk(): 'pending' | 'editing' | null {
     if (this.active || this.pending || parsing(this.job)) return 'pending';
-    return this.file && this.job?.state !== 'validated' ? 'editing' : null;
+    return (this.file || this.priorKey) && this.job?.state !== 'validated' ? 'editing' : null;
+  }
+  /** Main-only transition: bind an explicitly selected immutable key before file
+   * selection. Failed parsing preserves that target; reset never cancels it. */
+  beginRevision(candidate: C['IntakeCandidate'], access: IntakeAccess | null) {
+    if (this.disposed || this.closeRisk()) return reject('CONFLICT');
+    if (!this.allowed(access).some(s => s.scope.sourceId === candidate.sourceId)) return reject('FORBIDDEN');
+    if (!['awaiting-evidence', 'ready'].includes(candidate.state)) return reject('CONFLICT');
+    this.clearDraft(); this.sourceId = candidate.sourceId; this.priorKey = structuredClone(candidate.key); this.phase = 'selected';
   }
   private canManage(access: IntakeAccess | null) {
     return !!access && Date.now() < Date.parse(access.validUntil) && access.capabilities.some(c => c.scope.sourceId === this.sourceId
@@ -92,6 +101,7 @@ export class ContentIntakeUpload {
     const ready = readable && !busy && !this.pending;
     const deadlines = [access?.validUntil, this.context?.validUntil].filter((s): s is string => !!s);
     return structuredClone({ draftRevision: this.revision, phase: this.phase, busy, authorized: allowed.length > 0,
+      revisionOf: readable && this.priorKey ? { candidateId: this.priorKey.candidateId, version: this.priorKey.version } : null,
       validUntil: readable && deadlines.length ? new Date(Math.min(...deadlines.map(Date.parse))).toISOString() : null,
       sources: allowed.map(s => ({ selection: this.sources.get(s.scope.sourceId)!, label: `${s.scope.sourceId} · ${s.scope.shopId ?? s.scope.brandId}` })),
       sourceSelection: readable ? this.sources.get(this.sourceId!) ?? null : null,
@@ -107,6 +117,9 @@ export class ContentIntakeUpload {
       // intent, so refreshing an old upload cannot compete with another selection.
       canRefresh: ready && !!this.file && this.job?.state !== 'validated',
       canStop: busy, canSaveReport: ready && !!this.job?.reportObjectId,
+      // Abandoning only local preparation remains possible after import access
+      // is revoked. Unknown writes and parsing jobs must first be resolved.
+      canReset: !this.disposed && this.session.view().signedIn && !busy && !this.pending && !parsing(this.job) && !!(this.file || this.priorKey || this.sourceId),
       canOpen: ready && this.canManage(access) && this.job?.state === 'validated', notice: this.notice });
   }
   private sourcePath() { return `/v1/intake/sources/${encodeURIComponent(this.sourceId!)}`; }
@@ -188,7 +201,7 @@ export class ContentIntakeUpload {
     this.pending = { kind: 'receive', body: parseContractSchema('IntakeReceive', {
       operationId: randomUUID(), objectId: this.object.objectId, sourceVersion: this.context.sourceVersion, baseReleaseId: this.context.baseReleaseId,
       contributorDeclaration: { preparerPrincipalId: preparer.principalId,
-        editorPrincipalIds: this.editors.map(h => this.principals.find(p => p.selection === h)!.principalId), confirmed: true }, expectedPriorKey: null,
+        editorPrincipalIds: this.editors.map(h => this.principals.find(p => p.selection === h)!.principalId), confirmed: true }, expectedPriorKey: this.priorKey,
     }) };
     await this.transmit(request, false);
   }
@@ -196,6 +209,8 @@ export class ContentIntakeUpload {
     if (this.job && (job.jobId !== this.job.jobId || job.generation < this.job.generation
       || (!parsing(this.job) && JSON.stringify(job) !== JSON.stringify(this.job)))) return reject('STALE');
     if (job.state === 'validated' && (!job.candidateId || job.candidateVersion === null)) return reject('STALE');
+    if (job.state === 'validated' && this.priorKey && (job.candidateId !== this.priorKey.candidateId
+      || job.candidateVersion !== this.priorKey.version + 1)) return reject('STALE');
     this.job = job; this.phase = parsing(job) ? 'parsing' : job.state === 'validated' ? 'validated' : 'failed';
     this.notice = job.state === 'failed' ? '校验未通过，请下载完整报告，整批修正后重新选择文件。'
       : job.state === 'cancelled' ? '服务端解析已结束，请重新选择文件。' : null;
@@ -220,11 +235,11 @@ export class ContentIntakeUpload {
     if (this.pending && command.action !== 'upload-retry') return reject('CONFLICT');
     if (command.action === 'upload-reset') {
       if (parsing(this.job)) return reject('CONFLICT');
-      this.clearDraft(); this.phase = this.sourceId ? 'selected' : 'idle'; return null;
+      this.clearDraft(); this.priorKey = null; this.phase = this.sourceId ? 'selected' : 'idle'; return null;
     }
     const allowed = this.allowed(access);
     if (command.action === 'upload-source') {
-      if (parsing(this.job)) return reject('CONFLICT');
+      if (this.priorKey || parsing(this.job)) return reject('CONFLICT');
       const source = allowed.find(s => this.sources.get(s.scope.sourceId) === command.selection);
       if (!source) return reject('FORBIDDEN');
       this.clearDraft(); this.sourceId = source.scope.sourceId; this.phase = 'selected'; return null;
@@ -254,6 +269,10 @@ export class ContentIntakeUpload {
         if (!Buffer.isBuffer(picked.bytes) || picked.bytes.length < 4 || picked.bytes.length > INTAKE_UPLOAD_MAX_BYTES
           || picked.bytes.readUInt32LE(0) !== 0x04034b50 || !/\.xlsx$/i.test(picked.name)
           || /[\\/]/.test(picked.name) || [...picked.name].some(c => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127) || picked.name.length > 255) return reject('VALIDATION');
+        // A completed revision has consumed its old key. A new accepted file
+        // starts a separate candidate; cancelled pickers and failed revisions
+        // keep their target. Only beginRevision can bind another old version.
+        if (this.job?.state === 'validated') this.priorKey = null;
         this.clearDraft(); this.file = { name: picked.name, bytes: Buffer.from(picked.bytes) }; this.phase = 'confirming';
         await this.loadDeclaration(request, await this.readContext(request));
       } else if (command.action === 'upload-submit') {

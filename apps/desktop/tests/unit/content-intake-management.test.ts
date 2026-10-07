@@ -57,9 +57,11 @@ it.each(['lost', 'stop-late'] as const)('recovers an uncertain upload across the
     await vi.waitFor(() => expect(attempts).toBe(1));
     if (kind === 'stop-late') await f.main.command({ action: 'upload-stop' }); else await failed;
     expect(f.main.view().upload).toMatchObject({ pending: 'upload', canRetry: true });
+    await expect(f.main.command({ action: 'upload-reset' })).rejects.toMatchObject({ code: 'CONFLICT' });
     await expect(f.main.command({ action: 'select', selection: listed.candidates[0].selection })).rejects.toMatchObject({ code: 'CONFLICT' });
     const recovered = await f.main.command({ action: 'upload-retry' });
     expect(recovered.upload).toMatchObject({ phase: 'parsing', pending: null });
+    await expect(f.main.command({ action: 'upload-reset' })).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(operations[1].get('operationId')).toEqual(operations[0].get('operationId'));
     if (kind === 'stop-late') { late(); await failed; }
     expect(f.main.view()).toMatchObject({ authorized: true, upload: { phase: 'parsing', pending: null, job: { state: 'reading' } } });
@@ -317,4 +319,104 @@ it('quality drafts block workflow mutations and narrow commands reject identity,
     for (const c of [{ ...confirm, objectSha256: 'f'.repeat(64) }, { ...publish, key: f.data.candidate.key }, { action: 'refresh-review', expectedEvidenceVersion: 99 },
       { ...confirm, versionKind: 'integer', versionValue: '001' }, { ...publish, title: ' ' }]) expect(isIntakeManagementCommand(c)).toBe(false);
   } finally { f.main.dispose(); }
+});
+
+it('starts an explicit revision without accepting a renderer key or retaining old candidate evidence', async () => {
+  const f = fixture(); f.data.state.importer = true;
+  try {
+    await f.select(); await f.main.command({ action: 'material', next: false });
+    expect(isIntakeManagementCommand({ action: 'revise', expectedPriorKey: f.data.candidate.key })).toBe(false);
+    const v = await f.main.command({ action: 'revise' });
+    expect(v).toMatchObject({ selected: null, material: null, quality: null, review: null, candidates: [], upload: { revisionOf: { candidateId: 'candidate-a', version: 1 }, file: null } });
+    expect(f.main.closeRisk()).toBe('editing');
+    const listed = await f.main.command({ action: 'list', next: false });
+    await expect(f.main.command({ action: 'select', selection: listed.candidates[0].selection })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await f.main.command({ action: 'upload-reset' });
+    expect((await f.select()).selected?.key).toEqual(f.data.candidate.key);
+    expect(f.request.mock.calls.some(c => c[1].endsWith('/cancel'))).toBe(false);
+  } finally { f.main.dispose(); }
+});
+
+it.each(['recover','retry'] as const)('recovers cancellation via %s with the original key and operation after response loss', async recovery => {
+  const f = fixture(); f.data.state.canceller = true;
+  try {
+    await f.select(); await f.main.command({ action: 'material', next: false });
+    const original = f.request.getMockImplementation()!; let lost = true;
+    f.request.mockImplementation(async (...args) => {
+      const r = await original(...args);
+      if (args[1].endsWith('/cancel') && lost) { lost = false; throw new ProductHttpError('UNAVAILABLE'); }
+      return r;
+    });
+    await expect(f.main.command({ action: 'cancel-candidate' })).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+    const pending = f.main.view().pending!;
+    expect(pending).toMatchObject({ action: 'cancel', recovery: 'receipt' });
+    await expect(f.main.command({ action: 'discard' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    const result = await f.main.command({ action: recovery });
+    expect(result.pending).toBeNull();
+    await f.main.command({ action: 'list', next: false });
+    const current = f.main.view();
+    expect(current).toMatchObject({ selected: { state: 'cancelled' }, material: null, quality: null, review: null, canCancel: false, canRevise: false, workflowResult: { action: 'cancel', state: 'cancelled', operationId: pending.operationId } });
+    expect(f.data.workflowReceipts.size).toBe(1);
+    const sent = f.request.mock.calls.filter(c => c[1].endsWith('/cancel')).map(c => c[2]!.body);
+    expect(sent[0]).toEqual({ operationId: pending.operationId, key: f.data.candidate.key });
+    if (recovery === 'retry') expect(sent[1]).toEqual(sent[0]);
+    else expect(f.request.mock.calls.some(c => c[1].endsWith(`${pending.operationId}?action=cancel`))).toBe(true);
+  } finally { f.main.dispose(); }
+});
+
+it.each(['published','publishing','cancelled','invalidated'] as const)('does not offer or transmit cancellation/revision for %s', async state => {
+  const f = fixture(); f.data.state.canceller = true; f.data.state.importer = true; f.data.candidate.state = state;
+  try {
+    expect(await f.select()).toMatchObject({ canRevise: false, canCancel: false });
+    await expect(f.main.command({ action: 'cancel-candidate' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(f.main.command({ action: 'revise' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(f.request.mock.calls.some(c => c[2]?.body)).toBe(false);
+  } finally { f.main.dispose(); }
+});
+
+it('rejects cancellation without scoped authority and retains an uncertain cancellation on receipt mismatch', async () => {
+  const f = fixture();
+  try {
+    await f.select();
+    await expect(f.main.command({ action: 'cancel-candidate' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    f.data.state.canceller = true; await f.select();
+    const original = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async (...args) => {
+      const r = await original(...args);
+      if (args[1].endsWith('/cancel')) (r.value as { action: string }).action = 'publish';
+      return r;
+    });
+    await expect(f.main.command({ action: 'cancel-candidate' })).rejects.toMatchObject({ code: 'STALE' });
+    expect(f.main.view().pending).toMatchObject({ action: 'cancel' });
+    f.logout(); expect(f.main.view().pending).toBeNull();
+  } finally { f.main.dispose(); }
+});
+
+it('keeps a hidden revision fenced after import revocation but permits explicit local discard', async () => {
+  const f = fixture(); f.data.state.importer = true;
+  try {
+    await f.select(); await f.main.command({ action: 'revise' });
+    f.data.state.importer = false;
+    const listed = await f.main.command({ action: 'list', next: false });
+    expect(listed.upload.revisionOf).toBeNull();
+    await expect(f.main.command({ action: 'select', selection: listed.candidates[0].selection })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(f.main.view().upload.canReset).toBe(true);
+    await f.main.command({ action: 'upload-reset' });
+    expect((await f.select()).selected).not.toBeNull();
+  } finally { f.main.dispose(); }
+});
+
+it('clears local revision preparation offline after its access projection expires', async () => {
+  const f = fixture(); f.data.state.importer = true;
+  const clock = vi.spyOn(Date, 'now');
+  try {
+    await f.select(); await f.main.command({ action: 'revise' });
+    clock.mockReturnValue(Date.now() + 120_000);
+    expect(f.main.view()).toMatchObject({ authorized: false, upload: { canReset: true, revisionOf: null } });
+    expect(f.main.closeRisk()).toBe('editing');
+    f.request.mockClear(); f.request.mockRejectedValue(new ProductHttpError('UNAVAILABLE'));
+    await expect(f.main.command({ action: 'upload-reset' })).resolves.toMatchObject({ upload: { pending: null, file: null, revisionOf: null } });
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.main.closeRisk()).toBeNull();
+  } finally { clock.mockRestore(); f.main.dispose(); }
 });

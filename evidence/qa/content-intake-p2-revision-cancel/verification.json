@@ -1,0 +1,261 @@
+{
+  "schema": "content-intake-revision-cancel/v1",
+  "recordedAt": "2026-10-07T11:06:33.610882+00:00",
+  "baseCommit": "fcda90ca7137478c3653fd4cf73add337ba9af1f",
+  "mode": "SYNTHETIC_ONLY",
+  "environment": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "macOS": "26.5.2",
+    "postgres": "15.18"
+  },
+  "inputs": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "43ff991d9462376de6c9299dd86936aaba871c5baab9c539e7052e27a85a8eae"
+    },
+    {
+      "path": "apps/api/tests/support/intake-synthetic-host.ts",
+      "sha256": "677e7784b1b3e10bbc8d5d6691ef18a3586e2d5d05386df20dfd7adfe7433f93"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management-ipc.ts",
+      "sha256": "f80ecbd68f636b9d5983e1c73bb0d79ec2dd850f75f1a069cfd2357db88875f3"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management.ts",
+      "sha256": "5e3c474f05b206b4ef69c33e3a5ec2450dbd3f7ac2d87f322511a74973bbce86"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-upload.ts",
+      "sha256": "e70c6837d547a205aab44001b9497ee975380c8a8f3e34d36ea7215c6003747e"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "sha256": "54f30fea319e3bf05bec383b84739049068048dc0bd09368142e872ae6f09627"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx",
+      "sha256": "46db0aaebd4a47e515babcf5a0822cc1065b4b93d11e8dba9da644bcc50961e0"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/intake-management.css",
+      "sha256": "24dcd550fd451f1ecebad63bd8d1522b456a94a1f6a3c7c95a25444e3b3f7a49"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-management.ts",
+      "sha256": "5c2f797d736555eff1c6a9351aea8dd53fef588d809fab84e8ca8e2b5e24c560"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-upload.ts",
+      "sha256": "08b829160e9fb922eb9d915a053921e59e5decfe2c0cbeba018cad263cd7b54b"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-management.test.tsx",
+      "sha256": "43126e56d88546b68700ff8976084a035f57c373cf8b9c6060a350ea1b707f62"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-upload.test.tsx",
+      "sha256": "ec4a748e3107ebc2ad29fe81f3f6aa7307bbbe6d7d18167c4fe6782ec7b7f2d2"
+    },
+    {
+      "path": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+      "sha256": "a1b2ad16ed7d2223aa7f91861dff12d848abd567ef60aa4120731d90ada57d25"
+    },
+    {
+      "path": "apps/desktop/tests/fixtures/intake-management-data.ts",
+      "sha256": "de2714128a10a5ab37e8ed7bdb13b0707707779a15eb1843a37d1e73d7be2282"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management-ipc.test.ts",
+      "sha256": "80e7c46602bdd9d2179f5959539ce0f9b4b7586ac1351b082a0ef15cbd808ac0"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management.test.ts",
+      "sha256": "7a36eb0340c88daff957a0adf4ad76c12b6a4b47ea97b862800644a2e4cfbcb6"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-upload.test.ts",
+      "sha256": "ada3e4c4fbc42645e64d22e70b6b932efdb583e87b0219ea98f56d7e19058b2a"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "sha256": "48264f779cb82df938090e5495d6ebe5aeba32f279887a1394f941f3e14eb79b"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "sha256": "42f488a181c9f45ddfa5d0a77fdcf132b5c45e05bcfb30ea4373340449503555"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "sha256": "9d12685c4156ecaf85e975c15667c8508d49bc25c910fc79c4f038a2e0e089ea"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78"
+    },
+    {
+      "path": "apps/desktop/src/preload/dashboard.ts",
+      "sha256": "fae975058b90f896a78a10a7caa150f73b74055ef65c894078b595f111e7a3f1"
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "sha256": "5000fba4af0631cf758a6b99a4c0aff8923bde3f8bcbb6c71eeb9d0c379d1f15"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "sha256": "231d173a47d6f0e4b19bc9cc0c018f6c59e27862c1126237a000174a835440a4"
+    }
+  ],
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/lint-final2.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "completedAt": "2026-10-07T11:03:25.382596+00:00"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/typecheck-final2.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08",
+      "completedAt": "2026-10-07T11:03:32.674610+00:00"
+    },
+    {
+      "command": "pnpm test",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/test-final2.log",
+      "sha256": "18599468db40a2ce9ed6adf7e334fa22f617e1d7abc3a053805f35fc9a00842b",
+      "completedAt": "2026-10-07T11:05:42.148497+00:00"
+    },
+    {
+      "command": "pnpm build",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/build-final2.log",
+      "sha256": "09444783d4f135706cb10ef3858e91157fdd6b173a2eb1d114f196fdc744c2e4",
+      "completedAt": "2026-10-07T11:03:34.631838+00:00"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-management.test.ts tests/unit/content-intake-upload.test.ts tests/unit/content-intake-management-ipc.test.ts tests/component/intake-management.test.tsx tests/component/intake-upload.test.tsx",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/targeted-final3.log",
+      "sha256": "9dc88c5a969df09fa35bbb0038684f820f2f29acc58a4d00375d935b827ca622",
+      "completedAt": "2026-10-07T11:03:31.533534+00:00"
+    },
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'historical cancellation receipts|blocks the entire bad revision|win while publication is observing|commits once when cancellation waits|preserves old candidate on bad|serializes two revisions'",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/pg-regression.log",
+      "sha256": "0c1095a91bffe87182d97b37a8e4702efea90c2d1f6473092d12f96e4b452daa",
+      "completedAt": "2026-10-07T10:49:18.840028+00:00"
+    },
+    {
+      "command": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1",
+        "INTAKE_REAL_STACK_SCREENSHOT_DIR=/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/.gstack/qa-reports/content-intake-revision-cancel-20261007/final-revalidation/native",
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-real-stack.spec.ts"
+      ],
+      "result": "PASS",
+      "capture": "final-revalidation/001",
+      "receipt": ".gstack/qa-reports/content-intake-revision-cancel-20261007/final-revalidation/.qa-evidence/001/receipt.json",
+      "sha256": "0ee06634cd46bd1e44c076c245b00ce5d46e71ca481b08f86dfaacb5a35822e8",
+      "exitCode": 0,
+      "completedAt": "2026-10-07T11:04:28.661Z"
+    },
+    {
+      "command": "pnpm docs:check",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/docs-final2.log",
+      "sha256": "0c838da2dea20ee655d37cb71a2f60fcd9e8bd5664dc9a22d2dd34b10aa75364",
+      "completedAt": "2026-10-07T11:05:43.657377+00:00"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/workspace-final2.log",
+      "sha256": "6918e13f48804c445c89eb0f3df38d4160b712b33f4a8eb2aa7a377b3d695c4e",
+      "completedAt": "2026-10-07T11:05:44.668968+00:00"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "result": "PASS",
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/architecture-final2.log",
+      "sha256": "39ed4bc0e8c2899acfeffc5ce7faa574955382e7d10bbccca03b15037eb5a9d7",
+      "completedAt": "2026-10-07T11:05:45.083266+00:00"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "dashboard-cancelled.png",
+      "sha256": "ae0f45c3da3cda21f4441b0d38c634b98a11234e468aa343321c328e23013fcc"
+    },
+    {
+      "path": "dashboard-intake-dark.png",
+      "sha256": "ead130dbe59aed067c0e248a397b0e01458dd5ab0b64bed2a923a242a38c6708"
+    },
+    {
+      "path": "dashboard-intake-light.png",
+      "sha256": "99439a792399eaf203502a4cb22331d4936f662a9ddbdbf6d2900354c9c226ce"
+    },
+    {
+      "path": "dashboard-intake-minimum-dark.png",
+      "sha256": "a0af458dc0b058a5d5b0fd9691c58ded9925176fb05834ec774fab926cedd5e6"
+    },
+    {
+      "path": "dashboard-revision-v2.png",
+      "sha256": "6d2616eea109ecc70c19c6ab596be682b8c572a9eda0f06267be570acc120846"
+    },
+    {
+      "path": "query-published-faq.png",
+      "sha256": "a77048e74ac5606c9574488e213960b91d133d3ad7c8394c3222b4a5151d734a"
+    }
+  ],
+  "historicalFailures": [
+    {
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/revocation-red.log",
+      "sha256": "dd09c15d288f5391ec54ce4db14bb358c48752003ecbe974511b84561bb716c8"
+    },
+    {
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/completed-revision-red.log",
+      "sha256": "2adad5f79f5921a5dd62bfa15ebe3aab4661b4bcc01d18474b36bc4b7368cd62"
+    },
+    {
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/typecheck.log",
+      "sha256": "79a9d098a67268ddb0d08c1214f400403348dd33a6be75ed8dc449fe6766b8eb"
+    },
+    {
+      "receipt": ".gstack/qa-reports/content-intake-revision-cancel-20261007/.qa-evidence/001/receipt.json",
+      "sha256": "33895174c1a0759b79123e9e89ea8bdeb3f0f33df06016332620a3f8ca2ad722",
+      "result": "FAIL_REPAIRED_AND_REPLAYED"
+    },
+    {
+      "log": ".gstack/qa-reports/content-intake-revision-cancel-20261007/offline-reset-red.log",
+      "sha256": "cd341156fffafba69124c620f8f059bac835a370657c5fb0f418c83b89319864",
+      "result": "FAIL_REPAIRED_WITH_NO_HTTP_AND_PENDING_PARSING_GUARDS_VERIFIED"
+    }
+  ],
+  "limits": [
+    "Synthetic approval transport only; no real Feishu or production activation.",
+    "Native dialog path selection stubbed; manual macOS dialogs and Windows/WSL not tested.",
+    "No Git commit or external delivery for this new candidate."
+  ],
+  "qaVerdict": {
+    "result": {
+      "status": "pass",
+      "open": []
+    },
+    "path": ".gstack/qa-reports/content-intake-revision-cancel-20261007/final-revalidation/evidence.json",
+    "sha256": "ace956efd96f2d5b99a49249da688115e584a4fe9b87426c13037bcaaa40df1f"
+  }
+}

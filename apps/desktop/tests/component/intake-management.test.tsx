@@ -192,3 +192,32 @@ it('explains candidate readiness and risk without exposing internal codes or pro
     expect(await screen.findByText(/风险等级：常规内容/)).toBeInTheDocument();
   } finally { f.main.dispose(); }
 });
+
+it.each(['revise', 'cancel-candidate'] as const)('requires explicit confirmation and a clean form before %s', async action => {
+  const f = setup(); f.data.state.importer = true; f.data.state.canceller = true;
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  render(<IntakeManagement />);
+  try {
+    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    const label = action === 'revise' ? '修订当前候选' : '取消当前候选';
+    await f.user.click(screen.getByRole('button', { name: label }));
+    expect(f.command.mock.calls.some(([c]) => c.action === action)).toBe(false);
+    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    const source = screen.getByRole('textbox', { name: '来源版本' });
+    await f.user.type(source, '未提交来源');
+    expect(screen.getByRole('button', { name: label })).toBeDisabled();
+    await f.user.clear(source); confirm.mockReturnValue(true);
+    await f.user.click(screen.getByRole('button', { name: label }));
+    expect(f.command).toHaveBeenLastCalledWith({ action });
+    if (action === 'revise') {
+      await screen.findByText(/正在准备修订：candidate-a · 原版本 1/);
+      expect(screen.queryByRole('region', { name: '当前候选' })).not.toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: '上传来源' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '放弃本地修订' })).toBeEnabled();
+    } else {
+      await screen.findByText(/已取消 · 此版本不再接受修改或发布/);
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled();
+    }
+  } finally { confirm.mockRestore(); f.main.dispose(); }
+});

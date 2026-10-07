@@ -23,6 +23,8 @@ it('rejects non-Dashboard, child frames and extra intent fields before touching 
       { action: 'upload-save-report', url: 'https://outside.example/report' },
       { action: 'upload-submit', preparerSelection: 'choice', editorSelections: ['choice'], confirmed: true, actor: 'forged' },
       { action: 'upload-retry', operationId: 'replace-original' },
+      { action: 'revise', expectedPriorKey: { candidateId: 'other', version: 1, digest: 'forged' } },
+      { action: 'cancel-candidate', key: { candidateId: 'other', version: 1 } },
     ]) expect(await handlers.get('dashboard:intake-command')!(event(dashboard), command)).toMatchObject({ code: 'VALIDATION' });
   } finally { owned.dispose(); }
   expect(handlers.size).toBe(0);

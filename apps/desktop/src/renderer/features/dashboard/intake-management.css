@@ -14,6 +14,7 @@
 .intake-management button:not(.dash-action-primary):active:not(:disabled) { background: var(--dash-chrome-pressed); }
 .intake-management button:disabled { cursor: not-allowed; }
 .intake-management button:not(.dash-action-primary):disabled { background: var(--dash-disabled-bg); color: var(--dash-disabled-ink); border-color: var(--dash-line); }
+.intake-management button.intake-danger:not(:disabled) { color: var(--dash-danger); border-color: var(--dash-danger-line); background: var(--dash-danger-bg); }
 .intake-management :is(select, textarea, input:not([type=checkbox])) { min-width: 0; max-width: 100%; padding: 8px 12px; border: 1px solid var(--dash-control-line); border-radius: var(--dash-radius); background: var(--dash-surface); color: var(--dash-ink); font: inherit; font-size: 16px; line-height: 24px; }
 .intake-management label select { appearance: auto; }
 .intake-management :is(select, textarea, input):disabled { color: var(--dash-disabled-ink); background: var(--dash-disabled-bg); border-color: var(--dash-line); cursor: not-allowed; }

@@ -200,7 +200,7 @@ export function IntakeManagement() {
   }, []);
   const upload = view?.upload;
   const disabled = busy || stopping || !!view?.pending || !!upload?.busy || !!upload?.pending;
-  const uploadDraft = !!upload?.file && upload.phase !== 'validated';
+  const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
   const quality = view?.quality;
   const dirty = dirtyIds.size > 0;
   const qualityDirty = [...dirtyIds].some(id => id !== 'workflow-source' && id !== 'workflow-publish');
@@ -214,6 +214,7 @@ export function IntakeManagement() {
     {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <button disabled={busy || stopping}
       onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</button>}
     {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2>操作结果待确认</h2>
+      {view.pending.action === 'cancel' && <p>取消结果尚未确认。取得最终回执前，不能认定候选已经取消。</p>}
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
       <div>{view.pending.recovery === 'receipt' && <button disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</button>}
         <button disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</button></div></section>}
@@ -231,7 +232,16 @@ export function IntakeManagement() {
         </button>)}</div></section>
       {dirty && <p role="status">当前有尚未提交的输入。请完成对应操作，或关闭当前候选并明确放弃。</p>}
       {view.selected && <section aria-label="当前候选"><h2>当前候选 · {view.selected.sourceId} · 版本 {view.selected.key.version}</h2>
-        <p>{states[view.selected.state]} · {[...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验'}</p>
+        <p>{states[view.selected.state]} · {['awaiting-evidence','ready'].includes(view.selected.state)
+          ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
+        {(view.canRevise || view.canCancel) && <div className="intake-toolbar">
+          {view.canRevise && <button disabled={disabled || dirty || view.hasDraft} onClick={() => {
+            if (window.confirm('修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源、审批和质量检查；校验失败保留旧版。')) void apply({ action: 'revise' });
+          }}>修订当前候选</button>}
+          {view.canCancel && <button className="intake-danger" disabled={disabled || dirty || view.hasDraft} onClick={() => {
+            if (window.confirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。')) void apply({ action: 'cancel-candidate' });
+          }}>取消当前候选</button>}
+        </div>}
         <div className="intake-toolbar"><button disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新候选状态</button>
           <button disabled={disabled} onClick={() => void apply({ action: 'material', next: false })}>查看材料</button>
           <button disabled={disabled || !view.material?.nextCursor} onClick={() => void apply({ action: 'material', next: true })}>下一页材料</button>

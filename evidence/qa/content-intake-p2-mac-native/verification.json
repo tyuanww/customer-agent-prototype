@@ -1,0 +1,462 @@
+{
+  "schema": "content-intake-mac-native/v1",
+  "recordedAt": "2026-10-07T12:22:59.782680+00:00",
+  "baseCommit": "fcda90ca7137478c3653fd4cf73add337ba9af1f",
+  "mode": "SYNTHETIC_ONLY",
+  "environment": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "macOS": "26.5.2",
+    "postgres": "15.18"
+  },
+  "inputs": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "43ff991d9462376de6c9299dd86936aaba871c5baab9c539e7052e27a85a8eae"
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "sha256": "5000fba4af0631cf758a6b99a4c0aff8923bde3f8bcbb6c71eeb9d0c379d1f15"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "sha256": "231d173a47d6f0e4b19bc9cc0c018f6c59e27862c1126237a000174a835440a4"
+    },
+    {
+      "path": "apps/api/tests/support/intake-synthetic-host.ts",
+      "sha256": "677e7784b1b3e10bbc8d5d6691ef18a3586e2d5d05386df20dfd7adfe7433f93"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management-ipc.ts",
+      "sha256": "f80ecbd68f636b9d5983e1c73bb0d79ec2dd850f75f1a069cfd2357db88875f3"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management.ts",
+      "sha256": "5e3c474f05b206b4ef69c33e3a5ec2450dbd3f7ac2d87f322511a74973bbce86"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-upload.ts",
+      "sha256": "e70c6837d547a205aab44001b9497ee975380c8a8f3e34d36ea7215c6003747e"
+    },
+    {
+      "path": "apps/desktop/src/main/main.ts",
+      "sha256": "0c4816c8c21a611759732a24bb31a725fbb93dda08f1e9caeb003d354b39936e"
+    },
+    {
+      "path": "apps/desktop/src/preload/dashboard.ts",
+      "sha256": "fae975058b90f896a78a10a7caa150f73b74055ef65c894078b595f111e7a3f1"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "sha256": "54f30fea319e3bf05bec383b84739049068048dc0bd09368142e872ae6f09627"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx",
+      "sha256": "46db0aaebd4a47e515babcf5a0822cc1065b4b93d11e8dba9da644bcc50961e0"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/intake-management.css",
+      "sha256": "24dcd550fd451f1ecebad63bd8d1522b456a94a1f6a3c7c95a25444e3b3f7a49"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/QueryCapsule.tsx",
+      "sha256": "981fc84a1f975a2f9dd2b9c61e9187c5677a20ec4697800137fe0585f3ff9e72"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-management.ts",
+      "sha256": "5c2f797d736555eff1c6a9351aea8dd53fef588d809fab84e8ca8e2b5e24c560"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-upload.ts",
+      "sha256": "08b829160e9fb922eb9d915a053921e59e5decfe2c0cbeba018cad263cd7b54b"
+    },
+    {
+      "path": "apps/desktop/tests/component/QueryApp.test.tsx",
+      "sha256": "7532a2c5f5e868ad5225ea0b638ff707b4ffefb53e39eddb94c76092c47ec582"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-dashboard-shell.test.tsx",
+      "sha256": "f60964a3740b30d8da0a5550e5229837c9f2cfed775dec307ab397d68597297c"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-management.test.tsx",
+      "sha256": "43126e56d88546b68700ff8976084a035f57c373cf8b9c6060a350ea1b707f62"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-upload.test.tsx",
+      "sha256": "ec4a748e3107ebc2ad29fe81f3f6aa7307bbbe6d7d18167c4fe6782ec7b7f2d2"
+    },
+    {
+      "path": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+      "sha256": "f618bd83580d1573efe06b5f4790adeb160cdd6af95df50c0001a4113ef45865"
+    },
+    {
+      "path": "apps/desktop/tests/fixtures/intake-management-data.ts",
+      "sha256": "de2714128a10a5ab37e8ed7bdb13b0707707779a15eb1843a37d1e73d7be2282"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management-ipc.test.ts",
+      "sha256": "80e7c46602bdd9d2179f5959539ce0f9b4b7586ac1351b082a0ef15cbd808ac0"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management.test.ts",
+      "sha256": "7a36eb0340c88daff957a0adf4ad76c12b6a4b47ea97b862800644a2e4cfbcb6"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-upload.test.ts",
+      "sha256": "ada3e4c4fbc42645e64d22e70b6b932efdb583e87b0219ea98f56d7e19058b2a"
+    },
+    {
+      "path": "apps/desktop/tests/unit/product-announce-ipc.test.ts",
+      "sha256": "b672176c096360521755ce511356518403c8d2b7af6c57ed058015808d93bd5e"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "sha256": "48264f779cb82df938090e5495d6ebe5aeba32f279887a1394f941f3e14eb79b"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "sha256": "fc5b4b8bc25eb81d403f4ad05e4b33514a82470edd1d971559b466c4ea770566"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "sha256": "4dc5020e8b28a7d8da4a06d755cc89f14f57a873196606afe019a525193c46d5"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-mac-native/README.md",
+      "sha256": "c3a3522126ab523ee1e9a86b32bd1c1852a4ae69b3a9068dc7e54ce1a0d12fc7"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78"
+    },
+    {
+      "path": "apps/desktop/tests/unit/fox-head-assets.test.ts",
+      "sha256": "f05e895dcd3ec02c2c22f596805ac9ea0a82e2fcb1f30b79413b23c39772fd6c"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-access.test.ts",
+      "sha256": "cbd684cf71f69d78e2aa4f9b860169431e21b35514c644a775c3828496b9a84d"
+    }
+  ],
+  "checks": [
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/targeted-final.log",
+      "sha256": "04e883fbe51b87eafb757038d57ccc0c6a3b9845bb5264e9736eba72c9b494c4",
+      "result": "152 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/lint-stable-deadline.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "result": "PASS",
+      "exitCode": 0,
+      "command": "pnpm lint"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/typecheck-green.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08",
+      "result": "root typecheck PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/typecheck-stable-deadline.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "result": "PASS after final test-only repairs",
+      "exitCode": 0,
+      "command": "pnpm --filter @customer-agent/desktop typecheck"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/build-green.log",
+      "sha256": "d57bf83f55a708856ae7ce3a877e1ac25b0ac6c7325c0ea08d3cef1814bc6006",
+      "result": "root build PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/native-green.log",
+      "sha256": "4962dd65f0b7d036fe53b2aad3773f0ec150a50d70e5580f1ca4007328cbb8b0",
+      "result": "full actual Electron/API/PG PASS; 26.3s; OS path selection stub only",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/api-single-worker.log",
+      "sha256": "8dacb9e0dafce08c57ec44da9cbdbbf464988e7e0044fdc730edfe3427c054cf",
+      "result": "476 PASS / 247 skipped",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/generated-types-isolated.log",
+      "sha256": "0a2c37097053afb0a00c47cb46e713245f1bbd7390ddfadfd216d431730e5118",
+      "result": "2 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/artifact-green.log",
+      "sha256": "b13b1c5833ef0177407e7879bf3008c091eb44d4eaccca598f85ff936a6b7f9a",
+      "result": "9 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/architecture-tests-green.log",
+      "sha256": "02e83868b060af16cdf7d1d489c2bb358fa7d256d7964528a8a6dd69b31370b3",
+      "result": "19 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/workflow-green.log",
+      "sha256": "79a531e53c1be71bdf3d7266af230e00643c27d4471f2973456798c4a01fc417",
+      "result": "81 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/assets-split-green.log",
+      "sha256": "4369c3706859552838c7b494d9259edc29dc0a842bbaf71bc62a7eb7fa4f67e4",
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/fox-head-assets.test.ts",
+      "result": "6 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/access-stable-deadline-green.log",
+      "sha256": "ccac89ad36df455616cef713f6e917094f39ba59c800c56f7ea7623bcc58fe82",
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-access.test.ts",
+      "result": "12 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/test-after-stable-deadline.log",
+      "sha256": "6085e835a94805a24683876b8c7ee0d9c718c0263738ba5fc24d41cac64305ee",
+      "command": "VITEST_MAX_FORKS=1 VITEST_MIN_FORKS=1 VITEST_MAX_THREADS=1 VITEST_MIN_THREADS=1 pnpm test",
+      "result": "root PASS: contracts23 retrieval9 intake41 database27 API476 desktop1283 artifact9 architecture19 workflow81; API247/desktop6 environment-gated skips",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/docs-final-closed.log",
+      "sha256": "7df8fb436c43d3a93777e8f183c6278b4dbc0f27f1b1c8818f0fa94846e6a847",
+      "command": "pnpm docs:check",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/workspace-final-closed.log",
+      "sha256": "6918e13f48804c445c89eb0f3df38d4160b712b33f4a8eb2aa7a377b3d695c4e",
+      "command": "pnpm workspace:check",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/architecture-final.log",
+      "sha256": "39ed4bc0e8c2899acfeffc5ce7faa574955382e7d10bbccca03b15037eb5a9d7",
+      "command": "pnpm check:architecture",
+      "result": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "history": [
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/description-red.log",
+      "sha256": "f3d6d78bb99667f642b1254bdb1042e04483fff6bd30a549bbc5110a834973f4"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/ipc-red.log",
+      "sha256": "1c7a2437200a84803571e6e2c55b9adf2e440c5ad0bb8cdadc81d87bd3fc1062"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/test-green.log",
+      "sha256": "f0f3ecd876ca8be4d11548719adf32f9522fb44aba087ff321cf13c03893c941"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/test-green-serial.log",
+      "sha256": "6c8d716ddda661518317c34ef114c099d5f67fe4172198eabd374f819d65009e"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/test-final.log",
+      "sha256": "0a8fd2d42a97abaf7f575ec1d5f20f4f55de5797e941b0abd41fa9eeb46e76a2"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/test-final-replay.log",
+      "sha256": "1b9df87506023ee609b9646c258303a415227e74cfabc9b4b7e28743692637a5"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/desktop-standalone.log",
+      "sha256": "7897ad937b0250baa90e0c5be76b8adbaa99f474871cceba81bdd44603afafa7"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/assets-isolated.log",
+      "sha256": "a1cac7428ca2f88683a6ad7f2dfd06390727aa6212eb765bf326ac737892db74",
+      "result": "5 PASS",
+      "exitCode": 0
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/test-one-worker-final.log",
+      "sha256": "feeb8da92b0ee79732a4e13feb470253044a113553c03ff431cb435940e86fbd",
+      "result": "root FAIL: API 476 PASS / 247 skipped; desktop 1281 PASS / 1 timeout / 6 skipped",
+      "exitCode": 1
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/test-after-asset-split.log",
+      "sha256": "922ecc256925ef94f72287c58769169c6d7b28eb43976f1d93ff59bce60c6c14",
+      "result": "root FAIL: assets passed; desktop1282 PASS/1 fixture deadline mismatch/6 skipped",
+      "exitCode": 1
+    }
+  ],
+  "manual": {
+    "firstSession": "Actual macOS picker cancel / invalid input / native report save / corrected upload / candidate cancel via cua_repl",
+    "report": {
+      "bytes": 6614,
+      "sha256": "57351d3620f5288ab0e5ba292fa1131b2217718e277b6afcb1650fce19790740",
+      "row": [
+        "FAQ",
+        "3",
+        "C",
+        "REQUIRED",
+        "补齐必填内容后整批重新上传"
+      ]
+    },
+    "recheck": "Actual second native startup: FAQ AX no MiniMax description; no product:announce-unread missing-handler log",
+    "screenshots": "conversation receipts only; no saved native-dialog image"
+  },
+  "artifacts": [
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/report.md",
+      "sha256": "39b64ade9c020a843badb52733b1463f231d087b9ab232760eb2310c44f42e50"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/report-consumption.json",
+      "sha256": "089a1c24290881c63c0b2013b36a1341b5b848efdc45e605e6c0924805bef63f"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/cleanup.json",
+      "sha256": "cc84596efea2d6e52744623a41a371046640425bf0ff40c9a79a6e069602d43f"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/manual-recheck.json",
+      "sha256": "dc54b22c37dc9ca34d20dcaa5ef21ae2edf3f24e5a59f428c05f0d36d5612e47"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/manual-startup-green.log",
+      "sha256": "e5d75f4eaafbfbfba5a3506f7084462005eafeacdf457b0e6e26cdbad8fa4bb7"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/fixtures/faq-good.xlsx",
+      "sha256": "36518966771e81bdaad2951a0c19b9d579c488709ae32790c89f8fc88a753208"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/fixtures/faq-invalid.xlsx",
+      "sha256": "7baf85eebe1c80b8a319b93f9f2d0bcc14ede6846453ff2cf6feb960e451d2ed"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/fixtures/faq-native-report.xlsx",
+      "sha256": "57351d3620f5288ab0e5ba292fa1131b2217718e277b6afcb1650fce19790740"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/wsl-preflight.log",
+      "sha256": "5978777f6e2359b770babf4d4edb24775a14895e085ed4bd0151ac4b17b39a51"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/wsl-preflight-retry.log",
+      "sha256": "e65b2cadf3b002345a35ec1bd8c76c672c0ecea209d5499cc14e011436c82c01"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/wsl-toolchain.log",
+      "sha256": "7352a86feca5e517bd0f4da03ab2f6db37d10764ee47e97cbb485984f0f3ddda"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/wsl-port22.log",
+      "sha256": "2f8f00cd12e13405ac4109ec40d26a5c638034a9322423d6d950eb137b12d9f2"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/wsl-tailscale-ping.log",
+      "sha256": "256822d828c65e4c43390fcedbbff269bf8d6c9c31d395a478966f15c224425c"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/asset-timing-diagnostic.json",
+      "sha256": "60df8601c32d85581a9d653cb7960d6ce8d9031022bb89545da3367b4f462176"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/asset-split-preservation.json",
+      "sha256": "6e68277fcfab4a868c4e4e4770fa7c9439026e14fd42148a1e06eb070a4b9674"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/asset-investigation.md",
+      "sha256": "1d3d725093e1ecea84cc6ddd891bc7fd5ccd5702d92ca047310ebb47c72a8aa8"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-mac-dialog-20261007/access-fixture-investigation.md",
+      "sha256": "408bc01ff9226263eaee9e6013247cb56b57086c4f0b2e7b883c7f626822790a"
+    }
+  ],
+  "rootTestEnvironment": {
+    "VITEST_MAX_FORKS": "1",
+    "VITEST_MIN_FORKS": "1",
+    "VITEST_MAX_THREADS": "1",
+    "VITEST_MIN_THREADS": "1"
+  },
+  "rootTestStatus": "PASS_SINGLE_WORKER",
+  "priorReviewReuse": {
+    "record": "../content-intake-p2-revision-cancel/verification.json",
+    "unchangedInputs": [
+      "AGENTS.md",
+      "apps/api/tests/support/intake-synthetic-host.ts",
+      "apps/desktop/src/main/content-intake-management-ipc.ts",
+      "apps/desktop/src/main/content-intake-management.ts",
+      "apps/desktop/src/main/content-intake-upload.ts",
+      "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx",
+      "apps/desktop/src/renderer/features/dashboard/intake-management.css",
+      "apps/desktop/src/shared/content-intake-management.ts",
+      "apps/desktop/src/shared/content-intake-upload.ts",
+      "apps/desktop/tests/component/intake-management.test.tsx",
+      "apps/desktop/tests/component/intake-upload.test.tsx",
+      "apps/desktop/tests/fixtures/intake-management-data.ts",
+      "apps/desktop/tests/unit/content-intake-management-ipc.test.ts",
+      "apps/desktop/tests/unit/content-intake-management.test.ts",
+      "apps/desktop/tests/unit/content-intake-upload.test.ts",
+      "docs/how-to-develop-content-intake.md",
+      "pnpm-lock.yaml",
+      "apps/desktop/src/preload/dashboard.ts",
+      "apps/api/src/content-intake/management-http.ts",
+      "apps/api/tests/content-intake.integration.test.ts"
+    ],
+    "changedInputs": [
+      "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+      "docs/plans/2026-10-03-content-intake-requirements.md",
+      "docs/reference-project-architecture.md"
+    ]
+  },
+  "limits": [
+    "No current Windows GUI or WSL run",
+    "No actual Feishu, customer workbook, employee data, signing or deployment",
+    "OS picker proof is separate from E2E path selection stub",
+    "First manual session final DB status not independently read before TTL",
+    "Final whole-root command passes in recorded single-worker environment; earlier failures retained; no claim that default parallel configuration was rerun successfully",
+    "Exit-only intake-query:cancel missing-handler diagnostic remains; no claimed running-state failure",
+    "Local commit explicitly authorized on 2026-10-07 after review and repair; enclosing Git commit supplies the final SHA. WSL SSH preflight completed, expected PG15 absent, installed PG17 not used as a substitute"
+  ],
+  "remotePreflight": {
+    "status": "PARTIAL_TOOLCHAIN_ONLY",
+    "platform": "Ubuntu 24.04.4 LTS / WSL2",
+    "node": "v24.21.0",
+    "pnpm": "11.19.0",
+    "installedPostgres": "17.11",
+    "expectedPostgres15PathExists": false,
+    "xvfbRunOnPath": false,
+    "unprivilegedUserAvailable": true,
+    "systemdAvailable": true,
+    "firstSshAttempt": "connect timeout",
+    "retry": "public-key SSH connected after Tailscale DERP ping and TCP22 success",
+    "repositoryTransferred": false,
+    "testExecuted": false,
+    "mutations": false
+  },
+  "localCommitAuthorization": {
+    "date": "2026-10-07",
+    "source": "User explicitly requested code review, repair, then commit if clean",
+    "scope": "Current candidate revision/cancellation and Mac QA repairs, tests and evidence",
+    "actions": [
+      "local commit"
+    ],
+    "externalGitActionsAuthorized": false
+  }
+}

@@ -11,6 +11,8 @@ export type IntakeUploadPhase = 'idle' | 'selected' | 'choosing' | 'confirming' 
   | 'parsing' | 'failed' | 'validated' | 'unknown' | 'stopped';
 export type IntakeUploadView = {
   draftRevision: number; phase: IntakeUploadPhase; busy: boolean; authorized: boolean; validUntil: string | null;
+  /** Display only. Main retains the complete old key; renderer cannot replace it. */
+  revisionOf: { candidateId: string; version: number } | null;
   sources: { selection: string; label: string }[]; sourceSelection: string | null;
   file: { name: string; bytes: number } | null;
   principals: { selection: string; displayLabel: string; enabled: boolean }[];
@@ -18,7 +20,7 @@ export type IntakeUploadView = {
   pending: 'upload' | 'receive' | null;
   job: Pick<C['IntakeParseJob'], 'state' | 'issues' | 'totalIssues' | 'excludedSheetCount' | 'excludedMediaCount'> | null;
   canChoose: boolean; canSubmit: boolean; canRetry: boolean; canRefresh: boolean;
-  canStop: boolean; canSaveReport: boolean; canOpen: boolean; notice: string | null;
+  canStop: boolean; canSaveReport: boolean; canOpen: boolean; canReset: boolean; notice: string | null;
 };
 export const INTAKE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 /** 134,999 bounded issues produced 2,727,593 bytes (~2.60 MiB) in packages/content-intake/scripts/probe-issue-report.mjs. */

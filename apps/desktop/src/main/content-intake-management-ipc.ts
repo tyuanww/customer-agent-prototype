@@ -23,6 +23,8 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     return choice === 1;
   };
   const reasonMessages: Record<string, string> = {
+    MATERIAL_CHANGED: '候选版本或状态已改变，请刷新候选。修订失败不会替换旧版；结果不明时先恢复原操作。',
+    ALREADY_PUBLISHED: '该候选已经发布，不能再修订或取消。后续更正须重新上传并审批。',
     BASE_CHANGED: '发布基线已改变，请重新导入形成新候选后再审核发布。',
     SOURCE_MISMATCH: '来源证据已改变，请刷新候选和材料后重新核对。',
     APPROVAL_CHANGED: '审批证据已改变，请刷新候选并读取最新审批状态。',

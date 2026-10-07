@@ -31,9 +31,9 @@ export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
 ]);
 
 /** Workbook bytes for native file-picker journeys; all text is synthetic. */
-export function createIntakeSyntheticWorkbook({ missingAnswer = false } = {}) {
+export function createIntakeSyntheticWorkbook({ missingAnswer = false, answerSuffix = '' } = {}) {
   return createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' },
-    INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, missingAnswer && i === 1 ? '' : faq.answer,
+    INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, missingAnswer && i === 1 ? '' : faq.answer + answerSuffix,
       '', '', '合成分类', '', '启用', '', '', '', '合成内部说明', '', '', 'false']));
 }
 
