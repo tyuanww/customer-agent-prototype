@@ -10,18 +10,18 @@ import { intakeManagementData } from '../fixtures/intake-management-data';
 afterEach(() => { delete window.dashboardIntake; });
 function upload(overrides: Partial<IntakeUploadView> = {}): IntakeUploadView {
   return { phase: 'confirming', busy: false, authorized: true, validUntil: '2099-01-01T00:00:00Z', draftRevision: 1,
-    sources: [{ selection: 'source-handle', label: '合成店铺 FAQ' }], sourceSelection: 'source-handle',
+    sources: [{ selection: 'source-handle', label: '合成店铺 FAQ' }], sourceSelection: 'source-handle', revisionOf: null,
     file: { name: 'synthetic-faq.xlsx', bytes: 2048 }, principals: [
       { selection: 'self-handle', displayLabel: '合成整理人', enabled: true },
       { selection: 'editor-handle', displayLabel: '合成历史编辑', enabled: false },
     ], preparerSelection: null, editorSelections: [], confirmed: false, pending: null, job: null,
     canChoose: true, canSubmit: true, canRetry: false, canRefresh: false, canStop: false,
-    canSaveReport: false, canOpen: false, notice: null, ...overrides };
+    canSaveReport: false, canOpen: false, canReset: true, notice: null, ...overrides };
 }
 function management(state: IntakeUploadView): IntakeManagementView {
   return { signedIn: true, displayName: '合成上传人', authorized: true, validUntil: state.validUntil,
     candidates: [], moreCandidates: false, selected: null, material: null, canReview: false, quality: null, hasDraft: false,
-    canConfirmSource: false, canPublish: false, review: null, workflowResult: null, pending: null, receipt: null, upload: state };
+    canConfirmSource: false, canPublish: false, canRevise: false, canCancel: false, review: null, workflowResult: null, pending: null, receipt: null, upload: state };
 }
 async function declare(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByRole('combobox', { name: '整理责任人' }), 'self-handle');
@@ -194,4 +194,14 @@ it.each(['revoked', 'unavailable'] as const)('does not retain personal material 
   expect(screen.queryByRole('combobox', { name: '整理责任人' })).not.toBeInTheDocument();
   expect(screen.queryByText('synthetic-faq.xlsx')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '重新读取当前状态' })).toBeEnabled();
+});
+
+it('offers only local discard when revision details are hidden after import revocation', async () => {
+  const apply = vi.fn(), user = userEvent.setup();
+  render(<IntakeUpload view={upload({ authorized: false, sources: [], sourceSelection: null, file: null,
+    revisionOf: null, principals: [], canChoose: false, canSubmit: false, canReset: true })}
+    busy={false} blocked={false} refreshBlocked={false} stopping={false} apply={apply} />);
+  expect(screen.getByRole('button', { name: '选择 Excel 文件' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: '清除本地上传准备' }));
+  expect(apply).toHaveBeenCalledWith({ action: 'upload-reset' });
 });

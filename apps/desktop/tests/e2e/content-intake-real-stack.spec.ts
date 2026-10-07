@@ -20,7 +20,7 @@ async function closeOwnedElectron(app: ElectronApplication) {
 /** Real Electron + production preload/Main + HTTP modules + isolated PG15.
  * Identity and approval are explicit synthetic transports. This does not claim
  * real Feishu, manual OS focus, Stage Manager or Windows compositor evidence. */
-test('native FAQ upload and error report lead to the same approved release consumed by an ordinary seat through real API/PG', async () => {
+test('native FAQ upload, revision and cancellation preserve the approved release consumed by an ordinary seat through real API/PG', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
   test.setTimeout(180_000);
   // Keep ungated test discovery independent of built API artifacts and PG.
@@ -34,6 +34,7 @@ test('native FAQ upload and error report lead to the same approved release consu
   mkdirSync(evidence, { recursive: true });
   let app: ElectronApplication | undefined;
   const rendererErrors: string[] = [];
+  let mainStderr = '';
   try {
     console.info(JSON.stringify({ status: 'OWNED_RESOURCES', hostDirectory: host.root, desktopDirectory: directory }));
     expect(host.candidate).toBeNull(); expect(host.object).toBeNull();
@@ -41,12 +42,16 @@ test('native FAQ upload and error report lead to the same approved release consu
     const badFile = path.join(directory, 'synthetic-missing-answer.xlsx');
     const goodFile = path.join(directory, 'synthetic-corrected-faq.xlsx');
     const reportFile = path.join(directory, 'synthetic-issues.xlsx');
+    const revisionFile = path.join(directory, 'synthetic-revision.xlsx');
+    const revisionSuffix = '\n合成修订：请再次核对适用说明。';
+    writeFileSync(revisionFile, await createIntakeSyntheticWorkbook({ answerSuffix: revisionSuffix }));
     writeFileSync(badFile, await createIntakeSyntheticWorkbook({ missingAnswer: true }));
     writeFileSync(goodFile, await createIntakeSyntheticWorkbook());
     app = await electron.launch({ cwd: desktopRoot, args: [`--user-data-dir=${directory}`, 'out/main/index.js', '--demo-e2e'], env: {
       ...process.env, DEMO_E2E: '1', CUSTOMER_AGENT_DESKTOP_API_ORIGIN: host.apiOrigin,
       CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: host.identityOrigin, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
     } });
+    app.process().stderr?.on('data', chunk => { mainStderr += String(chunk); });
     const observe = (page: Page) => {
       page.on('pageerror', error => rendererErrors.push(error.message));
       page.on('console', message => { if (message.type() === 'error') rendererErrors.push(message.text()); });
@@ -55,17 +60,22 @@ test('native FAQ upload and error report lead to the same approved release consu
     // Replace only native path selection. Main reads actual XLSX bytes and saves
     // the actual API response; no filesystem, upload, parser or HTTP mocks.
     await app.evaluate(({ dialog }, files) => {
-      const choices = [files.badFile, files.goodFile];
+      const choices = [files.badFile, files.goodFile, files.badFile, files.revisionFile, files.goodFile];
       dialog.showOpenDialog = async () => {
         const selected = choices.shift();
         if (!selected) throw new Error('Unexpected extra native file selection');
         return { canceled: false, filePaths: [selected] };
       };
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.reportFile });
-    }, { badFile, goodFile, reportFile });
+    }, { badFile, goodFile, revisionFile, reportFile });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
+    const fox = app.windows().find(w => w.url().includes('role=fox'))!;
+    await fox.waitForFunction(() => Boolean(window.customerAgent?.productAnnounce));
+    // The shared Fox reads the legacy projection; FAQ must return unavailable
+    // without a missing-handler error or creating a legacy announce service.
+    expect(await fox.evaluate(() => window.customerAgent!.productAnnounce!.unread!())).toMatchObject({ ok: false, unread: false });
     async function login() {
       // The app may launch behind another native window. Exercise the ordinary
       // open handoff only after activating this owned test app, then wait for it.
@@ -174,7 +184,8 @@ test('native FAQ upload and error report lead to the same approved release consu
     await expect(dashboard.getByText(/待确认来源版本 \/ 待组织审批通过/)).toBeVisible();
     await expect(dashboard.getByText(/风险等级：常规内容/)).toBeVisible();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-uploaded-material.png') });
-    await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill('synthetic-export-one');
+    async function approveAndCheck(version: number) {
+    await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill(`synthetic-export-${version}`);
     await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');
     await dashboard.getByRole('button', { name: '确认来源版本', exact: true }).click();
     await expect(dashboard.getByText('本次操作结果：来源已确认', { exact: false })).toBeVisible();
@@ -189,7 +200,7 @@ test('native FAQ upload and error report lead to the same approved release consu
     await dashboard.getByRole('button', { name: '刷新审批结果', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '组织审批已通过' }).first()).toBeVisible();
     await dashboard.getByRole('status').filter({ hasText: '组织审批已通过' }).first().scrollIntoViewIfNeeded();
-    await dashboard.screenshot({ path: path.join(evidence, 'dashboard-approved.png') });
+    await dashboard.screenshot({ path: path.join(evidence, `dashboard-approved-v${version}.png`) });
     await dashboard.getByRole('button', { name: '读取初检', exact: true }).click();
     await dashboard.getByRole('button', { name: '冻结本次抽样', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '操作回执：' })).toBeVisible();
@@ -204,6 +215,29 @@ test('native FAQ upload and error report lead to the same approved release consu
     await dashboard.getByRole('button', { name: '提交本轮人工检查', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '质量检查通过' }).first()).toBeVisible();
     await dashboard.getByRole('button', { name: '刷新候选状态', exact: true }).click();
+    }
+    await approveAndCheck(1);
+    const old = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
+    dashboard.once('dialog', dialog => dialog.accept());
+    await dashboard.getByRole('button', { name: '修订当前候选', exact: true }).click();
+    await expect(upload.getByText(/正在准备修订/)).toContainText('原版本 1');
+    await expect(sources).toBeDisabled();
+    await selectAndSubmit(path.basename(badFile));
+    await settleParse('整批校验未通过');
+    const oldPath = `/v1/intake/candidates/${old.key.candidateId}/versions/1`;
+    const unchanged = await (await host.requestAs('enabler', oldPath)).json();
+    expect(unchanged).toMatchObject({ key: old.key, state: 'ready', sourceEvidenceVersion: 1, approvalEvidenceVersion: 1 });
+    await selectAndSubmit(path.basename(revisionFile));
+    await settleParse('校验通过，候选已形成');
+    const revised = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
+    expect(revised).toMatchObject({ key: { candidateId: old.key.candidateId, version: 2 }, sourceEvidenceVersion: 0, approvalEvidenceVersion: 0 });
+    expect(revised.key.digest).not.toBe(old.key.digest);
+    expect(await (await host.requestAs('enabler', oldPath)).json()).toMatchObject({ state: 'invalidated' });
+    await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
+    await expect(material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer + revisionSuffix, { exact: true })).toBeVisible();
+    await material.scrollIntoViewIfNeeded();
+    await dashboard.screenshot({ path: path.join(evidence, 'dashboard-revision-v2.png') });
+    await approveAndCheck(2);
     await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
     await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动模拟组织审批、逐条人工质量判断');
@@ -225,6 +259,20 @@ test('native FAQ upload and error report lead to the same approved release consu
     dashboard.once('dialog', dialog => dialog.accept());
     await dashboard.getByRole('button', { name: '关闭当前候选', exact: true }).click();
     await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })).toHaveCount(0);
+    // A separate unpublished candidate can be cancelled without withdrawing the live release.
+    await selectAndSubmit(path.basename(goodFile));
+    await settleParse('校验通过，候选已形成');
+    const cancelled = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
+    expect(cancelled.key.candidateId).not.toBe(revised.key.candidateId);
+    dashboard.once('dialog', dialog => dialog.accept());
+    await dashboard.getByRole('button', { name: '取消当前候选', exact: true }).click();
+    await expect(dashboard.getByText(/已取消 · 此版本不再接受修改或发布/)).toBeVisible();
+    expect(await (await host.requestAs('enabler', `/v1/intake/candidates/${cancelled.key.candidateId}/versions/1`)).json()).toMatchObject({ state: 'cancelled' });
+    expect((await host.status()).currentReleaseId).toBe(result.currentReleaseId);
+    expect((await host.status()).publications).toBe(1);
+    await dashboard.screenshot({ path: path.join(evidence, 'dashboard-cancelled.png') });
+    dashboard.once('dialog', dialog => dialog.accept());
+    await dashboard.getByRole('button', { name: '关闭当前候选', exact: true }).click();
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.close());
     host.selectIdentity('agent');
     await query.evaluate(() => window.customerAgent!.openSearch());
@@ -239,7 +287,7 @@ test('native FAQ upload and error report lead to the same approved release consu
     await query.getByTestId('search-button').click();
     await expect(query.getByTestId('answer-text-1')).toBeVisible();
     const answers = await query.locator('[data-testid^="answer-text-"]').allTextContents();
-    expect(answers.sort()).toEqual(INTAKE_SYNTHETIC_FAQ.map(f => f.answer).sort());
+    expect(answers.sort()).toEqual(INTAKE_SYNTHETIC_FAQ.map(f => f.answer + revisionSuffix).sort());
     await expect(query.getByTestId('answer-text-1')).toHaveCSS('white-space', 'pre-wrap');
     await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
       .find(w => w.webContents.getURL().includes('role=query'))!.getBounds().height)).toBeGreaterThan(150);
@@ -253,13 +301,14 @@ test('native FAQ upload and error report lead to the same approved release consu
     const final = await host.status();
     expect(final.currentReleaseId).toBe(result.currentReleaseId);
     expect(final.requests.some(p => p.startsWith('/v1/announce') || p === '/v1/search')).toBe(false);
-    expect(final.requests.filter(p => p === '/v1/intake/sources/source-a/objects')).toHaveLength(2);
-    expect(final.requests.filter(p => p === '/v1/intake/sources/source-a/candidates')).toHaveLength(2);
+    expect(final.requests.filter(p => p === '/v1/intake/sources/source-a/objects')).toHaveLength(5);
+    expect(final.requests.filter(p => p === '/v1/intake/sources/source-a/candidates')).toHaveLength(5);
     expect(final.requests.filter(p => /^\/v1\/intake\/parse-jobs\/[^/]+\/report$/.test(p))).toHaveLength(1);
     expect(rendererErrors).toEqual([]);
+    expect(mainStderr).not.toContain("No handler registered for 'product:announce-unread'");
     console.info(JSON.stringify({ status: 'PASS', electron: process.platform, api: 'actual', postgres: 15,
       nativeDialog: 'owned-path-selection-only', upload: 'actual-multipart', issueReport: 'saved-and-read-with-exceljs',
-      approval: 'manual-synthetic-transport', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
+      approval: 'manual-synthetic-transport', revision: 'same-id-v2-fresh-evidence', cancellation: 'server-confirmed-live-release-unchanged', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
   } catch (error) {
     for (const page of app?.windows() ?? []) {
       const role = page.url().includes('role=dashboard') ? 'dashboard' : page.url().includes('role=query') ? 'query' : null;

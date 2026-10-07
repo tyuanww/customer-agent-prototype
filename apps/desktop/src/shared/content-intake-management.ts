@@ -13,7 +13,7 @@ export type IntakeManagementCommand =
   | { action: 'check'; scriptId: string; defect: boolean; reason: string }
   | { action: 'confirm-source'; versionKind: 'integer' | 'opaque'; versionValue: string; reason: string }
   | { action: 'publish'; title: string; summary: string }
-  | { action: 'freeze' | 'submit' | 'recover' | 'retry' | 'discard' | 'refresh-candidate' | 'request-review' | 'read-review' | 'refresh-review' };
+  | { action: 'freeze' | 'submit' | 'recover' | 'retry' | 'discard' | 'refresh-candidate' | 'request-review' | 'read-review' | 'refresh-review' | 'revise' | 'cancel-candidate' };
 export type QualityPage = {
   status: C['IntakeQualityStatus']; phase: 'initial' | 'expanded'; offset: number; total: number; checked: number;
   samples: (C['IntakeQualitySample'] & { draft: C['IntakeQualityCheck'] | null })[];
@@ -24,11 +24,11 @@ export type IntakeManagementView = {
   candidates: { selection: string; candidate: C['IntakeCandidate'] }[]; moreCandidates: boolean;
   selected: C['IntakeCandidate'] | null; material: C['IntakeCandidatePage'] | null;
   canReview: boolean; quality: QualityPage | null; hasDraft: boolean;
-  canConfirmSource: boolean; canPublish: boolean;
+  canConfirmSource: boolean; canPublish: boolean; canRevise: boolean; canCancel: boolean;
   review: C['IntakeReview'] | null;
   /** Historical result only. The current candidate is always read separately. */
-  workflowResult: { operationId: string; action: 'source-confirm' | 'review-request' | 'review-refresh' | 'publish'; state: string; releaseId: string | null } | null;
-  pending: { action: C['IntakeQualityReceipt']['action'] | 'source-confirm' | 'review-request' | 'review-refresh' | 'publish'; operationId: string; recovery: 'receipt' | 'retry' } | null;
+  workflowResult: { operationId: string; action: 'source-confirm' | 'review-request' | 'review-refresh' | 'publish' | 'cancel'; state: string; releaseId: string | null } | null;
+  pending: { action: C['IntakeQualityReceipt']['action'] | 'source-confirm' | 'review-request' | 'review-refresh' | 'publish' | 'cancel'; operationId: string; recovery: 'receipt' | 'retry' } | null;
   receipt: C['IntakeQualityReceipt'] | null;
 };
 export type IntakeManagementReply = { ok: true; view: IntakeManagementView } | { ok: false; code: string; message: string; view: IntakeManagementView | null };
@@ -52,7 +52,7 @@ export function isIntakeManagementCommand(raw: unknown): raw is IntakeManagement
     && (r.versionKind === 'integer' || r.versionKind === 'opaque') && text(r.versionValue, 128) && text(r.reason, 512)
     && (r.versionKind !== 'integer' || /^(0|[1-9][0-9]{0,18})$/u.test(r.versionValue as string));
   if (r.action === 'publish') return exactKeys(r, ['action','title','summary']) && text(r.title, 256) && text(r.summary, 2048);
-  return ['freeze','submit','recover','retry','discard','refresh-candidate','request-review','read-review','refresh-review'].includes(r.action as string) && exactKeys(r, ['action']);
+  return ['freeze','submit','recover','retry','discard','refresh-candidate','request-review','read-review','refresh-review','revise','cancel-candidate'].includes(r.action as string) && exactKeys(r, ['action']);
 }
 
 function text(value: unknown, max: number): value is string { return typeof value === 'string' && value.trim().length > 0 && [...value].length <= max; }

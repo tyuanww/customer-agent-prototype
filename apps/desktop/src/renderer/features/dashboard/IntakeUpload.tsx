@@ -34,19 +34,21 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
   return <section className="intake-upload" aria-label="上传 FAQ 资料">
     <h2>上传 FAQ 资料</h2>
     <p>使用统一 Excel 模板。缺少某行不会删除已发布资料；有阻断错误时，请整批修正后重新选择文件。</p>
+    {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId} · 原版本 {view.revisionOf.version}。
+      请上传完整修订稿；校验失败保留旧版，成功后生成下一版并重新确认来源、审批及质量检查。</p>}
     {blocked && <p className="intake-notice">开始新的上传前，请先完成当前候选中的输入并关闭候选，或关闭时明确放弃尚未提交的输入。</p>}
     {!view.authorized && <p>当前没有可上传的来源，请核对登录身份与来源授权。</p>}
     <label>上传来源<select aria-label="上传来源" value={view.sourceSelection ?? ''}
-      disabled={disabled || !view.authorized || !!view.pending || !!view.file}
+      disabled={disabled || !view.authorized || !!view.pending || !!view.file || !!view.revisionOf}
       onChange={event => { if (event.target.value) apply({ action: 'upload-source', selection: event.target.value }); }}>
       <option value="">请选择有权维护的来源</option>
       {view.sources.map(source => <option key={source.selection} value={source.selection}>{source.label}</option>)}
     </select></label>
     <div className="intake-toolbar">
       <button className={!view.file ? 'dash-action-primary' : undefined} disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 Excel 文件</button>
-      {view.sourceSelection && <button disabled={disabled || !!view.pending} onClick={() => {
-        if (!view.file || window.confirm('放弃本地上传准备并重新选择来源？已经提交的服务端任务不会因此撤销。')) apply({ action: 'upload-reset' });
-      }}>重新选择来源</button>}
+      {(view.sourceSelection || view.canReset) && <button disabled={disabled || !view.canReset} onClick={() => {
+        if ((!view.file && !view.revisionOf) || window.confirm('放弃本地上传准备？已经提交的服务端任务不会因此撤销，原候选也不会因此取消。')) apply({ action: 'upload-reset' });
+      }}>{!view.authorized ? '清除本地上传准备' : view.revisionOf && view.phase !== 'validated' ? '放弃本地修订' : '重新选择来源'}</button>}
     </div>
     {view.file && <p className="intake-file">已选择：<strong>{view.file.name}</strong> · {(view.file.bytes / 1024).toFixed(1)} KB</p>}
     <p className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}</p>

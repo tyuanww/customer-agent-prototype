@@ -2528,6 +2528,7 @@ describe('QueryApp', () => {
       onInvalidated: listener => { invalidate = listener; return () => {}; },
     };
     render(<QueryApp intake />); activateQuery();
+    expect(screen.queryByText(/MiniMax 只规划/)).not.toBeInTheDocument();
     await screen.findByTestId('notice-accept');
     await act(async () => menu.resolve({ ok: true, shops: ['shop-a'], shopId: null }));
     expect(screen.getByTestId('notice-accept')).toBeVisible();

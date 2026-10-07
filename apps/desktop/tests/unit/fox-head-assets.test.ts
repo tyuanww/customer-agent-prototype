@@ -278,15 +278,11 @@ describe('fox head brand assets', () => {
     }
   });
 
-  it('generates identical PNG hashes across consecutive runs and keeps the Dock plate contract', async () => {
+  it('generates identical fox PNG hashes across consecutive runs', async () => {
     const {
       deriveDarkHeadsetPixels,
       writeFoxHeadAssets,
       decodePng,
-      generateAppIconMaster,
-      APP_ICON_MASTER_SIZE,
-      APP_ICON_FOX_FILL,
-      APP_ICON_PLATE_SIZE,
     } = await loadGenerators();
     const masterPixels = decodePng(readFileSync(path.join(root, 'assets/fox-head-master.png'))).pixels;
     expect(sha256(deriveDarkHeadsetPixels(masterPixels, 1254, 1254)))
@@ -315,7 +311,16 @@ describe('fox head brand assets', () => {
       rmSync(tempA, { recursive: true, force: true });
       rmSync(tempB, { recursive: true, force: true });
     }
+  });
 
+  it('generates identical Dock icons across consecutive runs and keeps the plate contract', async () => {
+    const {
+      decodePng,
+      generateAppIconMaster,
+      APP_ICON_MASTER_SIZE,
+      APP_ICON_FOX_FILL,
+      APP_ICON_PLATE_SIZE,
+    } = await loadGenerators();
     const master = decodePng(readFileSync(path.join(root, 'assets/app-icon.png')));
     expect(master.width).toBe(APP_ICON_MASTER_SIZE);
     expect(master.height).toBe(APP_ICON_MASTER_SIZE);

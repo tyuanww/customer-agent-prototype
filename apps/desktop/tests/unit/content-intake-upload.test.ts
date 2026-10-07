@@ -396,3 +396,79 @@ it('still rejects an expired current-caller context and a directory whose self m
     } finally { f.main.dispose(); }
   }
 });
+
+it('binds a revision to the exact Main-selected key across a failed parse and a lost receive response', async () => {
+  const f = fixture();
+  try {
+    const target = structuredClone(f.data.candidate);
+    f.main.beginRevision(target, f.access); target.key.version = 99;
+    expect(f.main.view(f.access).revisionOf).toEqual({ candidateId: 'candidate-a', version: 1 });
+    expect(f.main.closeRisk()).toBe('editing');
+    await expect(f.main.command({ action: 'upload-source', selection: f.main.view(f.access).sources[0].selection }, f.access)).rejects.toMatchObject({ code: 'CONFLICT' });
+    await f.main.command({ action: 'upload-choose' }, f.access);
+    await f.submit();
+    Object.assign(f.job, { state: 'failed', generation: 2, reportObjectId: 'failed-report' });
+    await f.main.command({ action: 'upload-refresh' }, f.access);
+    expect(f.data.candidate.state).toBe('awaiting-evidence');
+    expect(f.main.view(f.access)).toMatchObject({ revisionOf: { version: 1 }, phase: 'failed' });
+    await f.main.command({ action: 'upload-choose' }, f.access);
+    Object.assign(f.job, { jobId: 'revision-job', state: 'reading', generation: 1, reportObjectId: null });
+    const original = f.request.getMockImplementation()!; let lost = true;
+    f.request.mockImplementation(async (...args) => {
+      const result = await original(...args);
+      if (args[1].endsWith('/candidates') && lost) { lost = false; throw new ProductHttpError('UNAVAILABLE'); }
+      return result;
+    });
+    await expect(f.submit()).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+    await expect(f.main.command({ action: 'upload-reset' }, f.access)).rejects.toMatchObject({ code: 'CONFLICT' });
+    await f.main.command({ action: 'upload-retry' }, f.access);
+    const receives = f.request.mock.calls.filter(c => c[1].endsWith('/candidates')).map(c => c[2]!.body as C['IntakeReceive']);
+    expect(receives.every(body => JSON.stringify(body.expectedPriorKey) === JSON.stringify(f.data.candidate.key))).toBe(true);
+    expect(receives[2]).toEqual(receives[1]);
+    Object.assign(f.job, { state: 'validated', generation: 2, candidateId: 'wrong-candidate', candidateVersion: 2 });
+    await expect(f.main.command({ action: 'upload-refresh' }, f.access)).rejects.toMatchObject({ code: 'STALE' });
+    expect(f.main.view(f.access).phase).toBe('parsing');
+    f.job.candidateId = 'candidate-a';
+    const next = structuredClone(f.data.candidate); next.key.version = 2; next.key.digest = 'b'.repeat(64);
+    f.request.mockImplementation(async (...args) => args[1].endsWith('/versions/2') ? { status: 200, value: next } : original(...args));
+    expect(await f.main.command({ action: 'upload-refresh' }, f.access)).toEqual(next);
+    await f.main.command({ action: 'upload-reset' }, f.access);
+    expect(f.main.view(f.access).revisionOf).toBeNull();
+    expect(f.request.mock.calls.some(c => c[1].endsWith('/cancel'))).toBe(false);
+  } finally { f.main.dispose(); }
+});
+
+it('starts a new upload after a completed revision, but retains the result when the file dialog is cancelled', async () => {
+  const f = fixture();
+  try {
+    f.main.beginRevision(f.data.candidate, f.access);
+    await f.main.command({ action: 'upload-choose' }, f.access); await f.submit();
+    Object.assign(f.job, { state: 'validated', generation: 2, candidateId: 'candidate-a', candidateVersion: 2 });
+    const revised = structuredClone(f.data.candidate); revised.key.version = 2;
+    const original = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async (...args) => args[1].endsWith('/versions/2') ? { status: 200, value: revised } : original(...args));
+    await f.main.command({ action: 'upload-refresh' }, f.access);
+    f.chooseWorkbook.mockResolvedValueOnce(null);
+    await f.main.command({ action: 'upload-choose' }, f.access);
+    expect(f.main.view(f.access)).toMatchObject({ phase: 'validated', revisionOf: { version: 1 }, canOpen: true });
+    await f.main.command({ action: 'upload-choose' }, f.access);
+    expect(f.main.view(f.access)).toMatchObject({ phase: 'confirming', revisionOf: null });
+    Object.assign(f.job, { jobId: 'new-job', state: 'reading', generation: 1, candidateId: null, candidateVersion: null });
+    await f.submit();
+    const receives = f.request.mock.calls.filter(c => c[1].endsWith('/candidates')).map(c => c[2]!.body as C['IntakeReceive']);
+    expect(receives).toHaveLength(2);
+    expect(receives[0].expectedPriorKey).toEqual(f.data.candidate.key);
+    expect(receives[1].expectedPriorKey).toBeNull();
+  } finally { f.main.dispose(); }
+});
+
+it.each(['published','cancelled','invalidated','publishing'] as const)('rejects revision of %s and hides its target after logout', state => {
+  const f = fixture();
+  try {
+    f.data.candidate.state = state;
+    expect(() => f.main.beginRevision(f.data.candidate, f.access)).toThrow(ProductHttpError);
+    f.data.candidate.state = 'ready'; f.main.beginRevision(f.data.candidate, f.access);
+    f.main.invalidate(false); expect(f.main.view(null).revisionOf).toBeNull();
+    f.logout(); expect(f.main.view(f.access).revisionOf).toBeNull();
+  } finally { f.main.dispose(); }
+});

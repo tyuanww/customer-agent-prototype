@@ -1,10 +1,13 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 
-afterEach(() => { delete window.dashboardIntake; delete window.dashboardContent; vi.unstubAllGlobals(); });
+afterEach(() => {
+  // Unmount while the bridge still exists, including after an early assertion.
+  cleanup(); delete window.dashboardIntake; delete window.dashboardContent; vi.unstubAllGlobals();
+});
 
 it('reuses workspace chrome and theme without mounting legacy modules or calling their session API', async () => {
   const user = userEvent.setup();
@@ -16,7 +19,7 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
     command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '合成管理会话暂不可用', view: null }), onInvalidated: () => () => undefined };
   render(<DashboardApp />);
   const shell = await screen.findByTestId('dashboard-shell');
-  expect(document.title).toBe(DASHBOARD_WINDOW_TITLE);
+  await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
   expect(within(shell).getAllByRole('tab')).toHaveLength(1);
   const tab = screen.getByTestId('nav-content');
   expect(tab).toHaveAttribute('aria-selected', 'true');

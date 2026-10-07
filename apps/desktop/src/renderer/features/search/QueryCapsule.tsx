@@ -107,9 +107,9 @@ export function QueryCapsule({
                 }}
                 onKeyDown={onKeyDown}
               />
-            <span id="deep-thinking-description" className="sr-only">
+            {!intake ? <span id="deep-thinking-description" className="sr-only">
               {deepThinkingDescription}
-            </span>
+            </span> : null}
             <div className="capsule-meta">
               {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired')) ? (
               <p
