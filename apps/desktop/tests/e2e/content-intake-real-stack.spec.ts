@@ -3,19 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
-
-async function closeOwnedElectron(app: ElectronApplication) {
-  const process = app.process();
-  // Playwright calls app.quit(), which may open the native unsaved-work dialog
-  // after an assertion fails. Only this test's own process is terminated.
-  const force = setTimeout(() => { process.kill('SIGKILL'); }, 5000);
-  try {
-    await app.evaluate(({ dialog }) => { dialog.showMessageBoxSync = () => 1; });
-    await app.close();
-  } catch (error) {
-    if (process.exitCode === null && process.signalCode === null) throw error;
-  } finally { clearTimeout(force); }
-}
+import { closeOwnedElectron } from '../support/owned-electron';
 
 /** Real Electron + production preload/Main + HTTP modules + isolated PG15.
  * Identity and approval are explicit synthetic transports. This does not claim

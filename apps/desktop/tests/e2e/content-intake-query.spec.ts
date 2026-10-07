@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
 import { intakeQueryData } from '../fixtures/intake-query-data';
+import { closeOwnedElectron } from '../support/owned-electron';
 
 /** Actual Electron / preload / Main / HTTP / clipboard. The loopback service is
  * a contract wire double; actual PostgreSQL publication has separate evidence. */
@@ -107,8 +108,11 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await query.evaluate(() => window.customerAgent!.product!.logout());
     await expect(shop).toBeDisabled();
   } finally {
-    await app?.close(); api.closeAllConnections(); identity.closeAllConnections();
-    await Promise.all([new Promise<void>(r => api.close(() => r())), new Promise<void>(r => identity.close(() => r()))]);
-    rmSync(directory, { recursive: true, force: true });
+    try { if (app) await closeOwnedElectron(app); }
+    finally {
+      api.closeAllConnections(); identity.closeAllConnections();
+      await Promise.all([new Promise<void>(r => api.close(() => r())), new Promise<void>(r => identity.close(() => r()))]);
+      rmSync(directory, { recursive: true, force: true });
+    }
   }
 });
