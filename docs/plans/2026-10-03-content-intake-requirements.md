@@ -258,6 +258,20 @@ OCR 宿主审阅6/6可审文件及4个排除的Markdown；首审三项状态/样
 
 功能边界是 Main 消费实际质量产物，未开放 renderer、IPC 或生产 factory；上传/来源/审批/发布的完整管理界面仍待纵向接线。验证结果及后续门见[Main 质量验收](../../evidence/qa/content-intake-p2-quality-main/README.md)。
 
+
+### 0.24 管理候选与人工质量检查界面（2026-10-07）
+
+用户“开始下一步”延续合成 P2 实施、OCR delegate 审核、修复、验证及本地 commit 授权。复用 §0.22–0.23 的质量 HTTP / Main 结果；不授权 push、PR、真实资料、真实审批或生产接入。本次新增跨进程边界先做定向工程审查，业务规则和历史外审记录不重写。
+
+- 可独立交付：冻结合同已有 `GET /v1/intake/candidates` 的有权候选恢复列表；Dashboard 的材料查看、冻结抽样、逐条人工质量检查、结果不明时原操作恢复。所有内容均来自合成服务。
+- 所有者：API 每页重新验权并投影当前 readiness；Main 保管候选 key、材料分页、检查草稿和操作 ID；Dashboard 只拥有显示和人工输入。复用 `ContentIntakeQuality`，不再实现抽样或自动判定。
+- 边界比较：renderer 直消费 HTTP/传入 key 会泄漏凭据、版本与恢复顺序；选择 Dashboard 专用窄 preload → Main 管理会话 → 已有 ProductSession。候选列表扩展已有 discovery 所有者，复用权限投影和签名，不新建通用分页框架。
+- 不变量：普通坐席没有管理材料；sender 必须为 Dashboard 主帧；未知操作阻止换候选和新提交；关闭界面不能默默丢失未保存判断或不确定操作；回执只说明历史结果，重新读取才取得当前状态。表格和多行话术不能被裁切成隐含通过。
+- 失败与验证：实际 PostgreSQL 的越店/撤权/会话/游标/动态状态过滤；Main 的分页和失效、人工未填/缺陷理由、丢响应恢复；IPC 非法主帧/额外字段；组件和 Electron 的人工检查纵向路径。权限/跨进程变更运行根 lint/typecheck/test/build，核验 sandbox preload 产物。
+- 本轮接口缺口：新候选 receive 需要确切 `baseReleaseId` 和具备已确认身份的参与人；当前 sources/authorization 没有管理基线与人员映射。不得猜 null、借用同时签发旧离线租约的 announce，或要求业务人员手填内部 principal ID。独立界面先完成，上传合同差集和审批/发布后续 UI 保留明确后续入口，不能宣称完整 FAQ 管理闭环完成。
+
+定向工程审查：架构选择已落定；现有模块可复用；新 UI 分页显示避免整批渲染，服务扫描有界；上述关键路径须运行后才能记作通过。外部模型按用户选择 disabled；此前外审超时/校验失败仍保留。管理上下文新合同尚待具体批准，现有合同内实现不依赖该批准。 本次实现、修复与后续合同差集见[管理界面验收](../../evidence/qa/content-intake-p2-management-ui/README.md)。
+
 ## 1. 已确认的目标
 
 用户已确认本期完成“资料导入、维护、发布、坐席查询形成完整流程”。完成必须以坐席使用到正确的已发布内容为依据，不能止于后台上传成功。

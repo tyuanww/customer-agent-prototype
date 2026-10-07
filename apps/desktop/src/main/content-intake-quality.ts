@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { ProductHttpError } from './product-http';
+import type { QualityPage } from '../shared/content-intake-management';
 import type { ProductSession } from './product-session';
 
 type C = components['schemas'];
@@ -57,6 +58,17 @@ export class ContentIntakeQuality {
     this.key = structuredClone(key); this.clearView();
   }
   current(): IntakeQualityView | null { this.assertSession(); return structuredClone(this.loaded); }
+  hasDraft(): boolean { return this.draft.size > 0; }
+  /** Bounded display projection; drafts stay with the same owner as submission. */
+  page(offset: number): QualityPage | null {
+    this.assertSession();
+    const v = this.loaded;
+    if (!v) return null;
+    if (!Number.isSafeInteger(offset) || offset < 0 || (offset >= v.samples.length && offset !== 0)) return reject('VALIDATION');
+    return structuredClone({ status: v.status, phase: v.phase, offset, total: v.samples.length,
+      checked: v.samples.filter(s => s.check || this.draft.has(s.scriptId)).length,
+      samples: v.samples.slice(offset, offset + 20).map(s => ({ ...s, draft: this.draft.get(s.scriptId) ?? null })) });
+  }
   unresolved(): { operationId: string; action: Receipt['action'] } | null {
     this.assertSession();
     return this.pending ? { operationId: this.pending.body.operationId, action: this.pending.action } : null;
@@ -133,6 +145,7 @@ export class ContentIntakeQuality {
   setCheck(scriptId: string, defect: boolean, reason: string) {
     this.assertSession();
     if (this.pending || this.active) return reject('CONFLICT');
+    if (!this.loaded || this.loaded.status.state !== (this.loaded.phase === 'initial' ? 'initial_required' : 'expansion_required')) return reject('CONFLICT');
     const sample = this.loaded?.samples.find(s => s.scriptId === scriptId);
     if (!sample) return reject('STALE');
     if (sample.check) return reject('CONFLICT');

@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { allocationKinds } from './authority.js';
+import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, type IntakeTransaction, type Principal } from './transaction.js';
 
@@ -120,6 +121,55 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
     }, value => parseContractSchema(schema, value));
   }
   return {
+    /** Recovery menu, not a point-in-time snapshot. Scan at most limit versions
+     * per page and project readiness through the command owner's predicate.
+     * A state-filtered page may be empty with a next cursor. Every page rechecks
+     * the complete authority projection; a cursor grants no resource access. */
+    candidates(actor: AuthenticatedUser, raw: unknown) {
+      return run(actor, 'discover-candidates', null, null, async (client, who) => {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        const { sourceId, state: wanted, ...paging } = raw as Record<string, unknown>;
+        const request = page(paging);
+        if (sourceId !== undefined) parseContractSchema('IntakeId', sourceId);
+        if (wanted !== undefined && !['awaiting-evidence','ready','publishing','published','cancelled','invalidated'].includes(wanted as string)) {
+          throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        }
+        const session = await lockProductSession(client, actor), access = await discover(client, who, session.validUntil);
+        const sources = access.capabilities.filter(c => c.actions.includes('content-manage')).map(c => c.scope.sourceId!);
+        if (sourceId !== undefined && !sources.includes(sourceId as string)) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+        const binding = digest(canonical([access.revision, (sourceId as string | undefined) ?? null, (wanted as string | undefined) ?? null]));
+        let afterId = '', afterVersion = 0;
+        if (request.cursor) {
+          const parts = request.cursor.split('.');
+          if (parts.length !== 2 || !parts.every(s => /^[A-Za-z0-9_-]+$/.test(s))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+          const mac = Buffer.from(parts[1]!, 'base64url'), expected = signature(parts[0]!, session.hash);
+          if (mac.length !== expected.length || !timingSafeEqual(mac, expected)) throw new IntakeRejection('PERMISSION_CHANGED');
+          let tuple: unknown;
+          try { tuple = JSON.parse(Buffer.from(parts[0]!, 'base64url').toString()); } catch { throw new IntakeRejection('FILE_INVALID', 'VALIDATION'); }
+          if (!Array.isArray(tuple) || tuple.length !== 5 || tuple[0] !== binding || typeof tuple[1] !== 'string'
+            || !Number.isSafeInteger(tuple[2]) || tuple[2] < 1 || typeof tuple[3] !== 'number'
+            || tuple[4] !== 'candidates' || await clock(client) >= tuple[3]) throw new IntakeRejection('PERMISSION_CHANGED');
+          afterId = tuple[1]; afterVersion = tuple[2];
+        }
+        const rows = (await client.query<{ candidate_id: string; version: string }>(`SELECT candidate_id,version
+          FROM content_intake.candidate_versions WHERE source_id=ANY($1::text[])
+            AND (candidate_id COLLATE "C",version)>($2 COLLATE "C",$3::bigint)
+          ORDER BY candidate_id COLLATE "C",version LIMIT $4`,
+        [sourceId === undefined ? sources : [sourceId], afterId, afterVersion, request.limit + 1])).rows;
+        const scanned = rows.slice(0, request.limit), items: C['IntakeCandidate'][] = [];
+        for (const row of scanned) {
+          const candidate = await readCandidate(client, who, row.candidate_id, Number(row.version));
+          if (wanted === undefined || candidate.state === wanted) items.push(candidate);
+        }
+        let nextCursor: string | null = null;
+        if (rows.length > request.limit) {
+          const last = scanned.at(-1)!;
+          const body = Buffer.from(JSON.stringify([binding, last.candidate_id, Number(last.version), Date.parse(access.meta.validUntil), 'candidates'])).toString('base64url');
+          nextCursor = `${body}.${signature(body, session.hash).toString('base64url')}`;
+        }
+        return { items, nextCursor };
+      }, value => parseContractSchema('IntakeCandidateList', value));
+    },
     authorizations: (actor: AuthenticatedUser, raw: unknown) => read(actor, raw, 'authorization', 'IntakeAuthorization'),
     sources: (actor: AuthenticatedUser, raw: unknown) => read(actor, raw, 'sources', 'IntakeSourceList'),
   };

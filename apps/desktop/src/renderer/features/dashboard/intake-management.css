@@ -1,0 +1,16 @@
+.intake-management { max-width: 1120px; margin: 0 auto; padding: 48px 32px; color: var(--dashboard-text, #25232c); background: var(--dashboard-surface, #faf9fc); min-height: 100vh; font: 15px/1.6 system-ui, sans-serif; }
+.intake-management header { display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid #dcd8e5; padding-bottom: 20px; }
+.intake-management h1 { margin: 4px 0; font-size: 30px; } .intake-management h2 { font-size: 20px; margin-top: 28px; }
+.intake-eyebrow { color: #665380; font-size: 12px; letter-spacing: 2px; }
+.intake-toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
+.intake-management button, .intake-management select, .intake-management textarea { font: inherit; border: 1px solid #ccc5d9; border-radius: 8px; padding: 8px 14px; background: white; color: #302739; }
+.intake-management button:not(:disabled) { cursor: pointer; } .intake-management button:disabled { opacity: .5; }
+.intake-management :focus-visible { outline: 3px solid #8763b7; outline-offset: 3px; }
+.intake-candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.intake-candidates button { display: flex; flex-direction: column; text-align: left; overflow-wrap: anywhere; }
+.intake-card, .intake-notice { margin: 18px 0; border: 1px solid #dcd8e5; border-radius: 12px; padding: 20px; background: white; }
+.intake-notice, .intake-management [role=alert] { background: #fff3dc; padding: 16px; color: #65400b; }
+.intake-answer, .intake-management pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.intake-management pre { font-size: 12px; padding: 16px; background: #efedf4; max-height: 380px; overflow: auto; }
+.intake-management label { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0; }
+.intake-management textarea { flex: 1; min-height: 70px; } .intake-management fieldset { border: 0; padding: 12px 0 0; }

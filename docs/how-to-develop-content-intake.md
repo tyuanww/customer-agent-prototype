@@ -157,6 +157,17 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `ContentIntakeUsage` 重新取得完整资格快照。`productIds/scenarioIds` 暂为空数组，按冻结合同只取不限商品/场景条目；界面明确显示“店铺通用 FAQ”。检索复用 retrieval-core，标题/启用问法权重 3，正文 1，固定 BM25 k1=1.2、b=0.75；按快照顺序稳定破同分。暂不接外部模型、反馈写回或 SOP。最多 5000 条、2 MiB 检索字段输入；超限整次返回 LIMIT，不交付截断结果。计算后让出事件循环，再复核原资格，不能把计算期间到期的正文投影出来。
 
-`cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单和托盘隐藏工作台入口，Dock 激活转到 Query；Main 也拒绝直接打开工作台。FAQ 正文展示和复制均保留原换行。
+`cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单、托盘和 Dock 现在可进入 FAQ 专用资料审核页；没有 content-manage 权限时只显示无管理权限，不装配旧管理适配器。FAQ 正文展示和复制均保留原换行。
 
 本轮测试的 HTTP 是冻结合同 wire double，不能替代真实 API/PG 证据；此前封闭 PG → HTTP → Main 探针证据独立保留。剩余项包括商品/场景筛选、正式店铺显示名合同、上传/校验/飞书审核/发布管理闭环，以及安装包 Mac/Windows 人工交互。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
+
+## P2 管理候选与人工质量检查
+
+同一显式 FAQ 合成 profile 的工作台支持候选分页、材料及差异、冻结抽样、逐条人工判断和原操作回执恢复。列表使用实际来源权限，不按旧 coach/owner 名称授予权限。每页最多显示 20 条检查；未保存的编辑阻止翻页/提交，未提交草稿需明确放弃才能切候选。回执是历史记录，提交后重新读取检查状态。退出登录清空内存；关闭窗口或应用会提示正在处理/结果不明及尚未提交判断。强制关闭不是撤销服务端操作。
+
+```sh
+pnpm --filter @customer-agent/desktop build
+pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-management.spec.ts tests/e2e/content-intake-query.spec.ts
+```
+
+新上传仍缺确切当前基线及已确认参与人选择合同；不能默认空基线或从登录 userId 推断 principalId。来源确认、组织审批、发布 UI 尚待接线，现有合成 API/PG 工作流证据继续独立有效。冻结抽样和“质量检查通过”均不等于组织审批或发布许可。

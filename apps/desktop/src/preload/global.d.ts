@@ -1,3 +1,4 @@
+import type { IntakeManagementApi } from '../shared/content-intake-management';
 import type { CustomerAgentApi } from '../shared/contracts';
 import type { DashboardAnnounceApi } from '../shared/dashboard-announce';
 import type { DashboardContentApi } from '../shared/dashboard-content';
@@ -9,6 +10,7 @@ import type { SopWindowApi } from '../shared/sop-window';
 
 declare global {
   interface Window {
+    dashboardIntake?: IntakeManagementApi;
     customerAgent?: CustomerAgentApi;
     dashboardWording?: DashboardWordingApi;
     dashboardAnnounce?: DashboardAnnounceApi;
