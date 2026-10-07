@@ -263,6 +263,8 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。`main@4739c39` 的 CI run `37024571842` 已通过，`pnpm check:architecture` 当前对 303 个源码/配置文件报告 0 个依赖方向违规，`runtime_activated=false` 和 synthetic-only 边界仍保留。
 
+FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块和业务订阅。FAQ 只显示内容管理、仅挂 `IntakeManagement`，不订阅旧 `dashboardContent` 会话。模块消费既有 `--dash-*` token 与共享主按钮，不能另建主题或复制导航状态机。
+
 四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
 
 剩余耦合是有意保留的产品语义：检索 adapter 仍绑定桌面字段与发布租约，API `server.ts` 仍组合本项目的路由和合同，主状态机仍集中在上述入口。三份可复用能力 RFC（合同运行时、Migration 控制面、安全边界）均为 `DRAFT · 等待第二个真实消费者`；当前项目单独通过不能证明跨项目复用，出现第二个真实消费者前不继续抽公共包。

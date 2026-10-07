@@ -82,12 +82,14 @@ export function DashboardApp() {
       .catch(() => { if (active) setMode('failed'); });
     return () => { active = false; };
   }, []);
-  if (mode === 'intake') return <IntakeManagement />;
-  if (mode !== 'legacy') return <p role="status">{mode === 'loading' ? '正在读取管理模式…' : '管理模式不可用，请重新打开窗口。'}</p>;
-  return <LegacyDashboardApp />;
+  if (mode === 'loading' || mode === 'failed') return <p role="status">{mode === 'loading' ? '正在读取管理模式…' : '管理模式不可用，请重新打开窗口。'}</p>;
+  return <DashboardWorkspace profile={mode} />;
 }
-function LegacyDashboardApp() {
-  const [active, setActive] = useState<DashboardModuleId>('overview');
+/** Both profiles share native chrome and appearance. Only the selected profile
+ * mounts business modules or subscribes to its session API. */
+function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
+  const navItems = useMemo(() => profile === 'intake' ? DASHBOARD_NAV.filter(item => item.id === 'content') : DASHBOARD_NAV, [profile]);
+  const [active, setActive] = useState<DashboardModuleId>(profile === 'intake' ? 'content' : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [signedIn, setSignedIn] = useState(false);
@@ -134,6 +136,7 @@ function LegacyDashboardApp() {
   const contentRef = useRef<HTMLElement | null>(null);
   const navMaxWidth = getDashboardNavMaxWidth(viewportWidth);
   const resolvedTheme = resolveDashboardTheme(themeMode, systemDark);
+  const legacyDisclaimer = signedIn ? DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED : DASHBOARD_MANIFEST.banners.disclaimer;
   const navCollapsed = isDashboardNavRailPhase(navPhase);
   const hostPlatform = useMemo(
     () => inferDashboardHostPlatform({
@@ -147,8 +150,8 @@ function LegacyDashboardApp() {
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
   const activeItem = useMemo(
-    () => DASHBOARD_NAV.find((item) => item.id === active) ?? DASHBOARD_NAV[0],
-    [active],
+    () => navItems.find((item) => item.id === active) ?? navItems[0],
+    [active, navItems],
   );
 
   useLayoutEffect(() => {
@@ -160,6 +163,7 @@ function LegacyDashboardApp() {
   }, [active]);
 
   useEffect(() => {
+    if (profile !== 'legacy') return undefined;
     const api = window.dashboardContent;
     if (!api) return undefined;
     let live = true;
@@ -190,7 +194,7 @@ function LegacyDashboardApp() {
       window.removeEventListener('focus', load);
       stopSession?.();
     };
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -989,7 +993,7 @@ function LegacyDashboardApp() {
   };
 
   const move = (delta: number) => {
-    const nextId = nextDashboardNavId(active, delta);
+    const nextId = nextDashboardNavId(active, delta, navItems);
     setActive(nextId);
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${nextId}`)?.focus();
@@ -1100,7 +1104,7 @@ function LegacyDashboardApp() {
           aria-label="工作台功能"
           aria-orientation="vertical"
         >
-          {DASHBOARD_NAV.map((item) => {
+          {navItems.map((item) => {
             const selected = item.id === active;
             const showGroup = item.group !== lastGroup;
             lastGroup = item.group;
@@ -1155,13 +1159,13 @@ function LegacyDashboardApp() {
                     }
                     if (event.key === 'Home') {
                       event.preventDefault();
-                      const first = DASHBOARD_NAV[0].id;
+                      const first = navItems[0].id;
                       setActive(first);
                       focusModule(first);
                     }
                     if (event.key === 'End') {
                       event.preventDefault();
-                      const last = DASHBOARD_NAV[DASHBOARD_NAV.length - 1].id;
+                      const last = navItems[navItems.length - 1].id;
                       setActive(last);
                       focusModule(last);
                     }
@@ -1176,7 +1180,7 @@ function LegacyDashboardApp() {
         </div>
         <p className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
           <span data-testid="dashboard-boundary-disclaimer">
-            {signedIn ? DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED : DASHBOARD_MANIFEST.banners.disclaimer}
+            {profile === 'intake' ? '合成验证 · 未接入真实业务资料' : legacyDisclaimer}
           </span>
         </p>
         <div
@@ -1233,7 +1237,7 @@ function LegacyDashboardApp() {
           <div className="dashboard-page-context">
             <strong>{activeItem.label}</strong>
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
-              {refreshLabel}
+              {profile === 'intake' ? 'PILOT-S0 · SYNTHETIC' : refreshLabel}
             </p>
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
@@ -1249,20 +1253,22 @@ function LegacyDashboardApp() {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
-          {active === 'wording' ? (
-            <WordingLibraryModule
-              initialDomain={wordingDomain}
-              onDomainConsumed={() => setWordingDomain(undefined)}
-            />
-          ) : null}
-          {active === 'sop' ? <SopLibraryModule /> : null}
-          {active === 'announce' ? <AnnounceModule onOpenDomain={openWordingDomain} /> : null}
-          {keepContent || active === 'content' ? (
-            <div hidden={active !== 'content'}>
-              <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
-            </div>
-          ) : null}
+          {profile === 'intake' ? <IntakeManagement /> : <>
+            {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
+            {active === 'wording' ? (
+              <WordingLibraryModule
+                initialDomain={wordingDomain}
+                onDomainConsumed={() => setWordingDomain(undefined)}
+              />
+            ) : null}
+            {active === 'sop' ? <SopLibraryModule /> : null}
+            {active === 'announce' ? <AnnounceModule onOpenDomain={openWordingDomain} /> : null}
+            {keepContent || active === 'content' ? (
+              <div hidden={active !== 'content'}>
+                <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
+              </div>
+            ) : null}
+          </>}
         </main>
       </div>
     </div>

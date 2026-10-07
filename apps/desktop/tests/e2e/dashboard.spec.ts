@@ -152,7 +152,7 @@ test('opens one isolated Dashboard from trusted desktop entries', async () => {
     await expect(dashboard.getByTestId('dashboard-env-badges')).toHaveCount(0);
     await expect(dashboard.getByTestId('dashboard-disclaimer')).toHaveCount(0);
     await expect(dashboard.getByTestId('dashboard-boundary-disclaimer')).toContainText(
-      'VOC 明细为合成镜像 · 话术库读当前发布',
+      '未接入产品会话时不展示数字。话术库读当前发布',
     );
     for (const [width, height] of [[980, 680], [1180, 760], [1440, 820]] as const) {
       await expectDashboardWithoutHorizontalOverflow(app, dashboard, width, height);

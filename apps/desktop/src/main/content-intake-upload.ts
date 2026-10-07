@@ -102,7 +102,10 @@ export class ContentIntakeUpload {
       job: readable && this.job ? { state: this.job.state, issues: this.job.issues, totalIssues: this.job.totalIssues,
         excludedSheetCount: this.job.excludedSheetCount, excludedMediaCount: this.job.excludedMediaCount } : null,
       canChoose: ready && !parsing(this.job), canSubmit: ready && !!this.file && !this.job && !!declarations,
-      canRetry: !busy && !!this.pending && !this.disposed && this.session.view().signedIn && this.session.view().sessionEpoch === this.epoch, canRefresh: ready && !!this.file,
+      canRetry: !busy && !!this.pending && !this.disposed && this.session.view().signedIn && this.session.view().sessionEpoch === this.epoch,
+      // Completed parsing is immutable; reopening its candidate is an explicit
+      // intent, so refreshing an old upload cannot compete with another selection.
+      canRefresh: ready && !!this.file && this.job?.state !== 'validated',
       canStop: busy, canSaveReport: ready && !!this.job?.reportObjectId,
       canOpen: ready && this.canManage(access) && this.job?.state === 'validated', notice: this.notice });
   }
