@@ -121,17 +121,19 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 0024 adds one sealed native publication function, with unchanged ACL and table shapes.
 // 0025 adds immutable usage contexts and three private guards; the ACL is unchanged.
 // 0026 adds one discovery index and its five columns to the object manifest only.
+// 0027 adds a private rollback review lineage, two guards and three private functions.
+// The legacy non-login definer receives SELECT on that table only to refuse unsafe inheritance.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
-const EXPECTED_ACL_MANIFEST_ENTRIES = 223;
-const EXPECTED_ACL_MANIFEST_SHA256 = '733889747d9dbd94c592e64bd4c9c3e69e981eb00e1fe5fdc4ea3d50f2c4ab00';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2755;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = 'f63a772d859fca57fb16ef5303c7dc74cf291f0a5151b94559e7a6435fb7914e';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 220;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = 'fa97ffd2b673bc0429991598fa6517b53fa0e997f5a841ea8338dc64ca3ef729';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 82;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = '96a2a5fd681cb190c22db5e9aad27f17c5d3ac2a77be3133722d444778835676';
+const EXPECTED_ACL_MANIFEST_ENTRIES = 224;
+const EXPECTED_ACL_MANIFEST_SHA256 = '5480b366b50e1fdfdb330e8551397a597593f1180202fb6c46f4204766782b80';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2772;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '749b17c9201bfe6ecdbea21f735681221e9c494405e99091418e057b6451a7ab';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 223;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = 'f6991d0c9bdec1960691784f158818841a1ec4bfe0924367901fb54bb757bdcd';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 84;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = 'd3fe648f5fff06adefb428906cf6caa1d039fc8b0608c2a09cd93a210bb567b6';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -753,7 +755,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 84 || inventory.views !== 7 || inventory.functions !== 220 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 85 || inventory.views !== 7 || inventory.functions !== 223 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {
@@ -781,7 +783,7 @@ export async function verifyMigrationCatalogue(
     || trigger.entries !== EXPECTED_TRIGGER_MANIFEST_ENTRIES
     || sha256(trigger.manifest) !== EXPECTED_TRIGGER_MANIFEST_SHA256
   ) {
-    failures.push('exact trigger table/function/event/enabled manifest');
+    failures.push(`exact trigger table/function/event/enabled manifest [${trigger?.entries ?? 'missing'}:${trigger ? sha256(trigger.manifest) : 'missing'}]`);
   }
   if (REQUIRED_SCHEMA_COMMENT_FRAGMENTS.some((fragment) => !schemaComment.includes(fragment))) {
     failures.push('schema evidence-boundary comment');

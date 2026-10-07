@@ -1,0 +1,267 @@
+{
+  "schema_version": "1",
+  "mode": "workspace",
+  "repository": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "total_files": 39,
+  "reviewable_count": 20,
+  "excluded_count": 19,
+  "total_insertions": 1797,
+  "total_deletions": 91,
+  "reviewable_files": [
+    {
+      "path": "apps/api/src/content-intake/approval-adapter.ts",
+      "status": "modified",
+      "insertions": 12,
+      "deletions": 5
+    },
+    {
+      "path": "apps/api/src/content-intake/evidence.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 2
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "status": "modified",
+      "insertions": 17,
+      "deletions": 0
+    },
+    {
+      "path": "apps/api/src/content-intake/publication.ts",
+      "status": "modified",
+      "insertions": 10,
+      "deletions": 1
+    },
+    {
+      "path": "apps/api/src/content-intake/reviewer.ts",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 2
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management-ipc.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-management.ts",
+      "status": "modified",
+      "insertions": 18,
+      "deletions": 8
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 2
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-management.ts",
+      "status": "modified",
+      "insertions": 16,
+      "deletions": 0
+    },
+    {
+      "path": "package.json",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "packages/database/scripts/generate-migrations.mjs",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "packages/database/src/planner.ts",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 3
+    },
+    {
+      "path": "packages/database/src/verifier.ts",
+      "status": "modified",
+      "insertions": 12,
+      "deletions": 10
+    },
+    {
+      "path": "apps/api/src/content-intake/rollback.ts",
+      "status": "added",
+      "insertions": 237,
+      "deletions": 0
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-rollback.ts",
+      "status": "added",
+      "insertions": 133,
+      "deletions": 0
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/dashboard/IntakeRollback.tsx",
+      "status": "added",
+      "insertions": 53,
+      "deletions": 0
+    },
+    {
+      "path": "packages/database/migrations/0027_intake_rollback.sql",
+      "status": "added",
+      "insertions": 283,
+      "deletions": 0
+    },
+    {
+      "path": "packages/database/overlays/0027_intake_rollback.sql",
+      "status": "added",
+      "insertions": 279,
+      "deletions": 0
+    }
+  ],
+  "excluded_files": [
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "insertions": 176,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-upload.test.tsx",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-management.test.ts",
+      "status": "modified",
+      "insertions": 34,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "docs/how-to-verify-desktop.md",
+      "status": "modified",
+      "insertions": 15,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "insertions": 38,
+      "deletions": 2,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 4,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/database/README.md",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 2,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/database/migrations/manifest.generated.json",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/src/generated/migrations.generated.ts",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/generator.test.ts",
+      "status": "modified",
+      "insertions": 7,
+      "deletions": 6,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/planner.test.ts",
+      "status": "modified",
+      "insertions": 9,
+      "deletions": 9,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/postgres.integration.test.ts",
+      "status": "modified",
+      "insertions": 38,
+      "deletions": 30,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/component/intake-rollback.test.tsx",
+      "status": "added",
+      "insertions": 46,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts",
+      "status": "added",
+      "insertions": 136,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-rollback.test.ts",
+      "status": "added",
+      "insertions": 122,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-rollback/README.md",
+      "status": "added",
+      "insertions": 47,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-rollback/rollback-dark.png",
+      "status": "binary",
+      "insertions": 0,
+      "deletions": 0,
+      "exclude_reason": "binary"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-rollback/rollback-light.png",
+      "status": "binary",
+      "insertions": 0,
+      "deletions": 0,
+      "exclude_reason": "binary"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-rollback/rollback-ordinary-seat.png",
+      "status": "binary",
+      "insertions": 0,
+      "deletions": 0,
+      "exclude_reason": "binary"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import { isIntakeManagementCommand, type IntakeManagementCommand, type IntakeManagementView } from '../shared/content-intake-management';
+import { isIntakeManagementCommand, type IntakeManagementCommand, type IntakeManagementView, type IntakeRollbackCommand } from '../shared/content-intake-management';
 import { isIntakeUploadCommand } from '../shared/content-intake-upload';
 import { ContentIntakeUpload } from './content-intake-upload';
 import { loadIntakeAccess, type IntakeAccess } from './content-intake-access';
+import { ContentIntakeRollback } from './content-intake-rollback';
 import { ContentIntakeQuality } from './content-intake-quality';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
@@ -15,6 +16,7 @@ type WorkflowOperation =
   | { action: 'cancel'; body: C['IntakeCancel'] }
   | { action: 'publish'; body: C['IntakePublish'] };
 type Request = (path: string, body?: unknown) => Promise<unknown>;
+const isRollback = (command: IntakeManagementCommand): command is IntakeRollbackCommand => command.action.startsWith('rollback-');
 const sameKey = (a: C['IntakeCandidateKey'], b: C['IntakeCandidateKey']) => a.candidateId === b.candidateId && a.version === b.version && a.digest === b.digest;
 const reject = (code: 'FORBIDDEN' | 'STALE' | 'CONFLICT' | 'VALIDATION'): never => { throw new ProductHttpError(code); };
 
@@ -22,6 +24,7 @@ const reject = (code: 'FORBIDDEN' | 'STALE' | 'CONFLICT' | 'VALIDATION'): never 
  * commands and material reads reauthorize at API. Expiry clears readable data,
  * while an unknown mutation keeps its exact Main-owned body for recovery. */
 export class ContentIntakeManagement {
+  private readonly rollback = new ContentIntakeRollback();
   private readonly quality: ContentIntakeQuality;
   private readonly upload: ContentIntakeUpload;
   private access: IntakeAccess | null = null;
@@ -51,14 +54,14 @@ export class ContentIntakeManagement {
     });
     this.unsubscribe = session.subscribe(() => {
       if (!session.view().signedIn || session.view().sessionEpoch !== this.epoch) {
-        this.epoch = session.view().sessionEpoch; this.workflowPending = null; this.upload.invalidate(true); this.invalidate(); this.clearSelection();
+        this.epoch = session.view().sessionEpoch; this.workflowPending = null; this.rollback.invalidate(true); this.upload.invalidate(true); this.invalidate(); this.clearSelection();
       }
     });
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private invalidate() {
     this.active?.abort(); this.access = null; this.rows = []; this.cursor = null; this.material = null;
-    this.quality.cancelRead(); this.review = null;
+    this.quality.cancelRead(); this.review = null; this.rollback.invalidate();
     this.upload.invalidate(false);
     if (this.timer) clearTimeout(this.timer); this.timer = null;
     for (const listener of this.listeners) listener();
@@ -82,15 +85,15 @@ export class ContentIntakeManagement {
   }
   /** Native close/quit guard: never dispose an unknown write without a visible warning. */
   closeRisk(): 'pending' | 'editing' | null {
-    if (this.active || (this.session.view().signedIn && this.unresolved()) || this.upload.closeRisk() === 'pending') return 'pending';
-    return this.selected ? 'editing' : this.upload.closeRisk();
+    if (this.active || (this.session.view().signedIn && (this.unresolved() || this.rollback.pending())) || this.upload.closeRisk() === 'pending') return 'pending';
+    return this.selected || this.rollback.editing() ? 'editing' : this.upload.closeRisk();
   }
   view(): IntakeManagementView {
     const session = this.session.view(), access = this.validAccess(), authorized = this.can('content-manage');
     const canRead = !!this.selected && this.can('content-manage', this.selected.sourceId);
     const mutable = canRead && ['awaiting-evidence','ready'].includes(this.selected!.state);
     const canReview = mutable && this.can('review', this.selected!.sourceId);
-    return structuredClone({ signedIn: session.signedIn, displayName: session.signedIn ? session.displayName ?? '已登录' : '未登录',
+    return structuredClone({ rollback: this.rollback.view(access), signedIn: session.signedIn, displayName: session.signedIn ? session.displayName ?? '已登录' : '未登录',
       authorized, validUntil: access?.validUntil ?? null, candidates: this.rows, moreCandidates: this.cursor !== null,
       selected: canRead ? this.selected : null, material: canRead ? this.material : null,
       canReview, quality: canReview ? this.quality.page(this.offset) : null, hasDraft: canReview && this.quality.hasDraft(),
@@ -119,6 +122,7 @@ export class ContentIntakeManagement {
       await this.upload.command(c, this.validAccess()); return this.view();
     }
     if (this.active) return reject('CONFLICT');
+    if (this.rollback.pending() && !isRollback(c)) return reject('CONFLICT');
     const upload = this.upload.view(this.validAccess());
     if (!isIntakeUploadCommand(c) && upload.pending && c.action !== 'list') return reject('CONFLICT');
     // This fence uses owned state, not the access-filtered renderer projection:
@@ -135,7 +139,13 @@ export class ContentIntakeManagement {
       assertActive(); return r.value;
     };
     try {
-      if (isIntakeUploadCommand(c)) {
+      if (isRollback(c)) {
+        if (this.unresolved() || this.quality.hasDraft() || this.upload.closeRisk()) return reject('CONFLICT');
+        const recovery = ['rollback-recover','rollback-retry','rollback-discard'].includes(c.action);
+        if (!recovery && !this.validAccess()) { await this.refreshAccess(controller.signal); assertActive(); }
+        await this.rollback.command(c, request, this.validAccess());
+        if (c.action === 'rollback-correct') this.clearSelection();
+      } else if (isIntakeUploadCommand(c)) {
         if (this.unresolved() || this.quality.hasDraft()) return reject('CONFLICT');
         if (this.selected && ['upload-source','upload-choose','upload-submit','upload-open'].includes(c.action)) return reject('CONFLICT');
         // Reset only abandons local preparation. It must work offline after
@@ -315,5 +325,5 @@ export class ContentIntakeManagement {
   private address(candidate: Pick<C['IntakeCandidate'], 'key'>) {
     return `/v1/intake/candidates/${encodeURIComponent(candidate.key.candidateId)}/versions/${candidate.key.version}`;
   }
-  dispose() { this.disposed = true; this.unsubscribe(); this.invalidate(); this.quality.dispose(); this.upload.dispose(); this.workflowPending = null; this.listeners.clear(); }
+  dispose() { this.disposed = true; this.unsubscribe(); this.invalidate(); this.quality.dispose(); this.upload.dispose(); this.workflowPending = null; this.rollback.invalidate(true); this.listeners.clear(); }
 }

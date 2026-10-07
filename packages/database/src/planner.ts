@@ -73,6 +73,7 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
   }
 
   let precedingMigrationCount = prior?.migrationCount ?? 0;
+  let precedingSchemaSha256 = prior?.sourceSchemaSha256;
   const reviewedIds = new Set([catalogue.contractSetId, ...(prior ? [prior.contractSetId] : [])]);
   for (const upgrade of reviewedUpgrades) {
     if (
@@ -82,18 +83,20 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       || !HASH_PATTERN.test(upgrade.sourceSchemaSha256)
       || !Number.isSafeInteger(upgrade.migrationCount)
       || upgrade.migrationCount < precedingMigrationCount
-      || (upgrade.migrationCount === precedingMigrationCount && upgrade.migrationCount !== catalogue.migrations.length)
+      || (upgrade.migrationCount === precedingMigrationCount && upgrade.sourceSchemaSha256 !== precedingSchemaSha256)
       || upgrade.migrationCount > catalogue.migrations.length
       || reviewedIds.has(upgrade.contractSetId)
       // A reviewed HTTP-only contract may retain the complete SQL catalogue.
-      // Equal counts are safe only for the identical DDL and a distinct source
-      // contract; every migration still has its original provenance/hash below.
+      // Equal historical counts are safe only for identical predecessor DDL
+      // and a distinct source contract, including after a product overlay.
+      // Every migration still has its exact provenance/hash checked below.
       || (upgrade.migrationCount === catalogue.migrations.length
         && (upgrade.sourceSchemaSha256 !== catalogue.sourceSchemaSha256 || upgrade.contractSetId === catalogue.contractSetId))
     ) {
       catalogueError('Migration catalogue reviewed-upgrade metadata is invalid');
     }
     precedingMigrationCount = upgrade.migrationCount;
+    precedingSchemaSha256 = upgrade.sourceSchemaSha256;
     reviewedIds.add(upgrade.contractSetId);
   }
 

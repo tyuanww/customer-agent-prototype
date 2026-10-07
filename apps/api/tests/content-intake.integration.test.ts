@@ -1691,6 +1691,181 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       FROM content_intake.grants g WHERE scope_id='scope-a' ORDER BY (kind='allocation') DESC`,[suffix]);
   }
 
+  async function rollbackPair() {
+    await publicationBase();
+    const first=await publishable('rollback-first');const target=value(await service.publish(actor('enabler'),first.request)).releaseId!;
+    const second=await publishable('rollback-second',[['faq-one','合成问题','待纠正的合成正文','','','分类','','启用','','','','内部说明','','','false']]);
+    const base=value(await service.publish(actor('enabler'),second.request)).releaseId!;
+    return {first,second,base,target};
+  }
+  const rollbackReviewRequest=(p:C['IntakeRollbackImpact'],op='rollback-review',version=0)=>({operationId:op,impactDigest:p.impactDigest,expectedEvidenceVersion:version});
+  it('rollback: HTTP independent review publishes a new release consumed by another seat and replays the original operation', async()=>{
+    const {base,target}=await rollbackPair();const host=await managementHost();
+    const post=(url:string,payload:unknown)=>host.app.inject({method:'POST',url,headers:{...host.headers,'content-type':'application/json'},payload:JSON.stringify(payload)});
+    try {
+      const preview=await post('/v1/intake/rollback/preview',{baseReleaseId:base,targetReleaseId:target});expect(preview.statusCode,preview.body).toBe(200);
+      const p=parseContractSchema('IntakeRollbackImpact',preview.json());expect(p.scopes.map(s=>s.sourceId)).toEqual(['source-a']);
+      const url=`/v1/intake/rollback/${p.rollbackPlanId}/review`;
+      expect((await post(url,{...rollbackReviewRequest(p,'wrong-impact'),impactDigest:'f'.repeat(64)})).json()).toMatchObject({error:{details:{reason:'MATERIAL_CHANGED'}}});
+      const requested=await post(url,rollbackReviewRequest(p));expect(requested.statusCode,requested.body).toBe(202);
+      expect(provider.latest().form).toHaveProperty('rollbackPlanId',p.rollbackPlanId);expect(provider.latest().form).not.toHaveProperty('key');
+      const bytes=provider.packages.get(provider.latest().attachmentFileCode)!;const pack=JSON.parse(bytes.toString());
+      expect(pack.format).toBe('intake-rollback-review-package-v1');expect(pack.material.catalogs).toHaveLength(2);
+      provider.approve('enabler');expect((await post(`${url}/refresh`,rollbackReviewRequest(p,'bad-self',1))).json()).toMatchObject({error:{details:{reason:'HUMAN_REVIEW_REQUIRED'}}});
+      provider.approve('reviewer');const refreshed=await post(`${url}/refresh`,rollbackReviewRequest(p,'rollback-refresh',1));expect(refreshed.statusCode,refreshed.body).toBe(202);
+      const req:C['IntakeRollback']={operationId:'rollback-submit',rollbackPlanId:p.rollbackPlanId,baseReleaseId:base,targetReleaseId:target,impactDigest:p.impactDigest,approvalEvidenceVersion:1};
+      const submitted=await post('/v1/intake/rollback',req);expect(submitted.statusCode,submitted.body).toBe(202);
+      const receipt=parseContractSchema('IntakeRollbackReceipt',submitted.json());expect(receipt.state).toBe('published');expect(receipt.releaseId).not.toBe(target);
+      const ent=value(await issue());expect(ent.releaseId).toBe(receipt.releaseId);expect(value(await snapshot(ent.entitlementId)).faq[0]!.entry.answerText).toBe('第一行。\n第二行。');
+      expect((await post('/v1/intake/rollback',req)).json()).toEqual(receipt);
+      expect((await host.app.inject({url:'/v1/intake/operations/rollback-submit?action=rollback',headers:host.headers})).json()).toEqual(receipt);
+      provider.latest().state='REVOKED';expect(value(await service.refreshRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p,'rollback-revoke',1))).state).toBe('revoked');
+      expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_REVOKED'});
+    } finally {await host.app.close();}
+  });
+  it('rollback: creation uncertainty retains its independent UUID and original package across restart',async()=>{
+    const {base,target}=await rollbackPair();const p=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:base,targetReleaseId:target}));
+    let lose=true;
+    const transport:ApprovalTransport={...provider.transport,async create(b,bytes,signal){const result=await provider.transport.create(b,bytes,signal);if(lose){lose=false;throw new Error('synthetic response lost');}return result;}};
+    const before=provider.instances.size;const req=rollbackReviewRequest(p);
+    const creating=value(await evidenceService(transport).requestRollbackReview(actor('enabler'),p.rollbackPlanId,req));expect(creating.state).toBe('creating');
+    const recovered=value(await evidenceService(transport).requestRollbackReview(actor('enabler'),p.rollbackPlanId,req));
+    expect(recovered.instanceCode).toBeTruthy();expect(recovered.reviewPackageObjectId).toBe(creating.reviewPackageObjectId);expect(provider.instances.size).toBe(before+1);
+    expect(await service.requestRollbackReview(actor('enabler'),p.rollbackPlanId,{...req,operationId:'different-key',expectedEvidenceVersion:0})).toMatchObject({ok:false,reason:'APPROVAL_CHANGED'});
+  });
+  async function readyRollback() {
+    const pair=await rollbackPair();
+    const p=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:pair.base,targetReleaseId:pair.target}));
+    value(await service.requestRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p)));provider.approve('reviewer');
+    value(await service.refreshRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p,'rb-refresh',1)));
+    const req:C['IntakeRollback']={operationId:'rollback-submit',rollbackPlanId:p.rollbackPlanId,baseReleaseId:pair.base,targetReleaseId:pair.target,impactDigest:p.impactDigest,approvalEvidenceVersion:1};
+    return {...pair,p,req};
+  }
+  it('rollback: lost COMMIT recovers the original permanent receipt without observing the provider again',async()=>{
+    const {req}=await readyRollback();let lost=false;
+    const uncertain:IntakePool={async connect(){const client=await pool.connect();let writing=false;return new Proxy(client,{get(target,key){
+      if(key==='query')return async(sql:string,args?:unknown[])=>{const result=await target.query(sql,args);if(sql.includes('execute_rollback('))writing=true;
+        if(sql==='COMMIT'&&writing&&!lost){lost=true;throw new Error('synthetic rollback COMMIT lost');}return result;};
+      const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+    }}) as PoolClient;}};
+    const first=createContentIntakeService(uncertain,store,(_id,e)=>diagnostics.push(e),createApprovalAdapter(route,provider.transport));
+    expect(await first.rollback(actor('enabler'),req)).toMatchObject({ok:false,commit:'unknown',reason:'COMMIT_UNKNOWN'});
+    const restarted=createContentIntakeService(pool,store);const receipt=value(await restarted.operationReceipt(actor('enabler'),req.operationId,'rollback'));
+    const calls=provider.instanceCalls();expect(value(await restarted.rollback(actor('enabler'),req))).toEqual(receipt);expect(provider.instanceCalls()).toBe(calls);
+    expect(await restarted.rollback(actor('enabler'),{...req,targetReleaseId:'different'})).toMatchObject({ok:false,reason:'IDEMPOTENCY_CONFLICT'});
+    expect(await restarted.operationReceipt(actor('other'),req.operationId,'rollback')).toMatchObject({ok:false,code:'NOT_FOUND'});
+    expect((await admin.query("SELECT count(*) FROM content_intake.publications WHERE action='rollback'")).rows[0].count).toBe('1');
+  });
+  it.each(['revoke','publish','cancel-target','wrong-package','expired-target'] as const)('rollback: rejects %s during the lock-free approval observation without moving current',async(change)=>{
+    const {p,req,first,base}=await readyRollback();let enter!:()=>void;let release!:()=>void;
+    const entered=new Promise<void>(r=>{enter=r;});const gate=new Promise<void>(r=>{release=r;});
+    const next=change==='publish'?await publishable('competing-publish'):null;
+    // Capture only this rollback's provider response; a concurrent publisher uses its own instance.
+    const transport:ApprovalTransport={...provider.transport,async instance(b,signal){const raw=await provider.transport.instance(b,signal);enter();await gate;return raw;}};
+    const pending=evidenceService(transport).rollback(actor('enabler'),req);await entered;
+    let expectedCurrent=base;
+    try {
+      if(change==='revoke')value(await service.changeGrant(actor('director'),'business-enabler-rollback',{operationId:'rb-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));
+      if(change==='publish')expectedCurrent=value(await service.publish(actor('enabler'),next!.request)).releaseId!;
+      if(change==='cancel-target')expect(await service.cancel(actor('other'),{operationId:'rb-cancel-target',key:first.c.key})).toMatchObject({ok:false,reason:'ALREADY_PUBLISHED'});
+      if(change==='wrong-package'){
+        const b=(await admin.query('SELECT attachment_file_code FROM content_intake.review_bindings WHERE rollback_plan_id=$1',[p.rollbackPlanId])).rows[0];
+        provider.packages.set(b.attachment_file_code,Buffer.from('synthetic substitution'));
+      }
+      if(change==='expired-target'){
+        await admin.query(`INSERT INTO content_intake.approval_facts SELECT (jsonb_populate_record(NULL::content_intake.approval_facts,
+          to_jsonb(f)||jsonb_build_object('facts_version',facts_version+1,'checked_at',clock_timestamp(),'valid_until',clock_timestamp()+interval '0.1 seconds'))).*
+          FROM content_intake.approval_current cur JOIN content_intake.approval_facts f USING(review_request_id,facts_version)
+          JOIN content_intake.review_bindings r USING(review_request_id) WHERE r.candidate_id=$1`,[first.c.key.candidateId]);
+        await admin.query(`UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id IN
+          (SELECT review_request_id FROM content_intake.review_bindings WHERE candidate_id=$1)`,[first.c.key.candidateId]);
+        await admin.query('SELECT pg_sleep(0.15)');
+      }
+    } finally {release();}
+    const result=await pending;
+    if(change==='cancel-target'){expect(result).toMatchObject({ok:true});return;}
+    expect(result).toMatchObject({ok:false});expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(expectedCurrent);
+    expect((await admin.query("SELECT count(*) FROM content_intake.publications WHERE action='rollback'")).rows[0].count).toBe('0');
+  });
+  it('rollback: normal publication inherits independent review and source revocations through the restored lineage',async()=>{
+    const {p,req}=await readyRollback();const rolled=value(await service.rollback(actor('enabler'),req));
+    await expect(admin.query("SELECT content_intake.inherit_legacy_catalog($1,'unused')",[rolled.releaseId])).rejects.toMatchObject({code:'ZA003'});
+    const instance=provider.latest();const next=await publishable('after-rollback');const published=value(await service.publish(actor('enabler'),next.request));
+    const lineage=(await admin.query('SELECT release_id FROM content_intake.release_rollback_lineage ORDER BY release_id')).rows.map(r=>r.release_id);
+    expect(lineage.sort()).toEqual([rolled.releaseId,published.releaseId].sort());
+    instance.state='REVOKED';value(await service.refreshRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p,'inherited-revoke',1)));
+    expect((await admin.query('SELECT release_id FROM content_intake.release_revocations ORDER BY release_id')).rows.map(r=>r.release_id).sort()).toEqual(lineage.sort());
+    expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_REVOKED'});
+  });
+
+  it('rollback: a synthetic two-source catalog proves full impact authorization without exposing denied scopes',async()=>{
+    await publicationBase();await cloneScopeGrants('b');let old='';let target='';
+    for(const [label,source,text] of [['old-a','a','旧A'],['old-b','b','旧B'],['new-a','a','新A'],['new-b','b','新B']]){
+      const candidate=await publishable(label,[['faq-one','合成问题',text!,'','','分类','','启用','','','','内部说明','','','false']],source);
+      const release=value(await service.publish(actor('enabler'),candidate.request)).releaseId!;
+      if(label==='old-b')old=release;if(label==='new-b')target=release;
+    }
+    // Test-only composite catalog fixture: native single-source publish cannot
+    // change two shops at once. Preserve actual immutable source/candidate proofs.
+    await admin.query('BEGIN');await admin.query("SELECT set_config('app.publishing','on',true)");
+    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,title,status,source_binding_hash,tenant_id)
+      SELECT 'rel_composite',nextval('public.content_release_seq'),'合成双来源差集','published',source_binding_hash,tenant_id FROM public.content_releases WHERE release_id=$1`,[old]);
+    await admin.query(`INSERT INTO public.release_source_bindings SELECT 'rel_composite',domain,source_version_id FROM public.release_source_bindings WHERE release_id=$1`,[old]);
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES('rel_composite','intake-v2.1')");
+    await admin.query(`INSERT INTO content_intake.release_lineage SELECT 'rel_composite',source_id,business_entry_id,script_version,candidate_id,candidate_version,review_request_id,content_valid_until FROM content_intake.release_lineage WHERE release_id=$1`,[old]);
+    await admin.query("UPDATE public.content_current SET current_release_id='rel_composite' WHERE id=1");await admin.query('COMMIT');
+    const full=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:'rel_composite',targetReleaseId:target}));
+    expect(full.scopes.map(s=>s.sourceId)).toEqual(['source-a','source-b']);expect(full.requiresCorrectiveCandidate).toBe(false);
+    value(await service.changeGrant(actor('director'),'business-enabler-rollback-b',{operationId:'partial-rb',expectedVersion:1,change:'revoke',reason:'合成部分权限',stewardPrincipalId:null}));
+    const partial=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:'rel_composite',targetReleaseId:target}));
+    expect(partial.scopes.map(s=>s.sourceId)).toEqual(['source-a']);expect(partial.requiresCorrectiveCandidate).toBe(true);
+    expect(await service.requestRollbackReview(actor('enabler'),partial.rollbackPlanId,rollbackReviewRequest(partial))).toMatchObject({ok:false,reason:'SCOPE_DENIED'});
+    expect((await admin.query('SELECT source_id FROM content_intake.rollback_scopes WHERE rollback_plan_id=$1 ORDER BY source_id',[partial.rollbackPlanId])).rows).toEqual([{source_id:'source-a'},{source_id:'source-b'}]);
+  });
+  it('rollback: normal publication and read eligibility cannot outlive inherited rollback approval',async()=>{
+    const {p,req}=await readyRollback();const rolled=value(await service.rollback(actor('enabler'),req));
+    const next=await publishable('after-expiry');
+    await admin.query(`INSERT INTO content_intake.approval_facts SELECT (jsonb_populate_record(NULL::content_intake.approval_facts,
+      to_jsonb(f)||jsonb_build_object('facts_version',facts_version+1,'checked_at',clock_timestamp(),'valid_until',clock_timestamp()+interval '0.1 seconds'))).*
+      FROM content_intake.approval_current cur JOIN content_intake.approval_facts f USING(review_request_id,facts_version)
+      JOIN content_intake.review_bindings r USING(review_request_id) WHERE r.rollback_plan_id=$1`,[p.rollbackPlanId]);
+    await admin.query(`UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id IN
+      (SELECT review_request_id FROM content_intake.review_bindings WHERE rollback_plan_id=$1)`,[p.rollbackPlanId]);await admin.query('SELECT pg_sleep(0.15)');
+    expect(await service.publish(actor('enabler'),next.request)).toMatchObject({ok:false,reason:'APPROVAL_UNAVAILABLE'});
+    expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_UNAVAILABLE'});
+    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(rolled.releaseId);
+  });
+  it('rollback: original source approval revocation invalidates both original and restored releases',async()=>{
+    const {first,req}=await readyRollback();const rolled=value(await service.rollback(actor('enabler'),req));
+    const original=[...provider.instances.values()].find(i=>i.form.key?.candidateId===first.c.key.candidateId)!;
+    original.state='REVOKED';value(await refresh(first.c,'original-revoke'));
+    expect((await admin.query('SELECT 1 FROM content_intake.release_revocations WHERE release_id=$1',[rolled.releaseId])).rowCount).toBe(1);
+    expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_REVOKED'});
+  });
+
+  it('rollback: preview cannot retain a plan after its consumed grant expires before COMMIT',async()=>{
+    const {base,target}=await rollbackPair();
+    value(await service.changeGrant(actor('director'),'business-enabler-rollback',{operationId:'short-revoke',expectedVersion:1,change:'revoke',reason:'合成短授权',stewardPrincipalId:null}));
+    await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+      VALUES('short-rollback','business','director','enabler','tenant-a','app-a','scope-a','source-a','rollback',clock_timestamp()-interval '1 second',clock_timestamp()+interval '0.2 seconds','合成短授权','director','root-rollback')`);
+    const delayed:IntakePool={async connect(){const client=await pool.connect();return new Proxy(client,{get(target,key){
+      if(key==='query')return async(sql:string,args?:unknown[])=>{const result=await target.query(sql,args);if(sql.includes('INSERT INTO content_intake.rollback_plans'))await target.query('SELECT pg_sleep(0.25)');return result;};
+      const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+    }}) as PoolClient;}};
+    expect(await createContentIntakeService(delayed,store).rollbackPreview(actor('enabler'),{baseReleaseId:base,targetReleaseId:target})).toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
+    expect((await admin.query('SELECT count(*) FROM content_intake.rollback_plans')).rows[0].count).toBe('0');
+  });
+
+  it('rollback: partial scopes require a corrective candidate and cannot leak the unowned source',async()=>{
+    await publicationBase();await cloneScopeGrants('b');
+    const first=await publishable('rb-scope-a');const target=value(await service.publish(actor('enabler'),first.request)).releaseId!;
+    const second=await publishable('rb-scope-b',undefined,'b');const base=value(await service.publish(actor('enabler'),second.request)).releaseId!;
+    value(await service.changeGrant(actor('director'),'business-enabler-rollback-b',{operationId:'rb-scope-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));
+    // This rollback affects only source-b, so no authorized impact remains.
+    expect(await service.rollbackPreview(actor('enabler'),{baseReleaseId:base,targetReleaseId:target})).toMatchObject({ok:false,reason:'SCOPE_DENIED'});
+    expect(await service.rollbackPreview(actor('agent'),{baseReleaseId:base,targetReleaseId:target})).toMatchObject({ok:false,reason:'SCOPE_DENIED'});
+  });
+
   it('usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages', async () => {
     await publicationBase();await cloneScopeGrants('b');await cloneScopeGrants('brand');
     for (const source of ['a','b','brand']) {
@@ -2789,7 +2964,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(await refresh(c,`wrong-${field}`)).toMatchObject({ ok:false,reason:'APPROVAL_BINDING' });
       Object.assign(instance,structuredClone(original));
     }
-    instance.form.key.digest='b'.repeat(64);
+    instance.form.key!.digest='b'.repeat(64);
     expect(await refresh(c,'wrong-form')).toMatchObject({ ok:false,reason:'APPROVAL_BINDING' });
     Object.assign(instance,structuredClone(original));
     instance.task!.kind='AUTO_PASS';

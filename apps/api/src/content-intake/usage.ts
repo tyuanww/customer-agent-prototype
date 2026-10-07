@@ -74,11 +74,14 @@ async function releaseDeadline(client: IntakeTransaction, releaseId: string, ten
   const facts = await client.query<{ invalid: boolean; until: Date | null }>(`SELECT
     coalesce(bool_or(f.state IS DISTINCT FROM 'approved' OR f.checked_at>clock_timestamp()
       OR f.valid_until<=clock_timestamp() OR f.package_verified_sha256 IS DISTINCT FROM r.package_sha256),false) AS invalid,
-    min(f.valid_until) AS until FROM content_intake.release_lineage l
+    min(f.valid_until) AS until FROM (
+      SELECT review_request_id FROM content_intake.release_lineage WHERE release_id=$1
+      UNION SELECT review_request_id FROM content_intake.release_rollback_lineage WHERE release_id=$1
+    ) l
     LEFT JOIN content_intake.review_bindings r USING(review_request_id)
     LEFT JOIN content_intake.approval_current cur USING(review_request_id)
     LEFT JOIN content_intake.approval_facts f ON f.review_request_id=cur.review_request_id AND f.facts_version=cur.facts_version
-    WHERE l.release_id=$1`, [releaseId]);
+    `, [releaseId]);
   if (facts.rows[0]!.invalid) throw new IntakeRejection('APPROVAL_UNAVAILABLE', 'FORBIDDEN');
   const owners = await client.query<{ until: Date | null }>(`SELECT min(public.owner_acceptance_instant(a.record->'expires_at')) AS until
     FROM public.release_items i JOIN public.content_releases r USING(release_id)

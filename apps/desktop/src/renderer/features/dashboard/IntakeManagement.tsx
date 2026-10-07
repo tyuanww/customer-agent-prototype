@@ -1,6 +1,7 @@
 import type { components } from '@customer-agent/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import { IntakeRollback } from './IntakeRollback';
 import { IntakeUpload } from './IntakeUpload';
 import './intake-management.css';
 const states: Record<string, string> = { 'awaiting-evidence': '等待补证', ready: '候选就绪', publishing: '发布中', published: '已发布', cancelled: '已取消', invalidated: '已失效',
@@ -199,7 +200,7 @@ export function IntakeManagement() {
     return () => { invalidate(); off(); };
   }, []);
   const upload = view?.upload;
-  const disabled = busy || stopping || !!view?.pending || !!upload?.busy || !!upload?.pending;
+  const disabled = busy || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
   const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
   const quality = view?.quality;
   const dirty = dirtyIds.size > 0;
@@ -210,7 +211,7 @@ export function IntakeManagement() {
     <header><div><h1>资料审核</h1><p>上传 FAQ、核对候选材料并审核发布</p></div><span>{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</span></header>
     {error && <div><p role="alert">{error}</p><button disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</button></div>}
     {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy} stopping={stopping}
-      blocked={dirty || view.hasDraft || !!view.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
+      blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
     {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <button disabled={busy || stopping}
       onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</button>}
     {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2>操作结果待确认</h2>
@@ -218,6 +219,9 @@ export function IntakeManagement() {
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
       <div>{view.pending.recovery === 'receipt' && <button disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</button>}
         <button disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</button></div></section>}
+    {view?.signedIn && (view.rollback.available || view.rollback.pending) && <IntakeRollback view={view} busy={busy || stopping}
+      blocked={!!view.pending || !!upload?.busy || !!upload?.pending || uploadDraft || view.hasDraft || [...dirtyIds].some(id => id !== 'rollback-input')}
+      apply={c => void apply(c)} onDirty={onDirty} />}
     <div className="intake-toolbar"><button disabled={disabled || dirty || uploadDraft} onClick={() => void apply({ action: 'list', next: false })}>刷新候选</button>
       <button disabled={disabled || dirty || uploadDraft || !view?.moreCandidates} onClick={() => void apply({ action: 'list', next: true })}>下一页候选</button>
       {view?.selected && <button disabled={disabled} onClick={() => { if (window.confirm('放弃尚未提交的判断并关闭当前候选？')) void apply({ action: 'discard' }); }}>关闭当前候选</button>}</div>

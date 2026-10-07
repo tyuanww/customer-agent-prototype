@@ -458,6 +458,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
       return frozen;
     }),
     ...usageMigrations,
+    renderIntakeOverlay(projectRoot, snapshot, 27, '0027_intake_rollback'),
   ]);
   // A predecessor must precede this snapshot; the current contract is never its own upgrade.
   const currentIndex = COMPATIBLE_UPGRADES.findIndex(p => p.contractSetId === snapshot.contract_set_id);

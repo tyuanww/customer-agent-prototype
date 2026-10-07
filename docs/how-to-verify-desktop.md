@@ -466,3 +466,18 @@ pnpm test:intake:desktop
 ```
 
 原生文件选择和保存由 Main 拥有。单元测试覆盖有界文件/报告、停止等待、迟到响应与原操作恢复；真实 Electron E2E 从工作簿选择、阻断报告落盘回读、整批更正直到审批发布与坐席查询。原生对话框使用受控选择替身，文件/API/数据库实际执行；不计作人工 macOS 文件对话框或 Windows GUI 实机验收。报告预算 probe 只证明其记录的合成规模，不能将实测最大样例冒充所有可能 XLSX 的数学上界。跨边界改动仍须运行根 lint/typecheck/test/build。
+
+
+## FAQ 纠正回退
+
+`pnpm test:intake:desktop` 同时运行原生上传闭环和纠正回退的真实 Electron/HTTP/PG15 测试。回退用例先经实际上传、来源确认、人工审批模拟和质量检查发布两版，然后从工作台预览上一版影响、单独审批、确认发布新版本，换普通坐席查询并比对历史原文；光暗截图在 `.gstack/intake-synthetic/rollback-*`。截图等待主题过渡完成，不以切换属性生效冒充最终颜色。
+
+定向验证：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-rollback.test.ts tests/component/intake-rollback.test.tsx tests/unit/content-intake-management.test.ts
+pnpm --filter @customer-agent/api test:intake:transactions
+pnpm test:db:integration
+```
+
+回退只允许当前目录的上一已发布版本，仍须全部实际变化范围的资格及独立复核；权限不足走正常纠正候选。未知写入只能查询/重试原操作，不能换计划。历史审批/来源已失效时拒绝恢复，后续发布和坐席读取继续继承回退审批依赖。上述均为合成证据，不代表真实飞书、Windows GUI 或正式运行 ACL 已放行。

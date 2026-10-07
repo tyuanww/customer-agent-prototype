@@ -5,6 +5,7 @@ type C = components['schemas'];
 /** UI supplies intent only: no HTTP path, actor, candidate digest, grant or operation ID. */
 export type IntakeManagementCommand =
   | IntakeUploadCommand
+  | IntakeRollbackCommand
   | { action: 'list'; next: boolean }
   | { action: 'select'; selection: string }
   | { action: 'material'; next: boolean }
@@ -18,7 +19,20 @@ export type QualityPage = {
   status: C['IntakeQualityStatus']; phase: 'initial' | 'expanded'; offset: number; total: number; checked: number;
   samples: (C['IntakeQualitySample'] & { draft: C['IntakeQualityCheck'] | null })[];
 };
+export type IntakeRollbackCommand =
+  | { action: 'rollback-preview'; baseReleaseId: string; targetReleaseId: string }
+  | { action: 'rollback-request-review' | 'rollback-read-review' | 'rollback-refresh-review' | 'rollback-execute' | 'rollback-recover' | 'rollback-retry' | 'rollback-discard' | 'rollback-correct' };
+/** Presentation only: plan/digest, approval attachments and operation keys stay in Main. */
+export type IntakeRollbackView = {
+  available: boolean;
+  impact: Pick<C['IntakeRollbackImpact'], 'baseReleaseId' | 'targetReleaseId' | 'scopes' | 'requiresCorrectiveCandidate'> | null;
+  review: Pick<C['IntakeRollbackReview'], 'state' | 'checkedAt' | 'validUntil' | 'instanceCode'> | null;
+  pending: { action: 'review-request' | 'review-refresh' | 'rollback'; recovery: 'receipt' | 'retry' } | null;
+  result: { state: C['IntakeRollbackReceipt']['state']; releaseId: string | null } | null;
+  hasReview: boolean; canExecute: boolean;
+};
 export type IntakeManagementView = {
+  rollback: IntakeRollbackView;
   upload: IntakeUploadView;
   signedIn: boolean; displayName: string; authorized: boolean; validUntil: string | null;
   candidates: { selection: string; candidate: C['IntakeCandidate'] }[]; moreCandidates: boolean;
@@ -42,6 +56,8 @@ export function isIntakeManagementCommand(raw: unknown): raw is IntakeManagement
   if (isIntakeUploadCommand(raw)) return true;
   if (!raw || typeof raw !== 'object' || !('action' in raw)) return false;
   const r = raw as Record<string, unknown>;
+  if (r.action === 'rollback-preview') return exactKeys(r, ['action','baseReleaseId','targetReleaseId']) && text(r.baseReleaseId, 128) && text(r.targetReleaseId, 128) && r.baseReleaseId !== r.targetReleaseId;
+  if (['rollback-request-review','rollback-read-review','rollback-refresh-review','rollback-execute','rollback-recover','rollback-retry','rollback-discard','rollback-correct'].includes(r.action as string)) return exactKeys(r, ['action']);
   if (r.action === 'list' || r.action === 'material') return exactKeys(r, ['action','next']) && typeof r.next === 'boolean';
   if (r.action === 'select') return exactKeys(r, ['action','selection']) && typeof r.selection === 'string' && r.selection.length <= 128 && r.selection.length > 0;
   if (r.action === 'quality') return exactKeys(r, ['action','phase']) && (r.phase === 'initial' || r.phase === 'expanded');
