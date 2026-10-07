@@ -26,6 +26,32 @@ function ledgerRow(index: number) {
 }
 
 describe('database migration planner', () => {
+  it('accepts successive complete wire-only predecessors but rejects duplicate identities and partial or changed-DDL aliases', () => {
+    const quality = { contractSetId: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1',
+      sourceGitSha: '18297cf802b195d8ff4e9f625143e50bff169418',
+      sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013', migrationCount: 26 };
+    const beforeQuality = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.filter(p => p.contractSetId !== quality.contractSetId);
+    const catalogue = { ...generatedMigrationCatalogue,
+      contractSetId: `cs-ai-c11-openapi-1.19.0-schema-1.21-${'a'.repeat(12)}`, sourceGitSha: 'a'.repeat(40),
+      compatibility: { ...generatedMigrationCatalogue.compatibility, priorReviewedUpgrades: [...beforeQuality, quality] } };
+    expect(() => assertMigrationCatalogue(catalogue)).not.toThrow();
+    const status = deriveMigrationStatus(generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)), catalogue);
+    expect(status.state).toBe('COMPLETE');
+    expect(planMigrationCatalogue(status).migrations).toEqual([]);
+    for (const priorReviewedUpgrades of [
+      [...beforeQuality, { ...quality, sourceSchemaSha256: 'f'.repeat(64) }],
+      [...beforeQuality, quality, quality],
+      [...beforeQuality, { ...quality, migrationCount: 24 }],
+      [beforeQuality[0]!, { ...beforeQuality[0]!, contractSetId: quality.contractSetId }, ...beforeQuality.slice(1)],
+    ]) expect(() => assertMigrationCatalogue({ ...catalogue, compatibility: { ...catalogue.compatibility, priorReviewedUpgrades } }))
+      .toThrow(/reviewed-upgrade metadata/);
+    for (const change of [{ migration_sha256: 'f'.repeat(64) }, { contract_set_id: quality.contractSetId }]) {
+      const rows = generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index));
+      rows[rows.length - 1] = { ...rows.at(-1)!, ...change };
+      expect(() => deriveMigrationStatus(rows, catalogue)).toThrow(DatabaseMigrationError);
+    }
+  });
+
   it('allows a complete prior catalogue only when the wire-only intake retains its exact DDL', () => {
     expect(() => assertMigrationCatalogue(generatedMigrationCatalogue)).not.toThrow();
     const prior = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;

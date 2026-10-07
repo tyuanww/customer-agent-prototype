@@ -82,6 +82,24 @@ function prepareExistingPublication(root: string): void {
 }
 
 describe('database migration generator', () => {
+  it('changes only catalogue provenance across successive wire-only intakes', () => {
+    const prior = generator.buildDatabaseMigrationOutputs(snapshot());
+    const sourceGitSha = 'a'.repeat(40);
+    const next = generator.buildDatabaseMigrationOutputs({ ...snapshot(),
+      contract_set_id: `cs-ai-c11-openapi-1.19.0-schema-1.21-${sourceGitSha.slice(0, 12)}`, source_git_sha: sourceGitSha });
+    expect(next.migrations).toHaveLength(26);
+    expect(next.migrations).toEqual(prior.migrations);
+    for (const [file, bytes] of next.outputs) {
+      if (file.endsWith('.sql')) expect(bytes).toBe(prior.outputs.get(file));
+    }
+    const metadata = JSON.parse(next.outputs.get('packages/database/migrations/manifest.generated.json')!);
+    expect(metadata.compatibility.prior_reviewed_upgrades.at(-1)).toEqual({
+      contract_set_id: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1',
+      source_git_sha: '18297cf802b195d8ff4e9f625143e50bff169418',
+      source_schema_sha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013', migration_count: 26,
+    });
+  });
+
   it('preserves all twenty-six migrations when only the HTTP contract changes', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());

@@ -2,7 +2,7 @@
 
 > 状态：**治理合同已提交并 export · 产品 intake / codegen / 追加迁移已验收 · 仅限合成开发 · 三方公开交付 EVD 待齐**。2026-10-06，产品依赖 P1 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`。
 > 本页把已确认需求映射到下一份正式合同需要表达的资源、约束与验收，不签发合同版本、阶段门或真实运行权限。当前任务与授权只在[需求计划 §0](plans/2026-10-03-content-intake-requirements.md)维护。
-> 当前消费已推进至 OpenAPI 1.18.0 / schema.v1.21，精确来源由消费锁与不可变 manifest 拥有；API 持久绑定、管理 HTTP 与 Main/Query 已由显式合成消费者接入，生产 HTTP/ACL、完整管理界面和原生验收尚未完成。质量 HTTP 接入进展见末节。
+> 当前消费已推进至 OpenAPI 1.19.0 / schema.v1.21，精确来源由消费锁与不可变 manifest 拥有；API 持久绑定、管理 HTTP 与 Main/Query 已由显式合成消费者接入，生产 HTTP/ACL、完整管理界面和原生验收尚未完成。管理上下文接入进展见末节。
 
 ## 1. 交接范围与基线
 
@@ -185,3 +185,14 @@ API 现在从认证边界取得私有会话引用，逐页锁定核验，消费�
 Main 已通过实际 ProductHttp/ProductSession 消费冻结质量 HTTP，负责完整样本、人工草稿、会话隔离与原请求恢复。根探针复用现有隔离桥，API 测试不直接依赖桌面源码；通过实际冻结提交后主动丢响应，恢复同一个历史回执且无重复写，然后逐条检查并发布，由第二坐席读取原文。具体结果见[Main 质量验收](../evidence/qa/content-intake-p2-quality-main/README.md)。
 
 下一管理界面仍须接上传/解析报告、来源确认、组织审批状态、质量人工检查、发布与回执；Main 生成操作键及候选键，不允许 renderer 提交身份/抽样参数/发布结论。界面只展示授权能力；API 每次复核。未恢复操作须可见且不能静默换键，关闭/退出须明确内存恢复范围。跨平台原生和真实飞书验证仍分别待办。
+
+
+### 2026-10-07 管理上下文冻结、接收与最小运行切片
+
+治理提交 `240ae98a47d8b9432559c298f60af6fdc9ba8c4e` 已冻结并导出 `cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8`，产品通过原接收器 intake。OpenAPI SHA-256 为 `ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38`，DDL 为 `5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013`；状态仍为 VERIFIED_NOT_ACTIVATED。新增一条管理上下文 GET 与一个 schema，原81条路径、233个 schema 保持不变，现共234个 schema。
+
+26段迁移原字节、来源及 checksum 均不变。修复连续多个 HTTP 合同共享完整 DDL 时的规划器误拒绝，仍拒绝部分前缀重复、不同DDL、重复合同身份与任何原段漂移；真实PG验证旧1.17/1.18账本均 COMPLETE、apply 空列表，账本不变。
+
+管理上下文复用现有 discovery、source/authorize 和事务，不另建状态仓或 current 指针。有效产品会话且拥有 import 才可读取来源版本、本人身份与发布基线；内容锁后取得发布锁，事务结束前复核最早截止。该读不是授权或提交票据，receive 仍 CAS。实际HTTP→Main ProductSession→receive→解析候选已有合成验证，尚无新上传 UI。代码、测试与审查证据见[本切片验收](../evidence/qa/content-intake-p2-management-context/README.md)。
+
+下一切片由 Main 持有原生文件、上传对象/操作键、解析任务与错误报告，Dashboard 只提交选择与确认意图，来源上下文和参与人目录从 API 获取；复用既有候选/审批/质量/发布界面。真实飞书、生产factory/ACL、v2-active与跨平台人工验收继续分别待办。

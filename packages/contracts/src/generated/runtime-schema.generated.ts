@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.18.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.19.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -76,6 +76,7 @@ export const COMPONENT_SCHEMA_NAMES = [
   "IntakeGrantList",
   "IntakeId",
   "IntakeIssue",
+  "IntakeManagementContext",
   "IntakeMaterial",
   "IntakeMaterialHeader",
   "IntakeObject",
@@ -240,7 +241,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.18.0:components",
+  "$id": "urn:customer-agent:openapi:1.19.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -5206,6 +5207,47 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         },
         "location": {
           "$ref": "#/$defs/IntakeCoordinate"
+        }
+      }
+    },
+    "IntakeManagementContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "sourceVersion",
+        "baseReleaseId",
+        "principalId",
+        "factsVersion",
+        "validUntil"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "sourceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "baseReleaseId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IntakeId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "principalId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "factsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
         }
       }
     },

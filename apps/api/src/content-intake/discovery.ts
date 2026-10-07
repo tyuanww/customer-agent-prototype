@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
-import { allocationKinds, recipientRoleAllows, samePerson } from './authority.js';
+import { allocationKinds, authorize, recipientRoleAllows, samePerson, source } from './authority.js';
 import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, registeredPrincipalPage, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
@@ -125,6 +125,25 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
     }, value => parseContractSchema(schema, value));
   }
   return {
+    /** An importer's current input hints, not a grant, lease or commit ticket.
+     * The existing publication lock also fences a missing current row. Receive
+     * reauthorizes and compares this base/source version in its own transaction. */
+    managementContext(actor: AuthenticatedUser, sourceId: unknown) {
+      return run(actor, 'management-context', null, null, async (client, who) => {
+        const session = await lockProductSession(client, actor);
+        const id = parseContractSchema('IntakeId', sourceId), src = await source(client, id);
+        const importUntil = await authorize(client, who, 'import', src);
+        const validUntil = Math.min(session.validUntil, who.validUntil, importUntil);
+        client.validUntil(validUntil);
+        await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
+        const current = await client.query<{ current_release_id: string }>('SELECT current_release_id FROM public.content_current WHERE id=1');
+        const result = parseContractSchema('IntakeManagementContext', { sourceId: id, sourceVersion: src.version,
+          baseReleaseId: current.rows[0]?.current_release_id ?? null, principalId: who.id,
+          factsVersion: who.factsVersion, validUntil: new Date(validUntil).toISOString() });
+        if (Buffer.byteLength(JSON.stringify(result)) > 65_536) throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
+        return result;
+      }, value => parseContractSchema('IntakeManagementContext', value));
+    },
     /** Bounded registered-identity scan. Targets need no existing business grant;
      * contributors may be disabled, while grant recipients must be eligible now.
      * Filtered empty pages still advance. No snapshot, grant, lease or write. */

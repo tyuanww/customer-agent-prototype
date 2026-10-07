@@ -73,6 +73,7 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
   }
 
   let precedingMigrationCount = prior?.migrationCount ?? 0;
+  const reviewedIds = new Set([catalogue.contractSetId, ...(prior ? [prior.contractSetId] : [])]);
   for (const upgrade of reviewedUpgrades) {
     if (
       prior === null
@@ -80,8 +81,10 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       || !GIT_SHA_PATTERN.test(upgrade.sourceGitSha)
       || !HASH_PATTERN.test(upgrade.sourceSchemaSha256)
       || !Number.isSafeInteger(upgrade.migrationCount)
-      || upgrade.migrationCount <= precedingMigrationCount
+      || upgrade.migrationCount < precedingMigrationCount
+      || (upgrade.migrationCount === precedingMigrationCount && upgrade.migrationCount !== catalogue.migrations.length)
       || upgrade.migrationCount > catalogue.migrations.length
+      || reviewedIds.has(upgrade.contractSetId)
       // A reviewed HTTP-only contract may retain the complete SQL catalogue.
       // Equal counts are safe only for the identical DDL and a distinct source
       // contract; every migration still has its original provenance/hash below.
@@ -91,6 +94,7 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       catalogueError('Migration catalogue reviewed-upgrade metadata is invalid');
     }
     precedingMigrationCount = upgrade.migrationCount;
+    reviewedIds.add(upgrade.contractSetId);
   }
 
   const ids = new Set<string>();

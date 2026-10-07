@@ -3,7 +3,7 @@ openapi: 3.1.1
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: CS-AI-C11 Customer Service Agent API
-  version: 1.18.0
+  version: 1.19.0
   license:
     name: Proprietary - internal use only
     identifier: LicenseRef-Proprietary
@@ -233,6 +233,84 @@ security:
   - mockUser: []
     mockRole: []
 paths:
+  /v1/intake/sources/{sourceId}/management-context:
+    get:
+      operationId: getIntakeManagementContext
+      summary: 读取创建候选所需的来源与当前主体事实
+      description: 只允许目标来源当前 import 权限。认证主体由 ProductSession 解析，principalId 不能用产品 userId 或客户端输入替代。sourceVersion 来自既有来源映射；baseReleaseId 来自唯一 content_current 指针，尚无发布时为 null。字段在同一受保护读取中取值，validUntil 为会话、主体事实、授权期限最早值；该响应不是授权、租约或提交票据。读取不刷新远端组织、不创建查询资格、不确认公告、不改变当前发布。后续 receive 仍逐次重新授权并 CAS sourceVersion/baseReleaseId。只接收 sourceId 路径参数；未知或重复 query、GET body 拒绝。无来源或无权统一 404，不返回其他来源正文、提供方身份或真实员工信息。参见 16-P2管理上下文合同候选.md。
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IntakeId"
+      x-max-response-bytes: 65536
+      x-required-intake-action: import
+      responses:
+        "200":
+          description: "当前来源及认证主体的最小管理上下文；Cache-Control: no-store。"
+          headers:
+            Cache-Control:
+              description: 含认证主体事实的读取不得缓存。
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeManagementContext"
+        "400":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "401":
+          description: 会话未认证或失效，重新登录；不披露资源存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "403":
+          description: 与资源存在性无关的全局能力/策略拒绝。涉及具体资源无权统一使用404。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "404":
+          description: 资源不存在或无访问权，返回相同脱敏 NOT_FOUND。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "409":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "429":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "500":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+        "503":
+          description: 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeError"
+      tags:
+        - content-intake
+      security:
+        - ProductSession: []
   /v1/intake/quality/operations/{operationId}:
     get:
       operationId: getIntakeQualityOperation
@@ -7212,6 +7290,34 @@ components:
                   code: INTERNAL
                   message: 服务内部错误
   schemas:
+    IntakeManagementContext:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceId
+        - sourceVersion
+        - baseReleaseId
+        - principalId
+        - factsVersion
+        - validUntil
+      properties:
+        sourceId:
+          $ref: "#/components/schemas/IntakeId"
+        sourceVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        baseReleaseId:
+          oneOf:
+            - $ref: "#/components/schemas/IntakeId"
+            - type: "null"
+        principalId:
+          $ref: "#/components/schemas/IntakeId"
+        factsVersion:
+          $ref: "#/components/schemas/IntakeVersion"
+        validUntil:
+          type: string
+          format: date-time
+          maxLength: 35
+      description: 服务端已认证主体的已确认 principal 映射。validUntil 不是离线授权；Main 在创建候选前重读并保留原操作的精确输入进行不确定结果恢复。参与人目录复用 IntakePrincipalPage；本对象不包含展示名或整份权限。
     IntakeQualityReceipt:
       type: object
       additionalProperties: false
@@ -16233,3 +16339,8 @@ x-content-intake-quality-development:
   runtime_activated: false
   sqlContract: schema.v1.21
   transactionImplementationRequired: true
+x-content-intake-management-development:
+  status: DRAFT
+  runtime_activated: false
+  sqlContract: schema.v1.21
+  exportApproved: false

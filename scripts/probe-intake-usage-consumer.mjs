@@ -21,9 +21,12 @@ assert.ok(Number.isFinite(Date.parse(context.expiresAt)));
 const capacity = context.discoverySources === 5000;
 assert.ok(context.discoverySources === undefined || capacity);
 const quality = context.qualityKey !== undefined;
+const managementContext = context.managementContext === true;
+assert.ok(context.managementContext === undefined || managementContext);
+if (managementContext) assert.match(context.objectId, /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
 const principals = context.principals === true;
 assert.ok(context.principals === undefined || principals);
-assert.ok(!principals || (!quality && !capacity));
+assert.ok([managementContext, principals, quality, capacity].filter(Boolean).length <= 1);
 if (quality) {
   assert.equal(capacity, false);
   assert.match(context.qualityKey.candidateId, /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
@@ -36,7 +39,9 @@ const cli = join(dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
 let probe = { file: 'tests/unit/content-intake-usage-http.test.ts', marker: 'INTAKE_USAGE_HTTP_PASS',
   result: { status: 'PASS', actualSession: true, discovery: true, largePage: true, cancellation: true,
     publishedText: true, localExpiry: true, normalUpdate: true, revocationFanout: true } };
-if (principals) probe = { file: 'tests/unit/content-intake-principals-http.test.ts', marker: 'INTAKE_PRINCIPALS_HTTP_PASS',
+if (managementContext) probe = { file: 'tests/unit/content-intake-management-context-http.test.ts', marker: 'INTAKE_MANAGEMENT_CONTEXT_HTTP_PASS',
+  result: { status: 'PASS', actualSession: true, managementContext: true, receive: true, cancellation: true, logoutLateResponse: true } };
+else if (principals) probe = { file: 'tests/unit/content-intake-principals-http.test.ts', marker: 'INTAKE_PRINCIPALS_HTTP_PASS',
   result: { status: 'PASS', actualSession: true, principals: true, pagination: true, cancellation: true, logoutLateResponse: true } };
 else if (quality) probe = { file: 'tests/unit/content-intake-quality-http.test.ts', marker: 'INTAKE_QUALITY_HTTP_PASS',
   result: { status: 'PASS', actualSession: true, quality: true, unknownCommitRecovery: true } };

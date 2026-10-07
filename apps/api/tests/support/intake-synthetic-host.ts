@@ -39,7 +39,7 @@ export async function createIntakeSyntheticHost() {
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
   let pool: Pool | undefined;
   let auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined;
-  const app = Fastify({ logger: false, exposeHeadRoutes: false });
+  const app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
   let apiOrigin = '', identityOrigin = '', selectedIdentity: IntakeSyntheticIdentity = 'enabler';
   const loginCodes = new Map<string, { binding: IntakeSyntheticIdentity; expires: number }>();
   const sessions = new Map<IntakeSyntheticIdentity, string>();

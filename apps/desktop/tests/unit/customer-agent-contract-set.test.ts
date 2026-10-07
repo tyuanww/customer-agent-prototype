@@ -127,12 +127,14 @@ function createContractSet({
   intake = false,
   usage = false,
   quality = false,
+  management = false,
 }: {
   marker?: string;
   declaredSourceGitSha?: string;
   intake?: boolean;
   usage?: boolean;
   quality?: boolean;
+  management?: boolean;
 } = {}): Readonly<{
   directory: string;
   contractSetId: string;
@@ -141,11 +143,11 @@ function createContractSet({
   repositoryRoot: string;
   sourceGitSha: string;
 }> {
-  const apiVersion = quality ? '1.18.0' : usage ? '1.17.0' : intake ? '1.16.0' : '1.11.0';
-  const schemaVersion = quality || usage ? '1.21' : intake ? '1.20' : '1.12';
+  const apiVersion = management ? '1.19.0' : quality ? '1.18.0' : usage ? '1.17.0' : intake ? '1.16.0' : '1.11.0';
+  const schemaVersion = management || quality || usage ? '1.21' : intake ? '1.20' : '1.12';
   const developmentRoot = 'business-docs/01-客服Agent项目/30-开发-进行中';
-  const openapiPath = intake || usage || quality ? `${developmentRoot}/openapi.v${apiVersion.slice(0,-2)}.yaml` : OPENAPI_SOURCE_PATH;
-  const databasePath = intake || usage || quality ? `${developmentRoot}/schema.v${schemaVersion}.sql` : DATABASE_SOURCE_PATH;
+  const openapiPath = intake || usage || quality || management ? `${developmentRoot}/openapi.v${apiVersion.slice(0,-2)}.yaml` : OPENAPI_SOURCE_PATH;
+  const databasePath = intake || usage || quality || management ? `${developmentRoot}/schema.v${schemaVersion}.sql` : DATABASE_SOURCE_PATH;
   const openapi = `openapi: 3.1.0\ninfo:\n  title: Synthetic contract test ${marker}\n`;
   const database = `CREATE TABLE contract_test_${marker} (id bigint PRIMARY KEY);\n`;
   const sourceRepository = createSourceRepository(openapi, database, marker, openapiPath, databasePath);
@@ -256,9 +258,9 @@ describe('customer-agent contract-set intake', () => {
     })).toThrow(/Source Git verification failed at cat-file/);
   });
 
-  it('rejects self-consistent package bytes that differ from the declared Git source', () => {
+  it.each([false, true])('rejects self-consistent package bytes that differ from the declared Git source; management=%s', management => {
     const productRoot = createProductRoot();
-    const source = createContractSet();
+    const source = createContractSet({ management });
     const forgedOpenapi = 'openapi: 3.1.0\ninfo:\n  title: Forged package\n';
     const manifestPath = path.join(source.directory, 'contract-set.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
@@ -473,24 +475,29 @@ describe('customer-agent contract-set intake', () => {
     }
   });
 
-  it.each(['intake', 'usage', 'quality'])('accepts the reviewed P2 pair (%s) from the exact commit and rejects mixed versions or paths', pair => {
-    const source = createContractSet({ intake: true, usage: pair === 'usage', quality: pair === 'quality' });
+  it.each(['intake', 'usage', 'quality', 'management'])('accepts the reviewed P2 pair (%s) from the exact commit and rejects mixed versions or paths', pair => {
+    const source = createContractSet({ intake: true, usage: pair === 'usage', quality: pair === 'quality', management: pair === 'management' });
     const result = contractSet.ingestContractSet({ projectRoot: createProductRoot(), sourceDirectory: source.directory, sourceRepositoryRoot: source.repositoryRoot });
     expect(result).toMatchObject({ status: 'CREATED', runtime_activated: false, ddev_authorized: false });
     const manifestPath = path.join(source.directory, 'contract-set.json');
     const original = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-      contract_set_id: string; database: { version: string; file: string }; openapi: { source_path: string };
+      contract_set_id: string; database: { version: string; file: string; source_path: string }; openapi: { source_path: string };
     };
-    const mixed = structuredClone(original);
-    mixed.database.version = 'schema.v1.19';
-    mixed.database.file = 'schema-v1.19.sql';
-    mixed.contract_set_id = mixed.contract_set_id.replace(/schema-1\.(?:20|21)-/, 'schema-1.19-');
-    writeFileSync(manifestPath, JSON.stringify(mixed));
-    expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
-    const wrongPath = structuredClone(original);
-    wrongPath.openapi.source_path = OPENAPI_SOURCE_PATH;
-    writeFileSync(manifestPath, JSON.stringify(wrongPath));
-    expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/source_path/);
+    for (const version of ['1.19', '1.20', '1.22']) {
+      if (original.database.version === `schema.v${version}`) continue;
+      const mixed = structuredClone(original);
+      mixed.database.version = `schema.v${version}`;
+      mixed.database.file = `schema-v${version}.sql`;
+      mixed.contract_set_id = mixed.contract_set_id.replace(/schema-1\.(?:20|21)-/, `schema-${version}-`);
+      writeFileSync(manifestPath, JSON.stringify(mixed));
+      expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
+    }
+    for (const field of ['openapi', 'database'] as const) {
+      const wrongPath = structuredClone(original);
+      wrongPath[field].source_path = field === 'openapi' ? OPENAPI_SOURCE_PATH : DATABASE_SOURCE_PATH;
+      writeFileSync(manifestPath, JSON.stringify(wrongPath));
+      expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/source_path/);
+    }
   });
 
   it('verifies the repository snapshot without enabling Ddev or runtime use', () => {
@@ -500,8 +507,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1',
-      source_git_sha: '18297cf802b195d8ff4e9f625143e50bff169418',
+      contract_set_id: 'cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8',
+      source_git_sha: '240ae98a47d8b9432559c298f60af6fdc9ba8c4e',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -511,10 +518,10 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      'a703d6e95b8e565af29247322180cf805ec47c2f8ebbc8df26a629047332c00e',
+      '5cbb8de3be017df9d6a93d1214931d0621e32157673a706dc37ff891d1219ab9',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      '7982b5b05b1e686e446544db092e6c73325ad0386a1772e2b004e282ff792664',
+      'ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.21.sql')))).toBe(
       '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',

@@ -1,0 +1,309 @@
+{
+  "schema": "content-intake-management-context-verification/v1",
+  "environment": {
+    "os": "macOS26.5.2 arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "data": "owned temporary synthetic fixtures only"
+  },
+  "base_commit": "eab46efac27e2bed701fa1b2be242500d3d45555",
+  "governance_commit": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
+  "contract_set": {
+    "schema": "customer-agent-contract-consumption/v1",
+    "contract_set_id": "cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8",
+    "source_repository": "ai-赋能立项",
+    "source_git_sha": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
+    "manifest_sha256": "5cbb8de3be017df9d6a93d1214931d0621e32157673a706dc37ff891d1219ab9",
+    "openapi_sha256": "ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38",
+    "database_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
+    "intake_status": "VERIFIED_NOT_ACTIVATED",
+    "ddev_authorized": false,
+    "runtime_activated": false
+  },
+  "input_sha256": {
+    "apps/api/src/content-intake/discovery.ts": "c1031f5caabb54627c39d1fa21acc1232c99263b90eab683f63875feb86ae368",
+    "apps/api/src/content-intake/management-http.ts": "5000fba4af0631cf758a6b99a4c0aff8923bde3f8bcbb6c71eeb9d0c379d1f15",
+    "apps/api/tests/content-intake.integration.test.ts": "231d173a47d6f0e4b19bc9cc0c018f6c59e27862c1126237a000174a835440a4",
+    "apps/api/tests/support/intake-synthetic-host.ts": "930f651f014009706b691cb5e5c949d55401f16ab8a56fa612425f0d0e746202",
+    "apps/desktop/tests/unit/content-intake-management-context-http.test.ts": "1f743c6a91ed5a16b5a6c784742019c8d1d33e676443c6fdbacd18631cbd8621",
+    "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": "662649c300a7639f9e3ce5ac77cdeca4a09ef9cb73cfc9045a15744f8f25be83",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "da35e621416a6fb18cf2745ed2dc1fb454fd196a32e5ad9cb2ed67ad8a11b920",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8/contract-set.json": "5cbb8de3be017df9d6a93d1214931d0621e32157673a706dc37ff891d1219ab9",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8/openapi.v1.yaml": "ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8/schema-v1.21.sql": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
+    "packages/contracts/openapi/bundle.generated.yaml": "62ea86a72a7598aa03de13bce29958640aad44c3f569c5fbd4b60bbcea7c9a6c",
+    "packages/contracts/src/generated/codegen-manifest.generated.json": "f82adacd02edb5f41df8f5bbd940fc2a7a17d369e9897c911ae206411457bce2",
+    "packages/contracts/src/generated/openapi.generated.ts": "15514010702de97811066edca9654f17da1f4440f007050e4bfa86b5f419eab1",
+    "packages/contracts/src/generated/provenance.generated.ts": "207d6cb4761ad530ad4acf2401e191b28f1a60645458aaf28f0992434188f3da",
+    "packages/contracts/src/generated/runtime-schema.generated.ts": "ce2f48eeddcfdf423d68c1f51604426da6299303f4c3fc3da3569b182818055f",
+    "packages/contracts/tests/runtime.test.ts": "bdc0643485e8f209bc153932af9210ef4a2e12396bdf1cc3994bba04a6f64df4",
+    "packages/database/migrations/manifest.generated.json": "2243683c8dd860934949e44ba8aa05a8d604963d29e3e57b8973d225ebb0b489",
+    "packages/database/scripts/generate-migrations.mjs": "06cd48a5adc446bc7e81a1c4739eb3b9ea54343e4275c0b96de2fe724f7cf359",
+    "packages/database/src/generated/migrations.generated.ts": "c3681c7d66a6ef7089e764afbd0a0d90f4b3c73cd02f1f69f8aad15ff7dde5bf",
+    "packages/database/src/planner.ts": "52c116f1c046715fdf25c63aae51e497d53ea5ba2784ed78e0c88016a8d81dd0",
+    "packages/database/tests/generator.test.ts": "b1cc7f850cf65ee33df0fa3f6ed71b42a2a7be9439b0248f656229912e1f8de0",
+    "packages/database/tests/planner.test.ts": "5b936681b0937eb00042dc5f59c8b4260e562148b0057a824a5cab9bbb700bf2",
+    "packages/database/tests/postgres.integration.test.ts": "4eacb45b82b0d0d4261831e20c673b5c884b790eca2e95bec63a3b4babe4af25",
+    "scripts/customer-agent-contract-set.mjs": "e53e9af067565d615b108000c9d92c71f00123df6c14ef49cd8a123b1dae7d04",
+    "scripts/probe-intake-usage-consumer.mjs": "ca71032aaec4394c35465593e1a4548816865017c00791b4606b84ae3ec9f5b8"
+  },
+  "commands": [
+    {
+      "command": "pnpm lint",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management-context-20261007/root-lint.log",
+      "log_sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "completed_at": "2026-10-07T08:14:35.685988+00:00"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management-context-20261007/root-typecheck.log",
+      "log_sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08",
+      "completed_at": "2026-10-07T08:14:44.355768+00:00"
+    },
+    {
+      "command": "pnpm test",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management-context-20261007/root-test.log",
+      "log_sha256": "320e20f06d4e878e593edb14aa129282faa4259ba6907d52d5c46a5ac72b044c",
+      "completed_at": "2026-10-07T08:18:43.424973+00:00"
+    },
+    {
+      "command": "pnpm build",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management-context-20261007/root-build.log",
+      "log_sha256": "7df8009c7cbbf69cb5793545c5f8773e829ec18815df01ce6728fcdd00965e4f",
+      "completed_at": "2026-10-07T08:10:16.454611+00:00"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management-context-20261007/architecture.log",
+      "log_sha256": "00c4429e86eb9e31013b3f452e4ac96fb09323aba7e5c1310aecf5ab00b88b7b",
+      "completed_at": "2026-10-07T08:19:05.496870+00:00"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management-context-20261007/workspace.log",
+      "log_sha256": "d90f16d00953d4bda24d38e46ec76263516ab81369014b7342bd65bd8a0cac5b",
+      "completed_at": "2026-10-07T08:19:07.090286+00:00"
+    },
+    {
+      "command": "pnpm docs:check",
+      "status": "PASS",
+      "log": ".gstack/qa-reports/content-intake-management-context-20261007/docs.log",
+      "log_sha256": "130d3ed88b53e324e93843d3f8ff1f19b2bcae78c7d87cbe458098ef598eb545",
+      "completed_at": "2026-10-07T08:27:28.311233+00:00"
+    },
+    {
+      "argv": [
+        "env",
+        "PG_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "management context:"
+      ],
+      "status": "PASS",
+      "capture": "001",
+      "receipt": ".gstack/qa-reports/content-intake-management-context-20261007/.qa-evidence/001/receipt.json",
+      "receipt_sha256": "f242334c15cfaca213750b3409891b3a538242669f57452a9e8665f582665514",
+      "completed_at": "2026-10-07T08:16:20.397Z",
+      "observation_sha256": "a5738dfc6bbb0d961889c894917a4805fc4e19dbc4e431c93bda966ebd66a8b1"
+    },
+    {
+      "argv": [
+        "env",
+        "PG_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "test:intake:transactions"
+      ],
+      "status": "PASS",
+      "capture": "002",
+      "receipt": ".gstack/qa-reports/content-intake-management-context-20261007/.qa-evidence/002/receipt.json",
+      "receipt_sha256": "7e28b54995396d60deef848d9b8f54f7beae5646329166b4273a8ada04acec6b",
+      "completed_at": "2026-10-07T08:25:19.508Z",
+      "observation_sha256": "0ca229f7fd3add94a4d9fc5bf944e033f3e74f9be0a2981eb7bf0771feb62661"
+    },
+    {
+      "argv": [
+        "env",
+        "PG_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "pnpm",
+        "test:intake:synthetic"
+      ],
+      "status": "PASS",
+      "capture": "003",
+      "receipt": ".gstack/qa-reports/content-intake-management-context-20261007/.qa-evidence/003/receipt.json",
+      "receipt_sha256": "b4ddc2dfec0b30ffa9ed3c4fd084c752ee1f4cb65f542fe8abd13a5b1409bebb",
+      "completed_at": "2026-10-07T08:26:20.024Z",
+      "observation_sha256": "dfd4b5269b25acf9b4694d4131bfee40c0f1d55817533a12b66c432ef8bb91b3"
+    }
+  ],
+  "supplemental_results": {
+    "intake": 23,
+    "contracts_unit": 23,
+    "contracts_package": 1,
+    "database_unit": 27,
+    "database_package": 1,
+    "database_pg": 25,
+    "root_api": {
+      "passed": 476,
+      "skipped": 247
+    },
+    "root_desktop": {
+      "passed": 1203,
+      "skipped": 6
+    },
+    "management_context": 9,
+    "full_intake_pg": 153,
+    "synthetic_host_cli": 5
+  },
+  "logs": [
+    {
+      "path": ".gstack/management-context-intake/contract-additive-check.log",
+      "sha256": "fe12bd7089c07a7cabc8901cd2bcbf8502939477c3cb03b8cb2e280c3bd4b26a"
+    },
+    {
+      "path": ".gstack/management-context-intake/contracts-generated-check.log",
+      "sha256": "4288e20a41c6b3b4f2616079eb422fc1877c2928024ebf33e44687324e55761b"
+    },
+    {
+      "path": ".gstack/management-context-intake/contracts-test.log",
+      "sha256": "8de876c1c12ef7619f9d456d48486483f29d979f81fd7475f6f22fbc2803a226"
+    },
+    {
+      "path": ".gstack/management-context-intake/contracts-verify.log",
+      "sha256": "254cd6650f160738af6ec63e73656669a713d8f6f3b69c4144f48e17441941b1"
+    },
+    {
+      "path": ".gstack/management-context-intake/database-package.log",
+      "sha256": "0b991686c420fb71b2ec91555770863cd58507e1503f1c8cbcfc8c2fbdff37b7"
+    },
+    {
+      "path": ".gstack/management-context-intake/database-pg-full.log",
+      "sha256": "7478079df3d6728f864e4146bc2ae9890fcc565baac6758a55c62ed279695aef"
+    },
+    {
+      "path": ".gstack/management-context-intake/database-unit.log",
+      "sha256": "b16738b1761f574d946e9018d86a5315cee512c1eee945e9fee0c5ef9b2e19f3"
+    },
+    {
+      "path": ".gstack/management-context-intake/db-generated-check.log",
+      "sha256": "121515d30132329ba7ab787c585322c1064fc30cd24c8263510069d898c12d67"
+    },
+    {
+      "path": ".gstack/management-context-intake/db-wire-only.log",
+      "sha256": "dc943298add59cddc55931e86b3339a5065ded82b00de3abf8b5057a20a621eb"
+    },
+    {
+      "path": ".gstack/management-context-intake/formal-intake.log",
+      "sha256": "7787ddc62284b47d791d8faf9b96a9c8b03fb55addc0254b6ef749f5a17261d4"
+    },
+    {
+      "path": ".gstack/management-context-intake/intake-compat.log",
+      "sha256": "17e7ed3767af6f0c50c6e9ff481915f4ca78658b349da94bc293d734aded26c2"
+    },
+    {
+      "path": ".gstack/management-context-intake/intake-formal.log",
+      "sha256": "552ff151a96cde39d1bacd31153a58fffe38424deaf76cce3a4cbb0ff7fa0bd2"
+    },
+    {
+      "path": ".gstack/management-context-intake/planner-after.log",
+      "sha256": "a23859176fdccf2d8ee917a3755410408be474c96de56bf90c92cf2715564a74"
+    },
+    {
+      "path": ".gstack/management-context-intake/planner-before.log",
+      "sha256": "9c41fb387485c51db8479017a5542d9e6ed328cd8a3519b690451695d5b7ac04"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007-api/context-pg-r2.log",
+      "sha256": "ded1af0ba8c5015df0a6e78cb408c456bd28f138f3f268ca1da7c08dc44dbedb"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007-api/context-pg.log",
+      "sha256": "6fa07eee81a0b984c28a8ffe0c3a445cbc110ea05690daba4bb7a4a1de5c34f6"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007-api/eslint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007-api/router-length.log",
+      "sha256": "7a834db3238a180945f4c8fc48058566ee82102046194e221ba0eed3e2dc87d5"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007-api/typecheck.log",
+      "sha256": "c77cb16c9b4aa550cfa64a69d9962c74773a323bd22a8abb487d3a27136e1c47"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007/architecture.log",
+      "sha256": "00c4429e86eb9e31013b3f452e4ac96fb09323aba7e5c1310aecf5ab00b88b7b"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007/docs.log",
+      "sha256": "130d3ed88b53e324e93843d3f8ff1f19b2bcae78c7d87cbe458098ef598eb545"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007/root-build.log",
+      "sha256": "7df8009c7cbbf69cb5793545c5f8773e829ec18815df01ce6728fcdd00965e4f"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007/root-lint.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007/root-test.log",
+      "sha256": "320e20f06d4e878e593edb14aa129282faa4259ba6907d52d5c46a5ac72b044c"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007/root-typecheck.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007/workspace.log",
+      "sha256": "d90f16d00953d4bda24d38e46ec76263516ab81369014b7342bd65bd8a0cac5b"
+    },
+    {
+      "path": ".gstack/management-context-intake/review-and-commands.json",
+      "sha256": "daf4945eacbd773b226d3d705ee46190ab0b3d406be9a297a444a66b2389e1a3"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-management-context-20261007-api/verification.json",
+      "sha256": "cf5885a971bf8320b75de9d53bf8d2a681a9c2c1d47c987368d833e6a1a689c7"
+    }
+  ],
+  "review": {
+    "ocr": "delegate; host review, no external model",
+    "outside_status": "disabled",
+    "native": "in-host; test/fixture/support/probe SUMMARY; parent full increment review",
+    "remaining_confirmed_defects": 0,
+    "fixed": [
+      "consecutive complete same-DDL predecessor rejection",
+      "synthetic router100 rejected legal128-character IntakeId"
+    ],
+    "governance_fixed": [
+      "shallow history approval downgrade bypass",
+      "historical test fixtures depended on fixed repository SHAs"
+    ],
+    "reused": "unchanged machine paths/schemas/SQL; governance unchanged release gates after fixed-code tests; prior principals inputs and16logs match"
+  },
+  "limitations": [
+    "No native upload UI or new desktop production adapter",
+    "No real Feishu/staff/customer data",
+    "No Windows/WSL or packaged native UI verification this turn",
+    "Production factory/ACL and activation stay sealed",
+    "No push/PR/merge/deploy"
+  ]
+}

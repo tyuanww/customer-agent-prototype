@@ -205,7 +205,13 @@ const PRIOR_USAGE = Object.freeze({
   sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
   migrationCount: 26,
 });
-const COMPATIBLE_UPGRADES = Object.freeze([...REVIEWED_UPGRADES, PRIOR_INTAKE, PRIOR_USAGE]);
+const PRIOR_QUALITY = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1',
+  sourceGitSha: '18297cf802b195d8ff4e9f625143e50bff169418',
+  sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
+  migrationCount: 26,
+});
+const COMPATIBLE_UPGRADES = Object.freeze([...REVIEWED_UPGRADES, PRIOR_INTAKE, PRIOR_USAGE, PRIOR_QUALITY]);
 const FROZEN_INTAKE_OVERLAYS = Object.freeze([
   {
     "position": 22,
@@ -393,7 +399,7 @@ function renderIntakeOverlay(projectRoot, snapshot, position, id) {
     source_schema_sha256: snapshot.manifest.database.sha256, sql });
 }
 
-function renderCatalogue(manifest, migrations) {
+function renderCatalogue(manifest, migrations, compatibleUpgrades) {
   const migrationEntries = migrations.map((migration) => `  Object.freeze({
     position: ${migration.position},
     id: ${JSON.stringify(migration.id)},
@@ -405,7 +411,7 @@ function renderCatalogue(manifest, migrations) {
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(COMPATIBLE_UPGRADES.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
 export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
@@ -453,6 +459,9 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     }),
     ...usageMigrations,
   ]);
+  // A predecessor must precede this snapshot; the current contract is never its own upgrade.
+  const currentIndex = COMPATIBLE_UPGRADES.findIndex(p => p.contractSetId === snapshot.contract_set_id);
+  const compatibleUpgrades = currentIndex < 0 ? COMPATIBLE_UPGRADES : COMPATIBLE_UPGRADES.slice(0, currentIndex);
   const manifest = Object.freeze({
     schema: GENERATOR_SCHEMA,
     contract_set_id: snapshot.contract_set_id,
@@ -467,7 +476,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
         source_schema_sha256: BASELINE.sourceSchemaSha256,
         migration_count: BASELINE.migrationCount,
       }),
-      prior_reviewed_upgrades: Object.freeze(COMPATIBLE_UPGRADES.map((p) => Object.freeze({
+      prior_reviewed_upgrades: Object.freeze(compatibleUpgrades.map((p) => Object.freeze({
         contract_set_id: p.contractSetId, source_git_sha: p.sourceGitSha,
         source_schema_sha256: p.sourceSchemaSha256, migration_count: p.migrationCount,
       }))),
@@ -479,7 +488,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     outputs.set(`packages/database/migrations/${migration.file}`, migration.sql);
   }
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
-  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations));
+  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });
 }
 

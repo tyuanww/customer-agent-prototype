@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。当前基线是 `v0.3.26 / main@4739c39`：P2 合同消费锁已推进到 OpenAPI `1.18.0` / `schema.v1.21`，`packages/database` 保留 `0001..0025` 原字节并追加 `0026` 发现索引（`0025` 是使用上下文合同增量）（`0016..0019` 是历史产品 overlay），合同生成物包含 233 个 component runtime schema。API 的权限、持久候选、来源确认、人工审批、候选质量与原生原子发布、使用资格和原生按店目录已由隔离 PG 合成执行器消费；Main 资格目录消费者已通过封闭 Fastify 路由和实际 ProductHttp/ProductSession 消费同一合成执行器的发布产物；显式 FAQ 合成 profile 已接通坐席查询及管理候选、质量检查、来源确认、组织审批请求与发布；新上传 UI、真实审批 transport 和生产路由仍待完成，新 schema 应用 ACL 继续封闭；详见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。当前基线是 `v0.3.26 / main@4739c39`：P2 合同消费锁已推进到 OpenAPI `1.19.0` / `schema.v1.21`，`packages/database` 保留 `0001..0025` 原字节并追加 `0026` 发现索引（`0025` 是使用上下文合同增量）（`0016..0019` 是历史产品 overlay），合同生成物包含 234 个 component runtime schema。API 的权限、持久候选、来源确认、人工审批、候选质量与原生原子发布、使用资格和原生按店目录已由隔离 PG 合成执行器消费；Main 资格目录消费者已通过封闭 Fastify 路由和实际 ProductHttp/ProductSession 消费同一合成执行器的发布产物；显式 FAQ 合成 profile 已接通坐席查询及管理候选、质量检查、来源确认、组织审批请求与发布；新上传 UI、真实审批 transport 和生产路由仍待完成，新 schema 应用 ACL 继续封闭；详见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
 
 ## 1. 先看整体
 
@@ -82,11 +82,12 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `packages/content-intake/` | `intake-p1.1` 标准 FAQ 工作簿解析、预算前检、错误/模板实物及可取消子进程；P2 API 合成事务切片复用其编译产物 | 授权/审批/正式候选、renderer IPC、真实来源或自行发布 |
 | `apps/api/src/content-intake/` | 产品会话主体到组织/岗位/业务授权交集；原子授权、接收/解析/材料冻结、修订/取消、来源确认与固定审核包；适配器核验人工任务及附件，追加历史证明审核时资格，当前事实投影 readiness，撤销传播到全部引用谱系；候选质量预览复用 DB population/选样，冻结计划与逐条检查在封闭存储持久化，由 DB 投影质量状态；publication 拥有即时审批观察及原 operation 恢复，内部 SQL 原子签发 release；usage 统一拥有会话/店铺/选择绑定、最早截止、每页重验和坐席白名单投影；discovery 投影具体来源上的业务/分配/委派资格，签名分页绑定会话与完整权限版本 | 当前仅隔离 PG/合成审批 transport 消费者，无真实 Feishu adapter/生产 HTTP factory/新 ACL；不创建第二 current，不隐式 bootstrap/迁移旧同域内容 |
 | `apps/api/src/content-intake/usage-http.ts` | 四条发现/资格/快照 HTTP 路由的认证、查询解码、正式错误与响应校验；保留认证私有引用，复用既有 usage 事务 | 仅隔离合成宿主显式注册；不导入桌面，不注册生产工厂，不授予新应用 ACL |
-| `apps/api/src/content-intake/management-http.ts` / `files.ts` | 管理端文件上传、接收与有界串行解析；服务端摘要/永久回执/容量门、每阶段会话锁、材料签名分页与 Excel 错误报告实物；来源确认、审批请求/读取/刷新、发布/取消及主体+action+operationId 回执查询复用 evidence/publication/candidate；共享 `http-boundary.ts` 拥有认证引用、错误封口和严格分页解码，候选写入必须地址与正文键一致 | 仅隔离合成宿主显式注册；审批适配器来自服务端配置；不挂生产服务，不接受客户端角色/摘要/正文行或审批结论；质量 HTTP 已接入独立摘要/样本/提交/回执；管理 UI 已接候选/材料/人工检查/来源确认/审批/发布；新上传 UI 待管理上下文合同批准及实现 |
+| `apps/api/src/content-intake/management-http.ts` / `files.ts` | 管理端文件上传、接收与有界串行解析；服务端摘要/永久回执/容量门、每阶段会话锁、材料签名分页与 Excel 错误报告实物；来源确认、审批请求/读取/刷新、发布/取消及主体+action+operationId 回执查询复用 evidence/publication/candidate；共享 `http-boundary.ts` 拥有认证引用、错误封口和严格分页解码，候选写入必须地址与正文键一致 | 仅隔离合成宿主显式注册；审批适配器来自服务端配置；不挂生产服务，不接受客户端角色/摘要/正文行或审批结论；质量 HTTP 已接入独立摘要/样本/提交/回执；管理 UI 已接候选/材料/人工检查/来源确认/审批/发布；管理上下文已按1.19合同接入；新上传 UI 待消费上下文与参与人目录 |
 | `apps/desktop/src/main/content-intake-usage.ts` | Main 当前店/选择、代际与取消；复用 ProductSession 最小能力，原子组装分页目录和原文复制；每个目录句柄核验会话/上下文/原截止，正常发布不撤销旧句柄，已知撤权/退出/换店使全部失效 | 仅封闭探针及显式 FAQ 合成 Query 调用；不注册生产 factory 或第二 current，不持久化正文，不替代 ProductAnnounce，SOP/media 非空拒绝 |
 | `apps/desktop/src/main/content-intake-access.ts` | 同一 ProductSession 的权限/来源完整分页、可见权限一致性复读、取消/会话代际与 query 店铺筛选；返回限时选择提示，真实使用仍重签资格 | 不缓存权利、不构成跨 HTTP 原子快照、不发明店铺名称；供封闭探针及显式 FAQ 合成 Query 组合；未注册生产 factory |
 | `apps/desktop/src/main/content-intake-query.ts` / `content-intake-query-ipc.ts` | 单个可信 Query 的独立发现/查询任务、BM25 Top 3、当前展示句柄及窗口销毁；查询取消不取消店铺发现，使用资格仍由 usage 拥有；IPC 验证 main-frame/role/exact payload | 仅显式 loopback FAQ profile；不接旧 announce/hydrate、模型、管理写口；不扩大正式 ACL，索引超预算整次失败 |
 | `apps/desktop/src/main/content-intake-management.ts` / `content-intake-management-ipc.ts` | Dashboard 候选与材料选择、来源级权限提示、限时可读投影和关闭提醒；Main 保管来源确认、审批请求/刷新和发布的原操作正文与证据版本；人工检查复用 `ContentIntakeQuality`；发布查询原回执，来源/审批仅重放原 POST，成功后独立读取当前状态 | 仅 FAQ loopback 合成 profile；窄命令不接受 actor/key/操作 ID/URL；来源失权和会话变化清空材料；未知提交不默默重试 |
+| `apps/api/src/content-intake/discovery.ts` managementContext | 在原内容事务和发布锁内投影当前来源版本、本人 principal、事实版本、发布基线及最早有效期；只允许当前来源 import，receive 重新验权并比较版本 | 只读输入提示，不是资格、租约或提交票据；仅隔离宿主注册，不从 userId 推断主体或把未知基线当空值 |
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
 | `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；合成宿主显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；标签不由账号推导，缺失整页失败；目录不是授权或同一时刻快照，不新增姓名表或真实员工读取 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
@@ -95,6 +96,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
 | `docs/`、`evidence/qa/` | 可读合同、教程、验证方法和冻结证据 | 可执行源码、运行时缓存 |
+
+OpenAPI1.19 管理上下文没有新增 DDL；26段 SQL 的来源和校验和保持不变。迁移规划器允许连续已审合同拥有相同完整目录，仅限同 DDL、不同合同身份；旧1.17与1.18账本已实际验证无需 SQL。证据见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
 
