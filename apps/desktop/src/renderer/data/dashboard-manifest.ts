@@ -816,9 +816,10 @@ export const DASHBOARD_MANIFEST = deepFreeze({
 export function nextDashboardNavId(
   active: DashboardModuleId,
   delta: number,
+  items: readonly DashboardNavItem[] = DASHBOARD_NAV,
 ): DashboardModuleId {
-  const index = DASHBOARD_NAV.findIndex((item) => item.id === active);
-  return DASHBOARD_NAV[(index + delta + DASHBOARD_NAV.length) % DASHBOARD_NAV.length].id;
+  const index = items.findIndex((item) => item.id === active);
+  return items[(index + delta + items.length) % items.length].id;
 }
 
 export function findLedgerRow(operationId: string): LedgerRow | undefined {

@@ -86,6 +86,41 @@ test('native FAQ upload and error report lead to the same approved release consu
     const sources = upload.getByRole('combobox', { name: '上传来源', exact: true });
     await expect(sources.getByRole('option').filter({ hasText: 'source-a' })).toHaveCount(1);
     const sourceChoice = await sources.getByRole('option').filter({ hasText: 'source-a' }).getAttribute('value');
+    await dashboard.screenshot({ path: path.join(evidence, 'dashboard-intake-start.png') });
+    await expect(dashboard.getByTestId('dashboard-shell')).toBeVisible();
+    await expect(dashboard.getByRole('tab')).toHaveCount(1);
+    await expect(dashboard.getByTestId('nav-content')).toHaveAttribute('aria-selected', 'true');
+    async function appearance(mode: 'light' | 'dark') {
+      await dashboard.getByTestId('dashboard-theme-trigger').click();
+      await dashboard.getByTestId(`dashboard-theme-${mode}`).click();
+      await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', mode);
+      // Wait for the shared feedback transition before judging rendered colors.
+      await expect.poll(() => dashboard.locator('.intake-management select:enabled').first().evaluate(el => getComputedStyle(el).backgroundColor)).toBe(mode === 'dark' ? 'rgb(28, 27, 32)' : 'rgb(255, 255, 255)');
+    }
+    async function captureWorkspace(name: string) {
+      const layout = await dashboard.evaluate(() => {
+        const panel = document.querySelector<HTMLElement>('.dashboard-content')!;
+        const input = document.querySelector('select')!;
+        const form = document.querySelector('.intake-management')!;
+        return { width: innerWidth, height: innerHeight, bodyOverflow: document.documentElement.scrollWidth > innerWidth,
+          panelOverflow: panel.scrollWidth > panel.clientWidth, font: getComputedStyle(form).fontSize,
+          inputFont: getComputedStyle(input).fontSize, radius: getComputedStyle(input).borderRadius,
+          theme: document.documentElement.dataset.dashboardTheme, colorScheme: getComputedStyle(input).colorScheme,
+          inputAppearance: getComputedStyle(input).appearance };
+      });
+      expect(layout).toMatchObject({ bodyOverflow: false, panelOverflow: false, font: '14px', inputFont: '16px', radius: '8px', inputAppearance: 'auto' });
+      writeFileSync(path.join(evidence, `${name}.json`), JSON.stringify(layout, null, 2));
+      await dashboard.screenshot({ path: path.join(evidence, `${name}.png`) });
+    }
+    await appearance('light'); await captureWorkspace('dashboard-intake-light');
+    await appearance('dark'); await captureWorkspace('dashboard-intake-dark');
+    const nativeDashboard = await app.browserWindow(dashboard);
+    await nativeDashboard.evaluate(win => win.setSize(980, 680));
+    await expect.poll(() => dashboard.evaluate(() => innerWidth)).toBe(980);
+    await captureWorkspace('dashboard-intake-minimum-dark');
+    await nativeDashboard.evaluate(win => win.setSize(1180, 760));
+    await expect.poll(() => dashboard.evaluate(() => innerWidth)).toBe(1180);
+    await appearance('light');
     expect(sourceChoice).toBeTruthy(); await sources.selectOption(sourceChoice!);
     async function selectAndSubmit(filename: string) {
       await upload.getByRole('button', { name: '选择 Excel 文件', exact: true }).click();
@@ -96,6 +131,11 @@ test('native FAQ upload and error report lead to the same approved release consu
       await upload.getByRole('checkbox', { name: '实际改稿人 合成整理人', exact: true }).check();
       await expect(upload.getByRole('button', { name: '上传并校验', exact: true })).toBeDisabled();
       await confirmation.check();
+      await expect(confirmation).toBeChecked();
+      if (filename === path.basename(badFile)) {
+        await appearance('dark'); await captureWorkspace('dashboard-intake-declaration-dark');
+        await appearance('light');
+      }
       await upload.getByRole('button', { name: '上传并校验', exact: true }).click();
     }
     async function settleParse(expected: string) {
@@ -124,12 +164,15 @@ test('native FAQ upload and error report lead to the same approved release consu
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-upload-error-report.png') });
     await selectAndSubmit(path.basename(goodFile));
     await settleParse('校验通过，候选已形成');
+    await expect(upload.getByRole('button', { name: '刷新解析进度', exact: true })).toHaveCount(0);
     await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })).toBeVisible();
     await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
     const material = dashboard.getByRole('region', { name: '当前页材料与差异' });
     await expect(material.getByRole('article')).toHaveCount(3);
     await expect(material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer, { exact: true })).toHaveCSS('white-space', 'pre-wrap');
     await material.getByRole('article').first().scrollIntoViewIfNeeded();
+    await expect(dashboard.getByText(/待确认来源版本 \/ 待组织审批通过/)).toBeVisible();
+    await expect(dashboard.getByText(/风险等级：常规内容/)).toBeVisible();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-uploaded-material.png') });
     await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill('synthetic-export-one');
     await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');

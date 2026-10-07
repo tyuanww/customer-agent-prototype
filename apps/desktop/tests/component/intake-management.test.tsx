@@ -179,3 +179,16 @@ it('clears each confirmed source form by its operation identity and preserves ne
     expect(f.data.workflowReceipts.size).toBe(2);
   } finally { f.main.dispose(); }
 });
+
+it('explains candidate readiness and risk without exposing internal codes or prototype members', async () => {
+  const f = setup();
+  f.data.candidate.readinessReasons = ['SOURCE_CONFIRMATION_REQUIRED', 'AWAITING_APPROVAL', 'constructor', 'NEW_REASON'];
+  render(<IntakeManagement />);
+  try {
+    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    expect(screen.getByText(/待确认来源版本 \/ 待组织审批通过 \/ 还有待核验事项，请刷新候选状态/)).toBeInTheDocument();
+    expect(screen.queryByText(/SOURCE_CONFIRMATION_REQUIRED|constructor|NEW_REASON/)).not.toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    expect(await screen.findByText(/风险等级：常规内容/)).toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});

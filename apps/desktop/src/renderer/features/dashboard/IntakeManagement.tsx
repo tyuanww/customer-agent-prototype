@@ -5,6 +5,16 @@ import { IntakeUpload } from './IntakeUpload';
 import './intake-management.css';
 const states: Record<string, string> = { 'awaiting-evidence': '等待补证', ready: '候选就绪', publishing: '发布中', published: '已发布', cancelled: '已取消', invalidated: '已失效',
   confirmed: '来源已确认', creating: '审批创建结果待确认', pending: '等待组织审批', approved: '组织审批已通过', rejected: '组织审批未通过', revoked: '组织审批已撤回', unavailable: '审批服务暂不可用', unknown: '操作结果待确认', failed: '操作失败', not_frozen: '待冻结抽样', revision_required: '需要修订后重新检查', initial_required: '等待初检', expansion_required: '等待扩检', passed: '质量检查通过', blocked: '质量检查未通过' };
+const readinessLabels: Record<string, string> = {
+  SOURCE_MISMATCH: '来源已变更，请核对当前材料', BASE_CHANGED: '已发布版本已变更，请重新核对候选',
+  SOURCE_CONFIRMATION_REQUIRED: '待确认来源版本', APPROVAL_REVOKED: '组织审批已撤回',
+  APPROVAL_UNAVAILABLE: '审批结果需重新核验', AWAITING_APPROVAL: '待组织审批通过',
+  PERMISSION_CHANGED: '复核人资格已变更，需重新核验',
+};
+const riskLabels: Record<components['schemas']['IntakeRisk']['level'], string> = { routine: '常规内容', critical: '关键变更' };
+function readinessLabel(reason: string) {
+  return Object.hasOwn(readinessLabels, reason) ? readinessLabels[reason] : '还有待核验事项，请刷新候选状态';
+}
 /** An instance can be bound before the first observation exists. The frozen
  * wire uses unavailable for both that state and a later provider failure. */
 function stateLabel(state: string, review?: IntakeManagementView['review']) {
@@ -196,8 +206,8 @@ export function IntakeManagement() {
   const qualityDirty = [...dirtyIds].some(id => id !== 'workflow-source' && id !== 'workflow-publish');
   const workflowDirty = dirtyIds.has('workflow-source') || dirtyIds.has('workflow-publish');
   const editable = quality?.status.state === (quality?.phase === 'initial' ? 'initial_required' : 'expansion_required');
-  return <main className="intake-management">
-    <header><div><p className="intake-eyebrow">PILOT-S0 · SYNTHETIC</p><h1>资料审核</h1><p>核对候选材料、确认来源、完成质量检查并审核发布</p></div><span>{view?.displayName ?? '正在读取会话'}</span></header>
+  return <section className="intake-management" aria-label="FAQ 资料管理">
+    <header><div><h1>资料审核</h1><p>上传 FAQ、核对候选材料并审核发布</p></div><span>{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</span></header>
     {error && <div><p role="alert">{error}</p><button disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</button></div>}
     {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy} stopping={stopping}
       blocked={dirty || view.hasDraft || !!view.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
@@ -221,14 +231,14 @@ export function IntakeManagement() {
         </button>)}</div></section>
       {dirty && <p role="status">当前有尚未提交的输入。请完成对应操作，或关闭当前候选并明确放弃。</p>}
       {view.selected && <section aria-label="当前候选"><h2>当前候选 · {view.selected.sourceId} · 版本 {view.selected.key.version}</h2>
-        <p>{states[view.selected.state]} · {view.selected.readinessReasons.join(' / ') || '基础证据已齐备，发布仍须独立核验'}</p>
+        <p>{states[view.selected.state]} · {[...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验'}</p>
         <div className="intake-toolbar"><button disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新候选状态</button>
           <button disabled={disabled} onClick={() => void apply({ action: 'material', next: false })}>查看材料</button>
           <button disabled={disabled || !view.material?.nextCursor} onClick={() => void apply({ action: 'material', next: true })}>下一页材料</button>
           {view.canReview && <><button disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'initial' })}>读取初检</button>
             <button disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'expanded' })}>读取扩检</button></>}</div>
         {view.material && <section aria-label="当前页材料与差异">
-          <p>来源版本：{view.material.materialHeader.sourceClaim.versionValue ?? '尚未确认'} · 风险等级：{view.material.materialHeader.risk.level}</p>
+          <p>来源版本：{view.material.materialHeader.sourceClaim.versionValue ?? '尚未确认'} · 风险等级：{riskLabels[view.material.materialHeader.risk.level]}</p>
           {view.material.entries.map(entry => <article className="intake-card" key={entry.businessEntryId}><h3>{entry.title}</h3><p className="intake-answer">{entry.answerText}</p><EntryDetails entry={entry} /></article>)}
           <h3>当前页差异</h3>{view.material.differences.map(d => <p key={d.businessEntryId}>{d.businessEntryId} · {({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[d.change]} · {d.previousVersion ?? '无前版'} → {d.nextVersion}</p>)}
         </section>}
@@ -245,5 +255,5 @@ export function IntakeManagement() {
         {view.receipt && <p role="status">操作回执：{states[view.receipt.state] ?? view.receipt.state}。这是本次操作记录，请重新读取检查状态。</p>}
       </section>}
     </>}
-  </main>;
+  </section>;
 }

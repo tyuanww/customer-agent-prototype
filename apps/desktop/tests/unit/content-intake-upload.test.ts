@@ -68,7 +68,7 @@ it('uploads original bytes with opaque choices, permits disabled contributors, e
       contributorDeclaration: { preparerPrincipalId: 'principal-a', editorPrincipalIds: ['principal-a','principal-b'], confirmed: true } });
     Object.assign(f.job, { state: 'validated', generation: 2, candidateId: 'candidate-a', candidateVersion: 1 });
     expect(await f.main.command({ action: 'upload-refresh' }, f.access)).toEqual(f.data.candidate);
-    expect(f.main.view(f.access)).toMatchObject({ phase: 'validated', canOpen: true });
+    expect(f.main.view(f.access)).toMatchObject({ phase: 'validated', canOpen: true, canRefresh: false });
   } finally { f.main.dispose(); }
 });
 
@@ -224,7 +224,7 @@ it('keeps validated parse outcome if candidate reading fails, then recovers it w
     const original = f.request.getMockImplementation()!; let lost = true;
     f.request.mockImplementation(async (...args) => { if (args[1].includes('/versions/') && lost) { lost = false; throw new ProductHttpError('UNAVAILABLE'); } return original(...args); });
     await expect(f.main.command({ action: 'upload-refresh' }, f.access)).rejects.toMatchObject({ code: 'UNAVAILABLE' });
-    expect(f.main.view(f.access)).toMatchObject({ pending: null, canOpen: true, phase: 'validated' });
+    expect(f.main.view(f.access)).toMatchObject({ pending: null, canOpen: true, canRefresh: false, phase: 'validated' });
     expect(await f.main.command({ action: 'upload-open' }, f.access)).toEqual(f.data.candidate);
     expect(f.request.mock.calls.filter(c => c[1].endsWith('/candidates'))).toHaveLength(1);
   } finally { f.main.dispose(); }
