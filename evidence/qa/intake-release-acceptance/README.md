@@ -27,7 +27,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 ./node_modules/.bin/vitest run tests/intak
 CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_CANDIDATE=1 ./node_modules/.bin/playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts
 ```
 
-`checks.json` 绑定源码、候选 SQL、日志及本地截图 SHA。Electron 日志对应的 SQL 六件与最终副本逐字相同；其后只扩展了已 seed director 的选择白名单、读取 campaign 报告的测试断言和元数据说明，分别用定向检查验证，不机械重跑已通过 Electron。截图保留在 `.gstack/intake-synthetic/`，未把数 MB 图片纳入 Git；已目视检查发布结果及另一坐席查询截图。所有自有连接归零、identity listener 关闭、PG / 文件临时目录删除均有断言。
+`checks.json` 绑定源码、候选 SQL、日志及本地截图 SHA。两份 Vitest 日志仅移除文件末尾多余空行，并保留规范化前的原始日志 SHA。Electron 日志对应的 SQL 六件与最终副本逐字相同；其后只扩展了已 seed director 的选择白名单、读取 campaign 报告的测试断言和元数据说明，分别用定向检查验证，不机械重跑已通过 Electron。截图保留在 `.gstack/intake-synthetic/`，未把数 MB 图片纳入 Git；已目视检查发布结果及另一坐席查询截图。所有自有连接归零、identity listener 关闭、PG / 文件临时目录删除均有断言。
 
 首次 Electron 发现在旧候选缺 usage policy_versions SELECT，以及取消候选缺 business write_attempts 精确权限。修复均由治理候选所有者更新，本工作区重新复制并校验 SHA，没有测试临时 GRANT。中途一次回退复制按钮因窗口节点 detach 失败，下一次同测试、无强制点击或生产 UI 改动通过；它属于本机窗口验收的一次不稳定观测，不将其隐去，也不据此主张 OS 手动焦点验证完成。
 
