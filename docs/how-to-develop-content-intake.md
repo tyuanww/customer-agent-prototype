@@ -25,7 +25,7 @@ ZIP 前检逐条约束展开量、局部/中央文件名一致和规范 ASCII �
 
 ## CSV 与 XLSX 输入
 
-OpenAPI 1.22.0 / schema.v1.24 已冻结并实际 intake。`packages/content-intake/src/csv.ts` 与既有 XLSX 解析器通过同一隔离 runner 被 API 消费；`src/faq-rules.ts` 统一拥有两格式的 FAQ/问法业务规则。固定 `csv-parse` 7.0.3（MIT）是运行依赖；严格编码、引号、列结构、来源一致性和预算由 CSV 适配器负责，原件摘要从未转换的 Buffer 计算，保留 BOM 和换行字节。解析通过不代表来源已确认、权限已授予或可以发布。
+CSV 的 OpenAPI 1.22.0 / schema.v1.24 已冻结并实际 intake；当前消费已前进到仅追加旧 CHECK 执行权限的 schema.v1.25，格式与 HTTP 合同保持不变。`packages/content-intake/src/csv.ts` 与既有 XLSX 解析器通过同一隔离 runner 被 API 消费；`src/faq-rules.ts` 统一拥有两格式的 FAQ/问法业务规则。固定 `csv-parse` 7.0.3（MIT）是运行依赖；严格编码、引号、列结构、来源一致性和预算由 CSV 适配器负责，原件摘要从未转换的 Buffer 计算，保留 BOM 和换行字节。解析通过不代表来源已确认、权限已授予或可以发布。
 
 CSV 采用单文件 23 列，保留独立问法编号；同一话术带多问法时重复的 FAQ 字段须相同，否则整批拒绝。来源登记的模板、规则、映射与结构摘要决定输入格式，客户端文件名不能改变登记。CSV 使用 `faq-csv-v1` / `intake-csv-v1` / `faq-csv-columns-v1`；XLSX 保留原规则。原表的一次性整理不增加永久列映射，旧 Excel/CSV 不能直接当作规范模板上传。`experiments/csv/` 仅保留原字节合成夹具，唯一解析实现在 src。当前 Mac 开发态实际上传、XLSX 错误报告、修订、确认发布与另一客服查询复制的结果见[CSV 接入证据](../evidence/qa/intake-csv-runtime/README.md)。生产 HTTP 与真实资料仍未开放。
 

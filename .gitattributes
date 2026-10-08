@@ -18,3 +18,6 @@ packages/content-intake/experiments/csv/synthetic-template.csv -text whitespace=
 
 # 本轮原始工具输出按摘要留证；保留系统表格尾空格和测试报告末空行。
 evidence/qa/intake-csv-runtime/*.log -text -whitespace
+
+# 旧目录 ACL 回归的原始日志保留实际输出字节，供 SHA-256 复核。
+evidence/qa/intake-legacy-acl-runtime/*.log -text -whitespace

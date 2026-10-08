@@ -194,6 +194,39 @@ describe.skipIf(!enabled)('actual service on formal purpose roles (synthetic PG1
     expect((await readAll()).result[0]!.entry.answerText).toBe('第一行。\n第二行。');
     expect(value(await service.rollback(actors.enabler!, request))).toEqual(receipt);
   });
+  it.each(['source-suspended', 'source-mapping', 'permission'] as const)(
+    'rejects publication and an already-previewed corrective rollback after %s changes', async gate => {
+      const first = await publish('gate-first');
+      const second = await publish('gate-second', rows('合成新版正文'));
+      const impact = value(await service.rollbackPreview(actors.enabler!, {
+        baseReleaseId: second.receipt.releaseId, targetReleaseId: first.receipt.releaseId,
+      }));
+      const next = await prepared('gate-third', rows('不得发布的合成正文'));
+      if (gate === 'source-suspended') {
+        await admin.query("SELECT public.suspend_authoritative_source('srcv_pub_aftersale','SOURCE_REVOKED','EVD-SYNTHETIC-REVOKE','synthetic-owner','owner')");
+      } else if (gate === 'source-mapping') {
+        await admin.query(`INSERT INTO content_intake.source_mappings
+          SELECT source_id,2,template_version,rule_version,mapping_version,structure_digest
+          FROM content_intake.source_mappings WHERE source_id='source-a'`);
+        await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
+      } else {
+        for (const action of ['publish', 'rollback']) value(await service.changeGrant(actors.director!, `business-enabler-${action}`, {
+          operationId: `gate-revoke-${action}`, expectedVersion: 1, change: 'revoke', reason: '合成失效', stewardPrincipalId: null,
+        }));
+      }
+      const rejected = [await service.publish(actors.enabler!, next.request), await service.rollback(actors.enabler!, {
+        operationId: 'gate-rollback', rollbackPlanId: impact.rollbackPlanId, baseReleaseId: impact.baseReleaseId,
+        targetReleaseId: impact.targetReleaseId, impactDigest: impact.impactDigest, confirmed: true,
+      })];
+      for (const result of rejected) {
+        expect(result).toMatchObject({ ok: false, commit: 'rolled_back' });
+        expect(result).not.toMatchObject({ code: 'INTERNAL_ERROR' });
+      }
+      expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(second.receipt.releaseId);
+      expect((await admin.query('SELECT count(*)::int AS count FROM content_intake.publications')).rows[0].count).toBe(2);
+      expect((await admin.query(`SELECT count(*)::int AS count FROM backend_review.receipts
+        WHERE request_key=ANY($1::text[])`, [ [next.request.operationId, 'gate-rollback'] ])).rows[0].count).toBe(0);
+    });
   it('grants through the actual allocator and invalidates saved usage after revocation', async () => {
     await publish('grant');
     value(await service.changeGrant(actors.director!, 'business-agent-query', { operationId: 'revoke-original', expectedVersion: 1, change: 'revoke', reason: '合成替换', stewardPrincipalId: null }));

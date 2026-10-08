@@ -27,6 +27,7 @@ import { createApprovalAdapter, type ApprovalTransport } from '../src/content-in
 import { syntheticApproval } from './support/intake-approval.js';
 import { canonical, digest } from '../src/content-intake/material.js';
 import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
+import { createIntakePurposePool, type IntakePurposePool } from '../src/content-intake/runtime-pool.js';
 import type { IntakeQualityPreview, IntakeQualityProgress, QualityCheck } from '../src/content-intake/quality.js';
 
 type C = components['schemas'];
@@ -43,6 +44,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   let harness: Pg15Harness;
   let admin: Client;
   let pool: Pool;
+  let publicationPool: IntakePurposePool | undefined;
   let service: ReturnType<typeof createContentIntakeService>;
   let store: ReturnType<typeof createContentObjectStore>;
   let policyVersion: number;
@@ -81,6 +83,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     admin = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
     pool = new Pool({ ...db.config, max: 4 });
+    publicationPool = undefined;
     auth=undefined;seats.clear();
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
     authConfig={connectionString:`postgresql://synthetic_intake_auth@localhost/${db.name}?${new URLSearchParams({host:harness.socket,port:String(harness.port)})}`,
@@ -132,7 +135,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query('COMMIT');
     policyVersion = Number((await admin.query('SELECT version FROM content_intake.policy_versions')).rows[0].version);
   }, 60_000);
-  afterEach(async () => { await auth?.close(); await pool?.end(); await admin?.end(); harness?.stop(); }, 60_000);
+  afterEach(async () => { await auth?.close(); await publicationPool?.end(); await pool?.end(); await admin?.end(); harness?.stop(); }, 60_000);
 
   function batch(recipient: string, action: C['IntakeAction'] = 'import', kind: 'business' | 'delegation' = 'business', op = 'batch-one'): C['IntakeGrantBatch'] {
     return { operationId: op, issuerFactsVersion: 1, policyVersion, items: [{ kind, recipientPrincipalId: recipient,
@@ -2474,7 +2477,21 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     console.log(JSON.stringify({probe:'capacity-explain',plan:plan.rows[0]['QUERY PLAN']}));
   },180_000);
 
-  it('copies every existing legacy field from a different domain without manufacturing review evidence', async () => {
+  async function restrictedPublisher() {
+    await admin.query('CREATE ROLE synthetic_legacy_publisher LOGIN NOINHERIT; GRANT intake_business TO synthetic_legacy_publisher');
+    publicationPool = createIntakePurposePool({ ...pool.options, user: 'synthetic_legacy_publisher', max: 2 }, 'business');
+    const connection = await publicationPool.connect();
+    try {
+      expect((await connection.query(`SELECT current_user AS capability,session_user AS login,
+        (SELECT rolsuper FROM pg_roles WHERE rolname=session_user) AS superuser`)).rows[0])
+        .toEqual({ capability: 'intake_business', login: 'synthetic_legacy_publisher', superuser: false });
+      await expect(connection.query('INSERT INTO public.release_items DEFAULT VALUES')).rejects.toMatchObject({ code: '42501' });
+    } finally { connection.release(); }
+    return { publisher: createContentIntakeService(publicationPool, store, (_id, error) => diagnostics.push(error), undefined,
+      { requireProductSession: true }), user: (await seat('enabler')).actor };
+  }
+
+  it('copies all eight legacy rows unchanged through restricted publication, subsequent publication and corrective rollback', async () => {
     await seedSyntheticG1aRelease(admin);
     await admin.query('BEGIN');
     await admin.query("SELECT set_config('app.publishing','on',true)");
@@ -2490,19 +2507,41 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query("UPDATE public.content_current SET current_release_id='rel_native_base'");
     await admin.query("SELECT setval('public.content_release_seq',2,true)");
     await admin.query('COMMIT');
+    const { publisher, user } = await restrictedPublisher();
+    const legacyRows = async (releaseId: string) => (await admin.query(
+      "SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id=$1 ORDER BY script_id", [releaseId])).rows;
+    const before = await legacyRows('rel_native_base');
+    expect(before).toHaveLength(8);
     const { request }=await publishable('legacy-other-domain');
-    const published = await service.publish(actor('enabler'),request);
+    const published = await publisher.publish(user,request);
     expect(published.ok, JSON.stringify(diagnostics.map(error => error instanceof Error ? { ...error, message: error.message } : error))).toBe(true);
     const out=value(published);
-    const before=(await admin.query("SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id='rel_native_base' ORDER BY script_id")).rows;
-    const after=(await admin.query("SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id=$1 ORDER BY script_id",[out.releaseId])).rows;
-    expect(before.length).toBeGreaterThan(0);expect(after).toEqual(before);
+    expect(await legacyRows(out.releaseId!)).toEqual(before);
+    const second = await publishable('legacy-followup', [['faq-one','合成问题','待纠正的合成正文','','','分类','','启用','','','','内部说明','','','false']]);
+    const updated = value(await publisher.publish(user, second.request));
+    expect(await legacyRows(updated.releaseId!)).toEqual(before);
+    const impact = value(await publisher.rollbackPreview(user, { baseReleaseId: updated.releaseId, targetReleaseId: out.releaseId }));
+    expect(impact.requiresCorrectiveCandidate).toBe(false);
+    const rollback: C['IntakeRollback'] = { operationId: 'legacy-preserving-rollback', rollbackPlanId: impact.rollbackPlanId,
+      baseReleaseId: impact.baseReleaseId, targetReleaseId: impact.targetReleaseId, impactDigest: impact.impactDigest, confirmed: true };
+    const restored = value(await publisher.rollback(user, rollback));
+    expect(restored.releaseId).not.toBe(out.releaseId);
+    expect(await legacyRows(restored.releaseId!)).toEqual(before);
+    expect(await legacyRows('rel_native_base')).toEqual(before);
+    expect(value(await publisher.rollback(user, rollback))).toEqual(restored);
+    const qualified = value(await issue());
+    expect(qualified.releaseId).toBe(restored.releaseId);
+    expect(value(await snapshot(qualified.entitlementId)).faq[0]!.entry.answerText).toBe('第一行。\n第二行。');
+    expect((await admin.query('SELECT action,count(*)::int AS count FROM content_intake.publications GROUP BY action ORDER BY action')).rows)
+      .toEqual([{ action: 'publish', count: 2 }, { action: 'rollback', count: 1 }]);
     expect((await admin.query('SELECT count(*) FROM public.owner_acceptance_records')).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
   });
 
   it.each(['quality','publisher-revoked','cancelled','source-version','suspended-source'] as const)(
     'publication rejects %s with zero release/ticket side effects', async gate => {
       await publicationBase(); const { c,request }=await publishable(gate);
+      const { publisher, user } = await restrictedPublisher();
       if (gate==='quality') {
         // New material cannot borrow the already-passed plan.
         const req=await input('unreviewed-revision',c.key);req.baseReleaseId=request.baseReleaseId;
@@ -2520,7 +2559,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
         await admin.query('COMMIT');
       }
-      expect(await service.publish(actor('enabler'),request)).toMatchObject({ ok:false });
+      const rejected = await publisher.publish(user,request);
+      expect(rejected).toMatchObject({ ok:false });
+      expect(rejected).not.toMatchObject({ code:'INTERNAL_ERROR' });
       await noPublication();
     });
 
@@ -3176,15 +3217,18 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
 
   it.each(['revoked','expired']as const)('legacy history: mixed direct catalog never revives %s approval during read, publish or rollback',async state=>{
     await publicationBase();const h=await legacyHistory();const old=await legacyRelease(h);await cloneScopeGrants('b');
-    const next=await publishable('mixed-source-b',undefined,'b');const mixed=value(await service.publish(actor('enabler'),next.request)).releaseId!;
+    const { publisher, user } = await restrictedPublisher();
+    const next=await publishable('mixed-source-b',undefined,'b');const mixed=value(await publisher.publish(user,next.request)).releaseId!;
     expect((await admin.query('SELECT source_id,publication_policy FROM content_intake.release_lineage WHERE release_id=$1 ORDER BY source_id',[mixed])).rows)
       .toEqual([{source_id:'source-a',publication_policy:'approval-v1'},{source_id:'source-b',publication_policy:'direct-v1'}]);
     const ent=value(await issue());expect(value(await snapshot(ent.entitlementId)).faq).toHaveLength(1);
     const follow=await publishable('after-mixed',undefined,'b');
     await changeHistoricalApproval(h.reviewId,state);
     expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false});expect(await issue()).toMatchObject({ok:false});
-    expect(await service.publish(actor('enabler'),follow.request)).toMatchObject({ok:false});
-    expect(await service.rollbackPreview(actor('enabler'),{baseReleaseId:mixed,targetReleaseId:old})).toMatchObject({ok:false});
+    expect(await publisher.publish(user,follow.request)).toMatchObject({ok:false,reason:'APPROVAL_UNAVAILABLE'});
+    expect(await publisher.rollbackPreview(user,{baseReleaseId:mixed,targetReleaseId:old})).toMatchObject({ok:false,reason:'APPROVAL_UNAVAILABLE'});
+    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(mixed);
+    expect((await admin.query('SELECT count(*)::int AS count FROM content_intake.publications')).rows[0].count).toBe(1);
     const history=value(await service.review(actor('enabler'),h.key));expect(history.state).toBe(state==='revoked'?'revoked':'unavailable');
     expect((await admin.query('SELECT max(facts_version) v FROM content_intake.approval_facts')).rows[0].v).toBe('2');
     expect(provider.calls()).toBe(0);

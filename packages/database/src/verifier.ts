@@ -4,7 +4,7 @@ import { withExclusiveDatabaseClient } from './client.js';
 import { databaseDiagnostic, DatabaseMigrationError } from './errors.js';
 import { generatedMigrationCatalogue } from './generated/migrations.generated.js';
 import { inspectMigrationCatalogue } from './planner.js';
-import type { DatabaseClient, DatabaseQueryClient, DatabaseVerificationReport } from './types.js';
+import type { DatabaseClient, DatabaseQueryClient, DatabaseVerificationReport, ExecutableMigrationCatalogue } from './types.js';
 
 interface InventoryRow extends QueryResultRow {
   tables: number;
@@ -140,8 +140,10 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 0034 adds five invoker format functions (default PUBLIC EXECUTE remains
 // behind the sealed schema), four INSERT guards, and CSV input constraints.
 // No table grants, runtime roles or existing function bodies change.
-const EXPECTED_ACL_MANIFEST_ENTRIES = 542;
-const EXPECTED_ACL_MANIFEST_SHA256 = '95c8860d441fdb7429364476c09938e1935f8aa5383a9743a84b89399ff8f6b5';
+// 0035 adds exactly eight helper EXECUTEs to the NOLOGIN function owner.
+// Objects, function bodies/security attributes and triggers remain unchanged.
+const EXPECTED_ACL_MANIFEST_ENTRIES = 550;
+const EXPECTED_ACL_MANIFEST_SHA256 = '7890fde2f2bf59f2a941aa020864951091a8eef73e8010d869e14054fcefa38d';
 const EXPECTED_OBJECT_MANIFEST_ENTRIES = 3090;
 const EXPECTED_OBJECT_MANIFEST_SHA256 = 'c31a0c03694ec13c86ba15eb596c6b47c5164335712d839bc53cc0fb40e0de03';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 255;
@@ -174,10 +176,12 @@ async function verifyQuery<Row extends QueryResultRow>(
   }
 }
 
-export async function verifyMigrationCatalogue(
+async function verifyCatalogueState(
   client: DatabaseQueryClient,
+  catalogue: ExecutableMigrationCatalogue,
+  expectedAcl: Readonly<{ entries: number; sha256: string }>,
 ): Promise<DatabaseVerificationReport> {
-  const migrationStatus = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
+  const migrationStatus = await inspectMigrationCatalogue(client, catalogue);
   if (migrationStatus.state !== 'COMPLETE') {
     throw new DatabaseMigrationError(
       'MIGRATION_VERIFY_FAILED',
@@ -794,7 +798,7 @@ export async function verifyMigrationCatalogue(
   if (!roles || roles.total !== 17 || roles.safe !== 17 || roles.memberships !== 0) {
     failures.push('capability role safety');
   }
-  if (!acl || acl.entries !== EXPECTED_ACL_MANIFEST_ENTRIES || sha256(acl.manifest) !== EXPECTED_ACL_MANIFEST_SHA256) {
+  if (!acl || acl.entries !== expectedAcl.entries || sha256(acl.manifest) !== expectedAcl.sha256) {
     failures.push(`exact schema/relation/column/function/default ACL manifest [${acl?.entries ?? 'missing'}:${acl ? sha256(acl.manifest) : 'missing'}]`);
   }
   if (
@@ -874,6 +878,32 @@ export async function verifyMigrationCatalogue(
     }),
     phase1PolicyHardOff: true,
     compatibility: migrationStatus.compatibility,
+  });
+}
+
+// The ACL successor changes no objects, function bodies or triggers. Reuse the
+// full verifier with its exact frozen predecessor ledger and ACL, so a matching
+// ledger alone cannot authorize granting capabilities to a drifted installation.
+export function verifyLegacyCheckPredecessor(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
+  const predecessor = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.find(
+    prior => prior.contractSetId === 'cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251',
+  );
+  if (!predecessor || predecessor.migrationCount !== 34) {
+    throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Frozen CSV predecessor is required for the legacy CHECK ACL upgrade');
+  }
+  const catalogue = { ...generatedMigrationCatalogue, ...predecessor,
+    compatibility: { ...generatedMigrationCatalogue.compatibility,
+      priorReviewedUpgrades: generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.filter(prior => prior.migrationCount < 34) },
+    migrations: generatedMigrationCatalogue.migrations.slice(0, 34),
+  };
+  return verifyCatalogueState(client, catalogue, {
+    entries: 542, sha256: '95c8860d441fdb7429364476c09938e1935f8aa5383a9743a84b89399ff8f6b5',
+  });
+}
+
+export function verifyMigrationCatalogue(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
+  return verifyCatalogueState(client, generatedMigrationCatalogue, {
+    entries: EXPECTED_ACL_MANIFEST_ENTRIES, sha256: EXPECTED_ACL_MANIFEST_SHA256,
   });
 }
 

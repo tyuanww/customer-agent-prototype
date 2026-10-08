@@ -1,0 +1,41 @@
+{
+  "status": "LOCAL_CORE_AND_INDEPENDENT_REVIEW_COMPLETE",
+  "baseline": "f6f8cf35ef9a9007cddade8a0c7fa4b648bef9a1",
+  "method": [
+    "Primary final implementation, failure-path and documentation review",
+    "Independent local final product diff review by csv_api_wire",
+    "Independent actual export/intake/generator roundtrip"
+  ],
+  "scope": [
+    "v4 full-member intake, same-source approval and downgrade checks",
+    "immutable 0035 and sealed 34-to-35 verification",
+    "restricted API legacy publication/rollback and rejection regressions",
+    "affected generated provenance and documentation"
+  ],
+  "fixed": [
+    {
+      "finding": "Generated CSV rollback assertion accidentally included orphan 0035 literal",
+      "verification": "Removed stray expression; scoped lint, typecheck and PG rollback test pass"
+    },
+    {
+      "finding": "Ledger-only preflight could persist helper grants before detecting an unsafe LOGIN function owner",
+      "verification": "Preflight-red reproduced persisted grants; full predecessor and successor verification now share the grant/ledger transaction; seven drift cases and postcondition rollback pass"
+    },
+    {
+      "finding": "Migration-local search_path caused a textual object-manifest mismatch",
+      "verification": "Restore the exact predecessor verifier context within the transaction; exact manifests preserved"
+    },
+    {
+      "finding": "Old empty-install assertion described the current suffix as 25 instead of 26",
+      "verification": "Affected actual PG15 test rerun passed; unchanged 74 tests reused"
+    }
+  ],
+  "remainingActionableCodeFindings": [],
+  "externalCompleteReview": "INCOMPLETE",
+  "historicalRoleReview15of15": "REUSED_NOT_RERUN",
+  "limits": [
+    "Workspace source size remains over the existing 32 MiB budget; no budget raised or history deleted",
+    "No production activation, real-data, Windows or new packaged Mac acceptance"
+  ],
+  "validation": "checks.json"
+}

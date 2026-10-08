@@ -1,9 +1,9 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251",
-  "source_git_sha": "adbc7b1ce251816fc02957a0042742ae2d053f9a",
-  "source_schema_sha256": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
-  "upgrade_source_sha256": "2f9f5e463619c149e250947d75ed49f8cb157d0838dd1e5a1c6cf78963f19842",
+  "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+  "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+  "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
+  "upgrade_source_sha256": "c7893bbe4e007d075f6e524c358618b519a7a66fc501509a518cf9b9185398e4",
   "compatibility": {
     "current": "N",
     "prior_signed_baseline": {
@@ -84,6 +84,12 @@
         "source_git_sha": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
         "source_schema_sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e",
         "migration_count": 33
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251",
+        "source_git_sha": "adbc7b1ce251816fc02957a0042742ae2d053f9a",
+        "source_schema_sha256": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
+        "migration_count": 34
       }
     ]
   },
@@ -616,6 +622,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251",
       "source_git_sha": "adbc7b1ce251816fc02957a0042742ae2d053f9a",
       "source_schema_sha256": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5"
+    },
+    {
+      "position": 35,
+      "id": "0035_intake_legacy_check_acl_v1_25",
+      "file": "0035_intake_legacy_check_acl_v1_25.sql",
+      "source_ranges": [],
+      "sha256": "01a674d1f5a996a511babf193c28c217ec91a72a3f974922e9580cf2bcdabda7",
+      "bytes": 1318,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
     }
   ]
 }

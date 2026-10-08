@@ -1,12 +1,12 @@
 # FAQ 闭环：P2 正式合同交接
 
-> 状态：**治理合同已提交并 export · 产品 intake / codegen / 追加迁移已验收 · 仅限合成开发 · 三方公开交付 EVD 待齐**。2026-10-08 复核；产品依赖 P1 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`。
+> 状态：**治理合同已提交并 export · 产品 intake / codegen / 追加迁移已验收 · 仅限合成开发 · 三方公开交付 EVD 待齐**。2026-10-09 复核；产品依赖 P1 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`。
 > 本页把已确认需求映射到下一份正式合同需要表达的资源、约束与验收，不签发合同版本、阶段门或真实运行权限。当前任务与授权只在[需求计划 §0](plans/2026-10-03-content-intake-requirements.md)维护。
-> 当前消费为 OpenAPI 1.22.0 / schema.v1.24，精确来源由消费锁与不可变 manifest 拥有；API、Main/Query 已在显式合成 profile 接入确认直发与旧审批历史兼容。生产 HTTP/ACL 尚未接入；组织/用途权限/店铺名称已完成精确冻结、完整导出与接收，当前边界见下表及文末。
+> 当前消费为 OpenAPI 1.22.0 / schema.v1.25，精确来源由消费锁与不可变 manifest 拥有；API、Main/Query 已在显式合成 profile 接入确认直发与旧审批历史兼容。生产 HTTP/ACL 尚未接入；组织/用途权限/店铺名称已完成精确冻结、完整导出与接收，当前边界见下表及文末。
 
-## 当前消费状态（2026-10-08）
+## 当前消费状态（2026-10-09）
 
-下文 §1–§6 与 §7 初始交接保留各次历史时点和数字，不把当时的“下一步”“未接线”当成今日待办。当前消费锁为 OpenAPI 1.22.0 / schema.v1.24、VERIFIED_NOT_ACTIVATED；产品内部迁移已追加至 0034。新候选与回退确认直发；approval-v1 只保留历史有效性约束，不要求新审批 transport。不能把上游 schema 版本与本仓迁移段数混为一谈。
+下文 §1–§6 与 §7 初始交接保留各次历史时点和数字，不把当时的“下一步”“未接线”当成今日待办。当前消费锁为 OpenAPI 1.22.0 / schema.v1.25、VERIFIED_NOT_ACTIVATED；产品内部迁移已追加至 0035。新候选与回退确认直发；approval-v1 只保留历史有效性约束，不要求新审批 transport。不能把上游 schema 版本与本仓迁移段数混为一谈。
 
 | 能力 | 当前状态与证据 |
 | --- | --- |
@@ -19,7 +19,7 @@
 | 平台 | Mac 开发态及指定版本 Windows/WSL 已取得分层结果；[杭州证据](../evidence/qa/content-intake-p2-hangzhou/README.md)不覆盖后续回退、家族及商品/场景选择等新增切片，普通账号、可靠拖动、整机断网仍未确认 |
 | 组织与权限接入 | 组织观察/登记刷新/writer 已迁入 src 单一所有者，正式用途池逐次 SET ROLE/assert_purpose，transaction 直接调用正式会话锁；合成 host 实际使用受限组织池写入合成事实。业务/usage/worker 沿用原消费者，不再改写 SQL；生产 app/server 与真实 transport 保持关闭 |
 | CSV 格式增量 | 五项精确摘要已冻结、完整14件导出并接收；共享隔离解析、API和Main原字节上传已接线，当前Mac CSV/XLSX同链通过。来源/版本/MIME/结构逐项绑定，失败整批拒绝；见[CSV 接入证据](../evidence/qa/intake-csv-runtime/README.md)。真实资料与生产装配仍关闭 |
-| 版本化交付 | 当前CSV冻结来源 `adbc7b1`，完整包14件/运行伴随11件；产品codegen 236组件与0034增量已接收，前33段保持原字节。消费锁VERIFIED_NOT_ACTIVATED，runtime/Ddev=false；前序组合合同证据继续保留 |
+| 版本化交付 | 当前旧CHECK闭包冻结来源 `db6ba13`，完整包16件/运行伴随13件；产品codegen仍236组件，0035仅追加八项执行权限，前34段保持原字节。消费锁VERIFIED_NOT_ACTIVATED，runtime/Ddev=false；前序组合合同证据继续保留 |
 | 退出条件 | 真实目录登记范围/密钥、历史保留期及批准后的历史清理/磁盘核对、真实组织、旧审批历史失效依据（如有）、生产低权账号/factory、旧目录认领及业务/设备验收仍待完成；合成 CAS 已验证额外重审次数，不代表实际人工等待耗时；范围汇总见 [TODOS](../TODOS.md) |
 
 ## 1. 交接范围与基线
@@ -396,3 +396,11 @@ OpenAPI 1.21.0/schema.v1.23 仍是 DRAFT；精确字节、最终 release 结果�
 当前Mac CSV与XLSX真实Electron/HTTP/受限PG/剪贴板验收，以及本次重新生成的0.3.26未签名DMG安装副本CSV完整闭环均已实测，结果与限制见[本轮证据](../evidence/qa/intake-csv-runtime/README.md)。真实资料、Windows、真人系统框作业、生产配置和外部完整review均不由该合成结果替代。
 
 本轮扩大旧 intake PG 回归还发现：0033 的 `intake_runtime_fn_owner` 复制非空旧目录时缺旧表 CHECK 纯函数的 EXECUTE。该用途 ACL 缺口属于已冻结运行合同，需所属仓最小版本增量；本轮保留失败证据并准备 DRAFT，不改 0033 或已冻结快照，不用合成空目录掩盖。它仍阻塞旧非空目录承接，CSV/XLSX 新资料闭环不因此改写为失败；详细状态归[本轮证据](../evidence/qa/intake-csv-runtime/README.md)。
+
+### 2026-10-09 旧目录校验 ACL 精确批准与接收
+
+治理 `231cba5` 三份机器对象获准后保持原字节冻结，源提交 `db6ba13d4780a3abb1558e8673e016f7bfb5604e` 实际导出完整16件 v4 包；产品经同源批准、完整历史、防降级和逐件摘要核验后接收，当前锁仍为 VERIFIED_NOT_ACTIVATED。新安装清单包住未变CSV installation和全部旧依赖，不把一份补丁SQL视为完整安装包；缺件、改摘要、混搭版本或跳过旧安装条件均拒绝。
+
+0035仅向既有NOLOGIN函数属主授予八个旧表CHECK纯函数EXECUTE，前34段字节/来源不变，旧函数正文与发布wire不改。installer复用同一完整核验器，在0035事务内验证34段真实状态→执行增量→写账本→验证35段真实状态→提交，防止仅凭旧账本向漂移角色补权；后验失败同时回滚授权与账本。新权限不改变总监/经理分配资格或四岗业务上限。实际PG差异、旧资料受限发布/回退、负例和剩余限制见[本轮验收](../evidence/qa/intake-legacy-acl-runtime/README.md)。上节“旧非空目录仍阻塞”是CSV交付时点的历史记录，不代表本轮结果。
+
+本次不重新打包或宣称已完成新安装包验收；复用既有Mac CSV/XLSX界面行为证据时仍保留其原输入绑定。真实资料语义、具名来源/负责人登记与旧目录认领、真实组织刷新、生产账号/密钥/装配、历史保留期及办公Windows/人工现场仍按原事项办理。完整外部 `/review` 保持 INCOMPLETE。
