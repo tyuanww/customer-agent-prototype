@@ -37,5 +37,71 @@
     "Workspace source size remains over the existing 32 MiB budget; no budget raised or history deleted",
     "No production activation, real-data, Windows or new packaged Mac acceptance"
   ],
-  "validation": "checks.json"
+  "validation": "checks.json",
+  "externalIncrementalReview": {
+    "date": "2026-10-09",
+    "reviewer": "Grok, as identified in the user-provided report",
+    "status": "COMPLETE_NO_ACTIONABLE_FINDINGS",
+    "report": "grok-external-review-2026-10-09.md",
+    "reportSha256": "5ac7e7a0103a891cd0652e5688e88bf92e45e402361acda7ae37767f2317215f",
+    "provenance": "User delivered the external review; the main agent verified report bytes, repository heads, diff scope and recorded input/log hashes. The main agent did not invoke or rerun Grok.",
+    "productRange": {
+      "base": "f6f8cf35ef9a9007cddade8a0c7fa4b648bef9a1",
+      "head": "89bca38ffbbaae624cfc29e2e2a3fb76d981ac76",
+      "files": 66
+    },
+    "governanceRange": {
+      "base": "231cba56aa81afca43f009f3990f7a25b67f4f0f",
+      "head": "0125a97c284a78262a52a67b3d9834107a0f59bc",
+      "files": 17
+    },
+    "mainAgentReceiptChecks": {
+      "productInputHashesVerified": 44,
+      "productLogHashesVerified": 18,
+      "governanceReleaseLogHashVerified": true,
+      "testsRerun": false,
+      "original34MigrationsAbsentFromDiff": true,
+      "roleCeilingCodeAbsentFromDiff": true
+    },
+    "limitations": [
+      "Full DDL/OpenAPI were not read line by line; approved/member hashes, predecessor composition and eight helper signatures were checked.",
+      "No tests rerun and no recalculation of the 18 governance PG input hashes.",
+      "API subtask eslint/typecheck logs were not committed; committed root lint/typecheck evidence was available.",
+      "Legacy eight-row regression did not independently read the second publication FAQ body before rollback.",
+      "Other worktrees, original desktop worktree code, real data and new device acceptance were outside the review."
+    ],
+    "remainingExternalCoverageReported": [
+      {
+        "range": "54f428ca8296aba9a75d2205439b3063cfef8c9b..f6f8cf35ef9a9007cddade8a0c7fa4b648bef9a1",
+        "evidence": "evidence/qa/intake-csv-runtime/review.json"
+      },
+      {
+        "scope": "Organization writer since 29fc709; two 180-second external timeouts",
+        "evidence": "evidence/qa/intake-organization/review.json"
+      },
+      {
+        "scope": "Direct publication; two external timeouts",
+        "evidence": "evidence/qa/intake-direct-publication/review.json"
+      },
+      {
+        "scope": "Unified four-domain workspace since e25d528; no external review in that round",
+        "evidence": "evidence/qa/intake-unified-workspace/review.json"
+      },
+      {
+        "scope": "Governance new boundary; one external timeout",
+        "evidence": "evidence/qa/intake-parallel-recovery/three-part-completion/review.json"
+      },
+      {
+        "scope": "Earlier capacity, usage, query-filters, family and publication external gaps",
+        "evidenceDirectories": [
+          "content-intake-p2-capacity",
+          "content-intake-p2-usage",
+          "content-intake-p2-query-filters",
+          "content-intake-p2-family",
+          "content-intake-p2-publication"
+        ]
+      }
+    ],
+    "subsequentChanges": "Only actual code increments after the reviewed heads require new incremental coverage; this receipt does not cover future A/C/D implementations."
+  }
 }
