@@ -1,0 +1,33 @@
+{
+  "schema": "content-intake-runtime-protocol/v1",
+  "status": "DRAFT",
+  "organizationMappingVersion": "feishu-contact-job-title-v1",
+  "organizationInput": {
+    "registration": "trusted service only; current tenant/app/principal binding is sole open_id source",
+    "factsOwner": "existing organization facts writer; evidence hook in the same content-lock/CAS/deadline/commit transaction",
+    "digest": "SHA-256 of canonical JSON for the full immutable envelope; observation and registration replay preserve original input",
+    "maxFactsWindowMs": 300000,
+    "maxDirectoryPagesPerScan": 5,
+    "maxDirectoryItemsPerPage": 50,
+    "completeScans": 2,
+    "incompleteDirectory": "reject; never truncate and claim complete",
+    "limitsPerTenantAppOwner": {"userPerSecond": 50, "userPerMinute": 1000, "jobTitlePerMinute": 10},
+    "rateCoordination": "one explicit shared owner per tenant/app in one process; multi-instance coordination is a runtime prerequisite",
+    "tokenInput": "injected trusted supplier and per-lease identity; no environment or token endpoint in this candidate",
+    "realTenantProof": "not established by token supplier alone"
+  },
+  "transaction": {
+    "isolation": "READ COMMITTED",
+    "order": ["content lock", "product session lock", "principal/current facts", "business or directory operation", "database clock/final deadline", "COMMIT"],
+    "unknownCommit": "preserve original receipt/envelope; no ROLLBACK claimed after COMMIT begins",
+    "poolOwner": "application assembly owns pools; business service borrows business, terminal failure borrows worker, usage and organization remain separate"
+  },
+  "serviceIdentity": {
+    "session_user": "dedicated environment LOGIN NOINHERIT without elevated role flags",
+    "current_user": "exactly one NOLOGIN capability via controlled SET ROLE",
+    "membership": "exactly that capability, no admin option, no function-owner membership",
+    "endUser": "authenticated private product session bound by trusted service; DB purpose credentials are not user identity",
+    "rowIsolation": false
+  },
+  "approval": {"frozen": false, "exported": false, "intake": false, "realData": false, "production": false}
+}

@@ -4,7 +4,7 @@ import { withExclusiveDatabaseClient } from './client.js';
 import { databaseDiagnostic, DatabaseMigrationError } from './errors.js';
 import { generatedMigrationCatalogue } from './generated/migrations.generated.js';
 import { inspectMigrationCatalogue } from './planner.js';
-import { verifyMigrationCatalogue } from './verifier.js';
+import { verifyLegacyCheckPredecessor, verifyMigrationCatalogue } from './verifier.js';
 import type {
   ApplyMigrationsResult,
   AppliedMigrationResult,
@@ -181,7 +181,15 @@ export async function applyMigrationCatalogue(
       const startedAt = performance.now();
       await beginMigration(client, migration.id);
       let executionMs = 0;
+      const closesLegacyChecks = migration.id === '0035_intake_legacy_check_acl_v1_25';
       try {
+        // This grant-only successor requires a verified physical predecessor,
+        // not merely a matching ledger. Both audits share its ACL/ledger
+        // transaction so failed verification never commits partial authority.
+        if (closesLegacyChecks) await verifyLegacyCheckPredecessor(client);
+        const verifierSearchPath = closesLegacyChecks
+          ? (await client.query<{ search_path: string }>("SELECT current_setting('search_path') AS search_path")).rows[0]?.search_path
+          : undefined;
         await client.query(migration.sql);
         executionMs = Math.max(0, Math.round(performance.now() - startedAt));
         await client.query(
@@ -199,6 +207,14 @@ export async function applyMigrationCatalogue(
             executionMs,
           ],
         );
+        if (closesLegacyChecks) {
+          // Generated SQL changes search_path locally. pg_get_* definitions use
+          // that path when qualifying names; audit in the same context as the
+          // predecessor instead of mistaking rendering differences for drift.
+          if (verifierSearchPath === undefined) throw new DatabaseMigrationError('MIGRATION_VERIFY_FAILED', 'Missing predecessor search path');
+          await client.query("SELECT set_config('search_path', $1, true)", [verifierSearchPath]);
+          await verifyMigrationCatalogue(client);
+        }
       } catch (error) {
         await rollback(client, migration.id, error);
       }

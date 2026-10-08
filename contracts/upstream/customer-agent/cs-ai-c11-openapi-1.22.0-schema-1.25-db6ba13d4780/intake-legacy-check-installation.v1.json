@@ -1,0 +1,87 @@
+{
+  "schema": "content-intake-legacy-check-installation/v1",
+  "status": "DRAFT",
+  "freezeApproved": false,
+  "exportApproved": false,
+  "runtimeActivated": false,
+  "openapi": {
+    "path": "business-docs/01-客服Agent项目/30-开发-进行中/openapi.v1.22.yaml",
+    "sha256": "3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94",
+    "unchanged": true
+  },
+  "database": {
+    "path": "business-docs/01-客服Agent项目/30-开发-进行中/schema.v1.25.sql",
+    "sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+  },
+  "predecessor": {
+    "path": "business-docs/01-客服Agent项目/30-开发-进行中/schema.v1.24.sql",
+    "sha256": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
+    "installation": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-csv-candidate/installation.generated.json",
+    "installationSha256": "e7bee22391c96c498d96e20e868cbf90429405ac3793eeb02bbc93e817939a28"
+  },
+  "delta": {
+    "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/legacy-check-acl.v1.sql",
+    "sha256": "6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584"
+  },
+  "dependencies": {
+    "roles": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/roles.sql",
+      "sha256": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee"
+    },
+    "organization": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/organization.sql",
+      "sha256": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14"
+    },
+    "session": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/session-lock.sql",
+      "sha256": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6"
+    },
+    "acl": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/purpose-acl.sql",
+      "sha256": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05"
+    },
+    "directoryAcl": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/directory-acl.sql",
+      "sha256": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa"
+    },
+    "directory": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-shop-directory-candidate/storage.delta.sql",
+      "sha256": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc"
+    },
+    "provenance": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/provenance.json",
+      "sha256": "7b3699b3fbd94918c11f9250f643b6e896a634cbf262d022dc6b56c422a56c5c"
+    },
+    "protocol": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/protocol.json",
+      "sha256": "4546e98510add2b02b97baaca5bdd9603208502b891fe3e92a3f3bc3ed4f6030"
+    },
+    "csv": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-csv-candidate/storage.delta.sql",
+      "sha256": "f88db715af84ff0a4dc056ab3a37fdaf71cdd0ae439a78b2d565952a1b93b535"
+    },
+    "csvProtocol": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-csv-candidate/protocol.json",
+      "sha256": "ff83a005795f6a5bdd6597329d93c5fdc132267613886b701193bdf8583b62ca"
+    }
+  },
+  "referenceMode": {
+    "completeDdl": "business-docs/01-客服Agent项目/30-开发-进行中/schema.v1.25.sql",
+    "includesPredecessorRoles": true,
+    "includesProductFunctionBodies": false,
+    "runtimeReady": false
+  },
+  "productOrder": [
+    "verified-v1.24-product-migrations-and-complete-runtime-ACL",
+    "legacy-check-acl",
+    "environment-startup"
+  ],
+  "atomicAppendOnly": true,
+  "grantee": "intake_runtime_fn_owner",
+  "grantKind": "EXECUTE",
+  "loginRoleGrants": false,
+  "tablePrivileges": false,
+  "membershipChanges": false,
+  "functionBodyChanges": false,
+  "exportCondition": "Exact successor approval and versioned complete exporter/intake support are required; the existing CSV profile remains unchanged."
+}

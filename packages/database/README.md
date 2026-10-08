@@ -1,6 +1,6 @@
 # @customer-agent/database
 
-PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 与产品 overlay 确定性生成三十三个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是已复核 `schema.v1.13` 的受控 search projection 升级，第十一段是 `schema.v1.14` 的 ready-no-hit 搜索上下文升级；第十二段以一个事务安装 `schema.v1.15` 的完整负责人承接后缀，第十三段安装 `schema.v1.16` 的身份和审核命名空间；第十四段以固定 definer 修复发布延迟校验权限，不给 app_content_admin 增加底表权限；第十五段追加 `schema.v1.18` 的 ops-loop 存储与 SECURITY DEFINER 入口；第十六至十九段为冻结的产品 overlay；第二十段接收 coach 发布合同，第二十一段安装未开放应用授权的 content_intake 存储，第二十二段追加旧写共存门及统一锁序；第二十三/二十四段为候选质量及原子发布 overlay；第二十五段接入 schema.v1.21 的不可变使用资格上下文，第二十六段追加来源授权检索索引，第二十七段实现私有纠正回退事务与独立审批谱系，第二十八段追加显式同题家族的完整目录守卫，第二十九段追加私有对象容量账本与索引，第三十段只替换业务操作角色上限、不改冻结合同；第三十一段精确接收冻结 schema.v1.22 的发布政策与确认记录增量，第三十二段追加确认直发运行事务。0033 以一个事务安装已接收的运行伴随 SQL；0001–0032 的 SQL、来源与校验和保持不变。公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
+PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 与产品 overlay 确定性生成三十五个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是已复核 `schema.v1.13` 的受控 search projection 升级，第十一段是 `schema.v1.14` 的 ready-no-hit 搜索上下文升级；第十二段以一个事务安装 `schema.v1.15` 的完整负责人承接后缀，第十三段安装 `schema.v1.16` 的身份和审核命名空间；第十四段以固定 definer 修复发布延迟校验权限，不给 app_content_admin 增加底表权限；第十五段追加 `schema.v1.18` 的 ops-loop 存储与 SECURITY DEFINER 入口；第十六至十九段为冻结的产品 overlay；第二十段接收 coach 发布合同，第二十一段安装未开放应用授权的 content_intake 存储，第二十二段追加旧写共存门及统一锁序；第二十三/二十四段为候选质量及原子发布 overlay；第二十五段接入 schema.v1.21 的不可变使用资格上下文，第二十六段追加来源授权检索索引，第二十七段实现私有纠正回退事务与独立审批谱系，第二十八段追加显式同题家族的完整目录守卫，第二十九段追加私有对象容量账本与索引，第三十段只替换业务操作角色上限、不改冻结合同；第三十一段精确接收冻结 schema.v1.22 的发布政策与确认记录增量，第三十二段追加确认直发运行事务。0033 以一个事务安装已接收的运行伴随 SQL，0034 接收 CSV 格式守卫，0035 只追加旧目录 CHECK 所需八个函数 EXECUTE；本次0001–0034 的 SQL、来源与校验和保持不变。公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
 
 生成命令会先在同一文件系统完整暂存 migration 目录与内嵌 catalogue 目录，再进行目录级替换；普通 I/O 失败会把两个目录一起回滚，避免留下已知的新旧混合生成物，额外旧成员也会在成功发布时被移除。
 
@@ -14,7 +14,7 @@ pnpm test:db                 # database 全门禁，含隔离 PG15
 pnpm test:db:integration     # 仅隔离 PG15 集成门禁
 ```
 
-PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前门禁覆盖 `schema.v1.23` 的三十三段全迁移安装及已接入历史 ledger 的精确前缀升级；已有三十二行账本只追加 0033，旧账本行不改写。未知、缺失、改写或额外 ledger 仍失败关闭。0025 是使用上下文合同增量，0026 仅追加授权检索索引；0027 的私有回退审批谱系保留为历史依赖，既有不可登录 `cs_ai_definer` 仅获该表 SELECT，用于拒绝旧发布路径丢失回退审批的继承。应用 runtime/admin/worker/auth/review 角色仍无新表或函数访问权。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
+PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前门禁覆盖 `schema.v1.25` 的三十五段全迁移安装及已接入历史 ledger 的精确前缀升级；已有三十四行账本只追加 0035，旧账本行不改写。未知、缺失、改写或额外 ledger 仍失败关闭。0025 是使用上下文合同增量，0026 仅追加授权检索索引；0027 的私有回退审批谱系保留为历史依赖，既有不可登录 `cs_ai_definer` 仅获该表 SELECT，用于拒绝旧发布路径丢失回退审批的继承。应用 runtime/admin/worker/auth/review 角色仍无新表或函数访问权。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
 
 `0031_intake_direct_v1_22` 从已接收的 OpenAPI 1.20.0 / schema.v1.22 版本对提取冻结 DDL 后缀。候选、操作、票据、发布及谱系记录不可变 `publication_policy`，旧行默认保留 `approval-v1`；复合外键禁止跨政策关联。直发候选审批版本为 0，直发操作／票据／谱系的审批字段为空，直发发布记录服务器 `confirmed_at`；不会用虚构审核人满足旧约束。
 
@@ -36,3 +36,5 @@ PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOME
 `0033_intake_runtime_v1_23` 从已验证完整 v2 包消费 roles→organization→session→directory→directoryAcl→acl；不重复安装完整参考 schema。生成器绑定 installation 摘要、全部伴随输入及原 32 段依赖 manifest/overlay 摘要；安装缺函数或同名角色冲突时整体回滚，不修补未知角色。七个新能力/属主角色均不可登录，环境 LOGIN 绑定不写入 migration，正式生产账号不由本包创建。新用途权限只供可信服务按已批准合同消费，不能把 capability 当作用户授权。
 
 0033 后验覆盖运行/组织命名空间、七个角色边界、ACL、对象、函数安全属性和完整触发器定义（含 WHEN/延迟约束）。合成实际验证与正式环境未满足项见[接入证据](../../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。
+
+`0035_intake_legacy_check_acl_v1_25` 来自精确批准的 v4 完整十六件包，只有既有 NOLOGIN `intake_runtime_fn_owner` 获得八项纯 CHECK helper EXECUTE，其他用途/应用角色没有新增能力。旧schema1.24、CSV安装清单和全部运行依赖保留原字节；不重放完整参考DDL。安装器在0035同一事务内先以冻结34段账本和旧ACL摘要核对角色、membership、对象、函数正文及触发器，再执行增量和写账本，最后以新ACL摘要完整核验后才提交。生成SQL会临时设置search_path，因此后验恢复前验的会话路径，避免pg_get_*的名称限定差异被误判为结构漂移；不放宽任何摘要。COMMIT响应未知仍保留原账本恢复语义，不在提交异常后盲目回滚。具体红绿验证、权限精确差异与旧资料发布/回退见[本轮证据](../../evidence/qa/intake-legacy-acl-runtime/README.md)。

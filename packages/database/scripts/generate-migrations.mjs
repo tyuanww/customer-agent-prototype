@@ -608,7 +608,7 @@ const PRIOR_RUNTIME = Object.freeze({
   migrationCount: 33,
 });
 
-export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+function buildCsvMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
   if (snapshot?.manifest?.database?.sha256 !== CSV_DATABASE_SHA256) {
     return buildRuntimeMigrationOutputs(snapshot, { projectRoot });
   }
@@ -659,6 +659,73 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   });
   const outputs = new Map(prior.outputs);
   outputs.set(`packages/database/migrations/${csv.file}`, csv.sql);
+  outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
+  return Object.freeze({ manifest, migrations, outputs });
+}
+
+
+const LEGACY_CHECK_DATABASE_SHA256 = '0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998';
+const LEGACY_CHECK_INSTALLATION_SHA256 = 'fbc601f305013b54e5273e3c4b97faf009f348c3db6a6b4c9f397cfd87707418';
+const PRIOR_CSV = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251',
+  sourceGitSha: 'adbc7b1ce251816fc02957a0042742ae2d053f9a',
+  sourceSchemaSha256: CSV_DATABASE_SHA256,
+  migrationCount: 34,
+});
+
+export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+  if (snapshot?.manifest?.database?.sha256 !== LEGACY_CHECK_DATABASE_SHA256) {
+    return buildCsvMigrationOutputs(snapshot, { projectRoot });
+  }
+  if (typeof snapshot.database_source !== 'string' || sha256(snapshot.database_source) !== LEGACY_CHECK_DATABASE_SHA256) {
+    throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
+  }
+  const sources = snapshot.runtime_sources;
+  if (typeof sources?.installation !== 'string' || sha256(sources.installation) !== LEGACY_CHECK_INSTALLATION_SHA256) {
+    throw new Error('Legacy CHECK installation manifest is missing or drifted');
+  }
+  const installation = JSON.parse(sources.installation);
+  for (const [name, descriptor] of Object.entries({ ...installation.dependencies,
+    csvInstallation: { sha256: installation.predecessor.installationSha256 }, legacyAcl: installation.delta })) {
+    if (typeof sources[name] !== 'string' || sha256(sources[name]) !== descriptor.sha256) {
+      throw new Error(`Legacy CHECK companion is missing or drifted: ${name}`);
+    }
+  }
+  const priorRoot = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_CSV.contractSetId);
+  const priorManifest = JSON.parse(readFileSync(path.join(priorRoot, 'contract-set.json'), 'utf8'));
+  const priorSource = readFileSync(path.join(priorRoot, priorManifest.database.file), 'utf8');
+  const prior = buildCsvMigrationOutputs({
+    contract_set_id: PRIOR_CSV.contractSetId, source_git_sha: PRIOR_CSV.sourceGitSha,
+    manifest: priorManifest, database_source: priorSource,
+    runtime_sources: Object.fromEntries(Object.entries(priorManifest.runtime).map(([name, descriptor]) =>
+      [name, readFileSync(path.join(priorRoot, descriptor.file), 'utf8')])),
+  }, { projectRoot });
+  const expectedSource = '-- schema.v1.25 — DRAFT legacy CHECK execution closure; immutable v1.24 follows\n'
+    + priorSource + `\n-- BEGIN INTAKE LEGACY CHECK ACL ${installation.delta.sha256}\n`
+    + sources.legacyAcl + '-- END INTAKE LEGACY CHECK ACL\n';
+  if (snapshot.database_source !== expectedSource) throw new Error('Legacy CHECK predecessor or increment differs from immutable v1.24');
+  // Earlier migrations already own the table constraints, role boundary and
+  // function bodies. Append only their approved helper EXECUTE closure; never
+  // reinstall historical ACL or give the LOGIN roles an extra capability.
+  const legacyAcl = renderUpgradeMigration({ position: 35, id: '0035_intake_legacy_check_acl_v1_25',
+    version: 'schema.v1.25 legacy CHECK execution closure', ranges: [], sourceBody: sources.legacyAcl.trimEnd() }, snapshot);
+  const migrations = Object.freeze([...prior.migrations, legacyAcl]);
+  const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
+  const manifest = Object.freeze({
+    ...prior.manifest,
+    contract_set_id: snapshot.contract_set_id, source_git_sha: snapshot.source_git_sha,
+    source_schema_sha256: LEGACY_CHECK_DATABASE_SHA256, upgrade_source_sha256: sha256(sources.legacyAcl.trimEnd()),
+    compatibility: Object.freeze({ ...prior.manifest.compatibility,
+      prior_reviewed_upgrades: Object.freeze(compatibleUpgrades.map(p => Object.freeze({
+        contract_set_id: p.contractSetId, source_git_sha: p.sourceGitSha,
+        source_schema_sha256: p.sourceSchemaSha256, migration_count: p.migrationCount,
+      }))),
+    }),
+    migrations: Object.freeze(migrations.map(({ sql: _sql, ...migration }) => migration)),
+  });
+  const outputs = new Map(prior.outputs);
+  outputs.set(`packages/database/migrations/${legacyAcl.file}`, legacyAcl.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });

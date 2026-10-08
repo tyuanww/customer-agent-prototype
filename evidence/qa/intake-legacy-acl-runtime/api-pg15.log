@@ -1,0 +1,42 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/content-intake.integration.test.ts (152 tests | 137 skipped) 20554ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects missing-root atomically after actual parsing and quality checks  1429ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects foreign-brand atomically after actual parsing and quality checks  1512ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects foreign-domain atomically after actual parsing and quality checks  1504ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects linked-root atomically after actual parsing and quality checks  1517ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects same-shop-overlap atomically after actual parsing and quality checks  1295ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects cross-source-overlap atomically after actual parsing and quality checks  1497ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects protected-root atomically after actual parsing and quality checks  1296ms
+   ✓ P2 sealed synthetic authority and durable candidates > copies all eight legacy rows unchanged through restricted publication, subsequent publication and corrective rollback  1458ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects quality with zero release/ticket side effects  1424ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects publisher-revoked with zero release/ticket side effects  1143ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects cancelled with zero release/ticket side effects  1101ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects source-version with zero release/ticket side effects  1105ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects suspended-source with zero release/ticket side effects  1117ms
+   ✓ P2 sealed synthetic authority and durable candidates > legacy history: mixed direct catalog never revives revoked approval during read, publish or rollback  1633ms
+   ✓ P2 sealed synthetic authority and durable candidates > legacy history: mixed direct catalog never revives expired approval during read, publish or rollback  1521ms
+ ✓ tests/intake-runtime-consumers.integration.test.ts (16 tests) 20537ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rolls back receiving an old XLSX object against a newly registered CSV source version  1005ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > does not reinterpret a queued historical XLSX object after the source selects CSV  983ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > evicts a terminated idle connection and admits a new one through the purpose guard  994ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor  1439ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > publishes a confirmed corrective rollback through the actual service  1346ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rejects publication and an already-previewed corrective rollback after source-suspended changes  1501ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rejects publication and an already-previewed corrective rollback after source-mapping changes  1515ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rejects publication and an already-previewed corrective rollback after permission changes  1578ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > grants through the actual allocator and invalidates saved usage after revocation  1270ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > recovers an actually committed publication after a lost COMMIT response  1251ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT  1589ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uses the worker pool for actual parser failure and report capacity without business writes  1100ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response  1088ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical revoked approval unavailable to reads and rollback  1514ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical expired approval unavailable to reads and rollback  1397ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected  965ms
+
+ Test Files  2 passed (2)
+      Tests  31 passed | 137 skipped (168)
+   Start at  01:02:04
+   Duration  42.28s (transform 347ms, setup 0ms, collect 954ms, tests 41.09s, environment 0ms, prepare 62ms)
+

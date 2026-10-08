@@ -476,6 +476,154 @@ describe('CSV v3 bundle intake preparation', () => {
   });
 });
 
+const LEGACY_INCREMENT = 'business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/legacy-check-contract.md';
+const LEGACY_APPROVAL = 'business-docs/01-客服Agent项目/90-评审/2026-10-09_P2旧内容校验ACL合同批准.md';
+
+function createLegacyCheckContractSet(approvalState: 'approved' | 'draft' | 'draft-increment' | 'bad-hash' | 'bad-acl' | 'bad-predecessor' = 'approved') {
+  const fixture = createRuntimeContractSet(true), {manifest, content, source, directory, save, replace} = fixture;
+  const predecessorManifest = structuredClone(manifest);
+  const root = 'business-docs/01-客服Agent项目/30-开发-进行中';
+  const oldDatabase = manifest.database;
+  const csvInstallation = manifest.runtime.installation!;
+  manifest.runtime.csvInstallation = csvInstallation;
+  content.csvInstallation = content.installation!;
+  const descriptor = (relative:string, file:string, bytes:string) => ({version:'1', source_path:`${root}/${relative}`, file,sha256:sha256(bytes),bytes:Buffer.byteLength(bytes)});
+  content.legacyAcl = '-- Synthetic pure predicate closure; never SQL-installed.\n';
+  manifest.runtime.legacyAcl = descriptor('content-intake-runtime-candidate/legacy-check-acl.v1.sql','intake-legacy-check-acl.v1.sql',content.legacyAcl);
+  const database = '-- Synthetic immutable v1.25 reference successor; not installed.\n';
+  manifest.database = {version:'schema.v1.25',source_path:`${root}/schema.v1.25.sql`,file:'schema-v1.25.sql',sha256:sha256(database),bytes:Buffer.byteLength(database)};
+  const ref = (entry:{source_path:string;sha256:string}) => ({path:entry.source_path,sha256:entry.sha256});
+  content.installation = JSON.stringify({schema:'content-intake-legacy-check-installation/v1',status:'DRAFT',freezeApproved:false,exportApproved:false,runtimeActivated:false,
+    openapi:{...ref(manifest.openapi),unchanged:true},database:ref(manifest.database),
+    predecessor:{...ref(oldDatabase),installation:csvInstallation.source_path,installationSha256:csvInstallation.sha256},
+    delta:ref(manifest.runtime.legacyAcl),
+    dependencies:Object.fromEntries(Object.entries(manifest.runtime).filter(([key])=>!['installation','csvInstallation','legacyAcl'].includes(key)).map(([key,entry])=>[key,ref(entry)])),
+    referenceMode:{completeDdl:manifest.database.source_path,includesPredecessorRoles:true,includesProductFunctionBodies:false,runtimeReady:false},
+    productOrder:['verified-v1.24-product-migrations-and-complete-runtime-ACL','legacy-check-acl','environment-startup'],
+    atomicAppendOnly:true,grantee:'intake_runtime_fn_owner',grantKind:'EXECUTE',loginRoleGrants:false,tablePrivileges:false,membershipChanges:false,functionBodyChanges:false,
+    exportCondition:'Exact successor approval and complete exporter/intake support required.'});
+  manifest.runtime.installation = descriptor('content-intake-runtime-candidate/legacy-check-installation.v1.json','intake-legacy-check-installation.v1.json',content.installation);
+  for(const key of ['installation','legacyAcl'])writeFileSync(path.join(directory,manifest.runtime[key]!.file),content[key]!);
+  rmSync(path.join(directory,oldDatabase.file));
+  writeFileSync(path.join(directory,manifest.database.file),database);
+  writeFileSync(path.join(source.repositoryRoot,manifest.database.source_path),database);
+  for(const key of ['installation','legacyAcl'])writeFileSync(path.join(source.repositoryRoot,manifest.runtime[key]!.source_path),content[key]!);
+  const pair = `${manifest.openapi.sha256} ${manifest.database.sha256}`;
+  writeFileSync(path.join(source.repositoryRoot,LEGACY_INCREMENT),`> 状态：${approvalState==='draft-increment'?'DRAFT':'FROZEN'} · NOT EXPORTED · NOT INTAKE · SYNTHETIC DEVELOPMENT ONLY\n**直接前序机器合同：** ${manifest.openapi.sha256} ${approvalState==='bad-predecessor'?'f'.repeat(64):oldDatabase.sha256}\n**P2 旧内容校验 ACL 机器合同增量：** ${pair}\n**实际产物必须精确匹配：** ${pair}\n**旧内容校验安装清单：** ${manifest.runtime.installation.sha256}\n**旧内容校验 ACL 增量：** ${manifest.runtime.legacyAcl.sha256}\n`);
+  writeFileSync(path.join(source.repositoryRoot,LEGACY_APPROVAL),`> 状态：${approvalState==='draft'?'DRAFT':'APPROVED'} · CONTRACT ONLY · SYNTHETIC DEVELOPMENT ONLY\n**批准产物：** ${pair}\n**批准安装清单：** ${approvalState==='bad-hash'?'f'.repeat(64):manifest.runtime.installation.sha256}\n**批准 ACL 增量：** ${approvalState==='bad-acl'?'f'.repeat(64):manifest.runtime.legacyAcl.sha256}\n`);
+  runGit(source.repositoryRoot,['add','.']);
+  runGit(source.repositoryRoot,['-c','user.name=Contract Test','-c','user.email=contract-test@example.invalid','commit','--quiet','--no-verify','-m','synthetic exact legacy closure approval']);
+  manifest.schema='customer-agent-contract-set/v4';
+  manifest.source_git_sha=runGit(source.repositoryRoot,['rev-parse','HEAD']);
+  manifest.contract_set_id=`cs-ai-c11-openapi-1.22.0-schema-1.25-${manifest.source_git_sha.slice(0,12)}`;
+  save();
+  return {...fixture, predecessorManifest, replace, save};
+}
+
+describe('legacy check v4 complete bundle intake',()=>{
+  it('consumes all sixteen files and exposes all thirteen immutable runtime inputs',async()=>{
+    const fixture=createLegacyCheckContractSet(),projectRoot=createProductRoot();
+    const result=contractSet.ingestContractSet({projectRoot,sourceDirectory:fixture.directory,sourceRepositoryRoot:fixture.source.repositoryRoot});
+    expect(result).toMatchObject({status:'CREATED',intake_status:'VERIFIED_NOT_ACTIVATED',runtime_activated:false,ddev_authorized:false});
+    expect(readdirSync(result.path)).toHaveLength(16);
+    await contractSet.withVerifiedContractSetSnapshot({projectRoot},snapshot=>{
+      expect(snapshot.runtime_sources).toEqual(fixture.content);
+      expect(Object.keys(snapshot.runtime_sources!)).toHaveLength(13);
+      expect(Object.isFrozen(snapshot.runtime_sources)).toBe(true);
+    });
+    const verified=JSON.parse(execFileSync(process.execPath,[path.join(repositoryRoot,'scripts/customer-agent-contract-set.mjs'),'verify',`--project-root=${projectRoot}`],{encoding:'utf8'}));
+    expect(verified).toMatchObject({status:'VERIFIED',contract_set_id:fixture.manifest.contract_set_id,runtime_activated:false});
+  });
+
+  it.each(['installation','csvInstallation','legacyAcl'])('rejects missing v4 %s before creating any lock',key=>{
+    const fixture=createLegacyCheckContractSet(),projectRoot=createProductRoot();
+    rmSync(path.join(fixture.directory,fixture.manifest.runtime[key]!.file));
+    expect(()=>contractSet.ingestContractSet({projectRoot,sourceDirectory:fixture.directory,sourceRepositoryRoot:fixture.source.repositoryRoot})).toThrow(/members mismatch/);
+    expect(existsSync(path.join(projectRoot,'contracts'))).toBe(false);
+  });
+
+  it.each(['source_path','file','hash','mixed-schema','extra-key'])('rejects v4 descriptor %s corruption',field=>{
+    const fixture=createLegacyCheckContractSet(),entry=fixture.manifest.runtime.legacyAcl!;
+    if(field==='source_path')entry.source_path=entry.source_path.replace('legacy-check-acl.v1.sql','purpose-acl.sql');
+    if(field==='file')entry.file='../intake-legacy-check-acl.v1.sql';
+    if(field==='hash')entry.sha256='f'.repeat(64);
+    if(field==='mixed-schema')fixture.manifest.schema='customer-agent-contract-set/v3';
+    if(field==='extra-key')fixture.manifest.runtime.unapproved={...entry};
+    fixture.save();
+    expect(()=>contractSet.verifyContractSetDirectory(fixture.directory)).toThrow();
+  });
+
+  it.each(['predecessor','predecessor-installation','dependency','dependency-key','delta','order','runtimeReady','login','membership','body','grantee'])('rejects rehashed v4 %s closure mismatch',field=>{
+    const fixture=createLegacyCheckContractSet(),installation=JSON.parse(fixture.content.installation!);
+    if(field==='predecessor')installation.predecessor.sha256='f'.repeat(64);
+    if(field==='predecessor-installation')installation.predecessor.installationSha256='f'.repeat(64);
+    if(field==='dependency')installation.dependencies.roles.sha256='f'.repeat(64);
+    if(field==='dependency-key')delete installation.dependencies.csv;
+    if(field==='delta')installation.delta.sha256='f'.repeat(64);
+    if(field==='order')installation.productOrder.reverse();
+    if(field==='runtimeReady')installation.referenceMode.runtimeReady=true;
+    if(field==='login')installation.loginRoleGrants=true;
+    if(field==='membership')installation.membershipChanges=true;
+    if(field==='body')installation.functionBodyChanges=true;
+    if(field==='grantee')installation.grantee='intake_business';
+    fixture.replace('installation',JSON.stringify(installation));
+    expect(()=>contractSet.verifyContractSetDirectory(fixture.directory)).toThrow();
+  });
+
+  it.each(['order','runtimeReady','implementationRequired','consumerReady','overlays','sources'])('preserves nested CSV %s safety checks even after outer references are rehashed',field=>{
+    const fixture=createLegacyCheckContractSet(),csv=JSON.parse(fixture.content.csvInstallation!),installation=JSON.parse(fixture.content.installation!);
+    if(field==='order')csv.productMode.order.reverse();
+    if(field==='runtimeReady')csv.referenceMode.runtimeReady=true;
+    if(field==='implementationRequired')csv.productMode.csvInputImplementationRequired=false;
+    if(field==='consumerReady')csv.productMode.csvProductionConsumerReady=true;
+    if(field==='overlays')csv.productMode.implementation.overlayFiles['0032_intake_direct_publication.sql']='f'.repeat(64);
+    if(field==='sources')delete csv.sources.csv;
+    fixture.replace('csvInstallation',JSON.stringify(csv));
+    installation.predecessor.installationSha256=fixture.manifest.runtime.csvInstallation!.sha256;
+    fixture.replace('installation',JSON.stringify(installation));
+    expect(()=>contractSet.verifyContractSetDirectory(fixture.directory)).toThrow();
+  });
+
+  it.each(['draft','draft-increment','bad-hash','bad-acl','bad-predecessor'] as const)('rejects %s declared-source approval',approval=>{
+    const fixture=createLegacyCheckContractSet(approval),projectRoot=createProductRoot();
+    expect(()=>contractSet.ingestContractSet({projectRoot,sourceDirectory:fixture.directory,sourceRepositoryRoot:fixture.source.repositoryRoot})).toThrow(/FROZEN and APPROVED|approval hashes mismatch/);
+    expect(existsSync(path.join(projectRoot,'contracts'))).toBe(false);
+  });
+
+  it('checks predecessor DDL against source Git even when both installation references agree',()=>{
+    const fixture=createLegacyCheckContractSet();
+    const priorPath=fixture.predecessorManifest.database.source_path;
+    writeFileSync(path.join(fixture.source.repositoryRoot,priorPath),'-- tampered historical schema\n');
+    runGit(fixture.source.repositoryRoot,['add','--',priorPath]);
+    runGit(fixture.source.repositoryRoot,['-c','user.name=Contract Test','-c','user.email=contract-test@example.invalid','commit','--quiet','--no-verify','-m','synthetic corrupted predecessor']);
+    fixture.manifest.source_git_sha=runGit(fixture.source.repositoryRoot,['rev-parse','HEAD']);
+    fixture.manifest.contract_set_id=`cs-ai-c11-openapi-1.22.0-schema-1.25-${fixture.manifest.source_git_sha.slice(0,12)}`;fixture.save();
+    expect(()=>contractSet.ingestContractSet({projectRoot:createProductRoot(),sourceDirectory:fixture.directory,sourceRepositoryRoot:fixture.source.repositoryRoot})).toThrow(/predecessor does not match the declared source/);
+  });
+
+  it.each([false,true])('preserves valid v3 history but rejects later downgraded sources after approval deletion; shallow=%s',shallow=>{
+    const fixture=createLegacyCheckContractSet(),prior=fixture.predecessorManifest;
+    const priorDirectory=temporaryDirectory('legacy-predecessor-bundle');
+    for(const entry of [prior.openapi,prior.database,...Object.values(prior.runtime)]){
+      writeFileSync(path.join(priorDirectory,entry.file),execFileSync('git',['-C',fixture.source.repositoryRoot,'show',`${prior.source_git_sha}:${entry.source_path}`]));
+    }
+    writeFileSync(path.join(priorDirectory,'contract-set.json'),JSON.stringify(prior));
+    const projectRoot=createProductRoot();
+    const old=contractSet.ingestContractSet({projectRoot,sourceDirectory:priorDirectory,sourceRepositoryRoot:fixture.source.repositoryRoot});
+    const oldLock=readFileSync(old.lock_path);
+    rmSync(path.join(fixture.source.repositoryRoot,LEGACY_APPROVAL));
+    runGit(fixture.source.repositoryRoot,['add','--',LEGACY_APPROVAL]);
+    runGit(fixture.source.repositoryRoot,['-c','user.name=Contract Test','-c','user.email=contract-test@example.invalid','commit','--quiet','--no-verify','-m','synthetic removal cannot erase legacy approval history']);
+    prior.source_git_sha=runGit(fixture.source.repositoryRoot,['rev-parse','HEAD']);
+    prior.contract_set_id=`cs-ai-c11-openapi-1.22.0-schema-1.24-${prior.source_git_sha.slice(0,12)}`;
+    writeFileSync(path.join(priorDirectory,'contract-set.json'),JSON.stringify(prior));
+    let trusted=fixture.source.repositoryRoot;
+    if(shallow){trusted=temporaryDirectory('legacy-shallow-source');execFileSync('git',['clone','--quiet','--depth=1',pathToFileURL(fixture.source.repositoryRoot).href,trusted]);}
+    expect(()=>contractSet.ingestContractSet({projectRoot,sourceDirectory:priorDirectory,sourceRepositoryRoot:trusted})).toThrow(shallow?/shallow clones/:/Legacy check source history cannot be downgraded/);
+    expect(readFileSync(old.lock_path)).toEqual(oldLock);
+  });
+});
+
 describe('customer-agent contract-set intake', () => {
   it.each([
     'cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701',
@@ -791,8 +939,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251',
-      source_git_sha: 'adbc7b1ce251816fc02957a0042742ae2d053f9a',
+      contract_set_id: 'cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780',
+      source_git_sha: 'db6ba13d4780a3abb1558e8673e016f7bfb5604e',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -802,13 +950,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      '0bb26dccad0c3007435cff0666a5033f4ee439504c70fe47eead66f8e9a6d977',
+      '5824420144ff2a6267d588074594df56b9361df5908a03d5955d240826d58904',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
       '3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.24.sql')))).toBe(
-      'c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.25.sql')))).toBe(
+      '0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998',
     );
   });
 });

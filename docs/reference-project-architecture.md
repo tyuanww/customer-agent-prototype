@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。本期资料接入保持 `v0.3.26`，P2 合同消费锁已推进到 OpenAPI `1.22.0` / `schema.v1.24`；`packages/database` 当前为三十四段，前33段 SQL 与来源保持不变，`0031` 接收冻结发布政策 DDL，`0032` 接入确认直发事务，`0033` 原子安装已批准的组织、会话、目录及用途权限伴随合同，`0034` 追加冻结CSV输入格式守卫。API 已按服务端固定的 `direct-v1` 创建新候选，保留来源确认和质量检查；发布／回退不再创建人工审批，通过 Main 原生二次确认表达操作意图，最终权限、范围、版本和原子提交由 API / SQL 复核。旧 `approval-v1` 候选必须显式修订后才能首次直发；已发布历史与混合目录继续保留旧审批谱系和失效规则，旧未知操作只查原回执。显式 FAQ 合成 profile 已接线规范 CSV/XLSX 上传、候选修订／取消、质量检查、来源确认、确认发布及坐席查询复制；未装配审批 provider，不开放生产路由或新应用 ACL。实现、验证与剩余接入条件见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。本期资料接入保持 `v0.3.26`，P2 合同消费锁已推进到 OpenAPI `1.22.0` / `schema.v1.25`；`packages/database` 当前为三十五段，前34段 SQL 与来源保持不变，`0031` 接收冻结发布政策 DDL，`0032` 接入确认直发事务，`0033` 原子安装已批准的组织、会话、目录及用途权限伴随合同，`0034` 追加冻结CSV输入格式守卫，`0035` 仅补齐旧目录校验的八个函数执行权限。API 已按服务端固定的 `direct-v1` 创建新候选，保留来源确认和质量检查；发布／回退不再创建人工审批，通过 Main 原生二次确认表达操作意图，最终权限、范围、版本和原子提交由 API / SQL 复核。旧 `approval-v1` 候选必须显式修订后才能首次直发；已发布历史与混合目录继续保留旧审批谱系和失效规则，旧未知操作只查原回执。显式 FAQ 合成 profile 已接线规范 CSV/XLSX 上传、候选修订／取消、质量检查、来源确认、确认发布及坐席查询复制；未装配审批 provider，不开放生产路由或新应用 ACL。实现、验证与剩余接入条件见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
 
 ## 1. 先看整体
 
@@ -41,7 +41,7 @@ contracts/upstream（不可变输入；同一受锁 snapshot）
   │    └─ apps/api → 合成身份 / 内容闭环 / search / announce（loopback only）
   ├─ packages/retrieval-core（BM25 / RRF / similarity / threshold；纯算法）
   │    └─ apps/desktop → shared adapter 注入字段权重、分词和检索策略
-  └─ packages/database（0001..0034 / catalogue / ledger / verify）
+  └─ packages/database（0001..0035 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
 apps/api（DEV-M1 COMPLETE）
@@ -95,7 +95,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
 | `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；合成宿主显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；标签不由账号推导，缺失整页失败；目录不是授权或同一时刻快照，不新增姓名表或真实员工读取 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
-| `packages/database/` | 在同一已验证快照内确定性生成三十四段 migration：0031/0032 为直发增量，0033 原子安装冻结运行伴随合同，0034 追加CSV格式守卫；前33段保持原字节；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成三十五段 migration：0031/0032 为直发增量，0033 原子安装冻结运行伴随合同，0034 追加CSV格式守卫，0035追加旧CHECK执行闭包；前34段保持原字节；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -217,7 +217,7 @@ v1.17 migrated PG15
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-`customer-agent-contract-set/v2` 工具仅为 1.21.0/schema.v1.23 组合候选增补九件封闭运行伴随输入（共十二件包），逐件绑定源 Git、安装清单、外层 SHA 和消费锁；暂存副本必须与已核验源 manifest 完全一致。受锁消费者提供只读 `runtime_sources`，静态接收不执行 SQL 或代替运行安装器校验迁移账本。治理 `e35c0c0` 已冻结并导出完整包，产品已实际 intake；生成器验证前32段安装依赖后追加0033，消费锁仍 VERIFIED_NOT_ACTIVATED。 CSV v3 已按治理 `adbc7b1` 实际接收14件封闭包，核对来源SHA独立冻结/批准并拒绝浅克隆；0034只追加已冻结CSV增量，前33段不变。其完整性与历史兼容规则见 [P2 合同交接](reference-content-intake-p2-contract-handoff.md)。
+`customer-agent-contract-set/v2` 工具仅为 1.21.0/schema.v1.23 组合候选增补九件封闭运行伴随输入（共十二件包），逐件绑定源 Git、安装清单、外层 SHA 和消费锁；暂存副本必须与已核验源 manifest 完全一致。受锁消费者提供只读 `runtime_sources`，静态接收不执行 SQL 或代替运行安装器校验迁移账本。治理 `e35c0c0` 已冻结并导出完整包，产品已实际 intake；生成器验证前32段安装依赖后追加0033，消费锁仍 VERIFIED_NOT_ACTIVATED。 CSV v3 已按治理 `adbc7b1` 实际接收14件封闭包，核对来源SHA独立冻结/批准并拒绝浅克隆；0034只追加已冻结CSV增量，前33段不变。现行 v4 从治理 `db6ba13` 实际接收16件包，保留旧CSV installation与十项依赖，外加新安装清单和ACL；0035事务先核验旧34段的完整物理状态，再授权、写账本并核验新状态，任一步失败整体回滚。其完整性与历史兼容规则见 [P2 合同交接](reference-content-intake-p2-contract-handoff.md)。
 
 合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，不准落库与 `dashboardOps` 已接到同一产品会话，方案为 APPROVED。真实 `approved_redacted/pilot_recorded` 与正式运行激活仍受各自批准门约束；飞书登录 provider 已存在，P2 原生组织观察/登记刷新/writer 已进入 src 单一所有者并仅由合成 host 装配；本期确认直发不装配审批 transport，旧审批只保留历史读取和失效约束。
 

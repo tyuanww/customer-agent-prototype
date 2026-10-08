@@ -17,9 +17,9 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
   }, 60_000);
   afterAll(async () => { await client?.end(); harness?.stop(); }, 60_000);
 
-  it('verifies the actual 34-migration installation with both new schemas and all 17 sealed roles', async () => {
+  it('verifies the actual 35-migration installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
-      status: 'PASS', migrationCount: 34,
+      status: 'PASS', migrationCount: 35,
       inventory: { tables: 97, views: 7, functions: 255 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
@@ -50,6 +50,9 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
   });
 
   it.each([
+    ['legacy helper removed', 'REVOKE EXECUTE ON FUNCTION public.content_question_hash(jsonb) FROM intake_runtime_fn_owner'],
+    ['legacy helper leaked to business', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_business'],
+    ['legacy helper grant option', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_runtime_fn_owner WITH GRANT OPTION'],
     ['CSV guard removed', 'DROP TRIGGER candidate_format ON content_intake.candidate_versions'],
     ['CSV checker weakened', "CREATE OR REPLACE FUNCTION content_intake.input_format_matches(p_template text,p_rule text,p_mapping text,p_structure text,p_mime text) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS 'SELECT true'"],
     ['organization table grant', 'GRANT SELECT ON intake_organization.bindings TO PUBLIC'],
