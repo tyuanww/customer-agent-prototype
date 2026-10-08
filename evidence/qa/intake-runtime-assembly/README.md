@@ -26,7 +26,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 \
 
 eslint 退出码 0。`tsc --noEmit` 对本任务文件没有新错误。既有 `tests/support/intake-synthetic-host.ts` 仍因缺少 `apps/api/dist` 报模块找不到；没有为了消掉它生成 dist 或改该文件。没有跑全仓 `pnpm test`、`pnpm build` 或 `workspace:check`。新增源码、测试和这份日志共 83877 字节；两份说明和本 README 另计。基线 `workspace:check` 已超 32 MiB 约 331 KiB。没有删除历史证据，也没有放宽阈值。
 
-## 输入哈希
+## 原始提交 57325a9 输入哈希（回收前）
 
 | 文件 | sha256 |
 | --- | --- |
@@ -46,3 +46,30 @@ eslint 退出码 0。`tsc --noEmit` 对本任务文件没有新错误。既有 `
 - 治理冻结、export、intake、正式迁移号、生产账号和真实来源清单。
 - 完整外部 `/review` 仍是 INCOMPLETE。没有为消除该标记再次调用。
 - 旧角色审核 15/15 没有重做。
+
+## 2026-10-08 主 Agent 回收修复
+
+原 `vitest-final.log` 与以上 11 项历史证据保留；本节覆盖追加修复后的候选。版本仍是 0.3.26，未改正式迁移、运行工厂或 HTTP。
+
+实际发现并修复：
+
+- 数据库检查等待中调用 cancel/close 后仍返回 running，并发 start 也能重复通过。现在启动前占位、每次异步读前后检查取消，失败后释放占位；借用连接由调用方拥有。本模块不终止数据库查询，等待返回后丢弃结果。
+- 缺认领材料的成功依赖检查改为 `checked-not-activated` / `ready:false`，不再宣称运行。始终 `legacyAdopted:false`。
+- 函数属主原先缺文本 digest、随机票据和 family 校验的 EXECUTE。一次性 PG15 上三者原先均 42501；仅向 NOLOGIN 属主补足这三项，并给 purpose_gap 加对应检查。已逐项撤权证明缺失可被发现；business 仍不能直接执行随机票据函数。
+- 把实验资格/目录/授权入口显式命名为 probe，去掉固定 shop-a。临时资格 SQL 只用于验证现有 service 会话锁尚不兼容时的租约/context/ACL 组合。实际消费者接线与删除条件见 INTEGRATION，不把空目录读取写成完整分页或复制通过。
+
+先跑新增回归得到 4 个失败：[红灯日志](vitest-recovery-red.log)。其中并发启动旧实现表现为等待超时，后将测试改成释放等待后断言拒绝，避免把超时作为最终回归断言。随后完整本专项 **15/15 PASS**（单测 7，PG15 8）：[修复后日志](vitest-recovery.log)。它们仍不覆盖完整发布成功、非空正式 snapshot、真实 approval-v1 失效与质量/授权写入。
+
+本次在仓库根运行：
+
+```sh
+PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH \
+  CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin \
+  CUSTOMER_AGENT_API_PG15_INTEGRATION=1 \
+  apps/api/node_modules/.bin/vitest run apps/api/tests/intake-runtime-assembly.test.ts apps/api/tests/intake-runtime-assembly.integration.test.ts
+./node_modules/.bin/eslint apps/api/experiments/intake-runtime/assembly.ts apps/api/experiments/intake-runtime/purpose-boundary.ts apps/api/tests/intake-runtime-assembly.test.ts apps/api/tests/intake-runtime-assembly.integration.test.ts
+```
+
+vitest 和 eslint 退出码 0。`apps/api` 下 `./node_modules/.bin/tsc --noEmit` 仍被已有测试宿主对缺失 `apps/api/dist` 的导入阻塞，全部诊断只落在 `tests/support/intake-synthetic-host.ts`，不是完整 typecheck PASS：[原始诊断](typecheck-recovery.log)。未修改共享宿主或为通过检查生成 dist；主 Agent 集成时统一 build/typecheck。没有运行完整 `/review`、旧角色审核或工作区体积检查。
+
+修复后 `purpose-acl.sql` SHA-256：`4bb27efc556c9931b70386c29982db68dd2ee9e050feccc1dd6772a160fae23c`。修复后 vitest 日志 SHA-256：`ea4f5b62ec80cc2cdad596c28c65b547d7fb71e1059fd6241e4c782387461b1b`。

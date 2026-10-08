@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AuthenticatedUser } from '../src/auth-service.js';
 import { assessIntakeRuntimeAssembly, createIntakeRuntimeAssembly } from '../experiments/intake-runtime/assembly.js';
-import { createPurposeBoundary } from '../experiments/intake-runtime/purpose-boundary.js';
+import { createPurposePrivilegeProbe } from '../experiments/intake-runtime/purpose-boundary.js';
 import type { IntakePool } from '../src/content-intake/transaction.js';
 
 const SENTINEL = 'SENTINEL_CLAIM_LIST_MUST_NOT_BE_QUERIED';
@@ -88,7 +88,7 @@ describe('intake runtime assembly candidate without a database', () => {
     const fixture = request();
     const assembly = createIntakeRuntimeAssembly(fixture.input);
     await expect(assembly.start()).resolves.toEqual({
-      state: 'running', legacyAdopted: false, reason: 'CLAIM_MANIFEST_ABSENT', catalogObjects: 0, claimManifest: null,
+      state: 'checked-not-activated', ready: false, legacyAdopted: false, reason: 'CLAIM_MANIFEST_ABSENT', catalogObjects: 0, claimManifest: null,
     });
     expect(fixture.refreshed()).toBe(false);
     expect(() => assembly.adoptLegacy()).toThrow(/LEGACY_ADOPTION_REFUSED/);
@@ -98,10 +98,45 @@ describe('intake runtime assembly candidate without a database', () => {
     await expect(createIntakeRuntimeAssembly(gap.input).start()).rejects.toMatchObject({ reason: 'PURPOSE_PRIVILEGE_MISSING', gaps: ['session_lock'] });
   });
 
+  it.each(['cancel', 'close'] as const)('refuses %s while a database check is pending', async action => {
+    const fixture = request();
+    let entered!: () => void;
+    let resume!: () => void;
+    const checking = new Promise<void>(resolve => { entered = resolve; });
+    const gate = new Promise<void>(resolve => { resume = resolve; });
+    const delayedUsage = { query: async (sql: string, params?: readonly unknown[]) => {
+      entered();
+      await gate;
+      return fixture.usage.query(sql, params);
+    } };
+    const assembly = createIntakeRuntimeAssembly({ ...fixture.input,
+      connections: { ...fixture.input.connections, usage: delayedUsage } });
+    const pending = assembly.start();
+    await checking;
+    assembly[action]();
+    resume();
+    await expect(pending).rejects.toMatchObject({ reason: action === 'close' ? 'CLOSED' : 'CANCELLED' });
+    expect(fixture.business.sqls).toEqual([]);
+    if (action === 'cancel') await expect(assembly.start()).resolves.toMatchObject({ state: 'checked-not-activated', ready: false });
+    else await expect(assembly.start()).rejects.toMatchObject({ reason: 'CLOSED' });
+  });
+
+  it('reserves the startup attempt before awaiting the parser', async () => {
+    const fixture = request();
+    let resume!: (value: boolean) => void;
+    const gate = new Promise<boolean>(resolve => { resume = resolve; });
+    const assembly = createIntakeRuntimeAssembly({ ...fixture.input, parser: { probe: () => gate } });
+    const pending = assembly.start();
+    const duplicate = assembly.start();
+    resume(true);
+    await expect(duplicate).rejects.toMatchObject({ reason: 'ALREADY_RUNNING' });
+    await expect(pending).resolves.toMatchObject({ state: 'checked-not-activated', ready: false });
+  });
+
   it('does not open a connection for an actor without a private session', async () => {
     let connected = false;
     const pool = { connect: async () => { connected = true; throw new Error('CONNECTED'); } } as IntakePool;
-    const result = await createPurposeBoundary(pool).run({ user_id: 'user-agent' } as AuthenticatedUser, async () => true);
+    const result = await createPurposePrivilegeProbe(pool).run({ user_id: 'user-agent' } as AuthenticatedUser, async () => true);
     expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED', reason: 'SCOPE_DENIED', commit: 'rolled_back' });
     expect(connected).toBe(false);
   });

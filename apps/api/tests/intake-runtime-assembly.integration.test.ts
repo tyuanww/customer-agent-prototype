@@ -12,7 +12,7 @@ import { lockProductSession, type IntakePool } from '../src/content-intake/trans
 import { authenticatedProductSession, createProductAuthService } from '../src/product-auth-service.js';
 import { createIntakeRuntimeAssembly } from '../experiments/intake-runtime/assembly.js';
 import { createOrganizationFactsWriter } from '../experiments/intake-organization/facts-writer.js';
-import { createPurposeBoundary, finishParseTerminal } from '../experiments/intake-runtime/purpose-boundary.js';
+import { createPurposePrivilegeProbe, probeParseFailureWrites } from '../experiments/intake-runtime/purpose-boundary.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
 
 // Disposable cluster only. These roles are not a production ACL.
@@ -109,6 +109,29 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
     expect((await admin.query(`SELECT intake_runtime_probe.purpose_gap('usage') AS gap`)).rows[0].gap).toEqual(['role_mismatch']);
   });
 
+  it('lets the definer execute the hashing, ticket and family checks used beyond early publication refusal', async () => {
+    await admin.query('BEGIN');
+    try {
+      await admin.query('SET LOCAL ROLE intake_runtime_fn_owner');
+      const hashes = await admin.query(`SELECT octet_length(public.digest('{}'::text,'sha256')) AS payload_bytes,
+        octet_length(public.gen_random_bytes(32)) AS ticket_bytes`);
+      expect(hashes.rows[0]).toEqual({ payload_bytes: 32, ticket_bytes: 32 });
+      await admin.query("SELECT content_intake.assert_family_catalog('rel_native_base')");
+    } finally { await admin.query('ROLLBACK'); }
+    await denied(business, 'SELECT public.gen_random_bytes(32)');
+    for (const [signature, gap] of [
+      ['public.digest(text,text)', 'definer_digest_text'],
+      ['public.gen_random_bytes(integer)', 'definer_ticket_random'],
+      ['content_intake.assert_family_catalog(text)', 'definer_family'],
+    ] as const) {
+      // Fixed source signatures only; no external identifier enters this SQL.
+      await admin.query(`REVOKE EXECUTE ON FUNCTION ${signature} FROM intake_runtime_fn_owner`);
+      try {
+        expect((await business.query("SELECT intake_runtime_probe.purpose_gap('business') AS gap")).rows[0].gap).toEqual([gap]);
+      } finally { await admin.query(`GRANT EXECUTE ON FUNCTION ${signature} TO intake_runtime_fn_owner`); }
+    }
+  });
+
   it('does not treat an empty or later non-empty catalog as legacy adoption', async () => {
     const input = {
       claimManifest: null,
@@ -118,15 +141,15 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
       catalog: worker,
     };
     await expect(createIntakeRuntimeAssembly(input).start()).resolves.toEqual({
-      state: 'running', legacyAdopted: false, reason: 'CLAIM_MANIFEST_ABSENT', catalogObjects: 0, claimManifest: null,
+      state: 'checked-not-activated', ready: false, legacyAdopted: false, reason: 'CLAIM_MANIFEST_ABSENT', catalogObjects: 0, claimManifest: null,
     });
     await expect(createIntakeRuntimeAssembly({ ...input, connections: { ...input.connections, usage: admin } }).start())
       .rejects.toMatchObject({ reason: 'PURPOSE_PRIVILEGE_MISSING', gaps: ['role_mismatch'] });
   });
 
-  it('issues, pages and reads copy eligibility on the usage role without returning a lease token', async () => {
+  it('probes qualification writes, empty catalog reads and query authority without a lease token', async () => {
     const diagnostics: { code: string | undefined; message: string | undefined; detail: string | undefined; routine: string | undefined }[] = [];
-    const boundary = createPurposeBoundary(usage, (_id, error) => {
+    const boundary = createPurposePrivilegeProbe(usage, (_id, error) => {
       const value = error as { code?: string; message?: string; detail?: string; routine?: string };
       diagnostics.push({ code: value.code, message: value.message, detail: value.detail, routine: value.routine });
     });
@@ -142,7 +165,7 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
       },
       release: (broken?: boolean) => raw.release(broken),
     }) } as IntakePool;
-    const unknown = await createPurposeBoundary(wrapped).run(actor, async () => true);
+    const unknown = await createPurposePrivilegeProbe(wrapped).run(actor, async () => true);
     expect(unknown).toMatchObject({ ok: false, reason: 'COMMIT_UNKNOWN', commit: 'unknown' });
     expect(seen.includes('ROLLBACK')).toBe(false);
     const errors: unknown[] = [];
@@ -156,9 +179,9 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
       await locked.query('BEGIN');
       await expect(lockProductSession({ query: locked.query.bind(locked), validUntil: () => undefined }, actor)).rejects.toMatchObject({ code: '42501' });
     } finally { await locked.query('ROLLBACK'); locked.release(); }
-    const forged = await boundary.issueUsageQualification(actor, { ...seat, sessionTokenHash: 'a'.repeat(64) });
+    const forged = await boundary.probeQualificationWrites(actor, { ...seat, sessionTokenHash: 'a'.repeat(64) });
     expect(forged).toMatchObject({ ok: false, reason: 'FILE_INVALID', code: 'VALIDATION', commit: 'rolled_back' });
-    const issued = await boundary.issueUsageQualification(actor, seat);
+    const issued = await boundary.probeQualificationWrites(actor, seat);
     expect(issued.ok, JSON.stringify({ issued, diagnostics })).toBe(true);
     if (!issued.ok) return;
     expect(JSON.stringify(issued.value)).not.toContain('osl_');
@@ -168,9 +191,9 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
       JOIN public.snapshot_offline_leases l ON l.lease_token_hash=e.lease_token_hash WHERE e.entitlement_hash=$1`, [issued.value.entitlementHash]);
     expect(stored.rows[0].session_token_hash).toBe(authenticatedProductSession(actor));
     expect(stored.rows[0].client_id).toMatch(/^intake:[0-9a-f]{64}$/);
-    const page = await boundary.pageEmptyLineage(actor, 'rel_native_base');
+    const page = await boundary.probeEmptyCatalogReads(actor, seat.shopId, 'rel_native_base');
     expect(page).toMatchObject({ ok: true, value: { rows: 0, approvalInvalid: false } });
-    const copy = await boundary.readCopyEligibility(actor, 'source-a');
+    const copy = await boundary.probeQueryAuthorization(actor, 'source-a');
     expect(copy.ok, JSON.stringify(copy)).toBe(true);
     await denied(usage, `SELECT content_intake.publish_candidate('agent','{}'::jsonb,'null'::jsonb)`);
     await denied(usage, `INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
@@ -230,7 +253,7 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
       VALUES ('obj_${'c'.repeat(64)}','source-a','agent','tenant-a','app-a','intake/obj_${'c'.repeat(64)}','${'c'.repeat(64)}',4,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','input',clock_timestamp())`)).rejects.toMatchObject({ code: 'ZA003', message: 'WORKER_OBJECT_PURPOSE' });
     await expect(worker.query(`UPDATE content_intake.parse_jobs SET state='validated' WHERE job_id='job-report-1'`)).rejects.toMatchObject({ code: 'ZA003', message: 'WORKER_TERMINAL_ONLY' });
-    await expect(finishParseTerminal(worker, 'job-report-1', 'user-agent', { objectId: reportId, sha256: sha, sizeBytes: report.length })).resolves.toEqual({ finished: true });
+    await expect(probeParseFailureWrites(worker, 'job-report-1', 'user-agent', { objectId: reportId, sha256: sha, sizeBytes: report.length })).resolves.toEqual({ finished: true });
     expect((await admin.query(`SELECT state,report_object_id FROM content_intake.parse_jobs WHERE job_id='job-report-1'`)).rows[0]).toMatchObject({ state: 'failed', report_object_id: reportId });
     expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [reportId])).rows[0].state).toBe('adopted');
     await denied(worker, `INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
@@ -282,7 +305,7 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
     await denied(usage, 'UPDATE backend_identity.sessions SET revoked_at=NULL');
     await expect(usage.query('SELECT intake_runtime_probe.lock_product_session($1,$2)', [authenticatedProductSession(actor), actor.user_id]))
       .rejects.toMatchObject({ code: 'ZA003', message: 'SESSION_UNAVAILABLE' });
-    const locked = await createPurposeBoundary(usage).run(actor, async () => true);
+    const locked = await createPurposePrivilegeProbe(usage).run(actor, async () => true);
     expect(locked).toMatchObject({ ok: false, reason: 'SCOPE_DENIED', code: 'UNAUTHORIZED', commit: 'rolled_back' });
   });
 });
