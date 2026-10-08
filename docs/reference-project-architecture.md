@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。当前基线是 `v0.3.26 / main@4739c39`：P2 合同消费锁已推进到 OpenAPI `1.19.0` / `schema.v1.21`，`packages/database` 已追加至 `0029`：`0027` 是纠正回退与独立审批谱系，`0028` 是同题家族守卫，`0029` 是私有对象容量账本；前序迁移保持原字节（`0026` 是发现索引）（`0025` 是使用上下文合同增量）（`0016..0019` 是历史产品 overlay），合同生成物包含 234 个 component runtime schema。API 的权限、持久候选、来源确认、人工审批、候选质量与原生原子发布、使用资格和原生按店目录已由隔离 PG 合成执行器消费；Main 资格目录消费者已通过封闭 Fastify 路由和实际 ProductHttp/ProductSession 消费同一合成执行器的发布产物；显式 FAQ 合成 profile 已接通坐席查询及管理候选、质量检查、来源确认、组织审批请求与发布；原生 XLSX 上传、候选修订与取消已接通合成 profile；真实审批 transport 和生产路由仍待完成，新 schema 应用 ACL 继续封闭；详见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。本次资料接入核对基线是 `v0.3.26 / codex/intake-organization@34bbe0c`：P2 合同消费锁已推进到 OpenAPI `1.19.0` / `schema.v1.21`，`packages/database` 已追加至 `0029`：`0027` 是纠正回退与独立审批谱系，`0028` 是同题家族守卫，`0029` 是私有对象容量账本；前序迁移保持原字节（`0026` 是发现索引）（`0025` 是使用上下文合同增量）（`0016..0019` 是历史产品 overlay），合同生成物包含 234 个 component runtime schema。API 的权限、持久候选、来源确认、人工审批、候选质量与原生原子发布、使用资格和原生按店目录已由隔离 PG 合成执行器消费；Main 资格目录消费者已通过封闭 Fastify 路由和实际 ProductHttp/ProductSession 消费同一合成执行器的发布产物；显式 FAQ 合成 profile 已接通坐席查询及管理候选、质量检查、来源确认、组织审批请求与发布；原生 XLSX 上传、候选修订与取消已接通合成 profile；真实审批 transport 和生产路由仍待完成，新 schema 应用 ACL 继续封闭；详见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
 
 ## 1. 先看整体
 
@@ -70,7 +70,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
 | `apps/desktop/assets/`、`apps/desktop/fox-head.png` | 品牌主资产与可确定性派生的 app icon 输入 | 截图、构建包、临时导出 |
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
-| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock auth、service readiness、策略读写、受控搜索与事件事务边界、合成 CSV/XLSX 持久接收、冻结 iteration-task 列表/开始/关闭、OpenAPI 1.14.0 ops-loop HTTP（不准、SOP、话术草稿、检索账、软件目录） | 桌面 fixture、renderer、migration owner、正式 Feishu auth、真实数据、桌面 adapter、worker 解析或外部 bind |
+| `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock/Feishu 登录 provider（配置边界见 API 运行配置）、service readiness、策略读写、受控搜索与事件事务边界、合成 CSV/XLSX 持久接收、冻结 iteration-task 列表/开始/关闭、OpenAPI 1.14.0 ops-loop HTTP（不准、SOP、话术草稿、检索账、软件目录） | 桌面 fixture、renderer、migration owner、未获准的真实组织/审批输入、真实业务数据、桌面 adapter、worker 解析或外部 bind |
 | `apps/api/tests/support/g1a-e0/` | 测试专用仓外输入校验、一次性 PG15 装载、同一 SearchBackend 评测、聚合报告与清理 | HTTP route、事件写入、桌面依赖、长期数据库、真实内容或正式构建产物 |
 | `apps/api/tests/support/intake-synthetic-*.ts` / `scripts/intake-synthetic/` | 全新临时PG15、三条合成FAQ、实际身份/资料HTTP模块和显式本地审批控制；前台CLI与独立桌面profile的生命周期边界 | 业务配置、已有数据库、真实身份/飞书、正式factory/ACL、对外审批后门或自动续期 |
 | `apps/api/src/search-decision.ts`、`search-relations.ts` | 产品搜索判定、内部诊断，以及有界正文关系/否定/论元语义；实验复用同一规则 | 人工来源注解、实验 fixture、HTTP 诊断字段或绕过来源门禁 |
@@ -140,7 +140,7 @@ OpenAPI1.19 管理上下文没有新增 DDL；26段 SQL 的来源和校验和保
 
 `DEV-M0-W2` 把“合同接收”与“合同编译”分为两个写入所有者：根 intake 脚本验证、保存不可变输入并拥有 rollover/read snapshot 互斥；`packages/contracts/scripts/generate-contracts.mjs` 只从锁内一致快照生成产品资产。生成器拒绝外部 `$ref`、来源版本/双哈希漂移和手改生成物，并保留已登记的 `x-unique-by` 验证扩展；运行时 validator 按 schema 延迟编译，只返回数量有上限的 schema 路径与关键字，不回显请求正文。
 
-`DEV-M0-W3` 由 `apps/api/src/runtime-config.ts` 单独拥有 profile、auth、bind、port、build version 与错误脱敏；配置必须先于 Fastify 构造通过。当前只有 `formal-dev|test + AUTH_MODE=mock + 127.0.0.1` 可启动；公共 package 入口只提供 `startApi()` 和窄 `close()` 生命周期，不暴露 Fastify 实例或替换路由 owner 的 factory。自动 HEAD 派生继续关闭。
+`DEV-M0-W3` 由 `apps/api/src/runtime-config.ts` 单独拥有 profile、auth、bind、port、build version 与错误脱敏；配置必须先于 Fastify 构造通过。该历史切片当时只有 `formal-dev|test + AUTH_MODE=mock + 127.0.0.1` 可启动；当前 Feishu 配置条件见 [API 运行配置](reference-api-runtime-config.md#1-单一-profile)；公共 package 入口只提供 `startApi()` 和窄 `close()` 生命周期，不暴露 Fastify 实例或替换路由 owner 的 factory。自动 HEAD 派生继续关闭。
 
 `DEV-M0-W4` 由 `packages/database` 单独拥有 DDL source split、不可变 SHA catalogue、`customer_agent_meta.schema_migrations` 账本、固定 advisory-lock key、逐 migration 事务与后验验证。生成器机械证明上游可执行区间完整且只归属一次；runner 要求调用方传入同一个已连接 `pg.Client`，并把 migration 与账本行放在同一事务。API startup 不调用这一控制面，runtime pool 不获得 migration-owner 能力。
 
@@ -175,6 +175,8 @@ OpenAPI1.19 管理上下文没有新增 DDL；26段 SQL 的来源和校验和保
 Dashboard 没有 overlay 的 `customerAgent`（search / login / copy / inaccuracy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/发布、话术优化待办 list/start/close、系统同步投影，以及 `dashboardOps`（检索账 / SOP / 话术下架 / 软件目录 / 打开下载页）。这是有意收窄，不是「完全无 preload」。ops-loop HTTP 已由 Main `dashboard-ops-loop.ts` 消费冻结合同；不要把通用 IPC 或 Node 权限塞进当前窗口。
 
 ## 4. 数据边界
+
+下图合同组件数与数据库版本保留旧切片示意（165 / v1.17），不是当前 P2 版本；当前消费范围以页首和 [P2 交接](reference-content-intake-p2-contract-handoff.md)为准。图形版本标注尚待专门同步，本次未重绘。
 
 ```text
 SYNTHETIC_SCRIPTS ──local searchScripts──> Query view model
@@ -213,7 +215,7 @@ v1.17 migrated PG15
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，不准落库与 `dashboardOps` 已接到同一产品会话，方案为 APPROVED。真实 `approved_redacted/pilot_recorded`、飞书身份和运行激活均保持关闭。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，不准落库与 `dashboardOps` 已接到同一产品会话，方案为 APPROVED。真实 `approved_redacted/pilot_recorded` 与正式运行激活仍受各自批准门约束；飞书登录 provider 已存在，本次 P2 原生组织刷新和审批 transport 尚未接线。
 
 ## 5. 测试和验证层级
 
