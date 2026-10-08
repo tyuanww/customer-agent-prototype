@@ -1,0 +1,173 @@
+{
+  "schema": "intake-design-audit/v1",
+  "baseline": "01d7a0c6ef965a7e36a0578168b92d04038ea298",
+  "mode": "read-only actual renderer with synthetic bridge; not native acceptance",
+  "nativeReview": "completed; 3 Medium and 2 Low deferred; no UI edits",
+  "outsideDesign": {
+    "provider": "claude-code skill route",
+    "status": "unavailable",
+    "exitCode": 1,
+    "reason": "authentication failed; underlying xAI OAuth network error; zero usage"
+  },
+  "grokCsvAttempt": {
+    "scope": "54f428ca..f6f8cf35",
+    "previewFiles": 85,
+    "reviewable": 46,
+    "excluded": 39,
+    "status": "not_started",
+    "exitCode": 1,
+    "reason": "provider grok is set but not configured in custom_providers section"
+  },
+  "completeExternalReview": "INCOMPLETE",
+  "htmlValidation": "actual Aside snapshot and visual preview; all 8 embedded images decoded",
+  "artifacts": [
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/design-audit-intake.md",
+      "sha256": "7c88aedfa09e5aa0102992ce69ab4bac470d51f9b2ddc4cd088a33084cb37b9a",
+      "bytes": 7597
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/detector.json",
+      "sha256": "1bad31dbbbbbf45373718f4037d7e07dfa80da502a837611ace248d4bbe0d312",
+      "bytes": 41611
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/design-outside-result.json",
+      "sha256": "3db2546f3bdb38df617a27c1779dce90aa6cf8a5f5fff4634132d4f2479f9605",
+      "bytes": 780
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/csv-review-preview.json",
+      "sha256": "18ad47881c460d3472e22c57235351c3eb3c2121edb458d4c085ca776234f469",
+      "bytes": 17643
+    },
+    {
+      "path": "/Users/hutou/Desktop/客服Agent-新增板块设计审核-2026-10-09.html",
+      "sha256": "ee9bec2a9debb3451b8a864e26a945f00df3146812f7b16d48d201fef1492d17",
+      "bytes": 1424632
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/campaign-min-dark.jpg",
+      "sha256": "ce244e4d487e83c5a2aa90679f4b81efcc5ef4faaac9c5c08fa72a0ab9ff37ed",
+      "bytes": 145181
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/permissions.jpg",
+      "sha256": "4fa6f6b3c348b88794a69978221b4c7d15a5527caa19a6e143e57a4c0ac916b0",
+      "bytes": 89550
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/overview.jpg",
+      "sha256": "a9d148490b31c60fb44d84cc8ac2fcde98a7e0ec8afb9333678e80062c3113e4",
+      "bytes": 84297
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/upload-min.jpg",
+      "sha256": "959525edc289768756486521e219a64ee9f957882f62dcc2b53e55838d1f6610",
+      "bytes": 121739
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/library.jpg",
+      "sha256": "a7da8268f3c1921b5ae831a4d4243602b087c65375b2ac7b52839d5ed8ec6974",
+      "bytes": 159528
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/permissions-min-dark.jpg",
+      "sha256": "9f3b4e04f2409292609941e4dc6a490a0a3a5ceb5e117622d113ec33fbe4afaa",
+      "bytes": 110414
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/permissions-form.jpg",
+      "sha256": "22f33a86797b3b81a05eedfc18c048949bc8585148195d65923fa15c2e0afd53",
+      "bytes": 130343
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/empty-library.jpg",
+      "sha256": "0c1f6812c4dbf15c784837cafefbccb0b2ebb517b002bbb7147180c214ae9ca2",
+      "bytes": 189374
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/ready-publish-dark.jpg",
+      "sha256": "73d5b8c17b2c2bf25248b6b2f1e8342847372417b1c9f21ddb60adfb0a9e91ab",
+      "bytes": 160176
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/library-min-dark.jpg",
+      "sha256": "c4d3bf15abc630312555f7df6792b192f4920f60503b5d4834faea1fd10612a0",
+      "bytes": 146008
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/permission-input.jpg",
+      "sha256": "b7500cea809d27b0ada0401a70f8e31839b36bf2f565ab6ba3995fcd347c59fa",
+      "bytes": 145627
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/candidate.jpg",
+      "sha256": "1a69a7b73757c5b494922b05a021bc4e4391bea9f40b4f3d3540c387c53d92e4",
+      "bytes": 151795
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/library-min-dark-scan.jpg",
+      "sha256": "c4d3bf15abc630312555f7df6792b192f4920f60503b5d4834faea1fd10612a0",
+      "bytes": 146008
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/permissions-dark-settled.jpg",
+      "sha256": "6d4c5867dd2cbee0eae0dbf26f75d9721a6c947c259f24019d21d19b462b4289",
+      "bytes": 117223
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/ready-publish.jpg",
+      "sha256": "d65725d9aa82526f070587d2332b135410ef5271a2a60c6f588805d8f6f9cf9c",
+      "bytes": 166226
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/first-impression.jpg",
+      "sha256": "c7232d3c78f0afd2bc6eefb462887fb0920f804e11f26ec57aa81b3c0729be69",
+      "bytes": 133735
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/permission-preview.jpg",
+      "sha256": "0f98ff7074eef04cafc2bfd67f4838c3178fe120d3c2725e95795ff1ce828c15",
+      "bytes": 137857
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/sync.jpg",
+      "sha256": "66afeab01a81982f382f723280d55e4f5043c930031b1fb5884acec95dd52949",
+      "bytes": 130898
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/aftersale-large-dark.jpg",
+      "sha256": "e2b2237cc6aa524b2c877b65808b62c208623d7fbf37837139fe4ff557797343",
+      "bytes": 176130
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/quality.jpg",
+      "sha256": "6cee78fc0bb6e833d4782b113f2efd90a0174d2f5da4ede989a9dbd076b4a8f2",
+      "bytes": 130386
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/permissions-min.jpg",
+      "sha256": "f6f7c698486cf18f7057199e1085f06af197b647c09bcf6752f9c9435c9a846b",
+      "bytes": 116622
+    },
+    {
+      "path": "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/screenshots/sync-min-dark.jpg",
+      "sha256": "86868f86b19a081741dcbf6ec12cf1ec8c9262c9877fd7f1f5a8e9e4fc5e1ad3",
+      "bytes": 122544
+    }
+  ],
+  "ephemeralFilesRemoved": [
+    "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/dom/library-min-dark-scan.dom.html",
+    "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/dom/upload-min.dom.html",
+    "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/dom/sync-min-dark.dom.html",
+    "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/dom/permissions-min.dom.html",
+    "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/dom/permissions-min-dark.dom.html",
+    "/Users/hutou/.gstack/projects/weiweity-customer-agent-prototype/designs/design-audit-20261009/intake-01d7a0c/design-outside-prompt.txt",
+    "/Users/hutou/.aside/u/0/sessions/2026-10-09_HXfH9xeQzDrgDQ4f/permissions-dark-settled.dom.html",
+    "/Users/hutou/.aside/u/0/sessions/2026-10-09_HXfH9xeQzDrgDQ4f/library-min-dark-scan.dom.html",
+    "/Users/hutou/.aside/u/0/sessions/2026-10-09_HXfH9xeQzDrgDQ4f/upload-min.dom.html",
+    "/Users/hutou/.aside/u/0/sessions/2026-10-09_HXfH9xeQzDrgDQ4f/sync-min-dark.dom.html",
+    "/Users/hutou/.aside/u/0/sessions/2026-10-09_HXfH9xeQzDrgDQ4f/permissions-min.dom.html"
+  ]
+}
