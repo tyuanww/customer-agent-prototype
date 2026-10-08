@@ -50,8 +50,11 @@ export function covers(outer: Scope, inner: Scope): boolean {
     && outer.shop === inner.shop && outer.domain === inner.domain
     && (outer.source === null || outer.source === inner.source);
 }
+// enabler matches agent: query only. supervisor is not an allocator.
 function ceiling(role: Role | null, action: Action): boolean {
-  return role !== null && BUSINESS_ACTIONS.includes(action) && (role !== 'agent' || action === 'query');
+  if (role === null || !BUSINESS_ACTIONS.includes(action)) return false;
+  if (role === 'agent' || role === 'enabler') return action === 'query';
+  return role === 'director' || role === 'manager' || role === 'supervisor' || role === 'lead';
 }
 function inGrant(grant: Grant, principal: Principal, action: Action, scope: Scope, now: number): boolean {
   return grant.recipient === principal.id && live(grant, now) && grant.action === action
@@ -82,15 +85,15 @@ export function canAssign(issuer: Principal, recipient: Principal, proposed: Gra
   if (issuer.tenant !== recipient.tenant || issuer.app !== recipient.app || proposed.recipient !== recipient.id || proposed.issuer !== issuer.id) return no('SCOPE_DENIED');
   if (!proposed.id || !proposed.reason.trim() || !live(proposed, now) || !Number.isSafeInteger(proposed.version) || proposed.version < 1) return no('INVALID_GRANT');
   const issuerRole = roleOf(issuer, authority.rules), recipientRole = roleOf(recipient, authority.rules);
-  const intrinsic = issuerRole === 'supervisor' || issuerRole === 'manager' || issuerRole === 'director';
-  if (kind === 'delegation' && issuerRole !== 'manager' && issuerRole !== 'director') return no('REDELEGATION_DENIED');
+  // Only director/manager allocate. A delegation credential cannot create another delegation.
+  if (issuerRole !== 'director' && issuerRole !== 'manager') return no('REDELEGATION_DENIED');
   const { scope, action } = proposed;
   if (scope.tenant !== issuer.tenant || scope.app !== issuer.app) return no('SCOPE_DENIED');
-  // A delegate may distribute a capability it cannot use, but a business recipient
-  // can only receive actions within its job ceiling (agent stays read-only).
-  if (!BUSINESS_ACTIONS.includes(action) || (kind === 'business' && !ceiling(recipientRole, action))) return no('ROLE_CEILING');
+  if (!BUSINESS_ACTIONS.includes(action)
+    || (kind === 'business' && !ceiling(recipientRole, action))
+    || (kind === 'delegation' && recipientRole !== 'director' && recipientRole !== 'manager')) return no('ROLE_CEILING');
   const eligible = [
-    ...(intrinsic ? authority.allocations : []),
+    ...authority.allocations,
     ...(kind === 'business' ? authority.delegations : []),
   ].filter((g) => inGrant(g, issuer, action, scope, now)
     && g.steward !== null && proposed.startsAt >= g.startsAt && proposed.expiresAt <= g.expiresAt);

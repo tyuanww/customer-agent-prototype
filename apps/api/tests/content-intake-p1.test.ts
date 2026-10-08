@@ -7,12 +7,13 @@ import { assessRisk, attachEvidence, canCommit, freezeCandidate, issueTicket, ma
 const now = Date.parse('2026-10-04T03:00:00Z');
 const scope: Scope = { tenant: 'synthetic-tenant', app: 'synthetic-app', brand: 'synthetic-brand', shop: 'shop-a', domain: 'product', source: 'source-a' };
 const principal = (id: string, job = '服务赋能师'): Principal => ({ id, personKey: `person-${id}`, tenant: scope.tenant, app: scope.app, departments: ['support'], job, enabled: true, checkedAt: now - 1000, version: 1, generation: 0 });
-const writer = principal('writer'), peer = principal('peer'), agent = principal('agent', '坐席'), manager = principal('manager', '经理');
+const writer = principal('writer', '客服组长'), peer = principal('peer', '客服组长'), agent = principal('agent', '坐席'), manager = principal('manager', '经理');
 const grant = (recipient: string, overrides: Partial<Grant> = {}): Grant => ({ id: `grant-${recipient}`, issuer: 'operations', recipient, action: 'publish', scope, startsAt: now - 10_000, expiresAt: now + 600_000, revoked: false, version: 1, reason: 'synthetic scope', steward: 'manager', ...overrides });
 const authority: Authority = {
   rules: [ { department: 'support', job: '服务赋能师', role: 'enabler' }, { department: 'support', job: '话术师', role: 'enabler' },
+    { department: 'support', job: '客服组长', role: 'lead' },
     { department: 'support', job: '坐席', role: 'agent' }, { department: 'support', job: '经理', role: 'manager' },
-    { department: 'support', job: '主管', role: 'supervisor' } ],
+    { department: 'support', job: '主管', role: 'supervisor' }, { department: 'support', job: '总监', role: 'director' } ],
   grants: ['writer', 'peer', 'agent', 'manager'].flatMap((id) => BUSINESS_ACTIONS.map((action) => grant(id, { id: `${id}-${action}`, action }))),
   allocations: BUSINESS_ACTIONS.map((action) => grant('manager', { id: `allocation-${action}`, action })), delegations: [],
 };
@@ -20,6 +21,13 @@ const authority: Authority = {
 describe('P1 permissions — proposed rules, no production API grants', () => {
   it('intersects identity, exact department/job ceiling and manually granted store scope', () => {
     expect(authorize(writer, 'publish', scope, authority, now).ok).toBe(true);
+    const enabler = principal('enabler');
+    const withEnabler = { ...authority, grants: [...authority.grants, ...BUSINESS_ACTIONS.map((action) => grant(enabler.id, { id: `enabler-${action}`, action }))] };
+    expect(authorize(enabler, 'publish', scope, withEnabler, now)).toEqual({ ok: false, reason: 'ROLE_CEILING' });
+    expect(authorize(enabler, 'import', scope, withEnabler, now)).toEqual({ ok: false, reason: 'ROLE_CEILING' });
+    expect(authorize(enabler, 'query', scope, withEnabler, now).ok).toBe(true);
+    const supervisor = principal('supervisor', '主管');
+    expect(authorize(supervisor, 'publish', scope, { ...authority, grants: [...authority.grants, grant(supervisor.id, { id: 'supervisor-publish' })] }, now).ok).toBe(true);
     expect(authorize(agent, 'publish', scope, authority, now)).toEqual({ ok: false, reason: 'ROLE_CEILING' });
     expect(authorize(agent, 'query', scope, authority, now).ok).toBe(true);
     expect(authorize(writer, 'publish', { ...scope, shop: 'shop-b' }, authority, now).ok).toBe(false);
@@ -43,13 +51,20 @@ describe('P1 permissions — proposed rules, no production API grants', () => {
     expect(selectShop(['a', 'b'], 'c').ok).toBe(false);
   });
   it('separates grant qualification from business capabilities and denies redelegation', () => {
-    const delegated = { ...grant('agent', { issuer: manager.id, action: 'publish' }), mayRedelegate: false as const };
-    expect(canAssign(manager, agent, delegated, 'delegation', authority, now).ok).toBe(true);
+    const director = principal('director', '总监');
+    const toAgent = { ...grant('agent', { issuer: manager.id, action: 'publish' }), mayRedelegate: false as const };
+    const delegated = { ...grant(director.id, { issuer: manager.id, action: 'publish' }), mayRedelegate: false as const };
+    expect(canAssign(manager, agent, toAgent, 'delegation', authority, now)).toEqual({ ok: false, reason: 'ROLE_CEILING' });
+    expect(canAssign(manager, director, delegated, 'delegation', authority, now).ok).toBe(true);
     const state = { ...authority, delegations: [delegated] };
     expect(authorize(agent, 'publish', scope, state, now).ok).toBe(false);
-    expect(canAssign(agent, peer, grant('peer', { issuer: agent.id, action: 'publish' }), 'business', state, now).ok).toBe(true);
-    expect(canAssign(agent, peer, grant('peer', { issuer: agent.id }), 'delegation', state, now).ok).toBe(false);
+    expect(canAssign(director, peer, grant(peer.id, { issuer: director.id, action: 'publish' }), 'business', state, now).ok).toBe(true);
+    expect(canAssign(agent, peer, grant(peer.id, { issuer: agent.id, action: 'publish' }), 'business', state, now)).toEqual({ ok: false, reason: 'REDELEGATION_DENIED' });
+    expect(canAssign(director, agent, grant('agent', { issuer: director.id }), 'delegation', state, now).ok).toBe(false);
     expect(canAssign(manager, agent, grant('agent', { issuer: manager.id }), 'business', authority, now).ok).toBe(false);
+    const supervisor = principal('supervisor', '主管');
+    const supervisorAuthority = { ...authority, allocations: authority.allocations.map((item) => ({ ...item, recipient: supervisor.id })) };
+    expect(canAssign(supervisor, peer, grant(peer.id, { issuer: supervisor.id }), 'business', supervisorAuthority, now)).toEqual({ ok: false, reason: 'REDELEGATION_DENIED' });
   });
   it('denies self elevation (including same-person alias), extra scope and extended lifetime', () => {
     expect(canAssign(manager, manager, grant(manager.id, { issuer: manager.id }), 'business', authority, now).ok).toBe(false);
@@ -69,16 +84,17 @@ describe('P1 permissions — proposed rules, no production API grants', () => {
   });
   it('keeps action and store stewardship independent and repeated revocation inert', () => {
     const scopeB = { ...scope, shop: 'shop-b' };
-    const delegated = { ...grant('writer', { id: 'delegate-a', issuer: manager.id }), mayRedelegate: false as const };
+    const allocator = principal('allocator', '经理');
+    const delegated = { ...grant(allocator.id, { id: 'delegate-a', issuer: manager.id }), mayRedelegate: false as const };
     const other = { ...delegated, id: 'delegate-b', scope: scopeB };
-    const a = grant('peer', { id: 'a-publish', issuer: writer.id });
-    const b = grant('peer', { id: 'b-publish', issuer: writer.id, scope: scopeB });
-    const query = grant('peer', { id: 'a-query', issuer: writer.id, action: 'query' });
+    const a = grant(peer.id, { id: 'a-publish', issuer: allocator.id });
+    const b = grant(peer.id, { id: 'b-publish', issuer: allocator.id, scope: scopeB });
+    const query = grant(peer.id, { id: 'a-query', issuer: allocator.id, action: 'query' });
     const state = { ...authority, delegations: [delegated, other], grants: [a, b, query] };
-    expect(canAssign(writer, peer, a, 'business', state, now).ok).toBe(true);
-    expect(canAssign(writer, peer, b, 'business', state, now).ok).toBe(true);
+    expect(canAssign(allocator, peer, a, 'business', state, now).ok).toBe(true);
+    expect(canAssign(allocator, peer, b, 'business', state, now).ok).toBe(true);
     const revoked = revokeDelegation(state, delegated.id, 'shop-a-manager');
-    expect(revoked.grants[0]).toMatchObject({ steward: 'shop-a-manager', version: 2, issuer: writer.id });
+    expect(revoked.grants[0]).toMatchObject({ steward: 'shop-a-manager', version: 2, issuer: allocator.id });
     expect(revoked.grants[1]).toBe(b); expect(revoked.grants[2]).toBe(query);
     expect(revokeDelegation(revoked, delegated.id, null)).toBe(revoked);
     expect(authorize(peer, 'publish', scopeB, revoked, now).ok).toBe(true);

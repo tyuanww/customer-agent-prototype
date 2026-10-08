@@ -50,19 +50,21 @@ export function samePerson(a: Principal, b: Principal): boolean {
     && a.identityScope === b.identityScope && a.personKey === b.personKey);
 }
 
-/** The directory and the grant transaction share this role ceiling. A directory
- * choice is only a hint; createGrants still rechecks identity, facts and scope. */
+/** The directory and the grant transaction share this role ceiling. Historical
+ * grant rows stay; new operations are rechecked here and in SQL. */
 export function recipientRoleAllows(role: Principal['role'], kind: 'business' | 'delegation', action: C['IntakeAction']): boolean {
-  return role !== null && !(kind === 'business' && role === 'agent' && action !== 'query');
+  if (role === null) return false;
+  if (kind === 'delegation') return role === 'director' || role === 'manager';
+  if (action === 'query') return true;
+  return role === 'director' || role === 'manager' || role === 'supervisor' || role === 'lead';
 }
 
-/** Allocation credentials are independent of business-role ceilings. A delegate
- * may allocate the specified actions, but may never delegate that credential. */
+/** Only director/manager allocate. Delegation cannot create another delegation;
+ * it can still back a business grant. Historical rows stay and are rechecked. */
 export function allocationKinds(actor: Principal, kind: 'business' | 'delegation'): ('allocation' | 'delegation')[] {
-  if (actor.role === null) return [];
-  const manager = actor.role === 'manager' || actor.role === 'director';
-  if (kind === 'delegation') return manager ? ['allocation'] : [];
-  return manager || actor.role === 'supervisor' ? ['allocation', 'delegation'] : ['delegation'];
+  if (actor.role !== 'director' && actor.role !== 'manager') return [];
+  if (kind === 'delegation') return ['allocation'];
+  return ['allocation', 'delegation'];
 }
 
 async function parentAuthority(client: IntakeTransaction, issuer: Principal, kind: 'business' | 'delegation',

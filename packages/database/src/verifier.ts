@@ -126,6 +126,7 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 0028 adds the complete family guard and publication trigger, and grants the
 // non-login definer candidate SELECT only to refuse legacy family inheritance.
 // 0029 adds the private capacity journal and two accounting indexes, no ACL change.
+// 0030 replaces the private authorization_deadline body only. No new table and no application-role ACL.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
@@ -134,7 +135,7 @@ const EXPECTED_ACL_MANIFEST_SHA256 = '6128b6cc566759e78dd15f876411458ff79bda7205
 const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2807;
 const EXPECTED_OBJECT_MANIFEST_SHA256 = '8e33db594febe7068011271ead9aa55d168d795cebe984ef861f8cf6d2c83140';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 225;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '249c3c82b181f07af04d56d648af84d4711e3da154a6a5d8ba79603f35f72d30';
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '57ec21b50e5e4e310f3c4dcfc36ec5b4ecf0b4c29e7285c80ec089fc28b97344';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 85;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '075d4d3d5f0fae41b8d9c7be5c83c2c59da0f775aa85161c7b9217fbefc693a9';
 
