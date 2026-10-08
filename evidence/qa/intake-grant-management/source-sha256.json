@@ -1,0 +1,21 @@
+{
+  "apps/api/src/content-intake/authority.ts": "cfdf8829a75b4cf7ed9672a503e5d0a4089efe18a38a253333b1be29d0a38cec",
+  "apps/api/src/content-intake/discovery.ts": "f442e0b40843e619ed3928d188a4f212388c5ae1126972ae5c356255997b639b",
+  "apps/api/src/content-intake/service.ts": "1ad700408e608f76ebc065f168e0c056425af53bc83e18191aae416b9c2d3996",
+  "apps/desktop/src/main/content-intake-access.ts": "4a2e3903d2398bcacdb33289e380b9173f5e0a7b41fd68193676a852a52e1d11",
+  "apps/desktop/src/main/main.ts": "4551c6c6c6cb8ca58d49a68719492d32d43c4f42e24598dd863f2b07ae6b3d63",
+  "apps/desktop/src/preload/dashboard.ts": "ff565afa3afa0f8d2f3cf9fb12ea9d1d9ccb79ea9f5ee20b75e2516c5ac549ed",
+  "apps/desktop/src/preload/global.d.ts": "f0b10bdea40647bcb9d5edc70cf0c044eb6b44e9663e80df9102f992d2fb210b",
+  "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx": "06ce38b011aad5ea4aa52c85623867051580ce69e9c0f33da9a31b4a371ac400",
+  "apps/api/src/content-intake/grants-http.ts": "71d9e5bdd9406ad19947377954c6c6e4fad0022fe1e29dce7c22e077d2dc3f91",
+  "apps/api/tests/intake-grants-http.integration.test.ts": "0da5a384ed5829c62139889d31e5ddcc640ad4f644e41b79eee25270efe46cf5",
+  "apps/desktop/src/main/content-intake-permissions-ipc.ts": "6c2bf636b187eb00ae9a000f906c33cdc9ccc46ab2b04c709bb4cab7d1ec8b05",
+  "apps/desktop/src/main/content-intake-permissions.ts": "71eb92bfdb00b36e25e2cc68776ebda00a2b459bff63f4978703606a209a0a51",
+  "apps/desktop/src/renderer/features/dashboard/IntakePermissions.tsx": "5c099e5666a6f46dfedb1f0fda6355fc19f4d500ca25c9e317a936aaafd5d2e3",
+  "apps/desktop/src/shared/content-intake-permissions.ts": "b49bec4a20ef50f65e6352131f851ef8773121ddee60f0284b172562eb417394",
+  "apps/desktop/tests/component/intake-permissions.test.tsx": "c7712acc3b4e3600d3bc382fcb504c275a86c64551fcd8f2d5c799fcda306e05",
+  "apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts": "3daaba9de85cc41de91f3e0b7a91489c3b9e5a1c8ea131110c63be3addb63e65",
+  "apps/desktop/tests/fixtures/intake-permissions-data.ts": "1c2f8043feed7b5c2760b359aab9543859d76684b17a42d7317e46699f0a56a3",
+  "apps/desktop/tests/unit/content-intake-permissions-ipc.test.ts": "b95800c60c6230c1390cc08b0be7877f2517d1a3cfe888484101d0de5ef66c7b",
+  "apps/desktop/tests/unit/content-intake-permissions.test.ts": "5a7c99979466c884c232c504bcbfb1fef8dfe77ec5f6ddc6e9112d97ca173dbc"
+}

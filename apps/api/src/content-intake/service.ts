@@ -8,7 +8,7 @@ import { authenticatedProductSession } from '../product-auth-service.js';
 import type { ContentObjectStore, PersistedContentObject } from '../content-object-store.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { createIntakeTransactions, IntakeRejection, type IntakePool, type IntakeResult } from './transaction.js';
-import { authorize, changeGrant, createGrants, source } from './authority.js';
+import { authorize, changeGrant, createGrants, previewGrants, source } from './authority.js';
 import { cancelCandidate, cancellationReceipt, historicalCandidate, freezeParsed, getJob, readCandidate, receive } from './candidate.js';
 import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
@@ -198,6 +198,10 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     checkQuality(actor: AuthenticatedUser, raw: unknown) {
       return run(actor, 'quality-check', json(raw), operation(raw),
         (client, who) => checkQuality(client, who, qualitySubmission(raw)), value => value as IntakeQualityProgress);
+    },
+    previewGrants(actor: AuthenticatedUser, raw: unknown) {
+      return run(actor, 'grant-preview', null, null,
+        (client, who) => previewGrants(client, who, parseContractSchema('IntakeGrantBatch', raw)), grantList);
     },
     grantBatch(actor: AuthenticatedUser, raw: unknown) {
       return run(actor, 'grants', json(raw), operation(raw),

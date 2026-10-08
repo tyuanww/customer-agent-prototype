@@ -15,7 +15,7 @@ export type IntakeAccess = {
  * Shop names are not in the current contract: preserve IDs instead of inventing
  * display names or treating a brand-wide grant as access to every shop.
  */
-export async function loadIntakeAccess(session: IntakeUsageSession, signal?: AbortSignal): Promise<IntakeAccess> {
+export async function loadIntakeAccess(session: IntakeUsageSession, signal?: AbortSignal): Promise<IntakeAccess & { factsVersion: number; policyVersion: number; revocationGeneration: number }> {
   const initial = session.view(), controller = new AbortController();
   if (!initial.signedIn) throw new IntakeUsageError('UNAUTHORIZED');
   const abort = () => controller.abort();
@@ -93,7 +93,7 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
       if (src.contentIntakeMode === 'v2-preview' && src.scope.shopId !== null && cap.actions.includes('query')) shops.add(src.scope.shopId);
     }
     assertActive();
-    return { validUntil: after.validUntil, shops: [...shops].sort(), sources, capabilities: after.capabilities };
+    return { factsVersion: after.factsVersion, policyVersion: after.policyVersion, revocationGeneration: after.revocationGeneration, validUntil: after.validUntil, shops: [...shops].sort(), sources, capabilities: after.capabilities };
   } catch (error) {
     assertActive();
     if (error instanceof IntakeUsageError) throw error;

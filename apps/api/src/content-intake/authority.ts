@@ -100,11 +100,10 @@ export async function readGrant(client: IntakeTransaction, id: string): Promise<
   return parseContractSchema('IntakeGrant', rows[0].value);
 }
 
-export async function createGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']): Promise<C['IntakeGrantList']> {
+async function prepareGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']) {
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [issuer.tenantId, issuer.appId]);
   if (issuer.factsVersion !== request.issuerFactsVersion || Number(policy.rows[0]?.version) !== request.policyVersion) throw new IntakeRejection('PERMISSION_CHANGED');
-  const results: Grant[] = [];
-  const affected = new Set<string>();
+  const prepared: { item: C['IntakeGrantItem']; parent: string }[] = [];
   for (const item of request.items) {
     const recipient = await principal(client, { id: item.recipientPrincipalId });
     requireFresh(recipient, await clock(client));
@@ -115,14 +114,46 @@ export async function createGrants(client: IntakeTransaction, issuer: Principal,
     if (!recipientRoleAllows(recipient.role, item.kind, item.action)) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
     if (!item.reason.trim() || Date.parse(item.expiresAt) <= Math.max(Date.parse(item.startsAt), await clock(client))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     const parent = await parentAuthority(client, issuer, item.kind, item.action, item.scope, item);
+    prepared.push({ item, parent });
+  }
+  return prepared;
+}
+
+/** Preview shares the command validator and has no DML or receipt. Preview IDs
+ * identify hypothetical rows only; saving always validates and allocates anew. */
+export async function previewGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']): Promise<C['IntakeGrantList']> {
+  const prepared = await prepareGrants(client, issuer, request);
+  return parseContractSchema('IntakeGrantList', { items: prepared.map(({ item }) => ({
+    kind: item.kind, recipientPrincipalId: item.recipientPrincipalId, action: item.action,
+    scope: item.scope, startsAt: item.startsAt, expiresAt: item.expiresAt, reason: item.reason, grantId: `preview_${randomUUID()}`, version: 1,
+    issuerPrincipalId: issuer.id, revokedAt: null, stewardPrincipalId: issuer.id,
+    mayRedelegate: false, lastChangeReason: null,
+  })), nextCursor: null });
+}
+
+/** Listing uses precisely the command's current bounded authority, never the
+ * original issuer alone. Allocation rows remain controlled bootstrap records. */
+export async function mayManageGrant(client: IntakeTransaction, actor: Principal, grant: Grant): Promise<boolean> {
+  if (grant.kind === 'allocation') return false;
+  try { await parentAuthority(client, actor, grant.kind, grant.action, grant.scope); return true; }
+  catch (error) {
+    if (error instanceof IntakeRejection && ['SCOPE_DENIED','GRANT_AUTHORITY_DENIED','REDELEGATION_DENIED'].includes(error.reason)) return false;
+    throw error;
+  }
+}
+
+export async function createGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']): Promise<C['IntakeGrantList']> {
+  const prepared = await prepareGrants(client, issuer, request);
+  const results: Grant[] = [], affected = new Set<string>();
+  for (const { item, parent } of prepared) {
     const id = `grant_${randomUUID()}`;
     await client.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,
       scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$3,$13)`,
-    [id, item.kind, issuer.id, recipient.id, issuer.tenantId, issuer.appId, await scopeId(client, item.scope),
+    [id, item.kind, issuer.id, item.recipientPrincipalId, issuer.tenantId, issuer.appId, await scopeId(client, item.scope),
       item.scope.sourceId, item.action, item.startsAt, item.expiresAt, item.reason, parent]);
     results.push(await readGrant(client, id));
-    affected.add(recipient.id);
+    affected.add(item.recipientPrincipalId);
   }
   // A slow batch cannot extend any recipient/parent deadline observed earlier.
   for (const item of request.items) {

@@ -1,0 +1,102 @@
+[
+  {
+    "name": "api-types",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/tsc",
+      "--noEmit"
+    ],
+    "env": {},
+    "exitCode": 0,
+    "log": "api-types.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "desktop-types",
+    "cwd": "apps/desktop",
+    "command": [
+      "./node_modules/.bin/tsc",
+      "--noEmit"
+    ],
+    "env": {},
+    "exitCode": 0,
+    "log": "desktop-types.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "api-pg",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/intake-grants-http.integration.test.ts"
+    ],
+    "env": {
+      "CUSTOMER_AGENT_API_PG15_INTEGRATION": "1"
+    },
+    "exitCode": 0,
+    "log": "api-pg.log",
+    "sha256": "69b81fec5dc1ebe722019afa556166a98bb0a596a5c2b1291f42d871674b5827"
+  },
+  {
+    "name": "desktop-tests",
+    "cwd": "apps/desktop",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/unit/content-intake-permissions.test.ts",
+      "tests/unit/content-intake-permissions-ipc.test.ts",
+      "tests/component/intake-permissions.test.tsx",
+      "tests/component/intake-management.test.tsx",
+      "tests/unit/content-intake-access.test.ts",
+      "tests/unit/content-intake-upload.test.ts",
+      "tests/unit/content-intake-rollback.test.ts",
+      "tests/unit/content-intake-management-ipc.test.ts"
+    ],
+    "env": {},
+    "exitCode": 0,
+    "log": "desktop-tests.log",
+    "sha256": "539166a16bbb469d616bad9d03c2a3c35c7d83ba346a107db925e7ade888fe8d"
+  },
+  {
+    "name": "desktop-build",
+    "cwd": "apps/desktop",
+    "command": [
+      "./node_modules/.bin/electron-vite",
+      "build"
+    ],
+    "env": {},
+    "exitCode": 0,
+    "log": "desktop-build.log",
+    "sha256": "63c4d5941feb5de9a05585b66c66157960e400ae57404431f2b850e2d2acb216"
+  },
+  {
+    "name": "lint",
+    "cwd": ".",
+    "command": [
+      "./node_modules/.bin/eslint",
+      "apps/api/src/content-intake/authority.ts",
+      "apps/api/src/content-intake/discovery.ts",
+      "apps/api/src/content-intake/service.ts",
+      "apps/desktop/src/main/content-intake-access.ts",
+      "apps/desktop/src/main/main.ts",
+      "apps/desktop/src/preload/dashboard.ts",
+      "apps/desktop/src/preload/global.d.ts",
+      "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
+      "apps/api/src/content-intake/grants-http.ts",
+      "apps/api/tests/intake-grants-http.integration.test.ts",
+      "apps/desktop/src/main/content-intake-permissions-ipc.ts",
+      "apps/desktop/src/main/content-intake-permissions.ts",
+      "apps/desktop/src/renderer/features/dashboard/IntakePermissions.tsx",
+      "apps/desktop/src/shared/content-intake-permissions.ts",
+      "apps/desktop/tests/component/intake-permissions.test.tsx",
+      "apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts",
+      "apps/desktop/tests/fixtures/intake-permissions-data.ts",
+      "apps/desktop/tests/unit/content-intake-permissions-ipc.test.ts",
+      "apps/desktop/tests/unit/content-intake-permissions.test.ts"
+    ],
+    "exitCode": 0,
+    "log": "lint.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

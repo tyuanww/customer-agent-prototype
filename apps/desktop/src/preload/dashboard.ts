@@ -1,3 +1,4 @@
+import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -439,3 +440,12 @@ contextBridge.exposeInMainWorld('dashboardIntake', {
     return () => { ipcRenderer.removeListener('dashboard:intake-invalidated', handler); };
   },
 } satisfies IntakeManagementApi);
+
+contextBridge.exposeInMainWorld('dashboardPermissions', {
+  current: () => ipcRenderer.invoke('dashboard:permissions-current'),
+  command: (command: IntakePermissionCommand) => ipcRenderer.invoke('dashboard:permissions-command', command),
+  onInvalidated: (listener: () => void) => {
+    const handler = () => listener(); ipcRenderer.on('dashboard:permissions-invalidated', handler);
+    return () => { ipcRenderer.removeListener('dashboard:permissions-invalidated', handler); };
+  },
+} satisfies IntakePermissionApi);
