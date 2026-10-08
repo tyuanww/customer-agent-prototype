@@ -1,3 +1,4 @@
+import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
@@ -88,7 +89,7 @@ export function DashboardApp() {
 /** Both profiles share native chrome and appearance. Only the selected profile
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
-  const navItems = useMemo(() => profile === 'intake' ? DASHBOARD_NAV.filter(item => item.id === 'content') : DASHBOARD_NAV, [profile]);
+  const navItems = DASHBOARD_NAV;
   const [active, setActive] = useState<DashboardModuleId>(profile === 'intake' ? 'content' : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
@@ -1253,7 +1254,21 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {profile === 'intake' ? <IntakeManagement /> : <>
+          {profile === 'intake' ? <>
+            {active === 'overview' && <section className="dash-module" data-testid="module-overview">
+              <header className="dash-module-head"><h1>管理概览</h1></header>
+              <p>资料上传、检查与确认发布在内容管理中完成，总监和经理可在其中配置权限。</p>
+              <div className="intake-toolbar"><button className="dash-action-primary" onClick={() => setActive('content')}>打开内容管理</button>
+                <button onClick={() => setActive('wording')}>浏览可用话术</button></div>
+              <p className="dash-scope">经营统计与待办指标未接入。</p>
+            </section>}
+            {active === 'sop' && <section className="dash-module" data-testid="module-sop">
+              <header className="dash-module-head"><h1>SOP</h1></header>
+              <p>当前资料模式尚未接入 SOP。可在内容管理中维护售前、售后等 FAQ 资料。</p>
+            </section>}
+            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
+            {keepContent || active === 'content' ? <div hidden={active !== 'content'}><IntakeManagement /></div> : null}
+          </> : <>
             {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
             {active === 'wording' ? (
               <WordingLibraryModule

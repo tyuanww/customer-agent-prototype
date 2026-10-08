@@ -36,6 +36,8 @@ FAQ P2 的 `contentIntake: "faq-v2"` 仅限显式 loopback 合成 profile。Quer
 
 同一合成 profile 的权限配置仅通过独立 `dashboardPermissions.current/command/onInvalidated`，对应 `dashboard:permissions-current/permissions-command/permissions-invalidated`。Main 验证 Dashboard 主帧，拥有有期限的范围/人员选择句柄和原始写请求；renderer 只传预览、保存、撤销及原请求恢复意图，不提供主体 ID、任意范围、URL 或操作 ID。预览不写授权，保存仍由既有授权事务重新校验；停止等待不等于撤销已受理写入。权限页面与资料页面共用内容管理外壳，不向 Fox/Query 暴露管理能力。具体模块归属和验证入口见[架构参考](docs/reference-project-architecture.md)与[资料导入开发说明](docs/how-to-develop-content-intake.md)。
 
+同一 FAQ 合成 profile 的五模块工作台保留旧业务 adapter 隔离。已发布话术和当前可用版本仅通过独立 `dashboardIntakeCatalog.current/command/onInvalidated`（`dashboard:intake-catalog-current` / `dashboard:intake-catalog-command` / `dashboard:intake-catalog-invalidated`）读取；Main 校验 Dashboard 主帧、拥有独立于 Query 的选择/资格、完整分页和截止。renderer 只传店铺/条件选择、刷新或停止意图，没有复制、任意 URL、主体、资格 token 或旧目录回退能力。四域来自本次资格范围；所见数量仅指当前条件，非全店总量。内容及权限页切导航保活，隐藏期间仍处理失效。未接线的经营统计/SOP/软件/公告差异保持未接入，不挂旧业务 API。
+
 ## 3. 模块边界与依赖方向
 
 以下细则描述桌面模块；`apps/api/`、`packages/contracts/`、`packages/database/`、根脚本与合同快照的所有权以 `docs/reference-project-architecture.md` 和对应获批合同为准，不把桌面无后端 / 无 preload 等局部约束外推到整个 workspace。

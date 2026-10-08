@@ -1,0 +1,18 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/content-intake-workspace-real-stack.spec.ts"
+  ],
+  "environment": {
+    "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E": "1",
+    "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME": "1"
+  },
+  "startedAt": "2026-10-08T11:49:25.869160+00:00",
+  "endedAt": "2026-10-08T11:49:42.723257+00:00",
+  "exitCode": 0
+}

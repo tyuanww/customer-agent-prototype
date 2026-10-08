@@ -18,7 +18,7 @@ type CatalogEvent = 'invalidated' | 'updated' | 'expired';
 type Row = C['IntakeSnapshot']['faq'][number] & { key: string };
 export interface IntakeCatalog {
   /** Main-only handle: read/copy always recheck this exact qualification. No token in the projection. */
-  read(): { releaseId: string; contextGeneration: number; validUntil: string; faq: Row[]; vocabulary: C['IntakeVocabulary'][] } | null;
+  read(): { releaseId: string; contextGeneration: number; validUntil: string; faq: Row[]; scopes: C['IntakeEntitlement']['scopes']; vocabulary: C['IntakeVocabulary'][] } | null;
   copy(key: string): { copied: true };
 }
 const MAX_PAGES = 500;
@@ -156,7 +156,7 @@ export class ContentIntakeUsage {
       if (!live()) throw new IntakeUsageError('EXPIRED');
       const byKey = new Map(faq.map(row => [row.key, row]));
       const catalog: IntakeCatalog = {
-        read: () => live() ? structuredClone({ releaseId: entitlement.releaseId, contextGeneration: generation, validUntil: entitlement.validUntil, faq, vocabulary: [...vocabulary.values()] }) : null,
+        read: () => live() ? structuredClone({ releaseId: entitlement.releaseId, contextGeneration: generation, validUntil: entitlement.validUntil, faq, scopes: entitlement.scopes, vocabulary: [...vocabulary.values()] }) : null,
         copy: key => {
           if (!live()) throw new IntakeUsageError('STALE');
           const row = byKey.get(key);

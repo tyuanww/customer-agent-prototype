@@ -1,0 +1,67 @@
+[
+  {
+    "path": "evidence/qa/intake-unified-workspace/architecture.log",
+    "sha256": "e2bd640d89f923834d4575d3bc67aac66bf3640837cd41d97e123d203c629cf1",
+    "bytes": 100
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/build.log",
+    "sha256": "d2915a6d2aa6a61e2f34b74ecea135059f3c0f8b58bbec4263391e6019a14c76",
+    "bytes": 25748
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/docs-final.log",
+    "sha256": "19ebe2ac9b94adddd16d7cbc456f05b7e2043bf9ae995b17e9faba5ce19644cf",
+    "bytes": 121
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/docs.log",
+    "sha256": "19ebe2ac9b94adddd16d7cbc456f05b7e2043bf9ae995b17e9faba5ce19644cf",
+    "bytes": 121
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/electron-workspace-appearance.log",
+    "sha256": "0fd912bc8b4dca5eb9b3b9e02e8fb4df6e6e81cc0658b2cd5237dc02c81e6a31",
+    "bytes": 2006
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/electron-workspace-final.log",
+    "sha256": "8d8081a88c729d37260800c4ccd4fc44ccf0c1b11b50b17bd71d33f1450fa0a0",
+    "bytes": 2006
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/electron.log",
+    "sha256": "8e0dee75252e3f8cce7bdac279f1ca20eb6aa7949294127447d7af96fa89c5f4",
+    "bytes": 10650
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/final-desktop-types.log",
+    "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+    "bytes": 15
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/final-e2e-lint.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/lint.log",
+    "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+    "bytes": 11
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/test.log",
+    "sha256": "836fb965de717660c768fcf54985e37ecc660e4b705cf9bb6eb323b0aa6acc17",
+    "bytes": 68657
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/typecheck.log",
+    "sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+    "bytes": 612
+  },
+  {
+    "path": "evidence/qa/intake-unified-workspace/workspace.log",
+    "sha256": "b3af70f11026580e1087abf13bb953fae403811f0bca1dd1b1cefad477765f29",
+    "bytes": 226
+  }
+]

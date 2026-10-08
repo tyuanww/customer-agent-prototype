@@ -97,7 +97,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     const sourceChoice = await sources.getByRole('option').filter({ hasText: 'source-a' }).getAttribute('value');
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-intake-start.png') });
     await expect(dashboard.getByTestId('dashboard-shell')).toBeVisible();
-    await expect(dashboard.getByRole('tab')).toHaveCount(1);
+    await expect(dashboard.getByRole('tab')).toHaveCount(5);
     await expect(dashboard.getByTestId('nav-content')).toHaveAttribute('aria-selected', 'true');
     async function appearance(mode: 'light' | 'dark') {
       await dashboard.getByTestId('dashboard-theme-trigger').click();
@@ -192,6 +192,13 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     async function confirmSourceAndCheck(version: number) {
     await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill(`synthetic-export-${version}`);
     await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');
+    // The original content workspace stays mounted while the same window visits
+    // other modules. Unsaved source evidence must survive without a write.
+    await dashboard.getByTestId('nav-overview').click();
+    await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'overview');
+    await dashboard.getByTestId('nav-content').click();
+    await expect(dashboard.getByRole('textbox', { name: '来源版本', exact: true })).toHaveValue(`synthetic-export-${version}`);
+    await expect(dashboard.getByRole('textbox', { name: '来源确认说明', exact: true })).toHaveValue('已人工核对本轮合成导出及三条材料');
     await dashboard.getByRole('button', { name: '确认来源版本', exact: true }).click();
     await expect(dashboard.getByText('本次操作结果：来源已确认', { exact: false })).toBeVisible();
     await expect(dashboard.getByRole('button', { name: '发起组织审批', exact: true })).toHaveCount(0);
@@ -237,6 +244,11 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     const beforeCancel = (await host.status()).requests.filter(p => p.endsWith('/publish')).length;
+    await dashboard.getByTestId('nav-sop').click();
+    await expect(dashboard.getByTestId('dashboard-content')).toContainText('未接入');
+    await dashboard.getByTestId('nav-content').click();
+    await expect(dashboard.getByRole('textbox', { name: '发布标题', exact: true })).toHaveValue('合成桌面实链发布');
+    expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);
     await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
     await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toBeEnabled();
     expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);

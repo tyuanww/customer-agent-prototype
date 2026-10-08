@@ -13,7 +13,7 @@ export type IntakeUploadView = {
   draftRevision: number; phase: IntakeUploadPhase; busy: boolean; authorized: boolean; validUntil: string | null;
   /** Display only. Main retains the complete old key; renderer cannot replace it. */
   revisionOf: { candidateId: string; version: number } | null;
-  sources: { selection: string; label: string }[]; sourceSelection: string | null;
+  sources: { selection: string; label: string; domain: 'product' | 'campaign' | 'presale' | 'aftersale' }[]; sourceSelection: string | null;
   file: { name: string; bytes: number } | null;
   principals: { selection: string; displayLabel: string; enabled: boolean }[];
   preparerSelection: string | null; editorSelections: string[]; confirmed: boolean;

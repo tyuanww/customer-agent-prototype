@@ -470,6 +470,19 @@ pnpm test:intake:desktop
 另一个 [Electron 管理 wire 测试](../apps/desktop/tests/e2e/content-intake-management.spec.ts)使用自有合成 HTTP 替身，验证未知质量回执恢复、原生确认取消/提交与 sandbox 边界；它不替代上述真实 HTTP/PG 发布产物被另一客服消费的证据。
 
 
+## FAQ 统一工作台
+
+`pnpm test:intake:desktop` 包含原上传/回退/权限配置/店铺目录，以及[四域工作台测试](../apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts)。实际受限 HTTP/PG15 先发布资料，Electron 的话术库按产品/活动/售前/售后归类读取同一产物；系统同步展示相同发布版本，撤权后刷新清空正文。Dashboard 刷新不能破坏 Query 的既有合法复制资格，禁止走旧公告/内容/话术/SOP适配器。原上传和权限测试还验证跨导航保留未提交输入及预览。完整截图保存在 ignored `.gstack/intake-workspace/`；光暗和最小窗口证据不替代办公 Windows 与人工系统窗验收。
+
+目录只表示当前店铺、商品、场景条件下可读内容。无条件维度只读通用内容，不能据此声称全库同步。定向边界测试：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-catalog.test.ts tests/unit/content-intake-catalog-ipc.test.ts tests/component/intake-library.test.tsx tests/component/intake-dashboard-shell.test.tsx
+```
+
+本次证据、命令、跳过项及已知预算失败见[统一工作台记录](../evidence/qa/intake-unified-workspace/README.md)。
+
+
 ## FAQ 纠正回退
 
 `pnpm test:intake:desktop` 同时运行原生上传闭环和[纠正回退测试](../apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts)。回退用例先经实际上传、来源确认和人工质量检查直发两版，再从工作台预览上一版全部影响，由 Main 原生二次确认：取消时发布数不变，确认后创建新 release；另一普通客服查询、比对并复制历史原文。测试检查未发起任何 review HTTP 请求、数据库审批绑定和审批事实均为0；光暗截图在 `.gstack/intake-synthetic/rollback-*`，等待主题过渡完成且核对无页面横向溢出。原生对话框仍用受控响应，不声称真人 OS 点击或跨平台 GUI 验收。
