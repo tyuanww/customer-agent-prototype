@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "task": "intake-size-closeout",
+  "baseline": "01d7a0c6ef965a7e36a0578168b92d04038ea298",
+  "environment": {
+    "platform": "macOS arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "dependencies": "fresh worktree pnpm auto materialized 657 packages from existing store; zero download; lock unchanged"
+  },
+  "commands": [
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/workspace-hygiene.test.ts -t 'growing rebuildable'",
+      "exitCode": 1,
+      "result": "expected red: 12 FAIL / 29 SKIP on pre-fix classifier",
+      "log": "red.log",
+      "sha256": "4d424aae2f3fa329288f478d0e8028499ea02cf235b3eb3426382c65d07cb6c7"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/workspace-hygiene.test.ts",
+      "exitCode": 0,
+      "result": "41 PASS",
+      "log": "green.log",
+      "sha256": "2b1d438bc821fb94d2f57822e59c605438f7113e96a4780a35e1c7e94107aff2"
+    },
+    {
+      "command": "pnpm exec eslint scripts/workspace-hygiene.mjs apps/desktop/tests/unit/workspace-hygiene.test.ts",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": "lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop typecheck",
+      "exitCode": 2,
+      "result": "fresh worktree missing package/API dist; no product code change",
+      "log": "typecheck.log",
+      "sha256": "0e66427eed1e1f51d2f210c3748bcd9f6f515e383450ae6b61041309cb3a2293"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "result": "PASS; isolated worktree output",
+      "log": "build.log",
+      "sha256": "aca5eb09a6754fef7bac47865ee818f50e8f9db3ad0ae13abd607a8e83956633"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop typecheck",
+      "exitCode": 0,
+      "result": "PASS after build",
+      "log": "typecheck-after-build.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "command": "node --test evidence/qa/intake-size-closeout/budget-candidate.test.mjs",
+      "exitCode": 0,
+      "result": "candidate only 6 PASS; not applied",
+      "log": "budget-candidate-test.log",
+      "sha256": "4ea8a3be1d2fa27c9ae22051932d6244587b9aeea6e1c56099abe82c21f3e934"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 1,
+      "result": "32 MiB source budget FAIL; root policy PASS",
+      "log": "workspace-after.log",
+      "sha256": "423a525fb030b34427de62427275a20d1306bf9f323b3a1041419bd753a2a323"
+    },
+    {
+      "command": "pnpm exec eslint scripts/workspace-hygiene.mjs apps/desktop/tests/unit/workspace-hygiene.test.ts evidence/qa/intake-size-closeout/*.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": "lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 1,
+      "result": "13 pre-existing .gstack evidence targets absent in fresh worktree; new README references valid",
+      "log": "docs-final.log",
+      "sha256": "f1df31530ef3088e508c8f0006ec4ad5011db5ca289a31e141f92628633fcea1"
+    }
+  ],
+  "inputFingerprints": [
+    {
+      "path": "scripts/workspace-hygiene.mjs",
+      "sha256": "1393c8d6db2bd0b71acf6b5d11ff6c79887efb8c287bf30708c734bf008f8fbf"
+    },
+    {
+      "path": "apps/desktop/tests/unit/workspace-hygiene.test.ts",
+      "sha256": "61ad4cf95e6f7b662591642a46f50f5c0b10e4805ccfc08ffb901414b0e7c2c7"
+    },
+    {
+      "path": "package.json",
+      "sha256": "988f141eb7f362f259f5a1f6541008cdfc051a36dacbcd9b438064f8f0d792a4"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "2644b175dc2d784f232de0ea6a3198a39d11a650777dba26c42b8c09218e9e10"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "sha256": "0ad47d29854d228b36907a481de044ca0b759000dc5c0aae6c26ec0d79a201e4"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "c148d486f597c1448cba6867b28eb8b6620e8370ff2ab0288e580facc31fbbb0"
+    },
+    {
+      "path": "evidence/qa/intake-size-closeout/inventory.mjs",
+      "sha256": "a4902f11322d5c7a0e2e5ce88c031afa1d9b7846984e0f6c54e5361f2a56506b"
+    },
+    {
+      "path": "evidence/qa/intake-size-closeout/budget-policy-candidate.patch",
+      "sha256": "5d3ebb63ebf549dcf5632971d19c7fdc27276d318e95a6003402eefb91521937"
+    },
+    {
+      "path": "evidence/qa/intake-size-closeout/budget-candidate.test.mjs",
+      "sha256": "29ac8f6f53253328bda4c1db908cac6d51fab17a71cdc6ad71c471e688551cbc"
+    }
+  ],
+  "review": {
+    "scope": "workspace classifier, regression and budget candidate only",
+    "findings": "misclassified known outputs corrected; active default remains 32 MiB; no outstanding scoped code defect",
+    "fullExternalReview": "INCOMPLETE; no historical review rerun"
+  },
+  "unrun": [
+    "root lint/test (scoped tool change; module test and eslint run)",
+    "PG/API/UI/runtime tests (no runtime or contract change)",
+    "Mac/Windows package acceptance"
+  ],
+  "remainingDecision": "Accept or reject separate source20/contract15/evidence10 MiB caps and aggregate45 MiB candidate; not enabled by this commit.",
+  "scopedDocs": "PASS: all relative references in this task README resolve",
+  "diffCheck": "PASS",
+  "finalWorkspaceCheck": "38.2 MiB / 32 MiB after adding current task evidence, FAIL; root policy PASS"
+}

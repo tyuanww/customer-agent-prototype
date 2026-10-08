@@ -148,6 +148,55 @@ describe('workspace hygiene', () => {
     expect(result.remainderBytes).toBeLessThan(result.remainderBudgetBytes);
   });
 
+  it.each([
+    'packages/contracts/dist/index.js',
+    'packages/content-intake/dist/workbook.js',
+    'packages/retrieval-core/dist/index.js',
+    'packages/contracts/node_modules/tool/runtime.js',
+    'packages/content-intake/node_modules/tool/runtime.js',
+    'packages/retrieval-core/node_modules/tool/runtime.js',
+    'apps/desktop/build/icon.png',
+    'apps/desktop/build/icon.ico',
+    'apps/desktop/build/icon.icns',
+    'build/icon.png',
+    'build/icon.ico',
+    'build/icon.icns',
+  ])('keeps growing rebuildable output out of the source budget: %s', (relativePath) => {
+    const root = createWorkspaceFixture();
+    const target = path.join(root, relativePath);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, 'small');
+    const before = checkWorkspaceBudget(root);
+
+    writeFileSync(target, Buffer.alloc(128 * 1024, 'x'));
+    const after = checkWorkspaceBudget(root, { remainderBudgetBytes: before.remainderBytes });
+
+    expect(after.totalBytes).toBeGreaterThan(before.totalBytes);
+    expect(after.remainderBytes).toBe(before.remainderBytes);
+    expect(after.pass).toBe(true);
+  });
+
+  it.each([
+    'contracts/upstream/customer-agent/frozen/schema.sql',
+    'packages/database/migrations/0001_frozen.sql',
+    'packages/contracts/src/generated/openapi.generated.ts',
+    'evidence/qa/frozen.log',
+    'apps/desktop/build/entitlements.mac.plist',
+    'apps/desktop/build/unrecognized.bin',
+  ])('continues to count protected inputs and unknown outputs: %s', (relativePath) => {
+    const root = createWorkspaceFixture();
+    const target = path.join(root, relativePath);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, 'small');
+    const before = checkWorkspaceBudget(root);
+
+    writeFileSync(target, Buffer.alloc(128 * 1024, 'x'));
+    const after = checkWorkspaceBudget(root, { remainderBudgetBytes: before.remainderBytes });
+
+    expect(after.remainderBytes).toBeGreaterThan(before.remainderBytes);
+    expect(after.pass).toBe(false);
+  });
+
   it('pins the root toolchain and declares the staged monorepo targets', () => {
     const root = createWorkspaceFixture();
     const result = checkWorkspacePolicy(root);

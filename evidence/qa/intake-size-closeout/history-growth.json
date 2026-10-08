@@ -1,0 +1,255 @@
+{
+  "method": "git ls-tree -rlz; raw blob logical bytes, includes all tracked files and does not estimate allocated filesystem blocks",
+  "commits": {
+    "54f428ca": {
+      "logicalBytes": {
+        "source": 15020770,
+        "contracts": 10829783,
+        "evidence": 6925427
+      },
+      "total": 32775980
+    },
+    "f6f8cf35": {
+      "logicalBytes": {
+        "source": 15099354,
+        "contracts": 12061175,
+        "evidence": 7262305
+      },
+      "total": 34422834
+    },
+    "89bca38": {
+      "logicalBytes": {
+        "source": 15150974,
+        "contracts": 13299467,
+        "evidence": 7435316
+      },
+      "total": 35885757
+    },
+    "01d7a0c": {
+      "logicalBytes": {
+        "source": 15152051,
+        "contracts": 13299467,
+        "evidence": 7448515
+      },
+      "total": 35900033
+    }
+  },
+  "deltas": [
+    {
+      "from": "54f428ca",
+      "to": "f6f8cf35",
+      "totalLogicalBytes": 1646854,
+      "largest": [
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/schema-v1.24.sql",
+          "deltaLogicalBytes": 705427
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/openapi.v1.yaml",
+          "deltaLogicalBytes": 423919
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/test-reviewed-final.log",
+          "deltaLogicalBytes": 70476
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/test-final.log",
+          "deltaLogicalBytes": 68351
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-shop-directory.v1.sql",
+          "deltaLogicalBytes": 44220
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/package-build.log",
+          "deltaLogicalBytes": 30817
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/package-inputs.json",
+          "deltaLogicalBytes": 29068
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/build-final.log",
+          "deltaLogicalBytes": 26535
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/legacy-permission-failure.log",
+          "deltaLogicalBytes": 25926
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/checks.json",
+          "deltaLogicalBytes": 17997
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-acl.v1.sql",
+          "deltaLogicalBytes": 17007
+        },
+        {
+          "path": "apps/api/tests/intake-csv-http.integration.test.ts",
+          "deltaLogicalBytes": 11841
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/db-manifest-delta.json",
+          "deltaLogicalBytes": 8898
+        },
+        {
+          "path": "packages/content-intake/experiments/csv/candidate.ts",
+          "deltaLogicalBytes": -8402
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-organization.v1.sql",
+          "deltaLogicalBytes": 7893
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/csv-formal-api-format-final.log",
+          "deltaLogicalBytes": 7891
+        },
+        {
+          "path": "packages/content-intake/src/csv.ts",
+          "deltaLogicalBytes": 7859
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/package-checks.json",
+          "deltaLogicalBytes": 7603
+        },
+        {
+          "path": "evidence/qa/intake-csv-runtime/README.md",
+          "deltaLogicalBytes": 6991
+        },
+        {
+          "path": "packages/database/src/generated/migrations.generated.ts",
+          "deltaLogicalBytes": 6492
+        }
+      ],
+      "groups": {
+        "contracts": 1231392,
+        "evidence": 336878,
+        "source": 78584
+      }
+    },
+    {
+      "from": "f6f8cf35",
+      "to": "89bca38",
+      "totalLogicalBytes": 1462923,
+      "largest": [
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/schema-v1.25.sql",
+          "deltaLogicalBytes": 706504
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/openapi.v1.yaml",
+          "deltaLogicalBytes": 423919
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/test.log",
+          "deltaLogicalBytes": 71774
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-shop-directory.v1.sql",
+          "deltaLogicalBytes": 44220
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/build.log",
+          "deltaLogicalBytes": 27348
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-acl.v1.sql",
+          "deltaLogicalBytes": 17007
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/checks.json",
+          "deltaLogicalBytes": 15084
+        },
+        {
+          "path": "apps/desktop/tests/unit/customer-agent-contract-set.test.ts",
+          "deltaLogicalBytes": 13490
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/preflight-red.log",
+          "deltaLogicalBytes": 9969
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/database-pg15.log",
+          "deltaLogicalBytes": 8919
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/preflight-green.log",
+          "deltaLogicalBytes": 8405
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-organization.v1.sql",
+          "deltaLogicalBytes": 7893
+        },
+        {
+          "path": "scripts/customer-agent-contract-set.mjs",
+          "deltaLogicalBytes": 6847
+        },
+        {
+          "path": "packages/database/tests/postgres.integration.test.ts",
+          "deltaLogicalBytes": 6449
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/README.md",
+          "deltaLogicalBytes": 6269
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-csv-installation.v1.json",
+          "deltaLogicalBytes": 5561
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-directory-acl.v1.sql",
+          "deltaLogicalBytes": 5378
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/api-pg15.log",
+          "deltaLogicalBytes": 5378
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-csv-format.v1.sql",
+          "deltaLogicalBytes": 5283
+        },
+        {
+          "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/contract-set.json",
+          "deltaLogicalBytes": 5170
+        }
+      ],
+      "groups": {
+        "contracts": 1238292,
+        "evidence": 173011,
+        "source": 51620
+      }
+    },
+    {
+      "from": "89bca38",
+      "to": "01d7a0c",
+      "totalLogicalBytes": 14276,
+      "largest": [
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/grok-external-review-2026-10-09.md",
+          "deltaLogicalBytes": 9331
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/review.json",
+          "deltaLogicalBytes": 3187
+        },
+        {
+          "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+          "deltaLogicalBytes": 742
+        },
+        {
+          "path": "evidence/qa/intake-legacy-acl-runtime/README.md",
+          "deltaLogicalBytes": 681
+        },
+        {
+          "path": "TODOS.md",
+          "deltaLogicalBytes": 335
+        }
+      ],
+      "groups": {
+        "contracts": 0,
+        "evidence": 13199,
+        "source": 1077
+      }
+    }
+  ]
+}
