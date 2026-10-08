@@ -337,3 +337,6 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 ### D5 合成整链
 
 `apps/api/tests/backend-runtime.e2e.test.ts` 在同一 PG15 进程链上跑导入、worker、审核、发布、回退，并用桌面 `ProductSession` / `ProductAnnounce` / `ProductSearch` 经 loopback 查询与复制。回退后旧候选 STALE；退出后本地会话清空。不经 Dashboard，不启动跨仓 runner。
+
+
+`apps/api/experiments/intake-runtime/session-lock.sql` 是身份会话锁的离线 SQL 候选，仅由隔离 PG15 测试安装到一次性数据库的隔离 schema。它验证身份 owner 持锁、用途账号仅 EXECUTE 的边界；不属于 migration、生产构建或运行装配，现有 `transaction.ts::lockProductSession` 尚未改接。字段与正式采用条件见[接入交接](reference-content-intake-p2-contract-handoff.md#2026-10-08-接续核对原生输入与会话锁权限)，实际结果见[实验验收](../evidence/qa/intake-runtime-boundary/README.md)。

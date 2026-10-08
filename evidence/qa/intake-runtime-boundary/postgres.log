@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-runtime-boundary.integration.test.ts (4 tests) 4425ms
+   ✓ intake runtime session-lock permission boundary (synthetic only) > can SELECT the synthetic session but cannot lock it with SELECT-only privileges  992ms
+   ✓ intake runtime session-lock permission boundary (synthetic only) > demonstrates why granting security-column UPDATE just to satisfy row locks is unsafe  908ms
+   ✓ intake runtime session-lock permission boundary (synthetic only) > fails closed before a business callback and leaves the pool reusable when runtime privileges are missing  1600ms
+   ✓ intake runtime session-lock permission boundary (synthetic only) > keeps the candidate read/lock role out of identity writes, authority, publication and DDL  924ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  11:39:20
+   Duration  4.96s (transform 197ms, setup 0ms, collect 332ms, tests 4.42s, environment 0ms, prepare 57ms)
+
