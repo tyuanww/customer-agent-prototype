@@ -1,0 +1,396 @@
+{
+  "tested_runtime_commit": "b091c9e8de1149cd69d102e80243b884697a237c",
+  "version": "0.3.26",
+  "runtime_source_changed": false,
+  "test_harness_final_sha256": "ad42ceb01d9d71eddb840978a21b0dbb09f52d89efe922a90824ea503e9f40ae",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "electron": "43.4.0",
+    "os": "macOS arm64",
+    "macos": "26.5.2"
+  },
+  "captures": [
+    {
+      "capture": "001",
+      "name": "package",
+      "exit_code": 0,
+      "argv": [
+        "pnpm",
+        "package:mac:local"
+      ],
+      "started_at": "2026-10-08T13:21:04.104Z",
+      "completed_at": "2026-10-08T13:21:53.263Z",
+      "files": [
+        {
+          "path": "package.stdout.log",
+          "sha256": "fbb62a6e0305ddf5b832d8a3267b638a7b9ea174085a806e5e706686018abb43"
+        },
+        {
+          "path": "package.stderr.log",
+          "sha256": "8e2107b227e8c88f93fa2581ecf3b3f7383d0ae43894efaefd884e6867c671e5"
+        }
+      ]
+    },
+    {
+      "capture": "002",
+      "name": "install-dmg",
+      "exit_code": 0,
+      "argv": [
+        "python3",
+        ".gstack/qa-reports/intake-mac-package-20261008/install-dmg.py"
+      ],
+      "started_at": "2026-10-08T13:29:08.048Z",
+      "completed_at": "2026-10-08T13:29:13.765Z",
+      "files": [
+        {
+          "path": "install-dmg.stdout.log",
+          "sha256": "75c707b77e13e69c583078a95c43ec10c1c939a1dc95a61aa95b86c215be631a"
+        },
+        {
+          "path": "install-dmg.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "capture": "003",
+      "name": "packaged-first-path-alias",
+      "exit_code": 1,
+      "argv": [
+        "env",
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1",
+        "CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+        "INTAKE_REAL_STACK_SCREENSHOT_DIR=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/screenshots",
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-real-stack.spec.ts"
+      ],
+      "started_at": "2026-10-08T13:30:20.482Z",
+      "completed_at": "2026-10-08T13:30:31.014Z",
+      "files": [
+        {
+          "path": "packaged-first-path-alias.stdout.log",
+          "sha256": "1c5008f30794ff39571b575c37be334a2b5df1315c9cbceb04d076a7213072dd"
+        },
+        {
+          "path": "packaged-first-path-alias.stderr.log",
+          "sha256": "ff3e600057067671b2bc15aea42bf29a2952d9e5779cdf286fc4abc7d240236b"
+        }
+      ]
+    },
+    {
+      "capture": "004",
+      "name": "packaged-final",
+      "exit_code": 0,
+      "argv": [
+        "env",
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1",
+        "CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+        "INTAKE_REAL_STACK_SCREENSHOT_DIR=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/screenshots-final",
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-real-stack.spec.ts"
+      ],
+      "started_at": "2026-10-08T13:32:09.927Z",
+      "completed_at": "2026-10-08T13:32:28.672Z",
+      "files": [
+        {
+          "path": "packaged-final.stdout.log",
+          "sha256": "7ff42ff177e345cd05496b928967b2acf21cd0fcca4ee4600f9c168b7a817de5"
+        },
+        {
+          "path": "packaged-final.stderr.log",
+          "sha256": "99a8dfec89152995dd9755672d736a87c1fae35592141047e995c609dd5f4bae"
+        }
+      ]
+    },
+    {
+      "capture": "005",
+      "name": "native-first-input-unknown",
+      "exit_code": 1,
+      "argv": [
+        "env",
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1",
+        "CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+        "INTAKE_REAL_STACK_SCREENSHOT_DIR=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/native-screenshots",
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "--config",
+        "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/native.config.ts"
+      ],
+      "started_at": "2026-10-08T13:36:21.043Z",
+      "completed_at": "2026-10-08T13:38:10.151Z",
+      "files": [
+        {
+          "path": "native-first-input-unknown.stdout.log",
+          "sha256": "8e777d8ef46a264670bc54582c7aabb74573bf22b5fb182bb4f4416e527e597e"
+        },
+        {
+          "path": "native-first-input-unknown.stderr.log",
+          "sha256": "a6ab4421b03cfdfb58a07515cbd16bd2c221f404f5085f64fcb3c6179a8b0deb"
+        }
+      ]
+    },
+    {
+      "capture": "006",
+      "name": "native-final",
+      "exit_code": 0,
+      "argv": [
+        "env",
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1",
+        "CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+        "INTAKE_REAL_STACK_SCREENSHOT_DIR=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/native-final",
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "--config",
+        "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/native.config.ts"
+      ],
+      "started_at": "2026-10-08T13:40:14.498Z",
+      "completed_at": "2026-10-08T13:41:04.886Z",
+      "files": [
+        {
+          "path": "native-final.stdout.log",
+          "sha256": "09f4d8a20a5e5c89632f860708f900d0e23f1d0b0b009e52418aa506a36dc410"
+        },
+        {
+          "path": "native-final.stderr.log",
+          "sha256": "535159ce7dbe276c7e4ec2cac88a484920359f35c099bf7159a8164c4899dec9"
+        }
+      ]
+    }
+  ],
+  "inputs": {
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "ad42ceb01d9d71eddb840978a21b0dbb09f52d89efe922a90824ea503e9f40ae",
+    "apps/api/tests/support/intake-synthetic-host.ts": "1ee53cbd7476a84de5d4039ff85ecfa24172208abda333b648ad21bfeba29a08",
+    "apps/desktop/src/main/product-runtime-config.ts": "202e8b513e052bc2dfb1d07e8d0db23fff807a5db8320a8fbe7a34712970e7fd",
+    "apps/desktop/src/main/content-intake-native-files.ts": "8c15bb07843caf6ad290a2461e1266b3f3ae08a352e7295b9b90e8a2a7529e5f",
+    "apps/desktop/package.json": "0ad47d29854d228b36907a481de044ca0b759000dc5c0aae6c26ec0d79a201e4",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78"
+  },
+  "artifacts": [
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-dialog.spec.ts",
+      "sha256": "e10eaf51c55e6a83c9b0ab7069d3c602a8833587ce770e7b672bd5ac3173cdc9",
+      "bytes": 20886
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native.config.ts",
+      "sha256": "27a8fab283230b63910fb6c25ee2defcfb7d0f06ef03d711e2f0a6f67724c158",
+      "bytes": 209
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/install-dmg.py",
+      "sha256": "289036837bf64cc368a38fd33beddf4440858949659cbd6946392c3ec6206be1",
+      "bytes": 1725
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-cancelled.png",
+      "sha256": "6a8c1bf5bf59a33affdcbd52672d12d800b374fd03cef012803d044ff160a76f",
+      "bytes": 202866
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-dark.json",
+      "sha256": "8eed69f2be744956c7d47870176b080aaf1b01561ab121138a25967f228ce96f",
+      "bytes": 220
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-dark.png",
+      "sha256": "d5350e4c0234d0b27b5c164bf84e1b3928f92d922b7990f6d920ee4f5c13c5e5",
+      "bytes": 240569
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-declaration-dark.json",
+      "sha256": "8eed69f2be744956c7d47870176b080aaf1b01561ab121138a25967f228ce96f",
+      "bytes": 220
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-declaration-dark.png",
+      "sha256": "b31d1e4c4d20d6bfc88dacdcb61e634a3c6b7e412540688b373b7b35d7a02f4c",
+      "bytes": 230547
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-light.json",
+      "sha256": "005d135e8cea28a90e5d7211390861ea15ef7be54345f183a3caeec63309b092",
+      "bytes": 222
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-light.png",
+      "sha256": "b5dc9d28b8f1caa132a1aa254adfc94a94b4a5169d195811e65d04b14e844728",
+      "bytes": 238760
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-minimum-dark.json",
+      "sha256": "98356d21df13ea3c23c71bbd4f4e611609eae0f76fed7a88ce845f7cdeb3eb3e",
+      "bytes": 219
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-minimum-dark.png",
+      "sha256": "422e7a9eeb5e66d31997fa0ed4441d2e91f51626ec7763cdbbd82a9c795c9ac6",
+      "bytes": 225383
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-intake-start.png",
+      "sha256": "754b0bc63f984d220e13dc136bd26787536c7e06ca773ad6353238278a30fc8c",
+      "bytes": 238437
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-published.png",
+      "sha256": "2997d60deaea2bf7e4643234459c69eca9039310ad708b2d41b19b9769f57a5c",
+      "bytes": 216400
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-revision-v2.png",
+      "sha256": "9e1de0ee4adb54c0cd148b65366574269df1fb5e88a77d8704d996204d23b8c0",
+      "bytes": 207500
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-upload-error-report.png",
+      "sha256": "23bc75ebeabb6543b2e9de57fc540d43042f9c902e9e17ff0ba1fa71aa0d53ae",
+      "bytes": 275080
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/dashboard-uploaded-material.png",
+      "sha256": "37396d1ba3bd393967a93fb2fdcf2fcf201371ea43e5faf6b0f72687a8f88e5e",
+      "bytes": 214738
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/packaged-identity.json",
+      "sha256": "58657e3ebf88ccac4c105ae0974f31a9d104c38cfa66f7b6de958a293e0a2bb6",
+      "bytes": 575
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/screenshots-final/query-published-faq.png",
+      "sha256": "56463a5b9f8f415b96c124b3afd7c8ee43288dcac160b20b191747b30f38b77b",
+      "bytes": 237116
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/cancel-ready.json",
+      "sha256": "8e24476af30d4fb5b7149c5c0968fcb33070a4bf323f133de1c1bfa777e296fa",
+      "bytes": 52
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/confirm-ready.json",
+      "sha256": "6e6716b40e308ad89c3995bbd0ff8a4e50e31c1e89641f75de1eb25f47ea0adb",
+      "bytes": 53
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-intake-dark.json",
+      "sha256": "8eed69f2be744956c7d47870176b080aaf1b01561ab121138a25967f228ce96f",
+      "bytes": 220
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-intake-dark.png",
+      "sha256": "d5350e4c0234d0b27b5c164bf84e1b3928f92d922b7990f6d920ee4f5c13c5e5",
+      "bytes": 240569
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-intake-light.json",
+      "sha256": "005d135e8cea28a90e5d7211390861ea15ef7be54345f183a3caeec63309b092",
+      "bytes": 222
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-intake-light.png",
+      "sha256": "b5dc9d28b8f1caa132a1aa254adfc94a94b4a5169d195811e65d04b14e844728",
+      "bytes": 238760
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-intake-minimum-dark.json",
+      "sha256": "98356d21df13ea3c23c71bbd4f4e611609eae0f76fed7a88ce845f7cdeb3eb3e",
+      "bytes": 219
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-intake-minimum-dark.png",
+      "sha256": "422e7a9eeb5e66d31997fa0ed4441d2e91f51626ec7763cdbbd82a9c795c9ac6",
+      "bytes": 225383
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-intake-start.png",
+      "sha256": "754b0bc63f984d220e13dc136bd26787536c7e06ca773ad6353238278a30fc8c",
+      "bytes": 238437
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/dashboard-uploaded-material.png",
+      "sha256": "5898ca5575dff87be2e9a75e1c13e6c3f3fb939bd322145fbe2edb44420252d4",
+      "bytes": 214737
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/native-control.json",
+      "sha256": "7a18b75223b991cc4450974ab178fbbc2831b586d9fee55e80b9d9a6384ea4ea",
+      "bytes": 122
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/native-observations.json",
+      "sha256": "ad0167f1552600e00acc2c9714bd18e703f4f2a86650d67f6e1ca817501ed504",
+      "bytes": 3512
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/native-published.png",
+      "sha256": "10fc2f2ccbe3ea0c5c7ba70c7f4b3ddb35f7699231acf00ff8856c065c868cf1",
+      "bytes": 216016
+    },
+    {
+      "path": ".gstack/qa-reports/intake-mac-package-20261008/native-final/packaged-identity.json",
+      "sha256": "31f434c3ae39ff506f6c9ae81b813cc359a97c7412f14568fb56a7abdda61981",
+      "bytes": 575
+    }
+  ],
+  "native_cua_actions": [
+    {
+      "action": "cancel",
+      "at": "2026-10-08T13:40:50.394Z",
+      "button_index": 3
+    },
+    {
+      "action": "confirm",
+      "at": "2026-10-08T13:41:03.799Z",
+      "button_index": 4
+    }
+  ],
+  "verification": {
+    "targeted_eslint": "PASS",
+    "desktop_typecheck": "PASS",
+    "root_lint_typecheck_test_build": "REUSED b091c9e runtime unchanged; package command rebuilt services and desktop",
+    "docs_check": "PASS: 234 Markdown files",
+    "workspace_check": "FAIL: source remainder 36.7 MiB / 32.0 MiB; root policy PASS; no cleanup or threshold change"
+  },
+  "qa_aggregate": "inconclusive: capture 003 superseded; same scenario passed as 004 with a distinct screenshot destination; native 005 remains inconclusive; native 006 passed",
+  "external_review": "No new call; prior reviewed runtime unchanged; historical full /review INCOMPLETE",
+  "final_check_logs": [
+    {
+      "path": "docs-check.log",
+      "sha256": "858dc47a8ef61cf93d9826e4a97334e3c01173b2ab5509bed7b902b8c4c29312"
+    },
+    {
+      "path": "workspace-check.log",
+      "sha256": "5b203ab31c8b3ddac1c6a2f3a156e1a60979a6b91edb745fe1f710fa9aafe70f"
+    }
+  ],
+  "local_review": {
+    "scope": "new packaged E2E branch, four docs and Mac evidence only",
+    "required_fixes": 0,
+    "verified_fingerprints": 51,
+    "external_review": false
+  }
+}

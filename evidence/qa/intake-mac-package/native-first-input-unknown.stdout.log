@@ -1,0 +1,41 @@
+
+Running 1 test using 1 worker
+
+{"status":"OWNED_RESOURCES","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-Hr0Tgo","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-j0WhoI"}
+{"status":"CUA_FILE_READY","file":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-j0WhoI/synthetic-corrected-faq.xlsx"}
+CUA_CANCEL_READY
+{"status":"FAILED","rendererErrors":[],"screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/native-screenshots"}
+{"status":"OWNED_RESOURCES_REMOVED","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-Hr0Tgo","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-j0WhoI"}
+  ✘  1 ../../.gstack/qa-reports/intake-mac-package-20261008/native-dialog.spec.ts:11:1 › packaged native file chooser and real cancellation/confirmation operated through CUA (1.8m)
+
+
+  1) ../../.gstack/qa-reports/intake-mac-package-20261008/native-dialog.spec.ts:11:1 › packaged native file chooser and real cancellation/confirmation operated through CUA 
+
+    Error: expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+        "cancelId": 0,
+        "defaultId": 0,
+    -   "response": 0,
+    +   "response": 1,
+      }
+
+      224 |     const nativeResponses = () => app!.evaluate(() => (globalThis as typeof globalThis & { nativeProbe: unknown[] }).nativeProbe);
+      225 |     await expect.poll(async () => (await nativeResponses()).length, { timeout: 90_000 }).toBe(1);
+    > 226 |     expect((await nativeResponses())[0]).toMatchObject({ response: 0, defaultId: 0, cancelId: 0 });
+          |                                          ^
+      227 |     expect((await host.status()).publications).toBe(0);
+      228 |     expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);
+      229 |     await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toBeEnabled();
+        at /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/native-dialog.spec.ts:226:42
+
+    Error Context: ../../test-results/native-dialog-packaged-nat-f6789-mation-operated-through-CUA/error-context.md
+
+  1 failed
+    ../../.gstack/qa-reports/intake-mac-package-20261008/native-dialog.spec.ts:11:1 › packaged native file chooser and real cancellation/confirmation operated through CUA 
+undefined
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test --config /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/native.config.ts
