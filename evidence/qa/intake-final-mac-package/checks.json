@@ -1,0 +1,266 @@
+{
+  "recorded_at": "2026-10-08T18:45:18.201795+00:00",
+  "status": "PARTIAL",
+  "reason": "Installed synthetic business loop passed using a 1180x680 test-only restore size. Unmodified acceptance failed at 1180x760 because current native display is below product minimum. Full device acceptance remains incomplete.",
+  "version": "0.3.26",
+  "build_head": "953a5552cac127df50b03bff5966962e4d1d0951",
+  "integration_head_at_comparison": "ba9279b90d522cb6b63ef5f0accf69c23e4f1f42",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "macos": "26.5.2",
+    "macos_build": "25F84",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "electron": "43.4.0",
+    "postgres": "15.18"
+  },
+  "commands": [
+    {
+      "command": "pnpm package:mac:local",
+      "exit_code": 0,
+      "log": "package-build.log",
+      "post_verification": "PASS local unsigned universal; no signing, notarization, update metadata or distribution"
+    },
+    {
+      "command": "hdiutil attach -readonly -nobrowse -mountpoint <owned mount> <new DMG>; ditto <mounted app> <owned installed>; hdiutil detach <owned mount>",
+      "exit_code": 0,
+      "log": "package-install.log",
+      "note": "Exact arguments in log; no system Applications replacement"
+    },
+    {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE=<installed-artifact.json executable> INTAKE_REAL_STACK_SCREENSHOT_DIR=<owned e2e> pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 1,
+      "seconds": 17.7,
+      "log": "package-e2e-original.log",
+      "failure": "Expected [1180,760], actual [1180,680]; rendererErrors=[]; no upload reached"
+    },
+    {
+      "command": "Same gated environment, executable and existing spec; temporary copy changed exactly the one restore size in compact-variant.diff; playwright test tests/e2e/content-intake-packaged-compact-20261009.spec.ts",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "seconds": 15.0,
+      "log": "package-e2e-compact.log",
+      "temporary_spec_removed": true
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exit_code": 1,
+      "log": "workspace-check.log",
+      "result": "This isolated branch predates A: source remainder 40.4 MiB / 32.0 MiB, root policy PASS. Main agent must run the combined post-A tree; this result cannot replace that tree's budget evidence."
+    }
+  ],
+  "migrations": {
+    "count": 35,
+    "last": "0035_intake_legacy_check_acl_v1_25",
+    "behavior": "Existing synthetic host calls applyDatabaseMigrations before seeding; no old nonempty catalogue constructed"
+  },
+  "result": {
+    "log": "package-e2e-compact.log",
+    "status": "PASS",
+    "profile": "purpose-runtime",
+    "inputFormat": "csv",
+    "purposeQueries": {
+      "business": 2157,
+      "usage": 427,
+      "worker": 40,
+      "organization": 30
+    },
+    "electron": "darwin",
+    "api": "actual",
+    "postgres": 15,
+    "nativeDialog": "controlled-path-and-confirmation-responses",
+    "upload": "actual-multipart",
+    "issueReport": "saved-and-read-with-exceljs",
+    "publicationPolicy": "direct-v1",
+    "approvalRows": 0,
+    "revision": "same-id-v2-fresh-evidence",
+    "cancellation": "server-confirmed-live-release-unchanged",
+    "ordinarySeat": true,
+    "releaseId": "rel_2",
+    "screenshots": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact"
+  },
+  "owned_resources_removed": [
+    {
+      "log": "package-e2e-original.log",
+      "status": "OWNED_RESOURCES_REMOVED",
+      "hostDirectory": "/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-9SogDU",
+      "desktopDirectory": "/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-NtwHHr"
+    },
+    {
+      "log": "package-e2e-compact.log",
+      "status": "OWNED_RESOURCES_REMOVED",
+      "hostDirectory": "/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-6tx5vs",
+      "desktopDirectory": "/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-5THrxG"
+    }
+  ],
+  "owned_resources_absent_after_test": true,
+  "dmg_detached": true,
+  "inputs_unchanged_after_build_and_test": {
+    "package_inputs": {
+      "matched": 235,
+      "different": []
+    },
+    "synthetic_runtime_inputs": {
+      "matched": 193,
+      "different": []
+    }
+  },
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 24,
+      "sha256": "45fb6649fd891d590100736ba94acef426f23223920447c41da4a7d7f276217b"
+    },
+    {
+      "path": "compact-variant.diff",
+      "bytes": 502,
+      "sha256": "d58c0c224cfe82a7ec5dee47022c0c73c59824f29a20991a193f757158257127"
+    },
+    {
+      "path": "compact-variant.json",
+      "bytes": 672,
+      "sha256": "536b58b98a6a6740212992dabba4de7b393a70a7f5863569e07cf986ce3c8a09"
+    },
+    {
+      "path": "display-probe.json",
+      "bytes": 218,
+      "sha256": "cb0587dd6180b25abbfd2fff93d50292f8d58b12243348e77ab2cd19b73029d3"
+    },
+    {
+      "path": "inputs.json",
+      "bytes": 51920,
+      "sha256": "c711d1fee6efac429016ab3a050c9c61da9df88e2cf956131edbcba35911258e"
+    },
+    {
+      "path": "installed-artifact.json",
+      "bytes": 1459,
+      "sha256": "4bbfda9ad1bd8c85b9d2f8b2fc8c3829f4e8315e9f002ab1cf31e6cb212e66fe"
+    },
+    {
+      "path": "package-build.log",
+      "bytes": 31922,
+      "sha256": "f4018fe0ee49c9a31b850444e80db0489fe1f74f9bc0676986731e8e31836a65"
+    },
+    {
+      "path": "package-e2e-compact.log",
+      "bytes": 1558,
+      "sha256": "d15dee247b3c8ae70852131d468112857d00f6905ffa5b2005d8d1bda6dfa01d"
+    },
+    {
+      "path": "package-e2e-original.log",
+      "bytes": 3039,
+      "sha256": "346badc670316cc93b015a6eca3db3af71add393093e7c7061941abba0b23454"
+    },
+    {
+      "path": "package-install.log",
+      "bytes": 2284,
+      "sha256": "268ddb1235d6b6721d4657204950dfe8120fae74e5b975cd58dc52d6df1c6c73"
+    },
+    {
+      "path": "packaged-identity.json",
+      "bytes": 597,
+      "sha256": "2d54ff06399cd6ec21c841052d6296d2ae81a10433e3450b7730fb5faad57e63"
+    },
+    {
+      "path": "workspace-check.log",
+      "bytes": 226,
+      "sha256": "d523c03998ff585b236933d7f94c96c846db8c9714eb53d1b94370440638cfed"
+    }
+  ],
+  "retained_compact_screenshots_and_layouts": [
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-cancelled.png",
+      "bytes": 196631,
+      "sha256": "5bf497decac79e790eed02cccfd77284a923949658a087ab5713fa8921b32ec9"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-dark.json",
+      "bytes": 219,
+      "sha256": "98356d21df13ea3c23c71bbd4f4e611609eae0f76fed7a88ce845f7cdeb3eb3e"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-dark.png",
+      "bytes": 239298,
+      "sha256": "e90f5692d3cea611df9caf6ef705df7e54ad6985288ec2c105b709f077d9628a"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-declaration-dark.json",
+      "bytes": 220,
+      "sha256": "bd1ce7d6a7bb93f624249427769a3354a8d40a41e07823db55b67db642846c99"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-declaration-dark.png",
+      "bytes": 220117,
+      "sha256": "6ea4104d3c5b3f8156e822ce44f2ef90c3ab9c999869c0f9a41a5734b1bfa108"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-light.json",
+      "bytes": 221,
+      "sha256": "3e4496d03e4027267d1e77508cacdfee08ef5e92bdb0b46b7bed9f095687e7f3"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-light.png",
+      "bytes": 238058,
+      "sha256": "06eb53b2934f08ea4dcc4c4f90b2b8729557d3581ae8355a8cc55ce455620ebb"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-minimum-dark.json",
+      "bytes": 219,
+      "sha256": "98356d21df13ea3c23c71bbd4f4e611609eae0f76fed7a88ce845f7cdeb3eb3e"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-minimum-dark.png",
+      "bytes": 239298,
+      "sha256": "e90f5692d3cea611df9caf6ef705df7e54ad6985288ec2c105b709f077d9628a"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-intake-start.png",
+      "bytes": 237768,
+      "sha256": "335b514154abd0422cefb1189e29838715e93ea7a87576b8b7558410e33f95bb"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-published.png",
+      "bytes": 200969,
+      "sha256": "014e7280d8aaf375ac7391634c3ac68d4d5f2a6cb00d369525959f9f1a649ec4"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-revision-v2.png",
+      "bytes": 193257,
+      "sha256": "23d2674d3a07217a4409f5369c78e84b039778504e2c6e8d596eddfdcccd5b67"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-upload-error-report.png",
+      "bytes": 270244,
+      "sha256": "cf2f7ae38432486d131b8e3872a7e16cda01a350209ca7c99024de017a162208"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/dashboard-uploaded-material.png",
+      "bytes": 199680,
+      "sha256": "f895b5dc25e9fcb198ac92a91ba140c52b4ad2ba0081a7a6386e332296d10fe5"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/packaged-identity.json",
+      "bytes": 597,
+      "sha256": "2d54ff06399cd6ec21c841052d6296d2ae81a10433e3450b7730fb5faad57e63"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e-compact/query-published-faq.png",
+      "bytes": 169632,
+      "sha256": "b6e2714f69939d4642e9088b1035996795be0353ac5e7efb09112351d911c56d"
+    }
+  ],
+  "not_verified": [
+    "Unmodified 1180x760 native acceptance on current 960x600 display",
+    "Human file chooser, confirmation, macOS focus/Dock/Stage Manager/Gatekeeper behavior",
+    "Nonempty legacy catalogue publish/rollback in packaged app",
+    "Fresh four-domain installed acceptance; this run is product FAQ domain",
+    "Windows native install/device acceptance",
+    "Real Feishu identities, real Menokin content, production assembly, signing, notarization or deployment",
+    "Full historical external /review; remains INCOMPLETE"
+  ],
+  "reuse_boundary": "Existing role, PG35/legacy ACL and four-domain evidence remains separate; not rerun or promoted to this installed run. Future final integration can reuse this package only after both input maps compare unchanged."
+}
