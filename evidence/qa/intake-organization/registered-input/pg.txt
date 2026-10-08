@@ -1,0 +1,36 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-org-runtime-candidate/customer-agent-prototype/apps/api
+
+ ✓ experiments/intake-organization/transport-consumer.integration.test.ts (4 tests) 4429ms
+   ✓ HTTP organization transport through the restricted writer and real usage > refreshes from the local HTTP double and does not extend the existing usage deadline  1452ms
+   ✓ HTTP organization transport through the restricted writer and real usage > invalidates old usage after a job change, a department change, and deactivation  1130ms
+   ✓ HTTP organization transport through the restricted writer and real usage > recovers an unknown commit only from the original snapshot, not from a later observation  941ms
+   ✓ HTTP organization transport through the restricted writer and real usage > keeps the previous facts and expiry when a later HTTP page fails  906ms
+ ✓ experiments/intake-organization/registered-refresh.integration.test.ts (10 tests) 10256ms
+   ✓ registered organization input through the existing atomic facts writer > reads registered identity, persists exact provenance atomically and rejects modified replay  1419ms
+   ✓ registered organization input through the existing atomic facts writer > revokes binding and facts atomically, denies old/new usage and rejects a pre-rebind snapshot  1146ms
+   ✓ registered organization input through the existing atomic facts writer > serializes concurrent identical observations and fences different provenance  937ms
+   ✓ registered organization input through the existing atomic facts writer > recovers a lost COMMIT from the original observation and original revocation only  942ms
+   ✓ registered organization input through the existing atomic facts writer > rolls fact and binding pointers back if evidence insertion or final deadline fails  1031ms
+   ✓ registered organization input through the existing atomic facts writer > rejects wrong scope and active rebinding; cancellation cannot create an observation  869ms
+   ✓ registered organization input through the existing atomic facts writer > revokes an expired active registration before registering a new identity  937ms
+   ✓ registered organization input through the existing atomic facts writer > recovers registration COMMIT without rebinding and rejects an open ID already assigned to another principal  851ms
+   ✓ registered organization input through the existing atomic facts writer > rolls an expired registration insert back at its final database-clock checkpoint  1262ms
+   ✓ registered organization input through the existing atomic facts writer > rejects cross-scope, invalid domains, non-finite timestamps and null provenance in SQL itself  862ms
+ ✓ tests/intake-organization.integration.test.ts (10 tests) 10838ms
+   ✓ offline organization refresh through frozen storage and real usage > refreshes with a non-owner writer; exact replay changes no deadline or generation and old lease stays bounded  1428ms
+   ✓ offline organization refresh through frozen storage and real usage > disables actual usage and an old enabled replay cannot restore it; role changes revoke the old qualification  1026ms
+   ✓ offline organization refresh through frozen storage and real usage > rejects stale, future, expired, malformed and cross-scope snapshots without mutation  887ms
+   ✓ offline organization refresh through frozen storage and real usage > serializes concurrent snapshots and refuses a newer version with an older observation  920ms
+   ✓ offline organization refresh through frozen storage and real usage > recovers a lost commit using the exact immutable version after writer recreation  870ms
+   ✓ offline organization refresh through frozen storage and real usage > rolls back an observation that expires after writing but before commit  1941ms
+   ✓ offline organization refresh through frozen storage and real usage > department changes remove access and do not rewrite grants or silently choose a role  872ms
+   ✓ offline organization refresh through frozen storage and real usage > consumes native-shaped observations through the restricted writer and revokes real usage on status/department change  916ms
+   ✓ offline organization refresh through frozen storage and real usage > produces no writable snapshot when a later directory page fails; facts and expiry remain unchanged  1119ms
+   ✓ offline organization refresh through frozen storage and real usage > has no write authority over identity, role policy, grants, history or publication  858ms
+
+ Test Files  3 passed (3)
+      Tests  24 passed (24)
+   Start at  17:25:02
+   Duration  11.96s (transform 434ms, setup 0ms, collect 2.00s, tests 25.52s, environment 1ms, prepare 462ms)
+

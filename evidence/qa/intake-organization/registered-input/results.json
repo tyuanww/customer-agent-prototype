@@ -1,0 +1,76 @@
+{
+  "task": "A registered organization inputs and shared transport lifecycle candidate",
+  "base_commit": "a1eac1126a00b08c55b74e4b9c68c0597a085360",
+  "status": "DRAFT synthetic-only; not frozen/exported/intaken/activated",
+  "version": "0.3.26",
+  "environment": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "network": "127.0.0.1 ephemeral HTTP only",
+    "database": "one-shot Pg15Harness, existing synthetic seed, restricted facts/attachment role; usage consumer harness pool"
+  },
+  "source_sha256": {
+    "apps/api/experiments/intake-organization/facts-writer.ts": "5681a377a5333b9e2192e1ebbd090f00a207db6943cbadbdce7b749ec5a591aa",
+    "apps/api/experiments/intake-organization/feishu-observer.ts": "424a44268969dd57f645d59368b2bc4932dbe47f28a49a40e5c844a73d973393",
+    "apps/api/experiments/intake-organization/http-transport.ts": "83c4e8bc6a5c6cf12fff2069ca2458d602305f1e2638b57dce6a05665557eabf",
+    "apps/api/experiments/intake-organization/registered-input.sql": "f3bfa7c120720ba573b66f5899e4274a8702345678a8f496af6501fc7762f168",
+    "apps/api/experiments/intake-organization/registered-refresh.ts": "550b8f6d035c2bdd7caf6849e97d64a3dbdeef43149a80d241641b97297074bb",
+    "apps/api/experiments/intake-organization/registered-refresh.integration.test.ts": "70e7e13f40d3b67bb148586eacb4556e9466128c14146f691b82419fdd6811ff",
+    "apps/api/experiments/intake-organization/session-owner.test.ts": "18537b30626e5c984703b0af5fa675acbc8b3c8e03ef2901f0039da40c998cb9"
+  },
+  "logs_sha256": {
+    "unit.txt": "b8cca0c579a54d8c522888ba7d30aeddd98c4e55d63daa2d7f28e5eb60c43571",
+    "pg.txt": "1b054f65bb171211018651f371b96c2363ed0131f4016734f90910ad61c83706",
+    "typecheck.txt": "50a96f085ac4347857361ccce272773f6ef9b6d09abbe3a0e63af750cbdb5223",
+    "eslint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.txt": "24c42b76aecef2c39c8a5639a3536efb936b03bdac9a8f8be50c0e71ffbc7af8"
+  },
+  "checks": [
+    {
+      "command": "cd apps/api && pnpm exec vitest run experiments/intake-organization/session-owner.test.ts experiments/intake-organization/transport.test.ts tests/intake-organization-observer.test.ts",
+      "exit_code": 0,
+      "result": "52 passed, 0 failed, 0 skipped",
+      "log": "unit.txt"
+    },
+    {
+      "command": "cd apps/api && CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm exec vitest run experiments/intake-organization/registered-refresh.integration.test.ts experiments/intake-organization/transport-consumer.integration.test.ts tests/intake-organization.integration.test.ts",
+      "exit_code": 0,
+      "result": "24 passed, 0 failed, 0 skipped; new registered-input 10 + earlier transport-consumer 4 + writer 10",
+      "log": "pg.txt"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api typecheck",
+      "exit_code": 0,
+      "log": "typecheck.txt"
+    },
+    {
+      "command": "cd apps/api && pnpm exec eslint experiments/intake-organization/facts-writer.ts experiments/intake-organization/feishu-observer.ts experiments/intake-organization/http-transport.ts experiments/intake-organization/registered-refresh.ts experiments/intake-organization/session-owner.test.ts experiments/intake-organization/registered-refresh.integration.test.ts",
+      "exit_code": 0,
+      "log": "eslint.txt"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api build",
+      "exit_code": 0,
+      "log": "build.txt",
+      "reuse": "Build inputs are unchanged by final experiments-only fixes; tsconfig.build.json excludes experiments/**/*.ts."
+    },
+    {
+      "command": "rg -n \"createRegisteredOrganizationRefresh|createOrganizationHttpSessionOwner|intake_org_candidate\" apps/api/dist",
+      "exit_code": 1,
+      "result": "Expected no matches: candidate excluded from production dist"
+    }
+  ],
+  "not_run": [
+    "real Feishu/token endpoint/employees/credentials",
+    "formal contract freeze/export/intake/migration or production ACL/factory",
+    "full external /review remains INCOMPLETE",
+    "workspace:check: baseline already over budget; no threshold change or evidence deletion"
+  ],
+  "formal_conditions": [
+    "trusted registration owner and restricted ACL",
+    "registered-input.sql/provenance/recovery contract governance",
+    "five-page directory candidate capacity and upstream freshness guarantees",
+    "real scoped token provider and multi-process quota ownership"
+  ]
+}

@@ -3,16 +3,22 @@ import { parseContractSchema } from '@customer-agent/contracts';
 import { canonical, digest } from '../../src/content-intake/material.js';
 import { clock, type IntakePool } from '../../src/content-intake/transaction.js';
 
-type Snapshot = {
+export type OrganizationFactsSnapshot = {
   principalId: string; expectedFactsVersion: number; departmentIds: string[];
   jobId: string; enabled: boolean; checkedAt: string; validUntil: string;
 };
 type Failure = 'INVALID_INPUT' | 'SUBJECT_UNAVAILABLE' | 'VERSION_CONFLICT' | 'STALE_OBSERVATION' | 'DEPENDENCY_UNAVAILABLE';
 export type RefreshResult = { ok: true; status: 'applied' | 'replayed'; factsVersion: number; currentFactsVersion: number }
   | { ok: false; reason: Failure; commit: 'rolled_back' | 'unknown' };
-class Rejected extends Error { constructor(readonly reason: Failure) { super(reason); } }
+export class OrganizationFactsRejected extends Error { constructor(readonly reason: Failure) { super(reason); } }
+const Rejected = OrganizationFactsRejected;
+/** Experiment-only association owner. It runs under the writer's content lock,
+ * after its fact CAS, before its final deadline check/COMMIT. It must perform only
+ * database evidence work; throwing rolls the whole write back. It never owns the
+ * fact payload, facts version, deadline, transaction, or recovery decision. */
+export type OrganizationFactsAssociation = (client: PoolClient, snapshot: Readonly<OrganizationFactsSnapshot>, factsVersion: number, replay: boolean) => Promise<void>;
 
-function snapshot(raw: unknown): Snapshot {
+function snapshot(raw: unknown): OrganizationFactsSnapshot {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Rejected('INVALID_INPUT');
   const r = raw as Record<string, unknown>;
   const keys = ['principalId','expectedFactsVersion','departmentIds','jobId','enabled','checkedAt','validUntil'];
@@ -42,11 +48,14 @@ function snapshot(raw: unknown): Snapshot {
  * A replay acknowledges history only; current authority is always read separately.
  */
 export function createOrganizationFactsWriter(pool: IntakePool, scope: { tenantId: string; appId: string },
-  report: (error: unknown) => void = () => undefined) {
+  report: (error: unknown) => void = () => undefined, associate?: OrganizationFactsAssociation) {
   const tenantId=parseContractSchema('IntakeId',scope.tenantId), appId=parseContractSchema('IntakeId',scope.appId);
   return async (raw: unknown): Promise<RefreshResult> => {
-    let input: Snapshot;
-    try { input=snapshot(raw); } catch { return { ok:false,reason:'INVALID_INPUT',commit:'rolled_back' }; }
+    let input: OrganizationFactsSnapshot;
+    try {
+      input=snapshot(raw);
+      Object.freeze(input.departmentIds); Object.freeze(input);
+    } catch { return { ok:false,reason:'INVALID_INPUT',commit:'rolled_back' }; }
     const version=input.expectedFactsVersion+1;
     const hash=digest(canonical({ tenantId,appId,...input }));
     let client: PoolClient | undefined, committing=false, broken=false;
@@ -67,6 +76,7 @@ export function createOrganizationFactsWriter(pool: IntakePool, scope: { tenantI
         'SELECT facts_digest FROM content_intake.principal_facts WHERE principal_id=$1 AND facts_version=$2',[input.principalId,version]);
       if (prior.rows.length) {
         if (prior.rows[0]!.facts_digest!==hash) throw new Rejected('VERSION_CONFLICT');
+        await associate?.(client,input,version,true);
         committing=true; await client.query('COMMIT');
         return {ok:true,status:'replayed',factsVersion:version,currentFactsVersion:currentVersion};
       }
@@ -82,6 +92,7 @@ export function createOrganizationFactsWriter(pool: IntakePool, scope: { tenantI
       [input.principalId,version,input.departmentIds,input.jobId,input.enabled,input.checkedAt,input.validUntil,hash]);
       await client.query(`UPDATE content_intake.principals SET current_facts_version=$2,
         revocation_generation=revocation_generation+$3 WHERE principal_id=$1`,[input.principalId,version,changed?1:0]);
+      await associate?.(client,input,version,false);
       if (await clock(client)>=Date.parse(input.validUntil)) throw new Rejected('STALE_OBSERVATION');
       committing=true; await client.query('COMMIT');
       return {ok:true,status:'applied',factsVersion:version,currentFactsVersion:version};

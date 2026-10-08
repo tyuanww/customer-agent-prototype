@@ -54,11 +54,18 @@ export type OrganizationTokenSupplier = {
 };
 export type OrganizationHttpTransportOptions = {
   origin: string;
-  tokenSupplier: OrganizationTokenSupplier;
   requestTimeoutMs: number;
   /** Quota and token-expiry clock only. It is not the observation-start clock. */
   now?: () => number;
+} & ({ tokenSupplier: OrganizationTokenSupplier; session?: never } | { session: OrganizationHttpSession; tokenSupplier?: never });
+export type OrganizationHttpSession = {
+  current(signal: AbortSignal): Promise<OrganizationHttpCredential>;
+  reserve(kind: 'user' | 'jobs'): void;
+  assertCurrent(credential: OrganizationHttpCredential): void;
+  invalidate(credential?: OrganizationHttpCredential): void;
 };
+/** Object identity is the private issuance epoch, even when token text repeats. */
+export type OrganizationHttpCredential = Readonly<{ token: string }>;
 
 class SlidingWindow {
   private readonly stamps: number[] = [];
@@ -131,6 +138,100 @@ function declaredLength(header: string | null): number | undefined {
   return value;
 }
 
+/** One explicit owner per running application assembly. Its tenant/app entries
+ * survive transport creation/disposal; callers cannot clear quota by rotating a
+ * token or replacing an HTTP client. No global environment or token endpoint.
+ * Cancellation only detaches that waiter. A shared credential request has its own
+ * bounded lifetime; revocation aborts it and rejects all waiters, including a
+ * supplier that ignores AbortSignal. This owner does not prove tenant identity. */
+export function createOrganizationHttpSessionOwner(options: {
+  supplier(scope: { tenantId: string; appId: string }): OrganizationTokenSupplier;
+  tokenTimeoutMs: number; now?: () => number;
+}) {
+  requireTimeout(options.tokenTimeoutMs);
+  const now = options.now ?? Date.now;
+  const entries = new Map<string, OrganizationHttpSession>();
+  let closed = false;
+  return {
+    close() {
+      closed = true;
+      for (const entry of entries.values()) entry.invalidate();
+    },
+    session(raw: { tenantId: string; appId: string }): OrganizationHttpSession {
+      if (closed) throw new OrganizationTransportError('TOKEN_UNAVAILABLE');
+      const scope = { tenantId: parseContractSchema('IntakeId', raw.tenantId), appId: parseContractSchema('IntakeId', raw.appId) };
+      const key = JSON.stringify(scope);
+      const existing = entries.get(key);
+      if (existing) return existing;
+      const supplier = options.supplier(scope);
+      const jobs = new SlidingWindow(JOB_TITLES_PER_MINUTE, MINUTE_MS);
+      const seconds = new SlidingWindow(USERS_PER_SECOND, SECOND_MS);
+      const minutes = new SlidingWindow(USERS_PER_MINUTE, MINUTE_MS);
+      let cached: { lease: OrganizationHttpCredential; expiresAtMs: number } | undefined;
+      let generation = 0;
+      let pending: { controller: AbortController; promise: Promise<OrganizationHttpCredential> } | undefined;
+      const session: OrganizationHttpSession = {
+        async current(signal) {
+          if (signal.aborted) throw new OrganizationTransportError('CANCELLED');
+          if (closed) throw new OrganizationTransportError('TOKEN_UNAVAILABLE');
+          if (cached && cached.expiresAtMs > clockReading(now)) return cached.lease;
+          if (!pending) {
+            // Expiry starts a new issuance. A late rejection of the old lease
+            // must not cancel the replacement supplier while it is pending.
+            cached = undefined;
+            const controller = new AbortController(), version = generation;
+            const timer = setTimeout(() => controller.abort(), options.tokenTimeoutMs);
+            const promise = new Promise<OrganizationHttpCredential>((resolve, reject) => {
+              const abort = () => reject(new OrganizationTransportError('TOKEN_UNAVAILABLE'));
+              controller.signal.addEventListener('abort', abort, { once: true });
+              Promise.resolve().then(() => {
+                if (closed || controller.signal.aborted || generation !== version) throw new OrganizationTransportError('TOKEN_UNAVAILABLE');
+                return supplier.current(controller.signal);
+              }).then(issued => {
+                if (controller.signal.aborted || generation !== version) throw new OrganizationTransportError('TOKEN_UNAVAILABLE');
+                const token = usableToken(issued, clockReading(now));
+                const lease = Object.freeze({ token });
+                cached = { lease, expiresAtMs: issued.expiresAtMs };
+                resolve(lease);
+              }).catch(() => reject(new OrganizationTransportError('TOKEN_UNAVAILABLE'))).finally(() => {
+                controller.signal.removeEventListener('abort', abort);
+              });
+            }).finally(() => {
+              clearTimeout(timer);
+              if (pending?.controller === controller) pending = undefined;
+            });
+            pending = { controller, promise };
+          }
+          const shared = pending.promise;
+          return new Promise<OrganizationHttpCredential>((resolve, reject) => {
+            const abort = () => reject(new OrganizationTransportError('CANCELLED'));
+            signal.addEventListener('abort', abort, { once: true });
+            if (signal.aborted) abort();
+            shared.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+          });
+        },
+        reserve(kind) {
+          if (closed) throw new OrganizationTransportError('TOKEN_UNAVAILABLE');
+          const at = clockReading(now), windows = kind === 'jobs' ? [jobs] : [seconds, minutes];
+          if (windows.some(window => window.full(at))) throw new OrganizationTransportError('RATE_LIMITED');
+          for (const window of windows) window.mark(at);
+        },
+        assertCurrent(credential) {
+          if (closed || !cached || cached.lease !== credential || cached.expiresAtMs <= clockReading(now)) throw new OrganizationTransportError('TOKEN_UNAVAILABLE');
+        },
+        invalidate(credential) {
+          // A late 401 belongs to its original issuance, never a newer lease.
+          if (credential && cached?.lease !== credential) return;
+          generation += 1; cached = undefined;
+          pending?.controller.abort(); pending = undefined;
+        },
+      };
+      entries.set(key, session);
+      return session;
+    },
+  };
+}
+
 async function discard(response: Response) {
   await response.body?.cancel().catch(() => undefined);
 }
@@ -179,9 +280,10 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
     for (const window of windows) window.mark(at);
   }
 
-  async function credential(combined: AbortSignal, caller: AbortSignal, timeout: AbortSignal): Promise<string> {
+  async function credential(combined: AbortSignal, caller: AbortSignal, timeout: AbortSignal): Promise<OrganizationHttpCredential> {
+    if (options.session) return options.session.current(combined);
     const at = clockReading(now);
-    if (cached && cached.expiresAtMs > at) return cached.token;
+    if (cached && cached.expiresAtMs > at) return { token: cached.token };
     let issued: OrganizationAppToken;
     try {
       issued = await new Promise<OrganizationAppToken>((resolve, reject) => {
@@ -191,7 +293,7 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
         }
         const onAbort = () => reject(new OrganizationTransportError(caller.aborted ? 'CANCELLED' : 'TIMED_OUT'));
         combined.addEventListener('abort', onAbort, { once: true });
-        Promise.resolve().then(() => options.tokenSupplier.current(combined)).then(resolve, reject).finally(() => {
+        Promise.resolve().then(() => options.tokenSupplier!.current(combined)).then(resolve, reject).finally(() => {
           combined.removeEventListener('abort', onAbort);
         });
       });
@@ -205,7 +307,7 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
     if (timeout.aborted) throw new OrganizationTransportError('TIMED_OUT');
     const token = usableToken(issued, clockReading(now));
     cached = { token, expiresAtMs: issued.expiresAtMs };
-    return token;
+    return { token };
   }
 
   async function once(path: string, query: URLSearchParams, caller: AbortSignal, kind: 'user' | 'jobs'): Promise<string> {
@@ -215,8 +317,10 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
     timer.unref?.();
     const combined = AbortSignal.any([caller, timeoutController.signal]);
     try {
-      const token = await credential(combined, caller, timeoutController.signal);
-      reserve(kind, clockReading(now));
+      const lease = await credential(combined, caller, timeoutController.signal);
+      const token = lease.token;
+      if (options.session) options.session.reserve(kind);
+      else reserve(kind, clockReading(now));
       const url = new URL(path, origin);
       url.search = query.toString();
       let response: Response;
@@ -232,6 +336,7 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
       if (timeoutController.signal.aborted) { await discard(response); throw new OrganizationTransportError('TIMED_OUT'); }
       if (response.status === 429) { await discard(response); throw new OrganizationTransportError('RATE_LIMITED'); }
       if (response.status === 401 || response.status === 403) {
+        options.session?.invalidate(lease);
         await discard(response); throw new OrganizationTransportError('AUTH_REJECTED');
       }
       if (response.status !== 200) { await discard(response); throw new OrganizationTransportError('HTTP_STATUS'); }
@@ -240,7 +345,9 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
         await discard(response); throw new OrganizationTransportError('RESPONSE_TOO_LARGE');
       }
       try {
-        return await readBounded(response, combined);
+        const body = await readBounded(response, combined);
+        options.session?.assertCurrent(lease);
+        return body;
       } catch (error) {
         throw classify(caller, timeoutController.signal, error);
       }

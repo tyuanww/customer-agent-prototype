@@ -71,7 +71,8 @@ type Job = { id: string; name: string; enabled: boolean };
  * produces no snapshot. Retain a successful snapshot unchanged for unknown-COMMIT retry;
  * calling observe again is a NEW observation, not recovery of a previous write. */
 export function createFeishuOrganizationObserver(scope: { tenantId: string; appId: string },
-  transport: OrganizationTransport, now: () => Promise<number>) {
+  transport: OrganizationTransport, now: () => Promise<number>, maxDirectoryPages = MAX_PAGES) {
+  if (!Number.isSafeInteger(maxDirectoryPages) || maxDirectoryPages < 1 || maxDirectoryPages > MAX_PAGES) throw new Error('INVALID_PAGE_BUDGET');
   const tenantId = id(scope.tenantId), appId = id(scope.appId);
   return async (binding: OrganizationBinding, parentSignal?: AbortSignal): Promise<OrganizationObservation> => {
     let frozen: OrganizationBinding;
@@ -94,7 +95,7 @@ export function createFeishuOrganizationObserver(scope: { tenantId: string; appI
     async function directory(): Promise<Job[]> {
       const jobs = new Map<string, Job>(), tokens = new Set<string>();
       let token: string | undefined;
-      for (let page = 0; page < MAX_PAGES; page++) {
+      for (let page = 0; page < maxDirectoryPages; page++) {
         checkpoint();
         const raw = data(await transport.jobTitles(token, signal));
         checkpoint();
