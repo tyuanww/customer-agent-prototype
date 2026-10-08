@@ -1,0 +1,152 @@
+$ vitest run && pnpm test:package:built
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api
+
+ ↓ tests/intake-runtime-closeout.integration.test.ts (23 tests | 23 skipped)
+ ✓ experiments/search-decision/tests/acceptance-proof.test.ts (5 tests) 1608ms
+   ✓ full N acceptance proof > uses the real acceptance CLI, expected exit 0, and that run's frozen 23-case JSON  1557ms
+ ✓ experiments/search-decision/tests/vendor-parity.test.ts (1 test) 1682ms
+   ✓ lab judgeSearch vs product judgeSearch > inspection and product share one policy on every interface and v3 pool  1681ms
+ ✓ experiments/search-decision/tests/interface.test.ts (1 test) 568ms
+   ✓ interface decision-table acceptance > fails non-zero listing ids when decide diverges or v3 diffs are unexpected  567ms
+ ✓ experiments/search-decision/tests/generated-types.test.ts (2 tests) 2518ms
+   ✓ generated decision module typecheck > typechecks the materialized .generated module on the clean-checkout path  1777ms
+   ✓ generated decision module typecheck > fails when the generated file itself has a type error, not only the patch string  739ms
+ ✓ tests/content-intake-material.test.ts (18 tests) 1933ms
+   ✓ formal candidate material from independently parsed workbook > binds CSV format, original-byte object and independent questions without changing FAQ material rules  489ms
+   ✓ formal candidate material from independently parsed workbook > binds a family as a pair, versions association changes and clears only explicitly uploaded associations  340ms
+ ✓ experiments/intake-organization/session-owner.test.ts (9 tests) 252ms
+ ✓ tests/g1a-owner-assembly.test.ts (18 tests) 2196ms
+   ✓ versioned owner package assembler > round-trips actual normalized content to the identical approved five files in unique directories  672ms
+   ✓ versioned owner package assembler > runs the operator entry with synthetic external files and emits only a receipt  1163ms
+ ✓ tests/g1a-e0-input-package.test.ts (44 tests) 863ms
+ ✓ tests/search-unseen-v2.test.ts (2 tests) 353ms
+   ✓ search-unseen-v2 frozen policy suite > drives the wired search backend for every frozen unseen case  350ms
+ ✓ tests/search-confirmation-v1.test.ts (2 tests) 454ms
+   ✓ search-confirmation-v1 frozen policy suite > drives the wired search backend for every frozen case  451ms
+ ✓ tests/leftover-unseen-v1.test.ts (2 tests) 244ms
+ ✓ experiments/search-decision/tests/fail-gates.test.ts (3 tests) 3432ms
+   ✓ mutation fail gates > interface acceptance exits non-zero and records MX01 in run.json  1755ms
+   ✓ mutation fail gates > round1-scope exits non-zero and records N01 in round1.json  867ms
+   ✓ mutation fail gates > ordinary CLI strips TEST_UNFROZEN and still validates frozen fixtures  809ms
+ ✓ tests/iteration-task-routes.test.ts (8 tests) 197ms
+ ✓ tests/ops-loop-routes.test.ts (15 tests) 227ms
+ ✓ tests/content-intake-usage-http.test.ts (18 tests) 126ms
+ ✓ tests/iteration-task-repository.test.ts (3 tests) 58ms
+stdout | tests/app.test.ts > Application API bootstrap > starts on an ephemeral loopback port and closes cleanly without connecting health to DB
+{"level":"info","requestId":"req-1","userId":"anonymous","path":"/health","method":"GET","statusCode":200,"durationMs":1}
+
+ ✓ tests/app.test.ts (32 tests | 1 skipped) 230ms
+ ✓ tests/content-object-store.test.ts (9 tests) 119ms
+ ✓ tests/search-routes.test.ts (12 tests) 167ms
+ ✓ tests/notice-routes.test.ts (1 test) 87ms
+ ✓ experiments/intake-organization/transport.test.ts (24 tests) 3147ms
+   ✓ loopback organization transport > refuses the 51st user call in one second and the 1001st call in one minute  2509ms
+ ✓ tests/intake-organization-observer.test.ts (19 tests) 53ms
+ ✓ tests/search-service.test.ts (20 tests) 110ms
+ ✓ tests/event-routes.test.ts (3 tests) 120ms
+ ✓ tests/event-repository.test.ts (4 tests) 96ms
+ ✓ tests/search-decision.test.ts (12 tests) 137ms
+ ✓ tests/g1a-keyword-baseline.test.ts (3 tests) 115ms
+ ✓ experiments/search-decision/tests/round1-scope.test.ts (1 test) 82ms
+ ✓ experiments/search-decision/tests/n-facts.test.ts (1 test) 140ms
+ ✓ tests/content-import-service.test.ts (3 tests) 86ms
+ ✓ tests/ops-loop-repository.test.ts (6 tests) 112ms
+ ✓ experiments/search-decision/tests/body-statement.test.ts (1 test) 91ms
+ ✓ experiments/search-decision/tests/negation-regression.test.ts (15 tests) 89ms
+ ✓ tests/intake-runtime-consumer-pool.test.ts (10 tests) 60ms
+ ✓ tests/review-login-server.test.ts (2 tests) 50ms
+ ✓ tests/content-import-multipart.test.ts (11 tests) 53ms
+ ✓ tests/g1a-e0-evaluate.test.ts (25 tests) 52ms
+ ✓ tests/search-text.test.ts (19 tests) 7ms
+ ✓ tests/g1a-e0-boundary.test.ts (4 tests) 28ms
+ ✓ tests/content-intake-p1.test.ts (34 tests) 10ms
+ ✓ tests/workforce-identity-provider.test.ts (1 test) 6ms
+ ✓ tests/intake-transaction-runtime.test.ts (7 tests) 7ms
+stdout | tests/feishu-identity-provider.test.ts > feishu identity provider > retries a user_info TypeError once
+[api] feishu identity transport retry user_info: TypeError fetch failed UND_ERR_CONNECT_TIMEOUT
+
+stdout | tests/feishu-identity-provider.test.ts > feishu identity provider > still logs in when writing the display name fails
+[api] operator display name persist failed: Error
+
+ ✓ tests/feishu-identity-provider.test.ts (19 tests) 47ms
+ ✓ tests/content-normalize.test.ts (9 tests) 14ms
+ ✓ tests/ops-loop-csv.test.ts (5 tests) 8ms
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > returns the contract 403 when revalidation proves the lease invalid
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation confirms the lease is good
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation confirms the lease is good
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation is itself undetermined
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation is itself undetermined
+[api] diagnostic=ANNOUNCE_FAILED
+
+ ✓ tests/search-relations.test.ts (23 tests) 8ms
+ ✓ tests/announce-error-map.test.ts (16 tests) 11ms
+ ✓ tests/search-repository.test.ts (3 tests) 6ms
+ ✓ tests/runtime-config.test.ts (15 tests) 12ms
+ ✓ tests/content-intake-role-ceiling.test.ts (2 tests) 3ms
+ ✓ experiments/search-decision/tests/pin.test.ts (4 tests) 5ms
+ ✓ tests/intake-runtime-assembly.test.ts (7 tests) 7ms
+ ✓ tests/iteration-task-signals.test.ts (5 tests) 8ms
+ ✓ tests/request-boundary.test.ts (5 tests) 3ms
+ ✓ tests/idempotency.test.ts (3 tests) 5ms
+ ✓ tests/runtime-boundary-composition.test.ts (6 tests) 8ms
+ ✓ tests/policy-rules.test.ts (4 tests) 44ms
+ ✓ tests/review-commitment-hashes.test.ts (1 test) 5ms
+ ↓ tests/backend-runtime.e2e.test.ts (1 test | 1 skipped)
+ ✓ tests/synthetic-identity-provider.test.ts (11 tests) 5244ms
+   ✓ loopback synthetic identity provider > terminates a response that stalls past the provider deadline  5005ms
+ ↓ tests/announce.integration.test.ts (1 test | 1 skipped)
+ ↓ tests/content-import.integration.test.ts (14 tests | 14 skipped)
+ ↓ tests/content-worker.integration.test.ts (5 tests | 5 skipped)
+ ↓ tests/g1a-comparison.integration.test.ts (5 tests | 5 skipped)
+ ↓ tests/content-release.integration.test.ts (13 tests | 13 skipped)
+ ↓ tests/event-postgres.integration.test.ts (10 tests | 10 skipped)
+ ↓ tests/g1a-comparison.runner.test.ts (1 test | 1 skipped)
+ ↓ tests/content-intake.integration.test.ts (152 tests | 152 skipped)
+ ↓ tests/g1a-e0-synthetic.integration.test.ts (11 tests | 11 skipped)
+ ↓ tests/g1a-e0.runner.test.ts (1 test | 1 skipped)
+ ↓ tests/g1a-owner-assembly.runner.test.ts (1 test | 1 skipped)
+ ↓ tests/g1a-synthetic.runner.test.ts (1 test | 1 skipped)
+ ↓ tests/intake-grants-http.integration.test.ts (3 tests | 3 skipped)
+ ↓ tests/intake-organization.integration.test.ts (10 tests | 10 skipped)
+ ↓ tests/intake-runtime-candidate.integration.test.ts (1 test | 1 skipped)
+ ↓ tests/intake-runtime-boundary.integration.test.ts (8 tests | 8 skipped)
+ ↓ tests/intake-csv-http.integration.test.ts (8 tests | 8 skipped)
+ ↓ tests/intake-runtime-assembly.integration.test.ts (8 tests | 8 skipped)
+ ↓ tests/intake-scope-runtime.integration.test.ts (4 tests | 4 skipped)
+ ↓ tests/intake-runtime-consumers.integration.test.ts (16 tests | 16 skipped)
+ ↓ experiments/search-decision/tests/full-acceptance.test.ts (1 test | 1 skipped)
+ ↓ tests/search-postgres.integration.test.ts (28 tests | 28 skipped)
+ ↓ tests/product-auth.integration.test.ts (8 tests | 8 skipped)
+ ↓ tests/intake-shop-directory.integration.test.ts (6 tests | 6 skipped)
+ ↓ experiments/intake-organization/transport-consumer.integration.test.ts (4 tests | 4 skipped)
+ ↓ experiments/intake-organization/registered-refresh.integration.test.ts (10 tests | 10 skipped)
+
+ Test Files  59 passed | 28 skipped (87)
+      Tests  567 passed | 355 skipped (922)
+   Start at  02:36:28
+   Duration  7.55s (transform 2.74s, setup 0ms, collect 21.13s, tests 27.40s, environment 9ms, prepare 4.73s)
+
+$ node --test tests/package-entry.smoke.mjs tests/main-entry.smoke.mjs
+✔ compiled main entry starts, serves both probes, and closes on SIGINT (181.8545ms)
+✔ compiled main rejects missing private capability configuration before listening (102.480667ms)
+{"level":"info","requestId":"req-1","userId":"anonymous","path":"/health","method":"GET","statusCode":200,"durationMs":33}
+[api] diagnostic=DATABASE_READINESS_PROBE_FAILED
+{"level":"info","requestId":"req-2","userId":"anonymous","path":"/ready","method":"GET","statusCode":503,"durationMs":4}
+✔ compiled API package serves its contract-valid health and readiness routes (73.044542ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 325.269791

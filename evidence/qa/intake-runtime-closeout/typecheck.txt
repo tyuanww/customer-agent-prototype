@@ -1,0 +1,8 @@
+$ pnpm --filter @customer-agent/contracts typecheck && pnpm --filter @customer-agent/retrieval-core typecheck && pnpm --filter @customer-agent/content-intake typecheck && pnpm --filter @customer-agent/database typecheck && pnpm --filter @customer-agent/api typecheck && pnpm --filter @customer-agent/desktop typecheck
+$ tsc --noEmit
+$ tsc --noEmit
+$ tsc --noEmit
+$ tsc --noEmit
+$ node experiments/search-decision/check-generated-types.mjs && tsc --noEmit
+/Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api/experiments/search-decision/.generated/search-decision.ts
+$ tsc --noEmit

@@ -1,0 +1,60 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api
+
+ ❯ tests/intake-runtime-closeout.integration.test.ts (18 tests | 1 failed) 17377ms
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > uses existing Feishu identity normalization, native observation, restricted writer, usage and management HTTP 1110ms
+     → expected [ Error: SCOPE_DENIED { …(2) } ] to deeply equal []
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for disabled facts after a real session was issued  973ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for job facts after a real session was issued  953ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for department facts after a real session was issued  962ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for expired facts after a real session was issued  1282ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on missing-job refresh refusal  920ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on unregistered refresh refusal  922ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on network refresh refusal  988ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > aborts in-flight native reads before draining pools and can restart against retained receipts  1050ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after wrong-purpose startup rejection  882ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after admin startup rejection  961ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after auth-role startup rejection  992ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after storage startup rejection  935ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects scope configuration before opening resources  888ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects remote-origin configuration before opening resources  895ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects duplicate-login configuration before opening resources  889ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects profile configuration before opening resources  882ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects implicit-database configuration before opening resources  892ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > uses existing Feishu identity normalization, native observation, restricted writer, usage and management HTTP
+AssertionError: expected [ Error: SCOPE_DENIED { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   IntakeRejection {
++     "message": "SCOPE_DENIED",
++     "reason": "SCOPE_DENIED",
++     "code": "NOT_FOUND",
++   },
++ ]
+
+ ❯ tests/intake-runtime-closeout.integration.test.ts:91:20
+     89|     expect(denied).toMatchObject({ status: 404, body: { error: { detai…
+     90|     expect(await json(`${runtime!.address}/v1/intake/sources`, { heade…
+     91|     expect(errors).toEqual([]);
+       |                    ^
+     92|     const closing = runtime!.close(); expect(runtime!.close()).toBe(cl…
+     93|     await noLeakedConnections(); expect(closeIdentity).toHaveBeenCalle…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+   Start at  02:28:22
+   Duration  18.07s (transform 261ms, setup 0ms, collect 575ms, tests 17.38s, environment 0ms, prepare 34ms)
+
+undefined
+/Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/intake-runtime-closeout.integration.test.ts --no-file-parallelism

@@ -1,0 +1,19 @@
+{
+  "schema": "intake-runtime-closeout-review/v1",
+  "scope": [
+    "apps/api/experiments/intake-runtime/runtime-candidate.ts",
+    "apps/api/tests/intake-runtime-closeout.integration.test.ts"
+  ],
+  "local": "completed",
+  "independent": {
+    "agent": "/root/closeout_size",
+    "status": "completed; reviewed content hashes recorded in checks.json",
+    "fixed": [
+      "provider.close exceptions no longer prevent auth pool cleanup",
+      "prototype identity providers retain methods and receiver"
+    ],
+    "remainingActionableHighMedium": 0
+  },
+  "external": "INCOMPLETE",
+  "roleReview": "reused; unchanged authority.ts and 0030"
+}
