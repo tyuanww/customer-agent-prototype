@@ -12,6 +12,13 @@ import { closeOwnedElectron } from '../support/owned-electron';
  * a contract wire double; actual PostgreSQL publication has separate evidence. */
 test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows', async () => {
   const wire = intakeQueryData(), token = 's'.repeat(43), requests: string[] = [];
+  for (const [kind, displayName] of [['product','合成洁面产品'],['scenario','合成晨间场景']] as const) wire.vocabulary.push({
+    id:kind,kind,displayName,displayVersion:1,meaningDigest:'a'.repeat(64),active:true,
+    scope:{tenantId:'tenant',appId:'app',brandId:'brand',shopId:null,domain:'product',sourceId:null},
+  });
+  wire.entries.push({...wire.entries[0],businessEntryId:'selected',title:'麒麟',answerText:'仅用于特选验证',
+    questions:[{id:'selected-question',version:1,text:'麒麟',active:true}],
+    productRefs:[{id:'product',displayVersion:1}],scenarioRefs:[{id:'scenario',displayVersion:1}]});
   let authorized = false, apiOrigin = '', identityOrigin = '';
   const api = createServer(async (req, res) => {
     const url = new URL(req.url!, 'http://synthetic.invalid'); requests.push(url.pathname);
@@ -86,6 +93,33 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await query.getByTestId('search-button').click();
     await expect(query.getByTestId('answer-text-1')).toContainText('shop-b');
     await query.getByTestId('question-input').fill('zzzz'); await query.getByTestId('search-button').click();
+    await expect(query.getByTestId('no-hit')).toBeVisible();
+    await query.getByTestId('question-input').fill('麒麟');
+    await query.getByTestId('search-button').click();
+    await expect(query.getByTestId('no-hit')).toBeVisible();
+    const beforeFilters = (await query.getByTestId('query-shell').boundingBox())!.height;
+    await query.locator('summary').filter({hasText:'商品'}).click();
+    await expect.poll(async () => (await query.getByTestId('query-shell').boundingBox())!.height).toBeGreaterThan(beforeFilters);
+    await query.getByRole('checkbox', {name:'合成洁面产品'}).check();
+    await query.locator('summary').filter({hasText:'场景'}).click();
+    const scenario = query.getByRole('checkbox', {name:'合成晨间场景'});
+    await scenario.focus(); await scenario.press('Space');
+    await expect(scenario).toBeChecked();
+    await expect(query.getByTestId('error-state')).toHaveCount(0);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready','true');
+    await expect(query.getByTestId('question-input')).toHaveValue('麒麟');
+    await expect(query.getByTestId('answer-text-1')).toHaveCount(0);
+    await query.getByTestId('search-button').click();
+    await expect(query.getByTestId('answer-text-1')).toContainText('仅用于特选验证');
+    const capsule = await query.locator('.query-capsule').boundingBox();
+    const filter = await query.getByTestId('intake-query-filters').boundingBox();
+    expect(capsule!.height).toBe(88); expect(filter!.y).toBeGreaterThanOrEqual(capsule!.y+capsule!.height);
+    if (process.env.INTAKE_QUERY_SCREENSHOT) await query.screenshot({path:process.env.INTAKE_QUERY_SCREENSHOT});
+    const productDetails = query.locator('details').filter({has:query.locator('summary').filter({hasText:'商品'})});
+    if (await productDetails.getAttribute('open') === null) await productDetails.locator('summary').click();
+    await query.getByRole('button',{name:'清除商品'}).click();
+    await expect(query.getByTestId('answer-text-1')).toHaveCount(0);
+    await query.getByTestId('search-button').click();
     await expect(query.getByTestId('no-hit')).toBeVisible();
     const fox = app.windows().find(w => w.url().includes('role=fox'))!;
     expect(await fox.evaluate(() => window.customerAgent!.intakeQuery!.access())).toMatchObject({ code: 'FORBIDDEN' });

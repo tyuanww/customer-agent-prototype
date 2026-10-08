@@ -1,6 +1,6 @@
 import { buildBm25Index, characterUnigramBigramTerms, rankBm25 } from '@customer-agent/retrieval-core';
-import type { IntakeQueryContext, IntakeQueryRow } from '../shared/content-intake-query';
-import { loadIntakeAccess } from './content-intake-access';
+import { emptyIntakeQueryContext, isIntakeSelection, type IntakeQuerySelection, type IntakeQueryContext, type IntakeQueryRow } from '../shared/content-intake-query';
+import { loadIntakeAccess, loadIntakeVocabulary } from './content-intake-access';
 import { ContentIntakeUsage, IntakeUsageError, type IntakeCatalog, type IntakeUsageSession } from './content-intake-usage';
 
 /** One Query window's context. Discovery is a menu, never a qualification.
@@ -11,8 +11,9 @@ export class ContentIntakeQuery {
   private readonly unsubscribe: () => void;
   private generation = 0;
   private discovery: AbortController | null = null;
-  private context: IntakeQueryContext = { shops: [], shopId: null };
+  private context: IntakeQueryContext = emptyIntakeQueryContext();
   private shown: { catalog: IntakeCatalog; keys: Set<string> } | null = null;
+  private menuDeadline = 0;
   private epoch: number;
   private disposed = false;
   private listeners = new Set<(reason: 'invalidated' | 'expired') => void>();
@@ -27,7 +28,7 @@ export class ContentIntakeQuery {
     this.unsubscribe = session.subscribe(() => {
       const current = session.view();
       if (!current.signedIn || current.sessionEpoch !== this.epoch) {
-        this.epoch = current.sessionEpoch; this.discovery?.abort(); this.discovery = null; this.cancel(); this.context = { shops: [], shopId: null };
+        this.epoch = current.sessionEpoch; this.discovery?.abort(); this.discovery = null; this.cancel(); this.context = emptyIntakeQueryContext();
       }
     });
   }
@@ -38,24 +39,45 @@ export class ContentIntakeQuery {
   }
   async access(shopId?: string): Promise<IntakeQueryContext> {
     this.cancel();
+    const previous = this.context; this.context = emptyIntakeQueryContext();
     this.discovery?.abort();
     const controller = new AbortController(); this.discovery = controller;
     try {
       const access = await loadIntakeAccess(this.session, controller.signal);
       if (this.disposed || controller.signal.aborted || this.discovery !== controller) throw new IntakeUsageError('STALE');
-      const selected = shopId ?? this.context.shopId;
+      const selected = shopId ?? previous.shopId ?? (access.shops.length === 1 ? access.shops[0]! : null);
       if (selected !== null && !access.shops.includes(selected)) {
-        this.context = { shops: access.shops, shopId: null };
+        this.context = { ...emptyIntakeQueryContext(), shops: access.shops };
         throw new IntakeUsageError('FORBIDDEN');
       }
-      this.context = { shops: access.shops, shopId: selected };
+      const menus = selected === null ? { products: [], scenarios: [] }
+        : await loadIntakeVocabulary(this.session, access, selected, controller.signal);
+      if (this.disposed || controller.signal.aborted || this.discovery !== controller) throw new IntakeUsageError('STALE');
+      this.context = { ...emptyIntakeQueryContext(), ...menus, shops: access.shops, shopId: selected, validUntil: access.validUntil };
+      this.menuDeadline = performance.now() + Math.max(0, Date.parse(access.validUntil) - Date.now());
       if (selected !== null) this.usage.select({ shopId: selected, productIds: [], scenarioIds: [] });
       return structuredClone(this.context);
     } finally { if (this.discovery === controller) this.discovery = null; }
   }
+  selectConditions(selection: IntakeQuerySelection): IntakeQueryContext {
+    this.cancel();
+    this.assertMenu();
+    if (!isIntakeSelection(selection)
+      || selection.productIds.some(id => !this.context.products.some(p => p.id === id))
+      || selection.scenarioIds.some(id => !this.context.scenarios.some(p => p.id === id))) throw new IntakeUsageError('FORBIDDEN');
+    this.context = { ...this.context, productIds: [...selection.productIds].sort(), scenarioIds: [...selection.scenarioIds].sort() };
+    this.usage.select({ shopId: this.context.shopId!, productIds: this.context.productIds, scenarioIds: this.context.scenarioIds });
+    return structuredClone(this.context);
+  }
+  private assertMenu() {
+    if (this.disposed || this.discovery || !this.context.shopId) throw new IntakeUsageError('FORBIDDEN');
+    if (!this.context.validUntil || Date.now() >= Date.parse(this.context.validUntil) || performance.now() >= this.menuDeadline) {
+      throw new IntakeUsageError('EXPIRED');
+    }
+  }
   async search(queryText: string): Promise<IntakeQueryRow[]> {
     this.cancel();
-    if (this.disposed || this.discovery || !this.context.shopId) throw new IntakeUsageError('FORBIDDEN');
+    this.assertMenu();
     const generation = this.generation;
     const catalog = await this.usage.refresh();
     if (this.disposed || generation !== this.generation) throw new IntakeUsageError('STALE');

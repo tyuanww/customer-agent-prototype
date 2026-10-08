@@ -1,3 +1,4 @@
+import { emptyIntakeQueryContext } from '../../src/shared/content-intake-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -2523,16 +2524,18 @@ describe('QueryApp', () => {
     };
     window.customerAgent!.intakeQuery = {
       mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }), access: vi.fn().mockReturnValue(menu.promise),
-      selectShop: vi.fn().mockResolvedValue({ ok: true, shops: ['shop-a'], shopId: 'shop-a' }), search,
+      selectConditions: vi.fn(),
+      selectShop: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }), search,
       copy: vi.fn().mockResolvedValue({ ok: true, copied: true }), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }),
       onInvalidated: listener => { invalidate = listener; return () => {}; },
     };
     render(<QueryApp intake />); activateQuery();
     expect(screen.queryByText(/MiniMax 只规划/)).not.toBeInTheDocument();
     await screen.findByTestId('notice-accept');
-    await act(async () => menu.resolve({ ok: true, shops: ['shop-a'], shopId: null }));
+    await act(async () => menu.resolve({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: null }));
     expect(screen.getByTestId('notice-accept')).toBeVisible();
     await user.click(screen.getByTestId('notice-accept'));
+    await user.click(screen.getByRole('button', { name: '筛选' }));
     await user.selectOptions(screen.getByRole('combobox', { name: '当前店铺' }), 'shop-a');
     await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('shop-a'));
     const pending = deferred<unknown>(); search.mockReturnValueOnce(pending.promise);

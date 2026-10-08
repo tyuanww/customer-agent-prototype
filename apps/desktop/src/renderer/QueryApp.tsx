@@ -1,3 +1,4 @@
+import { IntakeQueryFilters } from './features/search/IntakeQueryFilters';
 import type { ProductSessionResult } from '@shared/product-session';
 import type { NoticeDecision, ProductNoticeResult } from '@shared/product-notice';
 import type { ProductAnnounceResult } from '@shared/product-announce';
@@ -340,6 +341,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       statusBanner,
       contentBanner,
       content?.lastElementChild ?? null,
+      pane?.querySelector('[data-query-context]') ?? null,
     ]);
     const panePad = pane
       ? Number.parseFloat(getComputedStyle(pane).paddingBottom) || 0
@@ -777,10 +779,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setInvalidMessage('');
       const noticePending = noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null);
       if (phase !== 'SEARCH_INPUT' && !noticePending) {
-        reportPhase('SEARCH_INPUT');
+        reportPhase(intake ? 'RESULTS' : 'SEARCH_INPUT');
       }
     },
-    [cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, recordNoHitExit, reportPhase],
+    [intake, cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, recordNoHitExit, reportPhase],
   );
 
   const refreshAnnounce = useCallback(async (sessionEpoch: number) => {
@@ -1062,7 +1064,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const resetIntakeView = useCallback(() => {
     cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
-    if (phaseRef.current !== 'FOX_IDLE') reportPhase(noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null) ? 'ERROR' : 'SEARCH_INPUT');
+    if (phaseRef.current !== 'FOX_IDLE') reportPhase(noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null) ? 'ERROR' : 'RESULTS');
   }, [cancelPendingSearch, cancelPendingCopy, reportPhase, noticeLoading, noticeBlocked, currentNotice]);
   const intakeShops = useIntakeShops(intake, Boolean(productState?.ok && productState.signedIn),
     productState?.sessionEpoch ?? 0, resetIntakeView);
@@ -1089,7 +1091,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       const generation = ++searchGenerationRef.current;
-      searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
+      searchInFlightRef.current = true; setSearching(true); reportPhase('RESULTS');
       void api.search({ queryText: text }).then(result => {
         if (generation !== searchGenerationRef.current) return;
         if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
@@ -1784,17 +1786,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
           intake={intake}
-          scopeControl={<div className="intake-shop-control">
-            <label htmlFor="intake-shop">店铺通用 FAQ</label>
-            <select id="intake-shop" aria-label="当前店铺" value={intakeShops.shopId ?? ''}
-              disabled={intakeShops.busy || !signedInSession} onChange={event => { void intakeShops.load(event.target.value); }}>
-              <option value="" disabled>{intakeShops.busy ? '读取中…' : intakeShops.shops.length ? '请选择店铺' : '暂无可用店铺'}</option>
-              {intakeShops.shops.map(shop => <option key={shop} value={shop}>{shop}</option>)}
-            </select>
-            <button type="button" className="retry-btn" disabled={intakeShops.busy || !signedInSession}
-              title={intakeShops.error || '重新读取有权店铺'} onClick={() => { void intakeShops.load(); }}>刷新店铺</button>
-            {intakeShops.error ? <span role="alert" className="validation-error">{intakeShops.error}</span> : null}
-          </div>}
+          scopeControl={<button type="button" className="retry-btn" disabled={!signedInSession}
+            onClick={() => { reportPhase('RESULTS', results.length as ResultCount); }}>筛选</button>}
           productControl={showProductSession ? (
             <QuerySessionControl
               busy={sessionBusy}
@@ -1859,7 +1852,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
         {expanded ? (
           <QueryResultsPane
-            contextControls={showScopeFields ? (
+            contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} onLayoutChange={() => setLayoutReady(false)} /> : showScopeFields ? (
               <QueryScopeFields
                 keys={scopeKeys}
                 values={placeholderValues}

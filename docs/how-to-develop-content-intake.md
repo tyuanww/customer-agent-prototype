@@ -157,7 +157,7 @@ Main `loadIntakeAccess(session,signal?)` 收齐两张列表并再次完整核对
 
 ## P2 桌面 Query 合成入口
 
-该切片连接“合成会话 → 授权店铺 → 已发布通用 FAQ → 原文复制”。开发态设置 `CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2`，同时提供不同端口的 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`（只能是 `http://127.0.0.1:<port>`）。然后运行 `pnpm dev`。未配置 flag 维持既有行为；flag 拼错、缺 origin 或使用远程 origin 都拒绝启动。
+该切片连接“合成会话 → 授权店铺/商品/场景 → 已发布适用 FAQ → 原文复制”。开发态设置 `CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2`，同时提供不同端口的 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`（只能是 `http://127.0.0.1:<port>`）。然后运行 `pnpm dev`。未配置 flag 维持既有行为；flag 拼错、缺 origin 或使用远程 origin 都拒绝启动。
 
 打包配置解析器支持在 `synthetic-stack.json` 的 `synthetic-local` 对象中添加 `"contentIntake":"faq-v2"`，指定版本已有 Windows 打包态验收，见[杭州记录](../evidence/qa/content-intake-p2-hangzhou/README.md)；不能推断后续回退/同题覆盖已在该包验收。标准 synthetic-stack 服务尚未注册新四条路由，不能只加 flag 就声称完整服务可用；需要已经登记合成来源/权限/发布物的隔离宿主和已批准会话入口。可复现原生验收用下述仓库测试，它自己创建两个 loopback 合成 wire 服务与独立 userData，退出清理，不访问生产服务：
 
@@ -166,11 +166,11 @@ pnpm --filter @customer-agent/desktop build
 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts
 ```
 
-Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `ContentIntakeUsage` 重新取得完整资格快照。`productIds/scenarioIds` 暂为空数组，按冻结合同只取不限商品/场景条目；界面明确显示“店铺通用 FAQ”。检索复用 retrieval-core，标题/启用问法权重 3，正文 1，固定 BM25 k1=1.2、b=0.75；按快照顺序稳定破同分。暂不接外部模型、反馈写回或 SOP。最多 5000 条、2 MiB 检索字段输入；超限整次返回 LIMIT，不交付截断结果。计算后让出事件循环，再复核原资格，不能把计算期间到期的正文投影出来。
+Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `ContentIntakeUsage` 重新取得完整资格快照。词项从冻结的 `GET /v1/intake/sources/{sourceId}/vocabulary` 完整分页读取，按授权店铺/品牌/域校验，最多 5000 词项、8 MiB；改名、撤权或分页内容变化要求重读。结果区的商品/场景支持多选与清除，空维度仅取通用条目。Main 校验菜单成员后把稳定 ID 交给原使用资格；换店清选择，换条件撤旧结果与复制、保留问题、等待手动查询。胶囊只留“筛选”入口。检索复用 retrieval-core，标题/启用问法权重 3，正文 1，固定 BM25 k1=1.2、b=0.75；按快照顺序稳定破同分。暂不接外部模型、反馈写回或 SOP。最多 5000 条、2 MiB 检索字段输入；超限整次返回 LIMIT，不交付截断结果。计算后让出事件循环，再复核原资格，不能把计算期间到期的正文投影出来。
 
 `cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单、托盘和 Dock 现在可进入 FAQ 专用资料审核页；没有 content-manage 权限时只显示无管理权限，不装配旧管理适配器。FAQ 正文展示和复制均保留原换行。
 
-上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。新上传/校验管理入口已接通。仍需补齐商品/场景筛选及正式店铺显示名合同、真实飞书审批接入与剩余平台人工验收；已有设备结果按版本复用，不重新列为全未做。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
+上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。新上传/校验管理入口已接通。商品/场景筛选已完成本组合成验证；正式店铺显示名合同、真实飞书审批接入与剩余平台人工验收仍待完成；已有设备结果按版本复用，不重新列为全未做。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
 
 ## P2 管理候选与人工质量检查
 

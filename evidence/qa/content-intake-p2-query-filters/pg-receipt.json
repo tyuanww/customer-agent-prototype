@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "id": "001",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-query/customer-agent-prototype",
+  "argv": [
+    "env",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "vocabulary:|usage: filters product"
+  ],
+  "deadline": "/Users/hutou/.codex/worktrees/content-intake-query/customer-agent-prototype/.gstack/qa-reports/intake-query-20261008/deadline.json",
+  "timing": [
+    {
+      "guard": "qa-deadline",
+      "event": "started",
+      "version": 1,
+      "startedAt": "2026-10-08T02:02:53.816Z",
+      "deadlineAt": "2026-10-08T02:07:53.816Z",
+      "budgetMs": 300000,
+      "observedAt": "2026-10-08T02:03:11.312Z",
+      "remainingMs": 282504,
+      "expired": false
+    },
+    {
+      "guard": "qa-deadline",
+      "event": "finished",
+      "observedAt": "2026-10-08T02:03:15.185Z",
+      "deadlineAt": "2026-10-08T02:07:53.816Z",
+      "timedOut": false,
+      "exitCode": 0
+    }
+  ],
+  "startedAt": "2026-10-08T02:03:11.309Z",
+  "completedAt": "2026-10-08T02:03:15.192Z",
+  "exitCode": 0,
+  "signal": null,
+  "status": "complete",
+  "observation": {
+    "sha256": "7e9299272e954ccdaa807912789dd0ca89e2c641d59eb3f82be24fc079d2eb0b",
+    "bytes": 775
+  },
+  "publicOutput": true,
+  "stdout": {
+    "sha256": "5a57765aef8ae4a866b6475ca6108e6e9ffc53f7cefcba8f7efeb4bb1d93227e",
+    "bytes": 760
+  },
+  "stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

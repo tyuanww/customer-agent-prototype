@@ -24,7 +24,7 @@ async function host(result: IntakeResult<C['IntakeEntitlement']> = { ok: true, v
   const sources = vi.fn(async (): Promise<IntakeResult<C['IntakeSourceList']>> => ({ ok: true, value: { items: [], nextCursor: null } }));
   const report = vi.fn();
   const app = Fastify({ logger: false, exposeHeadRoutes: false }); apps.push(app);
-  await app.register(contentIntakeUsageRoutes, { auth, usage: { issueEntitlement, snapshot, authorizations, sources }, report });
+  await app.register(contentIntakeUsageRoutes, { auth, usage: { issueEntitlement, snapshot, authorizations, sources, vocabulary: async () => ({ ok: true, value: { items: [], nextCursor: null } }) }, report });
   return { app, auth, issueEntitlement, snapshot, authorizations, sources, report };
 }
 const headers = { authorization: 'Bearer synthetic-token' };

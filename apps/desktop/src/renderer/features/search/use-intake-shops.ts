@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { IntakeQueryContext } from '@shared/content-intake-query';
+import { emptyIntakeQueryContext, type IntakeQuerySelection, type IntakeQueryContext } from '@shared/content-intake-query';
 
 /** Menu intent state only. Main must authorize even IDs returned by this hook. */
 export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: number, reset: () => void) {
-  const [context, setContext] = useState<IntakeQueryContext>({ shops: [], shopId: null });
+  const [context, setContext] = useState<IntakeQueryContext>(emptyIntakeQueryContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const sequence = useRef(0);
@@ -13,20 +13,44 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
     const api = window.customerAgent?.intakeQuery;
     if (!enabled || !signedIn || !api) return;
     const request = ++sequence.current;
-    resetRef.current(); setBusy(true); setError(''); setContext({ shops: [], shopId: null });
+    resetRef.current(); setBusy(true); setError(''); setContext(emptyIntakeQueryContext());
     try {
       const value = await (shopId ? api.selectShop({ shopId }) : api.access());
       if (request !== sequence.current) return;
-      if (value.ok) { setContext({ shops: value.shops, shopId: value.shopId }); resetRef.current(); }
+      if (value.ok) { setContext(value); resetRef.current(); }
       else setError(value.message);
     } catch { if (request === sequence.current) setError('店铺读取失败，请重试。'); }
     finally { if (request === sequence.current) setBusy(false); }
   }, [enabled, signedIn]);
+  const selectConditions = useCallback(async (selection: IntakeQuerySelection) => {
+    const api = window.customerAgent?.intakeQuery;
+    if (!enabled || !signedIn || !api) return;
+    const request = ++sequence.current;
+    resetRef.current(); setBusy(true); setError('');
+    // Reflect the checkbox intent immediately; search stays disabled until Main accepts it.
+    setContext(current => ({ ...current, ...selection }));
+    try {
+      const value = await api.selectConditions(selection);
+      if (request !== sequence.current) return;
+      if (value.ok) { setContext(value); resetRef.current(); }
+      else { setContext(emptyIntakeQueryContext()); setError(value.message); }
+    } catch {
+      if (request === sequence.current) { setContext(emptyIntakeQueryContext()); setError('筛选条件更新失败，请刷新店铺。'); }
+    } finally { if (request === sequence.current) setBusy(false); }
+  }, [enabled, signedIn]);
+  useEffect(() => {
+    if (!context.validUntil) return;
+    const timer = setTimeout(() => {
+      sequence.current++; resetRef.current(); setContext(emptyIntakeQueryContext()); setBusy(false);
+      setError('筛选资格已到期，请刷新店铺。');
+    }, Math.max(0, Math.min(2_147_483_647, Date.parse(context.validUntil) - Date.now())));
+    return () => clearTimeout(timer);
+  }, [context.validUntil]);
   const invalidate = useCallback(() => { sequence.current++; }, []);
   useEffect(() => {
-    invalidate(); setContext({ shops: [], shopId: null }); setError(''); setBusy(false);
+    invalidate(); setContext(emptyIntakeQueryContext()); setError(''); setBusy(false);
     if (enabled && signedIn) void load();
     return invalidate;
   }, [enabled, signedIn, epoch, load, invalidate]);
-  return { ...context, busy, error, load };
+  return { ...context, busy, error, load, selectConditions };
 }

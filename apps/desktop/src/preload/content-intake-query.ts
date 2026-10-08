@@ -2,7 +2,7 @@ import { ipcRenderer } from 'electron';
 import { IPC_CHANNELS as C } from '../shared/ipc-channels';
 import { exactKeys } from '../shared/product-session';
 import { intakeQueryFailure, isIntakeFailure, isIntakeContextResult, isIntakeSearchResult,
-  isIntakeShopRequest, isIntakeSearchRequest, isIntakeCopyRequest,
+  isIntakeSelection, isIntakeShopRequest, isIntakeSearchRequest, isIntakeCopyRequest,
   type IntakeQueryApi, type IntakeQueryResult } from '../shared/content-intake-query';
 
 const listeners = new Set<(reason: 'invalidated' | 'expired') => void>();
@@ -21,6 +21,8 @@ export const intakeQuery: IntakeQueryApi = {
     || (exactKeys(v, ['ok', 'enabled']) && v.ok === true && typeof v.enabled === 'boolean')),
   access: () => invoke(C.INTAKE_QUERY_ACCESS, [], isIntakeContextResult),
   selectShop: request => isIntakeShopRequest(request) ? invoke(C.INTAKE_QUERY_SELECT, [request], isIntakeContextResult)
+    : Promise.resolve(intakeQueryFailure('VALIDATION')),
+  selectConditions: request => isIntakeSelection(request) ? invoke(C.INTAKE_QUERY_CONDITIONS, [request], isIntakeContextResult)
     : Promise.resolve(intakeQueryFailure('VALIDATION')),
   search: request => isIntakeSearchRequest(request) ? invoke(C.INTAKE_QUERY_SEARCH, [request], isIntakeSearchResult)
     : Promise.resolve(intakeQueryFailure('VALIDATION')),

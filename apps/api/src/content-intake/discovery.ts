@@ -125,6 +125,55 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
     }, value => parseContractSchema(schema, value));
   }
   return {
+    /** Read-only query menu. Names come from the latest registered display
+     * version, never from answer text. Each page binds the complete bounded
+     * vocabulary and current authority; a rename/revocation restarts paging. */
+    vocabulary(actor: AuthenticatedUser, sourceId: unknown, raw: unknown) {
+      return run(actor, 'discover-vocabulary', null, null, async (client, who) => {
+        const id = parseContractSchema('IntakeId', sourceId), request = page(raw);
+        const session = await lockProductSession(client, actor), src = await source(client, id);
+        const grantUntil = await authorize(client, who, 'query', src);
+        if (src.mode !== 'v2-preview') throw new IntakeRejection('MODE_CONFLICT');
+        const until = Math.min(session.validUntil, who.validUntil, grantUntil);
+        const rows = await client.query<{ value: C['IntakeVocabulary'] }>(`
+          SELECT jsonb_build_object('id',v.vocabulary_id,'kind',v.kind,'active',v.active,
+            'meaningDigest',v.meaning_digest,'displayVersion',d.display_version,'displayName',d.display_name,
+            'scope',jsonb_build_object('tenantId',s.tenant_id,'appId',s.app_id,'brandId',s.brand_id,
+              'shopId',s.shop_id,'domain',s.domain,'sourceId',NULL)) AS value
+          FROM content_intake.vocabulary v JOIN content_intake.scopes s USING(scope_id)
+          LEFT JOIN LATERAL (SELECT display_version,display_name FROM content_intake.vocabulary_displays
+            WHERE vocabulary_id=v.vocabulary_id ORDER BY display_version DESC LIMIT 1) d ON true
+          WHERE v.active AND s.tenant_id=$1 AND s.app_id=$2 AND s.brand_id=$3 AND s.domain=$4
+            AND (s.shop_id IS NULL OR s.shop_id=$5)
+          ORDER BY v.vocabulary_id COLLATE "C" LIMIT 5001`,
+        [src.scope.tenantId,src.scope.appId,src.scope.brandId,src.scope.domain,src.scope.shopId]);
+        if (rows.rows.length > 5000 || Buffer.byteLength(JSON.stringify(rows.rows)) > 4 * 1024 * 1024) {
+          throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
+        }
+        const items = rows.rows.map(row => parseContractSchema('IntakeVocabulary', row.value));
+        const revision = digest(canonical([id,src,who.factsVersion,who.generation,until,request.limit,items]));
+        let offset = 0;
+        if (request.cursor) {
+          const parts = request.cursor.split('.'), body = parts[0] ?? '';
+          const mac = Buffer.from(parts[1] ?? '', 'base64url'), expected = signature(body, session.hash);
+          if (parts.length !== 2 || mac.length !== expected.length || !timingSafeEqual(mac, expected)) {
+            throw new IntakeRejection('PERMISSION_CHANGED');
+          }
+          let tuple: unknown;
+          try { tuple = JSON.parse(Buffer.from(body, 'base64url').toString()); }
+          catch { throw new IntakeRejection('FILE_INVALID', 'VALIDATION'); }
+          if (!Array.isArray(tuple) || tuple.length !== 3 || tuple[0] !== 'vocabulary' || tuple[1] !== revision
+            || !Number.isInteger(tuple[2]) || tuple[2] < 1 || tuple[2] >= items.length) {
+            throw new IntakeRejection('PERMISSION_CHANGED');
+          }
+          offset = tuple[2];
+        }
+        client.validUntil(until);
+        const end = Math.min(offset + request.limit, items.length);
+        const body = Buffer.from(JSON.stringify(['vocabulary', revision, end])).toString('base64url');
+        return { items: items.slice(offset, end), nextCursor: end < items.length ? `${body}.${signature(body, session.hash).toString('base64url')}` : null };
+      }, value => parseContractSchema('IntakeVocabularyList', value));
+    },
     /** An importer's current input hints, not a grant, lease or commit ticket.
      * The existing publication lock also fences a missing current row. Receive
      * reauthorizes and compares this base/source version in its own transaction. */
