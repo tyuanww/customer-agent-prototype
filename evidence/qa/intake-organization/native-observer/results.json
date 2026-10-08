@@ -1,0 +1,108 @@
+{
+  "base_commit": "bc681cca05d73e7f115cf13d1ab101824f164278",
+  "version": "0.3.26",
+  "environment": {
+    "node": "24.x",
+    "pnpm": "11.19.0",
+    "database": "temporary PostgreSQL 15, synthetic only"
+  },
+  "input_manifest": "input-sha256.json",
+  "full_workspace_checks": [
+    {
+      "command": "pnpm lint",
+      "exit_code": 0,
+      "started_at": "2026-10-08T05:06:59.834416+00:00",
+      "duration_seconds": 4.29,
+      "log": ".gstack/intake-native-observer/lint.log",
+      "log_sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "scope": "Before final cancellation guard fix; unaffected workspace/build inputs reused, affected observer revalidated below."
+    },
+    {
+      "command": "pnpm typecheck",
+      "exit_code": 0,
+      "started_at": "2026-10-08T05:07:04.127575+00:00",
+      "duration_seconds": 7.91,
+      "log": ".gstack/intake-native-observer/typecheck.log",
+      "log_sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+      "scope": "Before final cancellation guard fix; unaffected workspace/build inputs reused, affected observer revalidated below."
+    },
+    {
+      "command": "pnpm test",
+      "exit_code": 0,
+      "started_at": "2026-10-08T05:07:12.036162+00:00",
+      "duration_seconds": 102.37,
+      "log": ".gstack/intake-native-observer/test.log",
+      "log_sha256": "3fb7b68a67312ffd5c5ea70c5dcab672f89ecb3cf566dd74bdd453ed8706ebff",
+      "scope": "Before final cancellation guard fix; unaffected workspace/build inputs reused, affected observer revalidated below."
+    },
+    {
+      "command": "pnpm build",
+      "exit_code": 0,
+      "started_at": "2026-10-08T05:08:54.406102+00:00",
+      "duration_seconds": 8.05,
+      "log": ".gstack/intake-native-observer/build.log",
+      "log_sha256": "b710c7c38abdc077a757ab98fb6e4a3fa5d300a767d2dd6137b0c7cc6275c338",
+      "scope": "Before final cancellation guard fix; unaffected workspace/build inputs reused, affected observer revalidated below."
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api test:intake:organization",
+      "exit_code": 0,
+      "started_at": "2026-10-08T05:09:02.457579+00:00",
+      "duration_seconds": 15.21,
+      "log": ".gstack/intake-native-observer/organization.log",
+      "log_sha256": "80b3d84e237a00dfe7c99b7b0956e91cd0bd90f16f8df479978620ad32098531",
+      "scope": "Before final cancellation guard fix; unaffected workspace/build inputs reused, affected observer revalidated below."
+    }
+  ],
+  "final_checks": [
+    {
+      "command": "pnpm lint",
+      "exit_code": 0,
+      "local_log": ".gstack/intake-native-observer/lint-final.log",
+      "log_sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api typecheck",
+      "exit_code": 0,
+      "local_log": ".gstack/intake-native-observer/typecheck-final.log",
+      "log_sha256": "9b0c44f740698865fe6582d4d78da94e7393988e8a42ef8e2214b2f446936bff"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/intake-organization-observer.test.ts",
+      "exit_code": 0,
+      "local_log": ".gstack/intake-native-observer/observer-final.log",
+      "log_sha256": "4137a7927c4423aa22a270ed4abe6cee6c74f04468aa2e9a8498a96d613a19f2"
+    }
+  ],
+  "functional_qa": {
+    "status": "PASS",
+    "command": "pnpm --filter @customer-agent/api test:intake:organization",
+    "observer_tests": 19,
+    "actual_pg15_tests": 10,
+    "receipt": "capture-receipt.json",
+    "output": "organization-tests.txt",
+    "evidence": "qa-evidence.json"
+  },
+  "artifact_boundary": {
+    "dist_files": 168,
+    "experiment_files_found": [],
+    "config": "apps/api/tsconfig.build.json",
+    "production_sources_changed": false
+  },
+  "review": {
+    "scope": "Changes since bc681cc; no claim to re-review all inherited changes",
+    "core": "no unresolved actionable findings",
+    "native_independent": "cancellation race found, reproduced, fixed and re-reviewed; no unresolved actionable findings",
+    "outside": "unavailable: timeout after 180000 ms; one attempt, no retry",
+    "status": "INCOMPLETE",
+    "historic_review": "INCOMPLETE retained",
+    "fixed": [
+      "Cancellation while awaiting initial clock could start a late transport request; synchronous cancellation checkpoints now guard subsequent I/O."
+    ]
+  },
+  "limitations": [
+    "No real data, credentials, production HTTP, transport authentication, rate scheduler or migration changes.",
+    "Two full reads detect observable drift only; upstream atomicity/cache freshness and formal provenance persistence remain unverified.",
+    "Formal ACL/factory and approval mapping remain pending; direct permission configuration decision is recorded separately in plan 0.51."
+  ]
+}

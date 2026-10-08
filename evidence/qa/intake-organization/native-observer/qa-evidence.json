@@ -1,0 +1,24 @@
+{
+  "revision": "bc681cca05d73e7f115cf13d1ab101824f164278",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+  "limits": [
+    "Only synthetic fixture and temporary PG15; no real Feishu transport, authentication, rate-limit scheduling or production configuration.",
+    "No remote atomic-snapshot or freshness proof; mapping provenance is not persisted by a production writer.",
+    "Full workspace checks preceded the local cancellation guard fix; final observer, actual PG15, API typecheck and root lint reran after that fix."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/api test:intake:organization",
+      "contract": "Native-shaped synthetic organization observation feeds the restricted facts writer and existing usage consumer; invalid or expired observations never grant or extend access.",
+      "expected": "19 observer tests and 10 actual temporary PG15 integration tests pass, including revocation, replay and incomplete pagination.",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api\n\n ✓ tests/intake-organization-observer.test.ts (19 tests) 31ms\n ✓ tests/intake-organization.integration.test.ts (10 tests) 10138ms\n   ✓ offline organization refresh through frozen storage and real usage > refreshes with a non-owner writer; exact replay changes no deadline or generation and old lease stays bounded  990ms\n   ✓ offline organization refresh through frozen storage and real usage > disables actual usage and an old enabled replay cannot restore it; role changes revoke the old qualification  881ms\n   ✓ offline organization refresh through frozen storage and real usage > rejects stale, future, expired, malformed and cross-scope snapshots without mutation  853ms\n   ✓ offline organization refresh through frozen storage and real usage > serializes concurrent snapshots and refuses a newer version with an older observation  852ms\n   ✓ offline organization refresh through frozen storage and real usage > recovers a lost commit using the exact immutable version after writer recreation  858ms\n   ✓ offline organization refresh through frozen storage and real usage > rolls back an observation that expires after writing but before commit  1977ms\n   ✓ offline organization refresh through frozen storage and real usage > department changes remove access and do not rewrite grants or silently choose a role  860ms\n   ✓ offline organization refresh through frozen storage and real usage > consumes native-shaped observations through the restricted writer and revokes real usage on status/department change  867ms\n   ✓ offline organization refresh through frozen storage and real usage > produces no writable snapshot when a later directory page fails; facts and expiry remain unchanged  989ms\n   ✓ offline organization refresh through frozen storage and real usage > has no write authority over identity, role policy, grants, history or publication  1012ms\n\n Test Files  2 passed (2)\n      Tests  29 passed (29)\n   Start at  13:11:10\n   Duration  10.73s (transform 247ms, setup 0ms, collect 751ms, tests 10.17s, environment 0ms, prepare 105ms)\n\n"
+    }
+  ],
+  "learning": [],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

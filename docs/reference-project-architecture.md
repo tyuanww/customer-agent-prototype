@@ -103,7 +103,7 @@ OpenAPI1.19 管理上下文没有新增 DDL；26段 SQL 的来源和校验和保
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
 
-`apps/api/experiments/intake-organization/facts-writer.ts` 只用于已登记主体的离线组织事实写入验证，复用 content lock、事实历史/版本指针及 revocation generation。测试使用临时受限账号，通过实际登录/使用资格消费者验证失效；不会创建主体或业务 grant，也不进入 dist、HTTP 或生产角色配置。可信原生观察方及输入归一尚未实现，具体限制见[组织刷新验收](../evidence/qa/intake-organization/README.md)。
+`apps/api/experiments/intake-organization/facts-writer.ts` 只用于已登记主体的离线组织事实写入验证，复用 content lock、事实历史/版本指针及 revocation generation。测试使用临时受限账号，通过实际登录/使用资格消费者验证失效；不会创建主体或业务 grant，也不进入 dist、HTTP 或生产角色配置。原生字段/分页归一现由同目录 `feishu-observer.ts` 离线候选拥有，以受信同应用主体绑定、双扫描和观察期限生成既有快照；没有生产认证 transport，观察一致性不证明上游原子性。原 writer 与新增观察验证分别见[组织刷新验收](../evidence/qa/intake-organization/README.md)和[原生观察验收](../evidence/qa/intake-organization/native-observer/README.md)。
 
 `apps/api/src/content-intake/capacity.ts` 是 P2 磁盘容量生命周期的唯一 API 所有者，复用对象存储分配 ID、落盘前准入、持久删除。0029 私有账本在既有内容锁下统一计入输入、报告、普通/回滚审核包；所有调用方在同一业务事务采用。释放先写 tombstone 阻止迟到采用，再在锁外删除文件并同步目录，最后释放额度。未知提交、已登记引用、未知磁盘文件和历史资料不得因超时推断可删除。报告预留被明确拒绝时仍将任务终结，避免占满候选配额。没有新 renderer/HTTP 能力或生产 ACL；规则与实际证据见[容量验收](../evidence/qa/content-intake-p2-capacity/README.md)。
 
