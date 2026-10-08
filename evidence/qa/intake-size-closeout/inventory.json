@@ -1,0 +1,1419 @@
+{
+  "baseline": "01d7a0c6ef965a7e36a0578168b92d04038ea298",
+  "method": "lstat allocated blocks*512 when positive; stat.size fallback; shared dev:ino dedup; symlinks are not followed; directory entries count; logical numbers sum regular file byte lengths only",
+  "original": {
+    "root": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+    "total": 42231334,
+    "computedTotal": 42231334,
+    "groups": [
+      {
+        "path": "contracts/upstream",
+        "logical": 13299467,
+        "allocated": 13471808,
+        "files": 80
+      },
+      {
+        "path": "evidence",
+        "logical": 7448515,
+        "allocated": 8942016,
+        "files": 594
+      },
+      {
+        "path": "apps/desktop/src",
+        "logical": 2159819,
+        "allocated": 2624960,
+        "files": 200
+      },
+      {
+        "path": "docs",
+        "logical": 2151767,
+        "allocated": 2557248,
+        "files": 156
+      },
+      {
+        "path": "apps/desktop/tests",
+        "logical": 1750812,
+        "allocated": 2107328,
+        "files": 170
+      },
+      {
+        "path": "apps/api/tests",
+        "logical": 1316113,
+        "allocated": 1514848,
+        "files": 96
+      },
+      {
+        "path": "apps/desktop/build",
+        "logical": 1149705,
+        "allocated": 1171744,
+        "files": 7
+      },
+      {
+        "path": "apps/desktop/assets",
+        "logical": 1025892,
+        "allocated": 1032320,
+        "files": 2
+      },
+      {
+        "path": "packages/database/src",
+        "logical": 997053,
+        "allocated": 1024576,
+        "files": 10
+      },
+      {
+        "path": "packages/database/migrations",
+        "logical": 904435,
+        "allocated": 984256,
+        "files": 36
+      },
+      {
+        "path": "packages/contracts/dist",
+        "logical": 950735,
+        "allocated": 979424,
+        "files": 10
+      },
+      {
+        "path": "apps/api/src",
+        "logical": 779869,
+        "allocated": 966112,
+        "files": 91
+      },
+      {
+        "path": "packages/contracts/src",
+        "logical": 778104,
+        "allocated": 790880,
+        "files": 6
+      },
+      {
+        "path": "apps/desktop/fox-head.png",
+        "logical": 706189,
+        "allocated": 708608,
+        "files": 1
+      },
+      {
+        "path": "apps/api/experiments",
+        "logical": 493305,
+        "allocated": 637600,
+        "files": 61
+      },
+      {
+        "path": "scripts",
+        "logical": 447885,
+        "allocated": 546784,
+        "files": 52
+      },
+      {
+        "path": "packages/contracts/openapi",
+        "logical": 539021,
+        "allocated": 540768,
+        "files": 1
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "logical": 204597,
+        "allocated": 204800,
+        "files": 1
+      },
+      {
+        "path": "packages/database/overlays",
+        "logical": 141508,
+        "allocated": 168416,
+        "files": 13
+      },
+      {
+        "path": "packages/database/tests",
+        "logical": 126839,
+        "allocated": 152032,
+        "files": 10
+      },
+      {
+        "path": "apps/desktop/scripts",
+        "logical": 71844,
+        "allocated": 119392,
+        "files": 17
+      },
+      {
+        "path": "packages/content-intake/dist",
+        "logical": 54089,
+        "allocated": 86528,
+        "files": 14
+      },
+      {
+        "path": "CHANGELOG.md",
+        "logical": 54104,
+        "allocated": 57344,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/dist",
+        "logical": 12902,
+        "allocated": 53696,
+        "files": 12
+      },
+      {
+        "path": "packages/content-intake/src",
+        "logical": 43562,
+        "allocated": 53536,
+        "files": 7
+      },
+      {
+        "path": "packages/database/scripts",
+        "logical": 48437,
+        "allocated": 49248,
+        "files": 1
+      },
+      {
+        "path": "DESIGN.md",
+        "logical": 43678,
+        "allocated": 45056,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/tests",
+        "logical": 34135,
+        "allocated": 41120,
+        "files": 3
+      },
+      {
+        "path": "README.md",
+        "logical": 38813,
+        "allocated": 40960,
+        "files": 1
+      },
+      {
+        "path": "DEVELOPMENT_BRIEF.md",
+        "logical": 33408,
+        "allocated": 36864,
+        "files": 1
+      },
+      {
+        "path": "TODOS.md",
+        "logical": 35478,
+        "allocated": 36864,
+        "files": 1
+      },
+      {
+        "path": ".github",
+        "logical": 14157,
+        "allocated": 33216,
+        "files": 6
+      },
+      {
+        "path": "packages/retrieval-core/src",
+        "logical": 11372,
+        "allocated": 28928,
+        "files": 6
+      },
+      {
+        "path": "packages/contracts/tests",
+        "logical": 19757,
+        "allocated": 28864,
+        "files": 4
+      },
+      {
+        "path": "packages/contracts/node_modules",
+        "logical": 10953,
+        "allocated": 26141,
+        "files": 6
+      },
+      {
+        "path": "tests",
+        "logical": 18416,
+        "allocated": 24896,
+        "files": 2
+      },
+      {
+        "path": "AGENTS.md",
+        "logical": 23406,
+        "allocated": 24576,
+        "files": 1
+      },
+      {
+        "path": "apps/api/README.md",
+        "logical": 20629,
+        "allocated": 24576,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/node_modules",
+        "logical": 6702,
+        "allocated": 18034,
+        "files": 4
+      },
+      {
+        "path": "packages/retrieval-core/node_modules",
+        "logical": 6642,
+        "allocated": 17463,
+        "files": 4
+      },
+      {
+        "path": "packages/content-intake/scripts",
+        "logical": 10929,
+        "allocated": 16512,
+        "files": 2
+      },
+      {
+        "path": "packages/contracts/scripts",
+        "logical": 15026,
+        "allocated": 16480,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/experiments",
+        "logical": 5254,
+        "allocated": 12512,
+        "files": 2
+      },
+      {
+        "path": "packages/retrieval-core/tests",
+        "logical": 6559,
+        "allocated": 12416,
+        "files": 2
+      },
+      {
+        "path": "PROJECT_CHARTER.md",
+        "logical": 9367,
+        "allocated": 12288,
+        "files": 1
+      },
+      {
+        "path": "package.json",
+        "logical": 8202,
+        "allocated": 12288,
+        "files": 1
+      },
+      {
+        "path": "packages/database/README.md",
+        "logical": 10784,
+        "allocated": 12288,
+        "files": 1
+      },
+      {
+        "path": "apps/api/package.json",
+        "logical": 5414,
+        "allocated": 8192,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/package.json",
+        "logical": 5481,
+        "allocated": 8192,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/resources",
+        "logical": 29,
+        "allocated": 4192,
+        "files": 1
+      },
+      {
+        "path": ".gitattributes",
+        "logical": 741,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": ".gitignore",
+        "logical": 922,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": ".npmrc",
+        "logical": 91,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": ".nvmrc",
+        "logical": 3,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "logical": 3998,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "LICENSE",
+        "logical": 1064,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "VERSION",
+        "logical": 7,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/api/tsconfig.build.json",
+        "logical": 331,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/api/tsconfig.json",
+        "logical": 585,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/README.md",
+        "logical": 936,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/THIRD_PARTY_NOTICES.md",
+        "logical": 1999,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/electron.vite.config.ts",
+        "logical": 2197,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/playwright.config.ts",
+        "logical": 278,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/tsconfig.json",
+        "logical": 844,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/vitest.config.ts",
+        "logical": 685,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "eslint.config.js",
+        "logical": 1244,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "logo-wordmark.png",
+        "logical": 3662,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/README.md",
+        "logical": 3355,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/package.json",
+        "logical": 867,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/tsconfig.build.json",
+        "logical": 194,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/tsconfig.json",
+        "logical": 398,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/README.md",
+        "logical": 1619,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/package.json",
+        "logical": 1501,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/tsconfig.build.json",
+        "logical": 267,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/tsconfig.json",
+        "logical": 475,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/database/package.json",
+        "logical": 1506,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/database/tsconfig.build.json",
+        "logical": 267,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/database/tsconfig.json",
+        "logical": 475,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/README.md",
+        "logical": 1599,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/package.json",
+        "logical": 958,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/tsconfig.build.json",
+        "logical": 267,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/tsconfig.json",
+        "logical": 457,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "logical": 508,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "启动客服Agent.command",
+        "logical": 3104,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop",
+        "logical": 0,
+        "allocated": 608,
+        "files": 0
+      },
+      {
+        "path": "packages/database",
+        "logical": 0,
+        "allocated": 416,
+        "files": 0
+      },
+      {
+        "path": "packages/content-intake",
+        "logical": 0,
+        "allocated": 384,
+        "files": 0
+      },
+      {
+        "path": "packages/contracts",
+        "logical": 0,
+        "allocated": 384,
+        "files": 0
+      },
+      {
+        "path": "apps/api",
+        "logical": 0,
+        "allocated": 352,
+        "files": 0
+      },
+      {
+        "path": "packages/retrieval-core",
+        "logical": 0,
+        "allocated": 320,
+        "files": 0
+      },
+      {
+        "path": "packages",
+        "logical": 0,
+        "allocated": 192,
+        "files": 0
+      },
+      {
+        "path": "apps",
+        "logical": 0,
+        "allocated": 128,
+        "files": 0
+      },
+      {
+        "path": "contracts",
+        "logical": 0,
+        "allocated": 96,
+        "files": 0
+      }
+    ],
+    "largest": [
+      {
+        "path": "packages/database/src/generated/migrations.generated.ts",
+        "type": "file",
+        "logical": 917507,
+        "allocated": 921600
+      },
+      {
+        "path": "apps/desktop/build/icon.icns",
+        "type": "file",
+        "logical": 777646,
+        "allocated": 778240
+      },
+      {
+        "path": "apps/desktop/assets/fox-head-master.png",
+        "type": "file",
+        "logical": 706189,
+        "allocated": 708608
+      },
+      {
+        "path": "apps/desktop/fox-head.png",
+        "type": "file",
+        "logical": 706189,
+        "allocated": 708608
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/schema-v1.24.sql",
+        "type": "file",
+        "logical": 705427,
+        "allocated": 708608
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/schema-v1.25.sql",
+        "type": "file",
+        "logical": 706504,
+        "allocated": 708608
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/schema-v1.23.sql",
+        "type": "file",
+        "logical": 699965,
+        "allocated": 700416
+      },
+      {
+        "path": "apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png",
+        "type": "file",
+        "logical": 655563,
+        "allocated": 659456
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929/schema-v1.22.sql",
+        "type": "file",
+        "logical": 636987,
+        "allocated": 638976
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/schema-v1.21.sql",
+        "type": "file",
+        "logical": 630129,
+        "allocated": 630784
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1/schema-v1.21.sql",
+        "type": "file",
+        "logical": 630129,
+        "allocated": 630784
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8/schema-v1.21.sql",
+        "type": "file",
+        "logical": 630129,
+        "allocated": 630784
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa/schema-v1.20.sql",
+        "type": "file",
+        "logical": 626367,
+        "allocated": 626688
+      },
+      {
+        "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+        "type": "file",
+        "logical": 621786,
+        "allocated": 622592
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534/schema-v1.18.sql",
+        "type": "file",
+        "logical": 544228,
+        "allocated": 544768
+      },
+      {
+        "path": "packages/contracts/openapi/bundle.generated.yaml",
+        "type": "file",
+        "logical": 539021,
+        "allocated": 540672
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e/schema-v1.16.sql",
+        "type": "file",
+        "logical": 521122,
+        "allocated": 524288
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2/schema-v1.17.sql",
+        "type": "file",
+        "logical": 521868,
+        "allocated": 524288
+      },
+      {
+        "path": "packages/contracts/dist/generated/runtime-schema.generated.js",
+        "type": "file",
+        "logical": 514251,
+        "allocated": 516096
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701/schema-v1.15.sql",
+        "type": "file",
+        "logical": 479527,
+        "allocated": 483328
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/openapi.v1.yaml",
+        "type": "file",
+        "logical": 423919,
+        "allocated": 425984
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/openapi.v1.yaml",
+        "type": "file",
+        "logical": 423919,
+        "allocated": 425984
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/openapi.v1.yaml",
+        "type": "file",
+        "logical": 420290,
+        "allocated": 421888
+      },
+      {
+        "path": "packages/contracts/dist/generated/openapi.generated.d.ts",
+        "type": "file",
+        "logical": 421297,
+        "allocated": 421888
+      },
+      {
+        "path": "packages/contracts/src/generated/openapi.generated.ts",
+        "type": "file",
+        "logical": 421389,
+        "allocated": 421888
+      }
+    ]
+  },
+  "corrected": {
+    "root": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+    "total": 39894976,
+    "computedTotal": 39894976,
+    "groups": [
+      {
+        "path": "contracts/upstream",
+        "logical": 13299467,
+        "allocated": 13471808,
+        "files": 80
+      },
+      {
+        "path": "evidence",
+        "logical": 7448515,
+        "allocated": 8942016,
+        "files": 594
+      },
+      {
+        "path": "apps/desktop/src",
+        "logical": 2159819,
+        "allocated": 2624960,
+        "files": 200
+      },
+      {
+        "path": "docs",
+        "logical": 2151767,
+        "allocated": 2557248,
+        "files": 156
+      },
+      {
+        "path": "apps/desktop/tests",
+        "logical": 1750812,
+        "allocated": 2107328,
+        "files": 170
+      },
+      {
+        "path": "apps/api/tests",
+        "logical": 1316113,
+        "allocated": 1514848,
+        "files": 96
+      },
+      {
+        "path": "apps/desktop/assets",
+        "logical": 1025892,
+        "allocated": 1032320,
+        "files": 2
+      },
+      {
+        "path": "packages/database/src",
+        "logical": 997053,
+        "allocated": 1024576,
+        "files": 10
+      },
+      {
+        "path": "packages/database/migrations",
+        "logical": 904435,
+        "allocated": 984256,
+        "files": 36
+      },
+      {
+        "path": "apps/api/src",
+        "logical": 779869,
+        "allocated": 966112,
+        "files": 91
+      },
+      {
+        "path": "packages/contracts/src",
+        "logical": 778104,
+        "allocated": 790880,
+        "files": 6
+      },
+      {
+        "path": "apps/desktop/fox-head.png",
+        "logical": 706189,
+        "allocated": 708608,
+        "files": 1
+      },
+      {
+        "path": "apps/api/experiments",
+        "logical": 493305,
+        "allocated": 637600,
+        "files": 61
+      },
+      {
+        "path": "scripts",
+        "logical": 447885,
+        "allocated": 546784,
+        "files": 52
+      },
+      {
+        "path": "packages/contracts/openapi",
+        "logical": 539021,
+        "allocated": 540768,
+        "files": 1
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "logical": 204597,
+        "allocated": 204800,
+        "files": 1
+      },
+      {
+        "path": "packages/database/overlays",
+        "logical": 141508,
+        "allocated": 168416,
+        "files": 13
+      },
+      {
+        "path": "packages/database/tests",
+        "logical": 126839,
+        "allocated": 152032,
+        "files": 10
+      },
+      {
+        "path": "apps/desktop/scripts",
+        "logical": 71844,
+        "allocated": 119392,
+        "files": 17
+      },
+      {
+        "path": "CHANGELOG.md",
+        "logical": 54104,
+        "allocated": 57344,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/src",
+        "logical": 43562,
+        "allocated": 53536,
+        "files": 7
+      },
+      {
+        "path": "packages/database/scripts",
+        "logical": 48437,
+        "allocated": 49248,
+        "files": 1
+      },
+      {
+        "path": "DESIGN.md",
+        "logical": 43678,
+        "allocated": 45056,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/tests",
+        "logical": 34135,
+        "allocated": 41120,
+        "files": 3
+      },
+      {
+        "path": "README.md",
+        "logical": 38813,
+        "allocated": 40960,
+        "files": 1
+      },
+      {
+        "path": "DEVELOPMENT_BRIEF.md",
+        "logical": 33408,
+        "allocated": 36864,
+        "files": 1
+      },
+      {
+        "path": "TODOS.md",
+        "logical": 35478,
+        "allocated": 36864,
+        "files": 1
+      },
+      {
+        "path": ".github",
+        "logical": 14157,
+        "allocated": 33216,
+        "files": 6
+      },
+      {
+        "path": "packages/retrieval-core/src",
+        "logical": 11372,
+        "allocated": 28928,
+        "files": 6
+      },
+      {
+        "path": "packages/contracts/tests",
+        "logical": 19757,
+        "allocated": 28864,
+        "files": 4
+      },
+      {
+        "path": "tests",
+        "logical": 18416,
+        "allocated": 24896,
+        "files": 2
+      },
+      {
+        "path": "AGENTS.md",
+        "logical": 23406,
+        "allocated": 24576,
+        "files": 1
+      },
+      {
+        "path": "apps/api/README.md",
+        "logical": 20629,
+        "allocated": 24576,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/build",
+        "logical": 2943,
+        "allocated": 16672,
+        "files": 4
+      },
+      {
+        "path": "packages/content-intake/scripts",
+        "logical": 10929,
+        "allocated": 16512,
+        "files": 2
+      },
+      {
+        "path": "packages/contracts/scripts",
+        "logical": 15026,
+        "allocated": 16480,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/experiments",
+        "logical": 5254,
+        "allocated": 12512,
+        "files": 2
+      },
+      {
+        "path": "packages/retrieval-core/tests",
+        "logical": 6559,
+        "allocated": 12416,
+        "files": 2
+      },
+      {
+        "path": "PROJECT_CHARTER.md",
+        "logical": 9367,
+        "allocated": 12288,
+        "files": 1
+      },
+      {
+        "path": "package.json",
+        "logical": 8202,
+        "allocated": 12288,
+        "files": 1
+      },
+      {
+        "path": "packages/database/README.md",
+        "logical": 10784,
+        "allocated": 12288,
+        "files": 1
+      },
+      {
+        "path": "apps/api/package.json",
+        "logical": 5414,
+        "allocated": 8192,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/package.json",
+        "logical": 5481,
+        "allocated": 8192,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/resources",
+        "logical": 29,
+        "allocated": 4192,
+        "files": 1
+      },
+      {
+        "path": ".gitattributes",
+        "logical": 741,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": ".gitignore",
+        "logical": 922,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": ".npmrc",
+        "logical": 91,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": ".nvmrc",
+        "logical": 3,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "logical": 3998,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "LICENSE",
+        "logical": 1064,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "VERSION",
+        "logical": 7,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/api/tsconfig.build.json",
+        "logical": 331,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/api/tsconfig.json",
+        "logical": 585,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/README.md",
+        "logical": 936,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/THIRD_PARTY_NOTICES.md",
+        "logical": 1999,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/electron.vite.config.ts",
+        "logical": 2197,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/playwright.config.ts",
+        "logical": 278,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/tsconfig.json",
+        "logical": 844,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop/vitest.config.ts",
+        "logical": 685,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "eslint.config.js",
+        "logical": 1244,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "logo-wordmark.png",
+        "logical": 3662,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/README.md",
+        "logical": 3355,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/package.json",
+        "logical": 867,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/tsconfig.build.json",
+        "logical": 194,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/content-intake/tsconfig.json",
+        "logical": 398,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/README.md",
+        "logical": 1619,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/package.json",
+        "logical": 1501,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/tsconfig.build.json",
+        "logical": 267,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/contracts/tsconfig.json",
+        "logical": 475,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/database/package.json",
+        "logical": 1506,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/database/tsconfig.build.json",
+        "logical": 267,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/database/tsconfig.json",
+        "logical": 475,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/README.md",
+        "logical": 1599,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/package.json",
+        "logical": 958,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/tsconfig.build.json",
+        "logical": 267,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "packages/retrieval-core/tsconfig.json",
+        "logical": 457,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "logical": 508,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "启动客服Agent.command",
+        "logical": 3104,
+        "allocated": 4096,
+        "files": 1
+      },
+      {
+        "path": "apps/desktop",
+        "logical": 0,
+        "allocated": 608,
+        "files": 0
+      },
+      {
+        "path": "packages/database",
+        "logical": 0,
+        "allocated": 416,
+        "files": 0
+      },
+      {
+        "path": "packages/content-intake",
+        "logical": 0,
+        "allocated": 384,
+        "files": 0
+      },
+      {
+        "path": "packages/contracts",
+        "logical": 0,
+        "allocated": 384,
+        "files": 0
+      },
+      {
+        "path": "apps/api",
+        "logical": 0,
+        "allocated": 352,
+        "files": 0
+      },
+      {
+        "path": "packages/retrieval-core",
+        "logical": 0,
+        "allocated": 320,
+        "files": 0
+      },
+      {
+        "path": "packages",
+        "logical": 0,
+        "allocated": 192,
+        "files": 0
+      },
+      {
+        "path": "apps",
+        "logical": 0,
+        "allocated": 128,
+        "files": 0
+      },
+      {
+        "path": "contracts",
+        "logical": 0,
+        "allocated": 96,
+        "files": 0
+      }
+    ],
+    "largest": [
+      {
+        "path": "packages/database/src/generated/migrations.generated.ts",
+        "type": "file",
+        "logical": 917507,
+        "allocated": 921600
+      },
+      {
+        "path": "apps/desktop/assets/fox-head-master.png",
+        "type": "file",
+        "logical": 706189,
+        "allocated": 708608
+      },
+      {
+        "path": "apps/desktop/fox-head.png",
+        "type": "file",
+        "logical": 706189,
+        "allocated": 708608
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/schema-v1.24.sql",
+        "type": "file",
+        "logical": 705427,
+        "allocated": 708608
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/schema-v1.25.sql",
+        "type": "file",
+        "logical": 706504,
+        "allocated": 708608
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/schema-v1.23.sql",
+        "type": "file",
+        "logical": 699965,
+        "allocated": 700416
+      },
+      {
+        "path": "apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png",
+        "type": "file",
+        "logical": 655563,
+        "allocated": 659456
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929/schema-v1.22.sql",
+        "type": "file",
+        "logical": 636987,
+        "allocated": 638976
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/schema-v1.21.sql",
+        "type": "file",
+        "logical": 630129,
+        "allocated": 630784
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1/schema-v1.21.sql",
+        "type": "file",
+        "logical": 630129,
+        "allocated": 630784
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8/schema-v1.21.sql",
+        "type": "file",
+        "logical": 630129,
+        "allocated": 630784
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.16.0-schema-1.20-d029cb0908fa/schema-v1.20.sql",
+        "type": "file",
+        "logical": 626367,
+        "allocated": 626688
+      },
+      {
+        "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+        "type": "file",
+        "logical": 621786,
+        "allocated": 622592
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534/schema-v1.18.sql",
+        "type": "file",
+        "logical": 544228,
+        "allocated": 544768
+      },
+      {
+        "path": "packages/contracts/openapi/bundle.generated.yaml",
+        "type": "file",
+        "logical": 539021,
+        "allocated": 540672
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.13.0-schema-1.16-6f7d18e59f2e/schema-v1.16.sql",
+        "type": "file",
+        "logical": 521122,
+        "allocated": 524288
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.13.0-schema-1.17-0904a0aa11f2/schema-v1.17.sql",
+        "type": "file",
+        "logical": 521868,
+        "allocated": 524288
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.12.0-schema-1.15-2c75d8e76701/schema-v1.15.sql",
+        "type": "file",
+        "logical": 479527,
+        "allocated": 483328
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/openapi.v1.yaml",
+        "type": "file",
+        "logical": 423919,
+        "allocated": 425984
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/openapi.v1.yaml",
+        "type": "file",
+        "logical": 423919,
+        "allocated": 425984
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/openapi.v1.yaml",
+        "type": "file",
+        "logical": 420290,
+        "allocated": 421888
+      },
+      {
+        "path": "packages/contracts/src/generated/openapi.generated.ts",
+        "type": "file",
+        "logical": 421389,
+        "allocated": 421888
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929/openapi.v1.yaml",
+        "type": "file",
+        "logical": 415022,
+        "allocated": 417792
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8/openapi.v1.yaml",
+        "type": "file",
+        "logical": 413671,
+        "allocated": 413696
+      },
+      {
+        "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1/openapi.v1.yaml",
+        "type": "file",
+        "logical": 409489,
+        "allocated": 409600
+      }
+    ]
+  },
+  "removedMisclassificationBytes": 2336358,
+  "budgetUnchangedBytes": 33554432,
+  "sourceAfterCorrectionBytes": 39894976,
+  "knownGeneratedOnly": [
+    "packages/contracts/dist",
+    "packages/content-intake/dist",
+    "packages/retrieval-core/dist",
+    "packages/contracts/node_modules",
+    "packages/content-intake/node_modules",
+    "packages/retrieval-core/node_modules",
+    "apps/desktop/build/icon.png",
+    "apps/desktop/build/icon.ico",
+    "apps/desktop/build/icon.icns",
+    "build/icon.png",
+    "build/icon.ico",
+    "build/icon.icns"
+  ]
+}
