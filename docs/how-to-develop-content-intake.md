@@ -290,3 +290,12 @@ pnpm --filter @customer-agent/api test:intake:organization
 该命令构建已有运行依赖，在一次性 PG15 中运行 8 项合成测试；需要 Node 24 和现有 PG15 harness。实验写入器位于 `apps/api/experiments/intake-organization/facts-writer.ts`，不进入 API dist，不注册 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式运行角色与迁移不变。
 
 输入要求、提交未知恢复、验证证据与缺口见[组织刷新验收](../evidence/qa/intake-organization/README.md)。这里的 snapshot 是可信观察方提供的内部实验输入，不是飞书原始响应，也不是允许 renderer 调用的接口。重试须保留原快照和 expectedFactsVersion，历史成功不表示当前权限有效；没有观察到新事实时不能人为修改时间延长有效期。
+
+
+## 正式用途权限：会话锁离线候选
+
+```sh
+CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/intake-runtime-boundary.integration.test.ts
+```
+
+使用现有 PG15 harness 新建隔离集群，只装载合成身份/空目录。测试先证明现有会话锁 SELECT-only 拒绝，以及为锁授予身份安全列 UPDATE 的风险，再安装 experiments 中的窄函数并以非 owner 账号验证取锁/截止/撤销/权限；测试结束关闭临时集群。SQL 仅是候选，不得复制到已有数据库或生产 migration。通过不代表完整受限用途账号、原生审批或生产 factory 已具备，详细结论见[证据](../evidence/qa/intake-runtime-boundary/README.md)。

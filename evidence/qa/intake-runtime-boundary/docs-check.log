@@ -1,0 +1,3 @@
+$ node scripts/check-documentation.mjs
+evidence/qa/intake-runtime-boundary/README.md: missing review.json
+[ELIFECYCLE] Command failed with exit code 1.

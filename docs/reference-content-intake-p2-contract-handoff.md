@@ -284,3 +284,23 @@ factory 的可验收输入为：获准环境标识、受限连接配置、受控
 | 新表/函数对现有应用角色封闭，迁移及 ACL 后验 | [数据库验收](../evidence/qa/content-intake-p2-capacity/README.md)及所链 PG 日志 | 生产最小角色已建、非 owner 全流程已通过 |
 
 本组只核对源码、冻结合同和上述已运行证据，不新增或重跑未变化的功能测试。后续顺序：确认组织事实/审批的输入合同与用途权限方案 → 用合成原生响应和非 owner PG 连接完成离线实现 → 取得具体环境和真实输入授权后做受控联调。现场账号/拖动/整机断网继续按原安排；SOP/P3、历史删除和自动同步不进入本组。
+
+
+### 2026-10-08 接续核对：原生输入与会话锁权限
+
+治理工作树 `codex/content-intake-p2-contracts@240ae98` 干净；核对 `13-P2资料接入合同候选.md`、`2026-10-04_P2内容接入合同批准.md` 和 `2026-10-07_P2管理上下文合同批准.md`。批准只覆盖冻结合同及合成开发，明确未开放新应用 ACL、生产 factory、真实组织/审批与 active。产品消费锁仍是 1.19.0/schema1.21、VERIFIED_NOT_ACTIVATED。本轮没有改治理仓或正式快照，也没有读取凭据/员工资料。
+
+公开技术资料只证明原生字段结构；本轮未把字段存在当作可信输入证明。核对来源是飞书官方 SDK（2026-10-08 读取，非本项目合同）：
+
+| 输入 | 已核实的结构及与消费者的差异 | 进入正式映射前须明确 |
+| --- | --- | --- |
+| 组织 | [Contact User 模型](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/contact/v3/model/user.py) 有 open_id/user_id/union_id、department_ids、job_title、job_level_id、job_family_id，未列名为 job_id 的字段；不能把后三者任一直接等同本仓精确岗位键 | 岗位事实的权威来源和稳定标识、部门 ID 类型、同人归一命名空间及映射版本。若用自定义字段或人工映射，需要明确维护者与变更失效规则；姓名、登录角色和管理员标记均不授予业务权 |
+| 启用状态/新鲜度 | [UserStatus 模型](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/contact/v3/model/user_status.py) 列出五个可选布尔字段；本仓需要明确 enabled 和至多五分钟的完整观察 | 明确缺字段、冻结/离职/未激活等组合的失败策略，以及观察起点、缓存、请求身份和失败不续期；字段模型本身不证明缓存与时间戳可信 |
+| 审批实例 | [实例响应](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/get_instance_response_body.py) 有 approval_code/instance_code/uuid、字符串 form、task_list/timeline 及撤回关联；tenant/app 并非可直接照抄的响应字段 | tenant/app 由认证请求边界绑定；批准具体定义/节点、表单控件及完整附件字节取回协议；不将原生 JSON 直接作为内部规范化协议 |
+| 人工决定 | [Task](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/instance_task.py) 有 id/node_id/custom_node_id/type/status、人员标识和整数时间；[Timeline](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/instance_timeline.py) 有 task_id/node_key/type/create_time 与人员标识 | 明确节点键对应、枚举/时间单位及人工性依据；不能从字段名推断 HUMAN。转交、会签、多任务、撤回和重新提交须有确定策略；当前单个 HUMAN/PASS 消费者无法未经评审就自动挑最后一条通过 |
+
+**受限权限的实际障碍：** `transaction.ts::lockProductSession` 对 sessions 和 subject_bindings 做 `FOR SHARE`。临时 PG15 证明 SELECT-only 账号被 42501 拒绝；只加 sessions 的 UPDATE 会在 subject_bindings 继续失败。为这两张表授予 `UPDATE(revoked_at)` / `UPDATE(enabled)` 虽能取锁，也允许反向撤销管理员停用。这是未启用的候选权限方案风险，不是声称线上已存在同样授权。现有 API 会回滚且不进入业务回调，外部结果为 INTERNAL_ERROR / COMMIT_UNKNOWN、commit=rolled_back；运维诊断保留 42501。运行 factory 应在启用前检查依赖，不能靠增权消除错误。
+
+**两个边界方案：** A 给业务账号身份安全列 UPDATE；B 身份所有者提供固定查询的窄锁函数，仅返回原会话截止，业务账号仅 EXECUTE。选择 B 作为离线候选，隐藏身份表读取和锁权限；不去掉锁，也不复用认证 owner 池。`apps/api/experiments/intake-runtime/session-lock.sql` 仅由测试安装到一次性数据库的隔离 schema；NOLOGIN、非超级用户函数 owner 独占必要表权，函数固定 search_path、精确校验私有会话 hash+user、拒绝失效身份、持锁到调用事务结束并重验等待后的截止。私有 hash 必须由既有认证对象解析，不新增 HTTP 字段。调用方仍须遵守内容锁顺序及事务末尾最早截止校验。
+
+[8 项实测及限制](../evidence/qa/intake-runtime-boundary/README.md)覆盖非 owner 调用、缺权拒绝、两表锁竞争、等待中到期及越权矩阵。SQL 不在 migration/生产构建中，现有 transaction 消费者未改接候选；不能据此声称完整坐席受限签发/分页、管理/worker 权限或生产装配完成。正式采用须先在身份合同所属治理仓审核函数语义、owner/执行角色与错误合同，冻结 export/intake 后再接线并验收完整用途矩阵。原生可信输入及初始旧目录认领仍按本节原有缺项办理，不新增业务 TODO。
