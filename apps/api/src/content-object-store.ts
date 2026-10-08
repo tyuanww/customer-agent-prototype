@@ -45,7 +45,7 @@ export type ContentObjectStore = Readonly<{
   persist: (
     bytes: AsyncIterable<Buffer>,
     declaredType: ContentSourceType,
-    options?: Readonly<{ maxBytes?: number; timeoutMs?: number }>,
+    options?: Readonly<{ maxBytes?: number; timeoutMs?: number; beforeWrite?: (objectId: string) => Promise<void> }>,
   ) => Promise<PersistedContentObject>;
   readPayload: (objectId: string) => Promise<Buffer>;
   verify: (objectId: string, sha256: string, sizeBytes: number) => Promise<boolean>;
@@ -113,18 +113,19 @@ export function createContentObjectStore(rootDirectory: string): ContentObjectSt
   }
 
   async function referencedObjectIds(): Promise<Set<string>> {
-    const names = await readdir(receiptRoot).catch(() => [] as string[]);
+    const names = await readdir(receiptRoot);
     const referenced = new Set<string>();
     for (const name of names) {
       if (!name.endsWith('.json')) continue;
-      const raw = await readFile(path.join(receiptRoot, name), 'utf8').catch(() => '');
+      const raw = await readFile(path.join(receiptRoot, name), 'utf8');
       try {
         const parsed = JSON.parse(raw) as { objectId?: unknown };
         if (typeof parsed.objectId === 'string' && CONTENT_OBJECT_ID_PATTERN.test(parsed.objectId)) {
           referenced.add(parsed.objectId);
-        }
+        } else throw new Error('CONTENT_RECEIPT_INVALID');
       } catch {
-        // Unreadable receipts keep their objects; never delete on parse failure.
+        // A damaged receipt may name any object. Fail closed for the whole scan.
+        throw new Error('CONTENT_RECEIPT_INVALID');
       }
     }
     return referenced;
@@ -136,6 +137,9 @@ export function createContentObjectStore(rootDirectory: string): ContentObjectSt
       const maxBytes = options.maxBytes ?? CONTENT_UPLOAD_MAX_BYTES;
       const timeoutMs = options.timeoutMs ?? CONTENT_UPLOAD_TIMEOUT_MS;
       const id = objectId();
+      // Durable admission completes before any byte is written. Unknown admission
+      // leaves no file; its owner retains the reservation for reconciliation.
+      await options.beforeWrite?.(id);
       const tempPath = resolveInside(tmpRoot, `${id}.part`);
       const finalPath = resolveInside(objectRoot, id);
       const hash = createHash('sha256');
@@ -248,6 +252,9 @@ export function createContentObjectStore(rootDirectory: string): ContentObjectSt
       if ((await referencedObjectIds()).has(id)) return 'retained';
       await rm(resolveInside(objectRoot, id), { force: true });
       await rm(resolveInside(tmpRoot, `${id}.part`), { force: true });
+      // A released quota must survive a crash just as an adopted write does.
+      fsyncDirectory(objectRoot);
+      fsyncDirectory(tmpRoot);
       return 'reclaimed';
     },
 

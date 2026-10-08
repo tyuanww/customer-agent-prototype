@@ -1,3 +1,4 @@
+import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
@@ -34,60 +35,79 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   options: { requireProductSession?: boolean; principalLabels?: IntakePrincipalLabels } = {}) {
   const run = createIntakeTransactions(pool, report, options);
   const runner = createParseRunner();
+  const capacity = createIntakeCapacity(pool, store, error => {
+    try { report(`intake_${randomUUID()}`, error); } catch { /* Observational. */ }
+  });
   const grantList = (v: unknown) => parseContractSchema('IntakeGrantList', v);
   const grant = (v: unknown) => parseContractSchema('IntakeGrant', v);
   const candidate = (v: unknown) => parseContractSchema('IntakeCandidate', v);
   const job = (v: unknown) => parseContractSchema('IntakeParseJob', v);
-  const { refreshForPublish, ...evidence } = createIntakeEvidence(run, store, approval, report);
+  const { refreshForPublish, ...evidence } = createIntakeEvidence(run, store, capacity, approval, report);
 
   /** Worker-only terminal bookkeeping must still finish after user permission expires.
    * It cannot create a candidate, alter a terminal job or grant any authority. */
-  async function finishFailure(jobId: string, result: ParseResult, actorUserId: string): Promise<void> {
-    const client = await pool.connect();
-    let broken = false;
-    let committing = false;
-    let reclaim = false;
-    let stored: PersistedContentObject | undefined;
+  async function finishFailure(jobId: string, result: ParseResult, actorUserId: string): Promise<boolean> {
+    // Release the lookup connection before capacity admission borrows one. Even
+    // a one-connection pool must finish terminal bookkeeping without deadlock.
+    const lookup = await pool.connect();
+    let sourceId: string;
     try {
-      // A permanent receive receipt can refer to a terminal job. Avoid creating
-      // another report on replay; the locked INSERT below also handles races.
-      const pending = await client.query(`SELECT 1 FROM content_intake.parse_jobs j
+      const pending = await lookup.query<{ source_id: string }>(`SELECT j.source_id FROM content_intake.parse_jobs j
         JOIN content_intake.principals p ON p.principal_id=j.actor_id
         WHERE j.job_id=$1 AND p.user_id=$2 AND j.state IN ('reading','parsing')`, [jobId, actorUserId]);
-      if (pending.rowCount !== 1) return;
-      const bytes = Buffer.from(JSON.stringify(result));
-      // No transaction or DB lock is held while persisting the report.
-      stored = await store.persist((async function* () { yield bytes; })(), 'csv', { maxBytes: INTAKE_POLICY.outputBytes });
+      if (!pending.rows[0]) return true;
+      sourceId = pending.rows[0].source_id;
+    } finally { lookup.release(); }
+    let stored: PersistedContentObject | undefined;
+    const bytes = Buffer.from(JSON.stringify(result));
+    try {
+      stored = await capacity.persist(actorUserId, sourceId, 'report',
+        (async function* () { yield bytes; })(), 'csv', Math.min(bytes.length, INTAKE_POLICY.outputBytes));
+    } catch (error) {
+      // Quota cannot strand a failed/cancelled job in parsing and consume every
+      // candidate slot. Only a definite admission refusal permits reportless
+      // completion; unknown disk/DB outcomes stay protected and retryable.
+      if (!(error instanceof IntakeRejection) || error.reason !== 'QUOTA_EXCEEDED') throw error;
+    }
+    let reclaim = false;
+    let broken = false;
+    let committing = false;
+    const client = await pool.connect();
+    try {
       await client.query('BEGIN');
       await client.query("SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='5s'");
       await client.query('SELECT backend_review.lock_content()');
-      const inserted = await client.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
-        SELECT $2,j.source_id,j.actor_id,p.tenant_id,p.app_id,$3,$4,$5,'application/json','report',clock_timestamp()
-        FROM content_intake.parse_jobs j JOIN content_intake.principals p ON p.principal_id=j.actor_id
-        WHERE j.job_id=$1 AND j.state IN ('reading','parsing') AND p.user_id=$6`,
-      [jobId, stored.objectId, `intake/${stored.objectId}`, stored.sha256, stored.sizeBytes, actorUserId]);
+      if (stored) {
+        const inserted = await client.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
+          SELECT $2,j.source_id,j.actor_id,p.tenant_id,p.app_id,$3,$4,$5,'application/json','report',clock_timestamp()
+          FROM content_intake.parse_jobs j JOIN content_intake.principals p ON p.principal_id=j.actor_id
+          WHERE j.job_id=$1 AND j.state IN ('reading','parsing') AND p.user_id=$6`,
+        [jobId, stored.objectId, `intake/${stored.objectId}`, stored.sha256, stored.sizeBytes, actorUserId]);
+        if (inserted.rowCount === 1) await capacity.adopt(client, stored);
+        reclaim = inserted.rowCount === 0;
+      }
       await client.query(`UPDATE content_intake.parse_jobs SET state=$3,finished_at=clock_timestamp(),report_object_id=$2
         WHERE job_id=$1 AND state IN ('reading','parsing') AND EXISTS
-          (SELECT 1 FROM content_intake.objects WHERE object_id=$2)`,
-      [jobId, stored.objectId, result.issues.some(i => i.code === 'CANCELLED') ? 'cancelled' : 'failed']);
+          (SELECT 1 FROM content_intake.principals WHERE principal_id=actor_id AND user_id=$4)`,
+      [jobId, stored?.objectId ?? null, result.issues.some(i => i.code === 'CANCELLED') ? 'cancelled' : 'failed', actorUserId]);
       committing = true;
       await client.query('COMMIT');
-      reclaim = inserted.rowCount === 0;
     } catch (error) {
       broken = true;
+      reclaim = false;
       if (!committing) {
         try { await client.query('ROLLBACK'); reclaim = true; }
-        catch { /* Unknown rollback: retain the object and discard this connection. */ }
+        catch { /* Unknown rollback retains the object. */ }
       }
       throw error;
     } finally {
       client.release(broken);
       if (stored && reclaim) {
-        try { await store.reclaim(stored.objectId); }
+        try { await capacity.discard(stored.objectId); }
         catch (error) { try { report(`intake_${randomUUID()}`, error); } catch { /* Observational. */ } }
       }
     }
-    // Unknown commits retain their objects; reclamation needs an independent reconciliation.
+    return stored !== undefined;
   }
 
   let parseActive = false;
@@ -137,7 +157,10 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     if (!frozen.ok && frozen.commit !== 'unknown') {
       const failure = parsed.ok ? { ...parsed, ok: false, rows: [], questions: [],
         issues: [{ code: frozen.reason, sheet: '', row: 0, column: '', fix: '刷新权限、来源和候选后重新接收文件' }] } : parsed;
-      try { await finishFailure(id, failure, actor.user_id); } catch (error) {
+      try {
+        if (!await finishFailure(id, failure, actor.user_id)) return { ok: false, code: 'RATE_LIMITED',
+          reason: 'QUOTA_EXCEEDED', commit: 'rolled_back', diagnosticId: `intake_${randomUUID()}` };
+      } catch (error) {
         const diagnosticId = `intake_${randomUUID()}`;
         try { report(diagnosticId, error); } catch { /* Observational. */ }
         return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
@@ -148,12 +171,12 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
 
   return {
     ...evidence,
-    ...createIntakeRollback(run, store, approval, report),
+    ...createIntakeRollback(run, store, capacity, approval, report),
     ...createIntakePublication(run, refreshForPublish),
     ...createIntakeUsage(run),
     ...createIntakeDiscovery(run, options.principalLabels),
     ...createIntakeQualityAccess(run),
-    ...createIntakeFiles(run, store, report),
+    ...createIntakeFiles(run, store, capacity, report),
     qualityPreview(actor: AuthenticatedUser, key: unknown) {
       return run(actor, 'quality-preview', null, null,
         (client, who) => previewQuality(client, who, key), value => value as IntakeQualityPreview);

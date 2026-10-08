@@ -1,3 +1,6 @@
+import { createIntakeCapacity, intakeCapacityDryRun, INTAKE_TEMPORARY_BYTES } from '../src/content-intake/capacity.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -247,6 +250,112 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     return { url, headers, logged, get, status, page, samples, post, receipt };
   }
   const wireChecks = (items: C['IntakeQualitySample'][]) => items.map(i => i.check ?? ({ scriptId: i.scriptId, contentHash: i.contentHash, defect: false, reason: '' }));
+
+  it('capacity: serializes tenfold admission before bytes, protects unknown commits, retries cleanup and consumes the dry-run CLI', async () => {
+    const cap = createIntakeCapacity(pool, store, error => diagnostics.push(error));
+    const filler = `obj_${'f'.repeat(64)}`;
+    await admin.query(`INSERT INTO content_intake.object_reservations
+      (object_id,tenant_id,app_id,actor_id,source_id,purpose,reserved_bytes,state)
+      VALUES($1,'tenant-a','app-a','enabler','source-a','input',$2,'reserved')`, [filler, INTAKE_TEMPORARY_BYTES - 10]);
+    for (const contenders of [10, 100]) {
+      let consumed = 0;
+      const start = performance.now();
+      const attempts = await Promise.allSettled(Array.from({length: contenders}, () => cap.persist('user-enabler','source-a','input',
+        (async function* () { consumed++; yield Buffer.from('synthetic'); })(), 'csv', 10)));
+      const successes = attempts.filter(r => r.status === 'fulfilled');
+      expect(successes).toHaveLength(1); expect(consumed).toBe(1);
+      for (const rejected of attempts.filter(r => r.status === 'rejected')) expect(rejected.reason).toMatchObject({reason:'QUOTA_EXCEEDED'});
+      console.log(JSON.stringify({probe:'capacity-admission',contenders,adoptable:successes.length,elapsedMs:performance.now()-start}));
+      await cap.discard(successes[0]!.value.objectId);
+    }
+    await admin.query('DELETE FROM content_intake.object_reservations WHERE object_id=$1',[filler]); // synthetic fixture only
+    for (const phase of ['admission','persisted'] as const) {
+      let injected = false;
+      const uncertain: IntakePool = {async connect() {
+        const client = await pool.connect(); let target = false;
+        return new Proxy(client,{get(c,k) {
+          if(k==='query')return async(sql:string,args?:unknown[])=>{
+            const result=await c.query(sql,args);
+            if(phase==='admission' ? sql.includes('INSERT INTO content_intake.object_reservations') : sql.includes("SET state='persisted'"))target=true;
+            if(sql==='COMMIT'&&target&&!injected){injected=true;throw new Error('synthetic lost capacity commit');}return result;
+          }; const v:unknown=Reflect.get(c,k);return typeof v==='function'?v.bind(c):v;
+        }}) as PoolClient;
+      }};
+      const before=Number((await admin.query('SELECT count(*) FROM content_intake.object_reservations')).rows[0].count);
+      await expect(createIntakeCapacity(uncertain,store,()=>undefined).persist('user-enabler','source-a','input',
+        (async function*(){yield Buffer.from('synthetic');})(),'csv',10)).rejects.toThrow('synthetic lost capacity commit');
+      expect(injected).toBe(true);
+      expect(Number((await admin.query('SELECT count(*) FROM content_intake.object_reservations')).rows[0].count)).toBe(before+1);
+    }
+    let fail = true;
+    const failing = createIntakeCapacity(pool, {...store, async reclaim(id) {
+      if(fail){fail=false;throw new Error('synthetic disk error');}return store.reclaim(id);
+    }},()=>undefined);
+    const obj = await failing.persist('user-enabler','source-a','report',(async function*(){yield Buffer.from('report');})(),'csv',6);
+    await expect(failing.discard(obj.objectId)).rejects.toThrow('synthetic disk error');
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1',[obj.objectId])).rows[0].state).toBe('releasing');
+    await failing.discard(obj.objectId);
+    expect(await store.verify(obj.objectId,obj.sha256,obj.sizeBytes)).toBe(false);
+    const report = await intakeCapacityDryRun(admin);
+    expect(report).toMatchObject({historicalDeletionAllowed:false,retentionPolicy:'pending-approval',
+      reservations:expect.arrayContaining([{state:'reserved',objects:'1',charged_bytes:'10'},{state:'persisted',objects:'1',charged_bytes:'10'}])});
+    const params = pool.options;
+    const dsn = `postgresql://${encodeURIComponent(String(params.user))}@localhost/${params.database}?${new URLSearchParams({host:String(params.host),port:String(params.port)})}`;
+    const cli = path.resolve('../../scripts/content-retention.ts');
+    const output = await promisify(execFile)(process.execPath,[cli,'--group','intake-objects','--dsn',dsn]);
+    expect(JSON.parse(output.stdout)).toEqual(report);
+    await expect(promisify(execFile)(process.execPath,[cli,'--group','intake-objects','--dsn',dsn,'--apply','--confirm','0']))
+      .rejects.toMatchObject({stderr:expect.stringContaining('dry-run only')});
+  },60_000);
+
+  it('capacity: adopted references resist cleanup and releasing tombstones reject late adoption', async () => {
+    const cap = createIntakeCapacity(pool,store,()=>undefined);
+    const persist = () => cap.persist('user-enabler','source-a','report',(async function*(){yield Buffer.from('report');})(),'csv',6);
+    async function adopt(obj: Awaited<ReturnType<typeof persist>>) {
+      await admin.query('BEGIN');
+      try {
+        await admin.query('SELECT backend_review.lock_content()');
+        await admin.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
+          VALUES($1,'source-a','enabler','tenant-a','app-a',$2,$3,$4,'application/json','report',clock_timestamp())`,
+        [obj.objectId,`intake/${obj.objectId}`,obj.sha256,obj.sizeBytes]);
+        await cap.adopt(admin,obj); await admin.query('COMMIT');
+      } catch(error){await admin.query('ROLLBACK');throw error;}
+    }
+    const adopted=await persist();await adopt(adopted);await cap.discard(adopted.objectId);
+    expect(await store.verify(adopted.objectId,adopted.sha256,adopted.sizeBytes)).toBe(true);
+    const replay=await persist();
+    let release!:()=>void;let arrived!:()=>void;
+    const waiting=new Promise<void>(resolve=>{release=resolve;});const started=new Promise<void>(resolve=>{arrived=resolve;});
+    const cleanup=createIntakeCapacity(pool,{...store,async reclaim(id){arrived();await waiting;return store.reclaim(id);}},()=>undefined);
+    const discarding=cleanup.discard(replay.objectId);
+    try {
+      await started;
+      await expect(adopt(replay)).rejects.toMatchObject({reason:'COMMIT_UNKNOWN'});
+      expect((await admin.query('SELECT object_id FROM content_intake.objects WHERE object_id=$1',[replay.objectId])).rowCount).toBe(0);
+    } finally {release();await discarding;}
+    expect(await store.verify(replay.objectId,replay.sha256,replay.sizeBytes)).toBe(false);
+    await expect(cap.persist('user-enabler','source-a','input',(async function*(){yield Buffer.from('too large');})(),'csv',1)).rejects.toThrow('CONTENT_UPLOAD_TOO_LARGE');
+    expect((await admin.query("SELECT count(*) FROM content_intake.object_reservations WHERE state IN ('reserved','persisted','releasing')")).rows[0].count).toBe('0');
+  });
+
+  it('capacity: report quota refusal terminates failed and cancelled jobs even with one pool connection', async () => {
+    const one = new Pool({...pool.options,max:1,connectionTimeoutMillis:2000});
+    try {
+      const limited = createContentIntakeService(one,store);
+      const req = await input('full-report', null, [['faq-one','合成问题','','','','分类','','启用','','','','','','','false']]);
+      const used = Number((await admin.query('SELECT sum(bytes) bytes FROM content_intake.objects')).rows[0].bytes);
+      await admin.query(`INSERT INTO content_intake.object_reservations(object_id,tenant_id,app_id,actor_id,purpose,reserved_bytes,state)
+        VALUES($1,'tenant-a','app-a','enabler','input',$2,'reserved')`,[`obj_${'f'.repeat(64)}`,INTAKE_TEMPORARY_BYTES-used]);
+      for (const cancelled of [false,true]) {
+        const job=value(await limited.receive(actor('enabler'),'source-a',{...req,operationId:`full-${cancelled}`}));
+        const signal=cancelled?AbortSignal.abort():undefined;
+        const result=await limited.parse(actor('enabler'),job.jobId,signal);
+        expect(result).toMatchObject({ok:false,reason:'QUOTA_EXCEEDED'});
+        expect((await admin.query('SELECT state,report_object_id FROM content_intake.parse_jobs WHERE job_id=$1',[job.jobId])).rows[0])
+          .toEqual({state:cancelled?'cancelled':'failed',report_object_id:null});
+      }
+    } finally { await one.end(); }
+  },30_000);
 
   it('quality HTTP requires an explicit empty initial round when all entries are withdrawn', async () => {
     await publicationBase();
@@ -2561,6 +2670,46 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(entries.map(r => [r.e.businessEntryId,r.e.operation,r.e.scriptVersion])).toEqual([['faq-one','disable',2],['faq-two','upsert',1]]);
     expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('2');
   });
+
+  it('capacity: measures tenfold publication history and a two-source CAS rereview without losing the other source', async () => {
+    await publicationBase();
+    await cloneScopeGrants('b');
+    const first = await publishable('race-a');
+    const second = await publishable('race-b',undefined,'b');
+    const before = performance.now();
+    const published = value(await service.publish(actor('enabler'),first.request));
+    expect(await service.publish(actor('enabler'),second.request)).toMatchObject({ok:false,reason:'BASE_CHANGED'});
+    expect(provider.instances.size).toBe(2);
+    const corrected = await publishable('race-b-again',undefined,'b');
+    const after = value(await service.publish(actor('enabler'),corrected.request));
+    expect(provider.instances.size).toBe(3);
+    const lineage = (await admin.query(`SELECT to_jsonb(l)-'release_id' row FROM content_intake.release_lineage l
+      WHERE source_id='source-a' AND release_id=ANY($1::text[]) ORDER BY release_id`,[[published.releaseId,after.releaseId]])).rows;
+    expect(lineage).toHaveLength(2); expect(lineage[0]).toEqual(lineage[1]);
+    console.log(JSON.stringify({probe:'two-source-cas',initialReviews:2,extraReviews:1,
+      repeated:['parse-diff','source-confirmation','approval','quality'],syntheticElapsedMs:performance.now()-before,
+      humanApprovalWait:'not-measured',preservedOtherSource:true}));
+    const start = performance.now();
+    for (let n=3;n<=100;n++) {
+      const next = await publishable(`history-${n}`, [['faq-one','合成问题',`合成修订 ${n}`,'','','分类','','启用','','','','','','','false']]);
+      value(await service.publish(actor('enabler'),next.request));
+      if(n===10 || n===100) {
+        const checkStart=performance.now();
+        const projection=await intakeCapacityDryRun(admin);
+        const registered=Number((await admin.query('SELECT count(*) count FROM content_intake.publications')).rows[0].count);
+        expect(registered).toBe(n);
+        const orphaned=await admin.query(`SELECT 1 FROM content_intake.review_bindings b LEFT JOIN content_intake.objects o
+          ON o.object_id=b.package_object_id WHERE o.object_id IS NULL`);
+        expect(orphaned.rowCount).toBe(0);
+        console.log(JSON.stringify({probe:'publication-history',publications:n,elapsedMs:performance.now()-start,
+          dryRunMs:performance.now()-checkStart,objects:projection.registered.objects,allReviewReferencesPresent:true}));
+      }
+    }
+    // Exercise the actual aggregate plan against the tenfold history; no N+1.
+    const plan = await admin.query(`EXPLAIN (ANALYZE,FORMAT JSON) SELECT coalesce(sum(bytes),0)
+      FROM content_intake.objects WHERE tenant_id='tenant-a'`);
+    console.log(JSON.stringify({probe:'capacity-explain',plan:plan.rows[0]['QUERY PLAN']}));
+  },180_000);
 
   it('inherits another source unchanged and propagates its later approval revocation', async () => {
     await publicationBase();

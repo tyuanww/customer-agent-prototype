@@ -1,3 +1,4 @@
+import type { IntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { INTAKE_POLICY } from '@customer-agent/content-intake';
@@ -54,7 +55,7 @@ async function currentBinding(client: IntakeTransaction, key: C['IntakeCandidate
 /** Owns immutable source/review evidence and the lock-free provider lifecycle.
  * It never publishes, constructs legacy review assertions or opens a production connection.
  * A committed creation UUID is recovered before any retry can create another instance. */
-export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapter: ApprovalAdapter | undefined,
+export function createIntakeEvidence(run: Run, store: ContentObjectStore, capacity: IntakeCapacity, adapter: ApprovalAdapter | undefined,
   report: (diagnosticId: string, error: unknown) => void) {
   function diagnostic(error: unknown): void {
     try { report(`intake_${randomUUID()}`, error); } catch { /* Diagnostics cannot alter evidence. */ }
@@ -178,7 +179,7 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
         if (!b) {
           const reviewRequestId = `review_${randomUUID()}`;
           const bytes = Buffer.from(canonical({ format: 'intake-review-package-v1',reviewRequestId,key:req.key,material:context.material }));
-          const obj = await store.persist((async function* () { yield bytes; })(),'csv',{ maxBytes: INTAKE_POLICY.outputBytes });
+          const obj = await capacity.persist(actor.user_id, context.view.sourceId, 'review-package', (async function* () { yield bytes; })(), 'csv', Math.min(bytes.length, INTAKE_POLICY.outputBytes));
           reclaimObjectId = obj.objectId;
           const verified = await store.readPayload(obj.objectId);
           if (verified.length !== bytes.length || digest(verified) !== digest(bytes)) throw new IntakeRejection('ATTACHMENT_UNVERIFIED');
@@ -186,11 +187,10 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
             const c = await candidateContext(client,who,req.key,'content-manage',true);
             if (c.view.approvalEvidenceVersion !== req.expectedEvidenceVersion) throw new IntakeRejection('APPROVAL_CHANGED');
             if (c.view.revocationGeneration !== context.view.revocationGeneration) throw new IntakeRejection('APPROVAL_CHANGED');
-            const used = await client.query<{ bytes: string }>('SELECT coalesce(sum(bytes),0) AS bytes FROM content_intake.objects WHERE tenant_id=$1',[who.tenantId]);
-            if (Number(used.rows[0]!.bytes)+obj.sizeBytes>1073741824) throw new IntakeRejection('QUOTA_EXCEEDED','RATE_LIMITED');
             await client.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'application/json','review-package',clock_timestamp())`,
             [obj.objectId,c.view.sourceId,who.id,who.tenantId,who.appId,`intake/${obj.objectId}`,obj.sha256,obj.sizeBytes]);
+            await capacity.adopt(client, obj);
             await client.query(`INSERT INTO content_intake.review_bindings(review_request_id,candidate_id,candidate_version,candidate_digest,
               evidence_version,tenant_id,app_id,definition_id,node_id,create_uuid,package_object_id,package_sha256)
               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [reviewRequestId,req.key.candidateId,req.key.version,req.key.digest,
@@ -246,7 +246,7 @@ export function createIntakeEvidence(run: Run, store: ContentObjectStore, adapte
       } catch (error) { diagnostic(error); return failed(actor,error,review); }
       finally {
         if (reclaimObjectId) {
-          try { await store.reclaim(reclaimObjectId); } catch (error) { diagnostic(error); }
+          try { await capacity.discard(reclaimObjectId); } catch (error) { diagnostic(error); }
         }
       }
     },

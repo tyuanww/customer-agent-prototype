@@ -1,3 +1,4 @@
+import type { IntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { INTAKE_POLICY } from '@customer-agent/content-intake';
@@ -86,7 +87,7 @@ async function view(client: IntakeTransaction, b: RollbackReviewBinding): Promis
 /** Independent full-catalog rollback evidence. It shares the approval transport and
  * publication transaction owner, but never represents a rollback as a candidate.
  * Provider I/O is outside locks; creation reuses its durable UUID after uncertainty. */
-export function createIntakeRollback(run: Run, store: ContentObjectStore, adapter: ApprovalAdapter | undefined,
+export function createIntakeRollback(run: Run, store: ContentObjectStore, capacity: IntakeCapacity, adapter: ApprovalAdapter | undefined,
   report: (id:string,error:unknown) => void) {
   const request = (id:string,raw:unknown) => ({ rollbackPlanId:parseContractSchema('IntakeId',id),...parseContractSchema('IntakeRollbackReviewRequest',raw) });
   function diagnostic(error:unknown) { try { report(`intake_${randomUUID()}`,error); } catch { /* Observational only. */ } }
@@ -181,15 +182,14 @@ export function createIntakeRollback(run: Run, store: ContentObjectStore, adapte
         if (!b) {
           const reviewRequestId=`review_${randomUUID()}`;
           const bytes=Buffer.from(canonical({format:'intake-rollback-review-package-v1',reviewRequestId,rollbackPlanId:id,material:json(material)}));
-          const obj=await store.persist((async function*(){yield bytes;})(),'csv',{maxBytes:INTAKE_POLICY.outputBytes}); reclaim=obj.objectId;
+          const obj=await capacity.persist(actor.user_id, null, 'review-package', (async function*(){yield bytes;})(), 'csv', Math.min(bytes.length,INTAKE_POLICY.outputBytes)); reclaim=obj.objectId;
           const copied=await store.readPayload(obj.objectId);
           if(copied.length!==bytes.length || digest(copied)!==digest(bytes)) throw new IntakeRejection('ATTACHMENT_UNVERIFIED');
           const frozen=await run(actor,'rollback-review-request',json(req),req.operationId,async(client,who) => {
             await check(client,who,req);
-            const used=await client.query<{bytes:string}>('SELECT coalesce(sum(bytes),0) AS bytes FROM content_intake.objects WHERE tenant_id=$1',[who.tenantId]);
-            if(Number(used.rows[0]!.bytes)+obj.sizeBytes>1073741824) throw new IntakeRejection('QUOTA_EXCEEDED','RATE_LIMITED');
             await client.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
               VALUES($1,NULL,$2,$3,$4,$5,$6,$7,'application/json','review-package',clock_timestamp())`,[obj.objectId,who.id,who.tenantId,who.appId,`intake/${obj.objectId}`,obj.sha256,obj.sizeBytes]);
+            await capacity.adopt(client, obj);
             await client.query(`INSERT INTO content_intake.review_bindings(review_request_id,rollback_plan_id,impact_digest,evidence_version,
               tenant_id,app_id,definition_id,node_id,create_uuid,package_object_id,package_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
             [reviewRequestId,id,req.impactDigest,req.expectedEvidenceVersion+1,who.tenantId,who.appId,adapter!.route.definitionId,adapter!.route.nodeId,randomUUID(),obj.objectId,obj.sha256]);
@@ -214,7 +214,7 @@ export function createIntakeRollback(run: Run, store: ContentObjectStore, adapte
           return view(client,await binding(client,saved.reviewRequestId));
         },review);
       }catch(error){diagnostic(error);return failure(actor,error);}
-      finally{if(reclaim)try{await store.reclaim(reclaim);}catch(error){diagnostic(error);}}
+      finally{if(reclaim)try{await capacity.discard(reclaim);}catch(error){diagnostic(error);}}
     },
     refreshRollbackReview:refresh,
     async rollback(actor:AuthenticatedUser,raw:unknown) {

@@ -450,6 +450,8 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     manifest: { database: { sha256: PRIOR_USAGE.sourceSchemaSha256 } } };
   const rollbackMigration = renderIntakeOverlay(projectRoot, rollbackSnapshot, 27, '0027_intake_rollback');
   if (rollbackMigration.sha256 !== 'da90dd3eaa366037fbbe71f4296697fdf3f9f788954119731926e6500df55e98') throw new Error('Frozen rollback migration source drifted');
+  const familyMigration = renderIntakeOverlay(projectRoot, rollbackSnapshot, 28, '0028_intake_family');
+  if (familyMigration.sha256 !== '8b241e1b5f808c2278b53351a0d3cbee56f4ac23ca16c65736ba45ace859382e') throw new Error('Frozen family migration source drifted');
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
     ...REVIEWED_UPGRADES.map(p => loadPriorReviewedUpgrade(projectRoot, p)),
@@ -464,7 +466,8 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     }),
     ...usageMigrations,
     rollbackMigration,
-    renderIntakeOverlay(projectRoot, snapshot, 28, '0028_intake_family'),
+    familyMigration,
+    renderIntakeOverlay(projectRoot, snapshot, 29, '0029_intake_capacity'),
   ]);
   // A predecessor must precede this snapshot; the current contract is never its own upgrade.
   const currentIndex = COMPATIBLE_UPGRADES.findIndex(p => p.contractSetId === snapshot.contract_set_id);

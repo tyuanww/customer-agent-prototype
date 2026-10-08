@@ -1,0 +1,236 @@
+{
+  "scope": {
+    "base": "1e5cca6",
+    "mode": "workspace",
+    "skills": [
+      "open-code-review-delegate",
+      "review"
+    ],
+    "externalRuntime": "claude-code configured model unchanged"
+  },
+  "ocr": {
+    "total_files": 16,
+    "reviewed_files": 16,
+    "skipped_files": 0,
+    "coverage_rate": 1,
+    "files": [
+      {
+        "path": "apps/api/src/content-intake/evidence.ts",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "apps/api/src/content-intake/files.ts",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "apps/api/src/content-intake/rollback.ts",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "apps/api/src/content-intake/service.ts",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "apps/api/src/content-object-store.ts",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "packages/database/scripts/generate-migrations.mjs",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "packages/database/src/verifier.ts",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "scripts/content-retention.ts",
+        "status": "modified",
+        "review": "reviewed"
+      },
+      {
+        "path": "apps/api/src/content-intake/capacity.ts",
+        "status": "added",
+        "review": "reviewed"
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-capacity/inputs.json",
+        "status": "added",
+        "review": "reviewed"
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-capacity/observations.json",
+        "status": "added",
+        "review": "reviewed"
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-capacity/outside-adversarial.json",
+        "status": "added",
+        "review": "reviewed"
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-capacity/outside-structured.json",
+        "status": "added",
+        "review": "reviewed"
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-capacity/review.json",
+        "status": "added",
+        "review": "reviewed"
+      },
+      {
+        "path": "packages/database/migrations/0029_intake_capacity.sql",
+        "status": "added",
+        "review": "reviewed"
+      },
+      {
+        "path": "packages/database/overlays/0029_intake_capacity.sql",
+        "status": "added",
+        "review": "reviewed"
+      }
+    ],
+    "tool_excluded": [
+      {
+        "path": "TODOS.md",
+        "status": "modified",
+        "insertions": 1,
+        "deletions": 1,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "apps/api/tests/content-intake.integration.test.ts",
+        "status": "modified",
+        "insertions": 149,
+        "deletions": 0,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "apps/api/tests/content-object-store.test.ts",
+        "status": "modified",
+        "insertions": 8,
+        "deletions": 0,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "docs/how-to-develop-content-intake.md",
+        "status": "modified",
+        "insertions": 12,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+        "status": "modified",
+        "insertions": 9,
+        "deletions": 1,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "docs/reference-project-architecture.md",
+        "status": "modified",
+        "insertions": 3,
+        "deletions": 1,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "packages/database/README.md",
+        "status": "modified",
+        "insertions": 4,
+        "deletions": 2,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "packages/database/migrations/manifest.generated.json",
+        "status": "modified",
+        "insertions": 11,
+        "deletions": 0,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "packages/database/src/generated/migrations.generated.ts",
+        "status": "modified",
+        "insertions": 11,
+        "deletions": 0,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "packages/database/tests/generator.test.ts",
+        "status": "modified",
+        "insertions": 6,
+        "deletions": 6,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "packages/database/tests/planner.test.ts",
+        "status": "modified",
+        "insertions": 5,
+        "deletions": 5,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "packages/database/tests/postgres.integration.test.ts",
+        "status": "modified",
+        "insertions": 26,
+        "deletions": 26,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "evidence/qa/content-intake-p2-capacity/README.md",
+        "status": "added",
+        "insertions": 39,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      }
+    ],
+    "note": "Tool-excluded tests/docs/generated output additionally checked against commands, source hashes and immutable prefix; fixtures reviewed in summary mode."
+  },
+  "findings": [
+    {
+      "severity": "P1",
+      "path": "apps/api/src/content-intake/service.ts",
+      "issue": "Report quota prevented terminal job state",
+      "resolution": "Definite quota refusal terminates failed/cancelled without report; PG quota and one-connection tests PASS"
+    },
+    {
+      "severity": "P2",
+      "path": "apps/api/src/content-intake/service.ts",
+      "issue": "Nested pool connection during report admission",
+      "resolution": "Release lookup before persistence; reacquire only for terminal transaction"
+    },
+    {
+      "severity": "P2",
+      "path": "apps/api/src/content-object-store.ts",
+      "issue": "Released quota before durable directory deletion",
+      "resolution": "fsync object/tmp directories before reclaimed"
+    },
+    {
+      "severity": "P2",
+      "path": "apps/api/src/content-object-store.ts",
+      "issue": "Malformed receipts did not actually protect uncertain references",
+      "resolution": "Receipt scan fails closed; malformed receipt test PASS"
+    }
+  ],
+  "native": {
+    "firstPass": "issues_found",
+    "finalPass": "approve",
+    "remainingActionableFindings": 0,
+    "independentReviewer": "/root/capacity_review",
+    "testsRunBy": "parent agent",
+    "reviewerReranTests": false
+  },
+  "outside": {
+    "adversarial": "unavailable: timeout 180000ms, no result",
+    "structured": "unavailable: timeout 180000ms, no result",
+    "completed": false
+  },
+  "remainingDependencies": [
+    "Historical retention policy approval and controlled history/disk reconciliation",
+    "Formal runtime integration and business/device acceptance; see TODOS"
+  ]
+}
