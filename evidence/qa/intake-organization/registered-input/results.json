@@ -20,8 +20,8 @@
     "apps/api/experiments/intake-organization/session-owner.test.ts": "18537b30626e5c984703b0af5fa675acbc8b3c8e03ef2901f0039da40c998cb9"
   },
   "logs_sha256": {
-    "unit.txt": "b8cca0c579a54d8c522888ba7d30aeddd98c4e55d63daa2d7f28e5eb60c43571",
-    "pg.txt": "1b054f65bb171211018651f371b96c2363ed0131f4016734f90910ad61c83706",
+    "unit.txt": "a7ea9dac5f17cd9464bbcb4c759e925f2a1dada844d8b265b15f53d75e1abc96",
+    "pg.txt": "fc6e04c064b09d33b147aeb60b4875509454b0e77eba464b274fd007fe140f0f",
     "typecheck.txt": "50a96f085ac4347857361ccce272773f6ef9b6d09abbe3a0e63af750cbdb5223",
     "eslint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "build.txt": "24c42b76aecef2c39c8a5639a3536efb936b03bdac9a8f8be50c0e71ffbc7af8"
@@ -72,5 +72,13 @@
     "registered-input.sql/provenance/recovery contract governance",
     "five-page directory candidate capacity and upstream freshness guarantees",
     "real scoped token provider and multi-process quota ownership"
-  ]
+  ],
+  "raw_logs_sha256": {
+    "unit.txt": "b8cca0c579a54d8c522888ba7d30aeddd98c4e55d63daa2d7f28e5eb60c43571",
+    "pg.txt": "1b054f65bb171211018651f371b96c2363ed0131f4016734f90910ad61c83706",
+    "typecheck.txt": "50a96f085ac4347857361ccce272773f6ef9b6d09abbe3a0e63af750cbdb5223",
+    "eslint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.txt": "24c42b76aecef2c39c8a5639a3536efb936b03bdac9a8f8be50c0e71ffbc7af8"
+  },
+  "log_normalization": "Integration removes only extra EOF blank lines in pg.txt and unit.txt for git diff --check; original hashes retained, raw copies in .gstack/runtime-completion/a-raw-*.txt. Test results unchanged."
 }

@@ -1,0 +1,2 @@
+$ node scripts/check-documentation.mjs
+Documentation PASS: 224 Markdown files, local links and workflow entry ownership.

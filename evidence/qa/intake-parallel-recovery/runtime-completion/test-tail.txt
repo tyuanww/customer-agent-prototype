@@ -1,0 +1,47 @@
+ Test Files  3 passed (3)
+      Tests  24 passed (24)
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+ Test Files  1 passed (1)
+      Tests  56 passed (56)
+ Test Files  5 passed (5)
+      Tests  27 passed (27)
+ Test Files  58 passed | 23 skipped (81)
+      Tests  550 passed | 308 skipped (858)
+ Test Files  136 passed | 6 skipped (142)
+      Tests  1308 passed | 7 skipped (1315)
+✔ stack start modes (0.17875ms)
+▶ process identity survives a clock correction
+  ✔ treats a record as live when the signature drifted but the command line matches (7.730625ms)
+  ✔ still refuses a record whose pid belongs to a different command (3.127792ms)
+  ✔ does not claim ownership when the record carries no command line (1.674667ms)
+✔ process identity survives a clock correction (12.589208ms)
+✔ platformOf maps exactly the three linked platforms (0.499875ms)
+✔ formatSizeMb and formatDateZh match the printed page (10.030959ms)
+✔ manifestFromRelease keeps linked assets, drops the zip, and requires all three (0.665541ms)
+✔ renderIndex rewrites version, date, sizes, checksums and every URL (1.3345ms)
+✔ renderIndex and renderWindows are idempotent (0.616375ms)
+✔ renderIndex fails loudly when the page loses a panel or a chip (0.938667ms)
+✔ renderIndex refuses a page that links a different repository (0.22475ms)
+✔ renderIndex refuses a page that stopped linking a platform (0.159875ms)
+✔ renderIndex refuses a page carrying two different versions (0.151833ms)
+✔ compareVersions orders numerically rather than as strings (0.09425ms)
+✔ publishedVersion reads the version a page advertises (0.095167ms)
+✔ renderWindows points the redirect at the release asset (0.143875ms)
+✔ updateDownloadPages writes both pages once, then reports no changes (0.762042ms)
+✔ --check reports staleness without writing (0.385667ms)
+✔ the CLI republishes a stale page from a manifest (84.505625ms)
+✔ updateDownloadPages refuses to walk the page backwards (0.718417ms)
+✔ updateDownloadPages publishes an older release only when told to (0.842ms)
+✔ the CLI reports the resolved version and refuses a downgrade (93.014875ms)
+✔ only known documentation paths skip runtime lanes; rules retain semantic checks (0.934542ms)
+✔ gate refuses failure, cancellation, skip and missing classifier output (0.655333ms)
+✔ real git diff includes old code path of rename, deletion and new local files (140.939875ms)
+ℹ tests 81
+ℹ suites 14
+ℹ pass 81
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 502.842916

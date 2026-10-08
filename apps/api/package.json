@@ -36,7 +36,7 @@
     "test:built": "vitest run && pnpm test:package:built",
     "test:search-decision:proof": "node experiments/search-decision/cli.mjs proof",
     "test:g1a:comparison:package": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_G1A_COMPARISON=1 vitest run tests/g1a-comparison.runner.test.ts",
-    "test:intake:organization": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && pnpm --filter @customer-agent/content-intake build && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/intake-organization.integration.test.ts tests/intake-organization-observer.test.ts experiments/intake-organization/transport.test.ts experiments/intake-organization/transport-consumer.integration.test.ts"
+    "test:intake:organization": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && pnpm --filter @customer-agent/content-intake build && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/intake-organization.integration.test.ts tests/intake-organization-observer.test.ts experiments/intake-organization/transport.test.ts experiments/intake-organization/transport-consumer.integration.test.ts experiments/intake-organization/session-owner.test.ts experiments/intake-organization/registered-refresh.integration.test.ts"
   },
   "dependencies": {
     "@customer-agent/content-intake": "workspace:*",
