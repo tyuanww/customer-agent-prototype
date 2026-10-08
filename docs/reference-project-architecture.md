@@ -217,7 +217,7 @@ v1.17 migrated PG15
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-`customer-agent-contract-set/v2` 工具仅为 1.21.0/schema.v1.23 组合候选增补九件封闭运行伴随输入（共十二件包），逐件绑定源 Git、安装清单、外层 SHA 和消费锁；暂存副本必须与已核验源 manifest 完全一致。受锁消费者提供只读 `runtime_sources`，静态接收不执行 SQL 或代替运行安装器校验迁移账本。治理 `e35c0c0` 已冻结并导出完整包，产品已实际 intake；生成器验证前32段安装依赖后追加0033，消费锁仍 VERIFIED_NOT_ACTIVATED。
+`customer-agent-contract-set/v2` 工具仅为 1.21.0/schema.v1.23 组合候选增补九件封闭运行伴随输入（共十二件包），逐件绑定源 Git、安装清单、外层 SHA 和消费锁；暂存副本必须与已核验源 manifest 完全一致。受锁消费者提供只读 `runtime_sources`，静态接收不执行 SQL 或代替运行安装器校验迁移账本。治理 `e35c0c0` 已冻结并导出完整包，产品已实际 intake；生成器验证前32段安装依赖后追加0033，消费锁仍 VERIFIED_NOT_ACTIVATED。 CSV v3 接收准备另验证 14 件封闭包和来源 SHA 的独立冻结/批准，来源浅克隆拒绝；只在临时合成批准仓验证往返，正式消费未推进。其完整性与历史兼容规则见 [P2 合同交接](reference-content-intake-p2-contract-handoff.md)。
 
 合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，不准落库与 `dashboardOps` 已接到同一产品会话，方案为 APPROVED。真实 `approved_redacted/pilot_recorded` 与正式运行激活仍受各自批准门约束；飞书登录 provider 已存在，P2 原生组织观察/登记刷新/writer 已进入 src 单一所有者并仅由合成 host 装配；本期确认直发不装配审批 transport，旧审批只保留历史读取和失效约束。
 

@@ -202,7 +202,7 @@ function createContractSet({
 
 // A complete synthetic v2 bundle, including a separately committed source tree.
 // These bytes are never SQL-installed and contain no real governance approval.
-function createRuntimeContractSet() {
+function createRuntimeContractSet(csv = false, approvalState: 'approved' | 'draft' | 'draft-increment' | 'bad-hash' = 'approved') {
   const root = 'business-docs/01-客服Agent项目/30-开发-进行中';
   const specs: Record<string, [string, string]> = {
     installation: ['content-intake-runtime-candidate/installation.generated.json','intake-runtime-installation.v1.json'],
@@ -215,6 +215,13 @@ function createRuntimeContractSet() {
     provenance: ['content-intake-runtime-candidate/provenance.json','intake-runtime-provenance.v1.json'],
     protocol: ['content-intake-runtime-candidate/protocol.json','intake-runtime-protocol.v1.json'],
   };
+  if (csv) {
+    specs.installation = ['content-intake-csv-candidate/installation.generated.json', 'intake-csv-installation.v1.json'];
+    specs.csv = ['content-intake-csv-candidate/storage.delta.sql', 'intake-csv-format.v1.sql'];
+    specs.csvProtocol = ['content-intake-csv-candidate/protocol.json', 'intake-csv-protocol.v1.json'];
+  }
+  const apiVersion = csv ? '1.22.0' : '1.21.0', schemaVersion = csv ? '1.24' : '1.23';
+  const apiPath = `${root}/openapi.v${csv ? '1.22' : '1.21'}.yaml`, databasePath = `${root}/schema.v${schemaVersion}.sql`;
   const overlayNames = ['0021_content_intake_v1_20.sql','0022_intake_legacy_fence.sql','0023_intake_quality.sql',
     '0024_intake_publication.sql','0025_intake_usage_v1_21.sql','0026_intake_discovery_index.sql','0027_intake_rollback.sql',
     '0028_intake_family.sql','0029_intake_capacity.sql','0030_intake_role_ceiling.sql','0031_intake_direct_v1_22.sql','0032_intake_direct_publication.sql'];
@@ -225,21 +232,27 @@ function createRuntimeContractSet() {
   const content: Record<string,string> = Object.fromEntries(Object.keys(specs).map(key=>[key,`-- Synthetic ${key}; test only.\n`]));
   content.provenance = JSON.stringify({implementationDependencies:implementation});
   content.protocol = JSON.stringify({schema:'content-intake-runtime-protocol/v1',status:'DRAFT'});
-  content.installation = JSON.stringify({ schema:'content-intake-installation/v1',sqlContract:'schema.v1.23',
+  content.installation = JSON.stringify({ schema:'content-intake-installation/v1',sqlContract:`schema.v${schemaVersion}`,
     capabilityLogin:false,environmentCredentialsIncluded:false,companionAclRequired:true,
-    referenceMode:{runtimeReady:false},productMode:{atomicCandidateInstall:true,skipMissingDependencies:false,implementation,
-      order:['product-migrations','roles','organization','session','directory','directoryAcl','acl','environment-login-bindings']},
+    referenceMode:{runtimeReady:false,...(csv ? {includes:['roles','organization','session','directory','directoryAcl','csv']} : {})},productMode:{atomicCandidateInstall:true,skipMissingDependencies:false,implementation,
+      order:['product-migrations','roles','organization','session','directory','directoryAcl',...(csv ? ['csv'] : []),'acl','environment-login-bindings'],
+      ...(csv ? {csvInputImplementationRequired:true,csvProductionConsumerReady:false} : {})},
     requiredBundleArtifacts:['openapi','database',...Object.keys(specs)],
-    openapi:{path:`${root}/openapi.v1.21.yaml`,sha256:sha256(openapi)},database:{path:`${root}/schema.v1.23.sql`,sha256:sha256(database)},
+    openapi:{path:apiPath,sha256:sha256(openapi)},database:{path:databasePath,sha256:sha256(database)},
     sources:Object.fromEntries(Object.entries(specs).filter(([key])=>key!=='installation').map(([key,[relative]])=>[key,{path:`${root}/${relative}`,sha256:sha256(content[key]!)}])),
   });
-  const source = createSourceRepository(openapi,database,'runtime',`${root}/openapi.v1.21.yaml`,`${root}/schema.v1.23.sql`,
-    Object.fromEntries(Object.entries(specs).map(([key,[relative]])=>[`${root}/${relative}`,content[key]!])));
+  const companions = Object.fromEntries(Object.entries(specs).map(([key,[relative]])=>[`${root}/${relative}`,content[key]!]));
+  if (csv) {
+    const pair = `${sha256(openapi)} ${sha256(database)}`;
+    companions[`${root}/19-P2CSV资料输入合同候选.md`] = `> 状态：${approvalState === 'draft-increment' ? 'DRAFT' : 'FROZEN'} · NOT EXPORTED · NOT INTAKE · SYNTHETIC DEVELOPMENT ONLY\n**P2 CSV 机器合同增量：** ${pair}\n**实际产物必须精确匹配：** ${pair}\n**CSV 安装清单：** ${sha256(content.installation!)}\n`;
+    companions['business-docs/01-客服Agent项目/90-评审/2026-10-08_P2CSV输入合同批准.md'] = `> 状态：${approvalState === 'draft' ? 'DRAFT' : 'APPROVED'} · CONTRACT ONLY · SYNTHETIC DEVELOPMENT ONLY\n**批准产物：** ${pair}\n**批准安装清单：** ${approvalState === 'bad-hash' ? 'f'.repeat(64) : sha256(content.installation!)}\n`;
+  }
+  const source = createSourceRepository(openapi,database,'runtime',apiPath,databasePath,companions);
   const descriptor = (version:string, source_path:string, file:string, bytes:string) => ({version,source_path,file,sha256:sha256(bytes),bytes:Buffer.byteLength(bytes)});
-  const manifest = { schema:'customer-agent-contract-set/v2',contract_set_id:`cs-ai-c11-openapi-1.21.0-schema-1.23-${source.sourceGitSha.slice(0,12)}`,
+  const manifest = { schema:csv ? 'customer-agent-contract-set/v3' : 'customer-agent-contract-set/v2',contract_set_id:`cs-ai-c11-openapi-${apiVersion}-schema-${schemaVersion}-${source.sourceGitSha.slice(0,12)}`,
     source_repository:'ai-赋能立项',source_git_sha:source.sourceGitSha,architecture_version:'1.16',implementation_version:'1.21',
-    openapi:descriptor('1.21.0',`${root}/openapi.v1.21.yaml`,'openapi.v1.yaml',openapi),
-    database:descriptor('schema.v1.23',`${root}/schema.v1.23.sql`,'schema-v1.23.sql',database),
+    openapi:descriptor(apiVersion,apiPath,'openapi.v1.yaml',openapi),
+    database:descriptor(`schema.v${schemaVersion}`,databasePath,`schema-v${schemaVersion}.sql`,database),
     runtime:Object.fromEntries(Object.entries(specs).map(([key,[relative,file]])=>[key,descriptor('1',`${root}/${relative}`,file,content[key]!)])),
   };
   const directory = temporaryDirectory('runtime-contract-bundle');
@@ -367,6 +380,99 @@ describe('versioned runtime bundle intake', () => {
     source.manifest.database.version='schema.v1.22';source.manifest.database.file='schema-v1.22.sql';
     source.manifest.contract_set_id=source.manifest.contract_set_id.replace('openapi-1.21.0-schema-1.23','openapi-1.20.0-schema-1.22');source.save();
     expect(()=>contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
+  });
+});
+
+describe('CSV v3 bundle intake preparation', () => {
+  it('consumes all fourteen immutable artifacts without activating CSV or installing SQL', async () => {
+    const source = createRuntimeContractSet(true), productRoot = createProductRoot();
+    const result = contractSet.ingestContractSet({ projectRoot:productRoot, sourceDirectory:source.directory, sourceRepositoryRoot:source.source.repositoryRoot });
+    expect(result).toMatchObject({ status:'CREATED', intake_status:'VERIFIED_NOT_ACTIVATED', runtime_activated:false, ddev_authorized:false });
+    expect(readdirSync(result.path)).toHaveLength(14);
+    await contractSet.withVerifiedContractSetSnapshot({projectRoot:productRoot}, snapshot => {
+      expect(snapshot.runtime_sources).toEqual(source.content);
+      expect(Object.isFrozen(snapshot.runtime_sources)).toBe(true);
+    });
+    const verified = JSON.parse(execFileSync(process.execPath, [path.join(repositoryRoot,'scripts/customer-agent-contract-set.mjs'), 'verify', `--project-root=${productRoot}`], {encoding:'utf8'}));
+    expect(verified).toMatchObject({status:'VERIFIED',contract_set_id:source.manifest.contract_set_id,runtime_activated:false});
+    const before = readFileSync(result.lock_path);
+    writeFileSync(path.join(result.path,source.manifest.runtime.csv!.file),'changed');
+    expect(() => contractSet.ingestContractSet({projectRoot:productRoot,sourceDirectory:source.directory,sourceRepositoryRoot:source.source.repositoryRoot})).toThrow(/mismatch/);
+    expect(readFileSync(result.lock_path)).toEqual(before);
+    expect(readFileSync(path.join(result.path,source.manifest.runtime.csv!.file),'utf8')).toBe('changed');
+  });
+
+  it.each(['draft','draft-increment','bad-hash'] as const)('rejects %s source approval before writing any product lock', approval => {
+    const source = createRuntimeContractSet(true, approval), productRoot = createProductRoot();
+    expect(() => contractSet.ingestContractSet({ projectRoot:productRoot,sourceDirectory:source.directory,sourceRepositoryRoot:source.source.repositoryRoot })).toThrow(/FROZEN and APPROVED|approval hashes mismatch/);
+    expect(existsSync(path.join(productRoot,'contracts/upstream/customer-agent'))).toBe(false);
+  });
+
+  it.each([false, true])('checks declared-SHA CSV history and refuses downgraded sources even after deletion; shallow=%s', shallow => {
+    const source = createRuntimeContractSet(), productRoot = createProductRoot();
+    const approvalPath = 'business-docs/01-客服Agent项目/90-评审/2026-10-08_P2CSV输入合同批准.md';
+    mkdirSync(path.dirname(path.join(source.source.repositoryRoot,approvalPath)),{recursive:true});
+    writeFileSync(path.join(source.source.repositoryRoot,approvalPath),'Synthetic later CSV approval marker');
+    runGit(source.source.repositoryRoot,['add','--',approvalPath]);
+    runGit(source.source.repositoryRoot,['-c','user.name=Contract Test','-c','user.email=contract-test@example.invalid','commit','--quiet','--no-verify','-m','synthetic later CSV history']);
+    rmSync(path.join(source.source.repositoryRoot,approvalPath));
+    runGit(source.source.repositoryRoot,['add','--',approvalPath]);
+    runGit(source.source.repositoryRoot,['-c','user.name=Contract Test','-c','user.email=contract-test@example.invalid','commit','--quiet','--no-verify','-m','synthetic removal cannot erase CSV history']);
+    const old = contractSet.ingestContractSet({projectRoot:productRoot,sourceDirectory:source.directory,sourceRepositoryRoot:source.source.repositoryRoot});
+    const oldLock = readFileSync(old.lock_path);
+    expect(contractSet.verifyIngestedContractSet({projectRoot:productRoot}).contract_set_id).toBe(source.manifest.contract_set_id);
+    const later = runGit(source.source.repositoryRoot,['rev-parse','HEAD']);
+    source.manifest.source_git_sha = later;
+    source.manifest.contract_set_id = source.manifest.contract_set_id.replace(source.source.sourceGitSha.slice(0,12),later.slice(0,12)); source.save();
+    let trustedSource = source.source.repositoryRoot;
+    if (shallow) {
+      trustedSource = temporaryDirectory('csv-shallow-source');
+      execFileSync('git',['clone','--quiet','--depth=1',pathToFileURL(source.source.repositoryRoot).href,trustedSource],{stdio:['ignore','pipe','pipe']});
+      expect(runGit(trustedSource,['rev-parse','--is-shallow-repository'])).toBe('true');
+    }
+    expect(() => contractSet.ingestContractSet({projectRoot:productRoot,sourceDirectory:source.directory,sourceRepositoryRoot:trustedSource})).toThrow(shallow ? /shallow clones are not accepted/ : /cannot be downgraded/);
+    expect(readFileSync(old.lock_path)).toEqual(oldLock);
+    expect(existsSync(path.join(path.dirname(old.path),source.manifest.contract_set_id))).toBe(false);
+  });
+
+  it.each(['csv','csvProtocol','acl'])('rejects a missing v3 %s member before writing a lock', key => {
+    const source = createRuntimeContractSet(true), productRoot = createProductRoot();
+    rmSync(path.join(source.directory,source.manifest.runtime[key]!.file));
+    expect(() => contractSet.ingestContractSet({projectRoot:productRoot,sourceDirectory:source.directory,sourceRepositoryRoot:source.source.repositoryRoot})).toThrow(/members mismatch/);
+    expect(existsSync(path.join(productRoot,'contracts/upstream/customer-agent/contract-set.lock.json'))).toBe(false);
+  });
+
+  it('rejects corrupt or independently rehashed CSV protocol and storage members', () => {
+    for (const key of ['csv','csvProtocol']) {
+      const source = createRuntimeContractSet(true);
+      writeFileSync(path.join(source.directory,source.manifest.runtime[key]!.file),'corrupt');
+      expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/mismatch/);
+      source.replace(key,'rehashed');
+      expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/reference mismatch/);
+    }
+  });
+
+  it.each(['order','requiredBundleArtifacts','sources','runtimeReady','implementationRequired','consumerReady','referenceIncludes'])('rejects wrong v3 %s after outer hashes are updated', field => {
+    const source = createRuntimeContractSet(true), installation = JSON.parse(source.content.installation!);
+    if (field === 'order') installation.productMode.order.reverse();
+    if (field === 'requiredBundleArtifacts') installation.requiredBundleArtifacts.pop();
+    if (field === 'sources') delete installation.sources.csv;
+    if (field === 'runtimeReady') installation.referenceMode.runtimeReady = true;
+    if (field === 'implementationRequired') installation.productMode.csvInputImplementationRequired = false;
+    if (field === 'consumerReady') installation.productMode.csvProductionConsumerReady = true;
+    if (field === 'referenceIncludes') installation.referenceMode.includes.pop();
+    source.replace('installation',JSON.stringify(installation));
+    expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow();
+  });
+
+  it('rejects removed CSV descriptors and v3 disguised as v2 despite self-consistent member removal', () => {
+    const source = createRuntimeContractSet(true);
+    for (const key of ['csv','csvProtocol']) {
+      rmSync(path.join(source.directory,source.manifest.runtime[key]!.file)); delete source.manifest.runtime[key];
+    }
+    source.save(); expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/runtime artifacts/);
+    source.manifest.schema = 'customer-agent-contract-set/v2'; source.save();
+    expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
   });
 });
 
