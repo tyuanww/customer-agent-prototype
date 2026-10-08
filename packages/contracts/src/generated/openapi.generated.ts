@@ -1,6 +1,26 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
 export interface paths {
+    "/v1/intake/shop-directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页读取当前主体可查询店铺的正式显示名
+         * @description 只读店铺目录。认证主体和产品会话只来自 ProductSession，调用方不能提交 principal、tenant、app 或店铺名单。服务端先按既有 query 授权谓词得到店铺集合，再附上目录里的当前显示名；品牌级 shopId=null 不展开全公司店铺，显示名不授予 query 或其他业务动作。查询和复制仍使用 shopId。displayName 非空且最多 256 个字符，重名保留各自 shopId。同一 tenant/app/shop 只有一条当前名称和 displayVersion，同店多个来源不能各带一个名称。任一有 query 资格的店铺缺少当前名称时整次 409，不返回其余店铺。limit 为 1–100，缺省 50。nextCursor 不含会话哈希，由服务端用独立私有签名 key 进行 HMAC，绑定主体、租户、应用、会话、每页数量、主体事实版本、撤销代际、完整目录修订、授权集合摘要、截止和本页边界；更名、撤权、新增或失去 query 资格、身份代际变化返回 409 SHOP_DIRECTORY_CHANGED，截止已过返回 409 SHOP_DIRECTORY_EXPIRED。两种失败都不返回条目，调用方必须丢弃已读页并从第一页重读，不能把新旧页拼成一份目录。畸形 cursor 或 limit 为 400 SHOP_DIRECTORY_CURSOR；篡改游标、换会话或改变 limit 均为 400 SHOP_DIRECTORY_CURSOR。名称不来自飞书通讯录字段。参见 18-P2店铺目录合同候选.md。
+         */
+        get: operations["listIntakeShopDirectory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/intake/sources/{sourceId}/management-context": {
         parameters: {
             query?: never;
@@ -1729,6 +1749,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        IntakeShopDisplay: {
+            shopId: components["schemas"]["IntakeId"];
+            displayName: string;
+            displayVersion: components["schemas"]["IntakeVersion"];
+        };
+        IntakeShopDirectory: {
+            items: components["schemas"]["IntakeShopDisplay"][];
+            nextCursor: string | null;
+            /**
+             * Format: date-time
+             * @description 本页与后续同一次目录读取共用的最早截止。它不是新的业务授权。
+             */
+            validUntil: string;
+        };
         /** @description 服务端已认证主体的已确认 principal 映射。validUntil 不是离线授权；Main 在创建候选前重读并保留原操作的精确输入进行不确定结果恢复。参与人目录复用 IntakePrincipalPage；本对象不包含展示名或整份权限。 */
         IntakeManagementContext: {
             sourceId: components["schemas"]["IntakeId"];
@@ -2378,7 +2412,7 @@ export interface components {
             message: string;
             details: {
                 /** @enum {string} */
-                reason: "ORG_FACTS_UNAVAILABLE" | "PERMISSION_CHANGED" | "SCOPE_DENIED" | "ROLE_CEILING" | "GRANT_AUTHORITY_DENIED" | "SELF_ESCALATION" | "REDELEGATION_DENIED" | "NO_STEWARD" | "SOURCE_MISMATCH" | "SOURCE_ORDER_UNKNOWN" | "FILE_INVALID" | "FILE_LIMIT" | "TEMPLATE_VERSION" | "EMPTY_DATA" | "QUOTA_EXCEEDED" | "AWAITING_APPROVAL" | "APPROVAL_UNAVAILABLE" | "HUMAN_REVIEW_REQUIRED" | "APPROVAL_BINDING" | "ATTACHMENT_UNVERIFIED" | "MATERIAL_CHANGED" | "BASE_CHANGED" | "APPROVAL_CHANGED" | "APPROVAL_REVOKED" | "TICKET_EXPIRED" | "TICKET_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "COMMIT_UNKNOWN" | "ALREADY_PUBLISHED" | "MODE_CONFLICT" | "UPGRADE_REQUIRED" | "VOCABULARY_IN_USE" | "MEANING_CHANGED" | "LEASE_EXPIRED" | "NO_SHOP" | "CHOOSE_SHOP";
+                reason: "ORG_FACTS_UNAVAILABLE" | "PERMISSION_CHANGED" | "SCOPE_DENIED" | "ROLE_CEILING" | "GRANT_AUTHORITY_DENIED" | "SELF_ESCALATION" | "REDELEGATION_DENIED" | "NO_STEWARD" | "SOURCE_MISMATCH" | "SOURCE_ORDER_UNKNOWN" | "FILE_INVALID" | "FILE_LIMIT" | "TEMPLATE_VERSION" | "EMPTY_DATA" | "QUOTA_EXCEEDED" | "AWAITING_APPROVAL" | "APPROVAL_UNAVAILABLE" | "HUMAN_REVIEW_REQUIRED" | "APPROVAL_BINDING" | "ATTACHMENT_UNVERIFIED" | "MATERIAL_CHANGED" | "BASE_CHANGED" | "APPROVAL_CHANGED" | "APPROVAL_REVOKED" | "TICKET_EXPIRED" | "TICKET_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "COMMIT_UNKNOWN" | "ALREADY_PUBLISHED" | "MODE_CONFLICT" | "UPGRADE_REQUIRED" | "VOCABULARY_IN_USE" | "MEANING_CHANGED" | "LEASE_EXPIRED" | "NO_SHOP" | "CHOOSE_SHOP" | "SHOP_DIRECTORY_CURSOR" | "SHOP_DIRECTORY_SESSION" | "SHOP_DISPLAY_MISSING" | "SHOP_DIRECTORY_CHANGED" | "SHOP_DIRECTORY_EXPIRED" | "SHOP_DIRECTORY_UNAVAILABLE";
                 diagnosticId: string;
             };
         };
@@ -4068,6 +4102,78 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listIntakeShopDirectory: {
+        parameters: {
+            query?: {
+                /** @description 上一页返回的 nextCursor。省略表示第一页。 */
+                cursor?: string;
+                /** @description 本页店铺数。缺省 50，最大 100。 */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前主体可查询店铺的一页显示名。Cache-Control: no-store。空集合表示当前没有 query 店铺，不是缺少名称。 */
+            200: {
+                headers: {
+                    /** @description 含会话和授权截止的读取不得缓存。 */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeShopDirectory"];
+                };
+            };
+            /** @description cursor 或 limit 不符合合同。reason=SHOP_DIRECTORY_CURSOR。不返回条目。 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 会话未认证或主体不存在。reason=SHOP_DIRECTORY_SESSION。不披露目录是否存在。 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 与具体店铺无关的全局能力拒绝。未授权店铺不使用 403 暴露存在性。 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description SHOP_DISPLAY_MISSING、SHOP_DIRECTORY_CHANGED 或 SHOP_DIRECTORY_EXPIRED。不返回任何店铺。调用方丢弃已读页；CHANGED 或 EXPIRED 后从第一页重读，MISSING 时不得用店铺编号代替名称。 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+            /** @description 服务端目录 key 未配置、已撤销或已到期。reason=SHOP_DIRECTORY_UNAVAILABLE。不返回条目或配置细节。 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeError"];
+                };
+            };
+        };
+    };
     getIntakeManagementContext: {
         parameters: {
             query?: never;

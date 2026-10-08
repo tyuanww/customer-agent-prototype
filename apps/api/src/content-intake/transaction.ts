@@ -19,7 +19,12 @@ export type IntakePool = Pick<Pool, 'connect'>;
 type Queryable = Pick<PoolClient, 'query'>;
 /** Policy owners register the validity they consumed. The transaction owner checks
  * the earliest deadline after all writes, including the receipt, before COMMIT. */
-export type IntakeTransaction = Queryable & { validUntil: (deadline: number) => void };
+export type IntakeTransaction = Queryable & {
+  validUntil: (deadline: number) => void;
+  /** Register a database-only invariant check under this transaction's lock.
+   * Runs after work/receipt writes and before final authority/time checks. */
+  beforeCommit: (check: () => Promise<void>) => void;
+};
 export type Principal = {
   id: string; userId: string; tenantId: string; appId: string; identityScope: string; personKey: string;
   factsVersion: number; generation: number; enabled: boolean; checkedAt: number; validUntil: number;
@@ -28,13 +33,16 @@ export type Principal = {
 
 /** Lock the authentication module's private session reference until this read or
  * write commits. An actor-shaped DTO, including a clone, is not a session. */
-export async function lockProductSession(client: IntakeTransaction, actor: AuthenticatedUser): Promise<{hash: string; validUntil: number}> {
+export async function lockProductSession(client: Pick<IntakeTransaction, 'query' | 'validUntil'>, actor: AuthenticatedUser): Promise<{hash: string; validUntil: number}> {
   const hash = authenticatedProductSession(actor);
   if (!hash) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
-  const result = await client.query<{ expires_at: Date }>(`SELECT s.expires_at
-    FROM backend_identity.sessions s JOIN backend_identity.subject_bindings b USING(binding_id)
-    WHERE s.token_hash=$1 AND b.user_id=$2 AND b.enabled AND s.revoked_at IS NULL
-      AND s.expires_at>clock_timestamp() FOR SHARE OF s,b`, [hash, actor.user_id]);
+  const result = await client.query<{ expires_at: Date }>(
+    'SELECT intake_runtime.lock_product_session($1,$2) AS expires_at', [hash, actor.user_id]).catch(error => {
+    if (error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SESSION_UNAVAILABLE') {
+      throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+    }
+    throw error;
+  });
   if (!result.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
   const validUntil = result.rows[0].expires_at.getTime();
   client.validUntil(validUntil);
@@ -131,7 +139,9 @@ export function createIntakeTransactions(pool: IntakePool,
       await client.query('SELECT backend_review.lock_content()');
       const deadline = await clock(client) + 5_000;
       let authorityDeadline = Infinity;
+      const finalChecks: (() => Promise<void>)[] = [];
       const transaction: IntakeTransaction = { query: client.query.bind(client),
+        beforeCommit(check) { finalChecks.push(check); },
         validUntil(until) {
           if (!Number.isFinite(until)) throw new IntakeRejection('PERMISSION_CHANGED');
           authorityDeadline = Math.min(authorityDeadline, until);
@@ -160,6 +170,7 @@ export function createIntakeTransactions(pool: IntakePool,
       if (operationId !== null && requestHash !== null) await client.query(
         'INSERT INTO backend_review.receipts(actor_user_id,operation,request_key,request_hash,response) VALUES ($1,$2,$3,$4,$5::jsonb)',
         [who.userId, operation, operationId, requestHash, JSON.stringify(value)]);
+      for (const check of finalChecks) await check();
       // Time spent queued or executing cannot borrow validity from transaction start.
       requireFresh(await principal(client, { id: who.id }), await clock(client));
       const now = await clock(client);

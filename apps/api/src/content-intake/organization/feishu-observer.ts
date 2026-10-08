@@ -1,5 +1,5 @@
 import { parseContractSchema } from '@customer-agent/contracts';
-import { canonical, digest } from '../../src/content-intake/material.js';
+import { canonical, digest } from '../material.js';
 
 /** Offline candidate only. The transport owner must authenticate the fixed tenant/app,
  * use tenant identity, user_id_type=open_id and department_id_type=open_department_id,
@@ -19,7 +19,7 @@ export type OrganizationSnapshot = {
 type Reason = 'INVALID_BINDING' | 'INVALID_RESPONSE' | 'IDENTITY_MISMATCH' | 'JOB_UNRESOLVED'
   | 'INCOMPLETE_DIRECTORY' | 'OBSERVATION_CHANGED' | 'OBSERVATION_EXPIRED' | 'DEPENDENCY_UNAVAILABLE';
 export type OrganizationObservation = { ok: true; snapshot: OrganizationSnapshot;
-  provenance: { mappingVersion: 'feishu-contact-job-title-v1-experiment'; directoryDigest: string; observedUntil: string } }
+  provenance: { mappingVersion: 'feishu-contact-job-title-v1'; directoryDigest: string; observedUntil: string } }
   | { ok: false; reason: Reason };
 class Rejected extends Error { constructor(readonly reason: Reason) { super(reason); } }
 const MAX_RESPONSE_BYTES = 1_048_576;
@@ -65,8 +65,8 @@ function user(body: string, openId: string) {
 type Job = { id: string; name: string; enabled: boolean };
 /** This detects observable drift across two complete directory scans and two user
  * reads; Feishu supplies no snapshot revision here, so equality cannot prove an
- * atomic upstream snapshot or a fresh cache. Formal adoption needs that policy and
- * persisted provenance approved separately. Output feeds the existing offline writer;
+ * atomic upstream snapshot or a fresh cache. Registered refresh persists the versioned
+ * provenance; real provider activation remains a separate decision. Output feeds the facts writer;
  * it never registers a principal, chooses a role or issues grants. A failed observation
  * produces no snapshot. Retain a successful snapshot unchanged for unknown-COMMIT retry;
  * calling observe again is a NEW observation, not recovery of a previous write. */
@@ -143,7 +143,7 @@ export function createFeishuOrganizationObserver(scope: { tenantId: string; appI
       return { ok: true, snapshot: { principalId: frozen.principalId, expectedFactsVersion: frozen.expectedFactsVersion,
         departmentIds: last.departmentIds, jobId: matches[0]!.id, enabled: last.enabled,
         checkedAt: new Date(started).toISOString(), validUntil: new Date(started + OBSERVATION_MS).toISOString() },
-      provenance: { mappingVersion: 'feishu-contact-job-title-v1-experiment', directoryDigest: digest(canonical(jobs)),
+      provenance: { mappingVersion: 'feishu-contact-job-title-v1', directoryDigest: digest(canonical(jobs)),
         observedUntil: new Date(finished).toISOString() } };
     }
     try {

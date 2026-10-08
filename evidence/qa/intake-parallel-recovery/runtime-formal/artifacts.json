@@ -1,0 +1,87 @@
+{
+  "schema": "local-synthetic-artifact-sha256/v1",
+  "stored": "local ignored .gstack; paths relative to product workspace",
+  "files": {
+    ".gstack/intake-permissions/2026-10-08T11-03-49.694Z/permissions-dark.png": {
+      "sha256": "bc671ded16288297238b37d264393723f6957ea62f2752796e83e39935bbdacf",
+      "bytes": 142926
+    },
+    ".gstack/intake-permissions/2026-10-08T11-03-49.694Z/permissions-light.png": {
+      "sha256": "68664823c616d14eec8bcb152622b0cb5ee8dfb2ad24bc77c9e481c8f26ade14",
+      "bytes": 142290
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-cancelled.png": {
+      "sha256": "53301a6aef83619c3934314d657fb0f425a55250a7051102eb2f8cd06609607f",
+      "bytes": 186324
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-dark.json": {
+      "sha256": "8eed69f2be744956c7d47870176b080aaf1b01561ab121138a25967f228ce96f",
+      "bytes": 220
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-dark.png": {
+      "sha256": "a4c4f74a5a33829467bedd8394a9732c501a707796c80316e9186c300778e6c0",
+      "bytes": 225207
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-declaration-dark.json": {
+      "sha256": "8eed69f2be744956c7d47870176b080aaf1b01561ab121138a25967f228ce96f",
+      "bytes": 220
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-declaration-dark.png": {
+      "sha256": "363f90f467c7643350c3604c8f273d9aacff47c3325b153c1d0c6129e63552aa",
+      "bytes": 213839
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-light.json": {
+      "sha256": "005d135e8cea28a90e5d7211390861ea15ef7be54345f183a3caeec63309b092",
+      "bytes": 222
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-light.png": {
+      "sha256": "fefc2261277b3ea66d806131fcdee3e7769f947824d22e8a7cb1f983e43f5f6e",
+      "bytes": 223935
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-minimum-dark.json": {
+      "sha256": "98356d21df13ea3c23c71bbd4f4e611609eae0f76fed7a88ce845f7cdeb3eb3e",
+      "bytes": 219
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-minimum-dark.png": {
+      "sha256": "b318591b6c10fbb8f1829af919e36b1b2cbb5249e0ca45ff940791f6ed4c1d1a",
+      "bytes": 209386
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-intake-start.png": {
+      "sha256": "c53aba85423d18f6385253503767d17589cfccd36f54fe6b41107d988048ca13",
+      "bytes": 223624
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-published.png": {
+      "sha256": "f03c8401baa74bd48f40631ae6c6b03deea222a099a7a0a54e25fd4276e65931",
+      "bytes": 200713
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-revision-v2.png": {
+      "sha256": "d65e5b34f936165fbe5e64c1ba5bd944e8e377692543bd5ddbff0540db82ebed",
+      "bytes": 191841
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-upload-error-report.png": {
+      "sha256": "949f73421e7fdd2d913cee7dd4aa2a897be4bab523fc5ab4cfcc2b2020c1f683",
+      "bytes": 259745
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/dashboard-uploaded-material.png": {
+      "sha256": "124d9a917160a9f4c33bfd4e5544e4335fea8c8c47f56c758a84240c488f3b41",
+      "bytes": 198659
+    },
+    ".gstack/intake-synthetic/2026-10-08T11-03-54-151Z/query-published-faq.png": {
+      "sha256": "b671b1e5364f01fa1c129c0ded13dc8788a7ab82e12acbdda7063ec4241fd0ce",
+      "bytes": 238749
+    },
+    ".gstack/intake-synthetic/rollback-2026-10-08T11-04-09-253Z/rollback-dark.png": {
+      "sha256": "440ab7ebd54a36da7e0a601b38e86e3004dd30af73aa2ca0fc4990dbb6a18b86",
+      "bytes": 229326
+    },
+    ".gstack/intake-synthetic/rollback-2026-10-08T11-04-09-253Z/rollback-light.png": {
+      "sha256": "975691778b826d2703ecb8e0195a982c409f91d77e9bc927e8f9cb2647257d6e",
+      "bytes": 228926
+    },
+    ".gstack/intake-synthetic/rollback-2026-10-08T11-04-09-253Z/rollback-ordinary-seat.png": {
+      "sha256": "027906898faa7ebe8ac1e4402773e24bea50ffd24b2424b7b0af6100fa08c704",
+      "bytes": 236365
+    }
+  },
+  "directoryE2E": "Assertions in test and electron.log; no screenshot written by the directory case."
+}

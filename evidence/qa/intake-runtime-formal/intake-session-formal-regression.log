@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/content-intake.integration.test.ts (152 tests | 148 skipped) 6531ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: caps issuance at session expiry and reauthenticates persisted selection after a service restart  1137ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (reader-first)  996ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (logout-first)  867ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  3531ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 148 skipped (152)
+   Start at  19:04:37
+   Duration  7.29s (transform 300ms, setup 0ms, collect 569ms, tests 6.53s, environment 0ms, prepare 50ms)
+

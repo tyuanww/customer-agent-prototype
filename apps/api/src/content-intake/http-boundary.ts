@@ -33,18 +33,20 @@ export function intakeHttpBoundary(app: FastifyInstance, auth: ProductAuthServic
   app.addHook('onRequest', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const actor = await authenticateRequestHeaders(auth, request.headers);
-    if (!actor) return intakeFailure(reply, 'UNAUTHORIZED', 'SCOPE_DENIED');
+    if (!actor) return intakeFailure(reply, 'UNAUTHORIZED', request.routeOptions.url === '/v1/intake/shop-directory' ? 'SHOP_DIRECTORY_SESSION' : 'SCOPE_DENIED');
     actors.set(request, actor);
   });
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : null;
     if (status === 400 || status === 413 || status === 415) {
-      return intakeFailure(reply, 'VALIDATION', status === 413 ? 'FILE_LIMIT' : 'FILE_INVALID');
+      return intakeFailure(reply, 'VALIDATION', request.routeOptions.url === '/v1/intake/shop-directory' ? 'SHOP_DIRECTORY_CURSOR' : status === 413 ? 'FILE_LIMIT' : 'FILE_INVALID');
     }
     const diagnosticId = randomUUID();
     try { report?.(diagnosticId, error); }
     catch { /* Diagnostics cannot replace the fixed public error or disclose a sink exception. */ }
-    return intakeFailure(reply, 'INTERNAL_ERROR', 'ORG_FACTS_UNAVAILABLE', diagnosticId);
+    return request.routeOptions.url === '/v1/intake/shop-directory'
+      ? intakeFailure(reply, 'OVERLOADED', 'SHOP_DIRECTORY_UNAVAILABLE', diagnosticId)
+      : intakeFailure(reply, 'INTERNAL_ERROR', 'ORG_FACTS_UNAVAILABLE', diagnosticId);
   });
   return (request: FastifyRequest): AuthenticatedUser => actors.get(request)!;
 }

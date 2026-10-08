@@ -2127,7 +2127,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
             if(key!=='query'){const v=Reflect.get(target,key);return typeof v==='function'?v.bind(target):v;}
             return async(sql:string,args?:unknown[])=>{
               const result=await target.query(sql,args);
-              if(sql.includes('FOR SHARE OF s,b')){reached();await resume;}
+              if(sql.includes('intake_runtime.lock_product_session')){reached();await resume;}
               return result;
             };
           }});
@@ -2173,7 +2173,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         return reply.code(204).send();
       });
       await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:{
-        authorizations:service.authorizations,sources:service.sources,vocabulary:service.vocabulary,
+        authorizations:service.authorizations,sources:service.sources,vocabulary:service.vocabulary,shopDirectory:service.shopDirectory,
         issueEntitlement:async(current,body)=>{
           if(expireNext) {
             await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,

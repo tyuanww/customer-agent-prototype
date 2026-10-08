@@ -1,0 +1,164 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ❯ tests/postgres.integration.test.ts (38 tests | 2 failed) 49744ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the atomic runtime installation to the exact thirty-two-row ledger  1042ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for role-conflict  892ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for missing-implementation  809ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact thirty-row ledger with only direct storage and runtime overlays  850ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact 28-row prefix with only the private capacity ledger and no application access  843ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the unchanged 27-row prefix and keeps family policy private  891ms
+   ✓ PostgreSQL 15 immutable migration gate > checks explicit roots and all three applicability dimensions on the complete catalog  856ms
+   ✓ PostgreSQL 15 immutable migration gate > validates 5000 entries with grouped expansion under a bounded PG budget  1493ms
+   ✓ PostgreSQL 15 immutable migration gate > keeps fifty usage-page guard checks on 5000 unassociated rows within five seconds  1617ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint products under five seconds  1106ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint scenarios under five seconds  1415ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint half-open-time under five seconds  1268ms
+   ✓ PostgreSQL 15 immutable migration gate > matches a fixed-seed pairwise applicability oracle across wildcard and interval-chain catalogs  1096ms
+   ✓ PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op  1216ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'usage' ledger with the rollback and family overlays  1046ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'quality' ledger with the rollback and family overlays  939ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.12 ledger prefix through the immutable v1.13/v1.14 suffix  1340ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.16 with the deferred guard and ops-loop migrations and rejects privilege drift  1160ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the shipped nineteen-migration prefix and keeps P2 storage sealed  1426ms
+   ✓ PostgreSQL 15 immutable migration gate > appends discovery and rollback to the exact 25-row ledger and detects index drift  1353ms
+   × PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints 1715ms
+     → promise resolved "{ status: 'PASS', …(6) }" instead of rejecting
+   × PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed 1945ms
+     → promise resolved "{ status: 'PASS', …(6) }" instead of rejecting
+   ✓ PostgreSQL 15 immutable migration gate > appends sealed quality storage without rewriting the 22-row ledger or opening application access  1568ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=false  2317ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=true  1176ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.17 with only the ops-loop migration  1195ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact v1.15 ledger with only the backend migration  1482ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.14 with only the atomic owner suffix and denies registrar/runtime privilege drift  2259ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.13 ledger prefix with only the immutable v1.14 suffix  2815ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls back an interrupted synthetic backfill and safely retries the same migration id  1322ms
+   ✓ PostgreSQL 15 immutable migration gate > keeps DDL and its immutable ledger row atomic when the ledger insert fails  1098ms
+   ✓ PostgreSQL 15 immutable migration gate > reconciles an unknown COMMIT acknowledgement from the immutable ledger on a new session  2037ms
+   ✓ PostgreSQL 15 immutable migration gate > serializes two independent fresh clients and applies the catalogue exactly once  1768ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects concurrent control-plane operations on the same client session  1057ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects ACL, function-security, trigger-mode, and policy-key drift by exact manifest  1384ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a table  653ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a enum  654ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a schema  639ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/postgres.integration.test.ts > PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints
+AssertionError: promise resolved "{ status: 'PASS', …(6) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "acl": {
++     "publicLedgerRead": false,
++     "publicLedgerSchemaUsage": false,
++     "runtimeBackingViewRead": false,
++     "runtimeControlledSearchExecute": true,
++     "runtimeReleaseItemsRead": false,
++   },
++   "capabilityRoles": {
++     "memberships": 0,
++     "safe": 17,
++     "total": 17,
++   },
++   "compatibility": {
++     "current": "N",
++     "priorSignedBaseline": {
++       "contractSetId": "cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c",
++       "migrationCount": 9,
++       "sourceGitSha": "1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38",
++       "sourceSchemaSha256": "47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801",
++     },
++     "priorUpgrade": "SUPPORTED · immutable 9-migration baseline → 24-migration current suffix",
++   },
++   "inventory": {
++     "functions": 250,
++     "pgTrgm": "1.6",
++     "pgcrypto": "1.3",
++     "tables": 97,
++     "views": 7,
++   },
++   "migrationCount": 33,
++   "phase1PolicyHardOff": true,
++   "status": "PASS",
+  }
+
+ ❯ expectVerificationFailureAfterMutation tests/postgres.integration.test.ts:125:50
+    123|   try {
+    124|     await client.query(sql);
+    125|     await expect(verifyDatabaseMigrations(client)).rejects.toMatchObje…
+       |                                                  ^
+    126|       code: 'MIGRATION_VERIFY_FAILED',
+    127|     });
+ ❯ tests/postgres.integration.test.ts:659:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/postgres.integration.test.ts > PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed
+AssertionError: promise resolved "{ status: 'PASS', …(6) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "acl": {
++     "publicLedgerRead": false,
++     "publicLedgerSchemaUsage": false,
++     "runtimeBackingViewRead": false,
++     "runtimeControlledSearchExecute": true,
++     "runtimeReleaseItemsRead": false,
++   },
++   "capabilityRoles": {
++     "memberships": 0,
++     "safe": 17,
++     "total": 17,
++   },
++   "compatibility": {
++     "current": "N",
++     "priorSignedBaseline": {
++       "contractSetId": "cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c",
++       "migrationCount": 9,
++       "sourceGitSha": "1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38",
++       "sourceSchemaSha256": "47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801",
++     },
++     "priorUpgrade": "SUPPORTED · immutable 9-migration baseline → 24-migration current suffix",
++   },
++   "inventory": {
++     "functions": 250,
++     "pgTrgm": "1.6",
++     "pgcrypto": "1.3",
++     "tables": 97,
++     "views": 7,
++   },
++   "migrationCount": 33,
++   "phase1PolicyHardOff": true,
++   "status": "PASS",
+  }
+
+ ❯ expectVerificationFailureAfterMutation tests/postgres.integration.test.ts:125:50
+    123|   try {
+    124|     await client.query(sql);
+    125|     await expect(verifyDatabaseMigrations(client)).rejects.toMatchObje…
+       |                                                  ^
+    126|       code: 'MIGRATION_VERIFY_FAILED',
+    127|     });
+ ❯ tests/postgres.integration.test.ts:674:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 36 passed (38)
+   Start at  19:01:29
+   Duration  50.18s (transform 199ms, setup 0ms, collect 239ms, tests 49.74s, environment 0ms, prepare 44ms)
+
+undefined
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/postgres.integration.test.ts

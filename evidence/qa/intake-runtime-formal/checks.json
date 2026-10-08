@@ -1,0 +1,84 @@
+{
+  "status": "PASS_COMPOSITE_TARGETED",
+  "productionActivated": false,
+  "environment": {
+    "node": "24.19.0",
+    "postgres": "15.18",
+    "data": "synthetic only"
+  },
+  "sourceInputs": {
+    "apps/api/src/content-intake/transaction.ts": "90353e11a17b4f7ba7f520320f267899df260e9bd0157a1ab0e2cc8a47fedefb",
+    "apps/api/src/content-intake/runtime-pool.ts": "a0c483565a2c932f2c2c36bcaad181607a03c160be4601925b644ae7a1fe7d3c",
+    "apps/api/src/content-intake/organization/facts-writer.ts": "df1dbdd45fe3f3c59d8044123bcae14b28a14c367c629772709d2c0f695e9413",
+    "apps/api/src/content-intake/organization/feishu-observer.ts": "c24c5303613013bdc3a04014be13e8c90a5c2eef58ab40d59b7b1b2afe95aa80",
+    "apps/api/src/content-intake/organization/registered-refresh.ts": "9d0782fe5d44039b538353d3dd866b477e0bfd4cd67f1cdf401426bf8a1d9b4e",
+    "apps/api/tests/support/intake-synthetic-host.ts": "1ee53cbd7476a84de5d4039ff85ecfa24172208abda333b648ad21bfeba29a08",
+    "apps/api/tests/support/intake-historical-migrations.ts": "45f07a78fac920a2464bf348b607a6daf9bcfe3d16993ef20846765c45344796",
+    "packages/database/migrations/0033_intake_runtime_v1_23.sql": "9f32d82763193ea6da946eb4b9d105ab9ca7b5208846940771f15c5ec5ab28e3"
+  },
+  "logs": {
+    "intake-formal-runtime-b.log": "333aa02991256c2b0cf47580229afdb5c7dccf2b7c2555651d77753a9cf70288",
+    "intake-formal-runtime-final.log": "0d9bcc37965dd0cd2b9501af3465c22e0afaef7430b1391056959eb25c85cc2a",
+    "intake-formal-runtime-round2.log": "cae72ee23a29cc21f029a6bd0cf3457aef9a312b7ef15ca4019b10a6a7e26ab8",
+    "intake-registered-final.log": "9ad3f2ccb11b0326a56526f60a72742ed5dceee891eda071a348e7c196567bfb",
+    "intake-registered-sql-final.log": "ac9966799421716b99c70d578231ce8b92c001155c910ad0c412b65d8ad63e3a",
+    "intake-session-formal-regression.log": "54707e7336bd6bd047c53962ba5443ecf880c5480b52f12298a7efc3d430c4b3"
+  },
+  "results": {
+    "formalService": {
+      "passed": 11,
+      "log": "intake-formal-runtime-round2.log"
+    },
+    "poolOwnerUnit": {
+      "passed": 10,
+      "log": "intake-formal-runtime-round2.log"
+    },
+    "registeredRefresh": {
+      "passed": 10,
+      "composite": [
+        "intake-registered-final.log: first nine cases pass",
+        "intake-registered-sql-final.log: final SQL rejection case pass after adapting immutable transition fixture"
+      ]
+    },
+    "formalGuardAndGrantsHTTP": {
+      "passed": 4,
+      "log": "intake-formal-runtime-final.log"
+    },
+    "transactionFinalizerUnit": {
+      "passed": 4,
+      "log": "intake-formal-runtime-final.log"
+    },
+    "sessionMainRegression": {
+      "passed": 4,
+      "skippedByFilter": 148,
+      "log": "intake-session-formal-regression.log",
+      "filter": "usage: linearizes|usage: Main consumes|usage: caps issuance"
+    },
+    "historicalProbeOnly": {
+      "passed": 20,
+      "migrationCount": 32,
+      "log": "intake-formal-runtime-b.log"
+    },
+    "observerUnit": {
+      "passed": 19,
+      "log": "intake-formal-runtime-b.log"
+    },
+    "organizationWriterAndTransportRegression": {
+      "passed": 14,
+      "log": "intake-formal-runtime-round2.log"
+    },
+    "transportAndSessionUnit": {
+      "passed": 33,
+      "log": "intake-formal-runtime-round2.log"
+    }
+  },
+  "supersededFailures": [
+    "intake-formal-runtime-b.log: 24 formal cases were blocked by the pre-0033 verifier; later formal logs supersede them. Historical 20 and observer 19 remained valid.",
+    "registered SQL rejection case was updated for the formally approved transition/provenance guard; final targeted pass supersedes earlier assertion failures."
+  ],
+  "limits": [
+    "HTTP four-domain and native Electron acceptance are owned by the root agent; this report does not claim those runs.",
+    "The organization pure writer/transport regression uses its pre-existing independent restricted fixture. Formal NOLOGIN organization admission/evidence is covered by registered-refresh and synthetic host.",
+    "Complete external review remains separate. No production app/server HTTP registration, provider credentials, real data, push or deployment."
+  ]
+}

@@ -14,7 +14,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
   // Keep ungated test discovery independent of built API artifacts and PG.
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
   const { readIssueReport } = await import('../../../../packages/content-intake/tests/fixtures.ts');
-  const profile = process.env.CUSTOMER_AGENT_INTAKE_PURPOSE_CANDIDATE === '1' ? 'purpose-candidate' : 'existing';
+  const profile = process.env.CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME === '1' ? 'purpose-runtime' : 'existing';
   const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile });
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-real-stack-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -302,7 +302,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await query.getByTestId('copy-button-1').click();
     await expect(query.getByTestId('toast')).toContainText('已复制');
     expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(firstAnswer);
-    if (profile === 'purpose-candidate') {
+    if (profile === 'purpose-runtime') {
       const shown = await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }));
       expect(shown.ok).toBe(true);
       if (!shown.ok) throw new Error('Expected qualified rows before synthetic revocation');

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Pool, type Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations } from '@customer-agent/database';
+import { applyHistoricalIntakeMigrations } from './support/intake-historical-migrations.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
@@ -11,7 +11,7 @@ import { createContentIntakeService } from '../src/content-intake/service.js';
 import { lockProductSession, type IntakePool } from '../src/content-intake/transaction.js';
 import { authenticatedProductSession, createProductAuthService } from '../src/product-auth-service.js';
 import { createIntakeRuntimeAssembly } from '../experiments/intake-runtime/assembly.js';
-import { createOrganizationFactsWriter } from '../experiments/intake-organization/facts-writer.js';
+import { createOrganizationFactsWriter } from '../src/content-intake/organization/facts-writer.js';
 import { createPurposePrivilegeProbe, probeParseFailureWrites } from '../experiments/intake-runtime/purpose-boundary.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
 
@@ -34,7 +34,7 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
     const db = harness.createDatabase('intake_runtime_assembly');
     databaseName = db.name;
     admin = await harness.connect(db.config);
-    await applyDatabaseMigrations(admin);
+    await applyHistoricalIntakeMigrations(admin);
     await seedIntakeSyntheticHost(admin);
     await admin.query(await readFile(new URL('../experiments/intake-runtime/session-lock.sql', import.meta.url), 'utf8'));
     await admin.query(await readFile(new URL('../experiments/intake-runtime/purpose-acl.sql', import.meta.url), 'utf8'));
@@ -173,11 +173,11 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
       (_id, error) => errors.push(error), undefined, { requireProductSession: true });
     const serviceResult = await service.issueEntitlement(actor, seat);
     expect(serviceResult).toMatchObject({ ok: false, code: 'INTERNAL_ERROR', reason: 'COMMIT_UNKNOWN', commit: 'rolled_back' });
-    expect(errors[0]).toMatchObject({ code: '42501' });
+    expect(errors[0]).toMatchObject({ code: '3F000' }); // This historical fixture predates the formal runtime schema.
     const locked = await usage.connect();
     try {
       await locked.query('BEGIN');
-      await expect(lockProductSession({ query: locked.query.bind(locked), validUntil: () => undefined }, actor)).rejects.toMatchObject({ code: '42501' });
+      await expect(lockProductSession({ query: locked.query.bind(locked), validUntil: () => undefined }, actor)).rejects.toMatchObject({ code: '3F000' });
     } finally { await locked.query('ROLLBACK'); locked.release(); }
     const forged = await boundary.probeQualificationWrites(actor, { ...seat, sessionTokenHash: 'a'.repeat(64) });
     expect(forged).toMatchObject({ ok: false, reason: 'FILE_INVALID', code: 'VALIDATION', commit: 'rolled_back' });

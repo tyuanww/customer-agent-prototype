@@ -1,0 +1,30 @@
+$ electron-vite build
+vite v6.4.3 building SSR bundle for production...
+transforming...
+✓ 321 modules transformed.
+rendering chunks...
+out/main/index.js  1,141.88 kB
+✓ built in 510ms
+vite v6.4.3 building SSR bundle for production...
+transforming...
+✓ 24 modules transformed.
+rendering chunks...
+out/preload/login.cjs       1.48 kB
+out/preload/sop.cjs         7.91 kB
+out/preload/dashboard.cjs  16.19 kB
+out/preload/index.cjs      48.10 kB
+✓ built in 31ms
+vite v6.4.3 building for production...
+transforming...
+✓ 108 modules transformed.
+rendering chunks...
+../../out/renderer/index.html                                        0.45 kB
+../../out/renderer/assets/dashboard-fox-headset-dark-C9mwmYh5.png  655.56 kB
+../../out/renderer/assets/fox-head-DuCgrBSA.png                    706.19 kB
+../../out/renderer/assets/SopApp-CP028QG-.css                        2.84 kB
+../../out/renderer/assets/LoginApp-v_PWWaJd.css                      3.08 kB
+../../out/renderer/assets/index-pJI_ku9W.css                       162.35 kB
+../../out/renderer/assets/LoginApp-BWcg3sfq.js                       9.64 kB
+../../out/renderer/assets/SopApp-ayDkPaH-.js                        11.28 kB
+../../out/renderer/assets/index-B7pVTJ-C.js                        717.26 kB
+✓ built in 332ms

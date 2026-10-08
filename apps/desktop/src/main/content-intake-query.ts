@@ -14,6 +14,7 @@ export class ContentIntakeQuery {
   private context: IntakeQueryContext = emptyIntakeQueryContext();
   private shown: { catalog: IntakeCatalog; keys: Set<string> } | null = null;
   private menuDeadline = 0;
+  private namesDeadline = 0;
   private epoch: number;
   private disposed = false;
   private listeners = new Set<(reason: 'invalidated' | 'expired') => void>();
@@ -53,7 +54,9 @@ export class ContentIntakeQuery {
       const menus = selected === null ? { products: [], scenarios: [] }
         : await loadIntakeVocabulary(this.session, access, selected, controller.signal);
       if (this.disposed || controller.signal.aborted || this.discovery !== controller) throw new IntakeUsageError('STALE');
-      this.context = { ...emptyIntakeQueryContext(), ...menus, shops: access.shops, shopId: selected, validUntil: access.validUntil };
+      this.namesDeadline = access.shopNamesDeadline ?? 0;
+      const namesFresh = this.namesDeadline>performance.now() && !!access.shopNamesValidUntil && Date.now()<Date.parse(access.shopNamesValidUntil);
+      this.context = { ...emptyIntakeQueryContext(), ...menus, shops: access.shops, shopNames: namesFresh ? access.shopNames ?? [] : [], shopNamesValidUntil: namesFresh ? new Date(Math.min(Date.parse(access.shopNamesValidUntil!),Date.now()+this.namesDeadline-performance.now())).toISOString() : null, shopId: selected, validUntil: access.validUntil };
       this.menuDeadline = performance.now() + Math.max(0, Date.parse(access.validUntil) - Date.now());
       if (selected !== null) this.usage.select({ shopId: selected, productIds: [], scenarioIds: [] });
       return structuredClone(this.context);
@@ -65,6 +68,7 @@ export class ContentIntakeQuery {
     if (!isIntakeSelection(selection)
       || selection.productIds.some(id => !this.context.products.some(p => p.id === id))
       || selection.scenarioIds.some(id => !this.context.scenarios.some(p => p.id === id))) throw new IntakeUsageError('FORBIDDEN');
+    if (performance.now()>=this.namesDeadline || (this.context.shopNamesValidUntil && Date.now()>=Date.parse(this.context.shopNamesValidUntil))) { this.context.shopNames=[];this.context.shopNamesValidUntil=null; }
     this.context = { ...this.context, productIds: [...selection.productIds].sort(), scenarioIds: [...selection.scenarioIds].sort() };
     this.usage.select({ shopId: this.context.shopId!, productIds: this.context.productIds, scenarioIds: this.context.scenarioIds });
     return structuredClone(this.context);

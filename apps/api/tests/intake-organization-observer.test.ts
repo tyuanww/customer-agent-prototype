@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createFeishuOrganizationObserver, type OrganizationTransport } from '../experiments/intake-organization/feishu-observer.js';
+import { createFeishuOrganizationObserver, type OrganizationTransport } from '../src/content-intake/organization/feishu-observer.js';
 import { nativeOrganizationFixture } from './support/intake-organization-native.js';
 
 const scope = { tenantId: 'tenant-a', appId: 'app-a' };
@@ -18,7 +18,7 @@ describe('offline native organization observation', () => {
     expect(result).toMatchObject({ ok: true, snapshot: { principalId: 'agent', expectedFactsVersion: 1,
       departmentIds: ['dept-a'], jobId: 'job-agent', enabled: true,
       checkedAt: new Date(started).toISOString(), validUntil: new Date(started + 300_000).toISOString() },
-    provenance: { mappingVersion: 'feishu-contact-job-title-v1-experiment', observedUntil: new Date(started + 120_000).toISOString() } });
+    provenance: { mappingVersion: 'feishu-contact-job-title-v1', observedUntil: new Date(started + 120_000).toISOString() } });
     expect(f.calls.map(call => [call.kind, call.key])).toEqual([
       ['user', binding.openId], ['jobs', undefined], ['jobs', 'second'], ['jobs', undefined], ['jobs', 'second'], ['user', binding.openId],
     ]);

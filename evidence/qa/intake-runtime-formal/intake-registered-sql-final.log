@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ experiments/intake-organization/registered-refresh.integration.test.ts (10 tests | 9 skipped) 976ms
+   ✓ registered organization input through the existing atomic facts writer > rejects cross-scope, invalid domains, non-finite timestamps and null provenance in SQL itself  976ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 9 skipped (10)
+   Start at  19:04:15
+   Duration  1.64s (transform 229ms, setup 0ms, collect 437ms, tests 976ms, environment 0ms, prepare 59ms)
+

@@ -5,7 +5,7 @@ import { parseContractSchema } from '../../packages/contracts/dist/index.js';
 import { readIssueReport } from '../../packages/content-intake/tests/fixtures.ts';
 import { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } from '../../apps/api/tests/support/intake-synthetic-host.ts';
 
-const cases = [{ profile: 'existing', domain: 'product' }, ...(['product', 'campaign', 'presale', 'aftersale'] as const).map(domain => ({ profile: 'purpose-candidate' as const, domain }))] as const;
+const cases = [{ profile: 'existing', domain: 'product' }, ...(['product', 'campaign', 'presale', 'aftersale'] as const).map(domain => ({ profile: 'purpose-runtime' as const, domain }))] as const;
 for (const { profile, domain } of cases) test(`isolated ${profile}/${domain} HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot`, {
   skip: process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST !== '1', timeout: 60_000,
 }, async () => {
@@ -55,7 +55,7 @@ for (const { profile, domain } of cases) test(`isolated ${profile}/${domain} HTT
     assert.equal(result.pendingApprovals, 0); assert.equal(result.directPublications, 1);
     assert.ok(result.diagnostics.some(d => d.reason === 'MATERIAL_CHANGED'));
     assert.equal(snapshot.releaseId, result.currentReleaseId);
-    if (profile === 'purpose-candidate') {
+    if (profile === 'purpose-runtime') {
       assert.ok(result.purposeQueries.business! > 10); assert.ok(result.purposeQueries.usage! > 10);
       if (domain === 'campaign') {
         const workbook = await createIntakeSyntheticWorkbook({ domain, missingExpiry: true });
@@ -82,6 +82,6 @@ for (const { profile, domain } of cases) test(`isolated ${profile}/${domain} HTT
     }
     console.info(JSON.stringify({ status: 'PASS', profile, domain, consumer: 'ordinary-seat', http: 'actual', postgres: 15, publicationPolicy: 'direct-v1', approvalFacts: 0, publications: 1, faq: snapshot.faq.length, multilinePreserved: true }));
   } finally { await host.close(); }
-  assert.deepEqual(host.resources(), { closed: true, identityListening: false, poolConnections: profile === 'purpose-candidate' ? [0, 0, 0, 0] : [0] });
+  assert.deepEqual(host.resources(), { closed: true, identityListening: false, poolConnections: profile === 'purpose-runtime' ? [0, 0, 0, 0] : [0] });
   assert.equal(existsSync(host.root), false, 'owned PG, objects and attachments cleaned');
 });

@@ -2,12 +2,22 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Pool, type Client } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations } from '@customer-agent/database';
+import { applyHistoricalIntakeMigrations } from './support/intake-historical-migrations.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { authenticatedProductSession, createProductAuthService } from '../src/product-auth-service.js';
 import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.js';
-import { createIntakeTransactions, lockProductSession } from '../src/content-intake/transaction.js';
+import { createIntakeTransactions, IntakeRejection } from '../src/content-intake/transaction.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
+
+// Historical inline-lock counterexample, retained solely for the pre-0033 fixture.
+async function lockProductSession(client: { query: Client['query']; validUntil: (n: number) => void }, actor: AuthenticatedUser) {
+  const hash = authenticatedProductSession(actor);
+  if (!hash) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+  const result = await client.query(`SELECT s.expires_at FROM backend_identity.sessions s JOIN backend_identity.subject_bindings b USING(binding_id)
+    WHERE s.token_hash=$1 AND b.user_id=$2 AND b.enabled AND s.revoked_at IS NULL AND s.expires_at>clock_timestamp() FOR SHARE OF s,b`, [hash, actor.user_id]);
+  if (!result.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+  const validUntil = result.rows[0].expires_at.getTime(); client.validUntil(validUntil); return { hash, validUntil };
+}
 
 // A deliberately incomplete role: prove the first runtime assembly boundary,
 // not a production ACL or a successful full usage/publish flow.
@@ -20,7 +30,7 @@ describe.skipIf(!enabled)('intake runtime session-lock permission boundary (synt
     harness = new Pg15Harness(); harness.start();
     const db = harness.createDatabase('intake_runtime_boundary');
     admin = await harness.connect(db.config);
-    await applyDatabaseMigrations(admin);
+    await applyHistoricalIntakeMigrations(admin);
     await seedIntakeSyntheticHost(admin);
     // These grants exist only in a newly initialized disposable cluster.
     await admin.query(`CREATE ROLE synthetic_usage_probe LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
@@ -93,7 +103,7 @@ describe.skipIf(!enabled)('intake runtime session-lock permission boundary (synt
     expect(result).toMatchObject({ ok: false, code: 'INTERNAL_ERROR', reason: 'COMMIT_UNKNOWN', commit: 'rolled_back' });
     expect(reachedBusiness).toBe(false);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatchObject({ code: '42501', message: 'permission denied for table sessions' });
+    expect(errors[0]).toMatchObject({ code: '3F000' }); // Formal consumer refuses the historical database without intake_runtime.
     for (const table of ['entitlements', 'entitlement_contexts', 'entitlement_scopes', 'publications']) {
       // Static test-owned table names, not a product input.
       expect((await admin.query(`SELECT count(*) FROM content_intake.${table}`)).rows[0].count).toBe('0');

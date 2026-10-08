@@ -1,6 +1,6 @@
 # 如何验证合成资料导入
 
-本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。FAQ 原生文件选择、参与人确认、上传校验、报告保存、确认直发与坐席查询已接通。OpenAPI 1.20.0/schema.v1.22 已冻结并版本化接收，新候选按 direct-v1 执行；剩余原生设备人工验收和正式运行接入仍待完成。当前剩余范围见 [TODOS](../TODOS.md)，已取得的平台证据见[杭州分层验收](../evidence/qa/content-intake-p2-hangzhou/README.md)。
+本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。FAQ 原生文件选择、参与人确认、上传校验、报告保存、确认直发与坐席查询已接通。OpenAPI 1.21.0/schema.v1.23 组合合同已冻结并完整版本化接收，新候选按 direct-v1 执行；剩余原生设备人工验收和正式运行接入仍待完成。当前剩余范围见 [TODOS](../TODOS.md)，已取得的平台证据见[杭州分层验收](../evidence/qa/content-intake-p2-hangzhou/README.md)。
 
 ## 运行
 
@@ -56,7 +56,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 ./node_modules/.bin/playwright test tests/e2e/content-intake-permissions-real-stack.spec.ts
 ```
 
-用例要求现有 `purpose-candidate` 合成宿主，使用已登记合成总监和具名坐席，验证预览/取消不生效、保存后坐席新查询资格可用、撤销后重新取资格拒绝。它不代表经理身份单独实跑、真实员工名单、生产账号或正式运行装配已验证。版本和原角色上限保持不变。
+用例要求现有 `purpose-runtime` 合成宿主，使用已登记合成总监和具名坐席，验证预览/取消不生效、保存后坐席新查询资格可用、撤销后重新取资格拒绝。它不代表经理身份单独实跑、真实员工名单、生产账号或正式运行装配已验证。版本和原角色上限保持不变。
 
 ## P2 来源确认与历史审批兼容
 
@@ -184,7 +184,7 @@ Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `Content
 
 `cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单、托盘和 Dock 现在可进入 FAQ 专用资料审核页；没有 content-manage 权限时只显示无管理权限，不装配旧管理适配器。FAQ 正文展示和复制均保留原换行。
 
-上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。新上传/校验管理入口已接通。商品/场景筛选已完成本组合成验证；正式店铺显示名合同与剩余平台人工验收仍待完成；已有设备结果按版本复用，不重新列为全未做。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
+上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。新上传/校验管理入口已接通。商品/场景筛选已完成本组合成验证；店铺名称目录已接到查询选择器；名称异常保留编号，剩余平台人工验收仍待完成；已有设备结果按版本复用，不重新列为全未做。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
 
 ## P2 管理候选与人工质量检查
 
@@ -300,22 +300,22 @@ node scripts/content-retention.ts --group intake-objects --dsn "$SYNTHETIC_DATAB
 pnpm --filter @customer-agent/api test:intake:organization
 ```
 
-该命令构建已有运行依赖，覆盖原生观察、writer PG、回环 HTTP、共享令牌生命周期、版本化登记/provenance 与原子撤销测试；当前数量及结果以[本轮补齐证据](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)为准，需要 Node 24 和现有 PG15 harness。实验写入器位于 `apps/api/experiments/intake-organization/facts-writer.ts`，不进入 API dist，不注册 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式运行角色与迁移不变。
+该命令构建已有运行依赖，覆盖原生观察、writer PG、回环 HTTP、共享令牌生命周期、版本化登记/provenance 与原子撤销测试；当前数量及结果以[本轮补齐证据](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)为准，需要 Node 24 和现有 PG15 harness。单一写入器位于 `apps/api/src/content-intake/organization/facts-writer.ts`，与观察及登记刷新一起进入可构建模块；仅显式合成宿主装配，不注册生产 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式迁移0033已安装用途能力，环境运行账号仍只在合成宿主内创建。
 
 输入要求、提交未知恢复、验证证据与缺口见[组织刷新验收](../evidence/qa/intake-organization/README.md)。这里的 snapshot 是可信观察方提供的内部实验输入，不是飞书原始响应，也不是允许 renderer 调用的接口。重试须保留原快照和 expectedFactsVersion，历史成功不表示当前权限有效；没有观察到新事实时不能人为修改时间延长有效期。
 
 
-该入口现同时覆盖原生形状合成响应 → 精确职务映射 → 既有受限写入器 → 当前使用资格消费者。新观察模块与原 writer 一样排除在 API dist 之外；失败不产出可写快照，未知写入必须重试成功观察时保留的原快照。该命令不读取真实通讯录，不能证明生产认证、限流、上游缓存/原子快照或即时离职事件。具体边界见[组织观察交接](reference-content-intake-p2-contract-handoff.md#原生组织观察离线切片2026-10-08)及[本轮证据](../evidence/qa/intake-organization/native-observer/README.md)。
+该入口现同时覆盖原生形状合成响应 → 精确职务映射 → 既有受限写入器 → 当前使用资格消费者。观察模块与 writer 由 src 单一所有者提供，回环 transport 仍在实验目录；失败不产出可写快照，未知写入必须重试成功观察时保留的原快照。该命令不读取真实通讯录，不能证明生产认证、限流、上游缓存/原子快照或即时离职事件。具体边界见[组织观察交接](reference-content-intake-p2-contract-handoff.md#原生组织观察离线切片2026-10-08)及[本轮证据](../evidence/qa/intake-organization/native-observer/README.md)。
 
-新增 `http-transport.ts` 仅接受固定 `http://127.0.0.1:端口`，令牌由合成调用方注入并只在内存短期缓存；禁止重定向、隐式重试和环境凭据。请求/响应预算、限流、取消及异常释放由 transport 拥有；正式飞书 origin/认证装配保持关闭。四项 PG 消费用例经过已有资格服务，但 usage 仍使用 harness 管理池，不能据此声称完整用途受限装配通过。证据及修复见[HTTP 观察验收](../evidence/qa/intake-organization/http-transport/README.md)与[回收记录](../evidence/qa/intake-parallel-recovery/README.md)。
+新增 `http-transport.ts` 仅接受固定 `http://127.0.0.1:端口`，令牌由合成调用方注入并只在内存短期缓存；禁止重定向、隐式重试和环境凭据。请求/响应预算、限流、取消及异常释放由 transport 拥有；正式飞书 origin/认证装配保持关闭。早期四项 PG 证据使用过 harness 管理池；本轮正式用途消费另有新证据，不能把旧结果冒充新装配。证据及修复见[HTTP 观察验收](../evidence/qa/intake-organization/http-transport/README.md)与[回收记录](../evidence/qa/intake-parallel-recovery/README.md)。
 
-## 正式用途权限：会话锁离线候选
+## 历史会话锁离线实验
 
 ```sh
 CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/intake-runtime-boundary.integration.test.ts
 ```
 
-使用现有 PG15 harness 新建隔离集群，只装载合成身份/空目录。测试先证明现有会话锁 SELECT-only 拒绝，以及为锁授予身份安全列 UPDATE 的风险，再安装 experiments 中的窄函数并以非 owner 账号验证取锁/截止/撤销/权限；测试结束关闭临时集群。SQL 仅是候选，不得复制到已有数据库或生产 migration。通过不代表完整受限用途账号或生产 factory 已具备，详细结论见[证据](../evidence/qa/intake-runtime-boundary/README.md)。
+使用现有 PG15 harness 新建隔离集群，只装载合成身份/空目录。测试固定旧32段基线，先证明历史会话锁 SELECT-only 拒绝，以及为锁授予身份安全列 UPDATE 的风险，再安装 experiments 中的窄函数并以非 owner 账号验证取锁/截止/撤销/权限；测试结束关闭临时集群。SQL 仅是候选，不得复制到已有数据库或生产 migration。通过不代表完整受限用途账号或生产 factory 已具备，详细结论见[证据](../evidence/qa/intake-runtime-boundary/README.md)。
 
 ## 用途权限与装配依赖离线检查
 
@@ -328,26 +328,20 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 `purpose-acl.sql` 仅由测试安装四用途 LOGIN 与 NOLOGIN 函数属主，不是 migration 或生产 bootstrap。`createIntakeRuntimeAssembly` 检查 parser/权限/来源模式/目录等依赖；缺认领仅返回 `checked-not-activated`、`ready:false`，没有启动服务。检查中关闭/取消拒绝迟到结果，并发启动拒绝；连接由调用方借入并负责关闭，本模块不能中止已发出的 DB 查询。
 
-`createPurposePrivilegeProbe` 保留旧 SQL 探针的证据边界。未经候选锁适配的旧 service 仍会返回 42501；后续实际 consumer 测试通过精确锁 SQL 适配和独立 `consumer-acl.sql`，使用原 service 的上传、解析、质量、授权、确认发布、回退及非空分页逻辑。业务/usage 各借用途池，失败收尾借可选 `terminalPool`；默认池行为不变，COMMIT 未知不回滚或释放占用。运行下列专项后，必须区分原生 service 与真实 HTTP/桌面剪贴板：本专项消费 multipart 字节和认证主体，但不启动生产 HTTP，也不操作系统剪贴板。正式治理/intake、factory 和应用 ACL 仍未接入；旧探针待正式替换后移除。
-
+`createPurposePrivilegeProbe` 保留旧 SQL 探针证据，实验测试显式使用旧32段基线。正式实际消费者现在使用 `src/content-intake/runtime-pool.ts`，不改写SQL，直接消费0033。业务/usage借独立用途池，失败收尾借worker `terminalPool`；COMMIT未知不回滚或释放占用。下列专项覆盖原service，HTTP/剪贴板由后述宿主和Electron验收补齐，生产HTTP仍不注册。
 ```sh
 CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/intake-runtime-consumers.integration.test.ts
 ```
 
 验证与剩余条件见[本轮补齐](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)及[实验接线说明](../apps/api/experiments/intake-runtime/INTEGRATION.md)。
 
-## 用途能力候选贯穿 HTTP 与本机 Electron
+## 正式用途合同贯穿合成 HTTP 与本机 Electron
 
-显式 `purpose-candidate` profile 已接入既有合成宿主：环境 LOGIN 通过显式 `SET ROLE` 借用对应 NOLOGIN 用途能力，按实际安装的 32 段 migration ledger 和候选 SQL 校验，业务、usage、worker 使用各自受限连接。组织池本轮只预检，不把它计为组织写入。它复用原 service、解析器和发布/使用消费者，未注册生产 app/server，也未修改正式 migration 或消费锁。
+显式 `purpose-runtime` 使用正式33段迁移；四个环境LOGIN只借各自NOLOGIN能力，每次取连接都经过 `assert_purpose`。组织池实际完成合成绑定登记、双扫描观察及带provenance事实写入；业务/usage/worker复用原service。旧候选安装器和SQL改写桥不在这条运行链上，生产app/server不注册新路径。
 
-[本轮发布验收](../evidence/qa/intake-release-acceptance/README.md)已有实际 HTTP 5/5（原默认 profile product 回归，以及候选 profile 的产品/活动/售前/售后各一次完整上传→检查→确认直发→另一坐席读取）和 Mac Electron 2/2（product FAQ 原生文件/报告/确认发布/取消/查询复制与回退）。活动缺失失效时间拒绝，并实际回读完整 Excel 报告；真实系统剪贴板已比对。四域分别通过的是 HTTP 层，不是四套桌面 Tab 的独立验收；本轮权限配置 Electron 也已在主集成通过，具名授予和撤销另见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)。对话框响应由测试控制，不替代人工设备、Windows/Linux、Dock 或 Stage Manager 证据。
+```sh
+pnpm build
+CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-shop-directory-real-stack.spec.ts
+```
 
-按上述证据的“可复现入口”运行专项；不要把旧 consumer 探针的无 HTTP/无剪贴板边界套用到此新 profile，也不要把此合成 profile 当成生产 factory。正式受限账号、真实组织与初始目录认领仍未激活。
-
-治理出口和产品接收器已实现 `customer-agent-contract-set/v2`：在 manifest、OpenAPI、DDL 三件之外，以封闭成员集合接收九件 runtime 伴随产物，核对来源 Git blob、路径、字节摘要和安装/provenance 关系，向后兼容 v1。主集成已完成合成跨仓往返的 12 件产物 / 9 个 `runtime_sources` 验证；这是交付工具能力，不是实际候选已导出或接收。OpenAPI 1.21.0/schema.v1.23 仍为 DRAFT、未冻结、未 export、未 intake；当前正式锁仍为 1.20.0/1.22、VERIFIED_NOT_ACTIVATED，runtime/Ddev 未启用。精确候选批准、实际版本化交接和运行许可须分别完成；治理候选最终稳定输入 release 41/41 与 PG253 已通过，已回收到治理 `6a25304`，见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)，不推定其结果或新增产物 hash。
-
-## 发布二次确认（2026-10-08）
-
-Main 在第一次发布前冻结请求，使用绑定 Dashboard 的原生警告框；默认取消，关闭/取消不发 HTTP、不建立未知操作，保留表单。确认后再次检查会话/取消代际及当前发布权限；等待中重复命令受已有 active 状态约束。未知提交沿原操作恢复，不重新确认或修改基线。确认依赖未装配时失败关闭。renderer/preload 保持意图接口，HTTP 使用冻结直发合同的 confirmed=true。
-
-最初的[确认验证](../evidence/qa/intake-publication-confirmation/README.md)绑定旧审批合同，保留历史证据。当前 OpenAPI 1.20.0/schema.v1.22 已冻结、export、intake，API、Main、回退和使用读取已一同接入 direct-v1；本次实际 Electron→HTTP→PG15 合成闭环见[直发验证](../evidence/qa/intake-direct-publication/README.md)。对话框响应受控，不能作为真实系统按钮人工点击证据。
+名称目录仅服务查询可见性。Main完整读取所有页，核对 shopId 与已授权店铺集合一致后展示名称；同名附编号，更名/失效重新加载，失败保留编号并提示。名录不会新增授权，也不延长查询资格。实际测试数量、日志和失败边界见[正式合同合成接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。真实维护/登记范围、密钥托管、生产账号与实时飞书仍不在这些合成命令内。

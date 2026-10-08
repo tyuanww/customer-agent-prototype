@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createServer } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
-import { createFeishuOrganizationObserver } from './feishu-observer.js';
+import { createFeishuOrganizationObserver } from '../../src/content-intake/organization/feishu-observer.js';
 import { createOrganizationHttpTransport, type OrganizationTokenSupplier } from './http-transport.js';
 import { startSyntheticContactDouble } from './synthetic-contact-double.js';
 
@@ -51,7 +51,7 @@ describe('loopback organization transport', () => {
     expect(result).toMatchObject({ ok: true, snapshot: { principalId: 'agent', expectedFactsVersion: 1,
       departmentIds: ['dept-a'], jobId: 'job-agent', enabled: true,
       checkedAt: new Date(started).toISOString(), validUntil: new Date(started + 300_000).toISOString() },
-    provenance: { mappingVersion: 'feishu-contact-job-title-v1-experiment', observedUntil: new Date(started + 120_000).toISOString() } });
+    provenance: { mappingVersion: 'feishu-contact-job-title-v1', observedUntil: new Date(started + 120_000).toISOString() } });
     expect(paths()).toEqual([
       '/open-apis/contact/v3/users/synthetic-open-agent?user_id_type=open_id&department_id_type=open_department_id',
       '/open-apis/contact/v3/job_titles?page_size=50',

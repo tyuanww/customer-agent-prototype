@@ -19,7 +19,10 @@ import { createContentIntakeService } from '../../dist/content-intake/service.js
 import { contentIntakeManagementRoutes } from '../../dist/content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 import { IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
-import { installIntakeRuntimeCandidate } from './intake-runtime-candidate.ts';
+import { createIntakePurposePool, type IntakePurposePool } from '../../dist/content-intake/runtime-pool.js';
+import { createRegisteredOrganizationRefresh } from '../../dist/content-intake/organization/registered-refresh.js';
+import { nativeOrganizationFixture } from './intake-organization-native.ts';
+import { seedIntakeSyntheticDirectory } from './intake-synthetic-directory.ts';
 import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-synthetic-seed.ts';
 
 type C = components['schemas'];
@@ -40,34 +43,28 @@ export function createIntakeSyntheticWorkbook({ missingAnswer = false, answerSuf
 
 type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
-type SyntheticProfile = 'existing' | 'purpose-candidate';
-export function createIntakeSyntheticHost(options: { prepareCandidate: false; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain }): Promise<HostState>;
-export function createIntakeSyntheticHost(options?: { prepareCandidate?: true; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain }): Promise<PreparedHost>;
-export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain }): Promise<HostState> {
-  return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product');
+type SyntheticProfile = 'existing' | 'purpose-runtime';
+export function createIntakeSyntheticHost(options: { prepareCandidate: false; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean }): Promise<HostState>;
+export function createIntakeSyntheticHost(options?: { prepareCandidate?: true; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean }): Promise<PreparedHost>;
+export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean }): Promise<HostState> {
+  return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product', options?.duplicateShopNames ?? false);
 }
 
 /** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
  * files, existing DB, production factory or real provider is ever consumed.
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
-async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain) {
+async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean) {
   const pg = new Pg15Harness();
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
   let pool: IntakePool | undefined;
   let usagePool: IntakePool | undefined, terminalPool: IntakePool | undefined;
-  const ownedPools: Pool[] = [];
+  const ownedPools: (Pool | IntakePurposePool)[] = [];
   const purposeQueries: Record<string, number> = {};
-  function ownPool(raw: Pool, purpose: string, capability?: string): IntakePool {
+  function ownPool(raw: Pool | IntakePurposePool, purpose: string): IntakePool {
     ownedPools.push(raw); purposeQueries[purpose] = 0;
     return { connect: async () => {
       const client = await raw.connect();
-      if (capability) {
-        try {
-          await client.query(`SET ROLE ${capability}`);
-          await client.query('SELECT intake_runtime.assert_purpose($1)', [purpose === 'org_writer' ? 'organization' : purpose]);
-        } catch (error) { client.release(true); throw error; }
-      }
       return new Proxy(client, { get(target, key) {
         if (key === 'query') return (sql: string, parameters?: unknown[]) => { purposeQueries[purpose] = purposeQueries[purpose]! + 1; return target.query(sql, parameters); };
         const value: unknown = Reflect.get(target, key);
@@ -136,23 +133,23 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   }
   try {
     pg.start(); const database = pg.createDatabase('intake_desktop');
-    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, domain);
+    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, domain); await seedIntakeSyntheticDirectory(admin, { duplicateShopNames });
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
-    if (profile === 'purpose-candidate') {
-      // Candidate installer is confined to this disposable test database. Replace
-      // this installation boundary after versioned intake, never in app/server.
-      await installIntakeRuntimeCandidate(admin);
-      const { createSyntheticConsumerPool } = await import('../../experiments/intake-runtime/consumer-pool.ts');
-      const roles = {} as Record<'business' | 'usage' | 'worker' | 'org_writer', IntakePool>;
-      for (const purpose of ['business', 'usage', 'worker', 'org_writer'] as const) {
-        const capability = `intake_${purpose}`, login = `synthetic_${purpose}`;
+    if (profile === 'purpose-runtime') {
+      const roles = {} as Record<'business' | 'usage' | 'worker' | 'organization', IntakePool>;
+      for (const purpose of ['business', 'usage', 'worker', 'organization'] as const) {
+        const capability = purpose === 'organization' ? 'intake_org_writer' : `intake_${purpose}`, login = `synthetic_${purpose}`;
         await admin.query(`CREATE ROLE ${login} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT ${capability} TO ${login}`);
-        roles[purpose] = ownPool(new Pool({ ...database.config, user: login, max: 2 }), purpose, capability);
+        roles[purpose] = ownPool(createIntakePurposePool({ ...database.config, user: login, max: 2 }, purpose, () => { diagnostics.push({ id: `synthetic-pool-${purpose}`, reason: 'IDLE_CONNECTION_FAILED' }); }), purpose);
         const checked = await roles[purpose].connect(); checked.release();
       }
-      const unavailable = () => new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
-      pool = await createSyntheticConsumerPool(roles.business, unavailable, 'intake_runtime');
-      usagePool = await createSyntheticConsumerPool(roles.usage, unavailable, 'intake_runtime');
+      pool = roles.business; usagePool = roles.usage;
+      // Only invented native-shaped input is supplied here; no provider HTTP or credentials.
+      const refresh = createRegisteredOrganizationRefresh(roles.organization, { tenantId: 'tenant-a', appId: 'app-a' }, nativeOrganizationFixture().transport);
+      const registered = await refresh.register({ principalId: 'agent', openId: 'synthetic-open-agent', expectedBindingVersion: 0, validUntil: new Date(Date.now() + 600_000).toISOString() });
+      if (!registered.ok) throw new Error(`Synthetic organization registration failed: ${registered.reason}`);
+      const refreshed = await refresh.write(await refresh.observe('agent'));
+      if (!refreshed.ok) throw new Error(`Synthetic organization refresh failed: ${refreshed.reason}`);
       terminalPool = roles.worker;
     } else {
       pool = ownPool(new Pool({ ...database.config, max: 4 }), 'existing');
@@ -219,7 +216,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         if (!['director', 'enabler', 'reviewer', 'agent'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
       async revokeSyntheticQuery() {
-        if (closed || profile !== 'purpose-candidate') throw new Error('Synthetic candidate control unavailable');
+        if (closed || profile !== 'purpose-runtime') throw new Error('Synthetic runtime control unavailable');
         await admin!.query(`UPDATE content_intake.grants SET version=version+1,revoked_at=clock_timestamp(),last_change_reason='synthetic acceptance revoke'
           WHERE grant_id='business-agent-query' AND revoked_at IS NULL`);
       },

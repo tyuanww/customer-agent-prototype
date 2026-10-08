@@ -1,0 +1,18 @@
+$ node --test scripts/formal-artifact-boundary.test.mjs
+✔ accepts generic contract vocabulary without desktop fixture modules (2.412208ms)
+✔ rejects a desktop synthetic fixture import (1.607875ms)
+✔ rejects symlinks inside a formal artifact root (1.316333ms)
+✔ rejects missing artifact roots instead of silently passing (0.392958ms)
+✔ rejects unknown and credential-like file types instead of skipping them (0.586ms)
+✔ rejects a fine-grained GitHub credential marker in an allowed file type (0.5955ms)
+✔ rejects a formal candidate built from a different Git commit (2.474208ms)
+✔ rejects a symlinked formal candidate root (0.880875ms)
+✔ canonical candidate checks build once, test that build, then bind the copied bytes to HEAD (673.53675ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 734.709625
