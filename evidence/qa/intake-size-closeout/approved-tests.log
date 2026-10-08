@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-size-closeout/customer-agent-prototype/apps/desktop
+
+ ✓ tests/unit/workspace-hygiene.test.ts (47 tests) 537ms
+
+ Test Files  1 passed (1)
+      Tests  47 passed (47)
+   Start at  02:37:23
+   Duration  994ms (transform 33ms, setup 107ms, collect 26ms, tests 537ms, environment 211ms, prepare 36ms)
+
