@@ -34,12 +34,17 @@ const json = (value: unknown): CanonicalJsonValue => value as CanonicalJsonValue
  * this direct profile never calls it and cannot enable approval writes. */
 export function createContentIntakeService(pool: IntakePool, store: ContentObjectStore,
   report: (diagnosticId: string, error: unknown) => void = () => undefined, _legacyApproval?: ApprovalAdapter,
-  options: { requireProductSession?: boolean; principalLabels?: IntakePrincipalLabels } = {}) {
+  options: { requireProductSession?: boolean; principalLabels?: IntakePrincipalLabels; terminalPool?: IntakePool } = {}) {
   const run = createIntakeTransactions(pool, report, options);
   const runner = createParseRunner();
-  const capacity = createIntakeCapacity(pool, store, error => {
+  const reportCapacityError = (error: unknown) => {
     try { report(`intake_${randomUUID()}`, error); } catch { /* Observational. */ }
-  });
+  };
+  const capacity = createIntakeCapacity(pool, store, reportCapacityError);
+  // Failure bookkeeping may outlive the actor's authority. The caller owns both
+  // pools; only this terminal path uses the optional worker capability.
+  const terminalPool = options.terminalPool ?? pool;
+  const terminalCapacity = options.terminalPool ? createIntakeCapacity(terminalPool, store, reportCapacityError) : capacity;
   const grantList = (v: unknown) => parseContractSchema('IntakeGrantList', v);
   const grant = (v: unknown) => parseContractSchema('IntakeGrant', v);
   const candidate = (v: unknown) => parseContractSchema('IntakeCandidate', v);
@@ -51,7 +56,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   async function finishFailure(jobId: string, result: ParseResult, actorUserId: string): Promise<boolean> {
     // Release the lookup connection before capacity admission borrows one. Even
     // a one-connection pool must finish terminal bookkeeping without deadlock.
-    const lookup = await pool.connect();
+    const lookup = await terminalPool.connect();
     let sourceId: string;
     try {
       const pending = await lookup.query<{ source_id: string }>(`SELECT j.source_id FROM content_intake.parse_jobs j
@@ -63,7 +68,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     let stored: PersistedContentObject | undefined;
     const bytes = Buffer.from(JSON.stringify(result));
     try {
-      stored = await capacity.persist(actorUserId, sourceId, 'report',
+      stored = await terminalCapacity.persist(actorUserId, sourceId, 'report',
         (async function* () { yield bytes; })(), 'csv', Math.min(bytes.length, INTAKE_POLICY.outputBytes));
     } catch (error) {
       // Quota cannot strand a failed/cancelled job in parsing and consume every
@@ -74,7 +79,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     let reclaim = false;
     let broken = false;
     let committing = false;
-    const client = await pool.connect();
+    const client = await terminalPool.connect();
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='5s'");
@@ -85,7 +90,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
           FROM content_intake.parse_jobs j JOIN content_intake.principals p ON p.principal_id=j.actor_id
           WHERE j.job_id=$1 AND j.state IN ('reading','parsing') AND p.user_id=$6`,
         [jobId, stored.objectId, `intake/${stored.objectId}`, stored.sha256, stored.sizeBytes, actorUserId]);
-        if (inserted.rowCount === 1) await capacity.adopt(client, stored);
+        if (inserted.rowCount === 1) await terminalCapacity.adopt(client, stored);
         reclaim = inserted.rowCount === 0;
       }
       await client.query(`UPDATE content_intake.parse_jobs SET state=$3,finished_at=clock_timestamp(),report_object_id=$2
@@ -105,7 +110,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     } finally {
       client.release(broken);
       if (stored && reclaim) {
-        try { await capacity.discard(stored.objectId); }
+        try { await terminalCapacity.discard(stored.objectId); }
         catch (error) { try { report(`intake_${randomUUID()}`, error); } catch { /* Observational. */ } }
       }
     }

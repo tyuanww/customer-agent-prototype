@@ -15,16 +15,20 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
   async function transaction<T>(work: (client: Query) => Promise<T>): Promise<T> {
     const client = await pool.connect();
     let broken = false;
+    let committing = false;
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='5s'");
       await client.query('SELECT backend_review.lock_content()');
       const value = await work(client);
+      committing = true;
       await client.query('COMMIT');
       return value;
     } catch (error) {
       broken = true;
-      try { await client.query('ROLLBACK'); } catch { /* Keep all charges on uncertain outcomes. */ }
+      // A lost COMMIT response may have durably charged capacity. Do not issue
+      // rollback or classify it as uncommitted; discard the connection instead.
+      if (!committing) { try { await client.query('ROLLBACK'); } catch { /* Keep all charges on uncertain outcomes. */ } }
       throw error;
     } finally { client.release(broken); }
   }

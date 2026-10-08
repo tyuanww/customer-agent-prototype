@@ -39,7 +39,7 @@ eslint 退出码 0。`tsc --noEmit` 对本任务文件没有新错误。既有 `
 
 权限矩阵和接线差异见 [PURPOSE-ACL.md](../../../apps/api/experiments/intake-runtime/PURPOSE-ACL.md)、[INTEGRATION.md](../../../apps/api/experiments/intake-runtime/INTEGRATION.md)。
 
-## 未验证
+## 原探针阶段未验证
 
 - 正式 snapshot 分页闭包、完整发布成功、质量计划写入、授权写入。
 - approval-v1 的真实失效行。usage 不能插入 `approval_facts` 已验证。
@@ -73,3 +73,9 @@ PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH \
 vitest 和 eslint 退出码 0。`apps/api` 下 `./node_modules/.bin/tsc --noEmit` 仍被已有测试宿主对缺失 `apps/api/dist` 的导入阻塞，全部诊断只落在 `tests/support/intake-synthetic-host.ts`，不是完整 typecheck PASS：[原始诊断](typecheck-recovery.log)。未修改共享宿主或为通过检查生成 dist；主 Agent 集成时统一 build/typecheck。没有运行完整 `/review`、旧角色审核或工作区体积检查。
 
 修复后 `purpose-acl.sql` SHA-256：`4bb27efc556c9931b70386c29982db68dd2ee9e050feccc1dd6772a160fae23c`。修复后 vitest 日志 SHA-256：`06b7daa6205c20a56f6cf274898219af4e0b3546706b4b654bc525bf82a54aea`。仓内新增日志仅裁去行尾空白与多余 EOF 空行，未删改测试输出；未规范化原件仍在 `/tmp/intake-runtime-recovery-{red,green,typecheck}.log`。
+
+## 后续实际消费者补证
+
+[实际消费者候选证据](../intake-runtime-consumers/README.md) 已另外验证 multipart → 真实 service 上传/解析/质量检查/确认发布、另一认证主体的非空 snapshot 分页与 query 授权、业务授权及撤销、确认回退和实际形状 approval-v1 失效。它使用追加 `consumer-acl.sql` 与精确会话锁实验适配，不能回写为原 probe 的 PASS。原 SQL、测试、历史日志及上述输入指纹未改。
+
+正式 ACL、生产 factory、真实范围认领与真实数据仍未启用；新内部接口是默认 pool 加可选 terminalPool，见更新后的 INTEGRATION。完整 `/review` 仍为 INCOMPLETE。

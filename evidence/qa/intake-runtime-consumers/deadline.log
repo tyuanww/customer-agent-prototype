@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-assembly/customer-agent-prototype
+
+ ✓ apps/api/tests/intake-runtime-consumers.integration.test.ts (10 tests | 9 skipped) 1666ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT  1666ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 9 skipped (10)
+   Start at  17:18:27
+   Duration  2.29s (transform 200ms, setup 0ms, collect 437ms, tests 1.67s, environment 0ms, prepare 50ms)
