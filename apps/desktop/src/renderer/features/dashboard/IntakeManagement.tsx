@@ -1,3 +1,4 @@
+import { IntakePermissions } from './IntakePermissions';
 import type { components } from '@customer-agent/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
@@ -118,6 +119,17 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
   </section>;
 }
 export function IntakeManagement() {
+  const [page,setPage]=useState<'materials'|'permissions'>('materials');
+  return <>
+    {window.dashboardPermissions && <div className="intake-toolbar" role="group" aria-label="内容管理工作区">
+      <button aria-pressed={page==='materials'} onClick={()=>setPage('materials')}>资料</button>
+      <button aria-pressed={page==='permissions'} onClick={()=>setPage('permissions')}>权限配置</button>
+    </div>}
+    <div hidden={page!=='materials'}><IntakeMaterials /></div>
+    {window.dashboardPermissions && <div hidden={page!=='permissions'}><IntakePermissions active={page==='permissions'} /></div>}
+  </>;
+}
+function IntakeMaterials() {
   const [view, setView] = useState<IntakeManagementView | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
   const generation = useRef(0), pending = useRef<number | null>(null);

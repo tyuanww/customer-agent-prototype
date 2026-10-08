@@ -1,3 +1,4 @@
+import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
 import { registerProductSearchIpc } from './product-search-ipc';
@@ -92,6 +93,7 @@ if (!gotLock) {
   let productSession: ProductSession | null = null;
   let productAnnounce: ProductAnnounce | null = null;
   let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
+  let intakePermissions: ReturnType<typeof registerContentIntakePermissionsIpc> | null = null;
   let disposeIntakeQuery: (() => void) | null = null;
   let pendingSecondInstance = false;
 
@@ -125,6 +127,7 @@ if (!gotLock) {
 
   const beginShutdown = (): void => {
     intakeManagement?.dispose(); intakeManagement = null;
+    intakePermissions?.dispose(); intakePermissions = null;
     disposeIntakeQuery?.(); disposeIntakeQuery = null;
     void productSession?.shutdown();
     shuttingDown.begin();
@@ -248,6 +251,8 @@ if (!gotLock) {
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => [controller?.dashboardWebContents() ?? null]);
+    intakePermissions = registerContentIntakePermissionsIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,
@@ -353,6 +358,7 @@ if (!gotLock) {
   });
 
   app.on('before-quit', event => {
+    if (intakePermissions && !intakePermissions.allowClose()) { event.preventDefault(); return; }
     if (intakeManagement && !intakeManagement.allowClose()) { event.preventDefault(); return; }
     beginShutdown();
   });

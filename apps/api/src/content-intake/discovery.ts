@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
-import { allocationKinds, authorize, recipientRoleAllows, samePerson, source } from './authority.js';
+import { allocationKinds, authorize, mayManageGrant, readGrant, recipientRoleAllows, samePerson, source } from './authority.js';
 import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, registeredPrincipalPage, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
@@ -125,6 +125,51 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
     }, value => parseContractSchema(schema, value));
   }
   return {
+    /** Keyset scan is bounded before authority filtering. Empty pages may have a
+     * next cursor. This is a current menu, not a historical identity directory. */
+    grants(actor: AuthenticatedUser, raw: unknown) {
+      return run(actor, 'discover-grants', null, null, async (client, who) => {
+        const request = page(raw), session = await lockProductSession(client, actor);
+        const access = await discover(client, who, session.validUntil);
+        if (!allocationKinds(who, 'business').length) return { items: [], nextCursor: null };
+        const binding = digest(canonical([access.revision, who.id, request.limit, 'grants']));
+        let after = '', until = Date.parse(access.meta.validUntil);
+        if (request.cursor) {
+          const parts = request.cursor.split('.'), body = parts[0] ?? '';
+          const mac = Buffer.from(parts[1] ?? '', 'base64url'), expected = signature(body, session.hash);
+          if (parts.length !== 2 || mac.length !== expected.length || !timingSafeEqual(mac, expected)) throw new IntakeRejection('PERMISSION_CHANGED');
+          let tuple: unknown;
+          try { tuple = JSON.parse(Buffer.from(body, 'base64url').toString()); } catch { throw new IntakeRejection('FILE_INVALID','VALIDATION'); }
+          if (!Array.isArray(tuple) || tuple.length !== 3 || tuple[0] !== binding || typeof tuple[1] !== 'string'
+            || typeof tuple[2] !== 'number' || !Number.isFinite(tuple[2]) || await clock(client) >= tuple[2]) throw new IntakeRejection('PERMISSION_CHANGED');
+          after = parseContractSchema('IntakeId', tuple[1]); until = Math.min(until, tuple[2]);
+        }
+        client.validUntil(until);
+        const rows = (await client.query<{ grant_id: string }>(`SELECT g.grant_id FROM content_intake.grants g JOIN content_intake.scopes s USING(scope_id)
+          WHERE g.tenant_id=$1 AND g.app_id=$2 AND g.kind <> 'allocation' AND g.grant_id COLLATE "C">$3
+          AND EXISTS (SELECT 1 FROM jsonb_array_elements($8::jsonb) c
+            WHERE c->'scope'->>'brandId'=s.brand_id AND c->'scope'->>'shopId' IS NOT DISTINCT FROM s.shop_id
+              AND c->'scope'->>'domain'=s.domain AND (g.source_id IS NULL OR c->'scope'->>'sourceId'=g.source_id)
+              AND (CASE WHEN g.kind='business' THEN c->'mayAllocate' ELSE c->'mayDelegate' END) ? g.action)
+          AND EXISTS (SELECT 1 FROM content_intake.grants p WHERE p.recipient_id=$5 AND p.scope_id=g.scope_id AND p.action=g.action
+            AND (p.source_id IS NULL OR p.source_id IS NOT DISTINCT FROM g.source_id) AND p.revoked_at IS NULL
+            AND p.steward_id IS NOT NULL AND p.starts_at<=clock_timestamp() AND p.expires_at>clock_timestamp()
+            AND p.kind=ANY(CASE WHEN g.kind='business' THEN $6::text[] ELSE $7::text[] END))
+          ORDER BY g.grant_id COLLATE "C" LIMIT $4`, [who.tenantId,who.appId,after,request.limit+1,who.id,
+          allocationKinds(who,'business'),allocationKinds(who,'delegation'),JSON.stringify(access.capabilities)])).rows;
+        const scanned = rows.slice(0,request.limit), items: C['IntakeGrant'][] = [];
+        for (const row of scanned) {
+          const grant = await readGrant(client,row.grant_id);
+          if (await mayManageGrant(client,who,grant)) items.push(grant);
+        }
+        let nextCursor: string | null = null;
+        if (rows.length > request.limit) {
+          const body = Buffer.from(JSON.stringify([binding,scanned.at(-1)!.grant_id,until])).toString('base64url');
+          nextCursor = `${body}.${signature(body,session.hash).toString('base64url')}`;
+        }
+        return { items, nextCursor };
+      }, value => parseContractSchema('IntakeGrantList',value));
+    },
     /** Read-only query menu. Names come from the latest registered display
      * version, never from answer text. Each page binds the complete bounded
      * vocabulary and current authority; a rename/revocation restarts paging. */
