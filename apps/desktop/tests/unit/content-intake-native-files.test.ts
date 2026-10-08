@@ -6,7 +6,7 @@ import type { BrowserWindow } from 'electron';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createIntakeNativeFiles } from '../../src/main/content-intake-native-files';
 import { INTAKE_UPLOAD_MAX_BYTES } from '../../src/shared/content-intake-upload';
-const dialogs = vi.hoisted(() => ({ showOpenDialog: vi.fn(), showSaveDialog: vi.fn() }));
+const dialogs = vi.hoisted(() => ({ showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn() }));
 vi.mock('electron', () => ({ dialog: dialogs }));
 const directories: string[] = [];
 const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 1]);
@@ -73,4 +73,18 @@ it('a failed destination replacement preserves existing contents and removes onl
   await expect(f.files.saveReport(zip, f.controller.signal)).rejects.toThrow();
   expect(await readFile(f.path)).toEqual(zip);
   expect((await readdir(f.dir)).sort()).toEqual(['target.xlsx', '合成 FAQ.xlsx']);
+});
+
+it('publication dialog defaults to cancel and discards confirmation after cancellation', async () => {
+  const f = await fixture();
+  const prompt = { title: '合成更新', sourceId: 'source-a', candidateVersion: 3 };
+  dialogs.showMessageBox.mockResolvedValue({ response: 0 });
+  expect(await f.files.confirmPublication(prompt, f.controller.signal)).toBe(false);
+  expect(dialogs.showMessageBox).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+    buttons: ['取消', '确认发布'], defaultId: 0, cancelId: 0, detail: expect.stringContaining('候选版本：3'),
+  }));
+  dialogs.showMessageBox.mockResolvedValue({ response: 1 });
+  expect(await f.files.confirmPublication(prompt, f.controller.signal)).toBe(true);
+  dialogs.showMessageBox.mockImplementation(async () => { f.controller.abort(); return { response: 1 }; });
+  await expect(f.files.confirmPublication(prompt, f.controller.signal)).rejects.toMatchObject({ code: 'CANCELLED' });
 });

@@ -50,7 +50,8 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     if (!manager) {
       const win = BrowserWindow.fromWebContents(wc);
       if (!win || win.isDestroyed()) return failure('FORBIDDEN');
-      manager = new ContentIntakeManagement(session, createIntakeNativeFiles(win)); windows.set(wc, manager);
+      const nativeFiles = createIntakeNativeFiles(win);
+      manager = new ContentIntakeManagement(session, nativeFiles, nativeFiles.confirmPublication); windows.set(wc, manager);
       const owned = manager;
       const close = (event: { preventDefault(): void }) => { if (!allowClose(owned)) event.preventDefault(); };
       win?.on('close', close);

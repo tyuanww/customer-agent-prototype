@@ -16,6 +16,10 @@ type WorkflowOperation =
   | { action: 'cancel'; body: C['IntakeCancel'] }
   | { action: 'publish'; body: C['IntakePublish'] };
 type Request = (path: string, body?: unknown) => Promise<unknown>;
+/** Main freezes these display facts before showing the native publication dialog.
+ * This is human intent only, never a substitute for server authorization. */
+export type IntakePublicationPrompt = { title: string; sourceId: string; candidateVersion: number };
+
 const isRollback = (command: IntakeManagementCommand): command is IntakeRollbackCommand => command.action.startsWith('rollback-');
 const sameKey = (a: C['IntakeCandidateKey'], b: C['IntakeCandidateKey']) => a.candidateId === b.candidateId && a.version === b.version && a.digest === b.digest;
 const reject = (code: 'FORBIDDEN' | 'STALE' | 'CONFLICT' | 'VALIDATION'): never => { throw new ProductHttpError(code); };
@@ -45,7 +49,8 @@ export class ContentIntakeManagement {
   private disposed = false;
   private listeners = new Set<() => void>();
   private unsubscribe: () => void;
-  constructor(private readonly session: Session, nativeFiles?: ConstructorParameters<typeof ContentIntakeUpload>[1]) {
+  constructor(private readonly session: Session, nativeFiles?: ConstructorParameters<typeof ContentIntakeUpload>[1],
+    private readonly confirmPublication: (prompt: IntakePublicationPrompt, signal: AbortSignal) => Promise<boolean> = async () => { throw new ProductHttpError('UNAVAILABLE'); }) {
     this.epoch = session.view().sessionEpoch;
     this.quality = new ContentIntakeQuality(session);
     this.upload = new ContentIntakeUpload(session, nativeFiles ?? {
@@ -232,9 +237,17 @@ export class ContentIntakeManagement {
             } else if (c.action === 'publish') {
               if (!this.can('publish', selected.sourceId)) return reject('FORBIDDEN');
               if (!this.material || selected.state !== 'ready' || selected.sourceEvidenceVersion < 1 || selected.approvalEvidenceVersion < 1) return reject('CONFLICT');
-              this.workflowPending = { action: 'publish', body: parseContractSchema('IntakePublish', { operationId, key,
+              const body = parseContractSchema('IntakePublish', { operationId, key,
                 baseReleaseId: this.material.materialHeader.baseReleaseId, sourceEvidenceVersion: selected.sourceEvidenceVersion,
-                approvalEvidenceVersion: selected.approvalEvidenceVersion, title: c.title, summary: c.summary }) };
+                approvalEvidenceVersion: selected.approvalEvidenceVersion, title: c.title, summary: c.summary });
+              // Freeze the exact request before waiting; no pending write exists on
+              // cancel. active blocks selection changes and a second dialog.
+              const confirmed = await this.confirmPublication({ title: body.title, sourceId: selected.sourceId,
+                candidateVersion: key.version }, controller.signal);
+              assertActive();
+              if (confirmed !== true) return this.view();
+              if (!this.can('publish', selected.sourceId)) return reject('FORBIDDEN');
+              this.workflowPending = { action: 'publish', body };
             } else {
               if (c.action === 'refresh-review' && selected.approvalEvidenceVersion < 1) return reject('CONFLICT');
               this.workflowPending = { action: c.action === 'request-review' ? 'review-request' : 'review-refresh',

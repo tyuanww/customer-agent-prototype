@@ -45,8 +45,8 @@ test('native FAQ upload, revision and cancellation preserve the approved release
       page.on('console', message => { if (message.type() === 'error') rendererErrors.push(message.text()); });
     };
     app.on('window', observe); app.windows().forEach(observe);
-    // Replace only native path selection. Main reads actual XLSX bytes and saves
-    // the actual API response; no filesystem, upload, parser or HTTP mocks.
+    // Control native file and confirmation responses. Main reads actual XLSX bytes
+    // and saves the actual API response; no filesystem, parser or HTTP mocks.
     await app.evaluate(({ dialog }, files) => {
       const choices = [files.badFile, files.goodFile, files.badFile, files.revisionFile, files.goodFile];
       dialog.showOpenDialog = async () => {
@@ -55,6 +55,12 @@ test('native FAQ upload, revision and cancellation preserve the approved release
         return { canceled: false, filePaths: [selected] };
       };
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.reportFile });
+      dialog.showMessageBox = (async (_window, options) => {
+        if (options.defaultId !== 0 || options.cancelId !== 0 || !options.detail?.includes('source-a')) {
+          throw new Error('Publication confirmation lost its safe default or source binding');
+        }
+        return { response: 1, checkboxChecked: false };
+      }) as typeof dialog.showMessageBox;
     }, { badFile, goodFile, revisionFile, reportFile });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
@@ -308,7 +314,7 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     expect(rendererErrors).toEqual([]);
     expect(mainStderr).not.toContain("No handler registered for 'product:announce-unread'");
     console.info(JSON.stringify({ status: 'PASS', electron: process.platform, api: 'actual', postgres: 15,
-      nativeDialog: 'owned-path-selection-only', upload: 'actual-multipart', issueReport: 'saved-and-read-with-exceljs',
+      nativeDialog: 'controlled-path-and-confirmation-responses', upload: 'actual-multipart', issueReport: 'saved-and-read-with-exceljs',
       approval: 'manual-synthetic-transport', revision: 'same-id-v2-fresh-evidence', cancellation: 'server-confirmed-live-release-unchanged', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
   } catch (error) {
     for (const page of app?.windows() ?? []) {

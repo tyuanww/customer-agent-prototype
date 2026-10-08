@@ -12,9 +12,10 @@ function fixture(count = 2, files?: ConstructorParameters<typeof ContentIntakeMa
   const listeners = new Set<Parameters<ProductSession['subscribe']>[0]>();
   const view: ProductSession['view'] = () => signedIn ? { ok: true, enabled: true, signedIn, sessionEpoch: epoch, userId: 'synthetic', role: 'agent', authMode: 'mock', expiresAt: '2099-01-01T00:00:00Z', displayName: '合成管理人' } : { ok: true, enabled: true, signedIn: false, sessionEpoch: epoch, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
   const request = vi.fn(async (_epoch: number, path: string, options: Parameters<ProductSession['request']>[2] = {}) => ({ status: 200, value: structuredClone(data.respond(path, options.body)) }));
-  const main = new ContentIntakeManagement({ view, request, subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } }, files);
+  const confirmPublication = vi.fn().mockResolvedValue(true);
+  const main = new ContentIntakeManagement({ view, request, subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } }, files, confirmPublication);
   const select = async () => { const listed = await main.command({ action: 'list', next: false }); return main.command({ action: 'select', selection: listed.candidates[0].selection }); };
-  return { data, main, request, select, logout: () => { signedIn = false; epoch++; listeners.forEach(f => f(view())); } };
+  return { data, main, request, select, confirmPublication, logout: () => { signedIn = false; epoch++; listeners.forEach(f => f(view())); } };
 }
 it.each(['lost', 'stop-late'] as const)('recovers an uncertain upload across the manager boundary (%s), retaining original identity', async kind => {
   const bytes = Buffer.from('504b030401020304', 'hex');
@@ -285,6 +286,7 @@ it('publication recovers only a bound terminal receipt and retains the key after
     await f.main.command({ action: 'recover' }); expect(f.main.view().pending).toBeNull();
     await f.main.command({ action: 'list', next: false });
     expect(f.main.view().workflowResult).toMatchObject({ action: 'publish', state: 'published', releaseId: 'rel_2' });
+    expect(f.confirmPublication).toHaveBeenCalledTimes(1);
     expect(f.request.mock.calls.filter(c => c[1].endsWith('/publish'))).toHaveLength(1);
   } finally { f.main.dispose(); }
 });
@@ -452,5 +454,31 @@ it('returns a corrective-only rollback to the existing upload path by closing th
     await f.select(); await f.main.command({ action: 'rollback-preview', baseReleaseId: 'rel_2', targetReleaseId: 'rel_1' });
     const result = await f.main.command({ action: 'rollback-correct' });
     expect(result.selected).toBeNull(); expect(result.rollback.impact).toBeNull();
+  } finally { f.main.dispose(); }
+});
+
+it('cancelled publication confirmation creates no request or pending write; a later confirmation publishes once', async () => {
+  const f = fixture();
+  try {
+    await ready(f); f.request.mockClear(); f.confirmPublication.mockResolvedValue(false);
+    expect(await f.main.command(publish)).toMatchObject({ pending: null, selected: { state: 'ready' } });
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.confirmPublication).toHaveBeenCalledWith({ title: publish.title, sourceId: 'source-a', candidateVersion: 1 }, expect.any(AbortSignal));
+    f.confirmPublication.mockResolvedValue(true);
+    await f.main.command(publish);
+    expect(f.request.mock.calls.filter(c => c[1].endsWith('/publish'))).toHaveLength(1);
+  } finally { f.main.dispose(); }
+});
+it('blocks double submission and rejects a confirmation returned after logout', async () => {
+  const f = fixture(); let resolve!: (confirmed: boolean) => void;
+  try {
+    await ready(f); f.request.mockClear();
+    f.confirmPublication.mockImplementation(() => new Promise<boolean>(r => { resolve = r; }));
+    const pending = f.main.command(publish);
+    await vi.waitFor(() => expect(f.confirmPublication).toHaveBeenCalledTimes(1));
+    await expect(f.main.command(publish)).rejects.toMatchObject({ code: 'CONFLICT' });
+    f.logout(); resolve(true);
+    await expect(pending).rejects.toMatchObject({ code: 'STALE' });
+    expect(f.request).not.toHaveBeenCalled(); expect(f.main.view().pending).toBeNull();
   } finally { f.main.dispose(); }
 });

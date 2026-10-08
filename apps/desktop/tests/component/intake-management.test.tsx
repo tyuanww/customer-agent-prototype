@@ -13,12 +13,13 @@ function setup() {
     subscribe: () => () => undefined,
     request: async (_epoch, path, options = {}) => ({ status: 200, value: structuredClone(data.respond(path, options.body)) }),
   };
-  const main = new ContentIntakeManagement(session);
+  const confirmation = vi.fn().mockResolvedValue(true);
+  const main = new ContentIntakeManagement(session, undefined, confirmation);
   const command = vi.fn(async (c: Parameters<ContentIntakeManagement['command']>[0]) => ({ ok: true as const, view: await main.command(c) }));
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), current: async () => ({ ok: true, view: main.view() }), command,
     onInvalidated: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } };
   const user = userEvent.setup();
-  return { data, main, command, user, listeners };
+  return { data, main, command, user, listeners, confirmation };
 }
 it('requires explicit human checks and blocks submitting an older saved judgment after editing it', async () => {
   const f = setup(); render(<IntakeManagement />);
@@ -67,6 +68,12 @@ it('submits source and publication human intent through Main and displays the pu
     await screen.findByText(/组织审批已通过 · 审批编号/);
     await f.user.type(screen.getByRole('textbox', { name: '发布标题' }), '合成 FAQ 更新');
     await f.user.type(screen.getByRole('textbox', { name: '发布摘要' }), '新增已核对条目');
+    f.confirmation.mockResolvedValue(false);
+    await f.user.click(screen.getByRole('button', { name: '发布当前候选' }));
+    await waitFor(() => expect(f.confirmation).toHaveBeenCalledTimes(1));
+    expect(f.data.candidate.state).toBe('ready');
+    expect(screen.getByRole('textbox', { name: '发布标题' })).toHaveValue('合成 FAQ 更新');
+    f.confirmation.mockResolvedValue(true);
     await f.user.click(screen.getByRole('button', { name: '发布当前候选' }));
     expect(f.command).toHaveBeenCalledWith({ action: 'publish', title: '合成 FAQ 更新', summary: '新增已核对条目' });
     await screen.findByText(/当前候选已发布：rel_2/);
