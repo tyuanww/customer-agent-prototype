@@ -1,0 +1,336 @@
+{
+  "baseline": "01d7a0c6ef965a7e36a0578168b92d04038ea298",
+  "version": "0.3.26",
+  "status": "SYNTHETIC_READINESS_COMPLETE_REAL_BINDINGS_PENDING",
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "dependencies": "Reused installed immutable package dependencies; own worktree build output, no shared dist; no install."
+  },
+  "scope": {
+    "realFilesRead": false,
+    "realEmployeeRead": false,
+    "credentialsRead": false,
+    "realTransportInvoked": false,
+    "runtimeActivated": false,
+    "businessCodeChanged": false
+  },
+  "inputs": {
+    "packages/content-intake/experiments/csv/synthetic-template.csv": "9ef1019dfc84124f1aa1f6b1bbdb63ea9c08089d668aff6e1d2cb76a87f2e2bd",
+    "packages/content-intake/package.json": "5d122b28151f8958f879aabfac83154362b52504f88085877b70076f6c8e1460",
+    "packages/content-intake/src/archive.ts": "9d477f89275892cc41fea14001d8269f95ee6322c312305085773e6935a6322f",
+    "packages/content-intake/src/csv.ts": "28765fbdd327707afbd8ff49a908aecc462c2389c7c1316f438b49611b292488",
+    "packages/content-intake/src/faq-rules.ts": "d5c28602df2df5ef4b75d5fe504b1390894e7cfe53509a1fbaddce2cca74c833",
+    "packages/content-intake/src/parser-process.ts": "bc230a5a16e40e062552b793ebfd288b1a84651e1a45ef1a238650c57cf9a885",
+    "packages/content-intake/src/policy.ts": "36cd7120fc4602614287599bf93656d903875baf7d8a8ba8f41244bc2ecfe14c",
+    "packages/content-intake/src/runner.ts": "f2632f1fa61176d5b9642140c6540b07dc66d19f265d2a5ed05387873fd6885a",
+    "packages/content-intake/src/workbook.ts": "67e773e9a67e778237524d6cc4f2a1beb9be581c98ff9ec76c96950a9a37cdd7",
+    "packages/content-intake/tsconfig.build.json": "89f7cffdd3fbb928b80acb12c5e601ef29fb608b43193065ce686dc231a93c08",
+    "packages/content-intake/tsconfig.json": "52b6fa57e2a895c73fa6d3f1ff9a63bc11a8dc6bb5796e28c5f4a6993c3b0a96",
+    "pnpm-lock.yaml": "2644b175dc2d784f232de0ea6a3198a39d11a650777dba26c42b8c09218e9e10"
+  },
+  "checks": [
+    {
+      "name": "local-content-intake-build",
+      "command": "node packages/content-intake/node_modules/typescript/bin/tsc -p packages/content-intake/tsconfig.build.json",
+      "exitCode": 0
+    },
+    {
+      "name": "new-artifacts-real-consumption",
+      "command": "node .gstack/qa-reports/intake-menokin-readiness/probe.mjs",
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "case": "existing-checked-in-template",
+          "status": "PASS",
+          "faqRows": 2,
+          "questions": 2,
+          "sha256": "9ef1019dfc84124f1aa1f6b1bbdb63ea9c08089d668aff6e1d2cb76a87f2e2bd",
+          "networkAttempts": 0
+        },
+        {
+          "case": "product-disk-to-isolated-parser",
+          "status": "PASS",
+          "faqRows": 2,
+          "questions": 2,
+          "explicitDisabledRows": 1,
+          "networkAttempts": 0
+        },
+        {
+          "case": "campaign-disk-to-isolated-parser",
+          "status": "PASS",
+          "faqRows": 2,
+          "questions": 2,
+          "explicitDisabledRows": 1,
+          "networkAttempts": 0
+        },
+        {
+          "case": "campaign-missing-expiry",
+          "status": "PASS",
+          "wholeBatchRejected": true,
+          "issue": {
+            "code": "EXPIRY_REQUIRED",
+            "sheet": "CSV",
+            "row": 3,
+            "column": "O",
+            "fix": "活动必须填写失效时间"
+          },
+          "xlsxReportReopened": true,
+          "sourceTextInReport": false
+        },
+        {
+          "case": "campaign-missing-body",
+          "status": "PASS",
+          "wholeBatchRejected": true,
+          "issue": {
+            "code": "REQUIRED",
+            "sheet": "CSV",
+            "row": 3,
+            "column": "H",
+            "fix": "补齐必填内容后整批重新上传"
+          },
+          "xlsxReportReopened": true,
+          "sourceTextInReport": false
+        },
+        {
+          "case": "campaign-necessary-media",
+          "status": "PASS",
+          "wholeBatchRejected": true,
+          "issue": {
+            "code": "UNRESOLVED_MEDIA",
+            "sheet": "CSV",
+            "row": 3,
+            "column": "S",
+            "fix": "明确必要文字与媒体；P1 不认定附件已导入"
+          },
+          "xlsxReportReopened": true,
+          "sourceTextInReport": false
+        },
+        {
+          "case": "campaign-source-mismatch",
+          "status": "PASS",
+          "wholeBatchRejected": true,
+          "issue": {
+            "code": "SOURCE_MISMATCH",
+            "sheet": "CSV",
+            "row": 2,
+            "column": "A",
+            "fix": "下载此登记来源的模板；文件不能改变授权范围"
+          },
+          "xlsxReportReopened": true,
+          "sourceTextInReport": false
+        },
+        {
+          "case": "presale-disk-to-isolated-parser",
+          "status": "PASS",
+          "faqRows": 2,
+          "questions": 2,
+          "explicitDisabledRows": 1,
+          "networkAttempts": 0
+        },
+        {
+          "case": "aftersale-disk-to-isolated-parser",
+          "status": "PASS",
+          "faqRows": 2,
+          "questions": 2,
+          "explicitDisabledRows": 1,
+          "networkAttempts": 0
+        }
+      ]
+    },
+    {
+      "name": "whole-docs",
+      "command": "node scripts/check-documentation.mjs",
+      "exitCode": 1,
+      "failure": "13 historical links to ignored .gstack exploration files are absent in this independent worktree; no failures refer to the new document; not repaired or copied as task D."
+    },
+    {
+      "name": "scoped-docs",
+      "command": "node .gstack/qa-reports/intake-menokin-readiness/check-document.mjs",
+      "exitCode": 0,
+      "markdownFiles": 1,
+      "method": "Exact existing checker with files restricted to the new document; normal workflow-entry checks retained."
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --cached --check",
+      "exitCode": 0
+    }
+  ],
+  "artifacts": {
+    "directory": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/artifacts/",
+    "syntheticOnly": true,
+    "registeredInRuntime": false,
+    "files": {
+      "product.csv": {
+        "bytes": 1304,
+        "sha256": "c5b4da8a83bbcd53f7539aa5dc4bb93ebc2daba321863d09d30fa99b6a630e3a"
+      },
+      "campaign.csv": {
+        "bytes": 1460,
+        "sha256": "fe3dfae1fe90b77f297d1cbea3a09cc51da9e3d173a4eb3c01ee4c69b462f82b"
+      },
+      "campaign-missing-expiry.csv": {
+        "bytes": 990,
+        "sha256": "063a13e6f60493f33cfd6ef5c93e5275c70491d47b221bef5c24c7ca8a122448"
+      },
+      "campaign-missing-expiry-report.xlsx": {
+        "bytes": 6612,
+        "sha256": "78c57d84771e0b07afec7449769f96a223a50aee4c833ead1330137eb3185546"
+      },
+      "campaign-missing-body.csv": {
+        "bytes": 948,
+        "sha256": "beb87b32b998d8d087eb177879284425eb4d9e66c088d44b396b82916b6a5237"
+      },
+      "campaign-missing-body-report.xlsx": {
+        "bytes": 6614,
+        "sha256": "e33fc6f7c9abf2378f8f75ee5400113ccdfe64cf1fe635590da01bd594980a97"
+      },
+      "campaign-necessary-media.csv": {
+        "bytes": 1057,
+        "sha256": "8250f910d6a2a33dd65428915054bfc72a99f19afbf4a03b770158262adf5bd9"
+      },
+      "campaign-necessary-media-report.xlsx": {
+        "bytes": 6641,
+        "sha256": "7bb2bcb80559d25df2f2415d37af7445771b32aeb1822962229bada6cb6692c9"
+      },
+      "campaign-source-mismatch.csv": {
+        "bytes": 665,
+        "sha256": "69088e3843b124ed2217b43af151b2c0089ea78bd01c959fcda9ae85e6be09c5"
+      },
+      "campaign-source-mismatch-report.xlsx": {
+        "bytes": 6646,
+        "sha256": "e1255f5d70b83c6b459173159d299ee487a97f4968aa0b03e70d2ca8edafeb2e"
+      },
+      "presale.csv": {
+        "bytes": 1304,
+        "sha256": "a40c61b9426e24806022ceaf1e5a9bf3ad4ad6b90e4fffc1a831a06a93c260ad"
+      },
+      "aftersale.csv": {
+        "bytes": 1316,
+        "sha256": "2b99636b0fc9c3c0cde339810a4e09eb620d1a3f11af57e4124c526b475684aa"
+      },
+      "synthetic-contexts.json": {
+        "bytes": 999,
+        "sha256": "0928ecf4aa1f6823941773ed4ae7f691dbc734f8278ba6cd410d67712708101d"
+      }
+    }
+  },
+  "localEvidence": {
+    ".gstack/qa-reports/intake-menokin-readiness/probe.mjs": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/probe.mjs",
+      "bytes": 5693,
+      "sha256": "0224a3c6bf0ea873569ce2202754a9943c4b6c7b8137eb8f44721dd1764efa2e"
+    },
+    ".gstack/qa-reports/intake-menokin-readiness/probe-first.log": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/probe-first.log",
+      "bytes": 769,
+      "sha256": "ff8fe953cddcd45c601ef565f0255c3d4a4f77e9f8b8ab3248452210468f6f1c"
+    },
+    ".gstack/qa-reports/intake-menokin-readiness/probe.log": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/probe.log",
+      "bytes": 4634,
+      "sha256": "e1ff6edf9da91299b9e688eec36eea5179734a5565f828d77c57103e4fa2324f"
+    },
+    ".gstack/qa-reports/intake-menokin-readiness/result.json": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/result.json",
+      "bytes": 4634,
+      "sha256": "e1ff6edf9da91299b9e688eec36eea5179734a5565f828d77c57103e4fa2324f"
+    },
+    ".gstack/qa-reports/intake-menokin-readiness/build.log": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/build.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    ".gstack/qa-reports/intake-menokin-readiness/docs.log": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/docs.log",
+      "bytes": 1768,
+      "sha256": "54145067dd813e60badaee9493a56b5e6e6fcbfde1fb052534f345d6473eab2a"
+    },
+    ".gstack/qa-reports/intake-menokin-readiness/docs-scoped.log": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/docs-scoped.log",
+      "bytes": 80,
+      "sha256": "def76c46a23e221afb107c6960343308003b4cb8eba73677b2154afd0c3716b3"
+    },
+    ".gstack/qa-reports/intake-menokin-readiness/check-document.mjs": {
+      "absolutePath": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-menokin-readiness/check-document.mjs",
+      "bytes": 2362,
+      "sha256": "57202ba32759f4655687697c5d7826b06f0d3719af2af6e94d7e1f44c1b9b5e2"
+    }
+  },
+  "firstAttempt": {
+    "exitCode": 1,
+    "reason": "Probe compared ExcelJS sparse row-values index 0 with an explicit undefined; changed the probe to compare values.slice(1). Product code and data parsing unchanged. Raw first output retained."
+  },
+  "reusedEvidence": {
+    "record": "../intake-csv-runtime/checks.json",
+    "parserPassed": 97,
+    "reason": "Whole packages/content-intake tree and pnpm-lock.yaml byte-identical to f6f8cf35; only documents changed this task. Not rerun.",
+    "gitDiffFiles": [],
+    "verifiedRecordedInputs": {
+      "packages/content-intake/README.md": {
+        "sha256": "9632191576ff8b39e2559e49926dd89297d7c754d320bdbc4d2684beec7ac1a5",
+        "matched": true
+      },
+      "packages/content-intake/experiments/csv/README.md": {
+        "sha256": "2c419bce35cf0aa9865fbc115cd5b8cf98111670e0fd65b4c5f376b378e1067c",
+        "matched": true
+      },
+      "packages/content-intake/package.json": {
+        "sha256": "5d122b28151f8958f879aabfac83154362b52504f88085877b70076f6c8e1460",
+        "matched": true
+      },
+      "packages/content-intake/src/csv.ts": {
+        "sha256": "28765fbdd327707afbd8ff49a908aecc462c2389c7c1316f438b49611b292488",
+        "matched": true
+      },
+      "packages/content-intake/src/parser-process.ts": {
+        "sha256": "bc230a5a16e40e062552b793ebfd288b1a84651e1a45ef1a238650c57cf9a885",
+        "matched": true
+      },
+      "packages/content-intake/src/policy.ts": {
+        "sha256": "36cd7120fc4602614287599bf93656d903875baf7d8a8ba8f41244bc2ecfe14c",
+        "matched": true
+      },
+      "packages/content-intake/src/runner.ts": {
+        "sha256": "f2632f1fa61176d5b9642140c6540b07dc66d19f265d2a5ed05387873fd6885a",
+        "matched": true
+      },
+      "packages/content-intake/src/workbook.ts": {
+        "sha256": "67e773e9a67e778237524d6cc4f2a1beb9be581c98ff9ec76c96950a9a37cdd7",
+        "matched": true
+      },
+      "packages/content-intake/tests/csv-candidate.test.ts": {
+        "sha256": "2bebbd1714362e1bee8ba22ce0a0dd7a20d2c95c0d39687992bc71f76b866ad6",
+        "matched": true
+      }
+    },
+    "log": {
+      "path": "../intake-csv-runtime/test-reviewed-final.log",
+      "sha256": "4c9742f3f010c6b18dcba54a5a5cbbc28ad30612d37fe56cabf9fbfe5548d6f0",
+      "matchesRecorded": true
+    }
+  },
+  "unverified": [
+    "Real Menokin semantic mapping and business text",
+    "Actual source/principal/product/scenario bindings and source version",
+    "Real media necessity/text conversion",
+    "Legacy ownership adoption and retention decision",
+    "Database, desktop UI, installation and real activation in this task"
+  ],
+  "review": {
+    "scope": [
+      "docs/reference-intake-menokin-readiness.md",
+      "evidence/qa/intake-menokin-readiness/checks.json"
+    ],
+    "method": "Self-review against existing plan 0.53, frozen 23-column policy, parser, FAQ rules, actual runner/report outputs and original parser checks. No business code or contract changes.",
+    "actionableFindings": [],
+    "externalReview": "NOT_RUN_FOR_THIS_DOCUMENT_ONLY_TASK",
+    "overallExternalReview": "INCOMPLETE_UNCHANGED"
+  }
+}
