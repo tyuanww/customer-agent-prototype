@@ -33,7 +33,8 @@ export async function familyCatalog(client: Client, entries: FamilyEntry[]): Pro
       file_sha256,actor_id,canonical_encoding,canonical_material,material,risk,explicit_disable_count,created_at,updated_at)
       VALUES($1,1,$1,$2,1,$1,$3,'family-actor','candidate-p1.1',$4::text,$4::text::jsonb,'routine',0,now(),now())`,
     [source,scope,'a'.repeat(64),JSON.stringify(material)]);
-    await client.query(`INSERT INTO content_intake.release_lineage SELECT 'family-release',$1,id,1,$1,1,'family-review','infinity'
+    await client.query(`INSERT INTO content_intake.release_lineage(release_id,source_id,business_entry_id,script_version,
+      candidate_id,candidate_version,review_request_id,content_valid_until) SELECT 'family-release',$1,id,1,$1,1,'family-review','infinity'
       FROM unnest($2::text[]) id`,[source,rows.map(e=>e.id)]);
   }
   await client.query('SET LOCAL session_replication_role=origin');

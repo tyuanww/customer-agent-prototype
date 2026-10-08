@@ -25,8 +25,11 @@ export function createIntakeNativeFiles(window: BrowserWindow) {
   return {
     async confirmPublication(prompt: IntakePublicationPrompt, signal: AbortSignal): Promise<boolean> {
       const choice = await choose(signal, () => dialog.showMessageBox(window, {
-        type: 'warning', title: '确认发布资料', message: `确认发布「${prompt.title}」？`,
-        detail: `来源：${prompt.sourceId}\n候选版本：${prompt.candidateVersion}\n发布成功后，坐席重新查询将使用更新后的内容。`,
+        type: 'warning', title: '确认发布资料',
+        message: prompt.kind === 'candidate' ? `确认发布「${prompt.title}」？` : `确认回退至上一发布版本 ${prompt.targetReleaseId} 的可用内容？`,
+        detail: prompt.kind === 'candidate'
+          ? `来源：${prompt.sourceId}\n候选版本：${prompt.candidateVersion}\n发布成功后，坐席重新查询将使用更新后的内容。`
+          : `当前版本：${prompt.baseReleaseId}\n目标版本：${prompt.targetReleaseId}\n全部影响范围：\n${prompt.scopes.map(scope => `品牌 ${scope.brandId} · ${scope.shopId ? `店铺 ${scope.shopId}` : '品牌通用'} · 来源 ${scope.sourceId}`).join('\n')}\n确认后创建新的发布版本，坐席重新查询后使用更新内容。`,
         buttons: ['取消', '确认发布'], defaultId: 0, cancelId: 0, noLink: true,
       }));
       return choice.response === 1;

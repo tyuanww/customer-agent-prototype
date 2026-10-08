@@ -63,9 +63,7 @@ it('submits source and publication human intent through Main and displays the pu
     await f.user.click(screen.getByRole('button', { name: '确认来源版本' }));
     expect(f.command).toHaveBeenCalledWith({ action: 'confirm-source', versionKind: 'integer', versionValue: '7', reason: '人工核对合成导出' });
     await waitFor(() => expect(screen.getByRole('textbox', { name: '来源版本' })).toHaveValue(''));
-    await f.user.click(screen.getByRole('button', { name: '发起组织审批' }));
-    await f.user.click(screen.getByRole('button', { name: '刷新审批结果' }));
-    await screen.findByText(/组织审批已通过 · 审批编号/);
+    expect(screen.queryByRole('button', { name: '发起组织审批' })).not.toBeInTheDocument();
     await f.user.type(screen.getByRole('textbox', { name: '发布标题' }), '合成 FAQ 更新');
     await f.user.type(screen.getByRole('textbox', { name: '发布摘要' }), '新增已核对条目');
     f.confirmation.mockResolvedValue(false);
@@ -81,35 +79,22 @@ it('submits source and publication human intent through Main and displays the pu
     expect(screen.getByRole('textbox', { name: '发布标题' })).toHaveValue('');
   } finally { f.main.dispose(); }
 });
-it('only offers original-request retry while approval creation remains uncertain', async () => {
-  const f = setup(); f.data.candidate.sourceEvidenceVersion = 1; f.data.state.creating = true; render(<IntakeManagement />);
-  try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
-    await f.user.click(screen.getByRole('button', { name: '发起组织审批' }));
-    await screen.findByRole('heading', { name: '操作结果待确认' });
-    expect(screen.queryByRole('button', { name: '查询原操作回执' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '重试原操作' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: '发起组织审批' })).toBeDisabled();
-    f.data.state.creating = false; await f.user.click(screen.getByRole('button', { name: '重试原操作' }));
-    await waitFor(() => expect(screen.queryByRole('heading', { name: '操作结果待确认' })).not.toBeInTheDocument());
-    expect(f.data.candidate.approvalEvidenceVersion).toBe(1);
-  } finally { f.main.dispose(); }
-});
-it('allows a deliberate replacement of a completed rejected review without enabling it for an uncertain creation', async () => {
-  const f = setup(); f.data.candidate.sourceEvidenceVersion = 1;
-  const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
+it('legacy candidates show read-only history and cannot bypass an explicit revision for direct publication', async () => {
+  const f = setup(); f.data.historicalReview(); f.data.candidate.sourceEvidenceVersion = 1; f.data.candidate.state = 'ready';
   render(<IntakeManagement />);
   try {
     await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
-    await f.user.click(screen.getByRole('button', { name: '发起组织审批' }));
-    const review = [...f.data.workflowReceipts.values()].find(v => (v as { reviewRequestId?: string }).reviewRequestId) as { state: string };
-    review.state = 'rejected'; await f.user.click(screen.getByRole('button', { name: '读取审批状态' }));
-    const repeat = screen.getByRole('button', { name: '重新发起组织审批' });
-    expect(repeat).toBeEnabled(); await f.user.click(repeat);
-    expect(confirmation).toHaveBeenCalled(); expect(f.data.candidate.approvalEvidenceVersion).toBe(2);
-  } finally { confirmation.mockRestore(); f.main.dispose(); }
+    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    expect(screen.queryByRole('button', { name: '发起组织审批' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '刷新审批结果' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled();
+    await f.user.click(screen.getByRole('button', { name: '读取历史审批' }));
+    await screen.findByText(/组织审批已通过 · 审批编号 synthetic-history/);
+    expect(f.data.candidate.publicationPolicy).toBe('approval-v1');
+    expect(f.data.candidate.approvalEvidenceVersion).toBe(1);
+  } finally { f.main.dispose(); }
 });
-it('keeps an unsaved quality judgment isolated from source and approval mutations', async () => {
+it('keeps an unsaved quality judgment isolated from source and publication mutations', async () => {
   const f = setup(); f.data.candidate.sourceEvidenceVersion = 1; render(<IntakeManagement />);
   try {
     await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
@@ -119,9 +104,9 @@ it('keeps an unsaved quality judgment isolated from source and approval mutation
     await f.user.click(screen.getByRole('button', { name: '读取初检' }));
     await f.user.selectOptions(screen.getByRole('combobox', { name: '检查结论 合成洁面 1' }), 'pass');
     expect(screen.getByRole('textbox', { name: '来源版本' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '发起组织审批' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled();
     await f.user.click(screen.getByRole('button', { name: '保存本条判断' }));
-    expect(screen.getByRole('button', { name: '发起组织审批' })).toBeDisabled(); // Main-owned draft still needs submission
+    expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled(); // Main-owned draft still needs submission
   } finally { f.main.dispose(); }
 });
 it.each([false, true])('keeps a source form editable while excluding quality writes (frozen=%s)', async frozen => {
@@ -145,27 +130,6 @@ it.each([false, true])('keeps a source form editable while excluding quality wri
     if (frozen) expect(screen.getByRole('combobox', { name: '检查结论 合成洁面 1' })).toBeEnabled();
     else expect(screen.getByRole('button', { name: '冻结本次抽样' })).toBeEnabled();
     expect(f.main.view().hasDraft).toBe(false);
-  } finally { f.main.dispose(); }
-});
-it('distinguishes a bound review awaiting its first observation from an observed unavailable service', async () => {
-  const f = setup(); f.data.candidate.sourceEvidenceVersion = 1;
-  const original = f.data.respond;
-  f.data.respond = (path, body) => {
-    const value = original(path, body);
-    if (path.endsWith('/review') && body) (value as { state: string }).state = 'unavailable';
-    return value;
-  };
-  render(<IntakeManagement />);
-  try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
-    await f.user.click(screen.getByRole('button', { name: '发起组织审批' }));
-    await screen.findByText(/尚未核验审批结果 · 审批编号 synthetic-instance/);
-    expect(screen.queryByText(/审批服务暂不可用/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '刷新审批结果' })).toBeEnabled();
-    const review = [...f.data.workflowReceipts.values()].find(v => (v as { reviewRequestId?: string }).reviewRequestId) as { checkedAt: string };
-    review.checkedAt = new Date().toISOString();
-    await f.user.click(screen.getByRole('button', { name: '读取审批状态' }));
-    await screen.findByText(/审批服务暂不可用 · 审批编号 synthetic-instance/);
   } finally { f.main.dispose(); }
 });
 it('clears each confirmed source form by its operation identity and preserves new input across status reads', async () => {

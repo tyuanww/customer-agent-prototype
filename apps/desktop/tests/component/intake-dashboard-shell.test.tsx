@@ -34,7 +34,7 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   fireEvent.focus(window);
   expect(legacySession).not.toHaveBeenCalled();
   expect(screen.queryByTestId('overview-kpi-source')).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '资料审核' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '资料管理' })).toBeInTheDocument();
 });
 
 it('fails closed before choosing a workspace profile when the mode lookup fails', async () => {

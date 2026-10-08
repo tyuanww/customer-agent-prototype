@@ -37,13 +37,13 @@ if (stopRequested) {
   const readyHost = host;
   input = createInterface({ input: process.stdin, output: process.stdout, terminal: process.stdin.isTTY === true });
   let tasks = Promise.resolve();
-  const help = () => console.info('固定命令：status | identity enabler | identity reviewer | identity agent | approve | quit');
+  const help = () => console.info('固定命令：status | identity enabler | identity reviewer | identity agent | quit');
   console.info(JSON.stringify({ status: 'READY_SYNTHETIC_ONLY', apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin,
     candidate: host.candidate.key, expiresAt: host.expiresAt, hostDirectory: host.root, desktopProfile,
-    persistent: false, approval: 'manual-synthetic-transport' }));
-  console.info('当前身份：enabler。先在工作台查看材料、确认来源并发起审批，再在此输入 approve，回到工作台刷新审批结果、完成人工质量检查并发布。');
+    persistent: false, publicationPolicy: 'direct-v1' }));
+  console.info('当前身份：enabler。先在工作台查看材料、确认来源、完成人工质量检查，再点击发布并在原生弹窗二次确认。');
   console.info('输入 identity agent 后在桌面退出并重新登录，可检索刚发布的通用 FAQ。该命令只选择下一次合成登录，不改变已有会话。');
-  console.info('数据、身份和审批均为临时合成内容。约5分钟后事实资格到期并清理宿主PG/对象；需要更长验证时退出桌面并重新启动此入口，不延长生产TTL。');
+  console.info('数据和身份均为临时合成内容；发布不经过审批。约5分钟后事实资格到期并清理宿主PG/对象；需要更长验证时退出桌面并重新启动此入口，不延长生产TTL。');
   console.info(`桌面启动（需先构建）：CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2 CUSTOMER_AGENT_DESKTOP_API_ORIGIN=${host.apiOrigin} CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN=${host.identityOrigin} pnpm --filter @customer-agent/desktop exec electron --user-data-dir='${desktopProfile}' out/main/index.js`);
   console.info(`桌面目录由另起的Electron持有，本宿主不删除。退出Electron后请手动清理：${desktopProfile}`);
   help();
@@ -56,7 +56,6 @@ if (stopRequested) {
       const command = line.trim();
       if (command === 'quit') { await stop('requested'); return; }
       if (command === 'status') { console.info(JSON.stringify(await readyHost.status())); return; }
-      if (command === 'approve') { console.info(JSON.stringify(readyHost.approveReview())); return; }
       const match = /^identity (enabler|reviewer|agent)$/.exec(command);
       if (match) { readyHost.selectIdentity(match[1] as 'enabler' | 'reviewer' | 'agent'); console.info(`下一次合成登录：${match[1]}`); return; }
       help();

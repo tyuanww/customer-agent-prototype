@@ -27,7 +27,7 @@ export type IntakeRollbackView = {
   available: boolean;
   impact: Pick<C['IntakeRollbackImpact'], 'baseReleaseId' | 'targetReleaseId' | 'scopes' | 'requiresCorrectiveCandidate'> | null;
   review: Pick<C['IntakeRollbackReview'], 'state' | 'checkedAt' | 'validUntil' | 'instanceCode'> | null;
-  pending: { action: 'review-request' | 'review-refresh' | 'rollback'; recovery: 'receipt' | 'retry' } | null;
+  pending: { action: 'review-request' | 'review-refresh' | 'rollback'; recovery: 'receipt' | 'retry'; retryAllowed?: boolean } | null;
   result: { state: C['IntakeRollbackReceipt']['state']; releaseId: string | null } | null;
   hasReview: boolean; canExecute: boolean;
 };
@@ -42,7 +42,7 @@ export type IntakeManagementView = {
   review: C['IntakeReview'] | null;
   /** Historical result only. The current candidate is always read separately. */
   workflowResult: { operationId: string; action: 'source-confirm' | 'review-request' | 'review-refresh' | 'publish' | 'cancel'; state: string; releaseId: string | null } | null;
-  pending: { action: C['IntakeQualityReceipt']['action'] | 'source-confirm' | 'review-request' | 'review-refresh' | 'publish' | 'cancel'; operationId: string; recovery: 'receipt' | 'retry' } | null;
+  pending: { action: C['IntakeQualityReceipt']['action'] | 'source-confirm' | 'review-request' | 'review-refresh' | 'publish' | 'cancel'; operationId: string; recovery: 'receipt' | 'retry'; retryAllowed?: boolean } | null;
   receipt: C['IntakeQualityReceipt'] | null;
 };
 export type IntakeManagementReply = { ok: true; view: IntakeManagementView } | { ok: false; code: string; message: string; view: IntakeManagementView | null };

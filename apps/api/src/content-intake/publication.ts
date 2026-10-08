@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
@@ -13,15 +12,14 @@ const json = (value: unknown) => value as CanonicalJsonValue;
 
 /** The private DB publisher reports only existing typed rejection reasons. Other
  * SQL failures retain the transaction owner's diagnostics and certainty handling. */
-const denials = new Set<Reason>(['MATERIAL_CHANGED','ALREADY_PUBLISHED','SCOPE_DENIED','MODE_CONFLICT','BASE_CHANGED',
+const denials = new Set<Reason>(['FILE_LIMIT','MATERIAL_CHANGED','ALREADY_PUBLISHED','SCOPE_DENIED','MODE_CONFLICT','BASE_CHANGED',
   'APPROVAL_REVOKED','SOURCE_MISMATCH','APPROVAL_CHANGED','AWAITING_APPROVAL','PERMISSION_CHANGED','HUMAN_REVIEW_REQUIRED',
   'APPROVAL_UNAVAILABLE','TICKET_EXPIRED','TICKET_CONSUMED']);
 
-/** Owns the lock-free immediate observation followed by one atomic local commit.
+/** Owns confirmed direct publication followed by one atomic local commit.
  * Tickets never leave the server. A lost COMMIT response is recovered under the
  * original operation; a replay is a historical receipt, not current read authority. */
-export function createIntakePublication(run: Run,
-  refresh: (actor: AuthenticatedUser, request: unknown) => Promise<IntakeResult<C['IntakeReview']>>) {
+export function createIntakePublication(run: Run) {
   return {
     async publish(actor: AuthenticatedUser, raw: unknown): Promise<IntakeResult<C['IntakeReceipt']>> {
       const prepared = await run(actor,'publish-prepare',null,null,async (client,who) => {
@@ -33,23 +31,18 @@ export function createIntakePublication(run: Run,
         assertSnapshotPageable(c.material.entries);
         if (c.material.baseReleaseId!==req.baseReleaseId) throw new IntakeRejection('BASE_CHANGED');
         if (c.view.sourceEvidenceVersion!==req.sourceEvidenceVersion) throw new IntakeRejection('SOURCE_MISMATCH');
-        if (c.view.approvalEvidenceVersion!==req.approvalEvidenceVersion) throw new IntakeRejection('APPROVAL_CHANGED');
+        if (c.view.publicationPolicy !== 'direct-v1') throw new IntakeRejection('MODE_CONFLICT');
         if (!req.title.trim()) throw new IntakeRejection('FILE_INVALID','VALIDATION');
         return { req, prior: null };
       },v => v as { req: C['IntakePublish']; prior: C['IntakeReceipt'] | null });
       if (!prepared.ok) return prepared;
       const { req,prior } = prepared.value;
       if (prior) return { ok:true,value:prior };
-      // Fresh internal refresh key: never replay an old observation just because
-      // the caller retries its publish operation after a confirmed rollback.
-      const observed = await refresh(actor,{ operationId:`publish-check_${randomUUID()}`,key:req.key,
-        expectedEvidenceVersion:req.approvalEvidenceVersion });
-      if (!observed.ok) return observed;
       return run(actor,'publish',json(req),req.operationId,async (client,who) => {
         try {
           const result = await client.query<{ value: { receipt: unknown; validUntil: string } }>(
             'SELECT content_intake.publish_candidate($1,$2::jsonb,$3::jsonb) AS value',
-            [who.id,JSON.stringify(req),JSON.stringify(observed.value)]);
+            [who.id,JSON.stringify(req),'null']);
           client.validUntil(Date.parse(result.rows[0]!.value.validUntil));
           const published = receipt(result.rows[0]!.value.receipt);
           // The additive rollback lineage is checked by the DB publication trigger.
@@ -62,8 +55,8 @@ export function createIntakePublication(run: Run,
           if (inherited.rows[0]?.until) client.validUntil(inherited.rows[0].until.getTime());
           return published;
         } catch (error) {
-          if (error instanceof Error && 'code' in error && (error.code==='ZA003' || error.code==='ZA005')
-            && denials.has(error.message as Reason)) throw new IntakeRejection(error.message as Reason,error.code==='ZA005'?'FORBIDDEN':'CONFLICT');
+          if (error instanceof Error && 'code' in error && (error.code==='ZA001' || error.code==='ZA003' || error.code==='ZA005')
+            && denials.has(error.message as Reason)) throw new IntakeRejection(error.message as Reason,error.code==='ZA001'?'VALIDATION':error.code==='ZA005'?'FORBIDDEN':'CONFLICT');
           throw error;
         }
       },receipt);

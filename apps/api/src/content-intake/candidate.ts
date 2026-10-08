@@ -95,7 +95,7 @@ export async function readCandidate(client: IntakeTransaction, actor: Principal,
   action: C['IntakeAction'] = 'content-manage'): Promise<C['IntakeCandidate']> {
   const { rows } = await client.query<{ source_id: string; value: unknown }>(`SELECT c.source_id,jsonb_build_object(
     'key',jsonb_build_object('candidateId',c.candidate_id,'version',c.version,'digest',c.digest),
-    'sourceId',c.source_id,'state',c.state,'readinessReasons','[]'::jsonb,
+    'sourceId',c.source_id,'publicationPolicy',c.publication_policy,'state',c.state,'readinessReasons','[]'::jsonb,
     'sourceEvidenceVersion',c.source_evidence_version,'approvalEvidenceVersion',c.approval_evidence_version,
     'revocationGeneration',c.revocation_generation,'createdAt',c.created_at,'updatedAt',c.updated_at,
     'publishedReleaseId',p.release_id) AS value FROM content_intake.candidate_versions c
@@ -108,14 +108,15 @@ export async function readCandidate(client: IntakeTransaction, actor: Principal,
   // Readiness is a projection of current evidence, never a cached permission.
   // Merely reading it does not renew approval validity or change its history.
   const facts = (await client.query<{ source_ok: boolean; base_ok: boolean; approval_state: string | null;
-    fresh: boolean | null; reviewer_until: Date | null; reviewer_enabled: boolean | null }>(`SELECT
+    quality_state: string; fresh: boolean | null; reviewer_until: Date | null; reviewer_enabled: boolean | null }>(`SELECT
       s.current_mapping_version=c.source_version AND s.mode='v2-preview' AS source_ok,
+      content_intake.quality_state(c.candidate_id,c.version) AS quality_state,
       c.base_release_id IS NOT DISTINCT FROM (SELECT current_release_id FROM public.content_current WHERE id=1) AS base_ok,
       f.state AS approval_state, f.checked_at<=clock_timestamp() AND clock_timestamp()<f.valid_until AS fresh,
       content_intake.authorization_deadline(f.reviewer_id,'review',c.scope_id,c.source_id,clock_timestamp()) AS reviewer_until,
       b.enabled AS reviewer_enabled
       FROM content_intake.candidate_versions c JOIN content_intake.sources s USING(source_id)
-      LEFT JOIN content_intake.review_bindings r ON r.candidate_id=c.candidate_id AND r.candidate_version=c.version AND r.evidence_version=c.approval_evidence_version
+      LEFT JOIN content_intake.review_bindings r ON c.publication_policy='approval-v1' AND r.candidate_id=c.candidate_id AND r.candidate_version=c.version AND r.evidence_version=c.approval_evidence_version
       LEFT JOIN content_intake.approval_current p USING(review_request_id)
       LEFT JOIN content_intake.approval_facts f ON f.review_request_id=p.review_request_id AND f.facts_version=p.facts_version
       LEFT JOIN content_intake.principals reviewer ON reviewer.principal_id=f.reviewer_id
@@ -125,10 +126,12 @@ export async function readCandidate(client: IntakeTransaction, actor: Principal,
   if (!facts.source_ok) reasons.push('SOURCE_MISMATCH');
   if (!facts.base_ok) reasons.push('BASE_CHANGED');
   if (view.sourceEvidenceVersion === 0) reasons.push('SOURCE_CONFIRMATION_REQUIRED');
-  if (facts.approval_state === 'revoked') reasons.push('APPROVAL_REVOKED');
-  else if (!facts.fresh) reasons.push(view.approvalEvidenceVersion ? 'APPROVAL_UNAVAILABLE' : 'AWAITING_APPROVAL');
-  else if (facts.approval_state !== 'approved') reasons.push('AWAITING_APPROVAL');
-  else if (!facts.reviewer_until || !facts.reviewer_enabled) reasons.push('PERMISSION_CHANGED');
+  if (view.publicationPolicy === 'approval-v1') {
+    if (facts.approval_state === 'revoked') reasons.push('APPROVAL_REVOKED');
+    else if (!facts.fresh) reasons.push(view.approvalEvidenceVersion ? 'APPROVAL_UNAVAILABLE' : 'AWAITING_APPROVAL');
+    else if (facts.approval_state !== 'approved') reasons.push('AWAITING_APPROVAL');
+    else if (!facts.reviewer_until || !facts.reviewer_enabled) reasons.push('PERMISSION_CHANGED');
+  } else if (facts.quality_state !== 'passed') reasons.push('QUALITY_NOT_PASSED');
   return { ...view, state: reasons.length ? 'awaiting-evidence' : 'ready', readinessReasons: reasons };
 }
 
@@ -196,8 +199,8 @@ export async function freezeParsed(client: IntakeTransaction, actor: Principal, 
     updated_at=clock_timestamp() WHERE candidate_id=$1 AND version=$2`, [id, old.key.version]);
   const encoded = canonical(material);
   await client.query(`INSERT INTO content_intake.candidate_versions(candidate_id,version,source_id,scope_id,source_version,
-    object_id,file_sha256,actor_id,base_release_id,canonical_encoding,canonical_material,material,risk,explicit_disable_count,created_at,updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'candidate-p1.1',$10,$11::jsonb,$12,$13,clock_timestamp(),clock_timestamp())`,
+    object_id,file_sha256,actor_id,base_release_id,canonical_encoding,canonical_material,material,risk,explicit_disable_count,created_at,updated_at,publication_policy)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'candidate-p1.1',$10,$11::jsonb,$12,$13,clock_timestamp(),clock_timestamp(),'direct-v1')`,
   [id, version, job.source_id, src.scopeId, src.version, o.object_id, o.sha256, actor.id, job.base_release_id,
     encoded, JSON.stringify(material), material.risk.level, material.risk.explicitDisableCount]);
   const vocabulary = new Map(material.entries.flatMap(e => [...e.productRefs, ...e.scenarioRefs]).map(t => [t.id, t.displayVersion]));
@@ -219,8 +222,8 @@ export async function cancelCandidate(client: IntakeTransaction, actor: Principa
   if (c.state === 'publishing' || uncertain.rowCount) throw new IntakeRejection('COMMIT_UNKNOWN');
   if (c.state === 'invalidated') throw new IntakeRejection('MATERIAL_CHANGED');
   await client.query(`INSERT INTO content_intake.write_attempts(actor_id,operation_id,action,candidate_id,candidate_version,
-    candidate_digest,payload_digest,state,created_at) VALUES ($1,$2,'cancel',$3,$4,$5,$6,'pending',clock_timestamp())`,
-  [actor.id, req.operationId, req.key.candidateId, req.key.version, req.key.digest, digest(canonical(req))]);
+    candidate_digest,payload_digest,state,created_at,publication_policy) VALUES ($1,$2,'cancel',$3,$4,$5,$6,'pending',clock_timestamp(),$7)`,
+  [actor.id, req.operationId, req.key.candidateId, req.key.version, req.key.digest, digest(canonical(req)), c.publicationPolicy]);
   if (c.state !== 'cancelled') await client.query(`UPDATE content_intake.candidate_versions SET state='cancelled',
     revocation_generation=revocation_generation+1,updated_at=clock_timestamp() WHERE candidate_id=$1 AND version=$2`, [req.key.candidateId, req.key.version]);
   await client.query("UPDATE content_intake.write_attempts SET state='cancelled' WHERE actor_id=$1 AND action='cancel' AND operation_id=$2", [actor.id, req.operationId]);
@@ -231,8 +234,16 @@ export async function cancelCandidate(client: IntakeTransaction, actor: Principa
  * Keep stored candidate responses readable across restart; no receipt migration or
  * renewed candidate authority is implied by reading this historical result. */
 export function cancellationReceipt(operationId: string, response: unknown): C['IntakeReceipt'] {
-  const candidate = parseContractSchema('IntakeCandidate', response);
+  const candidate = historicalCandidate(response);
   if (candidate.state !== 'cancelled') throw new IntakeRejection('COMMIT_UNKNOWN');
   return parseContractSchema('IntakeReceipt', { operationId, key: candidate.key, action: 'cancel', state: 'cancelled',
     releaseId: null, announcementId: null, reason: null });
+}
+
+/** Decode only server-owned durable candidate receipts written before policy was
+ * introduced. New HTTP inputs and current DB views always use the strict schema. */
+export function historicalCandidate(value: unknown): C['IntakeCandidate'] {
+  const saved = value && typeof value === 'object' && !Array.isArray(value) && !('publicationPolicy' in value)
+    ? { ...value, publicationPolicy: 'approval-v1' } : value;
+  return parseContractSchema('IntakeCandidate', saved);
 }

@@ -131,8 +131,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 请求核验回退计划的原人工实例
-         * @description 按原rollbackPlanId、impactDigest和expectedEvidenceVersion核验已绑定的原人工实例与审核包，不新建UUID或实例，不改变材料。只有认证适配器成功核验才推进事实版本与validUntil；失败不续期。资源权限及全量影响范围资格仍须重验。
+         * 审批写入已停用（仅保留旧历史读取）
+         * @deprecated
+         * @description direct-v1 profile 下此审批写入已停用，返回409 CONFLICT / MODE_CONFLICT；不发起或刷新飞书审批，不生成假 approved。旧记录可通过同资源 GET 读取历史，不续期。
          */
         post: operations["refreshIntakeRollbackReview"];
         delete?: never;
@@ -170,13 +171,14 @@ export interface paths {
         };
         /**
          * 查询全目录回退计划人工审核事实
-         * @description 只读已绑定回退计划的人工审核事实，不发起实例、不重验或延长validUntil。证据过期时调用同计划review/refresh；提交仍须校验全部影响范围与审核资格。
+         * @description 只读既有审批历史，不发起、刷新或延长事实截止。旧审批过期/撤销继续约束历史内容；direct-v1 候选没有审批记录。
          */
         get: operations["getIntakeRollbackReview"];
         put?: never;
         /**
-         * 发起全目录回退计划的人工复核
-         * @description 服务端持久uuid后调用认证适配器，未知响应使用原uuid核对；绑定独立rollbackPlanId/impactDigest及完整影响范围审核包，不复用单候选审批。客户端不能提交PASS、审核人、instanceCode或附件证明；审核资格按回退实际影响范围核验。
+         * 审批写入已停用（仅保留旧历史读取）
+         * @deprecated
+         * @description direct-v1 profile 下此审批写入已停用，返回409 CONFLICT / MODE_CONFLICT；不发起或刷新飞书审批，不生成假 approved。旧记录可通过同资源 GET 读取历史，不续期。
          */
         post: operations["requestIntakeRollbackReview"];
         delete?: never;
@@ -235,8 +237,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 提交已批准的全范围回退
-         * @description 目标/基线 CAS、全部实际范围权限及有效证据在提交点复核。撤销内容不可复活。受限范围走重新审核的纠正候选。
+         * 二次确认后执行有权影响集的纠正回退
+         * @description direct-v1 专用。请求必须 confirmed=true；不接受审批版本、不创建或刷新飞书审批。事务重验当前会话、组织事实、动作与来源范围，绑定精确候选 key 或回退 impactDigest、baseReleaseId。来源/质量/内容期限及并发 CAS 不变。旧 approval-v1 候选拒绝首次直发；须显式修订新版本。已确认未知操作保留原 operationId/载荷恢复，不改 base 后重放；历史回执不授当前权限。取消原生确认不请求接口。旧审批撤销或过期不能因迁移自动恢复；详见 17-P2权限配置与确认直发合同候选.md。
          */
         post: operations["rollbackIntakeRelease"];
         delete?: never;
@@ -315,8 +317,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 发布精确候选及证据版本
-         * @description 仅服务端签发一次 60s 票据。提交在统一锁序核对 current/base、全部权限/模式/证据代际，原子更新既有 current、FAQ+空 SOP+媒体快照、公告和永久发布回执。原 operation 查询未知结果，不自动换键或重基线。
+         * 二次确认后按当前权限直接发布
+         * @description direct-v1 专用。请求必须 confirmed=true；不接受审批版本、不创建或刷新飞书审批。事务重验当前会话、组织事实、动作与来源范围，绑定精确候选 key 或回退 impactDigest、baseReleaseId。来源/质量/内容期限及并发 CAS 不变。旧 approval-v1 候选拒绝首次直发；须显式修订新版本。已确认未知操作保留原 operationId/载荷恢复，不改 base 后重放；历史回执不授当前权限。取消原生确认不请求接口。旧审批撤销或过期不能因迁移自动恢复；详见 17-P2权限配置与确认直发合同候选.md。
          */
         post: operations["publishIntakeCandidate"];
         delete?: never;
@@ -335,8 +337,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 请求核验原人工实例
-         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         * 审批写入已停用（仅保留旧历史读取）
+         * @deprecated
+         * @description direct-v1 profile 下此审批写入已停用，返回409 CONFLICT / MODE_CONFLICT；不发起或刷新飞书审批，不生成假 approved。旧记录可通过同资源 GET 读取历史，不续期。
          */
         post: operations["refreshIntakeHumanReview"];
         delete?: never;
@@ -354,13 +357,14 @@ export interface paths {
         };
         /**
          * 读取最近有效审核事实
-         * @description 缓存状态读取不续期；显式刷新由认证适配器核验原始人工 task/timeline 和审核包字节摘要，失败不延长五分钟截止。
+         * @description 只读既有审批历史，不发起、刷新或延长事实截止。旧审批过期/撤销继续约束历史内容；direct-v1 候选没有审批记录。
          */
         get: operations["getIntakeHumanReview"];
         put?: never;
         /**
-         * 发起或恢复飞书人工审批请求
-         * @description 服务端持久 uuid 后调用认证适配器；未知响应用原 uuid 核对。客户端不能提交 PASS、审核人、instanceCode 或附件证明。常规可自审；关键稿排除所有贡献人和同人别名。
+         * 审批写入已停用（仅保留旧历史读取）
+         * @deprecated
+         * @description direct-v1 profile 下此审批写入已停用，返回409 CONFLICT / MODE_CONFLICT；不发起或刷新飞书审批，不生成假 approved。旧记录可通过同资源 GET 读取历史，不续期。
          */
         post: operations["requestIntakeHumanReview"];
         delete?: never;
@@ -1973,8 +1977,12 @@ export interface components {
             baseReleaseId: string;
             targetReleaseId: string;
             impactDigest: string;
-            approvalEvidenceVersion: components["schemas"]["IntakeVersion"];
             rollbackPlanId: components["schemas"]["IntakeId"];
+            /**
+             * @description 明确的本次发布意图；桌面仅在 Main 原生二次确认后设置。不能替代服务端权限/版本/来源/质量复核，也不能证明任意第三方调用者弹过窗。
+             * @constant
+             */
+            confirmed: true;
         };
         IntakeRollbackPreview: {
             baseReleaseId: string;
@@ -2000,9 +2008,13 @@ export interface components {
             key: components["schemas"]["IntakeCandidateKey"];
             baseReleaseId: string | null;
             sourceEvidenceVersion: components["schemas"]["IntakeVersion"];
-            approvalEvidenceVersion: components["schemas"]["IntakeVersion"];
             title: string;
             summary: string;
+            /**
+             * @description 明确的本次发布意图；桌面仅在 Main 原生二次确认后设置。不能替代服务端权限/版本/来源/质量复核，也不能证明任意第三方调用者弹过窗。
+             * @constant
+             */
+            confirmed: true;
         };
         IntakeReview: {
             key: components["schemas"]["IntakeCandidateKey"];
@@ -2061,7 +2073,12 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             publishedReleaseId: string | null;
-        };
+            /**
+             * @description 服务端冻结的候选发布政策。旧候选不可原地改成直发；须显式修订为新版本。
+             * @enum {string}
+             */
+            publicationPolicy: "approval-v1" | "direct-v1";
+        } & unknown;
         IntakeMaterial: {
             /** @enum {string} */
             canonicalEncodingVersion: "candidate-p1.1";
@@ -4699,15 +4716,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 请求核验已绑定的回退人工实例 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntakeRollbackReview"];
-                };
-            };
             /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
             400: {
                 headers: {
@@ -4988,15 +4996,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 发起或恢复飞书人工审批请求 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntakeRollbackReview"];
-                };
-            };
             /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
             400: {
                 headers: {
@@ -5765,15 +5764,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 请求核验原人工实例 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntakeReview"];
-                };
-            };
             /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
             400: {
                 headers: {
@@ -5959,15 +5949,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 发起或恢复飞书人工审批请求 */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntakeReview"];
-                };
-            };
             /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */
             400: {
                 headers: {

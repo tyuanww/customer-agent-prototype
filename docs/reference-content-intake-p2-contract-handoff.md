@@ -330,14 +330,18 @@ factory 的可验收输入为：获准环境标识、受限连接配置、受控
 
 两个边界方案中，选择由观察模块隐藏原生字段、分页和比对，writer 只接已有快照；不把网络字段和分页规则塞进数据库事务。两遍相等只能检测可观察变化，不能证明飞书跨页原子快照或缓存新鲜度；这仍是正式治理输入，不能靠加读次数消除。现有角色规则、grant、迁移和生产装配不变。实际命令、指纹与限制见[本切片证据](../evidence/qa/intake-organization/native-observer/README.md)。
 
-### 用户最新权限与发布决定（2026-10-08，合同变更待实施）
+### 用户最新权限与发布决定（2026-10-08）
 
-客服总监、客服经理可直接配置权限，无需审批；客服总监、客服经理、客服主管、客服组长均可在负责范围上传Excel，并在弹窗二次确认后直接发布，无需人工审批。本期主管/组长不配置他人权限；普通客服查询复制。当前角色矩阵及并行安排见[计划§0.52](plans/2026-10-03-content-intake-requirements.md#052-四岗上传发布与剩余并行安排2026-10-08)。取消确认不发请求；二次确认不替代服务端当前权限、事实/会话有效期、材料版本/范围与发布冲突校验。上文人工审批、常规自审/关键独立审与原生审批 transport 描述仍是现有冻结合同/实现事实，不再是本期目标。接下来由合同所属仓承接版本化变更，再由本仓 intake；不得伪造已批准证据来绕过旧发布门。店铺/来源初始范围、正式用途权限和运行接入的剩余条件仍在。
+客服总监、客服经理可直接配置权限，无需审批；客服总监、客服经理、客服主管、客服组长均可在负责范围上传Excel，并在弹窗二次确认后直接发布，无需人工审批。本期主管/组长不配置他人权限；普通客服查询复制。当前角色矩阵及并行安排见[计划§0.52](plans/2026-10-03-content-intake-requirements.md#052-四岗上传发布与剩余并行安排2026-10-08)。取消确认不发请求；二次确认不替代服务端当前权限、事实/会话有效期、材料版本/范围与发布冲突校验。上文组织审批与原生审批 transport 描述属于历史 approval-v1，不再是新候选流程；常规自检/关键独立判断的质量门仍保留。所属仓已承接版本化变更并由本仓 intake，不伪造审批通过。店铺/来源初始范围、正式用途权限和运行接入的剩余条件仍在。
 
 ### 确认直发候选与二次确认（2026-10-08）
 
 产品 Main 的原生二次确认已完成：默认取消、请求冻结、取消保留表单、迟到确认拒绝、未知操作恢复不重复确认，未新增 IPC 或改写旧 HTTP wire。[验证记录](../evidence/qa/intake-publication-confirmation/README.md)包含完整检查与实际 Electron/HTTP/PG 合成闭环；原生弹窗响应受控，不是人工设备勾选。
 
-治理仓 `codex/content-intake-p2-contracts` 的直发候选仍是 DRAFT，未冻结、未 export、未 intake。OpenAPI 1.20.0 SHA-256 仍是 `1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d`（直发 wire 未改）。schema.v1.22 SHA-256 现为 `c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce`，增量末尾替换了 `authorization_deadline`。旧 schema `3b7d7e67fcf18b9d00cbb916220b862b4f6b4f1e942d6bf367d66dd20dd60c0f` 只覆盖上一版草稿。新请求仍是 confirmed=true、拒绝审批版本；direct-v1 不生成审批证据，旧 approval-v1 不改写。
+治理仓 `codex/content-intake-p2-contracts@6f318d448929d1a87c5dc9e725ea4f90c48a4b97` 已按用户对精确候选的批准冻结、导出；产品消费 `cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929`，状态 VERIFIED_NOT_ACTIVATED。OpenAPI 1.20.0 SHA-256 `1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d`；schema.v1.22 SHA-256 `c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce`，均为获批原字节。治理 38 步 test:release 实际通过。冻结文档中的 NOT EXPORTED/NOT INTAKE 是冻结时刻声明，当前消费状态以产品锁和本记录为准。
 
-产品侧已在现有 grant 接口和 migration `0030` 落实两岗配置、四岗业务上限；历史 grant 保留，enabler/agent 的旧非 query 授权不再放行新操作。当前消费锁仍是 1.19/1.21，发布/回退/使用资格/Main 仍执行审批合同。确认弹窗已完成，不能单独当成免审批发布。完整直发必须等这版草稿冻结并 export/intake 后，再同时改发布、纠正回退、目录和使用资格。细节见[计划 §0.53](plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)。
+产品保留 `0030` 两岗配置、四岗业务上限及历史 grant；新增 `0031` 冻结增量、`0032` 直发存储，前 30 段保持不变。新候选和显式修订为 direct-v1，发布/回退要求 confirmed=true，拒绝旧审批版本；四个审批写接口返回 MODE_CONFLICT，不生成审批事实。Main 原生确认默认取消，确认后重验会话、权限和取消代际；来源、人工质量、范围、CAS、最终截止和永久操作回执保留。
+
+历史 approval-v1 不改写：旧未发布候选先显式修订；旧未知发布/回退只查原回执；混合发布继承旧谱系时仍受其审批到期/撤销限制。使用读取同时检查来源模式/映射、确认与已发布材料，不能借直发复活失效旧资料。完整实际 Electron/HTTP/PG 合成证据见[本次直发验证](../evidence/qa/intake-direct-publication/README.md)。
+
+生产 app/server/factory、正式受限账号和真实组织刷新尚未接入，消费锁 runtime/Ddev 仍为 false；没有生产激活或真实范围认领。剩余条件在[计划 §0.53](plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)，完整 `/review` 的 INCOMPLETE 不变。

@@ -25,7 +25,7 @@ import { createProductAuthService, authenticatedProductSession } from '../src/pr
 import type { ApiDatabaseBootstrapConfig } from '../src/runtime-config.js';
 import { createApprovalAdapter, type ApprovalTransport } from '../src/content-intake/approval-adapter.js';
 import { syntheticApproval } from './support/intake-approval.js';
-import { digest } from '../src/content-intake/material.js';
+import { canonical, digest } from '../src/content-intake/material.js';
 import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
 import type { IntakeQualityPreview, IntakeQualityProgress, QualityCheck } from '../src/content-intake/quality.js';
 
@@ -152,8 +152,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior };
   }
   async function managementHost(customStore = store, hostPool: IntakePool = pool, transport: ApprovalTransport | null = provider.transport,
-    labels: IntakePrincipalLabels = label) {
-    const logged = await seat('enabler');
+    labels: IntakePrincipalLabels = label, identity = 'enabler') {
+    const logged = await seat(identity);
     const app = Fastify({ routerOptions: { maxParamLength: 128 } });
     app.get('/v1/auth/me', async (request, reply) => (await authenticateRequestHeaders(auth!, request.headers)) ?? reply.code(401).send());
     app.post('/v1/auth/logout', async (request, reply) => {
@@ -208,17 +208,15 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       confirmedVersionKind: 'opaque', confirmedVersionValue: 'synthetic-export-one', acquisition: 'controlled-synthetic-export',
       objectSha256: object.sha256, reason: '合成人工来源确认' };
     const publish: C['IntakePublish'] = { operationId: `${label}-publish`, key: c.key, baseReleaseId,
-      sourceEvidenceVersion: 1, approvalEvidenceVersion: 1, title: '合成 HTTP 发布', summary: '三条 FAQ' };
+      sourceEvidenceVersion: 1, confirmed: true, title: '合成 HTTP 发布', summary: '三条 FAQ' };
     const post = (suffix: string, body: unknown, headers = host.headers) => fetch(`${url}/${suffix}`, {
       method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     return { c, url, source, publish, post };
   }
-  async function httpReview(f: Awaited<ReturnType<typeof httpCandidate>>) {
+  async function httpConfirm(f: Awaited<ReturnType<typeof httpCandidate>>) {
     const confirmed = await f.post('source-confirmation', f.source);
     expect(confirmed.status, await confirmed.clone().text()).toBe(200);
-    const started = await f.post('review', reviewRequest(f.c));
-    expect(started.status, await started.clone().text()).toBe(202);
-    return parseContractSchema('IntakeReview', await started.json());
+    return parseContractSchema('IntakeCandidate', await confirmed.json());
   }
   async function httpQuality(host: Awaited<ReturnType<typeof managementHost>>, c: C['IntakeCandidate']) {
     const headers = { authorization: `Bearer ${(await seat('reviewer')).token}`, 'content-type': 'application/json' };
@@ -545,19 +543,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const origin = await reader.listen({ host: '127.0.0.1', port: 0 });
     try {
       const f = await httpCandidate(host);
-      await httpReview(f);
+      await httpConfirm(f);
       expect((await f.post('publish', f.publish)).status).toBe(409);
       await noPublication();
-      provider.approve('enabler'); // routine content allows a qualified self-review
-      const refreshed = await f.post('review/refresh', reviewRequest(f.c, 1, 'workflow-refresh'));
-      expect(refreshed.status).toBe(202);
-      const review = parseContractSchema('IntakeReview', await refreshed.json());
-      expect(review.state).toBe('approved');
-      const observations = provider.instanceCalls();
-      expect(await (await fetch(`${f.url}/review`, { headers: host.headers })).json()).toEqual(review);
-      expect(provider.instanceCalls()).toBe(observations);
-      expect((await f.post('publish', f.publish)).status).toBe(409); // ready is not quality-passed
-      await noPublication();
+      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('0');
       const qualitySeat = await seat('reviewer');
       const child = spawn(process.execPath, [fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs', import.meta.url))], { stdio: ['pipe', 'pipe', 'pipe'] });
       const ended = once(child, 'close'); let output = '';
@@ -591,7 +580,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(snapshot.faq[0]!.entry.answerText).toBe('第一行。\n第二行。');
       expect(JSON.stringify(snapshot)).not.toContain('合成内部说明');
       console.log(JSON.stringify({ probe: 'workflow-http-second-seat', source: 'uploaded-synthetic-xlsx', releaseId: receipt.releaseId,
-        faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'Main-ProductSession-HTTP', approvalTransport: 'synthetic' }));
+        faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'Main-ProductSession-HTTP', publicationPolicy: 'direct-v1' }));
     } finally { await reader.close(); await host.app.close(); }
   }, 40_000);
 
@@ -622,92 +611,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await host.app.close(); }
   }, 40_000);
 
-  it('workflow HTTP recovers an unknown provider creation with its original UUID across host restart', async () => {
-    let lose = true;
-    const transport = { ...provider.transport, async create(...args: Parameters<ApprovalTransport['create']>) {
-      const created = await provider.transport.create(...args);
-      if (lose) { lose = false; throw new Error('synthetic lost provider response'); }
-      return created;
-    } };
-    const host = await managementHost(store, pool, transport);
-    let restarted: Awaited<ReturnType<typeof managementHost>> | undefined;
-    try {
-      const f = await httpCandidate(host);
-      const first = await httpReview(f);
-      expect(first.state).toBe('creating');
-      expect((await f.post('review', reviewRequest(f.c, 1, 'replacement'))).status).toBe(409);
-      await host.app.close();
-      restarted = await managementHost(store, pool, transport);
-      const response = await fetch(`${f.url.replace(host.origin, restarted.origin)}/review`, { method: 'POST',
-        headers: { ...restarted.headers, 'content-type': 'application/json' }, body: JSON.stringify(reviewRequest(f.c)) });
-      expect(response.status).toBe(202);
-      expect(parseContractSchema('IntakeReview', await response.json())).toMatchObject({ reviewRequestId: first.reviewRequestId,
-        evidenceVersion: 1, reviewPackageSha256: first.reviewPackageSha256, state: 'unavailable' });
-      expect(provider.instances.size).toBe(1);
-      expect(provider.calls()).toBe(2);
-    } finally { await restarted?.app.close(); await host.app.close(); }
-  }, 40_000);
-
-  it('workflow HTTP fails closed without an adapter and does not accept critical self-review or renew facts on provider failure', async () => {
-    await publicationBase();
-    const host = await managementHost();
-    let unavailable: Awaited<ReturnType<typeof managementHost>> | undefined;
-    try {
-      const f = await httpCandidate(host, 'critical-http', true);
-      expect((await admin.query('SELECT risk FROM content_intake.candidate_versions WHERE candidate_id=$1', [f.c.key.candidateId])).rows[0].risk).toBe('critical');
-      await httpReview(f);
-      provider.approve('enabler');
-      expect((await f.post('review/refresh', reviewRequest(f.c, 1, 'self-review'))).status).toBe(409);
-      provider.approve('reviewer');
-      const valid = await f.post('review/refresh', reviewRequest(f.c, 1, 'other-review'));
-      expect(valid.status).toBe(202);
-      const old = parseContractSchema('IntakeReview', await valid.json());
-      unavailable = await managementHost(store, pool, null);
-      const url = f.url.replace(host.origin, unavailable.origin);
-      const refresh = await fetch(`${url}/review/refresh`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },
-        body: JSON.stringify(reviewRequest(f.c, 1, 'missing-adapter')) });
-      expect(refresh.status).toBe(503);
-      expect(await (await fetch(`${url}/review`, { headers: host.headers })).json()).toEqual(old);
-      provider.latest().state = 'REVOKED';
-      expect((await f.post('review/refresh', reviewRequest(f.c, 1, 'revoked'))).status).toBe(202);
-      expect((await f.post('publish', f.publish)).status).toBe(409);
-      await noPublication();
-    } finally { await unavailable?.app.close(); await host.app.close(); }
-  }, 40_000);
-
-  it.each(['logout', 'revoke', 'cancel', 'source-change'] as const)('workflow HTTP fences %s during publish approval I/O', async change => {
-    await publicationBase();
-    let armed = false;
-    let enter!: () => void;
-    let release!: () => void;
-    const entered = new Promise<void>(resolve => { enter = resolve; });
-    const gate = new Promise<void>(resolve => { release = resolve; });
-    const host = await managementHost(store, pool, { ...provider.transport, async instance(...args) {
-      const snapshot = await provider.transport.instance(...args);
-      if (armed) { enter(); await gate; }
-      return snapshot;
-    } });
-    try {
-      const f = await httpCandidate(host);
-      await httpReview(f); provider.approve('reviewer'); await httpQuality(host, f.c);
-      armed = true;
-      const pending = f.post('publish', f.publish); await entered;
-      if (change === 'logout') await auth!.logout(host.logged.token);
-      else if (change === 'revoke') value(await service.changeGrant(actor('director'), 'business-enabler-publish', {
-        operationId: 'revoke-http', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
-      else {
-        const headers = { authorization: `Bearer ${(await seat('other')).token}` };
-        const result = change === 'cancel' ? await f.post('cancel', { operationId: 'concurrent-cancel', key: f.c.key }, headers)
-          : await f.post('source-confirmation', { ...f.source, operationId: 'source-changed', expectedEvidenceVersion: 1 }, headers);
-        expect(result.status).toBe(200);
-      }
-      release();
-      const result = await pending;
-      expect(result.status).toBe(change === 'logout' ? 401 : change === 'revoke' ? 404 : 409);
-      await noPublication();
-    } finally { release(); await host.app.close(); }
-  }, 40_000);
-
   it('workflow HTTP recovers a lost publish COMMIT through actor/action-scoped receipts without another publication', async () => {
     await publicationBase();
     let lost = false;
@@ -726,7 +629,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const host = await managementHost(store, uncertain);
     try {
       const f = await httpCandidate(host);
-      await httpReview(f); provider.approve('reviewer'); await httpQuality(host, f.c);
+      await httpConfirm(f); await httpQuality(host, f.c);
       const first = await f.post('publish', f.publish);
       expect(first.status).toBe(503);
       expect(await first.json()).toMatchObject({ error: { details: { reason: 'COMMIT_UNKNOWN' } } });
@@ -761,88 +664,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect((await fetch(url, { headers: { authorization: `Bearer ${(await seat('other')).token}` } })).status).toBe(404);
       await auth!.logout(host.logged.token);
       expect((await fetch(url, { headers: host.headers })).status).toBe(401);
-    } finally { await host.app.close(); }
-  }, 40_000);
-
-  // Value: protects=DB quota and disk agree after concurrent request recovery;
-  // fails_when=losing review packages survive durable replay; seam=owned store I/O barrier.
-  it('workflow HTTP approval package cleanup keeps only the concurrently adopted package', async () => {
-    let arrivals = 0;
-    let release!: () => void;
-    const gate = new Promise<void>(resolve => { release = resolve; });
-    const host = await managementHost({ ...store, async persist(...args) {
-      const object = await store.persist(...args);
-      if (args[1] === 'csv') { if (++arrivals === 2) release(); await gate; }
-      return object;
-    } });
-    try {
-      const f = await httpCandidate(host);
-      const responses = await Promise.all([f.post('review', reviewRequest(f.c)), f.post('review', reviewRequest(f.c))]);
-      expect(responses.map(r => r.status)).toEqual([202, 202]);
-      const reviews = await Promise.all(responses.map(async r => parseContractSchema('IntakeReview', await r.json())));
-      expect(reviews[0]!.reviewRequestId).toBe(reviews[1]!.reviewRequestId);
-      expect(arrivals).toBe(2);
-      const referenced = (await admin.query('SELECT object_id FROM content_intake.objects ORDER BY object_id')).rows.map(r => r.object_id);
-      expect(referenced).toHaveLength(2); // uploaded workbook and one review package
-      expect((await readdir(path.join(store.rootDirectory, 'objects'))).sort()).toEqual(referenced);
-      expect(provider.instances.size).toBe(1);
-    } finally { release(); await host.app.close(); }
-  }, 40_000);
-
-  it.each(['verification', 'logout'] as const)('workflow HTTP approval package cleanup reclaims after %s before registration', async failure => {
-    let packageId: string | undefined;
-    const host = await managementHost({ ...store, async persist(...args) {
-      const object = await store.persist(...args);
-      if (args[1] === 'csv') {
-        packageId = object.objectId;
-        if (failure === 'logout') await auth!.logout((await seat('enabler')).token);
-      }
-      return object;
-    }, async readPayload(id) {
-      return id === packageId && failure === 'verification' ? Buffer.from('synthetic corrupted package') : store.readPayload(id);
-    } });
-    try {
-      const f = await httpCandidate(host);
-      const response = await f.post('review', reviewRequest(f.c));
-      expect(response.status).toBe(failure === 'logout' ? 401 : 409);
-      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('0');
-      expect((await readdir(path.join(store.rootDirectory, 'objects')))).toHaveLength(1);
-      expect(provider.calls()).toBe(0);
-    } finally { await host.app.close(); }
-  }, 40_000);
-
-  it.each(['unknown-commit', 'logout-after-adoption'] as const)('workflow HTTP retains the adopted approval package after %s', async failure => {
-    let injected = false;
-    const uncertain: IntakePool = { async connect() {
-      const client = await pool.connect(); let adopts = false;
-      return new Proxy(client, { get(target, key) {
-        if (key === 'query') return async (sql: string, args?: unknown[]) => {
-          const result = await target.query(sql, args);
-          if (sql.includes('INSERT INTO content_intake.review_bindings')) adopts = true;
-          if (failure === 'unknown-commit' && sql === 'COMMIT' && adopts && !injected) { injected = true; throw new Error('synthetic lost package adoption COMMIT'); }
-          return result;
-        };
-        const member: unknown = Reflect.get(target, key); return typeof member === 'function' ? member.bind(target) : member;
-      } }) as PoolClient;
-    } };
-    const host = await managementHost(store, uncertain, { ...provider.transport, async create(...args) {
-      const result = await provider.transport.create(...args);
-      if (failure === 'logout-after-adoption' && !injected) { injected = true; await auth!.logout((await seat('enabler')).token); }
-      return result;
-    } });
-    try {
-      const f = await httpCandidate(host);
-      const response = await f.post('review', reviewRequest(f.c));
-      expect(response.status).toBe(failure === 'unknown-commit' ? 503 : 401);
-      const binding = (await admin.query('SELECT package_object_id,package_sha256 FROM content_intake.review_bindings')).rows[0];
-      expect(digest(await store.readPayload(binding.package_object_id))).toBe(binding.package_sha256);
-      const headers = { authorization: `Bearer ${(await seat('enabler', 'recovery')).token}` };
-      const recovered = await f.post('review', reviewRequest(f.c), headers);
-      expect(recovered.status, await recovered.clone().text()).toBe(202);
-      expect(parseContractSchema('IntakeReview', await recovered.json()).reviewPackageObjectId).toBe(binding.package_object_id);
-      expect((await readdir(path.join(store.rootDirectory, 'objects')))).toHaveLength(2);
-      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('1');
-      expect(provider.instances.size).toBe(1);
     } finally { await host.app.close(); }
   }, 40_000);
 
@@ -1113,7 +934,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   }
   const reviewRequest = (c: C['IntakeCandidate'], expected = 0, op = 'review-one'): C['IntakeReviewRequest'] =>
     ({ operationId:op,key:c.key,expectedEvidenceVersion:expected });
-  const refresh = (c: C['IntakeCandidate'], op = 'refresh-one', expected = 1) => service.refreshReview(actor('other'),reviewRequest(c,expected,op));
 
   async function grantQuerySources(ids: string[]) {
     for (const id of ids) {
@@ -1563,14 +1383,14 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(second.nextCursor).toBeNull();
     expect(await service.candidates((await seat('enabler','other-session')).actor, { cursor: first.nextCursor })).toMatchObject({ ok: false });
     expect(await service.candidates(user, { cursor: first.nextCursor, state: 'published' })).toMatchObject({ ok: false });
-    // Persisted ready is not authoritative after the reviewer loses qualification.
+    // Persisted ready is not authoritative after the source mapping changes.
     for (const c of [one, two]) {
       value((await confirm(c, `menu-confirm-${c.key.candidateId}`)).result);
-      value(await service.requestReview(actor('enabler'), reviewRequest(c, 0, `menu-review-${c.key.candidateId}`)));
-      provider.approve('reviewer');
-      value(await service.refreshReview(actor('enabler'), reviewRequest(c, 1, `menu-refresh-${c.key.candidateId}`)));
+      const frozen = value(await service.freezeQuality(actor('reviewer'), {operationId:`menu-freeze-${c.key.candidateId}`,key:c.key}));
+      value(await service.checkQuality(actor('reviewer'), {operationId:`menu-quality-${c.key.candidateId}`,key:c.key,phase:'initial',checks:qualityChecks(frozen)}));
     }
-    value(await service.changeGrant(actor('director'), 'business-reviewer-review', { operationId: 'menu-revoke-reviewer', expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+    await admin.query("INSERT INTO content_intake.source_mappings SELECT source_id,2,template_version,rule_version,mapping_version,structure_digest FROM content_intake.source_mappings WHERE source_id='source-a'");
+    await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
     expect(value(await service.candidates(user, { state: 'ready', limit: 1 }))).toMatchObject({ items: [], nextCursor: expect.any(String) });
     expect(value(await service.candidates(user, { state: 'awaiting-evidence' })).items).toHaveLength(2);
     const host = await managementHost();
@@ -1836,13 +1656,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     if (!parsed.ok) throw new Error(JSON.stringify({parsed,diagnostics:diagnostics.map(e=>String(e)),report:await service.job(actor('enabler'),job)}));
     const c = value(parsed);
     value((await confirm(c,`pub-source-${label}`)).result);
-    value(await service.requestReview(actor('enabler'),reviewRequest(c,0,`pub-review-${label}`)));
-    provider.approve('reviewer');
-    value(await refresh(c,`pub-refresh-${label}`));
     const frozen = value(await service.freezeQuality(actor('reviewer'),{ operationId:`pub-freeze-${label}`,key:c.key }));
     value(await service.checkQuality(actor('reviewer'),{ operationId:`pub-quality-${label}`,key:c.key,phase:'initial',checks:qualityChecks(frozen) }));
     const request: C['IntakePublish']={ operationId:`pub-${label}`,key:c.key,baseReleaseId:req.baseReleaseId,
-      sourceEvidenceVersion:1,approvalEvidenceVersion:1,title:'合成发布',summary:'合成 FAQ 更新' };
+      sourceEvidenceVersion:1,confirmed:true,title:'合成发布',summary:'合成 FAQ 更新' };
     return { c,request };
   }
   async function noPublication() {
@@ -1867,7 +1684,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       FROM content_intake.grants g WHERE scope_id='scope-a' ORDER BY (kind='allocation') DESC`,[suffix]);
   }
 
-  // Family scenarios use the public workbook grammar and ordinary approval flow;
+  // Family scenarios use the public workbook grammar and confirmed direct publication;
   // only organization/source registration is synthetic setup.
   function familyRow(id: string, options: { family?: string; body?: string; title?: string; products?: string; scenarios?: string;
     from?: string; to?: string; disabled?: boolean; protected?: boolean } = {}) {
@@ -1991,7 +1808,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   },60_000);
 
   it.each(['missing-root','foreign-brand','foreign-domain','linked-root','same-shop-overlap','cross-source-overlap','protected-root'] as const)(
-    'family: publication rejects %s atomically after actual parsing and human review',async conflict=>{
+    'family: publication rejects %s atomically after actual parsing and quality checks',async conflict=>{
       await publicationBase();await cloneScopeGrants('brand');
       let target='source-brand/root';
       if(conflict==='foreign-brand'||conflict==='foreign-domain') {
@@ -2124,47 +1941,29 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const base=value(await service.publish(actor('enabler'),second.request)).releaseId!;
     return {first,second,base,target};
   }
-  const rollbackReviewRequest=(p:C['IntakeRollbackImpact'],op='rollback-review',version=0)=>({operationId:op,impactDigest:p.impactDigest,expectedEvidenceVersion:version});
-  it('rollback: HTTP independent review publishes a new release consumed by another seat and replays the original operation', async()=>{
+  it('rollback: HTTP confirmed direct intent publishes a new release consumed by another seat and replays the original operation', async()=>{
     const {base,target}=await rollbackPair();const host=await managementHost();
     const post=(url:string,payload:unknown)=>host.app.inject({method:'POST',url,headers:{...host.headers,'content-type':'application/json'},payload:JSON.stringify(payload)});
     try {
       const preview=await post('/v1/intake/rollback/preview',{baseReleaseId:base,targetReleaseId:target});expect(preview.statusCode,preview.body).toBe(200);
       const p=parseContractSchema('IntakeRollbackImpact',preview.json());expect(p.scopes.map(s=>s.sourceId)).toEqual(['source-a']);
-      const url=`/v1/intake/rollback/${p.rollbackPlanId}/review`;
-      expect((await post(url,{...rollbackReviewRequest(p,'wrong-impact'),impactDigest:'f'.repeat(64)})).json()).toMatchObject({error:{details:{reason:'MATERIAL_CHANGED'}}});
-      const requested=await post(url,rollbackReviewRequest(p));expect(requested.statusCode,requested.body).toBe(202);
-      expect(provider.latest().form).toHaveProperty('rollbackPlanId',p.rollbackPlanId);expect(provider.latest().form).not.toHaveProperty('key');
-      const bytes=provider.packages.get(provider.latest().attachmentFileCode)!;const pack=JSON.parse(bytes.toString());
-      expect(pack.format).toBe('intake-rollback-review-package-v1');expect(pack.material.catalogs).toHaveLength(2);
-      provider.approve('enabler');expect((await post(`${url}/refresh`,rollbackReviewRequest(p,'bad-self',1))).json()).toMatchObject({error:{details:{reason:'HUMAN_REVIEW_REQUIRED'}}});
-      provider.approve('reviewer');const refreshed=await post(`${url}/refresh`,rollbackReviewRequest(p,'rollback-refresh',1));expect(refreshed.statusCode,refreshed.body).toBe(202);
-      const req:C['IntakeRollback']={operationId:'rollback-submit',rollbackPlanId:p.rollbackPlanId,baseReleaseId:base,targetReleaseId:target,impactDigest:p.impactDigest,approvalEvidenceVersion:1};
+      for(const suffix of ['', '/refresh']){
+        const disabled=await post(`/v1/intake/rollback/${p.rollbackPlanId}/review${suffix}`,{operationId:'disabled-rollback-review',impactDigest:p.impactDigest,expectedEvidenceVersion:0});
+        expect(disabled.statusCode,disabled.body).toBe(409);expect(disabled.json()).toMatchObject({error:{details:{reason:'MODE_CONFLICT'}}});
+      }
+      const req:C['IntakeRollback']={operationId:'rollback-submit',rollbackPlanId:p.rollbackPlanId,baseReleaseId:base,targetReleaseId:target,impactDigest:p.impactDigest,confirmed:true};
       const submitted=await post('/v1/intake/rollback',req);expect(submitted.statusCode,submitted.body).toBe(202);
       const receipt=parseContractSchema('IntakeRollbackReceipt',submitted.json());expect(receipt.state).toBe('published');expect(receipt.releaseId).not.toBe(target);
       const ent=value(await issue());expect(ent.releaseId).toBe(receipt.releaseId);expect(value(await snapshot(ent.entitlementId)).faq[0]!.entry.answerText).toBe('第一行。\n第二行。');
       expect((await post('/v1/intake/rollback',req)).json()).toEqual(receipt);
       expect((await host.app.inject({url:'/v1/intake/operations/rollback-submit?action=rollback',headers:host.headers})).json()).toEqual(receipt);
-      provider.latest().state='REVOKED';expect(value(await service.refreshRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p,'rollback-revoke',1))).state).toBe('revoked');
-      expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_REVOKED'});
+      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('0');
     } finally {await host.app.close();}
-  });
-  it('rollback: creation uncertainty retains its independent UUID and original package across restart',async()=>{
-    const {base,target}=await rollbackPair();const p=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:base,targetReleaseId:target}));
-    let lose=true;
-    const transport:ApprovalTransport={...provider.transport,async create(b,bytes,signal){const result=await provider.transport.create(b,bytes,signal);if(lose){lose=false;throw new Error('synthetic response lost');}return result;}};
-    const before=provider.instances.size;const req=rollbackReviewRequest(p);
-    const creating=value(await evidenceService(transport).requestRollbackReview(actor('enabler'),p.rollbackPlanId,req));expect(creating.state).toBe('creating');
-    const recovered=value(await evidenceService(transport).requestRollbackReview(actor('enabler'),p.rollbackPlanId,req));
-    expect(recovered.instanceCode).toBeTruthy();expect(recovered.reviewPackageObjectId).toBe(creating.reviewPackageObjectId);expect(provider.instances.size).toBe(before+1);
-    expect(await service.requestRollbackReview(actor('enabler'),p.rollbackPlanId,{...req,operationId:'different-key',expectedEvidenceVersion:0})).toMatchObject({ok:false,reason:'APPROVAL_CHANGED'});
   });
   async function readyRollback() {
     const pair=await rollbackPair();
     const p=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:pair.base,targetReleaseId:pair.target}));
-    value(await service.requestRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p)));provider.approve('reviewer');
-    value(await service.refreshRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p,'rb-refresh',1)));
-    const req:C['IntakeRollback']={operationId:'rollback-submit',rollbackPlanId:p.rollbackPlanId,baseReleaseId:pair.base,targetReleaseId:pair.target,impactDigest:p.impactDigest,approvalEvidenceVersion:1};
+    const req:C['IntakeRollback']={operationId:'rollback-submit',rollbackPlanId:p.rollbackPlanId,baseReleaseId:pair.base,targetReleaseId:pair.target,impactDigest:p.impactDigest,confirmed:true};
     return {...pair,p,req};
   }
   it('rollback: lost COMMIT recovers the original permanent receipt without observing the provider again',async()=>{
@@ -2182,47 +1981,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await restarted.operationReceipt(actor('other'),req.operationId,'rollback')).toMatchObject({ok:false,code:'NOT_FOUND'});
     expect((await admin.query("SELECT count(*) FROM content_intake.publications WHERE action='rollback'")).rows[0].count).toBe('1');
   });
-  it.each(['revoke','publish','cancel-target','wrong-package','expired-target'] as const)('rollback: rejects %s during the lock-free approval observation without moving current',async(change)=>{
-    const {p,req,first,base}=await readyRollback();let enter!:()=>void;let release!:()=>void;
-    const entered=new Promise<void>(r=>{enter=r;});const gate=new Promise<void>(r=>{release=r;});
-    const next=change==='publish'?await publishable('competing-publish'):null;
-    // Capture only this rollback's provider response; a concurrent publisher uses its own instance.
-    const transport:ApprovalTransport={...provider.transport,async instance(b,signal){const raw=await provider.transport.instance(b,signal);enter();await gate;return raw;}};
-    const pending=evidenceService(transport).rollback(actor('enabler'),req);await entered;
-    let expectedCurrent=base;
-    try {
-      if(change==='revoke')value(await service.changeGrant(actor('director'),'business-enabler-rollback',{operationId:'rb-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));
-      if(change==='publish')expectedCurrent=value(await service.publish(actor('enabler'),next!.request)).releaseId!;
-      if(change==='cancel-target')expect(await service.cancel(actor('other'),{operationId:'rb-cancel-target',key:first.c.key})).toMatchObject({ok:false,reason:'ALREADY_PUBLISHED'});
-      if(change==='wrong-package'){
-        const b=(await admin.query('SELECT attachment_file_code FROM content_intake.review_bindings WHERE rollback_plan_id=$1',[p.rollbackPlanId])).rows[0];
-        provider.packages.set(b.attachment_file_code,Buffer.from('synthetic substitution'));
-      }
-      if(change==='expired-target'){
-        await admin.query(`INSERT INTO content_intake.approval_facts SELECT (jsonb_populate_record(NULL::content_intake.approval_facts,
-          to_jsonb(f)||jsonb_build_object('facts_version',facts_version+1,'checked_at',clock_timestamp(),'valid_until',clock_timestamp()+interval '0.1 seconds'))).*
-          FROM content_intake.approval_current cur JOIN content_intake.approval_facts f USING(review_request_id,facts_version)
-          JOIN content_intake.review_bindings r USING(review_request_id) WHERE r.candidate_id=$1`,[first.c.key.candidateId]);
-        await admin.query(`UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id IN
-          (SELECT review_request_id FROM content_intake.review_bindings WHERE candidate_id=$1)`,[first.c.key.candidateId]);
-        await admin.query('SELECT pg_sleep(0.15)');
-      }
-    } finally {release();}
-    const result=await pending;
-    if(change==='cancel-target'){expect(result).toMatchObject({ok:true});return;}
-    expect(result).toMatchObject({ok:false});expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(expectedCurrent);
-    expect((await admin.query("SELECT count(*) FROM content_intake.publications WHERE action='rollback'")).rows[0].count).toBe('0');
-  });
-  it('rollback: normal publication inherits independent review and source revocations through the restored lineage',async()=>{
-    const {p,req}=await readyRollback();const rolled=value(await service.rollback(actor('enabler'),req));
-    await expect(admin.query("SELECT content_intake.inherit_legacy_catalog($1,'unused')",[rolled.releaseId])).rejects.toMatchObject({code:'ZA003'});
-    const instance=provider.latest();const next=await publishable('after-rollback');const published=value(await service.publish(actor('enabler'),next.request));
-    const lineage=(await admin.query('SELECT release_id FROM content_intake.release_rollback_lineage ORDER BY release_id')).rows.map(r=>r.release_id);
-    expect(lineage.sort()).toEqual([rolled.releaseId,published.releaseId].sort());
-    instance.state='REVOKED';value(await service.refreshRollbackReview(actor('enabler'),p.rollbackPlanId,rollbackReviewRequest(p,'inherited-revoke',1)));
-    expect((await admin.query('SELECT release_id FROM content_intake.release_revocations ORDER BY release_id')).rows.map(r=>r.release_id).sort()).toEqual(lineage.sort());
-    expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_REVOKED'});
-  });
 
   it('rollback: a synthetic two-source catalog proves full impact authorization without exposing denied scopes',async()=>{
     await publicationBase();await cloneScopeGrants('b');let old='';let target='';
@@ -2238,35 +1996,15 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       SELECT 'rel_composite',nextval('public.content_release_seq'),'合成双来源差集','published',source_binding_hash,tenant_id FROM public.content_releases WHERE release_id=$1`,[old]);
     await admin.query(`INSERT INTO public.release_source_bindings SELECT 'rel_composite',domain,source_version_id FROM public.release_source_bindings WHERE release_id=$1`,[old]);
     await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES('rel_composite','intake-v2.1')");
-    await admin.query(`INSERT INTO content_intake.release_lineage SELECT 'rel_composite',source_id,business_entry_id,script_version,candidate_id,candidate_version,review_request_id,content_valid_until FROM content_intake.release_lineage WHERE release_id=$1`,[old]);
+    await admin.query(`INSERT INTO content_intake.release_lineage SELECT 'rel_composite',source_id,business_entry_id,script_version,candidate_id,candidate_version,review_request_id,content_valid_until,publication_policy FROM content_intake.release_lineage WHERE release_id=$1`,[old]);
     await admin.query("UPDATE public.content_current SET current_release_id='rel_composite' WHERE id=1");await admin.query('COMMIT');
     const full=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:'rel_composite',targetReleaseId:target}));
     expect(full.scopes.map(s=>s.sourceId)).toEqual(['source-a','source-b']);expect(full.requiresCorrectiveCandidate).toBe(false);
     value(await service.changeGrant(actor('director'),'business-enabler-rollback-b',{operationId:'partial-rb',expectedVersion:1,change:'revoke',reason:'合成部分权限',stewardPrincipalId:null}));
     const partial=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:'rel_composite',targetReleaseId:target}));
     expect(partial.scopes.map(s=>s.sourceId)).toEqual(['source-a']);expect(partial.requiresCorrectiveCandidate).toBe(true);
-    expect(await service.requestRollbackReview(actor('enabler'),partial.rollbackPlanId,rollbackReviewRequest(partial))).toMatchObject({ok:false,reason:'SCOPE_DENIED'});
+    expect(await service.rollback(actor('enabler'),{operationId:'partial-rollback',rollbackPlanId:partial.rollbackPlanId,baseReleaseId:'rel_composite',targetReleaseId:target,impactDigest:partial.impactDigest,confirmed:true})).toMatchObject({ok:false,reason:'SCOPE_DENIED'});
     expect((await admin.query('SELECT source_id FROM content_intake.rollback_scopes WHERE rollback_plan_id=$1 ORDER BY source_id',[partial.rollbackPlanId])).rows).toEqual([{source_id:'source-a'},{source_id:'source-b'}]);
-  });
-  it('rollback: normal publication and read eligibility cannot outlive inherited rollback approval',async()=>{
-    const {p,req}=await readyRollback();const rolled=value(await service.rollback(actor('enabler'),req));
-    const next=await publishable('after-expiry');
-    await admin.query(`INSERT INTO content_intake.approval_facts SELECT (jsonb_populate_record(NULL::content_intake.approval_facts,
-      to_jsonb(f)||jsonb_build_object('facts_version',facts_version+1,'checked_at',clock_timestamp(),'valid_until',clock_timestamp()+interval '0.1 seconds'))).*
-      FROM content_intake.approval_current cur JOIN content_intake.approval_facts f USING(review_request_id,facts_version)
-      JOIN content_intake.review_bindings r USING(review_request_id) WHERE r.rollback_plan_id=$1`,[p.rollbackPlanId]);
-    await admin.query(`UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id IN
-      (SELECT review_request_id FROM content_intake.review_bindings WHERE rollback_plan_id=$1)`,[p.rollbackPlanId]);await admin.query('SELECT pg_sleep(0.15)');
-    expect(await service.publish(actor('enabler'),next.request)).toMatchObject({ok:false,reason:'APPROVAL_UNAVAILABLE'});
-    expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_UNAVAILABLE'});
-    expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(rolled.releaseId);
-  });
-  it('rollback: original source approval revocation invalidates both original and restored releases',async()=>{
-    const {first,req}=await readyRollback();const rolled=value(await service.rollback(actor('enabler'),req));
-    const original=[...provider.instances.values()].find(i=>i.form.key?.candidateId===first.c.key.candidateId)!;
-    original.state='REVOKED';value(await refresh(first.c,'original-revoke'));
-    expect((await admin.query('SELECT 1 FROM content_intake.release_revocations WHERE release_id=$1',[rolled.releaseId])).rowCount).toBe(1);
-    expect(await issue()).toMatchObject({ok:false,reason:'APPROVAL_REVOKED'});
   });
 
   it('rollback: preview cannot retain a plan after its consumed grant expires before COMMIT',async()=>{
@@ -2535,27 +2273,21 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await issue()).toMatchObject({ok:false,code:'NOT_FOUND'});
   });
 
-  it.each(['grant','source','release','facts','approval-unavailable','approval-revoked'] as const)('usage: denies every page after %s changes', async change => {
+  it.each(['grant','source','source-mapping','release','facts'] as const)('usage: denies every page after %s changes', async change => {
     await publicationBase();const c=await publishable();value(await service.publish(actor('enabler'),c.request));
     const ent=value(await issue());value(await snapshot(ent.entitlementId));
     if (change==='grant') value(await service.changeGrant(actor('director'),'business-agent-query',
       {operationId:'usage-revoke',expectedVersion:1,change:'revoke',reason:'合成坐席撤权',stewardPrincipalId:null}));
     if (change==='source') await admin.query("UPDATE content_intake.sources SET revocation_generation=revocation_generation+1 WHERE source_id='source-a'");
+    if(change==='source-mapping'){
+      await admin.query("INSERT INTO content_intake.source_mappings SELECT source_id,2,template_version,rule_version,mapping_version,structure_digest FROM content_intake.source_mappings WHERE source_id='source-a'");
+      await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
+    }
     if (change==='release') await admin.query('INSERT INTO content_intake.release_revocations VALUES ($1,1,\'合成失效\',clock_timestamp())',[ent.releaseId]);
     if (change==='facts') {
       await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
         clock_timestamp()-interval '2 minutes',clock_timestamp()-interval '1 minute',repeat('b',64))`);
       await admin.query("UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='agent'");
-    }
-    if (change==='approval-revoked') { provider.latest().state='REVOKED';value(await refresh(c.c,'usage-revoked')); }
-    if (change==='approval-unavailable') {
-      // Simulates lost events + unavailable refresh after the last bounded fact.
-      await admin.query(`INSERT INTO content_intake.approval_facts SELECT (jsonb_populate_record(NULL::content_intake.approval_facts,
-        to_jsonb(f)||jsonb_build_object('facts_version',facts_version+1,'checked_at',clock_timestamp(),
-          'valid_until',clock_timestamp()+interval '0.2 seconds'))).*
-        FROM content_intake.approval_current cur JOIN content_intake.approval_facts f USING(review_request_id,facts_version)`);
-      await admin.query('UPDATE content_intake.approval_current SET facts_version=facts_version+1');
-      await admin.query('SELECT pg_sleep(0.25)');
     }
     expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false});
     if (change!=='source') expect(await issue()).toMatchObject({ok:false});
@@ -2695,7 +2427,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('2');
   });
 
-  it('capacity: measures tenfold publication history and a two-source CAS rereview without losing the other source', async () => {
+  it('capacity: measures tenfold publication history and a two-source CAS revision without losing the other source', async () => {
     await publicationBase();
     await cloneScopeGrants('b');
     const first = await publishable('race-a');
@@ -2703,16 +2435,16 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const before = performance.now();
     const published = value(await service.publish(actor('enabler'),first.request));
     expect(await service.publish(actor('enabler'),second.request)).toMatchObject({ok:false,reason:'BASE_CHANGED'});
-    expect(provider.instances.size).toBe(2);
+    expect(provider.instances.size).toBe(0);
     const corrected = await publishable('race-b-again',undefined,'b');
     const after = value(await service.publish(actor('enabler'),corrected.request));
-    expect(provider.instances.size).toBe(3);
+    expect(provider.instances.size).toBe(0);
     const lineage = (await admin.query(`SELECT to_jsonb(l)-'release_id' row FROM content_intake.release_lineage l
       WHERE source_id='source-a' AND release_id=ANY($1::text[]) ORDER BY release_id`,[[published.releaseId,after.releaseId]])).rows;
     expect(lineage).toHaveLength(2); expect(lineage[0]).toEqual(lineage[1]);
-    console.log(JSON.stringify({probe:'two-source-cas',initialReviews:2,extraReviews:1,
-      repeated:['parse-diff','source-confirmation','approval','quality'],syntheticElapsedMs:performance.now()-before,
-      humanApprovalWait:'not-measured',preservedOtherSource:true}));
+    console.log(JSON.stringify({probe:'two-source-cas',initialReviews:0,extraReviews:0,
+      repeated:['parse-diff','source-confirmation','quality'],syntheticElapsedMs:performance.now()-before,
+      publicationPolicy:'direct-v1',preservedOtherSource:true}));
     const start = performance.now();
     for (let n=3;n<=100;n++) {
       const next = await publishable(`history-${n}`, [['faq-one','合成问题',`合成修订 ${n}`,'','','分类','','启用','','','','','','','false']]);
@@ -2734,28 +2466,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       FROM content_intake.objects WHERE tenant_id='tenant-a'`);
     console.log(JSON.stringify({probe:'capacity-explain',plan:plan.rows[0]['QUERY PLAN']}));
   },180_000);
-
-  it('inherits another source unchanged and propagates its later approval revocation', async () => {
-    await publicationBase();
-    // Register a separate shop's grants before either review package is frozen.
-    await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
-      to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-b','scope_id','scope-b','source_id',CASE WHEN source_id IS NULL THEN NULL ELSE 'source-b' END,
-        'parent_grant_id',CASE WHEN parent_grant_id IS NULL THEN NULL ELSE parent_grant_id||'-b' END))).*
-      FROM content_intake.grants g ORDER BY (kind='allocation') DESC`);
-    const first=await publishable('shop-a');const firstInstance=provider.latest();
-    const r1=value(await service.publish(actor('enabler'),first.request));
-    const second=await publishable('shop-b',undefined,'b');
-    const r2=value(await service.publish(actor('enabler'),second.request));
-    const lineage=await admin.query(`SELECT to_jsonb(l)-'release_id' AS value FROM content_intake.release_lineage l
-      WHERE source_id='source-a' ORDER BY release_id`);
-    expect(lineage.rows).toHaveLength(2);expect(lineage.rows[0]).toEqual(lineage.rows[1]);
-    expect((await admin.query('SELECT source_id FROM content_intake.release_lineage WHERE release_id=$1 ORDER BY source_id',[r2.releaseId])).rows)
-      .toEqual([{ source_id:'source-a' },{ source_id:'source-b' }]);
-    firstInstance.state='REVOKED';
-    expect(value(await refresh(first.c,'revoke-inherited')).state).toBe('revoked');
-    expect((await admin.query('SELECT release_id FROM content_intake.release_revocations ORDER BY release_id')).rows)
-      .toEqual([r1.releaseId,r2.releaseId].sort().map(release_id=>({ release_id })));
-  });
 
   it('copies every existing legacy field from a different domain without manufacturing review evidence', async () => {
     await seedSyntheticG1aRelease(admin);
@@ -2781,7 +2491,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect((await admin.query('SELECT count(*) FROM public.owner_acceptance_records')).rows[0].count).toBe('0');
   });
 
-  it.each(['quality','publisher-revoked','reviewer-revoked','cancelled','source-version','revoked-approval','suspended-source'] as const)(
+  it.each(['quality','publisher-revoked','cancelled','source-version','suspended-source'] as const)(
     'publication rejects %s with zero release/ticket side effects', async gate => {
       await publicationBase(); const { c,request }=await publishable(gate);
       if (gate==='quality') {
@@ -2789,13 +2499,11 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         const req=await input('unreviewed-revision',c.key);req.baseReleaseId=request.baseReleaseId;
         const revision=value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',req)).jobId));
         value((await confirm(revision,'revision-source')).result);
-        value(await service.requestReview(actor('enabler'),reviewRequest(revision,0,'revision-review')));
-        provider.approve('reviewer');request.key=revision.key;
-      } else if (gate==='publisher-revoked' || gate==='reviewer-revoked') {
-        const id=gate==='publisher-revoked'?'business-enabler-publish':'business-reviewer-review';
+        request.key=revision.key;
+      } else if (gate==='publisher-revoked') {
+        const id='business-enabler-publish';
         value(await service.changeGrant(actor('director'),id,{ operationId:'gate-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null }));
       } else if (gate==='cancelled') value(await service.cancel(actor('other'),{ operationId:'gate-cancel',key:c.key }));
-      else if (gate==='revoked-approval') provider.latest().state='REVOKED';
       else if (gate==='suspended-source') await admin.query("SELECT public.suspend_authoritative_source('srcv_pub_aftersale','SOURCE_REVOKED','EVD-SYNTHETIC-REVOKE','synthetic-owner','owner')");
       else {
         await admin.query('BEGIN');
@@ -2841,20 +2549,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await restarted.operationReceipt(actor('other'),request.operationId,'publish')).toMatchObject({ ok:false });
   });
 
-  it.each(['cancel','revoke'] as const)('lets %s win while publication is observing approval without locks', async action => {
-    await publicationBase();const { c,request }=await publishable();
-    let reached!:()=>void;const observing=new Promise<void>(resolve=>{reached=resolve;});
-    let resume!:()=>void;const released=new Promise<void>(resolve=>{resume=resolve;});
-    const delayed=evidenceService({ ...provider.transport,async instance(b,signal) { reached();await released;return provider.transport.instance(b,signal); } });
-    const pending=delayed.publish(actor('enabler'),request);await observing;
-    try {
-      if (action==='cancel') value(await service.cancel(actor('other'),{ operationId:'racing-cancel',key:c.key }));
-      else value(await service.changeGrant(actor('director'),'business-enabler-publish',
-        { operationId:'racing-revoke',expectedVersion:1,change:'revoke',reason:'合成并发撤权',stewardPrincipalId:null }));
-    } finally { resume(); }
-    expect(await pending).toMatchObject({ ok:false });await noPublication();
-  });
-
   it('commits once when cancellation waits behind the final publication transaction', async () => {
     await publicationBase();const { c,request }=await publishable();
     let reached!:()=>void;const committing=new Promise<void>(resolve=>{reached=resolve;});
@@ -2877,7 +2571,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await cancel).toMatchObject({ ok:false,reason:'ALREADY_PUBLISHED' });
   });
 
-  it('requires a new candidate and approval after another candidate wins the same base', async () => {
+  it('requires a new candidate and quality checks after another candidate wins the same base', async () => {
     await publicationBase();const first=await publishable('base-one');const second=await publishable('base-two');
     value(await service.publish(actor('enabler'),first.request));
     expect(await service.publish(actor('enabler'),second.request)).toMatchObject({ ok:false,reason:'BASE_CHANGED' });
@@ -2894,25 +2588,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await service.publish(actor('enabler'),mixed.request)).toMatchObject({ ok:false,reason:'MODE_CONFLICT' });
     expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(base);
     expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('0');
-  });
-
-  it('rejects an exact but stale observation at the private commit boundary', async () => {
-    await publicationBase();const { c,request }=await publishable();
-    const fresh=value(await refresh(c,'before-expiry'));
-    // Append an intentionally old, otherwise valid observation. It is still
-    // inside the five-minute approval cache but outside the one-minute ticket.
-    await admin.query(`INSERT INTO content_intake.approval_facts SELECT review_request_id,facts_version+1,revocation_generation,state,
-      statement_timestamp()-interval '61 seconds',statement_timestamp()+interval '239 seconds',raw_facts_digest,package_verified_sha256,
-      human_task_id,reviewer_id,reviewer_facts_version,decided_at-interval '62 seconds'
-      FROM content_intake.approval_facts WHERE review_request_id=$1 ORDER BY facts_version DESC LIMIT 1`,[fresh.reviewRequestId]);
-    await admin.query('UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id=$1',[fresh.reviewRequestId]);
-    const old=(await admin.query('SELECT checked_at FROM content_intake.approval_facts WHERE review_request_id=$1 ORDER BY facts_version DESC LIMIT 1',[fresh.reviewRequestId])).rows[0].checked_at as Date;
-    // Use DB timestamp formatting to retain microseconds in the private probe.
-    const observed=(await admin.query(`SELECT $2::jsonb||jsonb_build_object('checkedAt',checked_at) AS value
-      FROM content_intake.approval_facts WHERE review_request_id=$1 ORDER BY facts_version DESC LIMIT 1`,[fresh.reviewRequestId,JSON.stringify({ ...fresh,checkedAt:old.toISOString() })])).rows[0].value;
-    await expect(admin.query('SELECT content_intake.publish_candidate($1,$2::jsonb,$3::jsonb)',
-      ['enabler',JSON.stringify(request),JSON.stringify(observed)])).rejects.toMatchObject({ message:'TICKET_EXPIRED' });
-    await noPublication();
   });
 
   it('freezes quality before individual checks, survives service recreation and creates no approval or release', async () => {
@@ -3074,10 +2749,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   it('critical quality population requires every live entry and does not fabricate owner acceptance', async () => {
     const c = await candidate();
     value((await confirm(c)).result);
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('reviewer');
-    value(await refresh(c));
-    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,c.key.version)).state).toBe('ready');
+    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,c.key.version)).readinessReasons).toContain('QUALITY_NOT_PASSED');
     const p = value(await service.qualityPreview(actor('reviewer'),c.key));
     expect(p).toMatchObject({ ordinaryCount:0,mandatoryCount:1,initialTarget:0,expandedTarget:0 });
     expect(p.initialScriptIds).toEqual(p.population.map(r => r.script_id));
@@ -3265,7 +2937,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const c = await candidate();
     expect(c.state).toBe('awaiting-evidence');
     expect(c.key.version).toBe(1);
-    expect(c.readinessReasons).toContain('AWAITING_APPROVAL');
+    expect(c.readinessReasons).toContain('QUALITY_NOT_PASSED');
+    expect(c.publicationPolicy).toBe('direct-v1');
     value(await service.candidate(actor('other'), c.key.candidateId, 1));
     expect(await service.candidate(actor('agent'), c.key.candidateId, 1)).toMatchObject({ ok: false, code: 'NOT_FOUND' });
     const persisted = (await admin.query('SELECT * FROM content_intake.candidate_versions WHERE candidate_id=$1', [c.key.candidateId])).rows[0];
@@ -3372,326 +3045,207 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await waiting).toMatchObject({ ok: false, reason: 'ORG_FACTS_UNAVAILABLE' });
     expect((await admin.query("SELECT count(*) FROM content_intake.grants WHERE recipient_id='manager'")).rows[0].count).toBe('0');
   });
-
-  it('round-trips the full review package and reaches ready with independent source confirmation and routine self-review', async () => {
-    const c = await routine();
-    const before = (await admin.query('SELECT canonical_material FROM content_intake.candidate_versions')).rows[0].canonical_material;
-    const r = value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    const bytes = await store.readPayload(r.reviewPackageObjectId);
-    expect(digest(bytes)).toBe(r.reviewPackageSha256);
-    const actual = JSON.parse(provider.packages.get(provider.latest().attachmentFileCode)!.toString());
-    expect(actual).toMatchObject({ format:'intake-review-package-v1',key:c.key,material:{ contributors:['enabler','other'],
-      entries:[{ answerText:'第一行。\n第二行。',internalNote:'内部说明' }],risk:{ level:'routine' } } });
-    expect(actual.material.differences).toHaveLength(1);
-    provider.approve('enabler');
-    expect(value(await refresh(c)).state).toBe('approved');
-    expect(value(await service.candidate(actor('other'),c.key.candidateId,1)).readinessReasons).toEqual(['SOURCE_CONFIRMATION_REQUIRED']);
-    const confirmation = await confirm(c);
-    expect(value(confirmation.result)).toMatchObject({ state:'ready',sourceEvidenceVersion:1,approvalEvidenceVersion:1,key:c.key });
-    expect(value(await service.confirmSource(actor('enabler'),confirmation.req)).state).toBe('ready');
-    expect((await admin.query('SELECT canonical_material FROM content_intake.candidate_versions')).rows[0].canonical_material).toBe(before);
-    expect((await admin.query("SELECT response->>'reason' AS reason FROM backend_review.receipts WHERE operation='intake:source-confirm'")).rows[0].reason).toBe('合成人工确认来源');
-    expect((await admin.query('SELECT count(*) FROM public.import_batches')).rows[0].count).toBe('0');
-    expect((await admin.query('SELECT count(*) FROM public.content_releases')).rows[0].count).toBe('0');
-  });
-
-  it('requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility', async () => {
-    const c = await candidate();
-    value((await confirm(c)).result);
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    for (const contributor of ['enabler','other']) {
-      provider.approve(contributor);
-      expect(await refresh(c,`self-${contributor}`)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    }
-    provider.approve('reviewer');
-    expect(value(await refresh(c)).state).toBe('approved');
-    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,1)).state).toBe('ready');
-    value(await service.changeGrant(actor('director'),'business-reviewer-review',
-      { operationId:'revoke-reviewer',expectedVersion:1,change:'revoke',stewardPrincipalId:null,reason:'合成审核者撤权' }));
-    // Historical PASS stays valid; it cannot authorize a new publication by an ineligible reviewer.
-    expect(value(await refresh(c,'after-revocation')).state).toBe('approved');
-    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,1))).toMatchObject({ state:'awaiting-evidence',readinessReasons:['PERMISSION_CHANGED'] });
-  });
-
-  it('rejects a historical PASS before the review grant or before the qualifying role existed', async () => {
-    const c = await routine();
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    const old = new Date(Date.now()-30_000).toISOString();
-    provider.approve('reviewer',old);
-    expect(await refresh(c)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    const beforeGrant = new Date((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time).toISOString();
-    value(await service.grantBatch(actor('director'),batch('manager','review','business','late-review-grant')));
-    provider.approve('manager',beforeGrant);
-    expect(await refresh(c,'before-grant')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-supervisor',2,'agent') ON CONFLICT (tenant_id,app_id,department_id,job_id) DO UPDATE SET role='agent',policy_version=2");
-    const duringAgentRole = new Date((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time).toISOString();
-    await admin.query("UPDATE content_intake.role_rules SET role='supervisor',policy_version=3 WHERE job_id='job-supervisor'");
-    provider.approve('reviewer',duringAgentRole);
-    expect(await refresh(c,'before-role')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
-  });
-
-  it('rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence', async () => {
-    const c = await routine();
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('enabler');
-    const r = value(await refresh(c));
-    const instance = provider.latest();
-    const original = structuredClone(instance);
-    for (const [field,wrong] of [['tenantId','tenant-b'],['appId','app-b'],['nodeId','auto-node'],['createUuid','wrong-uuid'],['instanceCode','wrong-instance']] as const) {
-      instance[field]=wrong;
-      expect(await refresh(c,`wrong-${field}`)).toMatchObject({ ok:false,reason:'APPROVAL_BINDING' });
-      Object.assign(instance,structuredClone(original));
-    }
-    instance.form.key!.digest='b'.repeat(64);
-    expect(await refresh(c,'wrong-form')).toMatchObject({ ok:false,reason:'APPROVAL_BINDING' });
-    Object.assign(instance,structuredClone(original));
-    instance.task!.kind='AUTO_PASS';
-    expect(await refresh(c,'auto-pass')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    Object.assign(instance,structuredClone(original));
-    instance.timeline[0]!.taskId='different-task';
-    expect(await refresh(c,'wrong-timeline')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    Object.assign(instance,structuredClone(original));
-    const bytes = provider.packages.get(instance.attachmentFileCode)!;
-    const corrupt = Buffer.from(bytes); corrupt[corrupt.length-2]=33;
-    provider.packages.set(instance.attachmentFileCode,corrupt);
-    expect(await refresh(c,'wrong-attachment')).toMatchObject({ ok:false,reason:'ATTACHMENT_UNVERIFIED' });
-    expect(value(await service.review(actor('other'),c.key)).validUntil).toBe(r.validUntil);
-    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('1');
-    expect(await service.refreshReview(actor('enabler'),{ ...reviewRequest(c,1,'forged-json'),approved:true })).toMatchObject({ ok:false,code:'VALIDATION' });
-  });
-
-  it('persists creation before I/O and recovers a lost provider response with one UUID across restart', async () => {
-    const c = await routine();
-    let lose = true;
-    const transport: ApprovalTransport = { ...provider.transport,async create(b,bytes,signal) {
-      expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings WHERE create_uuid=$1',[b.createUuid])).rows[0].count).toBe('1');
-      await admin.query('BEGIN');
-      try { expect((await admin.query('SELECT pg_try_advisory_xact_lock(724019,1) AS unlocked')).rows[0].unlocked).toBe(true); }
-      finally { await admin.query('ROLLBACK'); }
-      const result = await provider.transport.create(b,bytes,signal);
-      if (lose) { lose=false; throw new Error('synthetic provider lost creation response'); }
-      return result;
-    } };
-    const req = reviewRequest(c);
-    const first = value(await evidenceService(transport).requestReview(actor('enabler'),req));
-    expect(first.state).toBe('creating');
-    expect(await service.requestReview(actor('enabler'),reviewRequest(c,1,'new-key'))).toMatchObject({ ok:false,reason:'COMMIT_UNKNOWN' });
-    const recovered = value(await evidenceService(transport).requestReview(actor('enabler'),req));
-    expect(recovered).toMatchObject({ reviewRequestId:first.reviewRequestId,evidenceVersion:1,reviewPackageSha256:first.reviewPackageSha256 });
-    expect(recovered.instanceCode).not.toBeNull();
-    expect(provider.instances.size).toBe(1);
-    value(await evidenceService(transport).requestReview(actor('enabler'),req));
-    expect(provider.calls()).toBe(2);
-    expect(await service.requestReview(actor('enabler'),{ ...req,expectedEvidenceVersion:1 })).toMatchObject({ ok:false,reason:'IDEMPOTENCY_CONFLICT' });
-  });
-
-  it('invalidates approval work when cancellation or source evidence wins during external I/O', async () => {
-    const c = await routine();
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('enabler');
-    let during: () => Promise<void> = async () => { value((await confirm(c)).result); };
-    const delayed = evidenceService({ ...provider.transport,async instance(b,signal) {
-      const snapshot = await provider.transport.instance(b,signal);
-      await during(); return snapshot;
-    } });
-    expect(await delayed.refreshReview(actor('other'),reviewRequest(c,1,'source-race'))).toMatchObject({ ok:false,reason:'APPROVAL_CHANGED' });
-    during = async () => { value(await service.cancel(actor('other'),{ operationId:'cancel-during-review',key:c.key })); };
-    expect(await delayed.refreshReview(actor('other'),reviewRequest(c,1,'cancel-race'))).toMatchObject({ ok:false,reason:'MATERIAL_CHANGED' });
-    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
-  });
-
-  it('serializes concurrent review replacement and prevents old evidence from marking the candidate ready', async () => {
-    const c = await routine();
-    value((await confirm(c)).result);
-    const requests = await Promise.all([service.requestReview(actor('enabler'),reviewRequest(c)),
-      evidenceService().requestReview(actor('other'),reviewRequest(c,0,'other-request'))]);
-    expect(requests.filter(r => r.ok)).toHaveLength(1);
-    expect((await admin.query('SELECT count(*) FROM content_intake.review_bindings')).rows[0].count).toBe('1');
-    provider.approve('enabler');
-    value(await refresh(c));
-    value(await service.requestReview(actor('enabler'),reviewRequest(c,1,'replace')));
-    expect(await refresh(c,'old-evidence')).toMatchObject({ ok:false,reason:'APPROVAL_CHANGED' });
-    expect(value(await service.candidate(actor('other'),c.key.candidateId,1)).state).toBe('awaiting-evidence');
-    expect((await admin.query('SELECT digest FROM content_intake.candidate_versions')).rows[0].digest).toBe(c.key.digest);
-  });
-
-  it('keeps revoked evidence terminal and rejects a late approved response from another service', async () => {
-    const c = await routine();
-    value((await confirm(c)).result);
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('enabler');
-    value(await refresh(c));
-    const delayed = evidenceService({ ...provider.transport,async instance(b,signal) {
-      const snapshot = await provider.transport.instance(b,signal);
-      provider.latest().state='REVOKED';
-      expect(value(await refresh(c,'revoke')).state).toBe('revoked');
-      return snapshot;
-    } });
-    const late = await delayed.refreshReview(actor('other'),reviewRequest(c,1,'late-approval'));
-    expect(late,JSON.stringify(diagnostics.map(e => e instanceof Error ? e.message : e))).toMatchObject({ ok:false,reason:'APPROVAL_CHANGED' });
-    expect(value(await service.candidate(actor('enabler'),c.key.candidateId,1)).readinessReasons).toEqual(['APPROVAL_REVOKED']);
-    provider.approve('enabler');
-    expect(await refresh(c,'resurrect')).toMatchObject({ ok:false,reason:'APPROVAL_REVOKED' });
-    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('2');
-  });
-
-  it('recovers an approval COMMIT with the original operation even when the provider is now unavailable', async () => {
-    const c = await routine();
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('enabler');
-    let finishing = false;
-    let lost = false;
-    const uncertain = { async connect() {
-      const client = await pool.connect();
-      return new Proxy(client,{ get(target,key) {
-        if (key === 'query') return async (sql: string,values?: unknown[]) => {
-          const result = await target.query(sql,values);
-          if (sql.startsWith('INSERT INTO content_intake.approval_facts')) finishing=true;
-          if (sql === 'COMMIT' && finishing && !lost) { lost=true; throw new Error('synthetic lost approval COMMIT'); }
-          return result;
-        };
-        const member: unknown = Reflect.get(target,key);
-        return typeof member === 'function' ? member.bind(target) : member;
-      } }) as PoolClient;
-    } };
-    const req = reviewRequest(c,1,'unknown-refresh');
-    expect(await createContentIntakeService(uncertain,store,undefined,createApprovalAdapter(route,provider.transport)).refreshReview(actor('other'),req))
-      .toMatchObject({ ok:false,commit:'unknown' });
-    const after = evidenceService({ ...provider.transport,async instance() { throw new Error('must replay without provider'); } });
-    expect(value(await after.refreshReview(actor('other'),req)).state).toBe('approved');
-    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('1');
-  });
-
-  it('projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation', async () => {
-    const c = await routine();
-    const confirmed = await confirm(c);
-    value(confirmed.result);
-    expect(await service.confirmSource(actor('enabler'),{ ...confirmed.req,operationId:'stale-source' })).toMatchObject({ ok:false,reason:'SOURCE_MISMATCH' });
-    expect(await service.confirmSource(actor('enabler'),{ ...confirmed.req,operationId:'wrong-file',expectedEvidenceVersion:1,objectSha256:'b'.repeat(64) })).toMatchObject({ ok:false,reason:'SOURCE_MISMATCH' });
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('enabler');
-    value(await refresh(c));
-    await admin.query(`INSERT INTO content_intake.approval_facts SELECT review_request_id,2,revocation_generation,state,
-      statement_timestamp()-interval '299 seconds',statement_timestamp()+interval '0.1 seconds',raw_facts_digest,
-      package_verified_sha256,human_task_id,reviewer_id,reviewer_facts_version,statement_timestamp()-interval '299 seconds'
-      FROM content_intake.approval_facts WHERE facts_version=1`);
-    await admin.query('UPDATE content_intake.approval_current SET facts_version=2');
-    await admin.query('SELECT pg_sleep(0.15)');
-    const old = value(await service.review(actor('other'),c.key));
-    expect(old.state).toBe('unavailable');
-    expect(value(await service.candidate(actor('other'),c.key.candidateId,1))).toMatchObject({ state:'awaiting-evidence',readinessReasons:['APPROVAL_UNAVAILABLE'] });
-    const calls = provider.instanceCalls();
-    value(await service.review(actor('other'),c.key));
-    expect(provider.instanceCalls()).toBe(calls);
-    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('2');
-  });
-
-  it('inherits exact candidate and approval lineage and propagates later revocation to both releases', async () => {
-    const c = await routine();
-    value((await confirm(c)).result);
-    const r = value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('enabler');
-    value(await refresh(c));
-    // Seed real four-domain release rows via the existing test support. This tests
-    // revocation propagation through the legacy writer, independently of native publication.
-    await seedSyntheticG1aRelease(admin);
-    const original = (await admin.query('SELECT release_id FROM public.content_releases')).rows[0].release_id as string;
-    await admin.query('BEGIN');
-    await admin.query("SELECT set_config('app.publishing','on',true)");
-    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,status,source_binding_hash)
-      SELECT 'inherited-synthetic-release',2,'published',source_binding_hash FROM public.content_releases WHERE release_id=$1`,[original]);
-    await admin.query(`INSERT INTO public.release_source_bindings(release_id,domain,source_version_id)
-      SELECT 'inherited-synthetic-release',domain,source_version_id FROM public.release_source_bindings WHERE release_id=$1`,[original]);
-    await admin.query('COMMIT');
-    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[original]);
-    await admin.query(`INSERT INTO content_intake.release_lineage VALUES ($1,'source-a','faq-one',1,$2,1,$3,'2099-01-01T00:00:00Z')`,[original,c.key.candidateId,r.reviewRequestId]);
-    await admin.query('BEGIN');
-    await admin.query('SELECT backend_review.lock_content()');
-    await admin.query("SELECT content_intake.inherit_legacy_catalog($1,'inherited-synthetic-release')",[original]);
-    await admin.query('COMMIT');
-    const inherited = await admin.query(`SELECT to_jsonb(l)-'release_id' AS lineage
-      FROM content_intake.release_lineage l ORDER BY release_id`);
-    expect(inherited.rows).toHaveLength(2);
-    expect(inherited.rows[0]).toEqual(inherited.rows[1]);
-    provider.latest().state='REVOKED';
-    expect(value(await refresh(c,'cascade-revoke')).state).toBe('revoked');
-    const revoked = (await admin.query('SELECT release_id,reason FROM content_intake.release_revocations ORDER BY release_id')).rows;
-    expect(revoked).toEqual([original,'inherited-synthetic-release'].sort().map(release_id => ({ release_id,reason:'APPROVAL_REVOKED' })));
-    value(await refresh(c,'repeated-revoke'));
-    expect((await admin.query('SELECT count(*) FROM content_intake.release_revocations')).rows[0].count).toBe('2');
-  });
-
-  it('binds evidence freshness to verification start and leaves no locks held while reading the provider', async () => {
-    const c = await routine();
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    provider.approve('enabler');
-    let finished = 0;
-    const delayed = evidenceService({ ...provider.transport,async instance(b,signal) {
-      await admin.query('BEGIN');
-      try {
-        expect((await admin.query('SELECT pg_try_advisory_xact_lock(724019,1) AS unlocked')).rows[0].unlocked).toBe(true);
-        await admin.query('SELECT pg_sleep(0.1)');
-        finished = new Date((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time).getTime();
-      } finally { await admin.query('ROLLBACK'); }
-      return provider.transport.instance(b,signal);
-    } });
-    const r = value(await delayed.refreshReview(actor('other'),reviewRequest(c,1,'slow-verification')));
-    expect(Date.parse(r.validUntil!)-Date.parse(r.checkedAt!)).toBe(300_000);
-    expect(finished-Date.parse(r.checkedAt!)).toBeGreaterThanOrEqual(90);
-  });
-
-  it.each(['facts-expire','facts-disabled','grant-expires'] as const)('rejects ambiguous sub-millisecond eligibility: %s', async kind => {
-    const c = await routine();
-    const at = new Date(Date.now()+250).toISOString();
-    if (kind === 'grant-expires') {
-      await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成精度边界' WHERE grant_id='business-reviewer-review'");
-      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id,steward_id)
-        VALUES ('fractional-expiry','business','director','reviewer','tenant-a','app-a','scope-a','source-a','review',clock_timestamp(),$1::timestamptz+interval '0.2 milliseconds','合成自然到期','root-review','director')`,[at]);
-    } else {
-      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',2,ARRAY['dept-a'],'job-supervisor',$2,
-        $1::timestamptz+CASE WHEN $2 THEN interval '-10 milliseconds' ELSE interval '0.2 milliseconds' END,
-        $1::timestamptz+CASE WHEN $2 THEN interval '0.2 milliseconds' ELSE interval '1 minute' END,repeat('b',64))`,[at,kind === 'facts-expire']);
-      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',3,ARRAY['dept-a'],'job-supervisor',true,
-        $1::timestamptz+interval '1 millisecond',$1::timestamptz+interval '1 minute',repeat('c',64))`,[at]);
-      await admin.query("UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='reviewer'");
-    }
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    await admin.query('SELECT pg_sleep(0.3)');
-    provider.approve('reviewer',at);
-    expect(await refresh(c)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
-  });
-
-  it('does not backdate authority from an uncommitted grant and recovers with a new review after commit', async () => {
-    const c = await routine();
-    value(await service.requestReview(actor('enabler'),reviewRequest(c)));
-    let reached!: () => void;
-    const written = new Promise<void>(resolve => { reached=resolve; });
-    let release!: () => void;
-    const gate = new Promise<void>(resolve => { release=resolve; });
-    const paused = { async connect() {
-      const client = await pool.connect();
-      return new Proxy(client,{ get(target,key) {
-        if (key === 'query') return async (sql: string,values?: unknown[]) => {
-          const result = await target.query(sql,values);
-          if (sql.startsWith('INSERT INTO backend_review.receipts') && values?.[1] === 'intake:grants') { reached(); await gate; }
-          return result;
-        };
-        const member: unknown = Reflect.get(target,key);
-        return typeof member === 'function' ? member.bind(target) : member;
-      } }) as PoolClient;
-    } };
-    const pending = createContentIntakeService(paused,store).grantBatch(actor('director'),batch('manager','review'));
-    await written;
+  it.each(['director','manager','supervisor','enabler'] as const)('direct HTTP: %s uploads, passes real quality checks and publishes without approval', async id => {
+    await publicationBase();
+    if(id==='director')await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,to_jsonb(g)||jsonb_build_object('grant_id','manager-root-'||action,'recipient_id','manager'))).* FROM content_intake.grants g WHERE kind='allocation' AND recipient_id='director'`);
+    if (id !== 'enabler') await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+      to_jsonb(g)||jsonb_build_object('grant_id','four-post-'||$1||'-'||action,'recipient_id',$1::text,'issuer_id',CASE WHEN $1='director' THEN 'manager' ELSE issuer_id END,'parent_grant_id',CASE WHEN $1='director' THEN 'manager-root-'||action ELSE parent_grant_id END))).*
+      FROM content_intake.grants g WHERE recipient_id='enabler' AND kind='business'`,[id]);
+    const host=await managementHost(store,pool,provider.transport,label,id);
     try {
-      await admin.query('SELECT pg_sleep(0.01)');
-      provider.approve('manager');
-    } finally { release(); }
-    value(await pending);
-    expect(await refresh(c)).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    value(await service.requestReview(actor('enabler'),reviewRequest(c,1,'after-grant-commit')));
-    provider.approve('manager');
-    expect(value(await refresh(c,'qualified-later',2)).state).toBe('approved');
+      const f=await httpCandidate(host,`four-post-${id}`);expect(f.c.publicationPolicy).toBe('direct-v1');
+      expect(f.c.approvalEvidenceVersion).toBe(0);expect(f.c.readinessReasons).not.toContain('AWAITING_APPROVAL');
+      await httpConfirm(f);await httpQuality(host,f.c);
+      const published=await f.post('publish',f.publish);expect(published.status,JSON.stringify({body:await published.clone().text(),diagnostics:diagnostics.map(e=>String(e))})).toBe(202);
+      const receipt=parseContractSchema('IntakeReceipt',await published.json());
+      const headers={authorization:`Bearer ${(await seat('agent')).token}`,'content-type':'application/json'};
+      const issued=await host.app.inject({method:'POST',url:'/v1/intake/entitlements',headers,payload:{...usage,releaseId:receipt.releaseId}});
+      expect(issued.statusCode,issued.body).toBe(200);
+      const page=await host.app.inject({url:`/v1/intake/snapshot?entitlementId=${issued.json<C['IntakeEntitlement']>().entitlementId}`,headers});
+      expect(page.statusCode,page.body).toBe(200);expect(page.json<C['IntakeSnapshot']>().faq[0]?.entry.answerText).toBe('第一行。\n第二行。');
+      for(const table of ['review_bindings','approval_facts','release_rollback_lineage'])expect((await admin.query(`SELECT count(*) FROM content_intake.${table}`)).rows[0].count).toBe('0');
+      expect((await admin.query(`SELECT publication_policy,confirmed_at IS NOT NULL AS confirmed FROM content_intake.publications`)).rows).toEqual([{publication_policy:'direct-v1',confirmed:true}]);
+      expect((await admin.query(`SELECT reviewer_facts_version,reviewer_generation,approval_facts_version,approval_generation,publication_policy FROM content_intake.commit_tickets`)).rows).toEqual([
+        {reviewer_facts_version:null,reviewer_generation:null,approval_facts_version:null,approval_generation:null,publication_policy:'direct-v1'}]);
+      expect(provider.calls()).toBe(0);
+    }finally{await host.app.close();}
+  },40_000);
+
+  it('direct HTTP: disabled approval commands, invalid confirmation and query-only identities cannot create writes',async()=>{
+    await publicationBase();const host=await managementHost();
+    try{
+      const f=await httpCandidate(host,'direct-denials');
+      for(const suffix of ['review','review/refresh']){
+        const result=await f.post(suffix,reviewRequest(f.c));expect(result.status).toBe(409);
+        expect(await result.json()).toMatchObject({error:{code:'CONFLICT',details:{reason:'MODE_CONFLICT'}}});
+      }
+      const {confirmed: _confirmed,...missing}=f.publish;
+      for(const body of [missing,{...f.publish,confirmed:false},{...f.publish,confirmed:'true'},{...f.publish,approvalEvidenceVersion:1},{...f.publish,publicationPolicy:'approval-v1'}])expect((await f.post('publish',body)).status).toBe(400);
+      for(const id of ['agent','legacy-enabler']){
+        const headers={authorization:`Bearer ${(await seat(id)).token}`};
+        expect((await f.post('publish',f.publish,headers)).status).toBe(404);
+        const form=new FormData();form.set('operationId',`denied-upload-${id}`);form.set('file',new Blob([new Uint8Array(await httpWorkbook())]),'synthetic.xlsx');
+        expect((await fetch(`${host.origin}/v1/intake/sources/source-a/objects`,{method:'POST',headers,body:form})).status).toBe(404);
+      }
+      expect(provider.calls()).toBe(0);await noPublication();
+    }finally{await host.app.close();}
   });
+
+  it('direct publication rolls every write back when its consumed authority expires before COMMIT',async()=>{
+    await publicationBase();const {request}=await publishable('late-authority');
+    value(await service.changeGrant(actor('director'),'business-enabler-publish',{operationId:'replace-publish-grant',expectedVersion:1,change:'revoke',reason:'合成到期检查',stewardPrincipalId:null}));
+    await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+      VALUES('short-publish','business','director','enabler','tenant-a','app-a','scope-a','source-a','publish',clock_timestamp()-interval '1 second',clock_timestamp()+interval '0.3 seconds','合成短授权','director','root-publish')`);
+    const delayed:IntakePool={async connect(){const client=await pool.connect();return new Proxy(client,{get(target,key){
+      if(key==='query')return async(sql:string,args?:unknown[])=>{const result=await target.query(sql,args);if(sql.includes('SELECT content_intake.publish_candidate('))await target.query('SELECT pg_sleep(0.35)');return result;};
+      const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+    }})as PoolClient;}};
+    expect(await createContentIntakeService(delayed,store).publish(actor('enabler'),request)).toMatchObject({ok:false,commit:'rolled_back'});await noPublication();
+  });
+
+  it('direct publication keeps a currently live content deadline through the final COMMIT',async()=>{
+    await publicationBase();
+    const boundary=new Date(Math.ceil(Date.now()/1000)*1000+3_000).toISOString();
+    const {request}=await publishable('late-content',[
+      ['faq-one','合成限时问题','合成正文','','','分类','','启用','2020-01-01T00:00:00Z',boundary.replace('.000Z','Z'),'','','','','false'],
+    ]);
+    let reachedFinalWrite=false;
+    const delayed:IntakePool={async connect(){const client=await pool.connect();return new Proxy(client,{get(target,key){
+      if(key==='query')return async(sql:string,args?:unknown[])=>{const result=await target.query(sql,args);
+        if(sql.includes('SELECT content_intake.publish_candidate(')){reachedFinalWrite=true;await target.query('SELECT pg_sleep($1)',[Math.max(0,Date.parse(boundary)-Date.now())/1000+0.05]);}return result;};
+      const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+    }})as PoolClient;}};
+    expect(await createContentIntakeService(delayed,store).publish(actor('enabler'),request)).toMatchObject({ok:false,commit:'rolled_back'});
+    expect(reachedFinalWrite).toBe(true);
+    await noPublication();
+  });
+
+  // Explicit historical fixture: immutable approval-v1 records are inserted as
+  // pre-existing history. No application API creates an approval or changes policy.
+  async function legacyHistory(label='legacy') {
+    const inputRequest=await input(`${label}-input`,null,[['faq-one','合成问题','第一行。\n第二行。','','','分类','','启用','','','','内部说明','','','false']]);
+    inputRequest.baseReleaseId=(await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id??null;
+    const c=value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',inputRequest)).jobId));
+    const confirmed=value((await confirm(c,`${label}-source`)).result);
+    const id=`history-${label}`,reviewId=`history-review-${label}`;
+    await admin.query(`INSERT INTO content_intake.candidate_versions(candidate_id,version,source_id,scope_id,source_version,object_id,file_sha256,actor_id,base_release_id,
+      canonical_encoding,canonical_material,material,risk,explicit_disable_count,state,source_evidence_version,approval_evidence_version,revocation_generation,created_at,updated_at,publication_policy)
+      SELECT $2,version,source_id,scope_id,source_version,object_id,file_sha256,actor_id,base_release_id,canonical_encoding,canonical_material,material,risk,explicit_disable_count,
+      'awaiting-evidence',0,0,0,created_at,updated_at,'approval-v1' FROM content_intake.candidate_versions WHERE candidate_id=$1`,[c.key.candidateId,id]);
+    await admin.query(`INSERT INTO content_intake.source_confirmations SELECT (jsonb_populate_record(NULL::content_intake.source_confirmations,
+      to_jsonb(e)||jsonb_build_object('candidate_id',$2::text))).* FROM content_intake.source_confirmations e WHERE candidate_id=$1`,[c.key.candidateId,id]);
+    const bytes=Buffer.from(JSON.stringify({format:'historical-synthetic-review',candidateId:id}));
+    const object=await store.persist((async function*(){yield bytes;})(),'csv');
+    await admin.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
+      VALUES($1,'source-a','enabler','tenant-a','app-a',$2,$3,$4,'application/json','review-package',clock_timestamp()-interval '10 seconds')`,[object.objectId,`intake/${object.objectId}`,object.sha256,object.sizeBytes]);
+    await admin.query(`INSERT INTO content_intake.review_bindings(review_request_id,candidate_id,candidate_version,candidate_digest,evidence_version,tenant_id,app_id,definition_id,node_id,create_uuid,instance_code,package_object_id,package_sha256,attachment_file_code)
+      VALUES($1,$2,1,$3,1,'tenant-a','app-a','historical-definition','human-node',gen_random_uuid(),$4,$5,$6,'historical-attachment')`,[reviewId,id,c.key.digest,`instance-${label}`,object.objectId,object.sha256]);
+    await admin.query(`INSERT INTO content_intake.approval_facts VALUES($1,1,0,'approved',clock_timestamp(),clock_timestamp()+interval '299 seconds',repeat('a',64),$2,'historical-human-task','reviewer',1,clock_timestamp()-interval '1 second')`,[reviewId,object.sha256]);
+    await admin.query('INSERT INTO content_intake.approval_current VALUES($1,1)',[reviewId]);
+    await admin.query("UPDATE content_intake.candidate_versions SET source_evidence_version=1,approval_evidence_version=1,revocation_generation=1,state='ready' WHERE candidate_id=$1",[id]);
+    await admin.query("UPDATE content_intake.candidate_versions SET state='publishing' WHERE candidate_id=$1",[id]);
+    await admin.query("UPDATE content_intake.candidate_versions SET state='published' WHERE candidate_id=$1",[id]);
+    return {key:{...confirmed.key,candidateId:id},reviewId,object,original:c};
+  }
+  async function legacyRelease(h:Awaited<ReturnType<typeof legacyHistory>>,id='rel_legacy_history'){
+    await admin.query('BEGIN');await admin.query("SELECT set_config('app.publishing','on',true)");
+    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,title,status,source_binding_hash,tenant_id)
+      SELECT $1,nextval('public.content_release_seq'),'合成历史审批目录','published',source_binding_hash,tenant_id FROM public.content_releases WHERE release_id='rel_native_base'`,[id]);
+    await admin.query(`INSERT INTO public.release_source_bindings SELECT $1,domain,source_version_id FROM public.release_source_bindings WHERE release_id='rel_native_base'`,[id]);
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES($1,'intake-v2.1')",[id]);
+    await admin.query(`INSERT INTO content_intake.release_lineage(release_id,source_id,business_entry_id,script_version,candidate_id,candidate_version,review_request_id,content_valid_until,publication_policy)
+      VALUES($1,'source-a','faq-one',1,$2,1,$3,'infinity','approval-v1')`,[id,h.key.candidateId,h.reviewId]);
+    await admin.query('UPDATE public.content_current SET current_release_id=$1 WHERE id=1',[id]);await admin.query('COMMIT');return id;
+  }
+  async function changeHistoricalApproval(reviewId:string,state:'revoked'|'expired'){
+    await admin.query(`INSERT INTO content_intake.approval_facts SELECT (jsonb_populate_record(NULL::content_intake.approval_facts,to_jsonb(f)||jsonb_build_object(
+      'facts_version',facts_version+1,'revocation_generation',revocation_generation+1,'state',$2::text,
+      'decided_at',clock_timestamp()-interval '3 seconds','checked_at',clock_timestamp()-interval '2 seconds','valid_until',CASE WHEN $3 THEN clock_timestamp()-interval '1 second' ELSE clock_timestamp()+interval '297 seconds' END))).*
+      FROM content_intake.approval_current p JOIN content_intake.approval_facts f USING(review_request_id,facts_version) WHERE review_request_id=$1`,[reviewId,state==='revoked'?'revoked':'approved',state==='expired']);
+    await admin.query('UPDATE content_intake.approval_current SET facts_version=facts_version+1 WHERE review_request_id=$1',[reviewId]);
+  }
+
+  it.each(['revoked','expired']as const)('legacy history: mixed direct catalog never revives %s approval during read, publish or rollback',async state=>{
+    await publicationBase();const h=await legacyHistory();const old=await legacyRelease(h);await cloneScopeGrants('b');
+    const next=await publishable('mixed-source-b',undefined,'b');const mixed=value(await service.publish(actor('enabler'),next.request)).releaseId!;
+    expect((await admin.query('SELECT source_id,publication_policy FROM content_intake.release_lineage WHERE release_id=$1 ORDER BY source_id',[mixed])).rows)
+      .toEqual([{source_id:'source-a',publication_policy:'approval-v1'},{source_id:'source-b',publication_policy:'direct-v1'}]);
+    const ent=value(await issue());expect(value(await snapshot(ent.entitlementId)).faq).toHaveLength(1);
+    const follow=await publishable('after-mixed',undefined,'b');
+    await changeHistoricalApproval(h.reviewId,state);
+    expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false});expect(await issue()).toMatchObject({ok:false});
+    expect(await service.publish(actor('enabler'),follow.request)).toMatchObject({ok:false});
+    expect(await service.rollbackPreview(actor('enabler'),{baseReleaseId:mixed,targetReleaseId:old})).toMatchObject({ok:false});
+    const history=value(await service.review(actor('enabler'),h.key));expect(history.state).toBe(state==='revoked'?'revoked':'unavailable');
+    expect((await admin.query('SELECT max(facts_version) v FROM content_intake.approval_facts')).rows[0].v).toBe('2');
+    expect(provider.calls()).toBe(0);
+  });
+
+  it('legacy history: absent policy in durable cancellation/source receipts projects approval-v1 without rewriting storage',async()=>{
+    const h=await legacyHistory('receipts');const c=value(await service.candidate(actor('enabler'),h.key.candidateId,1));
+    const {publicationPolicy:_policy,...old}={...c,state:'cancelled' as const};
+    await admin.query(`INSERT INTO backend_review.receipts(actor_user_id,operation,request_key,request_hash,response)
+      VALUES('user-enabler','intake:cancel','old-cancel',repeat('a',64),$1::jsonb)`,[JSON.stringify(old)]);
+    expect(value(await service.operationReceipt(actor('enabler'),'old-cancel','cancel'))).toMatchObject({state:'cancelled',key:h.key});
+    expect((await admin.query("SELECT response ? 'publicationPolicy' AS changed FROM backend_review.receipts WHERE request_key='old-cancel'")).rows[0].changed).toBe(false);
+    const raw={operationId:'old-source',key:h.key,expectedEvidenceVersion:0,confirmedVersionKind:'opaque',confirmedVersionValue:'historical',acquisition:'controlled-synthetic-export',objectSha256:'a'.repeat(64),reason:'合成旧回执'};
+    await admin.query(`INSERT INTO backend_review.receipts(actor_user_id,operation,request_key,request_hash,response) VALUES('user-enabler','intake:source-confirm','old-source',$1,$2::jsonb)`,
+      [`intake-request-v1:${digest(canonical(raw))}`,JSON.stringify({candidate:{...old,state:'awaiting-evidence'},reason:raw.reason})]);
+    expect(value(await service.confirmSource(actor('enabler'),raw)).publicationPolicy).toBe('approval-v1');
+    for (const action of ['publish','rollback'] as const) {
+      const saved={operationId:`old-${action}`,action,state:'published',releaseId:'rel_historical',announcementId:'ann_historical',reason:null,
+        ...(action==='publish'?{key:h.key}:{rollbackPlanId:'historical-plan'})};
+      await admin.query(`INSERT INTO backend_review.receipts(actor_user_id,operation,request_key,request_hash,response)
+        VALUES('user-enabler',$1,$2,repeat('a',64),$3::jsonb)`,[`intake:${action}`,saved.operationId,JSON.stringify(saved)]);
+      expect(value(await service.operationReceipt(actor('enabler'),saved.operationId,action))).toEqual(saved);
+    }
+    expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('0');
+    expect(provider.calls()).toBe(0);
+    expect(await service.publish(actor('enabler'),{operationId:'old-unknown',key:h.key,baseReleaseId:null,sourceEvidenceVersion:1,approvalEvidenceVersion:1,title:'旧请求',summary:'原载荷'})).toMatchObject({ok:false,code:'VALIDATION'});
+  });
+
+  it.each(['revoked','expired'] as const)('legacy rollback history: inherited %s review still fences a direct release',async state=>{
+    const {base,target}=await rollbackPair();const p=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:base,targetReleaseId:target}));
+    const req:C['IntakeRollback']={operationId:'direct-with-history',rollbackPlanId:p.rollbackPlanId,baseReleaseId:base,targetReleaseId:target,impactDigest:p.impactDigest,confirmed:true};
+    const historicalObject=await store.persist((async function*(){yield Buffer.from('synthetic historic rollback review');})(),'csv');
+    await admin.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
+      VALUES($1,NULL,'enabler','tenant-a','app-a',$2,$3,$4,'application/json','review-package',clock_timestamp()-interval '10 seconds')`,[historicalObject.objectId,`intake/${historicalObject.objectId}`,historicalObject.sha256,historicalObject.sizeBytes]);
+    await admin.query(`INSERT INTO content_intake.review_bindings(review_request_id,rollback_plan_id,impact_digest,evidence_version,tenant_id,app_id,definition_id,node_id,create_uuid,instance_code,package_object_id,package_sha256,attachment_file_code)
+      VALUES('historical-rollback-review',$1,$2,1,'tenant-a','app-a','historical-definition','human-node',gen_random_uuid(),'historical-rollback-instance',$3,$4,'historical-rollback-file')`,[p.rollbackPlanId,p.impactDigest,historicalObject.objectId,historicalObject.sha256]);
+    await admin.query(`INSERT INTO content_intake.approval_facts VALUES('historical-rollback-review',1,0,'approved',clock_timestamp(),clock_timestamp()+interval '299 seconds',repeat('a',64),$1,'historical-task','reviewer',1,clock_timestamp()-interval '1 second')`,[historicalObject.sha256]);
+    await admin.query("INSERT INTO content_intake.approval_current VALUES('historical-rollback-review',1)");
+    // Existing target carried this independently approved rollback dependency.
+    await admin.query("INSERT INTO content_intake.release_rollback_lineage VALUES($1,'historical-rollback-review')",[target]);
+    const restored=value(await service.rollback(actor('enabler'),req)).releaseId!;
+    const prepared=await publishable('inherited-rollback-history');
+    const current=value(await service.publish(actor('enabler'),prepared.request)).releaseId!;
+    expect((await admin.query("SELECT release_id FROM content_intake.release_rollback_lineage WHERE review_request_id='historical-rollback-review' ORDER BY release_id")).rows.map(r=>r.release_id))
+      .toEqual([target,restored,current].sort());
+    const ent=value(await issue());
+    const next=await publishable('after-historical-expiry');
+    await changeHistoricalApproval('historical-rollback-review',state);
+    expect(await snapshot(ent.entitlementId)).toMatchObject({ok:false});expect(await service.publish(actor('enabler'),next.request)).toMatchObject({ok:false});
+    expect(await service.rollbackPreview(actor('enabler'),{baseReleaseId:current,targetReleaseId:target})).toMatchObject({ok:false});
+    expect(value(await service.rollbackReview(actor('enabler'),p.rollbackPlanId)).state).toBe(state==='revoked'?'revoked':'unavailable');
+    expect(provider.calls()).toBe(0);
+  });
+
+  it('legacy unpublished candidate requires explicit revision before its first direct publication',async()=>{
+    await publicationBase();const h=await legacyHistory('unpublished');
+    // Independent immutable historical version; do not rewrite an existing policy.
+    const id='legacy-unpublished';
+    await admin.query(`INSERT INTO content_intake.candidate_versions(candidate_id,version,source_id,scope_id,source_version,object_id,file_sha256,actor_id,base_release_id,
+      canonical_encoding,canonical_material,material,risk,explicit_disable_count,state,source_evidence_version,approval_evidence_version,revocation_generation,created_at,updated_at,publication_policy)
+      SELECT $2,version,source_id,scope_id,source_version,object_id,file_sha256,actor_id,base_release_id,canonical_encoding,canonical_material,material,risk,explicit_disable_count,
+      'awaiting-evidence',0,0,0,created_at,updated_at,'approval-v1' FROM content_intake.candidate_versions WHERE candidate_id=$1`,[h.key.candidateId,id]);
+    await admin.query("UPDATE content_intake.candidate_versions SET source_evidence_version=1 WHERE candidate_id=$1",[id]);
+    const old=value(await service.candidate(actor('enabler'),id,1));
+    expect(await service.publish(actor('enabler'),{operationId:'legacy-first',key:old.key,baseReleaseId:'rel_native_base',sourceEvidenceVersion:1,confirmed:true,title:'合成发布',summary:'不允许旧候选直发'}))
+      .toMatchObject({ok:false,reason:'MODE_CONFLICT'});
+    const revised=await input('legacy-explicit-revision',old.key);revised.baseReleaseId='rel_native_base';
+    const next=value(await service.parse(actor('enabler'),value(await service.receive(actor('enabler'),'source-a',revised)).jobId));
+    expect(next).toMatchObject({publicationPolicy:'direct-v1',approvalEvidenceVersion:0,key:{candidateId:id,version:2}});
+    expect(value(await service.candidate(actor('enabler'),id,1))).toMatchObject({publicationPolicy:'approval-v1',state:'invalidated'});
+  });
+
 });

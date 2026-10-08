@@ -4,7 +4,7 @@ export function intakeManagementData(count = 2) {
   const key: C['IntakeCandidateKey'] = { candidateId: 'candidate-a', version: 1, digest: 'a'.repeat(64) };
   const scope: C['IntakeSourceScope'] = { sourceId: 'source-a', tenantId: 'tenant-a', appId: 'app-a', brandId: 'brand-a', shopId: 'shop-a', domain: 'product' };
   const entry: C['IntakeEntry'] = { businessEntryId: 'faq-a', scriptVersion: 1, operation: 'upsert', title: '合成洁面', answerText: '第一行\n第二行', questions: [], productRefs: [], scenarioRefs: [], effectiveFrom: '2020-01-01T00:00:00Z', effectiveTo: null, applicabilityNote: '', familySourceId: null, familyBusinessEntryId: null, brandNonOverridable: false, category: '', internalNote: '合成内部说明', riskNote: '', attachmentNote: '' };
-  const candidate: C['IntakeCandidate'] = { key, sourceId: scope.sourceId, state: 'awaiting-evidence', readinessReasons: ['AWAITING_APPROVAL'], sourceEvidenceVersion: 0, approvalEvidenceVersion: 0, revocationGeneration: 0, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', publishedReleaseId: null };
+  const candidate: C['IntakeCandidate'] = { key, sourceId: scope.sourceId, publicationPolicy: 'direct-v1', state: 'awaiting-evidence', readinessReasons: ['SOURCE_CONFIRMATION_REQUIRED'], sourceEvidenceVersion: 0, approvalEvidenceVersion: 0, revocationGeneration: 0, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', publishedReleaseId: null };
   const status: C['IntakeQualityStatus'] = { key, viewHash: 'b'.repeat(64), state: 'not_frozen', frozen: null, rounds: [], plan: { policyVersion: 'intake-quality-v1', ordinaryCount: count, mandatoryCount: 0, withdrawalCount: 0, initialTarget: count, expandedTarget: count, initialCount: count, expandedCount: count, seedHash: 'a'.repeat(64), populationManifestHash: 'b'.repeat(64), selectionManifestHash: 'c'.repeat(64) } };
   const samples: C['IntakeQualitySample'][] = Array.from({ length: count }, (_, i) => ({ scriptId: `intake_${i.toString(16).padStart(64,'0')}`, contentHash: 'c'.repeat(64), mandatory: false, check: null, entry: { ...entry, operation: 'upsert', businessEntryId: `faq-${i}`, title: `合成洁面 ${i + 1}` } }));
   const state = { allowed: true, reviewer: true, confirmer: true, publisher: true, importer: false, canceller: false, creating: false, ttl: 60_000 };
@@ -18,8 +18,8 @@ export function intakeManagementData(count = 2) {
   let review: C['IntakeReview'] | null = null;
   const workflowReceipts = new Map<string, unknown>();
   const sync = () => { if (['published','cancelled','invalidated'].includes(candidate.state)) return;
-    candidate.state = candidate.sourceEvidenceVersion > 0 && review?.state === 'approved' && status.state === 'passed' ? 'ready' : 'awaiting-evidence';
-    candidate.readinessReasons = candidate.state === 'ready' ? [] : ['AWAITING_APPROVAL']; };
+    candidate.state = candidate.sourceEvidenceVersion > 0 && (candidate.publicationPolicy === 'direct-v1' || review?.state === 'approved') && status.state === 'passed' ? 'ready' : 'awaiting-evidence';
+    candidate.readinessReasons = candidate.state === 'ready' ? [] : ['SOURCE_CONFIRMATION_REQUIRED']; };
   const receipts = new Map<string, C['IntakeQualityReceipt']>();
   let validUntil = new Date(Date.now()+state.ttl).toISOString();
   const respond = (path: string, body?: unknown): unknown => {
@@ -36,23 +36,7 @@ export function intakeManagementData(count = 2) {
       candidate.sourceEvidenceVersion++; sync();
       const result = structuredClone(candidate); workflowReceipts.set(req.operationId, result); return result;
     }
-    if (u.pathname.endsWith('/review') && body) {
-      const req = body as C['IntakeReviewRequest'];
-      const prior = workflowReceipts.get(req.operationId) as C['IntakeReview'] | undefined;
-      if (prior) { if (!state.creating) { prior.state = 'pending'; prior.instanceCode = 'synthetic-instance'; } return prior; }
-      candidate.approvalEvidenceVersion++;
-      review = { key, reviewRequestId: 'review-a', instanceCode: state.creating ? null : 'synthetic-instance', evidenceVersion: candidate.approvalEvidenceVersion,
-        revocationGeneration: 0, state: state.creating ? 'creating' : 'pending', checkedAt: null, validUntil: null,
-        reviewPackageObjectId: 'review-object-a', reviewPackageSha256: 'e'.repeat(64) };
-      workflowReceipts.set(req.operationId, review); return review;
-    }
-    if (u.pathname.endsWith('/review/refresh')) {
-      const req = body as C['IntakeReviewRequest'];
-      if (workflowReceipts.has(req.operationId)) return workflowReceipts.get(req.operationId);
-      if (!review) throw new Error('NO_REVIEW');
-      review.state = 'approved'; review.checkedAt = new Date().toISOString(); review.validUntil = new Date(Date.now()+300000).toISOString(); sync();
-      const result = structuredClone(review); workflowReceipts.set(req.operationId, result); return result;
-    }
+    if (u.pathname.endsWith('/review/refresh') || (u.pathname.endsWith('/review') && body)) throw new Error('MODE_CONFLICT');
     if (u.pathname.endsWith('/review')) { if (!review) throw new Error('NO_REVIEW'); return review; }
     if (u.pathname.endsWith('/cancel')) {
       const req = body as C['IntakeCancel'];
@@ -63,6 +47,7 @@ export function intakeManagementData(count = 2) {
     }
     if (u.pathname.endsWith('/publish')) {
       const req = body as C['IntakePublish'];
+      if (req.confirmed !== true || 'approvalEvidenceVersion' in req) throw new Error('MODE_CONFLICT');
       if (workflowReceipts.has(req.operationId)) return workflowReceipts.get(req.operationId);
       candidate.state = 'published'; candidate.publishedReleaseId = 'rel_2';
       const result: C['IntakeReceipt'] = { key, action: 'publish', operationId: req.operationId, state: 'published', releaseId: 'rel_2', announcementId: 'announcement-2', reason: null };
@@ -85,5 +70,12 @@ export function intakeManagementData(count = 2) {
     if (u.pathname.endsWith('/versions/1')) return candidate;
     throw new Error(`Unexpected route ${u.pathname}`);
   };
-  return { respond, state, samples, candidate, receipts, workflowReceipts, material, status, expireAt: (ttl: number) => { validUntil = new Date(Date.now()+ttl).toISOString(); } };
+  const historicalReview = () => {
+    candidate.publicationPolicy = 'approval-v1'; candidate.approvalEvidenceVersion = 1;
+    review = { key, reviewRequestId: 'review-history', instanceCode: 'synthetic-history', evidenceVersion: 1,
+      revocationGeneration: 0, state: 'approved', checkedAt: '2026-01-01T00:00:00Z', validUntil: '2026-01-01T00:05:00Z',
+      reviewPackageObjectId: 'review-history-object', reviewPackageSha256: 'e'.repeat(64) };
+    return review;
+  };
+  return { historicalReview, respond, state, samples, candidate, receipts, workflowReceipts, material, status, expireAt: (ttl: number) => { validUntil = new Date(Date.now()+ttl).toISOString(); } };
 }

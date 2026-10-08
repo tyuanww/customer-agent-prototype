@@ -2,14 +2,14 @@
 
 export const CONTRACT_PROVENANCE = Object.freeze({
   "schema": "customer-agent-contract-codegen/v1",
-  "contract_set_id": "cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8",
+  "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
   "source_repository": "ai-赋能立项",
-  "source_git_sha": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
-  "manifest_sha256": "5cbb8de3be017df9d6a93d1214931d0621e32157673a706dc37ff891d1219ab9",
-  "openapi_version": "1.19.0",
-  "openapi_sha256": "ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38",
-  "database_version": "schema.v1.21",
-  "database_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
+  "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
+  "manifest_sha256": "1db23189fe6f088f312e5753f5a517dbf4fc4d386da0febeaa0ec3958265608c",
+  "openapi_version": "1.20.0",
+  "openapi_sha256": "1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d",
+  "database_version": "schema.v1.22",
+  "database_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce",
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "runtime_activated": false,
   "runtime_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
@@ -23,18 +23,18 @@ export const CONTRACT_PROVENANCE = Object.freeze({
   "artifacts": {
     "bundle": {
       "path": "packages/contracts/openapi/bundle.generated.yaml",
-      "sha256": "62ea86a72a7598aa03de13bce29958640aad44c3f569c5fbd4b60bbcea7c9a6c",
-      "bytes": 526244
+      "sha256": "e576e1f86099c624ffda255556c3ec552a555e7e51111a2a1ec527c20f570b12",
+      "bytes": 527617
     },
     "types": {
       "path": "packages/contracts/src/generated/openapi.generated.ts",
-      "sha256": "15514010702de97811066edca9654f17da1f4440f007050e4bfa86b5f419eab1",
-      "bytes": 411117
+      "sha256": "49dce0f1fe46f58ab62f8d9f6a76534677f5863f9f3bd0ca84a487ed05b03639",
+      "bytes": 411360
     },
     "runtime_schema": {
       "path": "packages/contracts/src/generated/runtime-schema.generated.ts",
-      "sha256": "ce2f48eeddcfdf423d68c1f51604426da6299303f4c3fc3da3569b182818055f",
-      "bytes": 338599
+      "sha256": "955716edaf71e35a5f534694e12c75514e0e7a6032795b00e3b8ba5de6e94679",
+      "bytes": 339251
     }
   }
 });
