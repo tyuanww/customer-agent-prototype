@@ -1,0 +1,6 @@
+"sourceId","templateVersion","brandId","scope","domain","条目编号","标题","标准话术","商品编号","场景编号","分类","适用说明","状态","生效时间","失效时间","对应通用条目","内部说明","风险提示","附件说明","品牌不可覆盖","问法编号","问法","问法状态"
+"synthetic-source","faq-csv-v1","synthetic-brand","shop-a","product","faq-001","合成快捷短语一","第一行：核对合成资料。
+第二行：由坐席人工选择。","","","合成分类","","启用","","","","","","","false","q-one","合成问法一","启用"
+"synthetic-source","faq-csv-v1","synthetic-brand","shop-a","product","faq-001","合成快捷短语一","第一行：核对合成资料。
+第二行：由坐席人工选择。","","","合成分类","","启用","","","","","","","false","q-two","合成问法二","停用"
+"synthetic-source","faq-csv-v1","synthetic-brand","shop-a","product","faq-002","合成快捷短语二","请确认合成示例说明。","","","合成分类","","启用","","","","","","","false","","",""

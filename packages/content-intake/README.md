@@ -9,3 +9,5 @@
 `parseWorkbook` / runner 的固定解析上下文必须显式提供 `scopeKind: 'brand' | 'shop'`；不能从范围标签是否等于 `brand` 推断权限。仅生成模板的 `createTemplate` 接收省略 `scopeKind` 的上下文，不承担授权判定。`parseFamilyReference` 按 `sourceId/businessEntryId` 解析 K 列「对应通用条目」；空单元格清除关联，缺行继承由 API 拥有。家族根、范围及冲突检查由发布数据库守卫拥有，格式通过不代表允许覆盖。
 
 运行、限制与实际证据见[开发配方](../../docs/how-to-develop-content-intake.md)；历史 P1 差集见[合同差集](../../docs/reference-content-intake-p1-contract-gap.md)，当前接收及消费状态见[P2 合同交接](../../docs/reference-content-intake-p2-contract-handoff.md)。
+
+CSV 候选位于 `experiments/`，与 XLSX 复用 `src/faq-rules.ts` 的业务校验。它使用独立的 `faq-csv-v1` / `intake-csv-v1`，保留原始 CSV 字节的摘要；不进入包的 `dist`、exports、现有 runner 或 HTTP。当前正式消费者仍只接受 XLSX，候选解析成功不表示 CSV 已能上传发布。所属仓精确版本冻结、export/intake 与消费者接线的剩余条件见[当前计划 §0.53](../../docs/plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)。

@@ -23,6 +23,12 @@ ZIP 前检逐条约束展开量、局部/中央文件名一致和规范 ASCII �
 - `apps/api/experiments/content-intake-p1`：权限交集、委派模型、候选材料、风险与人工证据/提交点判定。复用已有 test-support JCS/SHA；不进 API dist、不注册 HTTP、不增加数据库权限。
 - P2 `apps/api/src/content-intake` 复用正式 validator、对象存储与该解析包，隔离实库执行器、合成 HTTP 和桌面 Main/preload/界面已消费；生产 app/server 尚未注册新路径。
 
+## CSV 候选验证
+
+当前正式上传仍是 XLSX。`packages/content-intake/experiments/csv/` 的候选解析只用于合成验证，不进入正式编译出口或 runner；`src/faq-rules.ts` 统一拥有两格式的 FAQ/问法业务规则。固定 `csv-parse` 7.0.3（MIT）是开发依赖；严格编码、引号、列结构、来源一致性和预算由 CSV 适配器负责，原件摘要从未转换的 Buffer 计算。解析通过不代表来源已确认、权限已授予或可以发布。
+
+候选采用单文件 23 列，保留独立问法编号；同一话术带多问法时重复的 FAQ 字段须相同，否则整批拒绝。来源、版本和数据集组合须在所属仓冻结、export/intake 后才能接 API/Main；原表的一次性整理不增加永久列映射。可消费的合成 CSV、错误报告回读及测试结果见[CSV 候选证据](../evidence/qa/intake-csv-candidate/README.md)。
+
 ## P2 权限与持久候选事务
 
 ```sh

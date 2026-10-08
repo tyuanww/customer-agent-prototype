@@ -18,6 +18,7 @@
 | 对象容量 | 0029 与 API 已实现四类对象持久预留/采用/释放、未知提交保护及只读账本干跑；10→100 并发准入、10→100 合成发布历史与双来源 CAS 重审已验证，见[容量证据](../evidence/qa/content-intake-p2-capacity/README.md)；历史保留期与受控历史清理仍待批准 |
 | 平台 | Mac 开发态及指定版本 Windows/WSL 已取得分层结果；[杭州证据](../evidence/qa/content-intake-p2-hangzhou/README.md)不覆盖后续回退、家族及商品/场景选择等新增切片，普通账号、可靠拖动、整机断网仍未确认 |
 | 组织与权限接入 | 组织观察/登记刷新/writer 已迁入 src 单一所有者，正式用途池逐次 SET ROLE/assert_purpose，transaction 直接调用正式会话锁；合成 host 实际使用受限组织池写入合成事实。业务/usage/worker 沿用原消费者，不再改写 SQL；生产 app/server 与真实 transport 保持关闭 |
+| CSV 格式增量 | 所属仓 OpenAPI 1.22.0 / schema.v1.24 为新 DRAFT，产品仅有独立合成解析候选；正式消费仍为 1.21/1.23、XLSX。版本/MIME/mapping/结构签名精确绑定及原件指纹见[CSV 证据](../evidence/qa/intake-csv-candidate/README.md)；未冻结/export/intake，不提前改上传 wire |
 | 版本化交付 | 治理冻结源 `e35c0c0`，实际完整包12件、运行伴随9件；产品 intake/codegen 236个组件及0033增量已接收。全部绑定批准摘要和前32段依赖，runtime/Ddev仍false；见[本轮证据](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md) |
 | 退出条件 | 真实目录登记范围/密钥、历史保留期及批准后的历史清理/磁盘核对、真实组织、旧审批历史失效依据（如有）、生产低权账号/factory、旧目录认领及业务/设备验收仍待完成；合成 CAS 已验证额外重审次数，不代表实际人工等待耗时；范围汇总见 [TODOS](../TODOS.md) |
 

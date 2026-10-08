@@ -12,3 +12,6 @@
 # 将来如增加 Windows 原生命令脚本，检出时使用 CRLF。
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# CSV 原件摘要夹具保留引号内外的原始换行字节。
+packages/content-intake/experiments/csv/synthetic-template.csv -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

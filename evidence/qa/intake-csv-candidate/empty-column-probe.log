@@ -1,0 +1,9 @@
+{
+  "node": "v24.19.0",
+  "dependency": "csv-parse@7.0.3",
+  "syntheticInputBytes": 200000,
+  "lateCheckAllocatedColumns": 200001,
+  "earlyCheckVisitedFields": 24,
+  "earlyCheckCompletedRecords": 0,
+  "result": "PASS"
+}

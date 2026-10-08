@@ -1,0 +1,96 @@
+{
+  "status": "DRAFT_NOT_INTAKE",
+  "baseline": "3abd57c44bd76cf5e70f3fa9641920661074d482",
+  "version": "0.3.26",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "os": "macOS 26.5.2",
+    "arch": "arm64"
+  },
+  "inputs": {
+    "packages/content-intake/src/workbook.ts": "23e9a1eb7426e074678b930a34f3431a3c2c7657af6a44abf2479e61958ddfba",
+    "packages/content-intake/src/faq-rules.ts": "d5c28602df2df5ef4b75d5fe504b1390894e7cfe53509a1fbaddce2cca74c833",
+    "packages/content-intake/src/policy.ts": "bb5598b55ff267e77824e1c84ecf3c7be1f4cf855706d58ba448aa28a27755d7",
+    "packages/content-intake/experiments/csv/candidate.ts": "a8da664f11d9ff8b6f44c68f5130332069ac6691bd2f1d75be1f1efabb2bbe30",
+    "packages/content-intake/experiments/csv/synthetic-template.csv": "9ef1019dfc84124f1aa1f6b1bbdb63ea9c08089d668aff6e1d2cb76a87f2e2bd",
+    "packages/content-intake/tests/csv-candidate.test.ts": "380f728d703d978ef77ebb26b1730f2540d6f60136d631eed8c62bfe878278b4",
+    "packages/content-intake/tests/workbook.test.ts": "a5ecc439e52fe39a4ee652f418ff1162cbdd8775ad475522ee355800e262ce40",
+    "packages/content-intake/package.json": "9040290e67c5626b8aa0f8d408427a0bdba1692f463e2c1bf10535b91de68172",
+    "packages/content-intake/tsconfig.json": "52b6fa57e2a895c73fa6d3f1ff9a63bc11a8dc6bb5796e28c5f4a6993c3b0a96",
+    "packages/content-intake/tsconfig.build.json": "89f7cffdd3fbb928b80acb12c5e601ef29fb608b43193065ce686dc231a93c08",
+    "pnpm-lock.yaml": "c2d7e241897aece64f5db274d78948d22207972a4f512a265226a9c04ebe6718",
+    ".gitattributes": "34a7d638c29b784d96fc67c81c98ed4a8eeefaf40c1079224f90f5714bbc4437"
+  },
+  "checks": {
+    "parser": {
+      "result": "PASS",
+      "csvPassed": 38,
+      "xlsxPassed": 56
+    },
+    "lint": {
+      "exitCode": 0
+    },
+    "typecheck": {
+      "exitCode": 0
+    },
+    "test": {
+      "exitCode": 0,
+      "defaultSkipped": {
+        "database": 21,
+        "api": 319,
+        "desktop": 7
+      }
+    },
+    "build": {
+      "exitCode": 0
+    },
+    "workspace": {
+      "exitCode": 1,
+      "reason": "source-budget-36.9-MiB-over-32-MiB",
+      "rootPolicy": "PASS"
+    },
+    "dependencyAudit": {
+      "exitCode": 1,
+      "newCsvParseAdvisories": 0,
+      "wholeWorkspaceClean": false
+    },
+    "docs": {
+      "exitCode": 0,
+      "markdownFiles": 236
+    },
+    "diffCheck": {
+      "exitCode": 0
+    },
+    "artifactBoundary": {
+      "csvAbsentFromDist": true,
+      "csvNotExported": true,
+      "productionRunnerUnchanged": true,
+      "gitIndexFixtureBytesMatch": true
+    }
+  },
+  "review": {
+    "scope": "current-product-diff-only",
+    "method": "local core + independent /review",
+    "fixedFindings": [
+      "empty columns allocation before on_record"
+    ],
+    "unresolvedProductFindings": 0,
+    "externalCompleteReview": "INCOMPLETE"
+  },
+  "runtimeActivated": false,
+  "csvFrozen": false,
+  "csvExported": false,
+  "csvIntake": false,
+  "logs": {
+    "git-fixture-roundtrip.log": "fc7b66900ec7a1139d17b885b83c5c30e7d8d671067a6dbdbef3d7ed24875d0a",
+    "lint.log": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+    "test.log": "e4639f3328eb654bb73e7a6304d04f1e4004f1e1dcb32d17e313e3ea54a9ab4a",
+    "empty-column-probe.log": "87dbfbb1a47106d3956bc994678172bcc5a0c3a1a3cd7c0cb31338b40d62e4af",
+    "typecheck.log": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+    "workspace.log": "371aada9f356bb245157df69e47bd467a71eb61be44201abd58fdaed6f180ae1",
+    "docs.log": "ecaa7bad7e3769020f0dab3501c33b840f655b1308d63128c0654f9beead7017",
+    "parser-final.log": "a8d1d9d9b51d6e6704a206e3c84c64652d5ca9711c45eea33e22f30664cff43c",
+    "build.log": "70e01811fb2ba2b883d1fd1a1c7a35586fdb93a90f97d5508e59719a9311589d"
+  }
+}
