@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-grant-management/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-grants-http.integration.test.ts (3 tests) 4307ms
+   ✓ business permission HTTP and PG15 (synthetic) > selects names, previews without writes, saves/replays/lists, then revokes a disabled recipient  1235ms
+   ✓ business permission HTTP and PG15 (synthetic) > excludes invisible scope rows before paging and invalidates cursors on authority change  1353ms
+   ✓ business permission HTTP and PG15 (synthetic) > rechecks after preview and refuses forged input or a partially invalid batch without writes  1718ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  18:34:13
+   Duration  5.23s (transform 301ms, setup 0ms, collect 685ms, tests 4.31s, environment 0ms, prepare 79ms)
+
