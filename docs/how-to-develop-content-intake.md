@@ -1,6 +1,6 @@
 # 如何验证合成资料导入
 
-本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。FAQ 原生文件选择、参与人确认、上传校验、报告保存、合成审批发布与坐席查询已接通；真实审批 transport、原生设备人工验收及正式运行接入仍待完成。
+本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。FAQ 原生文件选择、参与人确认、上传校验、报告保存、合成审批发布与坐席查询已接通；真实飞书审批传输接入、剩余原生设备人工验收及正式运行接入仍待完成。当前剩余范围见 [TODOS](../TODOS.md)，已取得的平台证据见[杭州分层验收](../evidence/qa/content-intake-p2-hangzhou/README.md)。
 
 ## 运行
 
@@ -21,7 +21,7 @@ ZIP 前检逐条约束展开量、局部/中央文件名一致和规范 ASCII �
 
 - `packages/content-intake`：ExcelJS 4.4.0（MIT）、yauzl 3.4.0（MIT）、saxes 6.0.0（ISC），固定模板及错误坐标、前置预算、模板/报告实物与子进程生命周期。没有通用列映射或客户原表兼容分支。
 - `apps/api/experiments/content-intake-p1`：权限交集、委派模型、候选材料、风险与人工证据/提交点判定。复用已有 test-support JCS/SHA；不进 API dist、不注册 HTTP、不增加数据库权限。
-- P2 `apps/api/src/content-intake` 复用正式 validator、对象存储与该解析包，当前消费者是隔离实库执行器；生产 app/HTTP/Main 尚未注册新路径。
+- P2 `apps/api/src/content-intake` 复用正式 validator、对象存储与该解析包，隔离实库执行器、合成 HTTP 和桌面 Main/preload/界面已消费；生产 app/server 尚未注册新路径。
 
 ## P2 权限与持久候选事务
 
@@ -31,13 +31,13 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 
 命令使用合成主体、来源和真实生成的 XLSX，执行权限交集、批量授予、撤权保留下游、原始操作键恢复、候选冻结/修订/取消与错误报告回读。数据库安装账户只供该临时测试集群；不得把它接到 API 启动配置。正式运行角色仍无 `content_intake` schema 权限。
 
-服务接口只接收已验证会话和 objectId，不接文件路径、远程 URL、客户端 rows/digest 或 renderer 身份。根 allocation、身份事实、来源/词项及接收对象由测试受控登记；相关正式运维与上传 HTTP 接线仍待后续。当前任务回执复用 `backend_review.receipts` 的独立 `intake:` 命名空间，候选不依赖 24h HTTP 缓存。永久请求绑定沿用该私有回执的 SHA-256 方式，不依赖有保留期限的 HTTP HMAC 密钥。进程重启可按原 jobId 恢复解析，成功任务返回原候选；提交未知先查原 job/操作，不换键。
+服务接口只接收已验证会话和 objectId，不接文件路径、远程 URL、客户端 rows/digest 或 renderer 身份。根 allocation、身份事实、来源/词项及接收对象由测试受控登记；上传 HTTP 已由下述隔离合成宿主接入；正式组织事实维护和运行装配仍待后续。当前任务回执复用 `backend_review.receipts` 的独立 `intake:` 命名空间，候选不依赖 24h HTTP 缓存。永久请求绑定沿用该私有回执的 SHA-256 方式，不依赖有保留期限的 HTTP HMAC 密钥。进程重启可按原 jobId 恢复解析，成功任务返回原候选；提交未知先查原 job/操作，不换键。
 
-商品/场景单元格以英文逗号分隔稳定 ID；服务端只解析同品牌/域且属于品牌通用或当前店的已登记词项。正文和问法分别分配版本，缺行继承。来源版本尚未确认时材料记为 unknown，等待独立确认；不从文件时间推断新旧。`对应通用条目` 的非空内容暂时阻断，直到跨来源覆盖与发布冲突检查完成。该事务切片的原通过结论不含发布、使用资格或产品接线；后续封闭原子发布和旧写隔离见下文，注册生产角色与真实数据仍未开放。
+商品/场景单元格以英文逗号分隔稳定 ID；服务端只解析同品牌/域且属于品牌通用或当前店的已登记词项。正文和问法分别分配版本，缺行继承。来源版本尚未确认时材料记为 unknown，等待独立确认；不从文件时间推断新旧。K 列 `对应通用条目` 使用精确的 `sourceId/businessEntryId`，空值清除关联、缺行仍继承。内部解析上下文必须显式提供 `scopeKind`；不能从店铺 ID 是否叫 `brand` 推断品牌范围。0028 在发布及回退同一事务内检查通用根、范围、适用条件交集与品牌不可覆盖；坐席读取先过滤资格和选择，再计算店铺覆盖与通用回落，最后分页。多选有未覆盖组合时保留通用稿，标题相似不合并。详见[同题覆盖验收](../evidence/qa/content-intake-p2-family/README.md)。该事务切片的原通过结论不含发布、使用资格或产品接线；后续封闭原子发布和旧写隔离见下文，注册生产角色与真实数据仍未开放。
 
-业务授权、分配母资格和相关主体事实的截止时间由事务模块收集，在写回执后、COMMIT 前统一用数据库时钟复核；新负责人撤权/接管只检查当前资格，发新授权仍须覆盖整段期限。base 检查同时取得既有发布 advisory lock，保护尚无 current 行的首次导入；这不等于后续旧写影响集隔离已实现。
+业务授权、分配母资格和相关主体事实的截止时间由事务模块收集，在写回执后、COMMIT 前统一用数据库时钟复核；新负责人撤权/接管只检查当前资格，发新授权仍须覆盖整段期限。base 检查同时取得既有发布 advisory lock，保护尚无 current 行的首次导入；旧写影响集合由下述 0022 共存门独立校验，不能仅凭 base 检查替代。
 
-当前额度验证覆盖 actor/source 并发 admission 和保守的 1GiB 已登记对象总量门。对象上传准入、报告字节预留、retention 回收及十倍历史存量负载尚未接入；取消任务不自动释放磁盘，不能把本阶段称为完整暂存容量治理。已确认无引用的失败报告清理由后续受控 retention 流程承担。
+当前额度验证覆盖 actor/source 并发 admission 和保守的 1GiB 已登记对象总量门。上传已有单对象与请求边界，但对象/审核包/失败报告尚无统一持久字节预留、引用保护及 retention 回收；十倍历史存量负载尚未验收；取消任务不自动释放磁盘，不能把本阶段称为完整暂存容量治理。已确认无引用的失败报告清理由后续受控 retention 流程承担。
 
 ## P2 来源与审批证据
 
@@ -54,7 +54,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 
 此处比较过两种边界：为全部授权写入器增加提交后见证，以及复用现有审核包检查点。后者不新增冻结合同字段或写入生命周期，当前封闭执行器可直接验证；代价是资格晚于审核包时必须重开审批。该证明依赖所有资格写入器遵守 `lock_content()`，真实组织同步接入时必须一并验证，不得绕过锁直接写表。
 
-`ready` 不是发布回执。后续内部原子发布见下文，使用资格和桌面接线仍未实现；应用角色仍无新 schema 权限。发布会在锁内重新验证全部门，不能信任早先 GET 或幂等回执里的 readiness。详细证据见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。
+`ready` 不是发布回执。原子发布、使用资格和合成桌面接线见下文；应用角色仍无新 schema 权限。发布会在锁内重新验证全部门，不能信任早先 GET 或幂等回执里的 readiness。详细证据见[审批证据验收](../evidence/qa/content-intake-p2-evidence/README.md)。
 
 ## P1 测量含义与未验证范围
 
@@ -76,7 +76,7 @@ P2 已覆盖的词项、版本、候选与 PG 场景见[事务验收](../evidenc
 
 追加产品迁移 0022 在既有 SQL 发布/回退入口内统一取得 `backend_review.lock_content()`，再进入原发布锁和既有门禁。旧请求只有域，因此按整个绑定域的全部登记来源判定；与 active 或当前新谱系相交时拒绝。不同域发布必须在同一事务继承新目录、统一空 SOP/media 及原审批谱系，不能丢失目录。旧全量回退没有 P2 审批计划，触及新目录或 active 来源时拒绝。
 
-该门没有开放新 schema 的应用权限，也没有提供生产 mode 设置或候选发布接口。现有旧 API 返回 409 冲突；P2 专用恢复原因与 UI 接线仍待后续。来源 mode 与目录由隔离测试 fixture 登记，测试成功不代表真实 active 放行。
+该门没有开放新 schema 的应用权限，也没有提供生产 mode 设置或候选发布接口。现有旧 API 返回 409 冲突；P2 合成桌面的失败恢复与管理入口见下文，生产 mode 设置仍未接入。来源 mode 与目录由隔离测试 fixture 登记，测试成功不代表真实 active 放行。
 
 ```sh
 CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @customer-agent/database test:integration
@@ -110,14 +110,25 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 
 ## P2 原生候选原子发布
 
-同一个 `test:intake:transactions` 命令覆盖实际 XLSX → 来源确认 → 合成人工审批 → 质量 → 发布 → 按谱系回读材料。只有测试执行器显式建立的原生目录基线可以接续；服务不 bootstrap、不自动迁移旧同域数据、不认定显式同题覆盖已排除冲突。
+同一个 `test:intake:transactions` 命令覆盖实际 XLSX → 来源确认 → 合成人工审批 → 质量 → 发布 → 按谱系回读材料。只有测试执行器显式建立的原生目录基线可以接续；服务不 bootstrap、不自动迁移旧同域数据；显式同题覆盖由 0028 完整目录守卫在提交点检查。
 
 在来源、审批与候选质量通过后，用 `publish(actor,{operationId,key,baseReleaseId,sourceEvidenceVersion,approvalEvidenceVersion,title,summary})`。发布动作有独立业务授权，不隐含要求 content-manage/review。API 先锁外即时核验审批，再由私有 SQL 在内容锁/发布锁下核对当前门，签发并消费从观察开始至多 60 秒的票据。目录、公告、单 current、永久关联及原 operation 回执一起提交；最终截止还受授权、审批、继承 owner 记录期限限制。
 
 发生 `COMMIT_UNKNOWN` 时，用原 operationId 调 `operationReceipt(actor,operationId,'publish')`，或重试原 publish 请求；成功提交后的历史回执不再触发远程观察，不产生第二个 release。相同键换载荷拒绝；新操作键不能重复发布同一候选。历史回执不代替当前使用资格。隔离管理 HTTP 对应 `GET /v1/intake/operations/{operationId}?action=publish`；取消用 `action=cancel`，两者与当前主体共同限定命名空间。
 
-新字段保留在不可变材料，release_lineage 绑定完整候选及来源内条目；缺行继承、显式停用保留版本历史。不同来源谱系和不同域旧成员完整复制，并重新核对其审批/来源/owner 门。内部说明仍只供管理审核；封闭坐席白名单读模型见下节，生产桌面尚未接线。未支持媒体的解析规则保持阻断，非空附件说明不能被本发布入口绕过。具体映射、限制和下一切片验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
+新字段保留在不可变材料，release_lineage 绑定完整候选及来源内条目；缺行继承、显式停用保留版本历史。不同来源谱系和不同域旧成员完整复制，并重新核对其审批/来源/owner 门。内部说明仍只供管理审核；封闭坐席白名单读模型及合成桌面接线见下节，正式生产接入尚未放行。未支持媒体的解析规则保持阻断，非空附件说明不能被本发布入口绕过。具体映射、限制和下一切片验收见[合同交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
 
+
+## P2 纠正回退与同题覆盖验证
+
+在 FAQ 工作台提供当前版本和它的上一已发布版本，读取实际影响后发起独立复核，再确认回退。回退生成新的发布版本、公告和永久回执；不直接恢复旧指针，也不复用原候选审批。范围不完整时只能走完整纠正稿，目标内容或审批失效时拒绝回退。结果未知须恢复原操作，不能换编号重发。界面与权限边界、实际 Electron→HTTP→PG15 结果见[回退验收](../evidence/qa/content-intake-p2-rollback/README.md)。
+
+```sh
+pnpm test:intake:desktop
+node scripts/probe-intake-family-sql.mjs --output .gstack/family-sql-check.json
+```
+
+第一条构建并运行原生上传和回退的实际栈用例，需要 Node 24、Electron 和 PG15。第二条使用临时 PG15 验证家族守卫、选择语义及查询计划，并写出可再次消费的 JSON；输出使用本次自有路径，存在时会被替换。其局部目录性能结果不代表完整十倍候选、审批、回执和对象历史存量验收。已有[同题覆盖证据](../evidence/qa/content-intake-p2-family/README.md)保留过一次全量 PG 超时及修后受影响项复测，不将其改写为一次全量通过。
 
 ## P2 使用资格与按店目录
 
@@ -125,7 +136,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin CUSTOMER_AGENT_API_PG
 
 同一资格分页须沿用相同会话和选择；换店、重新登录或改变选择后重签。新资格只能签 current，可指定 releaseId 作 CAS。普通新发布时旧页保持自己的 release；若希望展示新版，重新取资格并完成全部页面后整体替换，不能把新旧页合并。实际空目录必须能替换旧目录。游标只定位，不授予权限；每页均重验，不能把回执/旧资格/hash 当权限。
 
-资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 停止使用并处理审批；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。Main 的 `ContentIntakeUsage` 已拥有完整分页、当前店/选择、迟到回调、原文复制与失效通知；单资格自然到期和精确 FORBIDDEN/LEASE_EXPIRED 只影响该资格，其他有效句柄仍受自己的原截止约束，真正会话/权限/审批失效才清除全部句柄。失败不会复活或延长资格。根级合成 HTTP 探针现在通过实际 `ProductHttp` / `ProductSession` 消费该模块；凭据仅驻留隔离进程内存，测试替换本机员工显示名读取，不读取用户 profile。产品 factory、白名单 IPC、renderer 和原生设备验收仍待接线；此前持久化和最终复审见[使用资格上下文验收](../evidence/qa/content-intake-p2-usage-context/README.md)。
+资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 停止使用并处理审批；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。Main 的 `ContentIntakeUsage` 已拥有完整分页、当前店/选择、迟到回调、原文复制与失效通知；单资格自然到期和精确 FORBIDDEN/LEASE_EXPIRED 只影响该资格，其他有效句柄仍受自己的原截止约束，真正会话/权限/审批失效才清除全部句柄。失败不会复活或延长资格。根级合成 HTTP 探针现在通过实际 `ProductHttp` / `ProductSession` 消费该模块；凭据仅驻留隔离进程内存，测试替换本机员工显示名读取，不读取用户 profile。合成 profile 的 Main factory、白名单 IPC 和 renderer 已接线；生产 factory 与未覆盖设备项仍待验收；此前持久化和最终复审见[使用资格上下文验收](../evidence/qa/content-intake-p2-usage-context/README.md)。
 
 封闭路由适配器 `apps/api/src/content-intake/usage-http.ts` 只由隔离合成宿主注册四个正式路径：`GET /v1/intake/authorization`、`GET /v1/intake/sources`、`POST /v1/intake/entitlements` 与 `GET /v1/intake/snapshot`。复用当前产品认证，原样保留私有 actor 引用；不接受额外身份/选择字段，重复查询参数不覆盖，错误统一为 `IntakeError` 并返回 `no-store`。生产 app/server 工厂未注册它。
 
@@ -148,7 +159,7 @@ Main `loadIntakeAccess(session,signal?)` 收齐两张列表并再次完整核对
 
 该切片连接“合成会话 → 授权店铺 → 已发布通用 FAQ → 原文复制”。开发态设置 `CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2`，同时提供不同端口的 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`（只能是 `http://127.0.0.1:<port>`）。然后运行 `pnpm dev`。未配置 flag 维持既有行为；flag 拼错、缺 origin 或使用远程 origin 都拒绝启动。
 
-打包配置解析器支持在 `synthetic-stack.json` 的 `synthetic-local` 对象中添加 `"contentIntake":"faq-v2"`，但本轮没有打包态验收。标准 synthetic-stack 服务尚未注册新四条路由，不能只加 flag 就声称完整服务可用；需要已经登记合成来源/权限/发布物的隔离宿主和已批准会话入口。可复现原生验收用下述仓库测试，它自己创建两个 loopback 合成 wire 服务与独立 userData，退出清理，不访问生产服务：
+打包配置解析器支持在 `synthetic-stack.json` 的 `synthetic-local` 对象中添加 `"contentIntake":"faq-v2"`，指定版本已有 Windows 打包态验收，见[杭州记录](../evidence/qa/content-intake-p2-hangzhou/README.md)；不能推断后续回退/同题覆盖已在该包验收。标准 synthetic-stack 服务尚未注册新四条路由，不能只加 flag 就声称完整服务可用；需要已经登记合成来源/权限/发布物的隔离宿主和已批准会话入口。可复现原生验收用下述仓库测试，它自己创建两个 loopback 合成 wire 服务与独立 userData，退出清理，不访问生产服务：
 
 ```sh
 pnpm --filter @customer-agent/desktop build
@@ -159,7 +170,7 @@ Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `Content
 
 `cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单、托盘和 Dock 现在可进入 FAQ 专用资料审核页；没有 content-manage 权限时只显示无管理权限，不装配旧管理适配器。FAQ 正文展示和复制均保留原换行。
 
-上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。剩余项包括商品/场景筛选、正式店铺显示名合同、新上传/校验管理入口、真实飞书审批 adapter，以及安装包 Mac/Windows 人工交互。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
+上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。新上传/校验管理入口已接通。仍需补齐商品/场景筛选及正式店铺显示名合同、真实飞书审批接入与剩余平台人工验收；已有设备结果按版本复用，不重新列为全未做。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
 
 ## P2 管理候选与人工质量检查
 
@@ -214,7 +225,7 @@ pnpm dev:intake:synthetic
 4. 读取初检、冻结抽样、逐条保存人工判断并提交。刷新候选状态，填写发布标题/摘要，再发布。
 5. 终端输入 `identity agent`，桌面退出登录后重新登录。选择 shop-a、查询「洁面」，核对新发布的多行原文和复制结果。切换命令只影响下一次登录。
 
-`status` 输出合成状态；`quit`、EOF、退出信号或约5分钟事实到期会停止宿主。宿主只清理自己创建的 PG/对象目录；另起 Electron 的 userData 在独立目录，退出 Electron 后按输出路径手动清理。不要延长事实 TTL 绕过到期检查。杭州机器需按本仓说明独立准备运行环境，本轮不包含远程部署或 Windows/WSL 实机结果。
+`status` 输出合成状态；`quit`、EOF、退出信号或约5分钟事实到期会停止宿主。宿主只清理自己创建的 PG/对象目录；另起 Electron 的 userData 在独立目录，退出 Electron 后按输出路径手动清理。不要延长事实 TTL 绕过到期检查。杭州机器需按本仓说明独立准备运行环境。这组本机命令本身不证明远程部署或 Windows/WSL 结果；已完成的指定版本远端和原生验收见[杭州分层证据](../evidence/qa/content-intake-p2-hangzhou/README.md)，不覆盖后续回退/同题家族。
 
 专项验收：
 
@@ -254,6 +265,6 @@ Main 保留原始字节、服务端对象、parse job 和上传/接收的原操�
 | 应用 ACL | [P2 基础迁移](../packages/database/migrations/0021_content_intake_v1_20.sql)及后续迁移保持应用角色对 intake 私有表/函数的权限封闭；业务事务还需锁定产品会话并写永久回执 | 按组织同步、业务事务、解析 worker、使用读取分别列出所需表/函数操作及角色；验证允许操作与越权拒绝，不能仅授 schema USAGE 或沿用管理员权限。正式 ACL 未批准、权限比预期更宽或必要操作不可用时拒绝启用；不修改既有 migration 来补权限 |
 | 初始目录与旧内容认领 | [发布执行器](../packages/database/migrations/0024_intake_publication.sql)要求明确原生 catalog 基线；[合成 seed](../apps/api/tests/support/intake-synthetic-seed.ts)只为临时库建立空目录，不是正式承接工具 | 提供原发布基线、旧键到登记来源/稳定编号的映射、未归属清单、B1 维护人确认、来源范围和模式切换/回退条件。初始承接执行器仍需独立实现验收；未认领旧内容保留，缺基线、未迁移同域成员或范围冲突时拒绝发布，不以空目录、正文去重或自动归属绕过 |
 
-可与显式同题家族工作并行准备组织/审批的合成字段样例与失败映射、权限矩阵和初始认领案例；当前接入准备只做接口与缺口核对，不因此注册生产入口或读取真实租户资料。后续离线实现应先用合成输入贯穿实际消费者：组织事实缺失/到期/禁用和乱序刷新不能恢复权限；审批创建丢响应沿原 UUID 恢复，错材料、自动通过及撤销不能发布；初始承接须验证首次映射、后续修改和正确范围内显式停用。样例存在不等于这些验证已运行。
+显式同题家族的合成闭环已完成。运行接入准备可与容量收尾并行，先准备组织/审批的合成字段样例与失败映射、权限矩阵和初始认领案例；当前接入准备只做接口与缺口核对，不因此注册生产入口或读取真实租户资料。后续离线实现应先用合成输入贯穿实际消费者：组织事实缺失/到期/禁用和乱序刷新不能恢复权限；审批创建丢响应沿原 UUID 恢复，错材料、自动通过及撤销不能发布；初始承接须验证首次映射、后续修改和正确范围内显式停用。样例存在不等于这些验证已运行。
 
 同题家族的材料、发布冲突、使用选择和数据库迁移由该功能所有者串行集成。运行接入准备不得并行改写发布指针、catalog/lineage、共享合同或新增 migration 序号；初始目录承接后续复用同一范围与家族校验，不另建规则。`content-intake.integration.test.ts`、合成 seed/host 是共用验证输入，改动须与集成负责人协调，避免组织有效期、审批绑定或基线变化使另一工作线的证据失效。

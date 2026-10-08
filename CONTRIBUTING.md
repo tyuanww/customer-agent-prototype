@@ -47,13 +47,15 @@ pnpm run         # 仓根全部脚本
 | 文档、链接、命令名 | `pnpm docs:check` 与 `git diff --check` |
 | 桌面 TypeScript / 合同形状 | `pnpm typecheck` |
 | 桌面局部行为 | 对应 `pnpm --filter @customer-agent/desktop exec vitest run <files>` |
-| 跨模块或准备交付 | `pnpm lint`、`pnpm typecheck`、`pnpm test` |
+| 跨模块或准备交付 | `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` |
 
 Health stack 与授权边界见 [AGENTS.md](AGENTS.md) 第 6 节。不要把「测试文件存在」写成通过。
 
 ## 文档放哪
 
 现行 how-to / 教程 / 参考 / 说明从 [README 文档表](README.md#文档) 进入。历史计划只增不删，索引在 [docs/plans/README.md](docs/plans/README.md)。文档生命周期见 [reference-document-lifecycle.md](docs/reference-document-lifecycle.md)。
+
+资料导入的运行与失败恢复见[合成资料导入指南](docs/how-to-develop-content-intake.md)。[TODOS](TODOS.md) 提供本期剩余、已完成与后续方向的入口；批准范围和阶段证据仍由[资料接入计划](docs/plans/2026-10-03-content-intake-requirements.md)拥有，不从历史记录里的“下一步”重新启动已完成工作。
 
 ## 提问与反馈
 
