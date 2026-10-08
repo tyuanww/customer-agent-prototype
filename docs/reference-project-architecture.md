@@ -103,6 +103,8 @@ OpenAPI1.19 管理上下文没有新增 DDL；26段 SQL 的来源和校验和保
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
 
+`apps/api/experiments/intake-organization/facts-writer.ts` 只用于已登记主体的离线组织事实写入验证，复用 content lock、事实历史/版本指针及 revocation generation。测试使用临时受限账号，通过实际登录/使用资格消费者验证失效；不会创建主体或业务 grant，也不进入 dist、HTTP 或生产角色配置。可信原生观察方及输入归一尚未实现，具体限制见[组织刷新验收](../evidence/qa/intake-organization/README.md)。
+
 `apps/api/src/content-intake/capacity.ts` 是 P2 磁盘容量生命周期的唯一 API 所有者，复用对象存储分配 ID、落盘前准入、持久删除。0029 私有账本在既有内容锁下统一计入输入、报告、普通/回滚审核包；所有调用方在同一业务事务采用。释放先写 tombstone 阻止迟到采用，再在锁外删除文件并同步目录，最后释放额度。未知提交、已登记引用、未知磁盘文件和历史资料不得因超时推断可删除。报告预留被明确拒绝时仍将任务终结，避免占满候选配额。没有新 renderer/HTTP 能力或生产 ACL；规则与实际证据见[容量验收](../evidence/qa/content-intake-p2-capacity/README.md)。
 
 产品迁移 `0028_intake_family` 拥有完整原生目录的显式家族关系与冲突证明，正常发布/回退通过同一 publications 触发器执行；usage在签资格和每页读取时复用私有校验。解析包只解释K列显式编号，API材料保存合同字段；usage按授权、时间、商品/场景先筛选，再以选中组合的完整覆盖选择店铺稿/通用回落，最后分页。没有renderer规则副本、标题推断或第二current；旧发布遇family明确拒绝，应用ACL仍关闭。

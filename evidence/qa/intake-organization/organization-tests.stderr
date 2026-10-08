@@ -1,0 +1,4 @@
+$ pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && pnpm --filter @customer-agent/content-intake build && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/intake-organization.integration.test.ts
+$ tsc -p tsconfig.build.json
+$ tsc -p tsconfig.build.json
+$ tsc -p tsconfig.build.json
