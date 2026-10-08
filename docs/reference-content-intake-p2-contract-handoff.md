@@ -223,3 +223,64 @@ Main 已通过实际 ProductHttp/ProductSession 消费冻结质量 HTTP，负责
 选择独立只读目录而不是给每个 Source 重复塞名称，可避免同店跨来源名称漂移；Main 将其与当前有权店铺集合对齐，仅替换显示文案，查询和复制继续使用 shopId 和原 entitlement。不得让名称服务授予业务权限，也不新增 renderer 通用 HTTP 能力。
 
 **进入实施前：** 治理仓明确组织目录名称的写入所有者、刷新时限/失败策略和字段版本，批准后 export → 产品仓版本化 intake/codegen → Main 显示接线。验收覆盖同名/更名/空名、跨租户、品牌授权、跨页目录变化、撤权/退出/过期；显示变化不改变 shopId。此条只是具体候选，不代表合同批准、真实组织数据接入或新 OpenAPI 版本已发布。当前继续清楚显示店铺编号。
+
+## 7. 第三组：运行接入交接（2026-10-08，候选，未激活）
+
+本组把已有“正式接入”待办细化为实施输入，不新增功能范围。核对基线为产品提交 `51a271b`，继续使用 OpenAPI 1.19.0 / schema.v1.21 与产品迁移 0029。以下是产品消费者要求及待治理的接入方案，不是正式配置、角色授权、真实租户验证或生产启用记录；当前批准及后续入口见[计划 §0.47](plans/2026-10-03-content-intake-requirements.md#047-第三组运行接入交接2026-10-08)。
+
+### 主体映射与组织事实输入
+
+已有登录链为 `feishu-identity-provider.exchange → product-auth-service.callback → backend_identity.complete_callback`。provider 返回 `open_id`，认证模块通过既有绑定签发产品会话；显示名只供显示，不能用 `usr_` 拼接、姓名或登录 owner 标签创建 P2 权限。[事务消费者](../apps/api/src/content-intake/transaction.ts)另从下列记录读组织事实，当前没有生产刷新写入者。
+
+| 输入 / 写入所有者 | 当前消费者要求 | 接入交接要求与失败处理 |
+| --- | --- | --- |
+| 登录绑定 / 既有认证模块 | `principals.user_id` 唯一并引用已登记 `subject_bindings.user_id`；受保护调用须保留认证对象的私有会话引用 | 明确登录绑定与 principal 的可信对应关系；不从 renderer 接身份，不把克隆 DTO 当会话。未登记主体拒绝，登录成功不自动登记业务权限 |
+| 同人关系 / 组织事实维护者 | `(tenant_id, app_id, identity_scope, person_key)` 唯一；关键审核按已确认同人关系排除贡献人 | 明确 ID 命名空间及跨账号归一依据；不能直接把不同应用标识认作同一人，也不能以姓名去重。只提供合成映射作开发输入，真实映射在获准环境登记 |
+| 组织事实 / 独立刷新写入者（待实现） | `principal_id/facts_version/department_ids/job_id/enabled/checked_at/valid_until/facts_digest`；部门 1–100 个，版本只增不改历史，当前指针由 principal 持有；有效期至多五分钟 | 原生字段来源、部门/岗位标识、摘要规范、乱序/重复刷新和停用处理须明确。按既有内容锁原子追加事实及推进指针/撤销代际；失败不续期。当前到期/禁用拒绝消费，不代表刷新器或事件监听已实现 |
+| 岗位规则 / 获准业务规则维护者 | 按 tenant/app、部门 ID 和精确 `job_id` 匹配 `role_rules`；多个不同角色匹配时不能选最高职级；策略版本单独 CAS | 提供经批准的部门/岗位映射。岗位能力上限、业务 grant、分配资格分开；不因“经理”等名称授予全公司范围 |
+| 店铺/来源与业务权限 / 既有授权模块 | `scope` 与 `source` 显式登记，业务动作、分配资格及委派资格分别判断 | 提供获准范围、初始维护者及撤权/接管责任；有登录/岗位不等于有店铺 grant。店铺显示名另走已列合同候选，不阻塞稳定 ID 的合成验证 |
+
+选择继续复用认证模块，并由独立组织事实写入者供给已有事务消费者；不把岗位刷新塞进每次登录，也不让每个业务入口自行查询飞书。这样登录会话、组织事实版本和内容事务仍各有唯一所有者。刷新写入的幂等/乱序合同及权限须在实施前明确，不能照搬合成 seed 的直接写表方式。
+
+### 审批 transport 的精确交接
+
+复用 [ApprovalTransport](../apps/api/src/content-intake/approval-adapter.ts) 三个方法及[合成提供方](../apps/api/tests/support/intake-approval.ts)，不增加客户端审批结论接口。以下字段是**内部规范化协议**；尚未验证飞书原生响应到这些字段的映射，不应当作原生 OpenAPI 请求样例。
+
+| 方法 / 材料 | 必须保留的语义 | 未完成接入与拒绝条件 |
+| --- | --- | --- |
+| `create(binding, packageBytes, signal)` | 固定 tenant/app/definition/node、`createUuid`、审核包 SHA/长度；返回 `instanceCode/attachmentFileCode`。候选表单绑定 `reviewRequestId/key/packageSha256`，回退表单绑定 `reviewRequestId/rollbackPlanId/impactDigest/packageSha256` | 服务端配置须指定获准定义、人工节点和表单字段。实例已创建但响应丢失时沿原 UUID 恢复；不能仅在内存去重或更换 UUID。原生创建/恢复及附件上传尚未实现 |
+| `instance(binding, signal)` | 精确回传绑定、表单、附件 fileCode 与状态；规范化状态为 PENDING/APPROVED/REJECTED/REVOKED。APPROVED 还须含指定节点 HUMAN task 与对应 PASS，task/person/time 一致 | 原生状态、撤回、转交、会签/多任务与时间单位必须显式映射。当前适配器只接受一个被绑定的人工决定和对应一条 PASS；不得从多条记录任取最后一次“通过”，也不得将未知状态映射成通过 |
+| 审核人 / 历史资格 | `identityScope/personKey/taskId/endTime`；UTC ISO 时间须精确，决定不得早于固定包登记；历史资格和当前资格分别验证 | 原生审核人标识须通过已确认主体映射归一；关键稿排除全部贡献人。规范化通过不代替数据库的历史事实、独立性及提交点检查 |
+| `attachment(fileCode, binding, signal)` | 输出 Buffer 流；实际长度等于 `packageBytes`、SHA 等于 `packageSha256`，受现有输出预算约束 | 用服务身份在获准租户取字节；fileCode 不等于临时下载 URL。原生上传后是否保持审核包原字节须实测；认证、下载权限、重定向与超时处理未由合成 transport 证明 |
+| 失败与时限 | 适配器调用限时 30 秒并传 AbortSignal；证据所有者独占有效期与撤销传播 | 原生 I/O 实现还须真正响应取消、限制响应/附件字节，不能只有 Promise 超时。远程失败不推进事实截止；撤销后迟到 APPROVED 不得复活原证据 |
+
+目前已验证错租户/实例/表单返回 `APPROVAL_BINDING`，自动通过或 task/timeline 不符返回 `HUMAN_REVIEW_REQUIRED`，换附件返回 `ATTACHMENT_UNVERIFIED`；缺 adapter 或依赖不可用不能发布。真实 API 的错误翻译、分页及租户认证是后续 transport 的验收项，不能用上述规范化模拟结果替代。
+
+### 运行权限与装配候选
+
+当前 [service](../apps/api/src/content-intake/service.ts) 只注入一个 pool；[管理 HTTP](../apps/api/src/content-intake/management-http.ts) 同时要求 `auth/pool/store`，审批与主体标签是服务端依赖。`requireProductSession: true` 由 HTTP 装配设置。生产 server 尚未注册 intake，不能靠新增环境变量自行变成可用服务。
+
+| 用途边界（尚非已建数据库角色） | 源码所需操作 | 必须隔离或证明的边界 |
+| --- | --- | --- |
+| 组织事实 / 策略维护 | 追加主体事实、历史和版本指针；策略及授权由各自写入者维护 | 普通业务 pool 不能任意伪造身份事实、岗位或扩大维护资格；刷新失败/乱序不恢复已撤资格 |
+| 管理与发布事务 | 来源/授权读取，候选/证据/质量/回退、永久回执及私有发布函数；共用内容锁和发布锁 | 不给 DDL/owner 权限；API 授权检查不能代替数据库运行角色验收。函数、触发器及跨 schema 依赖须纳入精确权限清单 |
+| 解析与对象生命周期 | 输入/报告落盘、容量账本、任务收尾和候选冻结；终态收尾可能发生在主体失效后 | worker 不得因收尾需要获得授予权限或绕过发布门的能力；目录删除与历史回收权限分开，未知提交继续保护 |
+| 坐席使用 | 签资格调用现有租约底座，并写 `entitlements/entitlement_scopes/entitlement_contexts`；分页读取有权目录 | 业务只读不等于数据库全程 SELECT；会话锁也须计入权限核对。不能给坐席通用候选/证据/发布写权限 |
+| 运维容量核对 | `--group intake-objects --dsn ...` 使用只读事务核对账本 | 仅供获准环境；不取得历史删除、DDL 或业务发布权限，不等于完整磁盘核对 |
+
+**实施前的具体差集：** 单一 service pool 尚未实现上表的连接用途隔离；所有新 schema 应用权限仍封闭。应先确定受限角色和可调用事务边界，再以追加迁移及实际非 owner 连接验证允许/拒绝矩阵。上表不是可执行 GRANT 清单，不承诺只需授几个表即可接入；尤其不能直接复用测试管理员 pool，也不能用 `GRANT ALL` 解决启动失败。
+
+factory 的可验收输入为：获准环境标识、受限连接配置、受控对象目录、组织事实供应者、审批 route/transport、主体显示标签、来源模式及初始目录基线。配置、必要权限或目录基线缺失时不启用；审批暂不可用时不得替换成合成审批。连接、parser 与 transport 的关闭/取消职责须由 factory 明确接管，不把测试宿主的生命周期当生产实现。
+
+### 旧目录认领与可复用验收
+
+初始认领需要可核对的 `{baseReleaseId, legacyEntryKey, sourceId, businessEntryId, scope}` 映射清单及维护人确认；这是交接材料字段候选，尚不是已冻结 API。保留原版本字段、未认领成员和来源关系，不能按正文相同自动归属。首次承接、后续修改、正确范围的显式停用及中途失败均需验证；基线变化须重新核对。合成 seed 的空目录登记不是正式认领工具。
+
+| 已有验证，可按内容指纹复用 | 证据位置 | 尚不能证明 |
+| --- | --- | --- |
+| 登录 owner 标签不授业务权；无范围、角色冲突、到期事实拒绝 | [事务测试](../apps/api/tests/content-intake.integration.test.ts) `ignores the login owner label`、`discovery: handles zero scope`；[实跑日志](../evidence/qa/content-intake-p2-capacity/api-postgres.log) | 原生组织同步、离职事件接收、乱序刷新写入器 |
+| 未知创建沿原 UUID；错绑定、自动 PASS、附件替换拒绝；撤销终态 | 同一测试的 `workflow HTTP recovers an unknown provider creation`、`rejects forged instance/form bindings`、`keeps revoked evidence terminal`；同一实跑日志 | 飞书原生 task/timeline 翻译、真正网络恢复和附件权限 |
+| 缺 bootstrap、同域旧成员未认领拒绝，current 不变 | 同一测试的 `refuses missing bootstrap and unmapped legacy-domain rows`；同一实跑日志 | 正式旧目录认领执行器或业务认领签收 |
+| 新表/函数对现有应用角色封闭，迁移及 ACL 后验 | [数据库验收](../evidence/qa/content-intake-p2-capacity/README.md)及所链 PG 日志 | 生产最小角色已建、非 owner 全流程已通过 |
+
+本组只核对源码、冻结合同和上述已运行证据，不新增或重跑未变化的功能测试。后续顺序：确认组织事实/审批的输入合同与用途权限方案 → 用合成原生响应和非 owner PG 连接完成离线实现 → 取得具体环境和真实输入授权后做受控联调。现场账号/拖动/整机断网继续按原安排；SOP/P3、历史删除和自动同步不进入本组。
