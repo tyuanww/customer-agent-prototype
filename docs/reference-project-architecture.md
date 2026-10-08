@@ -93,7 +93,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
 | `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；合成宿主显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；标签不由账号推导，缺失整页失败；目录不是授权或同一时刻快照，不新增姓名表或真实员工读取 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
-| `packages/database/` | 在同一已验证快照内确定性生成 migration（当前二十七段，含四个历史产品 overlay、三段 P2 合同增量及五个 P2 内部产品 overlay）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成 migration（当前二十九段，包含冻结合同增量与追加的产品私有 overlay）；拥有 catalogue、私有账本、合法前缀/N-1 升级规划、同会话锁/事务、稳定错误与 PG15 后验核验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -102,6 +102,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 OpenAPI1.19 管理上下文没有新增 DDL；26段 SQL 的来源和校验和保持不变。迁移规划器允许连续已审合同拥有相同完整目录，仅限同 DDL、不同合同身份；旧1.17与1.18账本已实际验证无需 SQL。证据见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
+
+`apps/api/src/content-intake/capacity.ts` 是 P2 磁盘容量生命周期的唯一 API 所有者，复用对象存储分配 ID、落盘前准入、持久删除。0029 私有账本在既有内容锁下统一计入输入、报告、普通/回滚审核包；所有调用方在同一业务事务采用。释放先写 tombstone 阻止迟到采用，再在锁外删除文件并同步目录，最后释放额度。未知提交、已登记引用、未知磁盘文件和历史资料不得因超时推断可删除。报告预留被明确拒绝时仍将任务终结，避免占满候选配额。没有新 renderer/HTTP 能力或生产 ACL；规则与实际证据见[容量验收](../evidence/qa/content-intake-p2-capacity/README.md)。
 
 产品迁移 `0028_intake_family` 拥有完整原生目录的显式家族关系与冲突证明，正常发布/回退通过同一 publications 触发器执行；usage在签资格和每页读取时复用私有校验。解析包只解释K列显式编号，API材料保存合同字段；usage按授权、时间、商品/场景先筛选，再以选中组合的完整覆盖选择店铺稿/通用回落，最后分页。没有renderer规则副本、标题推断或第二current；旧发布遇family明确拒绝，应用ACL仍关闭。
 

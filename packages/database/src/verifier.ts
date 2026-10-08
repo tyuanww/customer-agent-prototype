@@ -125,13 +125,14 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // The legacy non-login definer receives SELECT on that table only to refuse unsafe inheritance.
 // 0028 adds the complete family guard and publication trigger, and grants the
 // non-login definer candidate SELECT only to refuse legacy family inheritance.
+// 0029 adds the private capacity journal and two accounting indexes, no ACL change.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
 const EXPECTED_ACL_MANIFEST_ENTRIES = 225;
 const EXPECTED_ACL_MANIFEST_SHA256 = '6128b6cc566759e78dd15f876411458ff79bda7205c2c6dbaf0cce9c8d0d67da';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2774;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = 'aa8481403c6235f773a02f244d64322fc84a8e8223c3eaa856f36f2857ea1ea5';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2807;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '8e33db594febe7068011271ead9aa55d168d795cebe984ef861f8cf6d2c83140';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 225;
 const EXPECTED_FUNCTION_SECURITY_SHA256 = '249c3c82b181f07af04d56d648af84d4711e3da154a6a5d8ba79603f35f72d30';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 85;
@@ -757,7 +758,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 85 || inventory.views !== 7 || inventory.functions !== 225 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 86 || inventory.views !== 7 || inventory.functions !== 225 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {

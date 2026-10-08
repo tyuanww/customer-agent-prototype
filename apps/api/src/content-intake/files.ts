@@ -1,3 +1,4 @@
+import type { IntakeCapacity } from './capacity.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import { ContractValidationError, parseContractSchema, type components } from '@customer-agent/contracts';
@@ -18,7 +19,7 @@ const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 /** Owns bounded object admission, authenticated material pagination and report
  * export. DB transactions never hold locks across upload, disk or Excel I/O.
  * Only the sealed management host exposes these capabilities over HTTP. */
-export function createIntakeFiles(run: Run, store: ContentObjectStore,
+export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity: IntakeCapacity,
   report: (diagnosticId: string, error: unknown) => void) {
   const cursorSecret = randomBytes(32);
   let uploading = false;
@@ -84,7 +85,7 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore,
         if (!allowed.ok) return allowed;
         const form = await parseIntakeUploadMultipart(stream, contentType);
         const operationId = parseContractSchema('IntakeId', form.operationId);
-        stored = await store.persist(form.file, 'excel');
+        stored = await capacity.persist(actor.user_id, sourceId, 'input', form.file, 'excel');
         // The command identity binds server-computed bytes, never a claimed hash.
         const object = stored;
         const registered = await run<C['IntakeObject']>(actor, 'upload', { sourceId, sha256: object.sha256, bytes: object.sizeBytes }, operationId,
@@ -92,12 +93,10 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore,
             const src = await source(client, sourceId);
             await authorize(client, who, 'import', src);
             if (src.mode !== 'v2-preview') throw new IntakeRejection('MODE_CONFLICT');
-            const total = await client.query<{ bytes: string }>(
-              'SELECT coalesce(sum(bytes),0) AS bytes FROM content_intake.objects WHERE tenant_id=$1', [who.tenantId]);
-            if (Number(total.rows[0]!.bytes) + object.sizeBytes > 1073741824) throw new IntakeRejection('QUOTA_EXCEEDED', 'RATE_LIMITED');
             await client.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'input',clock_timestamp())`,
             [object.objectId, sourceId, who.id, who.tenantId, who.appId, `intake/${object.objectId}`, object.sha256, object.sizeBytes, MIME]);
+            await capacity.adopt(client, object);
             return { objectId: object.objectId, sourceId, sha256: object.sha256, bytes: object.sizeBytes, mime: MIME };
           }, v => parseContractSchema('IntakeObject', v));
         // A replay references the original object; this new temporary copy is
@@ -109,7 +108,7 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore,
       } catch (error) { return failed(error); }
       finally {
         if (stored && reclaim) {
-          try { await store.reclaim(stored.objectId); }
+          try { await capacity.discard(stored.objectId); }
           catch (error) { try { report(`intake_${randomUUID()}`, error); } catch { /* Retention failure is diagnostic only. */ } }
         }
         uploading = false;

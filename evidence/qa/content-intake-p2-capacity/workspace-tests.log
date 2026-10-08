@@ -1,0 +1,697 @@
+$ pnpm --filter @customer-agent/contracts test:built && pnpm --filter @customer-agent/retrieval-core test:built && pnpm --filter @customer-agent/content-intake test:built && pnpm --filter @customer-agent/database test:built && pnpm --filter @customer-agent/api test:built && pnpm --filter @customer-agent/desktop test && pnpm test:artifact-boundary && pnpm test:architecture && pnpm test:workflow
+$ vitest run && pnpm test:package:built
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/packages/contracts
+
+ ✓ tests/search-gold.test.ts (1 test) 25ms
+ ✓ tests/generate-contracts.test.ts (4 tests) 302ms
+ ✓ tests/runtime.test.ts (18 tests) 1105ms
+   ✓ generated customer-agent runtime contracts > keeps generated artifacts byte-for-byte reproducible  633ms
+   ✓ generated customer-agent runtime contracts > compiles every generated component schema on demand  460ms
+
+ Test Files  3 passed (3)
+      Tests  23 passed (23)
+   Start at  10:46:14
+   Duration  1.46s (transform 145ms, setup 0ms, collect 220ms, tests 1.43s, environment 0ms, prepare 164ms)
+
+$ node --test tests/package-entry.smoke.mjs
+✔ compiled package exports load in the supported Node runtime (46.360958ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 89.309542
+$ pnpm test:unit && pnpm test:package:built
+$ vitest run
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/packages/retrieval-core
+
+ ✓ tests/retrieval-core.test.ts (9 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  10:46:16
+   Duration  257ms (transform 35ms, setup 0ms, collect 35ms, tests 9ms, environment 0ms, prepare 51ms)
+
+$ node --test tests/package-entry.smoke.mjs
+✔ compiled retrieval-core entry ranks a serializable corpus (1.494084ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 40.68475
+$ vitest run
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/packages/content-intake
+
+ ✓ tests/workbook.test.ts (56 tests) 2855ms
+   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  701ms
+   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  522ms
+   ✓ P1 isolated process lifecycle > cancels one active job, rejects a second, then actually parses the next job without late resurrection  320ms
+
+ Test Files  1 passed (1)
+      Tests  56 passed (56)
+   Start at  10:46:17
+   Duration  3.21s (transform 41ms, setup 0ms, collect 134ms, tests 2.86s, environment 0ms, prepare 32ms)
+
+$ pnpm test:unit && pnpm test:package:built
+$ vitest run --exclude tests/postgres.integration.test.ts
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/packages/database
+
+ ✓ tests/client.test.ts (1 test) 2ms
+ ✓ tests/runner.test.ts (3 tests) 8ms
+ ✓ tests/planner.test.ts (12 tests) 32ms
+ ✓ tests/pg15-harness.test.ts (1 test) 126ms
+ ✓ tests/generator.test.ts (10 tests) 378ms
+
+ Test Files  5 passed (5)
+      Tests  27 passed (27)
+   Start at  10:46:21
+   Duration  635ms (transform 278ms, setup 0ms, collect 638ms, tests 547ms, environment 1ms, prepare 355ms)
+
+$ node --test tests/package-entry.smoke.mjs
+✔ compiled database package exposes the immutable migration control surface (0.343875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 58.164875
+$ vitest run && pnpm test:package:built
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/apps/api
+
+ ✓ tests/g1a-e0-evaluate.test.ts (25 tests) 90ms
+ ↓ tests/search-postgres.integration.test.ts (28 tests | 28 skipped)
+ ✓ tests/content-intake-p1.test.ts (34 tests) 8ms
+ ↓ tests/content-import.integration.test.ts (14 tests | 14 skipped)
+ ↓ tests/content-release.integration.test.ts (13 tests | 13 skipped)
+ ↓ tests/event-postgres.integration.test.ts (10 tests | 10 skipped)
+ ↓ tests/backend-runtime.e2e.test.ts (1 test | 1 skipped)
+ ✓ tests/ops-loop-routes.test.ts (15 tests) 368ms
+ ↓ tests/content-intake.integration.test.ts (181 tests | 181 skipped)
+ ↓ tests/announce.integration.test.ts (1 test | 1 skipped)
+ ✓ tests/ops-loop-repository.test.ts (6 tests) 186ms
+ ↓ tests/g1a-e0-synthetic.integration.test.ts (11 tests | 11 skipped)
+stdout | tests/app.test.ts > Application API bootstrap > starts on an ephemeral loopback port and closes cleanly without connecting health to DB
+{"level":"info","requestId":"req-1","userId":"anonymous","path":"/health","method":"GET","statusCode":200,"durationMs":1}
+
+ ✓ tests/app.test.ts (32 tests | 1 skipped) 496ms
+ ↓ tests/product-auth.integration.test.ts (8 tests | 8 skipped)
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > returns the contract 403 when revalidation proves the lease invalid
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation confirms the lease is good
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation confirms the lease is good
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation is itself undetermined
+[api] diagnostic=ANNOUNCE_FAILED
+
+stderr | tests/announce-error-map.test.ts > announce snapshot lease revalidation after a timeout > stays retryable when revalidation is itself undetermined
+[api] diagnostic=ANNOUNCE_FAILED
+
+ ✓ tests/announce-error-map.test.ts (16 tests) 38ms
+ ✓ tests/g1a-e0-input-package.test.ts (44 tests) 1387ms
+ ✓ tests/runtime-config.test.ts (15 tests) 34ms
+ ✓ tests/iteration-task-routes.test.ts (8 tests) 514ms
+   ✓ iteration task HTTP routes > returns an empty list for coach and owner without inventing rows  307ms
+stdout | tests/feishu-identity-provider.test.ts > feishu identity provider > retries a user_info TypeError once
+[api] feishu identity transport retry user_info: TypeError fetch failed UND_ERR_CONNECT_TIMEOUT
+
+stdout | tests/feishu-identity-provider.test.ts > feishu identity provider > still logs in when writing the display name fails
+[api] operator display name persist failed: Error
+
+ ✓ tests/feishu-identity-provider.test.ts (19 tests) 26ms
+ ✓ tests/iteration-task-repository.test.ts (3 tests) 161ms
+ ↓ tests/content-worker.integration.test.ts (5 tests | 5 skipped)
+ ✓ tests/search-decision.test.ts (12 tests) 268ms
+ ✓ tests/event-repository.test.ts (4 tests) 76ms
+ ↓ tests/g1a-comparison.integration.test.ts (5 tests | 5 skipped)
+ ✓ tests/content-normalize.test.ts (9 tests) 8ms
+ ✓ tests/search-service.test.ts (20 tests) 279ms
+ ✓ tests/content-intake-usage-http.test.ts (17 tests) 359ms
+ ✓ tests/search-routes.test.ts (12 tests) 391ms
+ ✓ tests/runtime-boundary-composition.test.ts (6 tests) 8ms
+ ✓ tests/search-unseen-v2.test.ts (2 tests) 611ms
+   ✓ search-unseen-v2 frozen policy suite > drives the wired search backend for every frozen unseen case  608ms
+ ✓ tests/leftover-unseen-v1.test.ts (2 tests) 549ms
+   ✓ leftover-unseen-v1 frozen policy suite > drives the wired search backend for every frozen unseen case  546ms
+ ✓ tests/content-import-service.test.ts (3 tests) 99ms
+ ✓ tests/content-object-store.test.ts (9 tests) 174ms
+ ✓ experiments/search-decision/tests/acceptance-proof.test.ts (5 tests) 1580ms
+   ✓ full N acceptance proof > uses the real acceptance CLI, expected exit 0, and that run's frozen 23-case JSON  1513ms
+ ✓ tests/event-routes.test.ts (3 tests) 311ms
+ ✓ experiments/search-decision/tests/n-facts.test.ts (1 test) 307ms
+   ✓ N-case fact-level diagnostics > records relation facts, exact match, leftover waiver split, and must-not-contain  306ms
+ ✓ tests/search-confirmation-v1.test.ts (2 tests) 1184ms
+   ✓ search-confirmation-v1 frozen policy suite > drives the wired search backend for every frozen case  1182ms
+ ✓ tests/iteration-task-signals.test.ts (5 tests) 3ms
+ ✓ tests/content-import-multipart.test.ts (10 tests) 20ms
+ ✓ experiments/search-decision/tests/body-statement.test.ts (1 test) 147ms
+ ✓ tests/g1a-e0-boundary.test.ts (4 tests) 18ms
+ ✓ tests/ops-loop-csv.test.ts (5 tests) 7ms
+ ✓ tests/search-repository.test.ts (3 tests) 5ms
+ ✓ tests/search-relations.test.ts (23 tests) 39ms
+ ✓ experiments/search-decision/tests/pin.test.ts (4 tests) 7ms
+ ✓ tests/content-intake-material.test.ts (17 tests) 2593ms
+   ✓ formal candidate material from independently parsed workbook > binds every material field to the sampling tuple without pretending it is a governance hash  632ms
+   ✓ formal candidate material from independently parsed workbook > rejects unknown vocabulary and cross-entry question identity  365ms
+   ✓ formal candidate material from independently parsed workbook > binds a family as a pair, versions association changes and clears only explicitly uploaded associations  413ms
+ ✓ tests/search-text.test.ts (19 tests) 17ms
+ ↓ tests/g1a-comparison.runner.test.ts (1 test | 1 skipped)
+ ✓ tests/g1a-keyword-baseline.test.ts (3 tests) 254ms
+ ↓ tests/g1a-synthetic.runner.test.ts (1 test | 1 skipped)
+ ✓ tests/request-boundary.test.ts (5 tests) 5ms
+ ✓ tests/g1a-owner-assembly.test.ts (18 tests) 3112ms
+   ✓ versioned owner package assembler > round-trips actual normalized content to the identical approved five files in unique directories  645ms
+   ✓ versioned owner package assembler > runs the operator entry with synthetic external files and emits only a receipt  1795ms
+ ↓ tests/g1a-e0.runner.test.ts (1 test | 1 skipped)
+ ✓ experiments/search-decision/tests/round1-scope.test.ts (1 test) 247ms
+ ✓ tests/notice-routes.test.ts (1 test) 241ms
+ ✓ tests/idempotency.test.ts (3 tests) 3ms
+ ✓ tests/review-login-server.test.ts (2 tests) 66ms
+ ✓ tests/policy-rules.test.ts (4 tests) 2ms
+ ↓ tests/g1a-owner-assembly.runner.test.ts (1 test | 1 skipped)
+ ✓ tests/workforce-identity-provider.test.ts (1 test) 13ms
+ ✓ experiments/search-decision/tests/negation-regression.test.ts (15 tests) 142ms
+ ↓ experiments/search-decision/tests/full-acceptance.test.ts (1 test | 1 skipped)
+ ✓ tests/review-commitment-hashes.test.ts (1 test) 6ms
+ ✓ experiments/search-decision/tests/interface.test.ts (1 test) 699ms
+   ✓ interface decision-table acceptance > fails non-zero listing ids when decide diverges or v3 diffs are unexpected  699ms
+ ✓ experiments/search-decision/tests/vendor-parity.test.ts (1 test) 1425ms
+   ✓ lab judgeSearch vs product judgeSearch > inspection and product share one policy on every interface and v3 pool  1424ms
+ ✓ experiments/search-decision/tests/generated-types.test.ts (2 tests) 2698ms
+   ✓ generated decision module typecheck > typechecks the materialized .generated module on the clean-checkout path  2020ms
+   ✓ generated decision module typecheck > fails when the generated file itself has a type error, not only the patch string  676ms
+ ✓ experiments/search-decision/tests/fail-gates.test.ts (3 tests) 3924ms
+   ✓ mutation fail gates > interface acceptance exits non-zero and records MX01 in run.json  2239ms
+   ✓ mutation fail gates > round1-scope exits non-zero and records N01 in round1.json  992ms
+   ✓ mutation fail gates > ordinary CLI strips TEST_UNFROZEN and still validates frozen fixtures  692ms
+ ✓ tests/synthetic-identity-provider.test.ts (11 tests) 5113ms
+   ✓ loopback synthetic identity provider > terminates a response that stalls past the provider deadline  5002ms
+
+ Test Files  52 passed | 16 skipped (68)
+      Tests  486 passed | 283 skipped (769)
+   Start at  10:46:23
+   Duration  9.16s (transform 2.57s, setup 0ms, collect 18.10s, tests 30.32s, environment 13ms, prepare 5.40s)
+
+$ node --test tests/package-entry.smoke.mjs tests/main-entry.smoke.mjs
+✔ compiled main entry starts, serves both probes, and closes on SIGINT (242.550667ms)
+✔ compiled main rejects missing private capability configuration before listening (121.793833ms)
+{"level":"info","requestId":"req-1","userId":"anonymous","path":"/health","method":"GET","statusCode":200,"durationMs":36}
+[api] diagnostic=DATABASE_READINESS_PROBE_FAILED
+{"level":"info","requestId":"req-2","userId":"anonymous","path":"/ready","method":"GET","statusCode":503,"durationMs":6}
+✔ compiled API package serves its contract-valid health and readiness routes (85.742541ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 413.530334
+$ vitest run
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/apps/desktop
+
+ ✓ tests/component/QueryApp.test.tsx (96 tests) 17159ms
+   ✓ QueryApp > does not mark read while the window is hidden, then marks read after it becomes visible  1017ms
+   ✓ QueryApp > keeps the same fixture ranking after toggling smart retrieval  362ms
+   ✓ QueryApp > exposes distinct SEARCHING, RESULTS, COPIED and EMPTY fox states  719ms
+   ✓ QueryApp > reports RESULTS with 1, 2, and 3 candidates for the demo queries  895ms
+   ✓ QueryApp > shows a stable Top 3 without numeric match scores  323ms
+   ✓ QueryApp > shows the allergy SOP banner between the heading and cards for the gold query  324ms
+   ✓ QueryApp > does not show the SOP button for usage-plus-allergy or empty results  316ms
+   ✓ QueryApp > keeps 少发/长痘 on aftersale Top 3 without a SOP button  317ms
+   ✓ QueryApp > renders the original synthetic aftersales wording for a natural category question  326ms
+   ✓ QueryApp > keeps result cards mounted long enough to play the closing fade  440ms
+   ✓ QueryApp > shows searching feedback before revealing results  316ms
+   ✓ QueryApp > uses number keys to copy the matching result but never hijacks input typing  316ms
+   ✓ QueryApp > does not hijack numeric typing when the user returns to the input from RESULTS  325ms
+   ✓ QueryApp > supports Numpad selection while blocking repeat, modifiers, and IME key events  317ms
+   ✓ QueryApp > ignores a number shortcut when that result rank does not exist  310ms
+   ✓ QueryApp > auto-dismisses only after successful copy feedback  1237ms
+   ✓ QueryApp > locks every copy entry point during COPIED feedback  324ms
+   ✓ QueryApp > never surfaces expired campaign copy in the result list  314ms
+   ✓ QueryApp > copies original answer text and only says 已复制  329ms
+   ✓ QueryApp > shows a hairline 话术不准 control on query results  316ms
+   ✓ QueryApp > records a local inaccuracy report for high-risk scripts without claiming it was processed  319ms
+   ✓ QueryApp > keeps the copy path as 已复制 after a local inaccuracy report  337ms
+   ✓ QueryApp > scopes a local inaccuracy record to the current query session  636ms
+   ✓ QueryApp > dismisses with Esc after copy without implying the reply was sent  322ms
+   ✓ QueryApp > clears customer text and transient results when the overlay collapses  320ms
+   ✓ QueryApp > shows a recoverable copy error with retry  321ms
+   ✓ QueryApp > never auto-dismisses after a failed copy  315ms
+   ✓ QueryApp > cancels an old success-dismiss timer when a new session opens  317ms
+   ✓ QueryApp > ignores a late copy promise after collapse and reopen  317ms
+   ✓ QueryApp > measures shortcut and status banners as independent layout owners  378ms
+   ✓ QueryApp > keeps manual search usable when getWindowContext rejects  314ms
+   ✓ QueryApp > measures shortcut and ERROR banners as independent layout owners  376ms
+   ✓ QueryApp > ignores stale layout ACKs from another session and keeps the new session waiting  630ms
+   ✓ QueryApp > rejects a second resize pointer, rolls back cancel after height changes, then allows another drag  337ms
+   ✓ QueryApp > applies a matching fallback ACK then lets the next natural layout succeed  619ms
+   ✓ QueryApp > cancels immediately on lostpointercapture even when buttons is still 1  330ms
+ ✓ tests/component/DashboardApp.test.tsx (52 tests) 1794ms
+   ✓ DashboardApp > fail-closes bad coach tables without leaking a staged preview or enabling publish  354ms
+ ✓ tests/component/FoxApp.test.tsx (52 tests) 255ms
+ ✓ tests/unit/dashboard-layout.test.ts (17 tests) 166ms
+ ✓ tests/component/ContentModule.test.tsx (31 tests) 492ms
+ ✓ tests/unit/fox-presence.test.ts (18 tests) 15ms
+ ✓ tests/unit/overlay-geometry.test.ts (21 tests) 7ms
+ ✓ tests/unit/windows-platform-contract.test.ts (16 tests) 32ms
+ ✓ tests/component/dashboard-live-actions.test.tsx (16 tests) 260ms
+ ✓ tests/unit/workspace-hygiene.test.ts (23 tests) 385ms
+ ✓ tests/unit/customer-agent-contract-set.test.ts (23 tests) 1708ms
+stderr | tests/unit/overlay-ipc-handlers.test.ts > overlay query layout IPC handlers > awaits dashboard opening and returns a typed failure to the trusted query
+[dashboard] IPC 打开工作台失败。 工作台未打开，请重试。查询窗口仍保持可用。
+
+stderr | tests/unit/overlay-ipc-handlers.test.ts > overlay query layout IPC handlers > turns an unexpected controller rejection into a typed failure
+[dashboard] IPC 打开工作台失败。 Error: dashboard failed
+    at /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/apps/desktop/tests/unit/overlay-ipc-handlers.test.ts:280:49
+    at file:///Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at runSuite (file:///Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+
+ ✓ tests/unit/overlay-ipc-handlers.test.ts (26 tests) 14ms
+ ✓ tests/unit/packaged-retrieval-paths.test.ts (15 tests) 14ms
+ ✓ tests/component/intake-upload.test.tsx (14 tests) 495ms
+ ✓ tests/unit/fox-head-assets.test.ts (6 tests) 5461ms
+   ✓ fox head brand assets > rejects an invalid raster before replacing canonical or derived assets  2052ms
+   ✓ fox head brand assets > generates identical fox PNG hashes across consecutive runs  2028ms
+   ✓ fox head brand assets > generates identical Dock icons across consecutive runs and keeps the plate contract  1110ms
+ ✓ tests/component/intake-management.test.tsx (13 tests) 1173ms
+ ✓ tests/unit/product-runtime-config.test.ts (13 tests) 15ms
+ ✓ tests/component/IterationModule.test.tsx (9 tests) 226ms
+ ✓ tests/unit/mac-platform-contract.test.ts (9 tests) 10ms
+ ✓ tests/unit/search-service.test.ts (30 tests) 19ms
+ ✓ tests/unit/query-visual.test.ts (10 tests) 5ms
+ ✓ tests/unit/dashboard-appearance.test.ts (7 tests) 45ms
+ ✓ tests/unit/coach-content-upload.test.ts (11 tests) 190ms
+ ✓ tests/unit/xlsx-first-sheet.test.ts (8 tests) 19ms
+ ✓ tests/unit/product-login-window.test.ts (11 tests) 12ms
+ ✓ tests/unit/overlay-controller-fox-settle.test.ts (10 tests) 6ms
+ ✓ tests/component/AnnounceModule.test.tsx (11 tests) 230ms
+ ✓ tests/unit/overlay-controller-dashboard.test.ts (10 tests) 16ms
+ ✓ tests/unit/dashboard-manifest.test.ts (15 tests) 7ms
+ ✓ tests/unit/query-layout.test.ts (7 tests) 4ms
+ ✓ tests/unit/app-identity.test.ts (3 tests) 833ms
+   ✓ brand icon assets > keeps a 1024 app-icon master that is not the transparent fox-head  656ms
+ ✓ tests/unit/contracts.test.ts (9 tests) 52ms
+ ✓ tests/unit/linux-platform-contract.test.ts (12 tests) 14ms
+ ✓ tests/unit/startup-failure-notice.test.ts (13 tests) 4ms
+ ✓ tests/component/SopLibraryModule.test.tsx (6 tests) 193ms
+ ✓ tests/unit/overlay-events.test.ts (5 tests) 2ms
+ ✓ tests/unit/fox-motion.test.ts (8 tests) 3ms
+ ✓ tests/unit/query-view.test.ts (12 tests) 2ms
+ ✓ tests/component/SopApp.test.tsx (6 tests) 95ms
+ ✓ tests/unit/dashboard-content-publish-gate.test.ts (8 tests) 7ms
+ ✓ tests/unit/dashboard-window.test.ts (4 tests) 3ms
+ ✓ tests/unit/sop-model.test.ts (11 tests) 3ms
+ ✓ tests/unit/query-view-model.test.ts (6 tests) 2ms
+ ✓ tests/component/QueryResultsPane.test.tsx (4 tests) 79ms
+ ✓ tests/unit/dashboard-iteration.test.ts (4 tests) 2ms
+ ✓ tests/unit/product-search-ipc.test.ts (3 tests) 5ms
+ ✓ tests/unit/shutdown-fence.test.ts (4 tests) 3ms
+ ✓ tests/unit/product-ipc.test.ts (3 tests) 4ms
+ ✓ tests/unit/desktop-menu-model.test.ts (6 tests) 2ms
+ ✓ tests/component/LoginApp.test.tsx (6 tests) 93ms
+ ✓ tests/unit/sop-window-ipc.test.ts (2 tests) 4ms
+ ✓ tests/unit/inaccuracy-report.test.ts (8 tests) 2ms
+ ✓ tests/unit/desktop-lifecycle.test.ts (6 tests) 106ms
+ ✓ tests/component/intake-rollback.test.tsx (3 tests) 130ms
+ ✓ tests/unit/dashboard-open-failure.test.ts (5 tests) 54ms
+ ✓ tests/unit/content-frozen-import.test.ts (4 tests) 2ms
+ ✓ tests/unit/query-understanding.test.ts (5 tests) 2ms
+ ✓ tests/unit/node-system-ca.test.ts (4 tests) 3ms
+ ✓ tests/unit/product-announce-ipc.test.ts (2 tests) 4ms
+ ✓ tests/unit/retrieval-telemetry.test.ts (3 tests) 4ms
+ ✓ tests/unit/product-catalog.test.ts (3 tests) 3ms
+ ✓ tests/unit/catalog-scope.test.ts (4 tests) 2ms
+ ✓ tests/unit/library-delta.test.ts (7 tests) 2ms
+ ✓ tests/unit/overlay-renderer-loader.test.ts (6 tests) 4ms
+ ✓ tests/unit/wording-library-browse.test.ts (5 tests) 2ms
+ ✓ tests/unit/overlay-test-harness.test.ts (2 tests) 2ms
+ ✓ tests/unit/sop-geometry.test.ts (7 tests) 2ms
+ ✓ tests/component/intake-dashboard-shell.test.tsx (2 tests) 88ms
+ ✓ tests/unit/inaccuracy-todo.test.ts (4 tests) 2ms
+ ✓ tests/unit/query-ipc-access.test.ts (3 tests) 2ms
+ ✓ tests/unit/renderer-url.test.ts (7 tests) 2ms
+ ✓ tests/unit/overlay-chrome-window.test.ts (2 tests) 2ms
+ ✓ tests/unit/iteration-close-hint.test.ts (3 tests) 1ms
+ ✓ tests/unit/synthetic-development-baseline.test.ts (52 tests) 16ms
+ ✓ tests/component/App.test.tsx (4 tests) 30ms
+ ✓ tests/unit/retrieval-quality.test.ts (5 tests) 2ms
+ ✓ tests/unit/sender-guard.test.ts (3 tests) 2ms
+ ✓ tests/unit/overlay-machine.test.ts (6 tests) 2ms
+ ✓ tests/unit/window-role.test.ts (4 tests) 1ms
+ ✓ tests/unit/dashboard-window-factory.test.ts (1 test) 2ms
+ ✓ tests/unit/desktop-fetch.test.ts (2 tests) 3ms
+ ✓ tests/unit/validity.test.ts (4 tests) 2ms
+ ✓ tests/unit/renderer-security-wiring.test.ts (1 test) 3ms
+ ✓ tests/unit/synthetic-catalog.test.ts (3 tests) 2ms
+ ✓ tests/unit/dashboard-announce.test.ts (1 test) 1ms
+ ✓ tests/unit/product-help.test.ts (1 test) 2ms
+ ✓ tests/unit/dashboard-access.test.ts (3 tests) 1ms
+ ✓ tests/unit/loopback-proxy.test.ts (2 tests) 1ms
+ ✓ tests/unit/shortcut.test.ts (3 tests) 2ms
+ ✓ tests/unit/query-route.test.ts (3 tests) 2ms
+ ✓ tests/unit/system-clipboard.test.ts (2 tests) 1ms
+ ✓ tests/unit/clipboard-write.test.ts (3 tests) 2ms
+ ✓ tests/unit/fox-peek-access.test.ts (2 tests) 1ms
+ ✓ tests/unit/macos-m5-remote.test.ts (1 test) 1ms
+ ✓ tests/unit/synthetic-content-boundary.test.ts (1 test) 1ms
+ ✓ tests/unit/product-help-open.test.ts (1 test) 2ms
+ ✓ tests/unit/ime.test.ts (2 tests) 1ms
+ ✓ tests/unit/product-loopback-chain.test.ts (1 test) 1ms
+ ✓ tests/unit/is-interactive-target.test.ts (1 test) 4ms
+ ✓ tests/unit/product-session-expiry.test.ts (3 tests) 1ms
+ ✓ tests/unit/file-renderer-html.test.ts (1 test) 1ms
+stdout | tests/unit/product-search.test.ts > product query and native copy provenance > preserves copy when telemetry is 'unrecorded'
+[desktop] product-http 503 OVERLOADED 0ms
+
+stdout | tests/unit/product-search.test.ts > product query and native copy provenance > maps inaccuracy HTTP errors via queryFailure and posts only query_id+script_id without a candidate
+[desktop] product-http 429 RATE_LIMITED 0ms
+
+stdout | tests/unit/product-search.test.ts > product no-hit escalate and terminal > keeps the native help action when telemetry is 'unrecorded'
+[desktop] product-http 503 OVERLOADED 0ms
+
+ ✓ tests/unit/product-search.test.ts (35 tests) 177ms
+ ✓ tests/unit/content-intake-upload.test.ts (37 tests) 54ms
+ ✓ tests/unit/content-intake-management.test.ts (32 tests) 336ms
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > acks without extending the lease and keeps the token off the public view
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > returns 304 without issuing a new lease or mixing snapshot releases
+[desktop] announce refresh failed VALIDATION Error
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > returns 304 without issuing a new lease or mixing snapshot releases
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > returns 304 without issuing a new lease or mixing snapshot releases
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > still hydrates when ack is forbidden for a client bound to another user
+[desktop] product-http 403 FORBIDDEN 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > still hydrates when ack is forbidden for a client bound to another user
+[desktop] announce ack FORBIDDEN; continuing with issued lease
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > still hydrates when ack is forbidden for a client bound to another user
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > retries announce current without conditionals when 304 arrives before a lease
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > keeps the local lease when a 304 omits snapshot-lease headers
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > maps source-gate 503 and expires the local lease without claiming a read
+[desktop] product-http 503 SOURCE_GATE_NOT_READY 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > maps source-gate 503 and expires the local lease without claiming a read
+[desktop] announce refresh failed SOURCE_GATE_NOT_READY Error
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > stops allowing a release after the lease deadline
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > writes the off-repo hydrate snapshot after paging the current release
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > schedules embeddings after hydrate writes or aligns, not when keeping a larger catalog
+[desktop] product-http 404 GONE 1ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > schedules embeddings after hydrate writes or aligns, not when keeping a larger catalog
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > product announce lease and snapshot > schedules embeddings after hydrate writes or aligns, not when keeping a larger catalog
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > content-updated fan-out and unread > emits content-updated without an invalidation and keeps the first snapshot unread-free
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > content-updated fan-out and unread > flags only the domains whose content moved, and mark-read clears exactly those
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > content-updated fan-out and unread > uses in-memory snapshot counts for the dashboard projection even when hydrate keeps a larger file
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > content-updated fan-out and unread > never writes last_seen on ACK, snapshot, or a FORBIDDEN ack
+[desktop] product-http 404 GONE 0ms
+
+stdout | tests/unit/product-announce.test.ts > content-updated fan-out and unread > exposes unread as false with no signed-in session
+[desktop] product-http 404 GONE 0ms
+
+ ✓ tests/unit/product-announce.test.ts (17 tests) 62ms
+ ✓ tests/unit/dashboard-content-ipc.test.ts (16 tests) 9ms
+ ✓ tests/unit/dashboard-ops-loop.test.ts (9 tests) 37ms
+ ✓ tests/unit/hydrate-catalog.test.ts (13 tests) 10ms
+ ✓ tests/unit/content-intake-quality.test.ts (20 tests) 204ms
+ ✓ tests/unit/dashboard-iteration-ipc.test.ts (6 tests) 4ms
+stdout | tests/unit/product-session.test.ts > product session lifetime > drops late login after logout
+[desktop] product-http transport AbortError 0ms
+
+stdout | tests/unit/product-session.test.ts > product session lifetime > cancels exchange when the login window aborts after opening the browser
+[desktop] product-http transport AbortError 0ms
+
+stdout | tests/unit/product-session.test.ts > loopback transport > does not follow redirects or expose server errors
+[desktop] product-http 503 OVERLOADED 0ms
+
+stdout | tests/unit/product-session.test.ts > loopback transport > maps source-gate 503 and keeps 304 bodies empty
+[desktop] product-http 503 SOURCE_GATE_NOT_READY 0ms
+
+ ✓ tests/unit/product-session.test.ts (23 tests) 92ms
+ ✓ tests/unit/content-intake-usage.test.ts (18 tests) 234ms
+ ✓ tests/unit/content-intake-rollback.test.ts (13 tests) 40ms
+stdout | tests/unit/doc2query.test.ts > MiniMax Doc2Query > sends only id, title, and shortcut question to MiniMax
+Downloading Electron binary...
+
+ ✓ tests/unit/doc2query.test.ts (10 tests) 1595ms
+   ✓ MiniMax Doc2Query > sends only id, title, and shortcut question to MiniMax  1557ms
+ ✓ tests/unit/content-intake-query.test.ts (12 tests) 359ms
+stdout | tests/unit/product-http.test.ts > authenticated bounded XLSX report reads > stops a stalled body when cancelled and never returns late binary data
+[desktop] product-http transport AbortError 0ms
+
+stdout | tests/unit/product-http.test.ts > authenticated bounded XLSX report reads > decodes a JSON authority rejection on a binary request
+[desktop] product-http 403 FORBIDDEN 0ms
+
+ ✓ tests/unit/product-http.test.ts (17 tests) 14ms
+ ✓ tests/unit/dashboard-wording.test.ts (6 tests) 6ms
+ ✓ tests/unit/retrieval-pipeline.test.ts (6 tests) 39ms
+ ✓ tests/unit/semantic-retrieve.test.ts (8 tests) 11ms
+ ✓ tests/unit/content-intake-access.test.ts (12 tests) 53ms
+ ✓ tests/unit/dense-retrieve.test.ts (8 tests) 11ms
+ ✓ tests/unit/content-intake-native-files.test.ts (6 tests) 30ms
+ ↓ tests/unit/content-intake-usage-http.test.ts (2 tests | 2 skipped)
+ ✓ tests/unit/dashboard-content-preload.test.ts (3 tests) 9ms
+ ✓ tests/unit/retrieval-core-parity.test.ts (2 tests) 10ms
+ ↓ tests/unit/content-intake-management-context-http.test.ts (1 test | 1 skipped)
+ ✓ tests/unit/dashboard-content-parse.test.ts (2 tests) 5ms
+ ↓ tests/unit/content-intake-principals-http.test.ts (1 test | 1 skipped)
+ ↓ tests/unit/stack-anomaly-rollback.test.ts (1 test | 1 skipped)
+ ↓ tests/unit/content-intake-quality-http.test.ts (1 test | 1 skipped)
+ ✓ tests/unit/dashboard-iteration-preload.test.ts (1 test) 4ms
+stderr | tests/unit/minimax-rerank.test.ts > minimax rerank parser > stays null when unconfigured and keeps BM25 order when chat fails
+[minimax-chat] fallback Error
+
+ ✓ tests/unit/minimax-rerank.test.ts (4 tests) 3ms
+ ✓ tests/unit/product-last-seen.test.ts (5 tests) 3ms
+ ↓ tests/unit/content-intake-family-http.test.ts (1 test | 1 skipped)
+ ✓ tests/unit/content-intake-management-ipc.test.ts (1 test) 2ms
+ ✓ tests/unit/retrieval-embeddings-store.test.ts (2 tests) 3ms
+ ✓ tests/unit/product-session-store.test.ts (3 tests) 3ms
+ ✓ tests/unit/retrieval-preference.test.ts (4 tests) 2ms
+ ✓ tests/unit/content-intake-query-ipc.test.ts (1 test) 2ms
+stderr | tests/unit/minimax-chat.test.ts > minimax chat fail-open > returns null when the key is missing, HTTP fails, or fetch throws
+[minimax-chat] fallback Error
+
+ ✓ tests/unit/minimax-chat.test.ts (1 test) 3ms
+ ✓ tests/unit/minimax-plan.test.ts (4 tests) 1ms
+ ✓ tests/unit/hybrid-live.test.ts (1 test) 98ms
+
+ Test Files  136 passed | 6 skipped (142)
+      Tests  1304 passed | 7 skipped (1311)
+   Start at  10:46:36
+   Duration  77.58s (transform 1.59s, setup 8.49s, collect 4.05s, tests 35.68s, environment 14.78s, prepare 3.86s)
+
+$ node --test scripts/formal-artifact-boundary.test.mjs
+✔ accepts generic contract vocabulary without desktop fixture modules (1.546083ms)
+✔ rejects a desktop synthetic fixture import (0.822917ms)
+✔ rejects symlinks inside a formal artifact root (0.677ms)
+✔ rejects missing artifact roots instead of silently passing (0.248417ms)
+✔ rejects unknown and credential-like file types instead of skipping them (0.468667ms)
+✔ rejects a fine-grained GitHub credential marker in an allowed file type (0.534083ms)
+✔ rejects a formal candidate built from a different Git commit (0.755666ms)
+✔ rejects a symlinked formal candidate root (0.611583ms)
+✔ canonical candidate checks build once, test that build, then bind the copied bytes to HEAD (503.736333ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 555.431042
+$ node --test scripts/architecture-boundary-check.test.mjs
+✔ renderer may import React, @shared, and contract types (2.3025ms)
+✔ renderer import of electron fails with file, rule, and fix (0.904291ms)
+✔ renderer import of main, preload, and database fails (6.801625ms)
+✔ preload may wrap fixed channels and keep a private channel helper (1.585708ms)
+✔ preload generic send/on/invoke fails (1.143959ms)
+✔ preload exposing a helper that accepts the caller channel fails (0.933708ms)
+✔ packages may import node builtins and root scripts (1.136ms)
+✔ packages importing an app fails (0.665875ms)
+✔ packages package.json dependency on an app fails (1.052334ms)
+✔ api may import contracts and the D5 desktop adapter seam (1.362208ms)
+✔ api source importing desktop fails (0.723583ms)
+✔ D5 e2e file still fails when it loads a desktop module outside the four adapters (0.725833ms)
+✔ api package.json dependency on desktop fails (0.972417ms)
+✔ shared may import contract types, node:crypto, and a document parameter (1.062458ms)
+✔ shared import of React or Electron fails (1.011667ms)
+✔ shared DOM use fails while a document parameter stays allowed (0.879833ms)
+✔ the current repository has no architecture violations (189.153625ms)
+✔ cli exits non-zero and names the file, rule, and fix (29.410542ms)
+✔ cli exits 0 on this repository (162.429875ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 451.690833
+$ node --test scripts/verification-policy.test.mjs scripts/synthetic-stack/stack.test.ts scripts/dev-help.test.mjs scripts/update-download-page.test.mjs scripts/ops/health-check.test.mjs
+✔ pnpm help:dev prints the golden path and a missing-script next step (35.275833ms)
+✔ dev-help --check stays aligned with the printed copy (37.684917ms)
+✔ the probe targets /ready, never the dependency-free /health (0.604542ms)
+✔ the unit does not keep its failure counter in the private /tmp (0.193959ms)
+✔ the timer fires every minute and starts shortly after boot (0.198334ms)
+✔ an unreachable configuration fails loudly instead of probing a default (6.713542ms)
+✔ an empty webhook fails loudly (21.855625ms)
+✔ a healthy endpoint alerts nobody and leaves the counter empty (95.3275ms)
+✔ alerts once, on the third consecutive failure, then stays quiet (171.042209ms)
+✔ recovery clears the counter so a later outage alerts again (207.878875ms)
+✔ the production stack stays in the foreground and restarts on child failure (0.455083ms)
+✔ the watchdog never uses flock, which may not exist on the host (0.320167ms)
+✔ the watchdog restarts via the stack unit's own command, and does not reseed (0.08625ms)
+✔ the watchdog unit carries the same environment the stack unit does (0.1635ms)
+✔ the watchdog timer starts after the stack has had a chance (0.141334ms)
+✔ a healthy stack makes the watchdog exit silently without restarting (17.523083ms)
+▶ synthetic seed content
+  ✔ declares a scope for every row that the catalog can label (0.512042ms)
+  ✔ keeps every catalog reference contract-safe (0.120458ms)
+  ✔ marks campaign rows with a bounded window (0.078834ms)
+✔ synthetic seed content (1.182542ms)
+▶ stack profile
+  ✔ builds loopback-only API environment with distinct login roles (0.904875ms)
+  ✔ enables Feishu OAuth while keeping the loopback password origin (0.240834ms)
+  ✔ writes only loopback origins to the packaged desktop profile (0.659417ms)
+  ✔ follows Electron Linux userData, including XDG_CONFIG_HOME (0.104333ms)
+  ✔ rejects a profile file that is not the current version or root (0.4215ms)
+✔ stack profile (3.17025ms)
+▶ process ownership
+  ✔ records and re-reads the current process signature (10.477458ms)
+  ✔ refuses to signal a stale record instead of killing an unrelated pid (3.731125ms)
+  ✔ reports a free and a busy loopback port (6.9795ms)
+  ✔ rejects an unsafe process name (4.162792ms)
+  ✔ keeps the marker file out of the seed path (0.068583ms)
+✔ process ownership (25.644583ms)
+▶ anomaly checks
+  ✔ refuses to put non-Latin-1 text into an Authorization header (0.704583ms)
+  ✔ keeps rollback staleness on the desktop adapter, not raw adoption HTTP (0.425958ms)
+  ✔ reads the source-suspend id from argv[4] (0.151666ms)
+✔ anomaly checks (1.348125ms)
+▶ synthetic identity password
+  ✔ grants a seeded binding and rejects unknown credentials without enumerating (176.924167ms)
+  ✔ no longer accepts the historical hardcoded password (62.986917ms)
+  ✔ refuses to start when the account file is absent, instead of seeding a default (0.471875ms)
+✔ synthetic identity password (240.491666ms)
+▶ identity admission
+  ✔ admits loopback Host headers and rejects a public one (0.099167ms)
+  ✔ permits an extra hostname only when explicitly configured (0.043875ms)
+  ✔ refuses to load accounts from a missing file instead of seeding a default (0.53275ms)
+✔ identity admission (0.762542ms)
+▶ stack content env
+  ✔ reads a real deployment database name and content constants (0.196417ms)
+  ✔ treats an absent file as "use the synthetic defaults" (0.069208ms)
+  ✔ fails closed on a present but invalid file rather than falling back (0.275709ms)
+  ✔ rejects a misspelled key instead of ignoring it (0.051583ms)
+  ✔ rejects duplicate keys and a non-identifier database name (0.071625ms)
+  ✔ keeps two stacks off each other's ports, not merely on different offsets (0.479041ms)
+✔ stack content env (1.229875ms)
+▶ stack production env
+  ✔ reads the portable secrets a production stack cannot invent (0.114666ms)
+  ✔ treats an absent file as "run with the synthetic secrets" (0.046958ms)
+  ✔ refuses every value the stack root can derive instead of merging it (0.23625ms)
+  ✔ fails closed on an empty value and a malformed profile name (0.095792ms)
+  ✔ lets a portable key replace the synthetic constant (0.08ms)
+  ✔ refuses a key set in both api.env and content.env (0.07475ms)
+✔ stack production env (0.7215ms)
+▶ stack profile reuse
+  ✔ adopts a profile it can use (0.798333ms)
+  ✔ refuses a profile whose database name would reach CREATE DATABASE (0.806208ms)
+✔ stack profile reuse (1.636375ms)
+▶ stack seed policy
+  ✔ never seeds a stack that declares its own database (0.044125ms)
+✔ stack seed policy (0.078875ms)
+▶ stack database wiring
+  ✔ never falls back to the module constant for the database name (0.329083ms)
+✔ stack database wiring (0.360291ms)
+▶ stack production wiring
+  ✔ applies api.env, because stack.ts is the production entry point (0.126875ms)
+✔ stack production wiring (0.154625ms)
+▶ stack start modes
+  ✔ can start without importing the synthetic catalog (0.09975ms)
+  ✔ keeps production children attached for systemd supervision (0.102917ms)
+✔ stack start modes (0.238625ms)
+▶ process identity survives a clock correction
+  ✔ treats a record as live when the signature drifted but the command line matches (9.429792ms)
+  ✔ still refuses a record whose pid belongs to a different command (3.34525ms)
+  ✔ does not claim ownership when the record carries no command line (1.72925ms)
+✔ process identity survives a clock correction (14.567834ms)
+✔ platformOf maps exactly the three linked platforms (0.539166ms)
+✔ formatSizeMb and formatDateZh match the printed page (13.81275ms)
+✔ manifestFromRelease keeps linked assets, drops the zip, and requires all three (1.185541ms)
+✔ renderIndex rewrites version, date, sizes, checksums and every URL (1.394541ms)
+✔ renderIndex and renderWindows are idempotent (0.331417ms)
+✔ renderIndex fails loudly when the page loses a panel or a chip (0.794ms)
+✔ renderIndex refuses a page that links a different repository (0.227333ms)
+✔ renderIndex refuses a page that stopped linking a platform (0.173ms)
+✔ renderIndex refuses a page carrying two different versions (0.1625ms)
+✔ compareVersions orders numerically rather than as strings (0.106125ms)
+✔ publishedVersion reads the version a page advertises (0.104833ms)
+✔ renderWindows points the redirect at the release asset (0.153667ms)
+✔ updateDownloadPages writes both pages once, then reports no changes (2.77825ms)
+✔ --check reports staleness without writing (0.919792ms)
+✔ the CLI republishes a stale page from a manifest (105.1365ms)
+✔ updateDownloadPages refuses to walk the page backwards (0.708792ms)
+✔ updateDownloadPages publishes an older release only when told to (1.13475ms)
+✔ the CLI reports the resolved version and refuses a downgrade (103.45075ms)
+✔ only known documentation paths skip runtime lanes; rules retain semantic checks (0.674625ms)
+✔ gate refuses failure, cancellation, skip and missing classifier output (0.795917ms)
+✔ real git diff includes old code path of rename, deletion and new local files (185.303042ms)
+ℹ tests 81
+ℹ suites 14
+ℹ pass 81
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 568.53625
