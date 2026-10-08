@@ -41,7 +41,7 @@ contracts/upstream（不可变输入；同一受锁 snapshot）
   │    └─ apps/api → 合成身份 / 内容闭环 / search / announce（loopback only）
   ├─ packages/retrieval-core（BM25 / RRF / similarity / threshold；纯算法）
   │    └─ apps/desktop → shared adapter 注入字段权重、分词和检索策略
-  └─ packages/database（0001..0032 / catalogue / ledger / verify）
+  └─ packages/database（0001..0033 / catalogue / ledger / verify）
        └─ migration owner 控制面（只 apply/verify，不进入 API 请求路径）
 
 apps/api（DEV-M1 COMPLETE）
@@ -276,9 +276,9 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 ## 7. 当前架构评价
 
-当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。`main@4739c39` 的 CI run `37024571842` 已通过，`pnpm check:architecture` 当前对 303 个源码/配置文件报告 0 个依赖方向违规，`runtime_activated=false` 和 synthetic-only 边界仍保留。
+当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。`main@4739c39` 的 CI run `37024571842` 已通过，当时 `pnpm check:architecture` 对 303 个源码/配置文件报告 0 个依赖方向违规；本轮统一工作台检查为 389 个文件、0 违规，`runtime_activated=false` 和 synthetic-only 边界仍保留。
 
-FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块和业务订阅。FAQ 只显示内容管理、仅挂 `IntakeManagement`，不订阅旧 `dashboardContent` 会话。模块消费既有 `--dash-*` token 与共享主按钮，不能另建主题或复制导航状态机。
+FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块和业务订阅。FAQ 恢复原五模块导航：`IntakeManagement` 在导航切换间保留上传/发布/权限表单；同一常驻 `IntakeLibrary` 投影话术库与当前可用版本。概览只有实际导航，SOP/经营统计/软件更新显示未接入，不订阅旧 `dashboardContent`、公告或目录适配器。模块消费既有 `--dash-*` token 与共享主按钮，不能另建主题或复制导航状态机。
 
 四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
 
@@ -351,4 +351,6 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 `shop-directory.ts` 借用原内容事务及真实 ProductSession，会话锁后 prepare 有界目录，最终 finish 和 deadline 通过才返回。Main `content-intake-access.ts` 完整消费分页并要求名称 shopId 集合与已授权 shops 相等，名称失败保留编号与可见提示；Query 只投影显示名，同名附 ID，不改变授权或新建 IPC。
 
-独立合成 host 的 `purpose-runtime` 使用正式33段迁移及四个低权 LOGIN，实际组织登记/观察/写入后启动业务、usage、worker 消费者；没有 SQL 改写桥或候选重复安装。旧 experiments SQL/probe 测试显式固定旧32段基线，仅保留历史实验边界。当前实现/证据见[正式合同合成接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。生产 app/server 注册、真实配置、真实数据和原工作台统一接线仍未完成。
+独立合成 host 的 `purpose-runtime` 使用正式33段迁移及四个低权 LOGIN，实际组织登记/观察/写入后启动业务、usage、worker 消费者；没有 SQL 改写桥或候选重复安装。旧 experiments SQL/probe 测试显式固定旧32段基线，仅保留历史实验边界。当前实现/证据见[正式合同合成接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。生产 app/server 注册、真实配置和真实数据仍未完成。FAQ 工作台接线见下一段，不把合成桌面验收等同生产激活。
+
+`main/content-intake-catalog.ts` 独占 Dashboard 的店铺/商品/场景选择、完整分页读取和失效；复用独立的 `ContentIntakeUsage` 实例，与 Query 的资格、选择和复制句柄隔离。每条所属域只取本次签发资格的唯一 source→domain 映射，重复/缺失映射拒绝，整组超限不截断显示。窄 `content-intake-catalog-ipc.ts` 仅接受 Dashboard 主 frame 的 current/command，窗口销毁释放实例；preload 不暴露 URL、身份、资格或复制能力。`IntakeLibrary` 保持一份视图供话术库/系统同步使用，正文失效即清空，名称失效只回退编号。它表达当前条件下可用内容，不是全库清单、公告已读或同步完成证明。上传来源的域由既有 discovery 权限投影透传，显示在原上传选择器。验证见[统一工作台合成证据](../evidence/qa/intake-unified-workspace/README.md)。

@@ -41,6 +41,8 @@ describe('Main sealed intake usage consumer',()=>{
       const catalog=await s.usage.refresh();const projected=catalog.read()!;const key=projected.faq[0]!.key;
       expect(projected).toMatchObject({releaseId:'release-1',contextGeneration:1,faq:[{entry:{answerText:entry.answerText}}]});
       expect(JSON.stringify(projected)).not.toContain('entitlementId');
+      expect(projected.scopes).toEqual([scope]);
+      projected.scopes[0]!.domain='campaign';expect(catalog.read()!.scopes[0]!.domain).toBe('product');
       projected.faq[0]!.entry.answerText='伪造正文';
       expect(catalog.copy(key)).toEqual({copied:true});expect(s.clipboard).toHaveBeenLastCalledWith(entry.answerText);
       expect(()=>catalog.copy('unknown')).toThrow('VALIDATION');

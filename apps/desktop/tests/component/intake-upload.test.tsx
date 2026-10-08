@@ -10,7 +10,7 @@ import { intakeManagementData } from '../fixtures/intake-management-data';
 afterEach(() => { delete window.dashboardIntake; });
 function upload(overrides: Partial<IntakeUploadView> = {}): IntakeUploadView {
   return { phase: 'confirming', busy: false, authorized: true, validUntil: '2099-01-01T00:00:00Z', draftRevision: 1,
-    sources: [{ selection: 'source-handle', label: '合成店铺 FAQ' }], sourceSelection: 'source-handle', revisionOf: null,
+    sources: [{ selection: 'source-handle', domain: 'product', label: '合成店铺 FAQ' }], sourceSelection: 'source-handle', revisionOf: null,
     file: { name: 'synthetic-faq.xlsx', bytes: 2048 }, principals: [
       { selection: 'self-handle', displayLabel: '合成整理人', enabled: true },
       { selection: 'editor-handle', displayLabel: '合成历史编辑', enabled: false },

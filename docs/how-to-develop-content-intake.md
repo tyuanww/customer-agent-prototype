@@ -152,7 +152,7 @@ node scripts/probe-intake-family-sql.mjs --output .gstack/family-sql-check.json
 
 资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 表示历史 approval-v1 依据失效，停止使用并核对历史资料；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。Main 的 `ContentIntakeUsage` 已拥有完整分页、当前店/选择、迟到回调、原文复制与失效通知；单资格自然到期和精确 FORBIDDEN/LEASE_EXPIRED 只影响该资格，其他有效句柄仍受自己的原截止约束，真正会话/权限/审批失效才清除全部句柄。失败不会复活或延长资格。根级合成 HTTP 探针现在通过实际 `ProductHttp` / `ProductSession` 消费该模块；凭据仅驻留隔离进程内存，测试替换本机员工显示名读取，不读取用户 profile。合成 profile 的 Main factory、白名单 IPC 和 renderer 已接线；生产 factory 与未覆盖设备项仍待验收；此前持久化和最终复审见[使用资格上下文验收](../evidence/qa/content-intake-p2-usage-context/README.md)。
 
-封闭路由适配器 `apps/api/src/content-intake/usage-http.ts` 只由隔离合成宿主注册五个正式路径：`GET /v1/intake/authorization`、`GET /v1/intake/sources`、`GET /v1/intake/sources/{sourceId}/vocabulary`、`POST /v1/intake/entitlements` 与 `GET /v1/intake/snapshot`。复用当前产品认证，原样保留私有 actor 引用；不接受额外身份/选择字段，重复查询参数不覆盖，错误统一为 `IntakeError` 并返回 `no-store`。生产 app/server 工厂未注册它。
+封闭路由适配器 `apps/api/src/content-intake/usage-http.ts` 只由隔离合成宿主注册六个正式路径：`GET /v1/intake/authorization`、`GET /v1/intake/sources`、`GET /v1/intake/sources/{sourceId}/vocabulary`、`GET /v1/intake/shop-directory`、`POST /v1/intake/entitlements` 与 `GET /v1/intake/snapshot`。复用当前产品认证，原样保留私有 actor 引用；不接受额外身份/选择字段，重复查询参数不覆盖，错误统一为 `IntakeError` 并返回 `no-store`。生产 app/server 工厂未注册它。
 
 `ProductHttp` 默认响应上限仍为 1 MiB；Main 的目录请求显式传入 32 MiB 总预算的剩余额度，每次 HTTP 读取也受同一剩余额度限制。合法 100 条长话术页可超过旧默认上限；没有截断或自动重试。错误诊断只写 HTTP 状态、已知错误类型/errno 和耗时，路径、游标、资格 ID、凭据与上游消息不进入日志。
 
@@ -250,6 +250,15 @@ pnpm test:intake:desktop
 前者包含真实 HTTP/PG 产物消费及 CLI 子进程的启动、固定命令、EOF 和清理边界；后者需要 Mac 图形桌面，使用空候选宿主验证原生选择坏 XLSX → renderer/preload/Main → HTTP/PG解析失败 → 完整报告落盘并由 ExcelJS 回读 → 整批更正重传 → 检查与确认直发 → 换坐席查询并复制。OS 文件对话框使用受控路径、确认框使用受控取消/确认响应，其余链路实际执行。截图保存在 ignored `.gstack/intake-synthetic/`。这些是合成联调证据，真实组织接入、生产激活、安装包、Windows 合成器和 macOS 人工窗口体验仍分别验收。
 
 
+## P2 FAQ 工作台
+
+显式 `faq-v2` 合成模式复用原五个导航，默认打开内容管理。切换到概览、话术库、SOP、系统同步时，上传声明、来源确认、质量检查、发布输入和权限配置预览保留；会话失效仍由原 owner 处理，不因隐藏页面而停用。
+
+话术库按当前店铺和商品/场景条件读取有权查看的已发布资料，再按产品话术、活动话术、售前流程、售后流程展示。FAQ 是格式，不新增第五类。未选商品/场景只读相应通用资料；修改条件后点击“刷新可用资料”，没有全库、下架、导出或独立复制入口。普通客服继续在查询窗口查询复制。目录名称不可用时显示店铺编号，正文或资格失败时清空旧结果。系统同步显示同一读取结果的发布版本和截止，不表示公告已读、全库同步或软件更新；概览指标、SOP和软件更新显示“未接入”。
+
+界面通过独立窄 IPC 读取 Main 的目录投影，不挂接旧资料适配器，也不共享 Query 的选店、资格与复制句柄。来源所属内容域取登记范围，在原上传选择器中显示；不得以文件名、标题或岗位推断。验证入口见[统一工作台](how-to-verify-desktop.md#faq-统一工作台)。
+
+
 ## P2 FAQ 原生上传
 
 Dashboard 使用既有窄 `dashboard:intake-command` 接口。选择有 import 权限的来源，再选择不超过 10 MiB 的统一模板 XLSX。界面必须明确确认整理责任人及所有实际改稿人；本人制作也须显式勾选本人，已确认的历史/禁用参与人可列入贡献声明，其身份事实不授予当前权限。来源、发布基线或当前主体事实变化时，重新展示声明并要求确认。
@@ -268,14 +277,14 @@ Main 保留原始字节、服务端对象、parse job 和上传/接收的原操�
 
 ## 运行接入准备与并行边界
 
-本节记录合成链路之外的接入输入和拒启条件，不代表生产接入已经实现或获准。逐字段、历史协议、用途权限与旧目录认领的具体交接见[第三组运行接入交接](reference-content-intake-p2-contract-handoff.md#7-第三组运行接入交接2026-10-08候选未激活)。当前范围与批准依赖仍由[实施计划 §0.51](plans/2026-10-03-content-intake-requirements.md#051-原生组织观察离线消费验证2026-10-08)拥有；真实组织、运行 ACL 和 `v2-active` 须绑定对应获准环境。
+本节记录合成链路之外的接入输入和拒启条件，不代表生产接入已经实现或获准。逐字段、历史协议、用途权限与旧目录认领的具体交接见[第三组运行接入交接](reference-content-intake-p2-contract-handoff.md#7-第三组运行接入交接2026-10-08候选未激活)。当前范围与批准依赖仍由[实施计划 §0.53](plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)拥有；真实组织、运行 ACL 和 `v2-active` 须绑定对应获准环境。
 
 | 接入环节 | 现有消费边界 | 接入前必须提供或实现；缺失时的处理 |
 | --- | --- | --- |
 | 组织事实 | [现有飞书身份 provider](../apps/api/src/feishu-identity-provider.ts)取得登录身份；[事务所有者](../apps/api/src/content-intake/transaction.ts)另读 `principals/principal_facts/role_rules`，按部门 ID 与精确岗位匹配，并检查事实有效期和产品会话 | 职位来源已完成单次受控只读可行性核对，见[字段映射](reference-content-intake-p2-contract-handoff.md#职位来源与登录授权的当前映射2026-10-08)；仍须明确 tenant/app、登录身份到 principal 的归一依据、批准部门/岗位规则、人工店铺范围、事实刷新/版本发布与离职撤权来源及维护人。生产组织事实写入者尚未接线；缺字段、禁用、过期或刷新失败不能授予新使用/写入资格，不以登录角色替代，不延长五分钟事实窗口 |
 | 历史审批兼容 | 新 direct-v1 不依赖审批 transport；旧 approval-v1 的材料与有效性只读保留 | 正式目录含旧审批谱系时，明确其有效性维护来源；不可伪造通过或绕过到期/撤销。缺有效依据时相应旧资料拒绝使用/继承/回退，不把接新审批流程列成本期目标 |
 | 生产 factory | [管理 HTTP 插件](../apps/api/src/content-intake/management-http.ts)保留 auth/pool/store/principalLabels 与强制产品会话校验；[启动入口](../apps/api/src/server.ts)尚未装配 intake | 明确受控配置所有者、专用受限连接池、对象目录、真实组织依赖、启动后验与关闭清理。环境/配置/ACL/目录基线不满足不得启用；不得复制合成宿主管理员 pool、固定身份或测试标签 |
-| 应用 ACL | [P2 基础迁移](../packages/database/migrations/0021_content_intake_v1_20.sql)及后续迁移保持应用角色对 intake 私有表/函数的权限封闭；业务事务还需锁定产品会话并写永久回执 | 按组织同步、业务事务、解析 worker、使用读取分别列出所需表/函数操作及角色；验证允许操作与越权拒绝，不能仅授 schema USAGE 或沿用管理员权限。正式 ACL 未批准、权限比预期更宽或必要操作不可用时拒绝启用；不修改既有 migration 来补权限 |
+| 应用 ACL | [P2 基础迁移](../packages/database/migrations/0021_content_intake_v1_20.sql)及后续迁移保持应用角色对 intake 私有表/函数的权限封闭；业务事务还需锁定产品会话并写永久回执 | 按组织同步、业务事务、解析 worker、使用读取分别列出所需表/函数操作及角色；验证允许操作与越权拒绝，不能仅授 schema USAGE 或沿用管理员权限。用途 ACL 已按冻结 1.23 在 0033 接收并完成合成验证，生产账号与真实配置仍未装配；权限比预期更宽或必要操作不可用时拒绝启用，不修改既有 migration 来补权限 |
 | 初始目录与旧内容认领 | [发布执行器](../packages/database/migrations/0024_intake_publication.sql)要求明确原生 catalog 基线；[合成 seed](../apps/api/tests/support/intake-synthetic-seed.ts)只为临时库建立空目录，不是正式承接工具 | 提供原发布基线、旧键到登记来源/稳定编号的映射、未归属清单、B1 维护人确认、来源范围和模式切换/回退条件。初始承接执行器仍需独立实现验收；未认领旧内容保留，缺基线、未迁移同域成员或范围冲突时拒绝发布，不以空目录、正文去重或自动归属绕过 |
 
 显式同题家族与确认直发的合成闭环已完成。真实运行接入继续使用既有事项：组织可信观察/刷新、受限用途权限与运行装配、初始范围与旧内容认领；保留期未批准不删除历史。组织刷新与会话锁离线实验不等于生产装配。用户单独授权的只读职位观察没有进入这些验证链路，本指南命令始终只消费合成输入。历史审批失败映射保留用于旧资料兼容，不新增本期审批 transport 待办。

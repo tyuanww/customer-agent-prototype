@@ -103,7 +103,7 @@ export class ContentIntakeUpload {
     return structuredClone({ draftRevision: this.revision, phase: this.phase, busy, authorized: allowed.length > 0,
       revisionOf: readable && this.priorKey ? { candidateId: this.priorKey.candidateId, version: this.priorKey.version } : null,
       validUntil: readable && deadlines.length ? new Date(Math.min(...deadlines.map(Date.parse))).toISOString() : null,
-      sources: allowed.map(s => ({ selection: this.sources.get(s.scope.sourceId)!, label: `${s.scope.sourceId} · ${s.scope.shopId ?? s.scope.brandId}` })),
+      sources: allowed.map(s => ({ selection: this.sources.get(s.scope.sourceId)!, domain: s.scope.domain, label: `${s.scope.sourceId} · ${s.scope.shopId ?? s.scope.brandId}` })),
       sourceSelection: readable ? this.sources.get(this.sourceId!) ?? null : null,
       file: readable && this.file ? { name: this.file.name, bytes: this.file.bytes.length } : null,
       principals: declarations ? this.principals.map(({ selection, displayLabel, enabled }) => ({ selection, displayLabel, enabled })) : [],

@@ -35,14 +35,14 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
     <h2>上传 FAQ 资料</h2>
     <p>使用统一 Excel 模板。缺少某行不会删除已发布资料；有阻断错误时，请整批修正后重新选择文件。</p>
     {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId} · 原版本 {view.revisionOf.version}。
-      请上传完整修订稿；校验失败保留旧版，成功后生成下一版并重新确认来源、审批及质量检查。</p>}
+      请上传完整修订稿；校验失败保留旧版，成功后生成下一版并重新确认来源、完成质量检查与发布确认。</p>}
     {blocked && <p className="intake-notice">开始新的上传前，请先完成当前候选中的输入并关闭候选，或关闭时明确放弃尚未提交的输入。</p>}
     {!view.authorized && <p>当前没有可上传的来源，请核对登录身份与来源授权。</p>}
     <label>上传来源<select aria-label="上传来源" value={view.sourceSelection ?? ''}
       disabled={disabled || !view.authorized || !!view.pending || !!view.file || !!view.revisionOf}
       onChange={event => { if (event.target.value) apply({ action: 'upload-source', selection: event.target.value }); }}>
       <option value="">请选择有权维护的来源</option>
-      {view.sources.map(source => <option key={source.selection} value={source.selection}>{source.label}</option>)}
+      {view.sources.map(source => <option key={source.selection} value={source.selection}>{({product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'})[source.domain]} · {source.label}</option>)}
     </select></label>
     <div className="intake-toolbar">
       <button className={!view.file ? 'dash-action-primary' : undefined} disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 Excel 文件</button>

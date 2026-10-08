@@ -1,0 +1,30 @@
+{
+  "scope": "only this round unified Dashboard and read-only intake catalog from e25d528",
+  "coreReview": "complete; no remaining must-fix findings",
+  "independentReview": {
+    "agent": "recover_c",
+    "mode": "local read-only",
+    "result": "no remaining must-fix findings",
+    "covered": [
+      "owner/state and Query independence",
+      "entitlement scopes and whole pagination/limits",
+      "Dashboard identity/main-frame IPC and destruction",
+      "preload narrow intent only",
+      "keep-mounted renderer invalidation and visible failures",
+      "new tests and docs"
+    ],
+    "finalE2eCorrection": "Rechecked after actual failures: lifecycle boundary respected; positive copy before/after directory refresh and revocation rejection kept; no product weakening; settled theme evidence"
+  },
+  "resolvedDuringImplementation": [
+    "duplicate source map last-wins now fail-closed",
+    "success reply obtained after clearing busy",
+    "ordinary commands no longer emit invalidation and swallow UI failures"
+  ],
+  "testCorrections": [
+    "Query key acquired after Dashboard-opening lifecycle cancellation",
+    "theme screenshots wait for settled computed colors"
+  ],
+  "previousRoleAudit": "15/15 user-provided result reused, not repeated",
+  "fullExternalReview": "INCOMPLETE",
+  "externalReviewInvokedThisRound": false
+}

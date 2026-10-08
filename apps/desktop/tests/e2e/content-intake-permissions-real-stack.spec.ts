@@ -72,6 +72,11 @@ test('director previews without saving, grants a named seat query access, then r
     await panel.getByRole('button', { name: '预览权限', exact: true }).click();
     await expect(panel.getByRole('heading', { name: '预览 · 尚未保存' })).toBeVisible();
     expect((await entitlement()).ok).toBe(false);
+    await dashboard.getByTestId('nav-overview').click();
+    await dashboard.getByTestId('nav-sop').click();
+    await dashboard.getByTestId('nav-content').click();
+    await expect(panel.getByRole('heading', { name: '预览 · 尚未保存' })).toBeVisible();
+    expect((await entitlement()).ok).toBe(false);
     await panel.getByRole('button', { name: '返回修改', exact: true }).click();
     await expect(panel.getByRole('region', { name: '权限预览', exact: true })).toHaveCount(0);
     expect((await entitlement()).ok).toBe(false);

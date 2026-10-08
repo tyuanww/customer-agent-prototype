@@ -1,3 +1,4 @@
+import type { IntakeCatalogApi, IntakeCatalogCommand } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import { contextBridge, ipcRenderer } from 'electron';
@@ -449,3 +450,12 @@ contextBridge.exposeInMainWorld('dashboardPermissions', {
     return () => { ipcRenderer.removeListener('dashboard:permissions-invalidated', handler); };
   },
 } satisfies IntakePermissionApi);
+
+contextBridge.exposeInMainWorld('dashboardIntakeCatalog', {
+  current: () => ipcRenderer.invoke('dashboard:intake-catalog-current'),
+  command: (command: IntakeCatalogCommand) => ipcRenderer.invoke('dashboard:intake-catalog-command', command),
+  onInvalidated: (listener: () => void) => {
+    const handler = () => listener(); ipcRenderer.on('dashboard:intake-catalog-invalidated', handler);
+    return () => { ipcRenderer.removeListener('dashboard:intake-catalog-invalidated', handler); };
+  },
+} satisfies IntakeCatalogApi);

@@ -1,3 +1,4 @@
+import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
 import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
@@ -94,6 +95,7 @@ if (!gotLock) {
   let productAnnounce: ProductAnnounce | null = null;
   let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
   let intakePermissions: ReturnType<typeof registerContentIntakePermissionsIpc> | null = null;
+  let disposeIntakeCatalog: (() => void) | null = null;
   let disposeIntakeQuery: (() => void) | null = null;
   let pendingSecondInstance = false;
 
@@ -128,6 +130,7 @@ if (!gotLock) {
   const beginShutdown = (): void => {
     intakeManagement?.dispose(); intakeManagement = null;
     intakePermissions?.dispose(); intakePermissions = null;
+    disposeIntakeCatalog?.(); disposeIntakeCatalog = null;
     disposeIntakeQuery?.(); disposeIntakeQuery = null;
     void productSession?.shutdown();
     shuttingDown.begin();
@@ -251,6 +254,8 @@ if (!gotLock) {
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => [controller?.dashboardWebContents() ?? null]);
+    disposeIntakeCatalog = registerContentIntakeCatalogIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     intakePermissions = registerContentIntakePermissionsIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,

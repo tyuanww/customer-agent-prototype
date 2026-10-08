@@ -1,3 +1,4 @@
+import type { IntakeCatalogApi } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi } from '../shared/content-intake-permissions';
 import type { IntakeManagementApi } from '../shared/content-intake-management';
 import type { CustomerAgentApi } from '../shared/contracts';
@@ -11,6 +12,7 @@ import type { SopWindowApi } from '../shared/sop-window';
 
 declare global {
   interface Window {
+    dashboardIntakeCatalog?: IntakeCatalogApi;
     dashboardPermissions?: IntakePermissionApi;
     dashboardIntake?: IntakeManagementApi;
     customerAgent?: CustomerAgentApi;
