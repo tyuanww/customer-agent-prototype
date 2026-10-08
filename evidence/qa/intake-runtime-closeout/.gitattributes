@@ -1,0 +1,2 @@
+# Preserve raw tool logs and their recorded byte digests, including blank EOF lines.
+*.txt -text -whitespace

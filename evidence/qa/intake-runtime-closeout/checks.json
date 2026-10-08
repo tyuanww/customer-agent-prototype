@@ -1,0 +1,262 @@
+{
+  "schema": "intake-runtime-closeout-checks/v1",
+  "date": "2026-10-09",
+  "baseline": "01d7a0c6ef965a7e36a0578168b92d04038ea298",
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "dependencies": "APFS clone; workspace links resolve inside this worktree"
+  },
+  "candidate": "synthetic-only; excluded from API dist; production app/server untouched",
+  "pgCommand": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/intake-runtime-closeout.integration.test.ts --no-file-parallelism",
+  "inputs": [
+    {
+      "path": "apps/api/experiments/intake-runtime/runtime-candidate.ts",
+      "sha256": "7e50fdd282d1b6eaaedd08d1c6dc7a7cc0369cc9254c7266e1508201b4761195",
+      "bytes": 11155
+    },
+    {
+      "path": "apps/api/tests/intake-runtime-closeout.integration.test.ts",
+      "sha256": "7fb1253b904d0aeff4da76c5c630bdc04c49e42bb02619cb8228c238f9f5b82e",
+      "bytes": 17561
+    },
+    {
+      "path": "apps/api/src/product-auth-service.ts",
+      "sha256": "a835aa796e6570e0ecba0a14e88b3bf8fef23b525f8bff92bf86850038d80689",
+      "bytes": 10631
+    },
+    {
+      "path": "apps/api/src/feishu-identity-provider.ts",
+      "sha256": "3f7beab886785438593faa19e5d58c308bb25716ae7a31ea243dca57201c8ecf",
+      "bytes": 9872
+    },
+    {
+      "path": "apps/api/src/content-intake/runtime-pool.ts",
+      "sha256": "a0c483565a2c932f2c2c36bcaad181607a03c160be4601925b644ae7a1fe7d3c",
+      "bytes": 2211
+    },
+    {
+      "path": "apps/api/src/content-intake/transaction.ts",
+      "sha256": "9906ed543c4e30329a2b768d95ebe11929279be0721f7dee3dc06be73b0736ae",
+      "bytes": 11848
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "sha256": "5488a6dc5dd51976e869881d4a92cbf77e248c4c45305041ad108d40e392546b",
+      "bytes": 16182
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "sha256": "b57937ad7d6848e3bd5ddbe4bffa897fd259d4af0aea0a0bb0aebe894ff0b1da",
+      "bytes": 13268
+    },
+    {
+      "path": "apps/api/src/content-intake/usage-http.ts",
+      "sha256": "89f7422ca2b5cbfbd2b8af95e6bd3f1ec9f2598e162c626a5e293b96507c1765",
+      "bytes": 2396
+    },
+    {
+      "path": "apps/api/src/content-intake/organization/registered-refresh.ts",
+      "sha256": "9d0782fe5d44039b538353d3dd866b477e0bfd4cd67f1cdf401426bf8a1d9b4e",
+      "bytes": 12223
+    },
+    {
+      "path": "apps/api/src/content-intake/organization/facts-writer.ts",
+      "sha256": "df1dbdd45fe3f3c59d8044123bcae14b28a14c367c629772709d2c0f695e9413",
+      "bytes": 7697
+    },
+    {
+      "path": "apps/api/src/content-intake/organization/feishu-observer.ts",
+      "sha256": "c24c5303613013bdc3a04014be13e8c90a5c2eef58ab40d59b7b1b2afe95aa80",
+      "bytes": 9424
+    },
+    {
+      "path": "apps/api/experiments/intake-organization/http-transport.ts",
+      "sha256": "999e458c405d9103e099d7916da7bcf34a6070f65bf119929fa83add64af2935",
+      "bytes": 18541
+    },
+    {
+      "path": "apps/api/experiments/intake-organization/synthetic-contact-double.ts",
+      "sha256": "e77afd0489dd390f5e0089ac87f3b64de14d6e1a3f95aaea510158fcde12fb97",
+      "bytes": 5923
+    },
+    {
+      "path": "apps/api/tests/support/intake-synthetic-seed.ts",
+      "sha256": "f772c13b7c0690a52ea27f10ba3e155717410564b57b0e6b4a29f936d9db8ba2",
+      "bytes": 5260
+    },
+    {
+      "path": "apps/api/tests/support/intake-organization-native.ts",
+      "sha256": "aac1adbe1f702e36ff113cdbb5dd810481783c898c8a5ab89bf8662824f33f4e",
+      "bytes": 1342
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "2644b175dc2d784f232de0ea6a3198a39d11a650777dba26c42b8c09218e9e10",
+      "bytes": 204597
+    },
+    {
+      "path": "packages/database/migrations/manifest.generated.json",
+      "sha256": "ffd584fec4912d780862d4207ddb9a23250d4ac80f2b80421e025eef82caa662",
+      "bytes": 24881
+    },
+    {
+      "path": "contracts/upstream/customer-agent/contract-set.lock.json",
+      "sha256": "5de9d834517b02d3dc2e73d9a1cb7bf44099417a79125604733e6fdc326dd59d",
+      "bytes": 606
+    }
+  ],
+  "logs": [
+    {
+      "path": "evidence/qa/intake-runtime-closeout/pg-final.txt",
+      "sha256": "91c59f6d2aab6d7f5d2c50693cb745853c7182ff646d098e15ad8c5bdb8ce446",
+      "bytes": 4038,
+      "command": "PG15 integration",
+      "exitCode": 0,
+      "passed": 23,
+      "failed": 0
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/pg-first.txt",
+      "sha256": "498e053f93d635cbdb0cf935468c116efce4e4680d400627b214cd5d91f913b3",
+      "bytes": 6258,
+      "command": "initial integration",
+      "exitCode": 1,
+      "passed": 13,
+      "failed": 5
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/pg-second.txt",
+      "sha256": "4d59070dfb731a38b295143eb88e3e40e4278040213cef1544dc0053d36aabdd",
+      "bytes": 6096,
+      "command": "second integration",
+      "exitCode": 1,
+      "passed": 15,
+      "failed": 3
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/pg-third.txt",
+      "sha256": "13a6df0e5e5a5d8998e53162fdb19efe4f9f1b35d9f7eacdd07104ec388ee650",
+      "bytes": 4593,
+      "command": "third integration",
+      "exitCode": 1,
+      "passed": 17,
+      "failed": 1
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/lint.txt",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "bytes": 11,
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "passed": null,
+      "failed": null
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/typecheck.txt",
+      "sha256": "d8b14524d50e34c7b8d53973c292419df4a69c2fd2a81f79dc165cf80497975e",
+      "bytes": 616,
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "passed": null,
+      "failed": null
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/root-test.txt",
+      "sha256": "21802cb20bef901682f0c7915a4b647996c926b8f7d7288002fd2b858e9cb2e8",
+      "bytes": 72047,
+      "command": "pnpm test",
+      "exitCode": 0,
+      "passed": null,
+      "failed": null
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/build.txt",
+      "sha256": "57931e77cc982b8c41a066f95c65ccd12d07a032844084d1674d29edafaee4ab",
+      "bytes": 27348,
+      "command": "pnpm build",
+      "exitCode": 0,
+      "passed": null,
+      "failed": null
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/api-default.txt",
+      "sha256": "57c342d386395557e013984dc6ef8701f6d9bcedcf16616a496317ea97335902",
+      "bytes": 10284,
+      "command": "pnpm --filter @customer-agent/api test:built",
+      "exitCode": 0,
+      "passed": 567,
+      "failed": null
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/lint-final-binding.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "pnpm exec eslint apps/api/experiments/intake-runtime/runtime-candidate.ts apps/api/tests/intake-runtime-closeout.integration.test.ts",
+      "exitCode": 0
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/typecheck-final-binding.txt",
+      "sha256": "4e3daeaf0fd20a2c44f1c9ae7c9189405c03d1441b9ca95a03d216559bfae9cd",
+      "bytes": 223,
+      "command": "pnpm --filter @customer-agent/api typecheck",
+      "exitCode": 0
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/docs.txt",
+      "sha256": "f1df31530ef3088e508c8f0006ec4ad5011db5ca289a31e141f92628633fcea1",
+      "bytes": 1853,
+      "command": "pnpm docs:check",
+      "exitCode": 1
+    },
+    {
+      "path": "evidence/qa/intake-runtime-closeout/workspace.txt",
+      "sha256": "9b80dfd06c08dca2a2f115fe5e4cdc43eae55cab4984d7c8fe9d01518e48d179",
+      "bytes": 226,
+      "command": "pnpm workspace:check",
+      "exitCode": 1
+    }
+  ],
+  "rootTest": {
+    "databaseSkipped": 26,
+    "apiPassed": 567,
+    "apiSkippedAtRootRun": 351,
+    "desktopPassed": 1426,
+    "desktopSkipped": 7
+  },
+  "finalApiDefault": {
+    "passed": 567,
+    "skipped": 355,
+    "packageSmokePassed": 3
+  },
+  "evidenceReuse": [
+    "Root test used the 19-case draft; final 23-case PG plus API default tests cover reviewed candidate changes. No production build input changed.",
+    "Published/rollback/COMMIT-unknown/35-migration/role review evidence remains bound to unchanged implementation; not rerun here."
+  ],
+  "unverified": [
+    "real tenant identity proof and trusted registrar bindings",
+    "real organization provider/credentials and multi-process quota coordination",
+    "production activation/HTTP registry and environment configuration",
+    "real data, legacy adoption and final Mac/Windows package acceptance",
+    "full external /review"
+  ],
+  "externalReview": "INCOMPLETE",
+  "docs": {
+    "full": "FAIL: 13 pre-existing references to ignored .gstack evidence are missing in a new worktree",
+    "newReadmeLinks": "PASS"
+  },
+  "workspace": {
+    "sourceBudget": "FAIL: remainder 39.4 MiB / 32 MiB",
+    "rootPolicy": "PASS",
+    "policyChanged": false
+  },
+  "independentReview": {
+    "agent": "/root/closeout_size",
+    "fixed": 2,
+    "remainingHighMedium": 0,
+    "finalCommitBinding": "final SHA is delivered with the commit; reviewed input hashes are recorded above"
+  }
+}
