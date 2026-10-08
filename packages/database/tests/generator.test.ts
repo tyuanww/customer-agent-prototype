@@ -66,6 +66,17 @@ function snapshot(source = databaseSource): Readonly<Record<string, unknown>> {
   };
 }
 
+function runtimeSnapshot(): Readonly<Record<string, unknown>> {
+  const id = 'cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551';
+  const root = path.join(projectRoot, 'contracts/upstream/customer-agent', id);
+  const previous = JSON.parse(readFileSync(path.join(root, 'contract-set.json'), 'utf8')) as typeof manifest;
+  return { contract_set_id: id, source_git_sha: previous.source_git_sha, manifest: previous,
+    database_source: readFileSync(path.join(root, previous.database.file), 'utf8'),
+    runtime_sources: Object.fromEntries(Object.entries(previous.runtime).map(([name, descriptor]) =>
+      [name, readFileSync(path.join(root, descriptor.file), 'utf8')])),
+  };
+}
+
 function publicationFixture(): ReadonlyMap<string, string> {
   return new Map([
     ['packages/database/migrations/0001_test.sql', '-- next migration\n'],
@@ -86,9 +97,9 @@ function prepareExistingPublication(root: string): void {
 
 describe('database migration generator', () => {
   it('preserves all thirty-two predecessor migrations and stamps only the runtime addition', () => {
-    const prior = generator.buildDatabaseMigrationOutputs(snapshot());
+    const prior = generator.buildDatabaseMigrationOutputs(runtimeSnapshot());
     const sourceGitSha = 'a'.repeat(40);
-    const next = generator.buildDatabaseMigrationOutputs({ ...snapshot(),
+    const next = generator.buildDatabaseMigrationOutputs({ ...runtimeSnapshot(),
       contract_set_id: `cs-ai-c11-openapi-1.21.0-schema-1.23-${sourceGitSha.slice(0, 12)}`, source_git_sha: sourceGitSha });
     expect(next.migrations).toHaveLength(33);
     expect(next.migrations.slice(0,32)).toEqual(prior.migrations.slice(0,32));
@@ -112,7 +123,20 @@ describe('database migration generator', () => {
     ]);
   });
 
-  it.each(['installation', 'roles', 'organization', 'session', 'directory', 'directoryAcl', 'acl', 'provenance', 'protocol'])(
+  it('preserves all thirty-three applied SQL blobs and their provenance when adding CSV', () => {
+    const prior = generator.buildDatabaseMigrationOutputs(runtimeSnapshot());
+    const next = generator.buildDatabaseMigrationOutputs(snapshot());
+    expect(next.migrations.slice(0,33)).toEqual(prior.migrations);
+    for (const [file, sql] of prior.outputs) if (file.endsWith('.sql')) expect(next.outputs.get(file)).toBe(sql);
+    expect(next.migrations[33]?.sql).toContain('CREATE TRIGGER candidate_format');
+    expect(next.migrations[33]?.sql).not.toMatch(/CREATE ROLE|^BEGIN;|^COMMIT;/m);
+    const metadata = JSON.parse(next.outputs.get('packages/database/migrations/manifest.generated.json')!);
+    expect(metadata.compatibility.prior_reviewed_upgrades.at(-1)).toMatchObject({
+      contract_set_id: 'cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551', migration_count: 33,
+    });
+  });
+
+  it.each(['installation', 'roles', 'organization', 'session', 'directory', 'directoryAcl', 'acl', 'provenance', 'protocol', 'csv', 'csvProtocol'])(
     'rejects missing or changed runtime companion %s before generating outputs', name => {
       const input = snapshot();
       const sources = input.runtime_sources as Record<string, string>;
@@ -123,11 +147,11 @@ describe('database migration generator', () => {
     },
   );
 
-  it('preserves immutable migrations and appends one atomic runtime installation', () => {
+  it('preserves immutable migrations and appends one atomic CSV increment', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());
 
-    expect(first.migrations).toHaveLength(33);
+    expect(first.migrations).toHaveLength(34);
     expect(first.migrations.map(({ id }) => id)).toEqual([
       '0001_extensions',
       '0002_identity_and_content',
@@ -147,7 +171,7 @@ describe('database migration generator', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24',
     ]);
     expect([...first.outputs]).toEqual([...second.outputs]);
     expect(first.migrations.slice(0,24).map(m => m.sha256)).toEqual(["4876b7ef62bb033b4b7b487e06e88a525b9cb8b3e32e82e6516124b7fc8eca62", "62322728f1621c75b2cc0f66ac20e65710a916c714caa84761a93108b71e1b64", "c109b3c7ec79c73cb6e3748808aca9296ed1c96e5d8fc91ab0046c80fd2b50d4", "ff68d5969e28a9d4d7eed963906f2fc3783f4c34b5ec1fa347ea87c3bc0b2f6a", "715db39163e2a99d10a88126a4bded14c75f4fb4ba1ec97dcba573265babdf02", "f5b369165b5e5f0e21801f8fd8eb2c4589ee26ca0761327811f4ed5c5903d4ca", "7cf632ec4123b9031893646b0b67348cf5a89dd3fe89ec544dccecb576513189", "f883a929a8742e0f71a498e70de410124e8c25fd2fdee6a492047201475990f2", "a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e", "026497120b6ad6d7d885de47d54335bb8891d8b45e2da010cc85eae6ea7b6818", "8f5337b69b1a10fb85013694699e683c99e14399fa3471bd970eb89ac8591a0f", "3bc06f81ed596049e0539a679e066b7a6c2d1814314c3d2ba9fd4d65f469be18", "8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2", "ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339", "e7ac1d9c5f487336b63ed4a8abeb66031dbcd3189286fbd2d07b97407685613b", "d574ebd891e3a7db771e6f6a5fb7a85f6e6d3614c7880f2dea4b4bb642d6b447", "eb3ccbf3f04c4005393fc757b8f1e03d55a5078837b2b8eb9dbac72d83116788", "c89d76992850aa562a3d24618bccb39a941a8bc88136342505a9edea5440acba", "e4720feabd0a9b92d8d5cc22fcb6dcce75cf6e8136c0b2d9365d0d7c1cf18cd7", "fd261530461c20aca90c5468997a695d67921fe53ff74b39de2c0a5f6b80d678", "7c19bf3f97fecb5af61c92131c0ce2a5f5f42822d2e104bb4202d96e292c73db", "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03", "c3b37131c28b76b2453e24d5f432e70329c478a7f90d34c95598518124e50136", "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2"]);

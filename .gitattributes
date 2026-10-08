@@ -15,3 +15,6 @@
 
 # CSV 原件摘要夹具保留引号内外的原始换行字节。
 packages/content-intake/experiments/csv/synthetic-template.csv -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+
+# 本轮原始工具输出按摘要留证；保留系统表格尾空格和测试报告末空行。
+evidence/qa/intake-csv-runtime/*.log -text -whitespace

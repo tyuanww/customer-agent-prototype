@@ -5,7 +5,7 @@ type C=components['schemas'];
 export function intakePermissionsData() {
  const until=new Date(Date.now()+60000).toISOString();
  const scope:C['IntakeSourceScope']={tenantId:'tenant-a',appId:'app-a',brandId:'brand-a',shopId:'shop-a',sourceId:'source-a',domain:'product'};
- const source:C['IntakeSource']={scope,version:1,templateVersion:'faq-p1.1',ruleVersion:'rule-1',mappingVersion:'mapping-1',structureDigest:'a'.repeat(64),contentIntakeMode:'v2-preview',modeVersion:1};
+ const source:C['IntakeSource']={scope,version:1,templateVersion:'faq-p1.1',ruleVersion:'intake-p1.1',mappingVersion:'mapping-1',structureDigest:'a'.repeat(64),contentIntakeMode:'v2-preview',modeVersion:1};
  const person:C['IntakePrincipalPage']['items'][number]={principalId:'registered-agent',displayLabel:'合成坐席',factsVersion:1,validUntil:until,enabled:true};
  let signedIn=true,epoch=1,unknown=false,omitPerson=false;
  const listeners=new Set<()=>void>(),requests:{path:string;body:unknown}[]=[];

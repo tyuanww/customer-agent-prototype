@@ -45,6 +45,17 @@ describe('formal transaction lock and finalizer ownership', () => {
     expect(result).toMatchObject({ ok: false, reason: 'SHOP_DIRECTORY_CHANGED', commit: 'rolled_back' });
     expect(f.events.at(-1)).toBe('ROLLBACK'); expect(f.events).not.toContain('COMMIT');
   });
+  it.each([
+    ['ZA003', 'SOURCE_FORMAT_MISMATCH', 'VALIDATION', 'SOURCE_FORMAT_MISMATCH'],
+    ['42501', 'SOURCE_FORMAT_MISMATCH', 'INTERNAL_ERROR', 'COMMIT_UNKNOWN'],
+    ['ZA003', 'OTHER_PRIVATE_FAILURE', 'INTERNAL_ERROR', 'COMMIT_UNKNOWN'],
+  ] as const)('normalizes only the frozen format rejection (%s/%s)', async (sqlstate, message, code, reason) => {
+    const f = fixture();
+    const result = await f.run(actor, 'test', {}, 'format-operation', async () => { throw Object.assign(new Error(message), { code: sqlstate }); }, Boolean);
+    expect(result).toMatchObject({ ok: false, code, reason, commit: 'rolled_back' });
+    expect(f.events.at(-1)).toBe('ROLLBACK'); expect(f.events).not.toContain('COMMIT');
+    expect(f.events.some(sql => sql.includes('INSERT INTO backend_review.receipts'))).toBe(false);
+  });
   it('does not borrow time spent in a successful finalizer past its deadline', async () => {
     const f = fixture();
     const result = await f.run(actor, 'test', null, null, async client => { client.validUntil(2000); client.beforeCommit(async () => { f.advance(2000); }); return true; }, Boolean);

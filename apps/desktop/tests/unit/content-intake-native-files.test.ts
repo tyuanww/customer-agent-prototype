@@ -21,25 +21,42 @@ async function fixture() {
 afterEach(async () => { vi.resetAllMocks(); await Promise.all(directories.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
 it('reads exact bytes without exposing a path and handles native cancellation', async () => {
   const f = await fixture();
-  expect(await f.files.chooseWorkbook(f.controller.signal)).toEqual({ name: '合成 FAQ.xlsx', bytes: zip });
+  expect(await f.files.chooseInputFile(f.controller.signal)).toEqual({ name: '合成 FAQ.xlsx', bytes: zip });
   dialogs.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
-  expect(await f.files.chooseWorkbook(f.controller.signal)).toBeNull();
+  expect(await f.files.chooseInputFile(f.controller.signal)).toBeNull();
 });
 it('rejects oversize, renamed non-ZIP, symlink and wrong extension before upload', async () => {
   const f = await fixture(); await truncate(f.path, INTAKE_UPLOAD_MAX_BYTES + 1);
-  await expect(f.files.chooseWorkbook(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_LIMIT' });
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_LIMIT' });
   await writeFile(f.path, 'not an Excel file');
-  await expect(f.files.chooseWorkbook(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_INVALID' });
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_INVALID' });
   const alias = join(f.dir, 'alias.xlsx'); await symlink(f.path, alias);
   dialogs.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [alias] });
-  await expect(f.files.chooseWorkbook(f.controller.signal)).rejects.toMatchObject({ code: 'VALIDATION' });
-  dialogs.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [join(f.dir, 'file.csv')] });
-  await expect(f.files.chooseWorkbook(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_INVALID' });
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ code: 'VALIDATION' });
+  dialogs.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [join(f.dir, 'file.txt')] });
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_INVALID' });
+});
+it('reads original CSV bytes including BOM, quotes and internal CRLF without decoding or conversion', async () => {
+  const f = await fixture(), path = join(f.dir, '合成 FAQ.CSV');
+  const bytes = Buffer.from('\uFEFF标题,标准话术\r\n合成问法,"第一行,带逗号\r\n第二行"\r\n');
+  await writeFile(path, bytes);
+  dialogs.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [path] });
+  expect(await f.files.chooseInputFile(f.controller.signal)).toEqual({ name: '合成 FAQ.CSV', bytes });
+  expect(dialogs.showOpenDialog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+    filters: [{ name: 'FAQ 资料（CSV / Excel）', extensions: ['csv', 'xlsx'] }],
+  }));
+  await truncate(path, 0);
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_LIMIT' });
+  await truncate(path, INTAKE_UPLOAD_MAX_BYTES + 1);
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_LIMIT' });
+  const alias = join(f.dir, 'alias.csv'); await symlink(path, alias);
+  dialogs.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [alias] });
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ reason: 'FILE_INVALID' });
 });
 it('checks cancellation after a native dialog resolves before reading or replacing anything', async () => {
   const f = await fixture();
   dialogs.showOpenDialog.mockImplementation(async () => { f.controller.abort(); return { canceled: false, filePaths: [f.path] }; });
-  await expect(f.files.chooseWorkbook(f.controller.signal)).rejects.toMatchObject({ code: 'CANCELLED' });
+  await expect(f.files.chooseInputFile(f.controller.signal)).rejects.toMatchObject({ code: 'CANCELLED' });
   const controller = new AbortController();
   dialogs.showSaveDialog.mockImplementation(async () => { controller.abort(); return { canceled: false, filePath: f.path }; });
   await expect(f.files.saveReport(Buffer.from('changed'), controller.signal)).rejects.toMatchObject({ code: 'CANCELLED' });
@@ -58,7 +75,7 @@ it('atomically replaces a selected destination, creates private files and leaves
 it('does not stack a second OS dialog while a cancelled first dialog still exists', async () => {
   const f = await fixture(); let finish!: () => void;
   dialogs.showOpenDialog.mockImplementation(() => new Promise(resolve => { finish = () => resolve({ canceled: false, filePaths: [f.path] }); }));
-  const first = f.files.chooseWorkbook(f.controller.signal);
+  const first = f.files.chooseInputFile(f.controller.signal);
   const cancelled = expect(first).rejects.toMatchObject({ code: 'CANCELLED' });
   f.controller.abort();
   await expect(f.files.saveReport(zip, new AbortController().signal)).rejects.toMatchObject({ code: 'CONFLICT' });

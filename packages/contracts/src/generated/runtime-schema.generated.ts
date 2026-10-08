@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.21.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.22.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -243,7 +243,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.21.0:components",
+  "$id": "urn:customer-agent:openapi:1.22.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -4919,7 +4919,8 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
                 "SHOP_DISPLAY_MISSING",
                 "SHOP_DIRECTORY_CHANGED",
                 "SHOP_DIRECTORY_EXPIRED",
-                "SHOP_DIRECTORY_UNAVAILABLE"
+                "SHOP_DIRECTORY_UNAVAILABLE",
+                "SOURCE_FORMAT_MISMATCH"
               ]
             },
             "diagnosticId": {
@@ -5441,7 +5442,72 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "minItems": 0,
           "maxItems": 0
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion",
+            "selectedSheets"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-p1.1"
+            },
+            "ruleVersion": {
+              "const": "intake-p1.1"
+            },
+            "object": {
+              "type": "object",
+              "properties": {
+                "mime": {
+                  "const": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+              }
+            },
+            "selectedSheets": {
+              "const": [
+                "来源",
+                "FAQ",
+                "相似问法"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion",
+            "selectedSheets"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-csv-v1"
+            },
+            "ruleVersion": {
+              "const": "intake-csv-v1"
+            },
+            "mappingVersion": {
+              "const": "faq-csv-columns-v1"
+            },
+            "object": {
+              "type": "object",
+              "properties": {
+                "mime": {
+                  "const": "text/csv"
+                }
+              }
+            },
+            "selectedSheets": {
+              "const": [
+                "CSV"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      ]
     },
     "IntakeMaterialHeader": {
       "type": "object",
@@ -5575,7 +5641,72 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "minItems": 0,
           "maxItems": 0
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion",
+            "selectedSheets"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-p1.1"
+            },
+            "ruleVersion": {
+              "const": "intake-p1.1"
+            },
+            "object": {
+              "type": "object",
+              "properties": {
+                "mime": {
+                  "const": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+              }
+            },
+            "selectedSheets": {
+              "const": [
+                "来源",
+                "FAQ",
+                "相似问法"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion",
+            "selectedSheets"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-csv-v1"
+            },
+            "ruleVersion": {
+              "const": "intake-csv-v1"
+            },
+            "mappingVersion": {
+              "const": "faq-csv-columns-v1"
+            },
+            "object": {
+              "type": "object",
+              "properties": {
+                "mime": {
+                  "const": "text/csv"
+                }
+              }
+            },
+            "selectedSheets": {
+              "const": [
+                "CSV"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      ]
     },
     "IntakeObject": {
       "type": "object",
@@ -5608,7 +5739,8 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "mime": {
           "type": "string",
           "enum": [
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv"
           ]
         },
         "sourceId": {
@@ -5736,7 +5868,8 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "orgFactsMaxAgeSeconds",
         "approvalFactsMaxAgeSeconds",
         "ticketMaxAgeSeconds",
-        "selectedMediaSupported"
+        "selectedMediaSupported",
+        "inputFormats"
       ],
       "properties": {
         "policyVersion": {
@@ -5846,6 +5979,38 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "enum": [
             false
           ]
+        },
+        "inputFormats": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "const": {
+                "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "templateVersion": "faq-p1.1",
+                "ruleVersion": "intake-p1.1",
+                "selectedSheets": [
+                  "来源",
+                  "FAQ",
+                  "相似问法"
+                ]
+              }
+            },
+            {
+              "const": {
+                "mime": "text/csv",
+                "templateVersion": "faq-csv-v1",
+                "ruleVersion": "intake-csv-v1",
+                "mappingVersion": "faq-csv-columns-v1",
+                "structureDigest": "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165",
+                "selectedSheets": [
+                  "CSV"
+                ]
+              }
+            }
+          ],
+          "items": false
         }
       }
     },
@@ -9763,7 +9928,45 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "modeVersion": {
           "$ref": "#/$defs/IntakeVersion"
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-p1.1"
+            },
+            "ruleVersion": {
+              "const": "intake-p1.1"
+            }
+          },
+          "type": "object"
+        },
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-csv-v1"
+            },
+            "ruleVersion": {
+              "const": "intake-csv-v1"
+            },
+            "mappingVersion": {
+              "const": "faq-csv-columns-v1"
+            },
+            "structureDigest": {
+              "const": "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165"
+            }
+          },
+          "type": "object"
+        }
+      ]
     },
     "IntakeSourceClaim": {
       "type": "object",
@@ -9990,7 +10193,45 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "minLength": 64,
           "maxLength": 64
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-p1.1"
+            },
+            "ruleVersion": {
+              "const": "intake-p1.1"
+            }
+          },
+          "type": "object"
+        },
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-csv-v1"
+            },
+            "ruleVersion": {
+              "const": "intake-csv-v1"
+            },
+            "mappingVersion": {
+              "const": "faq-csv-columns-v1"
+            },
+            "structureDigest": {
+              "const": "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165"
+            }
+          },
+          "type": "object"
+        }
+      ]
     },
     "IntakeTermRef": {
       "type": "object",

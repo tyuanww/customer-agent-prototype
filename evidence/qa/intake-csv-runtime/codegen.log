@@ -1,0 +1,15 @@
+$ pnpm --filter @customer-agent/contracts generate
+$ node scripts/generate-contracts.mjs
+{
+  "status": "GENERATED",
+  "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251",
+  "runtime_activated": false,
+  "schema_count": 236,
+  "files": [
+    "packages/contracts/openapi/bundle.generated.yaml",
+    "packages/contracts/src/generated/openapi.generated.ts",
+    "packages/contracts/src/generated/runtime-schema.generated.ts",
+    "packages/contracts/src/generated/provenance.generated.ts",
+    "packages/contracts/src/generated/codegen-manifest.generated.json"
+  ]
+}

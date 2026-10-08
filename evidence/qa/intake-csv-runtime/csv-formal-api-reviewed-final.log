@@ -1,0 +1,35 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/content-import-multipart.test.ts (11 tests) 19ms
+ ✓ tests/intake-transaction-runtime.test.ts (7 tests) 4ms
+ ✓ tests/content-intake-material.test.ts (18 tests) 725ms
+ ✓ tests/intake-csv-http.integration.test.ts (8 tests) 13177ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes product original CSV bytes and another agent reads the same text  2436ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes campaign original CSV bytes and another agent reads the same text  1485ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes presale original CSV bytes and another agent reads the same text  1343ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes aftersale original CSV bytes and another agent reads the same text  1335ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > rejects missing-answer as a whole batch and exports a real readable XLSX report  1508ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > rejects invalid-utf8 as a whole batch and exports a real readable XLSX report  1413ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > rejects missing-expiry as a whole batch and exports a real readable XLSX report  1372ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > enforces registered format and existing actor/scope grants before CSV admission  2285ms
+ ✓ tests/intake-runtime-consumers.integration.test.ts (13 tests) 17926ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rolls back receiving an old XLSX object against a newly registered CSV source version  1455ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > does not reinterpret a queued historical XLSX object after the source selects CSV  1616ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > evicts a terminated idle connection and admits a new one through the purpose guard  1137ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor  1540ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > publishes a confirmed corrective rollback through the actual service  1628ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > grants through the actual allocator and invalidates saved usage after revocation  1417ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > recovers an actually committed publication after a lost COMMIT response  1266ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT  1690ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uses the worker pool for actual parser failure and report capacity without business writes  1376ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response  1154ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical revoked approval unavailable to reads and rollback  1363ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical expired approval unavailable to reads and rollback  1393ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected  890ms
+
+ Test Files  5 passed (5)
+      Tests  57 passed (57)
+   Start at  23:47:22
+   Duration  18.74s (transform 582ms, setup 0ms, collect 2.00s, tests 31.85s, environment 0ms, prepare 280ms)
+

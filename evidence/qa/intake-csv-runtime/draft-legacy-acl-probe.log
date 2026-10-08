@@ -1,0 +1,14 @@
+{"probe":"DRAFT_LEGACY_CHECK_ACL","activated":false,"formallyConsumed":false,"originalTestSha256":"d40ad2bada3f753dc0f3f7e57898796922b90f588771aae6153930ea834718f0","sqlPath":"/Users/hutou/Desktop/ai-content-intake-p2-contracts/business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/legacy-check-acl.v1.sql","sqlSha256":"6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584","contractLockSha256":"493d7d74a1b4d102562d102c6c639c8afb946d2b64d0ca2a403543fd3ca20f70","exitCode":0,"signal":null,"temporaryRemoved":true,"error":null}
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+--------------------------------------------------------------------------------------------------stdout | tests/csv-legacy-acl-draft-22426.test.ts > P2 sealed synthetic authority and durable candidates > copies every existing legacy field from a different domain without manufacturing review evidence
+{"probe":"DRAFT_LEGACY_CHECK_ACL","status":"DRAFT_PROBE_PASS","contractConsumed":false,"sqlSha256":"6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584","legacyRows":8,"copiedRowsEqual":true,"fabricatedOwnerAcceptance":false}
+
+·-----------------------------------------------------
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 151 skipped (152)
+   Start at  23:55:51
+   Duration  2.27s (transform 337ms, setup 0ms, collect 679ms, tests 1.36s, environment 0ms, prepare 81ms)
+

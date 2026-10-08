@@ -5,7 +5,7 @@ import type { Client, PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
-import { createTemplate } from '@customer-agent/content-intake';
+import { createTemplate, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 import type { components } from '@customer-agent/contracts';
 import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
@@ -100,6 +100,38 @@ describe.skipIf(!enabled)('actual service on formal purpose roles (synthetic PG1
     }));
     return { object, jobId: received.jobId, base };
   }
+  it('rolls back receiving an old XLSX object against a newly registered CSV source version', async () => {
+    const bytes = await createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' }, rows());
+    const form = new FormData(); form.set('operationId', 'xlsx-before-remap');
+    form.set('file', new Blob([new Uint8Array(bytes)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'synthetic.xlsx');
+    const body = new Request('http://127.0.0.1/', { method: 'POST', body: form });
+    const object = value(await service.upload(actors.enabler!, 'source-a', Readable.from(Buffer.from(await body.arrayBuffer())), body.headers.get('content-type')!));
+    await admin.query('INSERT INTO content_intake.source_mappings VALUES ($1,2,$2,$3,$4,$5)',
+      ['source-a', CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_STRUCTURE_SHA256]);
+    await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
+    const result = await service.receive(actors.enabler!, 'source-a', { operationId: 'receive-old-format', objectId: object.objectId,
+      sourceVersion: 2, baseReleaseId: 'rel_native_base', expectedPriorKey: null,
+      contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['enabler'], confirmed: true } });
+    expect(result).toMatchObject({ ok: false, code: 'VALIDATION', reason: 'SOURCE_FORMAT_MISMATCH', commit: 'rolled_back' });
+    expect((await admin.query('SELECT count(*)::int AS count FROM content_intake.parse_jobs')).rows[0].count).toBe(0);
+    expect((await admin.query("SELECT count(*)::int AS count FROM backend_review.receipts WHERE request_key='receive-old-format'")).rows[0].count).toBe(0);
+    expect(await store.verify(object.objectId, object.sha256, object.bytes)).toBe(true);
+  });
+  it('does not reinterpret a queued historical XLSX object after the source selects CSV', async () => {
+    const input = await uploaded('xlsx-before-csv');
+    await admin.query('INSERT INTO content_intake.source_mappings VALUES ($1,2,$2,$3,$4,$5)',
+      ['source-a', CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_STRUCTURE_SHA256]);
+    await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
+    expect(await service.parse(actors.enabler!, input.jobId)).toMatchObject({ ok: false, reason: 'SOURCE_MISMATCH' });
+    const job = value(await service.job(actors.enabler!, input.jobId));
+    expect(job.state).toBe('failed'); expect(job.candidateId).toBeNull();
+    expect(job.issues).toContainEqual(expect.objectContaining({ code: 'SOURCE_MISMATCH' }));
+    expect((await admin.query('SELECT source_version,object_id FROM content_intake.parse_jobs WHERE job_id=$1', [input.jobId])).rows[0])
+      .toEqual({ source_version: '1', object_id: input.object.objectId });
+    expect((await admin.query('SELECT mime FROM content_intake.objects WHERE object_id=$1', [input.object.objectId])).rows[0].mime)
+      .toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(await store.verify(input.object.objectId, input.object.sha256, input.object.bytes)).toBe(true);
+  });
   async function prepared(label: string, table = rows()) {
     const input = await uploaded(label, table);
     const candidate = value(await service.parse(actors.enabler!, input.jobId));

@@ -22,6 +22,13 @@ export type IntakeUploadView = {
   canChoose: boolean; canSubmit: boolean; canRetry: boolean; canRefresh: boolean;
   canStop: boolean; canSaveReport: boolean; canOpen: boolean; canReset: boolean; notice: string | null;
 };
+/** Main's finite file-format hint. Bytes are uploaded unchanged; only the API
+ * parser validates encoding, contents and their registered source mapping. */
+export function intakeInputMime(name: string): C['IntakeObject']['mime'] | null {
+  if (/\.xlsx$/i.test(name)) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (/\.csv$/i.test(name)) return 'text/csv';
+  return null;
+}
 export const INTAKE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 /** 134,999 bounded issues produced 2,727,593 bytes (~2.60 MiB) in packages/content-intake/scripts/probe-issue-report.mjs. */
 export const INTAKE_REPORT_MAX_BYTES = 8 * 1024 * 1024;

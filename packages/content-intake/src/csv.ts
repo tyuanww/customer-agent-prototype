@@ -1,26 +1,17 @@
 import { createHash } from 'node:crypto';
 import { parse } from 'csv-parse/sync';
-import { createFaqTableValidator, validRegisteredContext } from '../../src/faq-rules.js';
+import { createFaqTableValidator, validRegisteredContext } from './faq-rules.js';
 import { FAQ_HEADERS, SOURCE_HEADERS, INTAKE_POLICY as P, IntakeFailure,
-  type Issue, type ParseContext, type ParseResult } from '../../src/policy.js';
+  type Issue, type ParseResult } from './policy.js';
 
-export const CSV_TEMPLATE_VERSION = 'faq-csv-v1';
-export const CSV_POLICY_VERSION = 'intake-csv-v1';
-export const CSV_MAPPING_VERSION = 'faq-csv-columns-v1';
-export const CSV_HEADERS = [...SOURCE_HEADERS, ...FAQ_HEADERS, '问法编号', '问法', '问法状态'] as const;
-/** Ordered UTF-8 JSON array, without whitespace; independent of BOM/record contents. */
-export const CSV_STRUCTURE_SHA256 = createHash('sha256').update(JSON.stringify(CSV_HEADERS), 'utf8').digest('hex');
-export type CsvContext = Omit<ParseContext, 'sheet' | 'templateVersion'> & { templateVersion: typeof CSV_TEMPLATE_VERSION };
-export type CsvCandidate = ParseResult & Readonly<{
-  policyVersion: typeof CSV_POLICY_VERSION;
-  rawSha256: string;
-  mime: 'text/csv';
-  templateVersion: typeof CSV_TEMPLATE_VERSION;
-  mappingVersion: typeof CSV_MAPPING_VERSION;
-  structureSha256: string;
-  selectedSheets: readonly ['CSV'];
-  candidateStatus: 'DRAFT';
-  runtimeActivated: false;
+export { CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_HEADERS, CSV_STRUCTURE_SHA256,
+  type CsvContext } from './policy.js';
+import { CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_HEADERS, CSV_STRUCTURE_SHA256,
+  type CsvContext } from './policy.js';
+export type CsvParseResult = ParseResult & Readonly<{
+  policyVersion: typeof CSV_POLICY_VERSION; rawSha256: string; mime: 'text/csv';
+  templateVersion: typeof CSV_TEMPLATE_VERSION; mappingVersion: typeof CSV_MAPPING_VERSION;
+  structureSha256: string; selectedSheets: readonly ['CSV'];
 }>;
 
 const column = (index: number) => String.fromCharCode(65 + index);
@@ -32,15 +23,14 @@ class CsvFieldFailure extends IntakeFailure {
   constructor(code: string, readonly row: number, readonly column: string) { super(code); }
 }
 
-/** Experiment only. Synchronous decoding must remain inside a future isolated parser;
- * this function is not a Main/HTTP/process-runner entry and is excluded from dist.
+/** Decode original CSV bytes inside the bounded parser process, never a Main/HTTP loop.
  * Source strings cannot grant rights. Hashes bind the original bytes, including BOM.
  * Rows refer to logical CSV records (header is 1), not physical lines inside quoted text. */
-export function parseCsvCandidate(bytes: Buffer, context: CsvContext): CsvCandidate {
+export function parseCsv(bytes: Buffer, context: CsvContext): CsvParseResult {
   const provenance = {
     policyVersion: CSV_POLICY_VERSION, rawSha256: createHash('sha256').update(bytes).digest('hex'),
     mime: 'text/csv', templateVersion: CSV_TEMPLATE_VERSION, mappingVersion: CSV_MAPPING_VERSION,
-    structureSha256: CSV_STRUCTURE_SHA256, selectedSheets: ['CSV'], candidateStatus: 'DRAFT', runtimeActivated: false,
+    structureSha256: CSV_STRUCTURE_SHA256, selectedSheets: ['CSV'],
     excluded: [], expandedBytes: 0, mediaCount: 0,
   } as const;
   const issues: Issue[] = [];
@@ -115,7 +105,7 @@ export function parseCsvCandidate(bytes: Buffer, context: CsvContext): CsvCandid
   }
 }
 
-/** Synthetic candidate template. A repeated FAQ row represents one additional question.
+/** Standard source-bound template. A repeated FAQ row represents one additional question.
  * Every cell is quoted; values are preserved, never converted to formulas or normalized. */
 export function createCsvTemplate(context: CsvContext, records: readonly Readonly<{
   faq: readonly string[]; question?: readonly [id: string, text: string, state: string];

@@ -17,10 +17,16 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     expect(existsSync(packagedExecutable)).toBe(true);
   }
   // Keep ungated test discovery independent of built API artifacts and PG.
-  const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
+  const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, createIntakeSyntheticCsv, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
   const { readIssueReport } = await import('../../../../packages/content-intake/tests/fixtures.ts');
   const profile = process.env.CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME === '1' ? 'purpose-runtime' : 'existing';
-  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile });
+  const inputFormat = process.env.CUSTOMER_AGENT_INTAKE_INPUT_FORMAT ?? 'xlsx';
+  expect(['xlsx', 'csv']).toContain(inputFormat);
+  const format = inputFormat as 'xlsx' | 'csv';
+  const createInput = format === 'csv'
+    ? (options?: Parameters<typeof createIntakeSyntheticCsv>[0]) => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), createIntakeSyntheticCsv(options)])
+    : createIntakeSyntheticWorkbook;
+  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile, inputFormat: format });
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-real-stack-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
   const evidence = process.env.INTAKE_REAL_STACK_SCREENSHOT_DIR
@@ -33,14 +39,14 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     console.info(JSON.stringify({ status: 'OWNED_RESOURCES', hostDirectory: host.root, desktopDirectory: directory }));
     expect(host.candidate).toBeNull(); expect(host.object).toBeNull();
     expect((await host.status()).requests.some(p => p.endsWith('/objects'))).toBe(false);
-    const badFile = path.join(directory, 'synthetic-missing-answer.xlsx');
-    const goodFile = path.join(directory, 'synthetic-corrected-faq.xlsx');
+    const badFile = path.join(directory, `synthetic-missing-answer.${format}`);
+    const goodFile = path.join(directory, `synthetic-corrected-faq.${format}`);
     const reportFile = path.join(directory, 'synthetic-issues.xlsx');
-    const revisionFile = path.join(directory, 'synthetic-revision.xlsx');
-    const revisionSuffix = '\n合成修订：请再次核对适用说明。';
-    writeFileSync(revisionFile, await createIntakeSyntheticWorkbook({ answerSuffix: revisionSuffix }));
-    writeFileSync(badFile, await createIntakeSyntheticWorkbook({ missingAnswer: true }));
-    writeFileSync(goodFile, await createIntakeSyntheticWorkbook());
+    const revisionFile = path.join(directory, `synthetic-revision.${format}`);
+    const revisionSuffix = format === 'csv' ? '\r\n合成修订："请再次核对",适用说明。' : '\n合成修订：请再次核对适用说明。';
+    writeFileSync(revisionFile, await createInput({ answerSuffix: revisionSuffix }));
+    writeFileSync(badFile, await createInput({ missingAnswer: true }));
+    writeFileSync(goodFile, await createInput());
     // A packaged app must resolve the existing profile file, never the development
     // origin variables. Reuse the same scenario against the installed artifact.
     if (packagedExecutable) writeFileSync(path.join(directory, 'synthetic-stack.json'), JSON.stringify({
@@ -66,7 +72,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       page.on('console', message => { if (message.type() === 'error') rendererErrors.push(message.text()); });
     };
     app.on('window', observe); app.windows().forEach(observe);
-    // Control native file and confirmation responses. Main reads actual XLSX bytes
+    // Control native file and confirmation responses. Main reads actual original bytes
     // and saves the actual API response; no filesystem, parser or HTTP mocks.
     await app.evaluate(({ dialog }, files) => {
       const choices = [files.badFile, files.goodFile, files.badFile, files.revisionFile, files.goodFile];
@@ -158,7 +164,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await appearance('light');
     expect(sourceChoice).toBeTruthy(); await sources.selectOption(sourceChoice!);
     async function selectAndSubmit(filename: string) {
-      await upload.getByRole('button', { name: '选择 Excel 文件', exact: true }).click();
+      await upload.getByRole('button', { name: '选择 CSV / Excel 文件', exact: true }).click();
       await expect(upload.getByText(filename, { exact: true })).toBeVisible();
       const confirmation = upload.getByRole('checkbox', { name: '我已核对整理责任人及全部实际改稿人', exact: true });
       await expect(confirmation).not.toBeChecked();
@@ -183,16 +189,18 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     }
     await selectAndSubmit(path.basename(badFile));
     await settleParse('整批校验未通过');
-    const validation = upload.getByRole('region', { name: '工作簿校验结果', exact: true });
+    const validation = upload.getByRole('region', { name: '资料校验结果', exact: true });
     await expect(validation).toContainText('共 1 个问题');
-    // The frozen API projects a numeric column; the saved XLSX keeps Excel's C.
-    await expect(validation).toContainText('3 / 3');
+    // The API projects a numeric column; the saved XLSX report retains the input
+    // format's logical record/worksheet coordinates, even across quoted newlines.
+    await expect(validation).toContainText(format === 'csv' ? '3 / 8' : '3 / 3');
+    if (format === 'csv') await expect(validation).toContainText('CSV 行号按记录计算');
     await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })).toHaveCount(0);
     await upload.getByRole('button', { name: '保存完整错误报告', exact: true }).click();
     await expect.poll(() => existsSync(reportFile)).toBe(true);
     expect(await readIssueReport(readFileSync(reportFile))).toEqual([
       ['工作表', '行', '列', '错误码', '修正建议'],
-      ['FAQ', '3', 'C', 'REQUIRED', '补齐必填内容后整批重新上传'],
+      [format === 'csv' ? 'CSV' : 'FAQ', '3', format === 'csv' ? 'H' : 'C', 'REQUIRED', '补齐必填内容后整批重新上传'],
     ]);
     expect((await host.status()).publications).toBe(0);
     await validation.scrollIntoViewIfNeeded();
@@ -358,7 +366,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     expect(final.requests.filter(p => /^\/v1\/intake\/parse-jobs\/[^/]+\/report$/.test(p))).toHaveLength(1);
     expect(rendererErrors).toEqual([]);
     expect(mainStderr).not.toContain("No handler registered for 'product:announce-unread'");
-    console.info(JSON.stringify({ status: 'PASS', profile, purposeQueries: final.purposeQueries, electron: process.platform, api: 'actual', postgres: 15,
+    console.info(JSON.stringify({ status: 'PASS', profile, inputFormat: format, purposeQueries: final.purposeQueries, electron: process.platform, api: 'actual', postgres: 15,
       nativeDialog: 'controlled-path-and-confirmation-responses', upload: 'actual-multipart', issueReport: 'saved-and-read-with-exceljs',
       publicationPolicy: 'direct-v1', approvalRows: 0, revision: 'same-id-v2-fresh-evidence', cancellation: 'server-confirmed-live-release-unchanged', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
   } catch (error) {

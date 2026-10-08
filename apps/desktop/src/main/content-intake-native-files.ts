@@ -3,11 +3,11 @@ import { constants } from 'node:fs';
 import { lstat, open, rename, unlink } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import { dialog, type BrowserWindow } from 'electron';
-import { INTAKE_UPLOAD_MAX_BYTES } from '../shared/content-intake-upload';
+import { INTAKE_UPLOAD_MAX_BYTES, intakeInputMime } from '../shared/content-intake-upload';
 import { ProductHttpError } from './product-http';
 import type { IntakePublicationPrompt } from './content-intake-management';
 
-/** Paths never leave Main. Read one bounded, regular XLSX file; save only to a
+/** Paths never leave Main. Read one bounded, regular CSV or XLSX file; save only to a
  * native user-selected destination, replacing it atomically after a full write.
  * An OS dialog may outlive cancellation, so every result is checked before I/O. */
 export function createIntakeNativeFiles(window: BrowserWindow) {
@@ -34,14 +34,15 @@ export function createIntakeNativeFiles(window: BrowserWindow) {
       }));
       return choice.response === 1;
     },
-    async chooseWorkbook(signal: AbortSignal): Promise<{ name: string; bytes: Buffer } | null> {
+    async chooseInputFile(signal: AbortSignal): Promise<{ name: string; bytes: Buffer } | null> {
       live(signal);
-      const choice = await choose(signal, () => dialog.showOpenDialog(window, { title: '选择合成 FAQ 工作簿',
-        properties: ['openFile'], filters: [{ name: 'Excel 工作簿', extensions: ['xlsx'] }] }));
+      const choice = await choose(signal, () => dialog.showOpenDialog(window, { title: '选择 FAQ 资料文件',
+        properties: ['openFile'], filters: [{ name: 'FAQ 资料（CSV / Excel）', extensions: ['csv', 'xlsx'] }] }));
       live(signal);
       if (choice.canceled) return null;
       const path = choice.filePaths[0];
-      if (choice.filePaths.length !== 1 || !path || extname(path).toLowerCase() !== '.xlsx') throw new ProductHttpError('VALIDATION', 'FILE_INVALID');
+      const mime = path ? intakeInputMime(path) : null;
+      if (choice.filePaths.length !== 1 || !path || !mime) throw new ProductHttpError('VALIDATION', 'FILE_INVALID');
       const before = await lstat(path); live(signal);
       if (!before.isFile()) throw new ProductHttpError('VALIDATION', 'FILE_INVALID');
       if (before.size < 1 || before.size > INTAKE_UPLOAD_MAX_BYTES) throw new ProductHttpError('VALIDATION', 'FILE_LIMIT');
@@ -59,7 +60,7 @@ export function createIntakeNativeFiles(window: BrowserWindow) {
         }
         const end = await file.stat(); live(signal);
         if (offset !== start.size || end.size !== start.size || end.mtimeMs !== start.mtimeMs || end.ctimeMs !== start.ctimeMs
-          || offset < 4 || bytes.readUInt32LE(0) !== 0x04034b50) throw new ProductHttpError('VALIDATION', 'FILE_INVALID');
+          || (mime !== 'text/csv' && (offset < 4 || bytes.readUInt32LE(0) !== 0x04034b50))) throw new ProductHttpError('VALIDATION', 'FILE_INVALID');
         return { name: basename(path), bytes: bytes.subarray(0, offset) };
       } finally { await file.close(); }
     },

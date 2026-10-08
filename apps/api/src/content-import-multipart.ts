@@ -95,7 +95,7 @@ function splitPart(body: Buffer, boundary: Buffer): Buffer[] {
 async function parseMultipart(
   stream: Readable,
   contentTypeHeader: string,
-  field: { name: string; maxBytes: number; excelOnly: boolean },
+  field: { name: string; maxBytes: number },
   options: Readonly<{ maxFileBytes?: number; timeoutMs?: number }> = {},
 ): Promise<{ file: AsyncIterable<Buffer>; sourceType: ContentSourceType; metadata: string }> {
   const boundary = parseBoundary(contentTypeHeader);
@@ -121,7 +121,7 @@ async function parseMultipart(
     if (name === 'file') {
       if (file !== undefined) throw new Error('CONTENT_UPLOAD_MULTIPART');
       const type = declaredSourceType(headerValue(headers, 'content-type'));
-      if (type === null || (field.excelOnly && type !== 'excel')) throw new Error('CONTENT_UPLOAD_TYPE');
+      if (type === null) throw new Error('CONTENT_UPLOAD_TYPE');
       if (content.length > maxFileBytes) throw new Error('CONTENT_UPLOAD_TOO_LARGE');
       file = content;
       sourceType = type;
@@ -147,15 +147,15 @@ async function parseMultipart(
 export async function parseContentImportMultipart(stream: Readable, contentTypeHeader: string,
   options: Readonly<{ maxFileBytes?: number; timeoutMs?: number }> = {}): Promise<ParsedContentImportForm> {
   const parsed = await parseMultipart(stream, contentTypeHeader,
-    { name: 'source_bindings', maxBytes: SOURCE_BINDINGS_MAX_BYTES, excelOnly: false }, options);
+    { name: 'source_bindings', maxBytes: SOURCE_BINDINGS_MAX_BYTES }, options);
   return { file: parsed.file, sourceType: parsed.sourceType, sourceBindingsJson: parsed.metadata };
 }
 
-/** The frozen intake upload accepts exactly an operation ID and one XLSX file.
+/** The frozen intake upload accepts exactly an operation ID and one CSV/XLSX file.
  * Client filenames and hashes never participate in storage or authorization. */
 export async function parseIntakeUploadMultipart(stream: Readable, contentTypeHeader: string,
   options: Readonly<{ maxFileBytes?: number; timeoutMs?: number }> = {}) {
   const parsed = await parseMultipart(stream, contentTypeHeader,
-    { name: 'operationId', maxBytes: 128, excelOnly: true }, options);
-  return { file: parsed.file, operationId: parsed.metadata };
+    { name: 'operationId', maxBytes: 128 }, options);
+  return { file: parsed.file, sourceType: parsed.sourceType, operationId: parsed.metadata };
 }

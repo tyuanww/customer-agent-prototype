@@ -6,13 +6,13 @@ type C = components['schemas'];
 type Scope = C['IntakeScope'];
 type Grant = C['IntakeGrant'];
 export type Source = { scopeId: string; scope: C['IntakeSourceScope']; version: number;
-  templateVersion: string; ruleVersion: string; mappingVersion: string; mode: string };
+  templateVersion: string; ruleVersion: string; mappingVersion: string; structureDigest: string; mode: string };
 
 export async function source(client: IntakeTransaction, id: string): Promise<Source> {
   const { rows } = await client.query<{ scope_id: string; tenant_id: string; app_id: string; brand_id: string;
     shop_id: string | null; domain: Scope['domain']; current_mapping_version: string;
-    template_version: string; rule_version: string; mapping_version: string; mode: string }>(`
-    SELECT s.*, src.current_mapping_version, src.mode, m.template_version,m.rule_version,m.mapping_version
+    template_version: string; rule_version: string; mapping_version: string; structure_digest: string; mode: string }>(`
+    SELECT s.*, src.current_mapping_version, src.mode, m.template_version,m.rule_version,m.mapping_version,m.structure_digest
     FROM content_intake.sources src JOIN content_intake.scopes s USING(scope_id)
     JOIN content_intake.source_mappings m ON m.source_id=src.source_id AND m.version=src.current_mapping_version
     WHERE src.source_id=$1`, [id]);
@@ -20,7 +20,7 @@ export async function source(client: IntakeTransaction, id: string): Promise<Sou
   if (!r) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   return { scopeId: r.scope_id, scope: { tenantId: r.tenant_id, appId: r.app_id, brandId: r.brand_id,
     shopId: r.shop_id, domain: r.domain, sourceId: id }, version: Number(r.current_mapping_version),
-    templateVersion: r.template_version, ruleVersion: r.rule_version, mappingVersion: r.mapping_version, mode: r.mode };
+    templateVersion: r.template_version, ruleVersion: r.rule_version, mappingVersion: r.mapping_version, structureDigest: r.structure_digest, mode: r.mode };
 }
 
 export async function authorize(client: IntakeTransaction, actor: Principal, action: C['IntakeAction'], src: Source): Promise<number> {

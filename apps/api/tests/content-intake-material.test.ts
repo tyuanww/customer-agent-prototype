@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTemplate, parseWorkbook, type ParseResult } from '@customer-agent/content-intake';
+import { createTemplate, parseWorkbook, createCsvTemplate, parseCsv, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_STRUCTURE_SHA256, type ParseResult } from '@customer-agent/content-intake';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { canonical, digest, materialFromParse } from '../src/content-intake/material.js';
 import type { Source } from '../src/content-intake/authority.js';
@@ -7,7 +7,7 @@ import { qualityPopulation } from '../src/content-intake/quality.js';
 
 const now = Date.parse('2026-10-06T00:00:00Z');
 const source: Source = { scopeId: 'scope', scope: { tenantId: 't', appId: 'a', brandId: 'b', shopId: 'shop', domain: 'product', sourceId: 'source' },
-  version: 1, templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'm1', mode: 'v2-preview' };
+  version: 1, templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'm1', structureDigest: 'a'.repeat(64), mode: 'v2-preview' };
 const context = { sourceId: 'source', brandId: 'b', scope: 'shop', scopeKind: 'shop' as const, domain: 'product' as const, sheet: 'FAQ' as const, templateVersion: 'faq-p1.1' as const };
 const row = (id = 'entry-a', body = '合成回答', state = '启用') => [id, '合成标题', body, '', '', '分类', '', state, '', '', '', '内部说明', '', '', 'false'];
 async function input(rows = [row()]) {
@@ -18,6 +18,28 @@ async function input(rows = [row()]) {
 }
 
 describe('formal candidate material from independently parsed workbook', () => {
+  it('binds CSV format, original-byte object and independent questions without changing FAQ material rules', () => {
+    const csvContext = { ...context, templateVersion: CSV_TEMPLATE_VERSION } as const;
+    const bytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), createCsvTemplate(csvContext, [
+      { faq: row(), question: ['question-1', '合成问法一', '启用'] }, { faq: row(), question: ['question-2', '合成问法二', '停用'] },
+    ])]);
+    const registered = { ...source, templateVersion: CSV_TEMPLATE_VERSION, ruleVersion: CSV_POLICY_VERSION,
+      mappingVersion: CSV_MAPPING_VERSION, structureDigest: CSV_STRUCTURE_SHA256 };
+    const parsed = parseCsv(bytes, csvContext);
+    const object = { objectId: 'csv-object', sourceId: 'source', sha256: digest(bytes), bytes: bytes.length, mime: 'text/csv' as const };
+    const input = { parsed, source: registered, object, contributors: ['principal'], previous: [], terms: [], baseReleaseId: null, now, recentDisables: 0 };
+    const material = materialFromParse(input);
+    expect(material).toMatchObject({ selectedSheets: ['CSV'], templateVersion: CSV_TEMPLATE_VERSION, ruleVersion: CSV_POLICY_VERSION,
+      mappingVersion: CSV_MAPPING_VERSION, sourceClaim: { fileSha256: digest(bytes) }, object });
+    expect(material.entries).toHaveLength(1);
+    expect(material.entries[0]!.questions).toEqual([
+      { id: 'question-1', version: 1, text: '合成问法一', active: true }, { id: 'question-2', version: 1, text: '合成问法二', active: false },
+    ]);
+    expect(() => materialFromParse({ ...input, parsed: { ...parsed, policyVersion: 'intake-p1.1' } })).toThrow('SOURCE_FORMAT_MISMATCH');
+    expect(() => materialFromParse({ ...input, object: { ...object, mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } })).toThrow('SOURCE_FORMAT_MISMATCH');
+    expect(() => materialFromParse({ ...input, source: { ...registered, mappingVersion: 'other' } })).toThrow('SOURCE_FORMAT_MISMATCH');
+    expect(() => materialFromParse({ ...input, source: { ...registered, structureDigest: 'a'.repeat(64) } })).toThrow('SOURCE_FORMAT_MISMATCH');
+  });
   it('binds every material field to the sampling tuple without pretending it is a governance hash', async () => {
     const material = materialFromParse(await input());
     const preview = (m = material) => qualityPopulation({ candidateId: 'candidate', version: 1, digest: digest(canonical(m)) }, m);

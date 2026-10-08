@@ -1,56 +1,58 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import ExcelJS from 'exceljs';
+import { createParseRunner } from '@customer-agent/content-intake/runner';
 import { describe, expect, it } from 'vitest';
 import { parseWorkbook, createTemplate, writeIssueReport } from '@customer-agent/content-intake';
-import { CSV_HEADERS, CSV_STRUCTURE_SHA256, CSV_TEMPLATE_VERSION, parseCsvCandidate, createCsvTemplate, type CsvContext } from '../experiments/csv/candidate.js';
+import { CSV_HEADERS, CSV_STRUCTURE_SHA256, CSV_TEMPLATE_VERSION, parseCsv, createCsvTemplate, type CsvContext } from '@customer-agent/content-intake';
 import { INTAKE_POLICY as P, isParseResult } from '../src/policy.js';
 import { context as workbookContext, sampleRows } from './fixtures.js';
 
 const context: CsvContext = { ...workbookContext, templateVersion: CSV_TEMPLATE_VERSION };
 const faq = () => [...sampleRows[0]!];
 const records = () => sampleRows.map((row) => ({ faq: [...row] }));
-const codes = (bytes: Buffer, selected = context) => parseCsvCandidate(bytes, selected).issues.map((issue) => issue.code);
+const codes = (bytes: Buffer, selected = context) => parseCsv(bytes, selected).issues.map((issue) => issue.code);
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 
-describe('isolated DRAFT CSV candidate', () => {
+describe('frozen standard CSV parser', () => {
   it('consumes the checked-in synthetic CSV and keeps an independent format/provenance boundary', async () => {
     const bytes = await readFile(new URL('../experiments/csv/synthetic-template.csv', import.meta.url));
-    const parsed = parseCsvCandidate(bytes, context);
+    const parsed = parseCsv(bytes, context);
     expect(parsed).toMatchObject({ ok: true, policyVersion: 'intake-csv-v1', templateVersion: 'faq-csv-v1',
       mappingVersion: 'faq-csv-columns-v1', mime: 'text/csv', rawSha256: hash(bytes), structureSha256: hash(Buffer.from(JSON.stringify(CSV_HEADERS))),
-      selectedSheets: ['CSV'], runtimeActivated: false, candidateStatus: 'DRAFT' });
+      selectedSheets: ['CSV'] });
     expect(parsed.rows).toHaveLength(2); expect(parsed.questions).toHaveLength(2);
     expect(CSV_STRUCTURE_SHA256).toBe(parsed.structureSha256);
-    expect(isParseResult(parsed)).toBe(false);
+    expect(isParseResult(parsed)).toBe(true);
+    expect(isParseResult(parsed, P.version)).toBe(false);
     expect(await parseWorkbook(bytes, workbookContext)).toMatchObject({ ok: false, rows: [], questions: [] });
   });
   it('roundtrips comma, doubled quotes, CRLF and literal formula-looking business text exactly', () => {
     const row = faq(); row[2] = '=合成,"文本"\r\n下一行\n第三行'; row[1] = ' 合成标题 ';
-    const parsed = parseCsvCandidate(createCsvTemplate(context, [{ faq: row }]), context);
+    const parsed = parseCsv(createCsvTemplate(context, [{ faq: row }]), context);
     expect(parsed.ok).toBe(true); expect(parsed.rows[0]!.values).toEqual(row);
   });
   it('accepts a UTF-8 BOM without making two different original objects share a raw hash', () => {
     const bytes = createCsvTemplate(context, records());
     const bom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), bytes]);
-    const a = parseCsvCandidate(bytes, context), b = parseCsvCandidate(bom, context);
+    const a = parseCsv(bytes, context), b = parseCsv(bom, context);
     expect(a.ok).toBe(true); expect(b.ok).toBe(true); expect(a.rows).toEqual(b.rows);
     expect(a.rawSha256).toBe(hash(bytes)); expect(b.rawSha256).toBe(hash(bom)); expect(a.rawSha256).not.toBe(b.rawSha256);
   });
   it('accepts LF record delimiters and a final record without a trailing newline', () => {
     const row = faq(); row[2] = '纯合成正文';
     const bytes = createCsvTemplate(context, [{ faq: row }]);
-    expect(parseCsvCandidate(Buffer.from(bytes.toString().replaceAll('\r\n', '\n').trimEnd()), context).ok).toBe(true);
+    expect(parseCsv(Buffer.from(bytes.toString().replaceAll('\r\n', '\n').trimEnd()), context).ok).toBe(true);
   });
   it.each(['\r\n', '\n', '\r'])('accepts %j record separators while preserving quoted bare CR', (delimiter) => {
     const row = faq(); row[2] = '合成第一行\r第二行';
     const text = createCsvTemplate(context, [{ faq: row }]).toString().replaceAll('\r\n', delimiter);
-    const parsed = parseCsvCandidate(Buffer.from(text), context);
+    const parsed = parseCsv(Buffer.from(text), context);
     expect(parsed.ok).toBe(true); expect(parsed.rows[0]!.body).toBe(row[2]);
   });
   it('matches XLSX business rows and question identity/state while collapsing only exact duplicate FAQ fields', async () => {
     const row = faq(); row[7] = '停用';
-    const csv = parseCsvCandidate(createCsvTemplate(context, [
+    const csv = parseCsv(createCsvTemplate(context, [
       { faq: row, question: ['q-one', '合成问法一', '启用'] }, { faq: row, question: ['q-two', '合成问法二', '停用'] },
     ]), context);
     const book = new ExcelJS.Workbook();
@@ -64,7 +66,7 @@ describe('isolated DRAFT CSV candidate', () => {
   });
   it('reports actual CSV columns and logical records after quoted multiline text; report reopens without source text', async () => {
     const valid = faq(), invalid = faq(); valid[2] = '私有合成标记\n第二行\n第三行'; invalid[0] = 'faq-next'; invalid[2] = '';
-    const parsed = parseCsvCandidate(createCsvTemplate(context, [{ faq: valid }, { faq: invalid }]), context);
+    const parsed = parseCsv(createCsvTemplate(context, [{ faq: valid }, { faq: invalid }]), context);
     expect(parsed.issues).toEqual([{ code: 'REQUIRED', sheet: 'CSV', row: 3, column: 'H', fix: '补齐必填内容后整批重新上传' }]);
     expect(parsed.rows).toEqual([]); expect(parsed.questions).toEqual([]);
     const book = new ExcelJS.Workbook(); await book.xlsx.load(await writeIssueReport(parsed.issues) as unknown as ExcelJS.Buffer);
@@ -80,7 +82,7 @@ describe('isolated DRAFT CSV candidate', () => {
     ['example question ID', () => [{ faq: faq(), question: ['EXAMPLE_q', '问法', '启用'] as const }], 'INVALID_QUESTION'],
     ['duplicate question across entries', () => records().map((r) => ({ ...r, question: ['q-same', '合成问法', '启用'] as const })), 'DUPLICATE_QUESTION'],
   ] as const)('blocks whole batch for %s', (_label, input, code) => {
-    const parsed = parseCsvCandidate(createCsvTemplate(context, input()), context);
+    const parsed = parseCsv(createCsvTemplate(context, input()), context);
     expect(parsed.ok).toBe(false); expect(parsed.rows).toEqual([]); expect(parsed.questions).toEqual([]);
     expect(parsed.issues.some((issue) => issue.code === code)).toBe(true);
     if (code === 'DUPLICATE_QUESTION') expect(parsed.issues[0]).toMatchObject({ sheet: 'CSV', row: 3, column: 'U' });
@@ -91,7 +93,7 @@ describe('isolated DRAFT CSV candidate', () => {
     [13, '必要图片', 'UNRESOLVED_MEDIA', 'S'], [14, 'true', 'BRAND_OVERRIDE', 'T'], [2, '过敏请核对', 'ALLERGY_BODY', 'H'],
   ] as const)('reuses the workbook business rule for field %i', (index, value, code, col) => {
     const row = faq(); row[index] = value;
-    const parsed = parseCsvCandidate(createCsvTemplate(context, [{ faq: row }]), context);
+    const parsed = parseCsv(createCsvTemplate(context, [{ faq: row }]), context);
     expect(parsed.issues).toContainEqual(expect.objectContaining({ code, row: 2, column: col }));
     expect(parsed.rows).toEqual([]);
   });
@@ -99,13 +101,13 @@ describe('isolated DRAFT CSV candidate', () => {
     const selected = { ...context, domain: 'campaign' as const }, row = faq();
     expect(codes(createCsvTemplate(selected, [{ faq: row }]), selected)).toContain('EXPIRY_REQUIRED');
     row[8] = '2028-02-29T12:00:00+08:00'; row[9] = '2028-03-01T00:00:00Z';
-    expect(parseCsvCandidate(createCsvTemplate(selected, [{ faq: row }]), selected).ok).toBe(true);
+    expect(parseCsv(createCsvTemplate(selected, [{ faq: row }]), selected).ok).toBe(true);
     row[9] = row[8]; expect(codes(createCsvTemplate(selected, [{ faq: row }]), selected)).toContain('INVALID_WINDOW');
   });
   it('checks the registered source on every record rather than trusting the first record', () => {
     const bytes = createCsvTemplate(context, records());
     const altered = bytes.toString().replace(/"synthetic-source"/gu, (match, offset: number) => offset > bytes.toString().indexOf('"synthetic-source"') ? '"other-source"' : match);
-    const parsed = parseCsvCandidate(Buffer.from(altered), context);
+    const parsed = parseCsv(Buffer.from(altered), context);
     expect(parsed.issues).toContainEqual(expect.objectContaining({ code: 'SOURCE_MISMATCH', row: 3, column: 'A' }));
     expect(parsed.rows).toEqual([]);
   });
@@ -132,7 +134,7 @@ describe('isolated DRAFT CSV candidate', () => {
   });
   it('enforces cell text and aggregate text budgets on physical records before duplicate grouping', () => {
     const row = faq(); row[2] = 'x'.repeat(P.cellChars);
-    expect(parseCsvCandidate(createCsvTemplate(context, [{ faq: row }]), context).ok).toBe(true);
+    expect(parseCsv(createCsvTemplate(context, [{ faq: row }]), context).ok).toBe(true);
     row[2] += 'x'; expect(codes(createCsvTemplate(context, [{ faq: row }]))).toContain('CELL_TEXT_LIMIT');
     row[2] = 'x'.repeat(P.cellChars);
     const repeated = Array.from({ length: 100 }, (_, i) => ({ faq: row, question: [`q-${i}`, '问法', '启用'] as const }));
@@ -144,17 +146,44 @@ describe('isolated DRAFT CSV candidate', () => {
   });
   it('rejects the 24th empty field before consuming later malformed CSV or growing an unbounded record array', () => {
     const header = createCsvTemplate(context).toString();
-    const parsed = parseCsvCandidate(Buffer.from(`${header}${','.repeat(24)}"unterminated`), context);
+    const parsed = parseCsv(Buffer.from(`${header}${','.repeat(24)}"unterminated`), context);
     expect(parsed.issues).toEqual([expect.objectContaining({ code: 'COLUMN_COUNT', sheet: 'CSV', row: 2, column: 'X' })]);
     // With only the permitted field count, the malformed quote is still surfaced.
     expect(codes(Buffer.from(`${header}${','.repeat(22)}"unterminated`))).toContain('INVALID_CSV');
   });
   it('enforces physical record and normalized FAQ + question limits separately', () => {
     const unique = Array.from({ length: P.rows }, (_, i) => { const row = faq(); row[0] = `faq-${i}`; return { faq: row }; });
-    expect(parseCsvCandidate(createCsvTemplate(context, unique), context).rows).toHaveLength(P.rows);
+    expect(parseCsv(createCsvTemplate(context, unique), context).rows).toHaveLength(P.rows);
     expect(codes(createCsvTemplate(context, [...unique, { faq: faq() }]))).toContain('ROW_LIMIT');
     const withQuestions = unique.slice(0, P.rows / 2).map((r, i) => ({ ...r, question: [`q-${i}`, '问法', '启用'] as const }));
-    expect(parseCsvCandidate(createCsvTemplate(context, withQuestions), context).ok).toBe(true);
+    expect(parseCsv(createCsvTemplate(context, withQuestions), context).ok).toBe(true);
     expect(codes(createCsvTemplate(context, [...withQuestions, unique[P.rows / 2]!]))).toContain('ROW_LIMIT');
+  });
+});
+
+
+describe('CSV isolated process boundary', () => {
+  it('consumes original BOM bytes and returns the identical shared parse result without network', async () => {
+    const bytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), createCsvTemplate(context, [{ faq: faq(), question: ['csv-question', '合成问法', '启用'] }])]);
+    const output = await createParseRunner().parse(bytes, context);
+    expect(output.result).toEqual(parseCsv(bytes, context));
+    expect(output.maxRssKiB).toBeGreaterThan(0); expect(output.networkAttempts).toBe(0);
+    expect(isParseResult(output.result, 'intake-csv-v1')).toBe(true);
+    expect(isParseResult({ ...output.result, policyVersion: ['intake-csv-v1'] })).toBe(false);
+  });
+  it('keeps CSV row-limit coordinates consumable and rejects mismatched parser policies', async () => {
+    const records = Array.from({ length: P.rows + 1 }, (_, i) => { const row = faq(); row[0] = `row-${i}`; return { faq: row }; });
+    const output = await createParseRunner().parse(createCsvTemplate(context, records), context);
+    expect(output.result).toMatchObject({ ok: false, policyVersion: 'intake-csv-v1', issues: [{ code: 'ROW_LIMIT', sheet: 'CSV', row: P.rows + 2, column: 'A' }] });
+    expect(isParseResult(output.result)).toBe(true); expect(isParseResult(output.result, P.version)).toBe(false);
+    expect((await createParseRunner().parse(createCsvTemplate(context), workbookContext)).result.ok).toBe(false);
+    expect((await createParseRunner().parse(await createTemplate(workbookContext, sampleRows), context)).result.issues[0]?.code).toBe('INVALID_CSV');
+  });
+  it('cancels a CSV process and can subsequently parse without reusing a late result', async () => {
+    const runner = createParseRunner(), abort = new AbortController();
+    const pending = runner.parse(createCsvTemplate(context, records()), context, { signal: abort.signal });
+    abort.abort();
+    expect((await pending).result).toMatchObject({ policyVersion: 'intake-csv-v1', ok: false, issues: [{ code: 'CANCELLED' }] });
+    expect((await runner.parse(createCsvTemplate(context, records()), context)).result.ok).toBe(true);
   });
 });

@@ -1,11 +1,12 @@
 import ExcelJS from 'exceljs';
 import { inspectArchive } from './archive.js';
 import { createFaqTableValidator, validRegisteredContext } from './faq-rules.js';
+export { parseCsv, createCsvTemplate, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_HEADERS, CSV_STRUCTURE_SHA256, type CsvContext, type CsvParseResult } from './csv.js';
 export { parseFamilyReference } from './faq-rules.js';
 import { FAQ_HEADERS, QUESTION_HEADERS, SOURCE_HEADERS, TEMPLATE_VERSION, INTAKE_POLICY as P,
   IntakeFailure, failedParse, type ParseContext, type ParseResult, type Issue } from './policy.js';
 export { FAQ_HEADERS, QUESTION_HEADERS, SOURCE_HEADERS, TEMPLATE_VERSION, INTAKE_POLICY, type ParseContext,
-  isParseResult, type ParseResult, type Issue, type FaqRow } from './policy.js';
+  isParseResult, failedParse, type IntakeParseContext, type ParseResult, type Issue, type FaqRow } from './policy.js';
 
 /** Caller supplies registered source facts; workbook strings can never grant a scope.
  * P1 only validates the standard FAQ shape. Vocabulary, version allocation and publication

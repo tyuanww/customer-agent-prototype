@@ -1,0 +1,78 @@
+{
+  "aclResult": {
+    "before": {
+      "entries": 537,
+      "sha256": "aaabfeda8877ef28c5d8d3aa7a6c8143e41254c221497778d9d4d11a231ec1a9"
+    },
+    "after": {
+      "entries": 542,
+      "sha256": "95c8860d441fdb7429364476c09938e1935f8aa5383a9743a84b89399ff8f6b5"
+    },
+    "added": [
+      "function|content_intake.candidate_format_guard()|PUBLIC|EXECUTE|f",
+      "function|content_intake.input_format_matches(p_template text, p_rule text, p_mapping text, p_structure text, p_mime text)|PUBLIC|EXECUTE|f",
+      "function|content_intake.input_object_format_guard()|PUBLIC|EXECUTE|f",
+      "function|content_intake.parse_format_guard()|PUBLIC|EXECUTE|f",
+      "function|content_intake.source_format_guard()|PUBLIC|EXECUTE|f"
+    ],
+    "removed": []
+  },
+  "objectResult": {
+    "before": {
+      "entries": 3085,
+      "sha256": "fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca"
+    },
+    "after": {
+      "entries": 3090,
+      "sha256": "c31a0c03694ec13c86ba15eb596c6b47c5164335712d839bc53cc0fb40e0de03"
+    },
+    "added": [
+      "constraint|content_intake.objects.objects_input_format_check|type=c|deferrable=f|deferred=f|validated=t|definition=CHECK ((((purpose = 'input'::text) AND (bytes <= 10485760) AND (mime = ANY (ARRAY['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'::text, 'text/csv'::text]))) OR ((purpose <> 'input'::text) AND (mime <> 'text/csv'::text))))",
+      "constraint|content_intake.objects.objects_mime_check|type=c|deferrable=f|deferred=f|validated=t|definition=CHECK ((mime = ANY (ARRAY['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'::text, 'text/csv'::text, 'application/pdf'::text, 'application/json'::text])))",
+      "function|content_intake.candidate_format_guard()|kind=f|owner=<migration_owner>",
+      "function|content_intake.input_format_matches(p_template text, p_rule text, p_mapping text, p_structure text, p_mime text)|kind=f|owner=<migration_owner>",
+      "function|content_intake.input_object_format_guard()|kind=f|owner=<migration_owner>",
+      "function|content_intake.parse_format_guard()|kind=f|owner=<migration_owner>",
+      "function|content_intake.source_format_guard()|kind=f|owner=<migration_owner>"
+    ],
+    "removed": [
+      "constraint|content_intake.objects.objects_check1|type=c|deferrable=f|deferred=f|validated=t|definition=CHECK (((purpose <> 'input'::text) OR ((bytes <= 10485760) AND (mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'::text))))",
+      "constraint|content_intake.objects.objects_mime_check|type=c|deferrable=f|deferred=f|validated=t|definition=CHECK ((mime = ANY (ARRAY['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'::text, 'application/pdf'::text, 'application/json'::text])))"
+    ]
+  },
+  "functionSecurityResult": {
+    "before": {
+      "entries": 250,
+      "sha256": "71a71dfbb803858ea4c7728fb04d625e2b3038c531194d177e9510007c158662"
+    },
+    "after": {
+      "entries": 255,
+      "sha256": "51ec728928940da3bbd28767d8727727518574d124c24330e64eb5189a38d26b"
+    },
+    "added": [
+      "content_intake.candidate_format_guard()|owner=<migration_owner>|returns=trigger|language=plpgsql|kind=f|security_definer=f|leakproof=f|strict=f|volatility=v|parallel=u|config=search_path=pg_catalog|defaults=<none>|binary=<null>|source=\nDECLARE m content_intake.source_mappings; o content_intake.objects;\nBEGIN\n  SELECT * INTO STRICT m FROM content_intake.source_mappings WHERE source_id=NEW.source_id AND version=NEW.source_version;\n  SELECT * INTO STRICT o FROM content_intake.objects WHERE object_id=NEW.object_id;\n  IF o.source_id IS DISTINCT FROM NEW.source_id OR o.purpose<>'input'\n    OR NOT content_intake.input_format_matches(m.template_version,m.rule_version,m.mapping_version,m.structure_digest,o.mime)\n    OR NEW.material->>'templateVersion' IS DISTINCT FROM m.template_version\n    OR NEW.material->>'ruleVersion' IS DISTINCT FROM m.rule_version\n    OR NEW.material->>'mappingVersion' IS DISTINCT FROM m.mapping_version\n    OR NEW.material->>'sourceVersion' IS DISTINCT FROM m.version::text\n    OR NEW.material#>>'{object,sourceId}' IS DISTINCT FROM o.source_id::text\n    OR NEW.material#>>'{object,mime}' IS DISTINCT FROM o.mime\n    OR NEW.material#>>'{object,bytes}' IS DISTINCT FROM o.bytes::text\n    OR NEW.material->'selectedSheets' IS DISTINCT FROM (CASE WHEN o.mime='text/csv' THEN '[\"CSV\"]'::jsonb ELSE '[\"来源\",\"FAQ\",\"相似问法\"]'::jsonb END)\n  THEN RAISE EXCEPTION USING ERRCODE='ZA003', MESSAGE='SOURCE_FORMAT_MISMATCH'; END IF;\n  RETURN NEW;\nEND;\n",
+      "content_intake.input_format_matches(p_template text, p_rule text, p_mapping text, p_structure text, p_mime text)|owner=<migration_owner>|returns=boolean|language=sql|kind=f|security_definer=f|leakproof=f|strict=f|volatility=i|parallel=u|config=search_path=pg_catalog|defaults=<none>|binary=<null>|source=\n  SELECT coalesce(\n    (p_template='faq-p1.1' AND p_rule='intake-p1.1' AND p_mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'\n      AND length(p_mapping) BETWEEN 1 AND 64 AND p_structure ~ '^[0-9a-f]{64}$')\n    OR (p_template='faq-csv-v1' AND p_rule='intake-csv-v1' AND p_mapping='faq-csv-columns-v1'\n      AND p_structure='daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165' AND p_mime='text/csv'),false);\n",
+      "content_intake.input_object_format_guard()|owner=<migration_owner>|returns=trigger|language=plpgsql|kind=f|security_definer=f|leakproof=f|strict=f|volatility=v|parallel=u|config=search_path=pg_catalog|defaults=<none>|binary=<null>|source=\nBEGIN\n  IF NEW.purpose='input' AND NOT EXISTS (\n    SELECT 1 FROM content_intake.sources s JOIN content_intake.source_mappings m\n      ON m.source_id=s.source_id AND m.version=s.current_mapping_version\n    WHERE s.source_id=NEW.source_id AND content_intake.input_format_matches(m.template_version,m.rule_version,m.mapping_version,m.structure_digest,NEW.mime)\n  ) THEN RAISE EXCEPTION USING ERRCODE='ZA003', MESSAGE='SOURCE_FORMAT_MISMATCH'; END IF;\n  RETURN NEW;\nEND;\n",
+      "content_intake.parse_format_guard()|owner=<migration_owner>|returns=trigger|language=plpgsql|kind=f|security_definer=f|leakproof=f|strict=f|volatility=v|parallel=u|config=search_path=pg_catalog|defaults=<none>|binary=<null>|source=\nBEGIN\n  IF NOT EXISTS (SELECT 1 FROM content_intake.source_mappings m JOIN content_intake.objects o\n    ON o.source_id=m.source_id AND o.object_id=NEW.object_id AND o.purpose='input'\n    WHERE m.source_id=NEW.source_id AND m.version=NEW.source_version\n      AND content_intake.input_format_matches(m.template_version,m.rule_version,m.mapping_version,m.structure_digest,o.mime)) THEN\n    RAISE EXCEPTION USING ERRCODE='ZA003', MESSAGE='SOURCE_FORMAT_MISMATCH';\n  END IF;\n  RETURN NEW;\nEND;\n",
+      "content_intake.source_format_guard()|owner=<migration_owner>|returns=trigger|language=plpgsql|kind=f|security_definer=f|leakproof=f|strict=f|volatility=v|parallel=u|config=search_path=pg_catalog|defaults=<none>|binary=<null>|source=\nBEGIN\n  IF NOT (content_intake.input_format_matches(NEW.template_version,NEW.rule_version,NEW.mapping_version,NEW.structure_digest,\n    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')\n    OR content_intake.input_format_matches(NEW.template_version,NEW.rule_version,NEW.mapping_version,NEW.structure_digest,'text/csv')) THEN\n    RAISE EXCEPTION USING ERRCODE='ZA003', MESSAGE='SOURCE_FORMAT_MISMATCH';\n  END IF;\n  RETURN NEW;\nEND;\n"
+    ],
+    "removed": []
+  },
+  "triggerResult": {
+    "before": {
+      "entries": 105,
+      "sha256": "3f262813591fee4cd2938bbd7078d55f02664942eef253fd093271f33cc1ca71"
+    },
+    "after": {
+      "entries": 109,
+      "sha256": "97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505"
+    },
+    "added": [
+      "content_intake.candidate_versions|candidate_format|content_intake.candidate_format_guard()|7|O|definition=CREATE TRIGGER candidate_format BEFORE INSERT ON content_intake.candidate_versions FOR EACH ROW EXECUTE FUNCTION content_intake.candidate_format_guard()",
+      "content_intake.objects|input_object_format|content_intake.input_object_format_guard()|7|O|definition=CREATE TRIGGER input_object_format BEFORE INSERT ON content_intake.objects FOR EACH ROW EXECUTE FUNCTION content_intake.input_object_format_guard()",
+      "content_intake.parse_jobs|parse_format|content_intake.parse_format_guard()|7|O|definition=CREATE TRIGGER parse_format BEFORE INSERT ON content_intake.parse_jobs FOR EACH ROW EXECUTE FUNCTION content_intake.parse_format_guard()",
+      "content_intake.source_mappings|source_format|content_intake.source_format_guard()|7|O|definition=CREATE TRIGGER source_format BEFORE INSERT ON content_intake.source_mappings FOR EACH ROW EXECUTE FUNCTION content_intake.source_format_guard()"
+    ],
+    "removed": []
+  }
+}

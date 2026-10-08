@@ -19,7 +19,7 @@ function fixture(count = 2, files?: ConstructorParameters<typeof ContentIntakeMa
 }
 it.each(['lost', 'stop-late'] as const)('recovers an uncertain upload across the manager boundary (%s), retaining original identity', async kind => {
   const bytes = Buffer.from('504b030401020304', 'hex');
-  const f = fixture(2, { chooseWorkbook: async () => ({ name: 'synthetic.xlsx', bytes }), saveReport: async () => true });
+  const f = fixture(2, { chooseInputFile: async () => ({ name: 'synthetic.xlsx', bytes }), saveReport: async () => true });
   const original = f.request.getMockImplementation()!;
   const validUntil = new Date(Date.now() + 60_000).toISOString();
   const job = { jobId: 'job-a', generation: 1, state: 'reading', candidateId: null, candidateVersion: null,

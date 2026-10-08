@@ -6,7 +6,7 @@ import Fastify from 'fastify';
 import { Pool } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
-import { createTemplate } from '@customer-agent/content-intake';
+import { createTemplate, createCsvTemplate, CSV_TEMPLATE_VERSION } from '@customer-agent/content-intake';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 // Built production modules are the exact HTTP consumers. This test-only host is
 // intentionally outside app.ts/main.ts and does not alter runtime/ACL locks.
@@ -34,27 +34,34 @@ export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面保存', answer: '合成洁面示例：置于阴凉处。\n使用后盖好瓶盖。' },
 ]);
 
-/** Workbook bytes for native file-picker journeys; all text is synthetic. */
-export function createIntakeSyntheticWorkbook({ missingAnswer = false, answerSuffix = '', domain = 'product', missingExpiry = false }: { missingAnswer?: boolean; answerSuffix?: string; domain?: IntakeSyntheticDomain; missingExpiry?: boolean } = {}) {
-  return createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain, sheet: 'FAQ', templateVersion: 'faq-p1.1' },
-    INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, missingAnswer && i === 1 ? '' : faq.answer + answerSuffix,
-      '', '', '合成分类', '', '启用', '', domain === 'campaign' && !missingExpiry ? '2099-01-01T00:00:00Z' : '', '', '合成内部说明', '', '', 'false']));
+type SyntheticFileOptions = { missingAnswer?: boolean; answerSuffix?: string; domain?: IntakeSyntheticDomain; missingExpiry?: boolean };
+function syntheticRows({ missingAnswer = false, answerSuffix = '', domain = 'product', missingExpiry = false }: SyntheticFileOptions) {
+  return INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, missingAnswer && i === 1 ? '' : faq.answer + answerSuffix,
+    '', '', '合成分类', '', '启用', '', domain === 'campaign' && !missingExpiry ? '2099-01-01T00:00:00Z' : '', '', '合成内部说明', '', '', 'false']);
+}
+/** Original bytes for native file-picker journeys; all text is synthetic. */
+export function createIntakeSyntheticWorkbook(options: SyntheticFileOptions = {}) {
+  return createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: options.domain ?? 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' }, syntheticRows(options));
+}
+export function createIntakeSyntheticCsv(options: SyntheticFileOptions = {}) {
+  return createCsvTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', scopeKind: 'shop', domain: options.domain ?? 'product', templateVersion: CSV_TEMPLATE_VERSION },
+    syntheticRows(options).map(faq => ({ faq })));
 }
 
 type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
 type SyntheticProfile = 'existing' | 'purpose-runtime';
-export function createIntakeSyntheticHost(options: { prepareCandidate: false; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean }): Promise<HostState>;
-export function createIntakeSyntheticHost(options?: { prepareCandidate?: true; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean }): Promise<PreparedHost>;
-export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean }): Promise<HostState> {
-  return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product', options?.duplicateShopNames ?? false);
+export function createIntakeSyntheticHost(options: { prepareCandidate: false; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv' }): Promise<HostState>;
+export function createIntakeSyntheticHost(options?: { prepareCandidate?: true; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv' }): Promise<PreparedHost>;
+export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv' }): Promise<HostState> {
+  return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product', options?.duplicateShopNames ?? false, options?.inputFormat ?? 'xlsx');
 }
 
 /** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
  * files, existing DB, production factory or real provider is ever consumed.
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
-async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean) {
+async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv') {
   const pg = new Pg15Harness();
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
   let pool: IntakePool | undefined;
@@ -133,7 +140,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   }
   try {
     pg.start(); const database = pg.createDatabase('intake_desktop');
-    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, domain); await seedIntakeSyntheticDirectory(admin, { duplicateShopNames });
+    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, domain, inputFormat); await seedIntakeSyntheticDirectory(admin, { duplicateShopNames });
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
     if (profile === 'purpose-runtime') {
       const roles = {} as Record<'business' | 'usage' | 'worker' | 'organization', IntakePool>;
@@ -183,10 +190,10 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
     let prepared: { candidate: C['IntakeCandidate']; object: C['IntakeObject'] } | null = null;
     if (prepareCandidate) {
-      const workbook = await createIntakeSyntheticWorkbook({ domain });
+      const workbook = inputFormat === 'csv' ? createIntakeSyntheticCsv({ domain }) : await createIntakeSyntheticWorkbook({ domain });
       const form = new FormData(); form.set('operationId', 'synthetic-prepare-upload'); form.set('file', new Blob([new Uint8Array(workbook)], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      }), 'synthetic-faq.xlsx');
+        type: inputFormat === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }), `synthetic-faq.${inputFormat}`);
       const checkedJson = async (response: Response, label: string) => {
         const body: unknown = await response.json();
         if (!response.ok) throw new Error(`Synthetic ${label} failed (${response.status}): ${JSON.stringify(body)}`);
@@ -229,7 +236,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
           (SELECT count(*)::integer FROM content_intake.publications WHERE publication_policy='direct-v1') AS direct,
           (SELECT count(*)::integer FROM content_intake.review_bindings r LEFT JOIN content_intake.approval_current c USING(review_request_id)
             LEFT JOIN content_intake.approval_facts f USING(review_request_id,facts_version) WHERE f.state IS DISTINCT FROM 'approved') AS pending`);
-        return { profile, domain, purposeQueries: { ...purposeQueries }, currentReleaseId: current.rows[0].current_release_id as string, publications: published.rows[0].count as number,
+        return { profile, domain, inputFormat, purposeQueries: { ...purposeQueries }, currentReleaseId: current.rows[0].current_release_id as string, publications: published.rows[0].count as number,
           pendingApprovals: evidence.rows[0].pending as number, reviewBindings: evidence.rows[0].bindings as number,
           approvalFacts: evidence.rows[0].facts as number, directPublications: evidence.rows[0].direct as number,
           diagnostics: [...diagnostics], requests: [...requests] };

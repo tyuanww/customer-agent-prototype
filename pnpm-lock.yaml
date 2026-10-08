@@ -139,6 +139,9 @@ importers:
 
   packages/content-intake:
     dependencies:
+      csv-parse:
+        specifier: 7.0.3
+        version: 7.0.3
       exceljs:
         specifier: 4.4.0
         version: 4.4.0
@@ -155,9 +158,6 @@ importers:
       '@types/yauzl':
         specifier: 2.10.3
         version: 2.10.3
-      csv-parse:
-        specifier: 7.0.3
-        version: 7.0.3
       jszip:
         specifier: 3.10.1
         version: 3.10.1

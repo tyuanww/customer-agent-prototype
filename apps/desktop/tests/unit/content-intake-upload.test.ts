@@ -11,8 +11,10 @@ import { intakeManagementData } from '../fixtures/intake-management-data';
 
 type C = components['schemas'];
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; }
-function fixture() {
-  const data = intakeManagementData(), bytes = Buffer.from('504b030401020304', 'hex');
+function fixture(format: 'xlsx' | 'csv' = 'xlsx') {
+  const data = intakeManagementData(), bytes = format === 'csv'
+    ? Buffer.from('\uFEFF标题,标准话术\r\n合成问法,"第一行,带逗号\r\n第二行"\r\n')
+    : Buffer.from('504b030401020304', 'hex');
   const validUntil = new Date(Date.now() + 60_000).toISOString();
   const source: C['IntakeSource'] = { scope: data.material.materialHeader.scope, version: 1, templateVersion: 'faq-p1.1',
     ruleVersion: 'intake-p1.1', mappingVersion: 'mapping-p1.1', structureDigest: 'a'.repeat(64), contentIntakeMode: 'v2-preview', modeVersion: 1 };
@@ -24,7 +26,7 @@ function fixture() {
     { principalId: 'principal-a', displayLabel: '合成整理人', enabled: true, factsVersion: 1, validUntil },
     { principalId: 'principal-b', displayLabel: '合成历史改稿人', enabled: false, factsVersion: 2, validUntil }], nextCursor: null };
   const object: C['IntakeObject'] = { sourceId: 'source-a', objectId: 'object-a', bytes: bytes.length,
-    sha256: createHash('sha256').update(bytes).digest('hex'), mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+    sha256: createHash('sha256').update(bytes).digest('hex'), mime: format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
   const job: C['IntakeParseJob'] = { jobId: 'job-a', generation: 1, state: 'reading', candidateId: null, candidateVersion: null,
     issues: [], totalIssues: 0, excludedSheetCount: 0, excludedMediaCount: 0, reportObjectId: null };
   let epoch = 1, signedIn = true;
@@ -40,9 +42,9 @@ function fixture() {
     if (value === undefined) throw new Error(`Unexpected fixture path ${p}`);
     return { status: 200, value: Buffer.isBuffer(value) ? Buffer.from(value) : structuredClone(value) };
   });
-  const chooseWorkbook = vi.fn(async (): Promise<{ name: string; bytes: Buffer } | null> => ({ name: 'synthetic.xlsx', bytes }));
+  const chooseInputFile = vi.fn(async (): Promise<{ name: string; bytes: Buffer } | null> => ({ name: `synthetic.${format}`, bytes }));
   const saveReport = vi.fn(async (_bytes: Buffer, _signal: AbortSignal) => true);
-  const main = new ContentIntakeUpload({ view, request, subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } }, { chooseWorkbook, saveReport });
+  const main = new ContentIntakeUpload({ view, request, subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } }, { chooseInputFile, saveReport });
   const select = () => main.command({ action: 'upload-source', selection: main.view(access).sources[0].selection }, access);
   const choose = async () => { await select(); await main.command({ action: 'upload-choose' }, access); };
   const submit = () => {
@@ -50,7 +52,7 @@ function fixture() {
       editorSelections: v.principals.map(p => p.selection), confirmed: true }, access);
   };
   const logout = () => { signedIn = false; epoch++; listeners.forEach(f => f(view())); };
-  return { main, request, access, context, principals, object, job, data, bytes, chooseWorkbook, saveReport, choose, select, submit, logout };
+  return { main, request, access, context, principals, object, job, data, bytes, chooseInputFile, saveReport, choose, select, submit, logout };
 }
 
 it('uploads original bytes with opaque choices, permits disabled contributors, explicitly refreshes a validated candidate', async () => {
@@ -72,8 +74,8 @@ it('uploads original bytes with opaque choices, permits disabled contributors, e
   } finally { f.main.dispose(); }
 });
 
-it('retains exact upload bytes and identity after lost response, then receives once on replay', async () => {
-  const f = fixture();
+it.each(['xlsx', 'csv'] as const)('retains exact %s upload bytes, MIME and identity after lost response, then receives once on replay', async format => {
+  const f = fixture(format);
   try {
     await f.choose(); const original = f.request.getMockImplementation()!; let lost = true;
     f.request.mockImplementation(async (...args) => { const value = await original(...args); if (args[1].endsWith('/objects') && lost) { lost = false; throw new ProductHttpError('UNAVAILABLE'); } return value; });
@@ -85,8 +87,27 @@ it('retains exact upload bytes and identity after lost response, then receives o
     await f.main.command({ action: 'upload-retry' }, f.access);
     const forms = f.request.mock.calls.filter(c => c[1].endsWith('/objects')).map(c => c[2]!.form!);
     expect(forms[0].get('operationId')).toBe(forms[1].get('operationId'));
+    for (const form of forms) {
+      const file = form.get('file') as File;
+      expect(file.name).toBe(`faq.${format}`);
+      expect(file.type).toBe(f.object.mime);
+      expect(createHash('sha256').update(Buffer.from(await file.arrayBuffer())).digest('hex')).toBe(f.object.sha256);
+    }
     expect(await (forms[0].get('file') as File).arrayBuffer()).toEqual(await (forms[1].get('file') as File).arrayBuffer());
     expect(f.request.mock.calls.filter(c => c[1].endsWith('/candidates'))).toHaveLength(1);
+  } finally { f.main.dispose(); }
+});
+
+it.each(['mime', 'sha256', 'bytes'] as const)('keeps the original CSV operation when uploaded object %s does not match', async field => {
+  const f = fixture('csv');
+  try {
+    await f.choose();
+    if (field === 'mime') f.object.mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    else if (field === 'sha256') f.object.sha256 = 'f'.repeat(64);
+    else f.object.bytes++;
+    await expect(f.submit()).rejects.toMatchObject({ code: 'STALE' });
+    expect(f.main.view(f.access)).toMatchObject({ pending: 'upload', canRetry: true });
+    expect(f.request.mock.calls.some(call => call[1].endsWith('/candidates'))).toBe(false);
   } finally { f.main.dispose(); }
 });
 
@@ -188,7 +209,7 @@ it.each(['choose','upload','receive','report'] as const)('logout drops late %s a
   try {
     const arrived = deferred<void>(), release = deferred<void>(); let running: Promise<unknown>;
     if (stage === 'choose') {
-      await f.select(); f.chooseWorkbook.mockImplementation(async () => { arrived.resolve(); await release.promise; return { name: 'synthetic.xlsx', bytes: f.bytes }; });
+      await f.select(); f.chooseInputFile.mockImplementation(async () => { arrived.resolve(); await release.promise; return { name: 'synthetic.xlsx', bytes: f.bytes }; });
       running = f.main.command({ action: 'upload-choose' }, f.access);
     } else {
       await f.choose();
@@ -208,10 +229,10 @@ it('same-name same-size reselection resets confirmation while dialog cancel keep
   const f = fixture();
   try {
     await f.choose(); const first = f.main.view(f.access);
-    f.chooseWorkbook.mockResolvedValueOnce(null); await f.main.command({ action: 'upload-choose' }, f.access);
+    f.chooseInputFile.mockResolvedValueOnce(null); await f.main.command({ action: 'upload-choose' }, f.access);
     expect(f.main.view(f.access).draftRevision).toBe(first.draftRevision);
     const changed = Buffer.from(f.bytes); changed[4]++;
-    f.chooseWorkbook.mockResolvedValueOnce({ name: 'synthetic.xlsx', bytes: changed }); await f.main.command({ action: 'upload-choose' }, f.access);
+    f.chooseInputFile.mockResolvedValueOnce({ name: 'synthetic.xlsx', bytes: changed }); await f.main.command({ action: 'upload-choose' }, f.access);
     expect(f.main.view(f.access).draftRevision).toBeGreaterThan(first.draftRevision);
     expect(f.main.view(f.access).principals[0].selection).not.toBe(first.principals[0].selection);
   } finally { f.main.dispose(); }
@@ -254,12 +275,12 @@ it('permission loss blocks reads and upload, hides file and people, and does not
   } finally { f.main.dispose(); }
 });
 
-it('rejects file paths, oversized or non-XLSX payloads and untrusted command identity/body fields', async () => {
+it('rejects file paths, empty CSV, oversized or mismatched XLSX payloads and untrusted command identity/body fields', async () => {
   const f = fixture();
   try {
     await f.select();
-    for (const file of [{ name: '/private/synthetic.xlsx', bytes: f.bytes }, { name: 'synthetic.xlsx', bytes: Buffer.alloc(INTAKE_UPLOAD_MAX_BYTES + 1) }, { name: 'synthetic.xlsx', bytes: Buffer.from('not-a-zip') }]) {
-      f.chooseWorkbook.mockResolvedValueOnce(file);
+    for (const file of [{ name: '/private/synthetic.xlsx', bytes: f.bytes }, { name: 'synthetic.csv', bytes: Buffer.alloc(0) }, { name: 'synthetic.txt', bytes: f.bytes }, { name: 'synthetic.xlsx', bytes: Buffer.alloc(INTAKE_UPLOAD_MAX_BYTES + 1) }, { name: 'synthetic.xlsx', bytes: Buffer.from('not-a-zip') }]) {
+      f.chooseInputFile.mockResolvedValueOnce(file);
       await expect(f.main.command({ action: 'upload-choose' }, f.access)).rejects.toMatchObject({ code: 'VALIDATION' });
     }
     expect(f.request).not.toHaveBeenCalled();
@@ -448,7 +469,7 @@ it('starts a new upload after a completed revision, but retains the result when 
     const original = f.request.getMockImplementation()!;
     f.request.mockImplementation(async (...args) => args[1].endsWith('/versions/2') ? { status: 200, value: revised } : original(...args));
     await f.main.command({ action: 'upload-refresh' }, f.access);
-    f.chooseWorkbook.mockResolvedValueOnce(null);
+    f.chooseInputFile.mockResolvedValueOnce(null);
     await f.main.command({ action: 'upload-choose' }, f.access);
     expect(f.main.view(f.access)).toMatchObject({ phase: 'validated', revisionOf: { version: 1 }, canOpen: true });
     await f.main.command({ action: 'upload-choose' }, f.access);

@@ -11,7 +11,7 @@ export function intakeManagementData(count = 2) {
   const material: C['IntakeCandidatePage'] = { key, entries: [entry], differences: [], nextCursor: null,
     materialHeader: { canonicalEncodingVersion: 'candidate-p1.1', scope, sourceVersion: 1,
       sourceClaim: { versionKind: 'opaque', versionValue: 'export-v1', acquisition: 'controlled-synthetic-export', fileSha256: 'd'.repeat(64) },
-      templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'mapping-p1.1', selectedSheets: ['FAQ话术'],
+      templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'mapping-p1.1', selectedSheets: ['来源', 'FAQ', '相似问法'],
       object: { objectId: 'object-a', sha256: 'd'.repeat(64), bytes: 1000, mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sourceId: scope.sourceId },
       contributors: ['preparer-a'], risk: { policyVersion: 'risk-p1.1', level: 'routine', reasons: [], explicitDisableCount: 0, sameSourceDisabledLast24Hours: 0, evaluatedAt: '2026-01-01T00:00:00Z' },
       baseReleaseId: 'rel_1', media: [] } };

@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ✓ tests/postgres.integration.test.ts (40 tests | 35 skipped) 4191ms
+   ✓ PostgreSQL 15 immutable migration gate > appends CSV to the exact thirty-three-row ledger without changing historical SQL or role attributes  938ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls CSV constraints and ledger back together when a later format function conflicts  816ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the atomic runtime installation to the exact thirty-two-row ledger  840ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for role-conflict  787ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for missing-implementation  809ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 35 skipped (40)
+   Start at  23:31:30
+   Duration  4.60s (transform 161ms, setup 0ms, collect 203ms, tests 4.19s, environment 0ms, prepare 56ms)
+

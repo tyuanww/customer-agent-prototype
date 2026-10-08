@@ -1567,11 +1567,15 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       ANALYZE content_intake.sources; ANALYZE content_intake.source_mappings; ANALYZE content_intake.grants`);
     const logged = await seat();
     const server = Fastify({logger:false,exposeHeadRoutes:false});
+    const routes: Record<string, number> = {};
     let pages = 0, child: ReturnType<typeof spawn> | undefined, ended: Promise<unknown[]> | undefined;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       server.get('/v1/auth/me', async (request,reply) => (await authenticateRequestHeaders(auth!,request.headers)) ?? reply.code(401).send());
-      server.addHook('onResponse', async request => { if(request.url.startsWith('/v1/intake/')) pages++; });
+      server.addHook('onResponse', async request => {
+        const route = request.url.split('?')[0]!;
+        if (route.startsWith('/v1/intake/')) { pages++; routes[route] = (routes[route] ?? 0) + 1; }
+      });
       await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:service});
       const origin = await server.listen({port:0,host:'127.0.0.1'});
       child = spawn(process.execPath,[fileURLToPath(new URL('../../../scripts/probe-intake-usage-consumer.mjs',import.meta.url))],{stdio:['pipe','pipe','pipe']});
@@ -1586,7 +1590,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       child.stdin!.end(JSON.stringify({origin,token:logged.token,expiresAt:logged.expiresAt,releaseId:'',discoverySources:5000}));
       expect((await ended)[0],stderr).toBe(0);
       expect(JSON.parse(stdout)).toEqual({status:'PASS',actualSession:true,discovery:true,sourceCount:5000});
-      expect(pages).toBe(150);
+      // Current Main resolves the shop label once in addition to its unchanged
+      // authorization/source pages; no extra business or arbitrary route is allowed.
+      expect(routes).toEqual({ '/v1/intake/authorization': 100, '/v1/intake/sources': 50, '/v1/intake/shop-directory': 1 });
+      expect(pages).toBe(151);
       expect(stdout + stderr).not.toContain(logged.token);
       console.log(JSON.stringify({probe:'discovery-capacity',sources:5000,pages,elapsedMs:Math.round(performance.now()-started)}));
     } finally {
@@ -2484,7 +2491,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query("SELECT setval('public.content_release_seq',2,true)");
     await admin.query('COMMIT');
     const { request }=await publishable('legacy-other-domain');
-    const out=value(await service.publish(actor('enabler'),request));
+    const published = await service.publish(actor('enabler'),request);
+    expect(published.ok, JSON.stringify(diagnostics.map(error => error instanceof Error ? { ...error, message: error.message } : error))).toBe(true);
+    const out=value(published);
     const before=(await admin.query("SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id='rel_native_base' ORDER BY script_id")).rows;
     const after=(await admin.query("SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id=$1 ORDER BY script_id",[out.releaseId])).rows;
     expect(before.length).toBeGreaterThan(0);expect(after).toEqual(before);

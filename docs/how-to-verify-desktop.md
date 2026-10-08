@@ -465,6 +465,15 @@ node packages/content-intake/scripts/probe-issue-report.mjs
 pnpm test:intake:desktop
 ```
 
+上述默认使用 XLSX。CSV 的完整真实合成栈单独指定格式，不能用 XLSX 结果替代：
+
+```sh
+pnpm build
+CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts
+```
+
+CSV 用例保留 BOM、逗号、引号及多行正文原字节，回读 `CSV!H3` 的 Excel 报告，再修订、确认发布并由另一普通客服复制相同正文。当前 Mac 开发构建的两格式结果见[CSV 接入证据](../evidence/qa/intake-csv-runtime/README.md)。
+
 原生文件选择、报告保存与发布二次确认由 Main 拥有。单元测试覆盖有界文件/报告、停止等待、迟到响应、取消不提交、会话失效与原操作恢复；[实际 Electron 上传测试](../apps/desktop/tests/e2e/content-intake-real-stack.spec.ts)从选择工作簿、阻断报告落盘回读、整批更正与修订，贯穿来源确认、人工质量检查、原生取消/确认直发，再换另一普通客服查询并通过系统剪贴板复制。新候选为 `direct-v1`，没有 review HTTP 请求；测试读取实际数据库，验证审批绑定和审批事实均为0，发布由直发政策记录。原生文件选择和确认响应使用受控替身，文件、HTTP、PostgreSQL 15、Main/preload 与系统剪贴板实际执行；不计作真人点击 macOS 原生对话框、Windows GUI 或真实飞书验收。报告预算 probe 只证明其记录的合成规模，不能将实测最大样例冒充所有可能 XLSX 的数学上界。跨边界改动仍须运行根 lint/typecheck/test/build。
 
 另一个 [Electron 管理 wire 测试](../apps/desktop/tests/e2e/content-intake-management.spec.ts)使用自有合成 HTTP 替身，验证未知质量回执恢复、原生确认取消/提交与 sandbox 边界；它不替代上述真实 HTTP/PG 发布产物被另一客服消费的证据。
@@ -483,7 +492,7 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 测试为自有 userData 写 `synthetic-stack.json`，用打包态文件 profile 接到一次性回环 HTTP/PG15，故意把开发环境地址置为不可用，并校验版本、`isPackaged`、实际 executable 与 userData。没有指定 executable 时沿用既有开发态场景。解析器属于 API 子进程，不宣称在桌面包内。文件/确认框仍用受控响应；真人 OS 验收、Windows、签名/公证及真实资料另验。
 
-本轮另有 CUA 操作真实文件选择与取消/确认系统框的窄探针，最终取消零写入、确认一条发布；这是工具操作的实机证据，不是非开发维护者的人工作业验收。产物、命令、首次路径别名断言失败和不明输入记录见[Mac 包证据](../evidence/qa/intake-mac-package/README.md)。CSV 尚未通过此链，不能用 XLSX 结果代替。
+本轮另有 CUA 操作真实文件选择与取消/确认系统框的窄探针，最终取消零写入、确认一条发布；这是工具操作的实机证据，不是非开发维护者的人工作业验收。产物、命令、首次路径别名断言失败和不明输入记录见[Mac 包证据](../evidence/qa/intake-mac-package/README.md)。CSV 已在本次重新生成的 0.3.26 本地未签名包中完成独立副本实际闭环，见[CSV 安装副本证据](../evidence/qa/intake-csv-runtime/README.md)。运行上面的副本命令时再显式设置 `CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`；不指定时仍为 XLSX。新 CSV 包的文件/确认框使用受控响应，不继承旧包的 CUA 或人工作业结论。
 
 
 ## FAQ 统一工作台

@@ -23,6 +23,15 @@ export type ParseContext = Readonly<{
   scopeKind: 'brand' | 'shop';
   sheet: 'FAQ'; templateVersion: typeof TEMPLATE_VERSION;
 }>;
+export const CSV_TEMPLATE_VERSION = 'faq-csv-v1';
+export const CSV_POLICY_VERSION = 'intake-csv-v1';
+export const CSV_MAPPING_VERSION = 'faq-csv-columns-v1';
+export const CSV_HEADERS = [...SOURCE_HEADERS, ...FAQ_HEADERS, '问法编号', '问法', '问法状态'] as const;
+/** SHA256 of the ordered UTF-8 JSON header array, exactly as frozen by the source contract. */
+export const CSV_STRUCTURE_SHA256 = 'daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165';
+export type CsvContext = Omit<ParseContext, 'sheet' | 'templateVersion'> & { templateVersion: typeof CSV_TEMPLATE_VERSION };
+export type IntakeParseContext = ParseContext | CsvContext;
+export type IntakePolicyVersion = typeof INTAKE_POLICY.version | typeof CSV_POLICY_VERSION;
 export type Issue = Readonly<{ code: string; sheet: string; row: number; column: string; fix: string }>;
 export type FaqRow = Readonly<{
   id: string; title: string; body: string; state: '启用' | '停用'; values: readonly string[];
@@ -37,19 +46,21 @@ export type ParseResult = Readonly<{
 export class IntakeFailure extends Error {
   constructor(readonly code: string) { super(code); }
 }
-export function failedParse(code: string): ParseResult {
-  return { ok: false, policyVersion: INTAKE_POLICY.version, rows: [], questions: [],
+export function failedParse(code: string, policyVersion: IntakePolicyVersion = INTAKE_POLICY.version): ParseResult {
+  return { ok: false, policyVersion, rows: [], questions: [],
     issues: [{ code, sheet: '', row: 0, column: '', fix: '检查文件或重新导出标准模板后重试' }],
     excluded: [], expandedBytes: 0, mediaCount: 0 };
 }
 
 /** Process stdout is an untrusted boundary too: validate shape and whole-batch semantics
  * before returning it to a caller. No partial rows may escape with blocking issues. */
-export function isParseResult(value: unknown): value is ParseResult {
+export function isParseResult(value: unknown, expectedPolicy?: IntakePolicyVersion): value is ParseResult {
   const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
   const text = (v: unknown): v is string => typeof v === 'string' && v.length <= INTAKE_POLICY.cellChars;
   const count = (v: unknown, max: number): v is number => Number.isSafeInteger(v) && Number(v) >= 0 && Number(v) <= max;
-  if (!object(value) || typeof value.ok !== 'boolean' || value.policyVersion !== INTAKE_POLICY.version
+  if (!object(value) || typeof value.ok !== 'boolean' || typeof value.policyVersion !== 'string'
+    || ![INTAKE_POLICY.version, CSV_POLICY_VERSION].includes(value.policyVersion)
+    || (expectedPolicy !== undefined && value.policyVersion !== expectedPolicy)
     || !Array.isArray(value.rows) || !Array.isArray(value.questions) || !Array.isArray(value.issues) || !Array.isArray(value.excluded)
     || value.rows.length + value.questions.length > INTAKE_POLICY.rows || value.issues.length > INTAKE_POLICY.cells
     || value.excluded.length > INTAKE_POLICY.zipEntries || !count(value.expandedBytes, INTAKE_POLICY.expandedBytes)
@@ -58,6 +69,6 @@ export function isParseResult(value: unknown): value is ParseResult {
   return value.rows.every((r) => object(r) && text(r.id) && text(r.title) && text(r.body) && (r.state === '启用' || r.state === '停用')
       && Array.isArray(r.values) && r.values.length === FAQ_HEADERS.length && r.values.every(text))
     && value.questions.every((q) => object(q) && text(q.entryId) && text(q.id) && text(q.text) && (q.state === '启用' || q.state === '停用'))
-    && value.issues.every((i) => object(i) && text(i.code) && text(i.sheet) && text(i.column) && text(i.fix) && count(i.row, INTAKE_POLICY.rows + 1))
+    && value.issues.every((i) => object(i) && text(i.code) && text(i.sheet) && text(i.column) && text(i.fix) && count(i.row, INTAKE_POLICY.rows + (value.policyVersion === CSV_POLICY_VERSION ? 2 : 1)))
     && value.excluded.every((s) => object(s) && text(s.sheet) && count(s.rows, INTAKE_POLICY.rows + 1) && count(s.images, INTAKE_POLICY.cells));
 }

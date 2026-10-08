@@ -146,13 +146,42 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
   beforeEach(() => { harness = new Pg15Harness(); harness.start(); }, 60_000);
   afterEach(() => harness.stop(), 60_000);
 
+  it('appends CSV to the exact thirty-three-row ledger without changing historical SQL or role attributes', async () => {
+    const database = harness.createDatabase('csv_upgrade'); const client = await harness.connect(database.config);
+    try {
+      await applyMigrationCatalogue(client, frozenIntakePrefix(33));
+      const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
+      const roles = (await client.query("SELECT rolname, rolcanlogin, rolinherit, rolsuper FROM pg_roles WHERE rolname LIKE 'intake_%' ORDER BY rolname")).rows;
+      expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0034_intake_csv_v1_24']);
+      expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=33 ORDER BY position')).rows).toEqual(before);
+      expect((await client.query("SELECT rolname, rolcanlogin, rolinherit, rolsuper FROM pg_roles WHERE rolname LIKE 'intake_%' ORDER BY rolname")).rows).toEqual(roles);
+      expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
+    } finally { await client.end(); }
+  });
+
+  it('rolls CSV constraints and ledger back together when a later format function conflicts', async () => {
+    const database = harness.createDatabase('csv_abort'); const client = await harness.connect(database.config);
+    try {
+      await applyMigrationCatalogue(client, frozenIntakePrefix(33));
+      const constraints = "SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='content_intake.objects'::regclass ORDER BY conname";
+      const before = (await client.query(constraints)).rows;
+      await client.query("CREATE FUNCTION content_intake.input_format_matches(text,text,text,text,text) RETURNS boolean LANGUAGE sql AS 'SELECT false'");
+      await expect(applyDatabaseMigrations(client)).rejects.toMatchObject({
+        code: 'MIGRATION_APPLY_FAILED', migrationId: '0034_intake_csv_v1_24',
+      });
+      expect((await client.query(constraints)).rows).toEqual(before);
+      expect((await client.query('SELECT max(position)::int AS position FROM customer_agent_meta.schema_migrations')).rows).toEqual([{ position: 33 }]);
+      expect((await client.query("SELECT to_regprocedure('content_intake.source_format_guard()') AS guard")).rows).toEqual([{ guard: null }]);
+    } finally { await client.end(); }
+  });
+
   it('appends the atomic runtime installation to the exact thirty-two-row ledger', async () => {
     const database = harness.createDatabase('runtime_upgrade'); const client = await harness.connect(database.config);
     try {
       await applyMigrationCatalogue(client, frozenIntakePrefix(32));
       const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       expect((await applyMigrationCatalogue(client, generatedMigrationCatalogue)).applied.map(m => m.id))
-        .toEqual(['0033_intake_runtime_v1_23']);
+        .toEqual(['0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=32 ORDER BY position')).rows).toEqual(before);
       const roles = await client.query(`SELECT rolname, rolcanlogin, rolinherit, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls
         FROM pg_roles WHERE rolname LIKE 'intake_%' ORDER BY rolname`);
@@ -186,7 +215,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client, frozenIntakePrefix(30));
       const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=30 ORDER BY position')).rows).toEqual(before);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       for (const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker']) {
@@ -200,7 +229,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client,frozenIntakePrefix(28));
       const before=await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position');
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=28 ORDER BY position')).rows).toEqual(before.rows);
       for(const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker']) {
         await expectSqlState(client,'SELECT * FROM content_intake.object_reservations','42501',undefined,role);
@@ -219,7 +248,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       await expect(applyDatabaseMigrations(client)).rejects.toThrow(/Migration 0028_intake_family failed/);
       expect((await client.query("SELECT to_regprocedure('content_intake.assert_family_catalog(text)') guard")).rows[0].guard).toBeNull();
       await client.query(definition);
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=27 ORDER BY position')).rows).toEqual(before.rows);
       for (const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker']) {
         await expectSqlState(client,"SELECT content_intake.assert_family_catalog('missing')",'42501',undefined,role);
@@ -399,7 +428,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(33);
+      expect(fresh.pending).toHaveLength(34);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -411,12 +440,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 33,
-        inventory: { tables: 97, views: 7, functions: 250 },
+        migrationCount: 34,
+        inventory: { tables: 97, views: 7, functions: 255 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 24-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 25-migration current suffix',
         },
       });
 
@@ -510,7 +539,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect((await applyMigrationCatalogue(client, oldCatalogue)).applied).toHaveLength(26);
       const ledger = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       expect((await inspectDatabaseMigrations(client)).state).toBe('PARTIAL');
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=26 ORDER BY position')).rows).toEqual(ledger);
     } finally { await client.end(); }
   }, 60_000);
@@ -539,7 +568,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       '0015_ops_loop_v1_18', '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24',
       ]);
 
       const upgraded = await applyDatabaseMigrations(client);
@@ -552,7 +581,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       '0015_ops_loop_v1_18', '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24',
       ]);
       const afterProjection = await client.query<TextRow>(`
         SELECT pg_get_function_result(
@@ -563,7 +592,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 33,
+        migrationCount: 34,
       });
     } finally {
       await client.end();
@@ -586,7 +615,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         '0015_ops_loop_v1_18', '0016_office_owner_publish',
         '0017_rollback_previous_target',
         '0018_owner_read_views',
-        '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23',
+        '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24',
       ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM release_source_bindings', '42501', undefined, 'app_content_admin');
@@ -607,7 +636,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       await applyMigrationCatalogue(client, baseline);
       const before = await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position');
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       const after = await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position <= 19 ORDER BY position');
       expect(after.rows).toEqual(before.rows);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
@@ -635,7 +664,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client, frozenIntakePrefix(25));
       const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m => m.id)).toEqual(['0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=25 ORDER BY position')).rows).toEqual(before);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectVerificationFailureAfterMutation(client,'DROP INDEX content_intake.grants_recipient_scope_source');
@@ -647,7 +676,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client,frozenIntakePrefix(24));
       const before=(await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=24 ORDER BY position')).rows).toEqual(before);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       for(const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read']) {
@@ -666,7 +695,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       await applyMigrationCatalogue(client,frozenIntakePrefix(23));
       const before=(await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect((await applyDatabaseMigrations(client)).applied.map(m=>m.id)).toEqual(['0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=23 ORDER BY position')).rows).toEqual(before);
       for (const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_auth','app_backend_review','app_backend_worker']) {
         await expectSqlState(client,"SELECT content_intake.publish_candidate('synthetic','{}','{}')",'42501',undefined,role);
@@ -683,7 +712,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       await applyMigrationCatalogue(client,frozenIntakePrefix(22));
       const before = (await client.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(m => m.id)).toEqual(['0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect(upgraded.applied.map(m => m.id)).toEqual(['0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=22 ORDER BY position')).rows).toEqual(before);
       for (const role of ['app_runtime','app_content_admin','app_import_worker','app_backend_review','app_backend_worker']) {
         await expectSqlState(client,'SELECT * FROM content_intake.quality_plans','42501',undefined,role);
@@ -716,7 +745,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         expect((await client.query("SELECT to_regprocedure('content_intake.guard_legacy_write(text,text)') AS helper")).rows[0].helper).toBeNull();
       } else {
         const result = await applyDatabaseMigrations(client);
-        expect(result.applied.map(m => m.id)).toEqual(['0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+        expect(result.applied.map(m => m.id)).toEqual(['0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
         expect((await client.query('SELECT * FROM customer_agent_meta.schema_migrations WHERE position<=21 ORDER BY position')).rows).toEqual(before);
         expect((await identities()).rows).toEqual(functions);
       }
@@ -734,7 +763,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 14) };
       await applyMigrationCatalogue(client, baseline);
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM ops_loop.inaccuracy_reports', '42501', undefined, 'app_runtime');
     } finally { await client.end(); }
@@ -751,9 +780,9 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 12) };
       await applyMigrationCatalogue(client, baseline);
       expect((await inspectDatabaseMigrations(client)).pending.map(({ id }) => id))
-        .toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+        .toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
       await expectSqlState(client, 'SELECT * FROM backend_identity.sessions', '42501', undefined, 'app_backend_auth');
       await expectSqlState(client, 'SELECT * FROM backend_review.waits', '42501', undefined, 'app_backend_review');
@@ -771,14 +800,14 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         migrations: generatedMigrationCatalogue.migrations.slice(0, 11) };
       await applyMigrationCatalogue(client, baseline);
       const plan = await inspectDatabaseMigrations(client);
-      expect(plan.pending.map(({ id }) => id)).toEqual(['0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect(plan.pending.map(({ id }) => id)).toEqual(['0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       await client.query('CREATE ROLE app_owner_acceptance_registrar NOLOGIN');
       await expect(applyDatabaseMigrations(client)).rejects.toMatchObject({ code: 'MIGRATION_APPLY_FAILED' });
       expect((await inspectDatabaseMigrations(client)).applied).toHaveLength(11);
       expect((await client.query("SELECT to_regclass('public.owner_acceptance_records') AS relation")).rows[0].relation).toBeNull();
       await client.query('DROP ROLE app_owner_acceptance_registrar');
       await applyDatabaseMigrations(client);
-      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(33);
+      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(34);
       await expectSqlState(client, 'SELECT * FROM owner_acceptance_records', '42501', undefined, 'app_runtime');
       await expectSqlState(client, "SELECT register_owner_acceptance('synthetic','{}','bad','bad')", '42501', undefined, 'app_runtime');
       await expectVerificationFailureAfterMutation(client, 'ALTER ROLE app_owner_acceptance_registrar LOGIN');
@@ -807,10 +836,10 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
 
       const pending = await inspectDatabaseMigrations(client);
       expect(pending.state).toBe('PARTIAL');
-      expect(pending.pending.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect(pending.pending.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
 
       const upgraded = await applyDatabaseMigrations(client);
-      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23']);
+      expect(upgraded.applied.map(({ id }) => id)).toEqual(['0011_search_no_hit_context_v1_14', '0012_owner_acceptance_v1_15', '0013_backend_identity_content_v1_16', '0014_release_deferred_guard_v1_17', '0015_ops_loop_v1_18', '0016_office_owner_publish', '0017_rollback_previous_target', '0018_owner_read_views', '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24']);
       const afterNoHitContext = await client.query<TextRow>(`
         SELECT pg_get_function_result(
           'public.search_recommendable_scripts(text,text,text)'::regprocedure
@@ -819,7 +848,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 33,
+        migrationCount: 34,
       });
     } finally {
       await client.end();
@@ -976,12 +1005,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         applyDatabaseMigrations(firstClient),
         applyDatabaseMigrations(secondClient),
       ]);
-      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 33]);
+      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 34]);
       expect(results.every(({ after }) => after.state === 'COMPLETE')).toBe(true);
       const ledger = await firstClient.query<CountRow>(`
         SELECT count(*)::int AS count FROM customer_agent_meta.schema_migrations
       `);
-      expect(ledger.rows[0]?.count).toBe(33);
+      expect(ledger.rows[0]?.count).toBe(34);
     } finally {
       await firstClient.end();
       secondClient.release();

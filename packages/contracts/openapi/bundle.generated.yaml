@@ -3,7 +3,7 @@ openapi: 3.1.1
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: CS-AI-C11 Customer Service Agent API
-  version: 1.21.0
+  version: 1.22.0
   license:
     name: Proprietary - internal use only
     identifier: LicenseRef-Proprietary
@@ -2538,13 +2538,13 @@ paths:
   /v1/intake/sources/{sourceId}/objects:
     post:
       operationId: uploadIntakeObject
-      summary: 接收受控 XLSX 对象
-      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      summary: 接收来源已登记格式的原始 XLSX 或 CSV 对象
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。来源版本决定唯一允许格式；不依据扩展名、MIME 或文件内范围授予权限。CSV 原始字节保留，服务端独立复算 SHA-256 并按 CSV 协议解析，不转换为 XLSX 后冒充原件。来源登记与 MIME/模板/规则/结构组合不符返回 SOURCE_FORMAT_MISMATCH。
       tags:
         - content-intake
       responses:
         "201":
-          description: 接收受控 XLSX 对象
+          description: 接收来源已登记格式的原始 XLSX 或 CSV 对象
           content:
             application/json:
               schema:
@@ -2627,7 +2627,7 @@ paths:
                   format: binary
             encoding:
               file:
-                contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+                contentType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv
       security:
         - ProductSession: []
   /v1/intake/sources/{sourceId}/vocabulary:
@@ -2800,7 +2800,7 @@ paths:
     get:
       operationId: downloadIntakeTemplate
       summary: 下载带来源及稳定编号说明的统一模板
-      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+      description: 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。按已登记来源模板版本返回 XLSX 或 UTF-8 CSV；CSV 只有固定有序 23 列，来源元信息预填且不授予范围。
       tags:
         - content-intake
       responses:
@@ -2808,6 +2808,10 @@ paths:
           description: 下载带来源及稳定编号说明的统一模板
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            text/csv:
               schema:
                 type: string
                 format: binary
@@ -9164,6 +9168,45 @@ components:
                 maxLength: 1024
           minItems: 0
           maxItems: 0
+      oneOf:
+        - required:
+            - templateVersion
+            - ruleVersion
+            - selectedSheets
+          properties:
+            templateVersion:
+              const: faq-p1.1
+            ruleVersion:
+              const: intake-p1.1
+            object:
+              type: object
+              properties:
+                mime:
+                  const: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+            selectedSheets:
+              const:
+                - 来源
+                - FAQ
+                - 相似问法
+        - required:
+            - templateVersion
+            - ruleVersion
+            - selectedSheets
+          properties:
+            templateVersion:
+              const: faq-csv-v1
+            ruleVersion:
+              const: intake-csv-v1
+            mappingVersion:
+              const: faq-csv-columns-v1
+            object:
+              type: object
+              properties:
+                mime:
+                  const: text/csv
+            selectedSheets:
+              const:
+                - CSV
     IntakeOperationReceipt:
       oneOf:
         - $ref: "#/components/schemas/IntakeReceipt"
@@ -10115,6 +10158,45 @@ components:
                 maxLength: 1024
           minItems: 0
           maxItems: 0
+      oneOf:
+        - required:
+            - templateVersion
+            - ruleVersion
+            - selectedSheets
+          properties:
+            templateVersion:
+              const: faq-p1.1
+            ruleVersion:
+              const: intake-p1.1
+            object:
+              type: object
+              properties:
+                mime:
+                  const: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+            selectedSheets:
+              const:
+                - 来源
+                - FAQ
+                - 相似问法
+        - required:
+            - templateVersion
+            - ruleVersion
+            - selectedSheets
+          properties:
+            templateVersion:
+              const: faq-csv-v1
+            ruleVersion:
+              const: intake-csv-v1
+            mappingVersion:
+              const: faq-csv-columns-v1
+            object:
+              type: object
+              properties:
+                mime:
+                  const: text/csv
+            selectedSheets:
+              const:
+                - CSV
     IntakeRisk:
       type: object
       additionalProperties: false
@@ -11578,6 +11660,7 @@ components:
           type: string
           enum:
             - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+            - text/csv
         sourceId:
           type: string
           pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
@@ -11739,6 +11822,27 @@ components:
           pattern: ^[0-9a-f]{64}$
           minLength: 64
           maxLength: 64
+      oneOf:
+        - required:
+            - templateVersion
+            - ruleVersion
+          properties:
+            templateVersion:
+              const: faq-p1.1
+            ruleVersion:
+              const: intake-p1.1
+        - required:
+            - templateVersion
+            - ruleVersion
+          properties:
+            templateVersion:
+              const: faq-csv-v1
+            ruleVersion:
+              const: intake-csv-v1
+            mappingVersion:
+              const: faq-csv-columns-v1
+            structureDigest:
+              const: daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165
     IntakeSource:
       type: object
       additionalProperties: false
@@ -11781,6 +11885,27 @@ components:
             - v2-active
         modeVersion:
           $ref: "#/components/schemas/IntakeVersion"
+      oneOf:
+        - required:
+            - templateVersion
+            - ruleVersion
+          properties:
+            templateVersion:
+              const: faq-p1.1
+            ruleVersion:
+              const: intake-p1.1
+        - required:
+            - templateVersion
+            - ruleVersion
+          properties:
+            templateVersion:
+              const: faq-csv-v1
+            ruleVersion:
+              const: intake-csv-v1
+            mappingVersion:
+              const: faq-csv-columns-v1
+            structureDigest:
+              const: daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165
     IntakePolicy:
       type: object
       additionalProperties: false
@@ -11803,6 +11928,7 @@ components:
         - approvalFactsMaxAgeSeconds
         - ticketMaxAgeSeconds
         - selectedMediaSupported
+        - inputFormats
       properties:
         policyVersion:
           type: string
@@ -11876,6 +12002,28 @@ components:
           type: boolean
           enum:
             - false
+        inputFormats:
+          type: array
+          minItems: 2
+          maxItems: 2
+          prefixItems:
+            - const:
+                mime: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+                templateVersion: faq-p1.1
+                ruleVersion: intake-p1.1
+                selectedSheets:
+                  - 来源
+                  - FAQ
+                  - 相似问法
+            - const:
+                mime: text/csv
+                templateVersion: faq-csv-v1
+                ruleVersion: intake-csv-v1
+                mappingVersion: faq-csv-columns-v1
+                structureDigest: daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165
+                selectedSheets:
+                  - CSV
+          items: false
     IntakeGrantChange:
       type: object
       additionalProperties: false
@@ -12247,6 +12395,7 @@ components:
                 - SHOP_DIRECTORY_CHANGED
                 - SHOP_DIRECTORY_EXPIRED
                 - SHOP_DIRECTORY_UNAVAILABLE
+                - SOURCE_FORMAT_MISMATCH
             diagnosticId:
               type: string
               pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
@@ -16495,3 +16644,12 @@ x-content-intake-runtime-development:
   purposeRolesLogin: false
   sourceCommit: cff9fa9b611a5f77de465b3a5ee1022c64027d9c
   exportApproved: false
+x-content-intake-csv-development:
+  status: DRAFT
+  freezeApproved: false
+  exportApproved: false
+  runtime_activated: false
+  sqlContract: schema.v1.24
+  protocolSha256: ff83a005795f6a5bdd6597329d93c5fdc132267613886b701193bdf8583b62ca
+  originalBytesRequired: true
+  rawHashBeforeParse: true
