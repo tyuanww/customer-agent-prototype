@@ -19,8 +19,8 @@
   "logs": {
     "http-four-domains.log": "42a75d17ebace321ff440bf7a54796a3a6ac61fb221c5072a791e592a652122f",
     "electron-mac.log": "e74d586cc5b1d74e4383db90427891d525357a9f942756d7414d4b19f929e553",
-    "candidate-guards.log": "0737ccaf613f47d58eca8cc7031442e7fc279b76c529a28e149dfd87415225ec",
-    "default-unit.log": "7b10d532a072bc68a02504cac926a5f89c83f1dbf8a6b09f1997fefdf49a8773",
+    "candidate-guards.log": "7585ed559cb3022ee475c543e214b458ea0bee2a7f130a4f96dbb21d00893fd1",
+    "default-unit.log": "f90bedd83d04460bfe6a73ac39d33cef93ecd32b044be54ed9a469b1af7ec47a",
     "director-login.log": "b1e8242ac0d05362061a1c9b6bacc05f1121500b9eb2a7af8e9b9b4854518a40",
     "lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "api-typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -97,5 +97,9 @@
       "rollback test whitespace",
       "candidate/evidence documentation"
     ]
+  },
+  "rawLogHashesBeforeTrailingBlankNormalization": {
+    "candidate-guards.log": "0737ccaf613f47d58eca8cc7031442e7fc279b76c529a28e149dfd87415225ec",
+    "default-unit.log": "7b10d532a072bc68a02504cac926a5f89c83f1dbf8a6b09f1997fefdf49a8773"
   }
 }
