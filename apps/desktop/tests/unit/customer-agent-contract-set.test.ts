@@ -128,6 +128,7 @@ function createContractSet({
   usage = false,
   quality = false,
   management = false,
+  direct = false,
 }: {
   marker?: string;
   declaredSourceGitSha?: string;
@@ -135,6 +136,7 @@ function createContractSet({
   usage?: boolean;
   quality?: boolean;
   management?: boolean;
+  direct?: boolean;
 } = {}): Readonly<{
   directory: string;
   contractSetId: string;
@@ -143,11 +145,11 @@ function createContractSet({
   repositoryRoot: string;
   sourceGitSha: string;
 }> {
-  const apiVersion = management ? '1.19.0' : quality ? '1.18.0' : usage ? '1.17.0' : intake ? '1.16.0' : '1.11.0';
-  const schemaVersion = management || quality || usage ? '1.21' : intake ? '1.20' : '1.12';
+  const apiVersion = direct ? '1.20.0' : management ? '1.19.0' : quality ? '1.18.0' : usage ? '1.17.0' : intake ? '1.16.0' : '1.11.0';
+  const schemaVersion = direct ? '1.22' : management || quality || usage ? '1.21' : intake ? '1.20' : '1.12';
   const developmentRoot = 'business-docs/01-客服Agent项目/30-开发-进行中';
-  const openapiPath = intake || usage || quality || management ? `${developmentRoot}/openapi.v${apiVersion.slice(0,-2)}.yaml` : OPENAPI_SOURCE_PATH;
-  const databasePath = intake || usage || quality || management ? `${developmentRoot}/schema.v${schemaVersion}.sql` : DATABASE_SOURCE_PATH;
+  const openapiPath = intake || usage || quality || management || direct ? `${developmentRoot}/openapi.v${apiVersion.slice(0,-2)}.yaml` : OPENAPI_SOURCE_PATH;
+  const databasePath = intake || usage || quality || management || direct ? `${developmentRoot}/schema.v${schemaVersion}.sql` : DATABASE_SOURCE_PATH;
   const openapi = `openapi: 3.1.0\ninfo:\n  title: Synthetic contract test ${marker}\n`;
   const database = `CREATE TABLE contract_test_${marker} (id bigint PRIMARY KEY);\n`;
   const sourceRepository = createSourceRepository(openapi, database, marker, openapiPath, databasePath);
@@ -475,20 +477,20 @@ describe('customer-agent contract-set intake', () => {
     }
   });
 
-  it.each(['intake', 'usage', 'quality', 'management'])('accepts the reviewed P2 pair (%s) from the exact commit and rejects mixed versions or paths', pair => {
-    const source = createContractSet({ intake: true, usage: pair === 'usage', quality: pair === 'quality', management: pair === 'management' });
+  it.each(['intake', 'usage', 'quality', 'management', 'direct'])('accepts the reviewed P2 pair (%s) from the exact commit and rejects mixed versions or paths', pair => {
+    const source = createContractSet({ intake: true, usage: pair === 'usage', quality: pair === 'quality', management: pair === 'management', direct: pair === 'direct' });
     const result = contractSet.ingestContractSet({ projectRoot: createProductRoot(), sourceDirectory: source.directory, sourceRepositoryRoot: source.repositoryRoot });
     expect(result).toMatchObject({ status: 'CREATED', runtime_activated: false, ddev_authorized: false });
     const manifestPath = path.join(source.directory, 'contract-set.json');
     const original = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
       contract_set_id: string; database: { version: string; file: string; source_path: string }; openapi: { source_path: string };
     };
-    for (const version of ['1.19', '1.20', '1.22']) {
+    for (const version of ['1.19', '1.20', '1.21', '1.22']) {
       if (original.database.version === `schema.v${version}`) continue;
       const mixed = structuredClone(original);
       mixed.database.version = `schema.v${version}`;
       mixed.database.file = `schema-v${version}.sql`;
-      mixed.contract_set_id = mixed.contract_set_id.replace(/schema-1\.(?:20|21)-/, `schema-${version}-`);
+      mixed.contract_set_id = mixed.contract_set_id.replace(/schema-1\.(?:20|21|22)-/, `schema-${version}-`);
       writeFileSync(manifestPath, JSON.stringify(mixed));
       expect(() => contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
     }
@@ -507,8 +509,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8',
-      source_git_sha: '240ae98a47d8b9432559c298f60af6fdc9ba8c4e',
+      contract_set_id: 'cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929',
+      source_git_sha: '6f318d448929d1a87c5dc9e725ea4f90c48a4b97',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -518,13 +520,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      '5cbb8de3be017df9d6a93d1214931d0621e32157673a706dc37ff891d1219ab9',
+      '1db23189fe6f088f312e5753f5a517dbf4fc4d386da0febeaa0ec3958265608c',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      'ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38',
+      '1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.21.sql')))).toBe(
-      '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.22.sql')))).toBe(
+      'c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce',
     );
   });
 });

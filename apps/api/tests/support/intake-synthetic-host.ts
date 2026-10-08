@@ -19,7 +19,6 @@ import { createContentIntakeService } from '../../dist/content-intake/service.js
 import { contentIntakeManagementRoutes } from '../../dist/content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 import { IntakeRejection } from '../../dist/content-intake/transaction.js';
-import { createApprovalAdapter, reviewForm, type ApprovalTransport, type ReviewBinding } from '../../dist/content-intake/approval-adapter.js';
 import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-synthetic-seed.ts';
 
 type C = components['schemas'];
@@ -48,7 +47,7 @@ export function createIntakeSyntheticHost(options?: { prepareCandidate: false })
 /** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
  * files, existing DB, production factory or real provider is ever consumed.
  * The returned control methods are local test/terminal controls, not HTTP
- * administrative routes. Data and approval attachments disappear on close. */
+ * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
 async function startIntakeSyntheticHost(prepareCandidate: boolean) {
   const pg = new Pg15Harness();
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
@@ -58,7 +57,6 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
   let apiOrigin = '', identityOrigin = '', selectedIdentity: IntakeSyntheticIdentity = 'enabler';
   const loginCodes = new Map<string, { binding: IntakeSyntheticIdentity; expires: number }>();
   const sessions = new Map<IntakeSyntheticIdentity, string>();
-  const approvals = new Map<string, { binding: ReviewBinding; bytes: Buffer; approvedAt: string | null }>();
   const diagnostics: { id: string; reason: string }[] = [];
   const requests: string[] = [];
   const identity = createServer((request, response) => {
@@ -81,30 +79,6 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
     const code = randomBytes(32).toString('base64url');
     loginCodes.set(code, { binding, expires: Date.now() + 60_000 }); return code;
   }
-  const transport: ApprovalTransport = {
-    async create(binding, bytes, signal) {
-      signal.throwIfAborted();
-      if (!approvals.has(binding.createUuid)) approvals.set(binding.createUuid, { binding: structuredClone(binding), bytes: Buffer.from(bytes), approvedAt: null });
-      return { instanceCode: `instance-${binding.createUuid}`, attachmentFileCode: `file-${binding.createUuid}` };
-    },
-    async instance(binding, signal) {
-      signal.throwIfAborted();
-      const stored = approvals.get(binding.createUuid);
-      if (!stored) throw new Error('Synthetic approval not found');
-      const taskId = `task-${binding.createUuid}`, at = stored.approvedAt;
-      return { tenantId: binding.tenantId, appId: binding.appId, definitionId: binding.definitionId, nodeId: binding.nodeId,
-        createUuid: binding.createUuid, instanceCode: `instance-${binding.createUuid}`, form: reviewForm(stored.binding),
-        attachmentFileCode: `file-${binding.createUuid}`, state: at ? 'APPROVED' : 'PENDING',
-        task: at ? { taskId, nodeId: binding.nodeId, kind: 'HUMAN', status: 'APPROVED', identityScope: 'confirmed-synthetic', personKey: 'reviewer', endTime: at } : null,
-        timeline: at ? [{ type: 'PASS', taskId, identityScope: 'confirmed-synthetic', personKey: 'reviewer', time: at }] : [] };
-    },
-    async *attachment(code, binding, signal) {
-      signal.throwIfAborted();
-      const stored = approvals.get(binding.createUuid);
-      if (!stored || code !== `file-${binding.createUuid}`) throw new Error('Synthetic attachment not found');
-      yield Buffer.from(stored.bytes);
-    },
-  };
   let closed = false;
   async function close() {
     if (closed) return; closed = true;
@@ -115,7 +89,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
     }), () => auth?.close(), () => pool?.end(), () => admin?.end(), () => pg.stop()]) {
       try { await cleanup(); } catch (error) { failures.push(error); }
     }
-    sessions.clear(); loginCodes.clear(); approvals.clear();
+    sessions.clear(); loginCodes.clear();
     if (failures.length) throw new AggregateError(failures, 'Synthetic host cleanup failed');
   }
   async function requestAs(actor: IntakeSyntheticIdentity, pathname: string, options: RequestInit = {}) {
@@ -162,10 +136,9 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
     });
     const store = createContentObjectStore(path.join(pg.root, 'objects'));
     const report = (id: string, error: unknown) => { diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
-    const approval = createApprovalAdapter({ tenantId: 'tenant-a', appId: 'app-a', definitionId: 'synthetic-definition', nodeId: 'manual-node' }, transport);
-    const usage = createContentIntakeService(pool, store, report, approval, { requireProductSession: true });
+    const usage = createContentIntakeService(pool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
-    await app.register(contentIntakeManagementRoutes, { auth, pool, store, approval, report,
+    await app.register(contentIntakeManagementRoutes, { auth, pool, store, report,
       principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
         ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2] ?? null : null });
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
@@ -203,17 +176,17 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
       selectIdentity(value: IntakeSyntheticIdentity) {
         if (!['enabler', 'reviewer', 'agent'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
-      approveReview() {
-        const pending = [...approvals.values()].filter(v => v.approvedAt === null);
-        if (pending.length !== 1) throw new Error('Exactly one pending synthetic review is required');
-        pending[0]!.approvedAt = new Date().toISOString();
-        return { approved: true, reviewer: 'reviewer', synthetic: true };
-      },
       async status() {
         const current = await admin!.query('SELECT current_release_id FROM public.content_current WHERE id=1');
         const published = await admin!.query('SELECT count(*)::integer AS count FROM content_intake.publications');
+        const evidence=await admin!.query(`SELECT (SELECT count(*)::integer FROM content_intake.review_bindings) AS bindings,
+          (SELECT count(*)::integer FROM content_intake.approval_facts) AS facts,
+          (SELECT count(*)::integer FROM content_intake.publications WHERE publication_policy='direct-v1') AS direct,
+          (SELECT count(*)::integer FROM content_intake.review_bindings r LEFT JOIN content_intake.approval_current c USING(review_request_id)
+            LEFT JOIN content_intake.approval_facts f USING(review_request_id,facts_version) WHERE f.state IS DISTINCT FROM 'approved') AS pending`);
         return { currentReleaseId: current.rows[0].current_release_id as string, publications: published.rows[0].count as number,
-          pendingApprovals: [...approvals.values()].filter(v => v.approvedAt === null).length,
+          pendingApprovals: evidence.rows[0].pending as number, reviewBindings: evidence.rows[0].bindings as number,
+          approvalFacts: evidence.rows[0].facts as number, directPublications: evidence.rows[0].direct as number,
           diagnostics: [...diagnostics], requests: [...requests] };
       },
       close,

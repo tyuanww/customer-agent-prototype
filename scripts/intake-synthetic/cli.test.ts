@@ -45,14 +45,16 @@ test('foreground CLI consumes fixed commands and cleans its host while retaining
     cli.child.stdin.write('identity agent\n');
     await cli.waitFor(line => line === '下一次合成登录：agent');
     cli.child.stdin.write('approve\n');
-    // No requested review exists: this command cannot manufacture an approval.
+    // Removed approval command only displays the fixed help; it cannot write facts.
     await new Promise(resolve => setTimeout(resolve, 50));
     cli.child.stdin.write('quit\n');
     const stopped = JSON.parse(await cli.waitFor(line => line.includes('"status":"STOPPED"'))) as { reason: string; hostDataRemoved: boolean; desktopProfileRetained: string };
     assert.equal(stopped.reason, 'requested'); assert.equal(stopped.hostDataRemoved, true);
     assert.equal(stopped.desktopProfileRetained, ready.desktopProfile);
     assert.deepEqual(await cli.exit, [0, null]);
-    assert.match(cli.stderr(), /Exactly one pending synthetic review is required/);
+    assert.equal(cli.stderr(), '');
+    assert.ok(cli.lines.filter(line => line.startsWith('固定命令：')).length >= 2);
+    assert.ok(cli.lines.filter(line => line.startsWith('固定命令：')).every(line => !line.includes('approve')));
     assert.equal(existsSync(ready.hostDirectory), false);
     assert.equal(readFileSync(path.join(ready.desktopProfile, 'owned-by-desktop'), 'utf8'), 'synthetic');
   } finally { await cli.close(); if (ready) rmSync(ready.desktopProfile, { recursive: true, force: true }); }

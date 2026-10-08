@@ -127,15 +127,17 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // non-login definer candidate SELECT only to refuse legacy family inheritance.
 // 0029 adds the private capacity journal and two accounting indexes, no ACL change.
 // 0030 replaces the private authorization_deadline body only. No new table and no application-role ACL.
+// 0031 adds immutable policy/confirmation columns, composite foreign keys and shape constraints.
+// 0032 replaces five private publishing/lineage functions; ACL and triggers stay identical.
 // No application role gains content_intake USAGE or table/function access.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
 const EXPECTED_ACL_MANIFEST_ENTRIES = 225;
 const EXPECTED_ACL_MANIFEST_SHA256 = '6128b6cc566759e78dd15f876411458ff79bda7205c2c6dbaf0cce9c8d0d67da';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2807;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '8e33db594febe7068011271ead9aa55d168d795cebe984ef861f8cf6d2c83140';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2837;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = '95651e9136340adf1379c5f9aa5ebeabdc1980984637f4f1a0bfbbe7cea96825';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 225;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '57ec21b50e5e4e310f3c4dcfc36ec5b4ecf0b4c29e7285c80ec089fc28b97344';
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '4d6d47123400c992b392024f24c0058fa74f517a6392318ed5cec809fc0f8bfc';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 85;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '075d4d3d5f0fae41b8d9c7be5c83c2c59da0f775aa85161c7b9217fbefc693a9';
 

@@ -10,15 +10,17 @@ import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 type C = components['schemas'];
 type Session = Pick<ProductSession, 'view' | 'subscribe' | 'request'>;
+type LegacyPublish = Omit<C['IntakePublish'], 'confirmed'> & { approvalEvidenceVersion: number };
 type WorkflowOperation =
   | { action: 'source-confirm'; body: C['IntakeSourceConfirmation'] }
   | { action: 'review-request' | 'review-refresh'; body: C['IntakeReviewRequest'] }
   | { action: 'cancel'; body: C['IntakeCancel'] }
-  | { action: 'publish'; body: C['IntakePublish'] };
+  | { action: 'publish'; body: C['IntakePublish'] | LegacyPublish };
 type Request = (path: string, body?: unknown) => Promise<unknown>;
 /** Main freezes these display facts before showing the native publication dialog.
  * This is human intent only, never a substitute for server authorization. */
-export type IntakePublicationPrompt = { title: string; sourceId: string; candidateVersion: number };
+export type IntakePublicationPrompt = { kind: 'candidate'; title: string; sourceId: string; candidateVersion: number }
+  | { kind: 'rollback'; baseReleaseId: string; targetReleaseId: string; scopes: C['IntakeSourceScope'][] };
 
 const isRollback = (command: IntakeManagementCommand): command is IntakeRollbackCommand => command.action.startsWith('rollback-');
 const sameKey = (a: C['IntakeCandidateKey'], b: C['IntakeCandidateKey']) => a.candidateId === b.candidateId && a.version === b.version && a.digest === b.digest;
@@ -84,7 +86,9 @@ export class ContentIntakeManagement {
   }
   private unresolved(): IntakeManagementView['pending'] {
     if (this.workflowPending) return { action: this.workflowPending.action, operationId: this.workflowPending.body.operationId,
-      recovery: ['publish','cancel'].includes(this.workflowPending.action) ? 'receipt' : 'retry' };
+      recovery: ['publish','cancel'].includes(this.workflowPending.action) ? 'receipt' : 'retry',
+      retryAllowed: this.workflowPending.action === 'publish' ? 'confirmed' in this.workflowPending.body && this.workflowPending.body.confirmed === true && !('approvalEvidenceVersion' in this.workflowPending.body)
+        : !['review-request','review-refresh'].includes(this.workflowPending.action) };
     const quality = this.quality.unresolved();
     return quality ? { ...quality, recovery: 'receipt' } : null;
   }
@@ -148,7 +152,11 @@ export class ContentIntakeManagement {
         if (this.unresolved() || this.quality.hasDraft() || this.upload.closeRisk()) return reject('CONFLICT');
         const recovery = ['rollback-recover','rollback-retry','rollback-discard'].includes(c.action);
         if (!recovery && !this.validAccess()) { await this.refreshAccess(controller.signal); assertActive(); }
-        await this.rollback.command(c, request, this.validAccess());
+        await this.rollback.command(c, request, () => this.validAccess(), async plan => {
+          const confirmed = await this.confirmPublication({ kind: 'rollback', baseReleaseId: plan.baseReleaseId,
+            targetReleaseId: plan.targetReleaseId, scopes: plan.scopes }, controller.signal);
+          assertActive(); return confirmed;
+        });
         if (c.action === 'rollback-correct') this.clearSelection();
       } else if (isIntakeUploadCommand(c)) {
         if (this.unresolved() || this.quality.hasDraft()) return reject('CONFLICT');
@@ -214,13 +222,16 @@ export class ContentIntakeManagement {
             await this.readCandidate(request);
             this.upload.beginRevision(this.selected!, this.validAccess());
             this.clearSelection(); this.rows = []; this.cursor = null;
+          } else if (c.action === 'request-review' || c.action === 'refresh-review') {
+            throw new ProductHttpError('CONFLICT', 'MODE_CONFLICT');
           } else if (c.action === 'read-review') {
             await this.readCandidate(request);
+            if (this.selected!.publicationPolicy !== 'approval-v1' || this.selected!.approvalEvidenceVersion < 1) throw new ProductHttpError('CONFLICT', 'MODE_CONFLICT');
             this.review = null;
             const review = parseContractSchema('IntakeReview', await request(`${this.address(selected)}/review`));
             if (!sameKey(review.key, selected.key) || review.evidenceVersion !== this.selected!.approvalEvidenceVersion) return reject('STALE');
             this.review = review;
-          } else if (c.action === 'confirm-source' || c.action === 'request-review' || c.action === 'refresh-review' || c.action === 'publish' || c.action === 'cancel-candidate') {
+          } else if (c.action === 'confirm-source' || c.action === 'publish' || c.action === 'cancel-candidate') {
             if (this.quality.hasDraft()) return reject('CONFLICT');
             const key = structuredClone(selected.key), operationId = randomUUID();
             if (c.action === 'cancel-candidate') {
@@ -236,22 +247,19 @@ export class ContentIntakeManagement {
                 confirmedVersionValue: c.versionValue, reason: c.reason, acquisition: header.sourceClaim.acquisition, objectSha256: header.object.sha256 }) };
             } else if (c.action === 'publish') {
               if (!this.can('publish', selected.sourceId)) return reject('FORBIDDEN');
-              if (!this.material || selected.state !== 'ready' || selected.sourceEvidenceVersion < 1 || selected.approvalEvidenceVersion < 1) return reject('CONFLICT');
+              if (selected.publicationPolicy !== 'direct-v1') throw new ProductHttpError('CONFLICT', 'MODE_CONFLICT');
+              if (!this.material || selected.state !== 'ready' || selected.sourceEvidenceVersion < 1) return reject('CONFLICT');
               const body = parseContractSchema('IntakePublish', { operationId, key,
                 baseReleaseId: this.material.materialHeader.baseReleaseId, sourceEvidenceVersion: selected.sourceEvidenceVersion,
-                approvalEvidenceVersion: selected.approvalEvidenceVersion, title: c.title, summary: c.summary });
+                confirmed: true, title: c.title, summary: c.summary });
               // Freeze the exact request before waiting; no pending write exists on
               // cancel. active blocks selection changes and a second dialog.
-              const confirmed = await this.confirmPublication({ title: body.title, sourceId: selected.sourceId,
+              const confirmed = await this.confirmPublication({ kind: 'candidate', title: body.title, sourceId: selected.sourceId,
                 candidateVersion: key.version }, controller.signal);
               assertActive();
               if (confirmed !== true) return this.view();
               if (!this.can('publish', selected.sourceId)) return reject('FORBIDDEN');
               this.workflowPending = { action: 'publish', body };
-            } else {
-              if (c.action === 'refresh-review' && selected.approvalEvidenceVersion < 1) return reject('CONFLICT');
-              this.workflowPending = { action: c.action === 'request-review' ? 'review-request' : 'review-refresh',
-                body: parseContractSchema('IntakeReviewRequest', { operationId, key, expectedEvidenceVersion: selected.approvalEvidenceVersion }) };
             }
             this.workflowResult = null; this.review = null;
             await this.transmitWorkflow(request, true);
@@ -293,18 +301,21 @@ export class ContentIntakeManagement {
     }
     this.selected = next;
   }
-  /** Source/review have no public operation-receipt route. Their original POST
-   * is the recovery protocol; publication and cancellation have receipt GETs.
-   * Request-review can commit a package before a later provider/authority error,
-   * so even an explicit rejection cannot discard that operation's create UUID. */
+  /** Source confirmation recovers by its exact original POST; publication and
+   * cancellation also have receipt GETs. Historical approval writes and legacy
+   * publication payloads cannot be replayed under the direct profile. */
   private async transmitWorkflow(request: Request, firstAttempt: boolean) {
     const operation = this.workflowPending;
     if (!operation) return reject('STALE');
+    if (operation.action === 'review-request' || operation.action === 'review-refresh'
+      || (operation.action === 'publish' && (!('confirmed' in operation.body) || operation.body.confirmed !== true || 'approvalEvidenceVersion' in operation.body))) {
+      throw new ProductHttpError('CONFLICT', 'MODE_CONFLICT');
+    }
     const suffix = { 'source-confirm': 'source-confirmation', 'review-request': 'review', 'review-refresh': 'review/refresh', publish: 'publish', cancel: 'cancel' }[operation.action];
     let raw: unknown;
     try { raw = await request(`${this.address({ key: operation.body.key })}/${suffix}`, operation.body); }
     catch (error) {
-      if (firstAttempt && operation.action !== 'review-request' && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
+      if (firstAttempt && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
         && ['VALIDATION','FORBIDDEN','UNAUTHORIZED','CONFLICT','GONE'].includes(error.code) && this.workflowPending === operation) this.workflowPending = null;
       throw error;
     }

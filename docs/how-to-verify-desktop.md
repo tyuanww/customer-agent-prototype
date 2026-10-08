@@ -465,12 +465,14 @@ node packages/content-intake/scripts/probe-issue-report.mjs
 pnpm test:intake:desktop
 ```
 
-原生文件选择和保存由 Main 拥有。单元测试覆盖有界文件/报告、停止等待、迟到响应与原操作恢复；真实 Electron E2E 从工作簿选择、阻断报告落盘回读、整批更正直到审批发布与坐席查询。原生对话框使用受控选择替身，文件/API/数据库实际执行；不计作人工 macOS 文件对话框或 Windows GUI 实机验收。报告预算 probe 只证明其记录的合成规模，不能将实测最大样例冒充所有可能 XLSX 的数学上界。跨边界改动仍须运行根 lint/typecheck/test/build。
+原生文件选择、报告保存与发布二次确认由 Main 拥有。单元测试覆盖有界文件/报告、停止等待、迟到响应、取消不提交、会话失效与原操作恢复；[实际 Electron 上传测试](../apps/desktop/tests/e2e/content-intake-real-stack.spec.ts)从选择工作簿、阻断报告落盘回读、整批更正与修订，贯穿来源确认、人工质量检查、原生取消/确认直发，再换另一普通客服查询并通过系统剪贴板复制。新候选为 `direct-v1`，没有 review HTTP 请求；测试读取实际数据库，验证审批绑定和审批事实均为0，发布由直发政策记录。原生文件选择和确认响应使用受控替身，文件、HTTP、PostgreSQL 15、Main/preload 与系统剪贴板实际执行；不计作真人点击 macOS 原生对话框、Windows GUI 或真实飞书验收。报告预算 probe 只证明其记录的合成规模，不能将实测最大样例冒充所有可能 XLSX 的数学上界。跨边界改动仍须运行根 lint/typecheck/test/build。
+
+另一个 [Electron 管理 wire 测试](../apps/desktop/tests/e2e/content-intake-management.spec.ts)使用自有合成 HTTP 替身，验证未知质量回执恢复、原生确认取消/提交与 sandbox 边界；它不替代上述真实 HTTP/PG 发布产物被另一客服消费的证据。
 
 
 ## FAQ 纠正回退
 
-`pnpm test:intake:desktop` 同时运行原生上传闭环和纠正回退的真实 Electron/HTTP/PG15 测试。回退用例先经实际上传、来源确认、人工审批模拟和质量检查发布两版，然后从工作台预览上一版影响、单独审批、确认发布新版本，换普通坐席查询并比对历史原文；光暗截图在 `.gstack/intake-synthetic/rollback-*`。截图等待主题过渡完成，不以切换属性生效冒充最终颜色。
+`pnpm test:intake:desktop` 同时运行原生上传闭环和[纠正回退测试](../apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts)。回退用例先经实际上传、来源确认和人工质量检查直发两版，再从工作台预览上一版全部影响，由 Main 原生二次确认：取消时发布数不变，确认后创建新 release；另一普通客服查询、比对并复制历史原文。测试检查未发起任何 review HTTP 请求、数据库审批绑定和审批事实均为0；光暗截图在 `.gstack/intake-synthetic/rollback-*`，等待主题过渡完成且核对无页面横向溢出。原生对话框仍用受控响应，不声称真人 OS 点击或跨平台 GUI 验收。
 
 定向验证：
 
@@ -480,4 +482,4 @@ pnpm --filter @customer-agent/api test:intake:transactions
 pnpm test:db:integration
 ```
 
-回退只允许当前目录的上一已发布版本，仍须全部实际变化范围的资格及独立复核；权限不足走正常纠正候选。未知写入只能查询/重试原操作，不能换计划。历史审批/来源已失效时拒绝恢复，后续发布和坐席读取继续继承回退审批依赖。上述均为合成证据，不代表真实飞书、Windows GUI 或正式运行 ACL 已放行。
+回退只允许当前目录的上一已发布版本，仍须全部实际变化范围的当前资格、来源/内容有效性和基线校验；权限不足走正常纠正候选。新直发无需人工审批，但保留人工质量检查与确认。未知直发只能查询回执或重试原已确认输入，不能换计划；旧协议未知发布/回退只能查原回执，不能重编码为确认直发。混合目录中的旧审批内容仍按其历史政策验证，审批或来源失效不得借直发恢复。上述均为合成证据，不代表真实飞书、Windows GUI、生产装配或正式运行 ACL 已放行。

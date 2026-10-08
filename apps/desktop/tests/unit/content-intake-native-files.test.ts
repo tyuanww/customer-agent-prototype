@@ -77,7 +77,7 @@ it('a failed destination replacement preserves existing contents and removes onl
 
 it('publication dialog defaults to cancel and discards confirmation after cancellation', async () => {
   const f = await fixture();
-  const prompt = { title: '合成更新', sourceId: 'source-a', candidateVersion: 3 };
+  const prompt = { kind: 'candidate' as const, title: '合成更新', sourceId: 'source-a', candidateVersion: 3 };
   dialogs.showMessageBox.mockResolvedValue({ response: 0 });
   expect(await f.files.confirmPublication(prompt, f.controller.signal)).toBe(false);
   expect(dialogs.showMessageBox).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
@@ -87,4 +87,16 @@ it('publication dialog defaults to cancel and discards confirmation after cancel
   expect(await f.files.confirmPublication(prompt, f.controller.signal)).toBe(true);
   dialogs.showMessageBox.mockImplementation(async () => { f.controller.abort(); return { response: 1 }; });
   await expect(f.files.confirmPublication(prompt, f.controller.signal)).rejects.toMatchObject({ code: 'CANCELLED' });
+});
+
+it('rollback publication uses the same safe native dialog and shows target plus every affected scope', async () => {
+  const f = await fixture(); dialogs.showMessageBox.mockResolvedValue({ response: 0 });
+  const prompt = { kind: 'rollback' as const, baseReleaseId: 'rel_2', targetReleaseId: 'rel_1', scopes: [
+    { tenantId: 'tenant-a', appId: 'app-a', brandId: 'brand-a', shopId: 'shop-a', sourceId: 'source-a', domain: 'product' as const },
+    { tenantId: 'tenant-a', appId: 'app-a', brandId: 'brand-a', shopId: 'shop-b', sourceId: 'source-b', domain: 'product' as const },
+  ] };
+  expect(await f.files.confirmPublication(prompt, f.controller.signal)).toBe(false);
+  const options = dialogs.showMessageBox.mock.calls.at(-1)![1];
+  expect(options).toMatchObject({ defaultId: 0, cancelId: 0, buttons: ['取消', '确认发布'] });
+  for (const binding of ['rel_2', 'rel_1', 'shop-a', 'shop-b', 'source-a', 'source-b']) expect(options.detail).toContain(binding);
 });

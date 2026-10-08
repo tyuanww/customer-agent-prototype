@@ -9,7 +9,7 @@ import type { ContentObjectStore, PersistedContentObject } from '../content-obje
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { createIntakeTransactions, IntakeRejection, type IntakePool, type IntakeResult } from './transaction.js';
 import { authorize, changeGrant, createGrants, source } from './authority.js';
-import { cancelCandidate, cancellationReceipt, freezeParsed, getJob, readCandidate, receive } from './candidate.js';
+import { cancelCandidate, cancellationReceipt, historicalCandidate, freezeParsed, getJob, readCandidate, receive } from './candidate.js';
 import { digest } from './material.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
@@ -29,9 +29,11 @@ const json = (value: unknown): CanonicalJsonValue => value as CanonicalJsonValue
 
 /** P2 preview transaction slice. No production factory/HTTP registration is provided.
  * The authenticated actor comes from product-auth, never from a request body's userId.
- * The existing object store and isolated parser are the only file consumers. */
+ * The existing object store and isolated parser are the only file consumers.
+ * The old transport argument is retained for internal caller compatibility only;
+ * this direct profile never calls it and cannot enable approval writes. */
 export function createContentIntakeService(pool: IntakePool, store: ContentObjectStore,
-  report: (diagnosticId: string, error: unknown) => void = () => undefined, approval?: ApprovalAdapter,
+  report: (diagnosticId: string, error: unknown) => void = () => undefined, _legacyApproval?: ApprovalAdapter,
   options: { requireProductSession?: boolean; principalLabels?: IntakePrincipalLabels } = {}) {
   const run = createIntakeTransactions(pool, report, options);
   const runner = createParseRunner();
@@ -42,7 +44,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   const grant = (v: unknown) => parseContractSchema('IntakeGrant', v);
   const candidate = (v: unknown) => parseContractSchema('IntakeCandidate', v);
   const job = (v: unknown) => parseContractSchema('IntakeParseJob', v);
-  const { refreshForPublish, ...evidence } = createIntakeEvidence(run, store, capacity, approval, report);
+  const evidence = createIntakeEvidence(run);
 
   /** Worker-only terminal bookkeeping must still finish after user permission expires.
    * It cannot create a candidate, alter a terminal job or grant any authority. */
@@ -171,8 +173,8 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
 
   return {
     ...evidence,
-    ...createIntakeRollback(run, store, capacity, approval, report),
-    ...createIntakePublication(run, refreshForPublish),
+    ...createIntakeRollback(run),
+    ...createIntakePublication(run),
     ...createIntakeUsage(run),
     ...createIntakeDiscovery(run, options.principalLabels),
     ...createIntakeQualityAccess(run),
@@ -217,7 +219,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     },
     async cancel(actor: AuthenticatedUser, raw: unknown) {
       const result = await run(actor, 'cancel', json(raw), operation(raw),
-        (client, who) => cancelCandidate(client, who, parseContractSchema('IntakeCancel', raw)), candidate);
+        (client, who) => cancelCandidate(client, who, parseContractSchema('IntakeCancel', raw)), historicalCandidate);
       return result.ok ? { ok: true as const, value: cancellationReceipt(operation(raw)!, result.value) } : result;
     },
     async parse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {

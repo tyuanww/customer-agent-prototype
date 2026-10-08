@@ -50,7 +50,10 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
     await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
     await query.getByRole('button', { name: '登录', exact: true }).click();
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
     await app.windows().find(w => w.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();
@@ -92,8 +95,7 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     await dashboard.getByRole('textbox', { name: '来源确认说明' }).fill('已核对合成资料');
     await dashboard.getByRole('button', { name: '确认来源版本' }).click();
     await expect(dashboard.getByRole('textbox', { name: '来源版本' })).toHaveValue('');
-    await dashboard.getByRole('button', { name: '发起组织审批' }).click();
-    await dashboard.getByRole('button', { name: '刷新审批结果' }).click();
+    await expect(dashboard.getByRole('button', { name: '发起组织审批' })).toHaveCount(0);
     await dashboard.getByRole('textbox', { name: '发布标题' }).fill('合成确认发布');
     await dashboard.getByRole('textbox', { name: '发布摘要' }).fill('本机合成确认验证');
     await app.evaluate(({ dialog }) => { dialog.showMessageBox = (async (_window, options) => {
@@ -108,6 +110,7 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     await dashboard.getByRole('button', { name: '发布当前候选' }).click();
     await expect(dashboard.getByText(/当前候选已发布：rel_2/)).toBeVisible();
     expect(requests.filter(p => p.endsWith('/publish'))).toHaveLength(1);
+    expect(requests.filter(p => p.endsWith('/review') || p.endsWith('/review/refresh'))).toHaveLength(0);
     expect(wire.receipts.size).toBe(2);
     expect(requests.filter(p => p.endsWith('/quality/freeze'))).toHaveLength(1);
     expect(await dashboard.evaluate(() => ({ node: typeof (window as unknown as { require?: unknown }).require, overlay: !!window.customerAgent }))).toEqual({ node: 'undefined', overlay: false });

@@ -10,7 +10,8 @@ const readinessLabels: Record<string, string> = {
   SOURCE_MISMATCH: '来源已变更，请核对当前材料', BASE_CHANGED: '已发布版本已变更，请重新核对候选',
   SOURCE_CONFIRMATION_REQUIRED: '待确认来源版本', APPROVAL_REVOKED: '组织审批已撤回',
   APPROVAL_UNAVAILABLE: '审批结果需重新核验', AWAITING_APPROVAL: '待组织审批通过',
-  PERMISSION_CHANGED: '复核人资格已变更，需重新核验',
+  PERMISSION_CHANGED: '当前资格已变更，请刷新并核对权限',
+  QUALITY_NOT_PASSED: '待完成质量检查',
 };
 const riskLabels: Record<components['schemas']['IntakeRisk']['level'], string> = { routine: '常规内容', critical: '关键变更' };
 function readinessLabel(reason: string) {
@@ -70,7 +71,7 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
   const candidate = view.selected!, result = view.workflowResult;
   const mutable = ['awaiting-evidence', 'ready'].includes(candidate.state);
   const sourceDirty = !!versionValue || !!reason, publishDirty = !!title || !!summary;
-  const canReplaceReview = !!view.review?.instanceCode && view.review.state !== 'creating';
+  const legacy = candidate.publicationPolicy === 'approval-v1';
   const sourceValid = !!versionValue.trim() && !!reason.trim() && [...versionValue].length <= 128 && [...reason].length <= 512
     && (versionKind !== 'integer' || /^(0|[1-9][0-9]{0,18})$/u.test(versionValue));
   useEffect(() => {
@@ -85,7 +86,7 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
     if (result?.action === 'source-confirm' && result.state === 'confirmed') { setVersionValue(''); setReason(''); }
     if (result?.action === 'publish' && result.state === 'published') { setTitle(''); setSummary(''); }
   }, [result?.operationId, result?.action, result?.state]);
-  return <section aria-label="来源审批与发布">
+  return <section aria-label="来源确认与发布">
     <h2>来源确认</h2><p>已记录 {candidate.sourceEvidenceVersion} 次来源确认。请核对原资料版本与当前候选材料。</p>
     {view.canConfirmSource ? <fieldset disabled={disabled || view.hasDraft || publishDirty || !mutable || !view.material}>
       <legend>确认本次导出对应的来源版本</legend>
@@ -97,19 +98,14 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
       <p>版本最多 128 字；说明最多 512 字。递增整数须为 0 或不带前导零的正整数。</p>
       <button disabled={!sourceValid} onClick={() => apply({ action: 'confirm-source', versionKind, versionValue, reason })}>确认来源版本</button>
     </fieldset> : <p>当前没有此来源的确认权限。</p>}
-    <h2>组织审批</h2><p>组织审核在飞书完成。此处发起审核并核验服务端返回的结果。</p>
-    <div className="intake-toolbar">
-      <button disabled={disabled || view.hasDraft || sourceDirty || publishDirty || !mutable || !candidate.sourceEvidenceVersion || (!!candidate.approvalEvidenceVersion && !canReplaceReview)}
-        onClick={() => { if (!candidate.approvalEvidenceVersion || window.confirm('重新发起会生成新的审核记录，发布将以新记录为准。确认重新发起？')) apply({ action: 'request-review' }); }}>{candidate.approvalEvidenceVersion ? '重新发起组织审批' : '发起组织审批'}</button>
-      <button disabled={disabled || !candidate.approvalEvidenceVersion} onClick={() => apply({ action: 'read-review' })}>读取审批状态</button>
-      <button disabled={disabled || view.hasDraft || sourceDirty || publishDirty || !candidate.approvalEvidenceVersion} onClick={() => apply({ action: 'refresh-review' })}>刷新审批结果</button>
-    </div>
-    {!candidate.approvalEvidenceVersion && <p>尚未发起组织审批。</p>}
-    {view.review && <div role="status"><p>{stateLabel(view.review.state, view.review)}{view.review.instanceCode ? ` · 审批编号 ${view.review.instanceCode}` : ''}</p>
-      <p>最近核验：{view.review.checkedAt ?? '尚未核验'} · 核验有效至：{view.review.validUntil ?? '尚无有效核验'}</p>
-      <p>上述结果为最近一次观察，发布时会再次核验。</p></div>}
-    <h2>发布</h2><p>来源、审批与质量检查均满足要求后，由具备发布权限的人员提交。</p>
-    {view.canPublish ? <fieldset disabled={disabled || view.hasDraft || sourceDirty || !view.material || candidate.state !== 'ready'}>
+    {legacy && <section aria-label="历史审批记录"><h2>历史审批记录</h2>
+      <p>这是旧审批流程的候选。首次确认直发须显式修订或重新导入，不能直接转换；已发布历史保留原审核记录。</p>
+      <button disabled={disabled || !candidate.approvalEvidenceVersion} onClick={() => apply({ action: 'read-review' })}>读取历史审批</button>
+      {view.review && <div role="status"><p>{stateLabel(view.review.state, view.review)}{view.review.instanceCode ? ` · 审批编号 ${view.review.instanceCode}` : ''}</p>
+        <p>历史核验：{view.review.checkedAt ?? '尚未核验'} · 有效至：{view.review.validUntil ?? '尚无有效核验'}。此处只读，不延长有效期。</p></div>}
+    </section>}
+    <h2>发布</h2><p>来源与质量检查满足要求后，由具备发布权限的人员确认发布。点击发布将弹窗再次确认。</p>
+    {view.canPublish ? <fieldset disabled={disabled || view.hasDraft || sourceDirty || !view.material || legacy || candidate.state !== 'ready'}>
       <legend>本次发布说明</legend>
       <label>发布标题<input aria-label="发布标题" value={title} onChange={e => setTitle(e.target.value)} /></label>
       <label>发布摘要<textarea aria-label="发布摘要" value={summary} onChange={e => setSummary(e.target.value)} /></label>
@@ -208,7 +204,7 @@ export function IntakeManagement() {
   const workflowDirty = dirtyIds.has('workflow-source') || dirtyIds.has('workflow-publish');
   const editable = quality?.status.state === (quality?.phase === 'initial' ? 'initial_required' : 'expansion_required');
   return <section className="intake-management" aria-label="FAQ 资料管理">
-    <header><div><h1>资料审核</h1><p>上传 FAQ、核对候选材料并审核发布</p></div><span>{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</span></header>
+    <header><div><h1>资料管理</h1><p>上传 FAQ、核对来源与质量，确认后发布</p></div><span>{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</span></header>
     {error && <div><p role="alert">{error}</p><button disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</button></div>}
     {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy} stopping={stopping}
       blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
@@ -218,7 +214,8 @@ export function IntakeManagement() {
       {view.pending.action === 'cancel' && <p>取消结果尚未确认。取得最终回执前，不能认定候选已经取消。</p>}
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
       <div>{view.pending.recovery === 'receipt' && <button disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</button>}
-        <button disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</button></div></section>}
+        {view.pending.retryAllowed !== false && <button disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</button>}
+        {view.pending.retryAllowed === false && <p>旧流程操作不能转成确认直发，请查询原回执或读取历史状态。</p>}</div></section>}
     {view?.signedIn && (view.rollback.available || view.rollback.pending) && <IntakeRollback view={view} busy={busy || stopping}
       blocked={!!view.pending || !!upload?.busy || !!upload?.pending || uploadDraft || view.hasDraft || [...dirtyIds].some(id => id !== 'rollback-input')}
       apply={c => void apply(c)} onDirty={onDirty} />}
@@ -240,7 +237,7 @@ export function IntakeManagement() {
           ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
         {(view.canRevise || view.canCancel) && <div className="intake-toolbar">
           {view.canRevise && <button disabled={disabled || dirty || view.hasDraft} onClick={() => {
-            if (window.confirm('修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源、审批和质量检查；校验失败保留旧版。')) void apply({ action: 'revise' });
+            if (window.confirm('修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源和质量检查；校验失败保留旧版。')) void apply({ action: 'revise' });
           }}>修订当前候选</button>}
           {view.canCancel && <button className="intake-danger" disabled={disabled || dirty || view.hasDraft} onClick={() => {
             if (window.confirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。')) void apply({ action: 'cancel-candidate' });

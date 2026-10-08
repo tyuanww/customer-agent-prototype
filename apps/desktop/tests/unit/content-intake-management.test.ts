@@ -186,22 +186,21 @@ const confirm = { action: 'confirm-source', versionKind: 'opaque', versionValue:
 const publish = { action: 'publish', title: '合成 FAQ 更新', summary: '新增合成条目' } as const;
 async function ready(f: ReturnType<typeof fixture>) {
   await f.select(); await f.main.command({ action: 'material', next: false });
-  await f.main.command(confirm); await f.main.command({ action: 'request-review' });
-  await f.main.command({ action: 'refresh-review' });
+  await f.main.command(confirm);
   await f.main.command({ action: 'freeze' }); await f.main.command({ action: 'quality', phase: 'initial' });
   for (const s of f.data.samples) await f.main.command({ action: 'check', scriptId: s.scriptId, defect: false, reason: '' });
   await f.main.command({ action: 'submit' }); await f.main.command({ action: 'refresh-candidate' });
 }
-it('composes source/review/publication only from the selected server key, material and evidence versions', async () => {
+it('composes confirmed direct publication only from selected server material without approval writes', async () => {
   const f = fixture();
   try {
     await ready(f);
-    expect(f.main.view()).toMatchObject({ selected: { state: 'ready' }, review: { state: 'approved' } });
+    expect(f.main.view()).toMatchObject({ selected: { state: 'ready', publicationPolicy: 'direct-v1', approvalEvidenceVersion: 0 }, review: null });
     const result = await f.main.command(publish);
     expect(result).toMatchObject({ pending: null, selected: { state: 'published', publishedReleaseId: 'rel_2' }, workflowResult: { action: 'publish', state: 'published', releaseId: 'rel_2' } });
     const writes = f.request.mock.calls.filter(c => c[2]?.body);
     expect(writes.find(c => c[1].endsWith('/source-confirmation'))![2]!.body).toMatchObject({ key: f.data.candidate.key, objectSha256: 'd'.repeat(64), acquisition: 'controlled-synthetic-export', expectedEvidenceVersion: 0 });
-    expect(writes.find(c => c[1].endsWith('/publish'))![2]!.body).toMatchObject({ key: f.data.candidate.key, baseReleaseId: 'rel_1', sourceEvidenceVersion: 1, approvalEvidenceVersion: 1 });
+    expect(writes.find(c => c[1].endsWith('/publish'))![2]!.body).toMatchObject({ key: f.data.candidate.key, baseReleaseId: 'rel_1', sourceEvidenceVersion: 1, confirmed: true });
     await expect(f.main.command(publish)).rejects.toMatchObject({ code: 'CONFLICT' });
   } finally { f.main.dispose(); }
 });
@@ -239,32 +238,31 @@ it('lost source confirmation replays its exact original body and never invents a
     expect(f.request.mock.calls.some(c => c[1].includes('/operations/'))).toBe(false);
   } finally { f.main.dispose(); }
 });
-it('creating approval keeps the original operation until the same request resolves, including partial-commit authority errors', async () => {
-  const f = fixture(); f.data.state.creating = true;
+it('rejects retired approval writes and only reads immutable legacy history', async () => {
+  const f = fixture(); f.data.historicalReview();
   try {
-    await f.select(); const initial = await f.main.command({ action: 'request-review' });
-    expect(initial).toMatchObject({ pending: { action: 'review-request', recovery: 'retry' }, review: { state: 'creating' } });
-    const pending = initial.pending;
-    await expect(f.main.command({ action: 'request-review' })).rejects.toMatchObject({ code: 'CONFLICT' });
-    f.request.mockImplementationOnce(async () => { throw new ProductHttpError('FORBIDDEN'); });
-    await expect(f.main.command({ action: 'retry' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(f.main.view().pending).toEqual(pending);
-    f.data.state.creating = false;
-    await f.main.command({ action: 'retry' });
-    expect(f.main.view().pending).toBeNull(); expect(f.data.candidate.approvalEvidenceVersion).toBe(1);
-    const writes = f.request.mock.calls.filter(c => c[2]?.body);
-    expect(writes.every(c => (c[2]!.body as { operationId: string }).operationId === pending!.operationId)).toBe(true);
+    await f.select(); f.request.mockClear();
+    for (const action of ['request-review','refresh-review'] as const)
+      await expect(f.main.command({ action })).rejects.toMatchObject({ code: 'CONFLICT', reason: 'MODE_CONFLICT' });
+    expect(f.request).not.toHaveBeenCalled(); expect(f.main.view().pending).toBeNull();
+    await f.main.command({ action: 'read-review' }); expect(f.main.view().review?.reviewRequestId).toBe('review-history');
+    await expect(f.main.command(publish)).rejects.toMatchObject({ code: 'CONFLICT', reason: 'MODE_CONFLICT' });
+    expect(f.request.mock.calls.some(c => c[2]?.body)).toBe(false); expect(f.confirmPublication).not.toHaveBeenCalled();
   } finally { f.main.dispose(); }
 });
-it('even the first review request rejection can follow a committed package and cannot allocate a replacement', async () => {
+it('legacy unknown publication only reads its original receipt without converting the payload', async () => {
   const f = fixture();
   try {
-    await f.select(); const original = f.request.getMockImplementation()!;
-    f.request.mockImplementationOnce(async (...args) => { await original(...args); throw new ProductHttpError('FORBIDDEN'); });
-    await expect(f.main.command({ action: 'request-review' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(f.data.candidate.approvalEvidenceVersion).toBe(1);
-    expect(f.main.view().pending?.action).toBe('review-request');
-    await f.main.command({ action: 'retry' }); expect(f.main.view().pending).toBeNull();
+    await ready(f); const original = f.request.getMockImplementation()!;
+    f.request.mockImplementationOnce(async (...args) => { await original(...args); throw new ProductHttpError('UNAVAILABLE'); });
+    await expect(f.main.command(publish)).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+    const operation = Reflect.get(f.main, 'workflowPending') as { body: Record<string, unknown> };
+    delete operation.body.confirmed; operation.body.approvalEvidenceVersion = 1;
+    const body = structuredClone(operation.body), count = f.request.mock.calls.length;
+    expect(f.main.view().pending?.retryAllowed).toBe(false);
+    await expect(f.main.command({ action: 'retry' })).rejects.toMatchObject({ code: 'CONFLICT', reason: 'MODE_CONFLICT' });
+    expect(f.request.mock.calls).toHaveLength(count); expect(operation.body).toEqual(body);
+    await f.main.command({ action: 'recover' }); expect(f.main.view().pending).toBeNull();
   } finally { f.main.dispose(); }
 });
 it('publication recovers only a bound terminal receipt and retains the key after missing/wrong/nonterminal results', async () => {
@@ -304,9 +302,9 @@ it('a failed follow-up status read does not turn a confirmed publication into an
 it('logout during a workflow response clears the memory-only operation and ignores the old response', async () => {
   const f = fixture(); let release!: () => void;
   try {
-    await f.select();
+    await f.select(); await f.main.command({ action: 'material', next: false });
     f.request.mockImplementationOnce(async () => { await new Promise<void>(r => { release = r; }); return { status: 202, value: {} }; });
-    const ongoing = f.main.command({ action: 'request-review' });
+    const ongoing = f.main.command(confirm);
     expect(f.main.closeRisk()).toBe('pending'); f.logout(); release();
     await expect(ongoing).rejects.toMatchObject({ code: 'STALE' });
     expect(f.main.view()).toMatchObject({ signedIn: false, pending: null, selected: null, review: null });
@@ -428,15 +426,15 @@ it('keeps rollback recovery isolated from candidate writes, clears readable plan
     scopes: [f.data.material.materialHeader.scope], requiresCorrectiveCandidate: false, approvalEvidenceVersion: 0 };
   f.request.mockImplementation(async (...args) => {
     if (args[1].endsWith('/rollback/preview')) return { status: 200, value: plan };
-    if (args[1].endsWith('/rollback/rollback-a/review')) throw new ProductHttpError('UNAVAILABLE');
+    if (args[1].endsWith('/v1/intake/rollback')) throw new ProductHttpError('UNAVAILABLE');
     const reply = await original(...args);
     if (args[1].includes('/authorization?')) (reply.value as { capabilities: { actions: string[] }[] }).capabilities.forEach(c => c.actions.push('rollback'));
     return reply;
   });
   try {
     await f.select(); await f.main.command({ action: 'rollback-preview', baseReleaseId: 'rel_2', targetReleaseId: 'rel_1' });
-    await expect(f.main.command({ action: 'rollback-request-review' })).rejects.toMatchObject({ code: 'UNAVAILABLE' });
-    expect(f.main.view().rollback).toMatchObject({ impact: null, review: null, pending: { action: 'review-request', recovery: 'retry' } });
+    await expect(f.main.command({ action: 'rollback-execute' })).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+    expect(f.main.view().rollback).toMatchObject({ impact: null, review: null, pending: { action: 'rollback', recovery: 'receipt' } });
     expect(f.main.closeRisk()).toBe('pending');
     for (const action of ['request-review','discard','cancel-candidate'] as const) await expect(f.main.command({ action })).rejects.toMatchObject({ code: 'CONFLICT' });
     f.logout(); expect(f.main.view().rollback.pending).toBeNull(); expect(f.main.closeRisk()).toBeNull();
@@ -463,7 +461,7 @@ it('cancelled publication confirmation creates no request or pending write; a la
     await ready(f); f.request.mockClear(); f.confirmPublication.mockResolvedValue(false);
     expect(await f.main.command(publish)).toMatchObject({ pending: null, selected: { state: 'ready' } });
     expect(f.request).not.toHaveBeenCalled();
-    expect(f.confirmPublication).toHaveBeenCalledWith({ title: publish.title, sourceId: 'source-a', candidateVersion: 1 }, expect.any(AbortSignal));
+    expect(f.confirmPublication).toHaveBeenCalledWith({ kind: 'candidate', title: publish.title, sourceId: 'source-a', candidateVersion: 1 }, expect.any(AbortSignal));
     f.confirmPublication.mockResolvedValue(true);
     await f.main.command(publish);
     expect(f.request.mock.calls.filter(c => c[1].endsWith('/publish'))).toHaveLength(1);
@@ -480,5 +478,28 @@ it('blocks double submission and rejects a confirmation returned after logout', 
     f.logout(); resolve(true);
     await expect(pending).rejects.toMatchObject({ code: 'STALE' });
     expect(f.request).not.toHaveBeenCalled(); expect(f.main.view().pending).toBeNull();
+  } finally { f.main.dispose(); }
+});
+
+it('rollback confirmation shares the Main single-operation fence and ignores logout before confirmation', async () => {
+  const f = fixture(), original = f.request.getMockImplementation()!;
+  f.request.mockImplementation(async (...args) => {
+    if (args[1].endsWith('/rollback/preview')) return { status: 200, value: { rollbackPlanId: 'rollback-a', impactDigest: 'a'.repeat(64), baseReleaseId: 'rel_2', targetReleaseId: 'rel_1',
+      scopes: [f.data.material.materialHeader.scope], requiresCorrectiveCandidate: false, approvalEvidenceVersion: 0 } };
+    const response = await original(...args);
+    if (args[1].includes('/authorization?')) (response.value as { capabilities: { actions: string[] }[] }).capabilities.forEach(c => c.actions.push('rollback'));
+    return response;
+  });
+  let resolve!: (value: boolean) => void;
+  try {
+    await f.main.command({ action: 'list', next: false });
+    await f.main.command({ action: 'rollback-preview', baseReleaseId: 'rel_2', targetReleaseId: 'rel_1' });
+    f.request.mockClear(); f.confirmPublication.mockImplementation(() => new Promise<boolean>(r => { resolve = r; }));
+    const pending = f.main.command({ action: 'rollback-execute' });
+    await vi.waitFor(() => expect(f.confirmPublication).toHaveBeenCalledTimes(1));
+    await expect(f.main.command({ action: 'rollback-execute' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(f.main.command({ action: 'rollback-discard' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    f.logout(); resolve(true); await expect(pending).rejects.toMatchObject({ code: 'STALE' });
+    expect(f.request).not.toHaveBeenCalled(); expect(f.main.view().rollback.pending).toBeNull();
   } finally { f.main.dispose(); }
 });

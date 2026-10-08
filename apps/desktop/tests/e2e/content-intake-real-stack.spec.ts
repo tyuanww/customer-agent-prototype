@@ -6,9 +6,9 @@ import { expect, test, _electron as electron, type ElectronApplication, type Pag
 import { closeOwnedElectron } from '../support/owned-electron';
 
 /** Real Electron + production preload/Main + HTTP modules + isolated PG15.
- * Identity and approval are explicit synthetic transports. This does not claim
+ * Identity is an explicit synthetic transport; direct publication creates no approvals. This does not claim
  * real Feishu, manual OS focus, Stage Manager or Windows compositor evidence. */
-test('native FAQ upload, revision and cancellation preserve the approved release consumed by an ordinary seat through real API/PG', async () => {
+test('native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
   test.setTimeout(180_000);
   // Keep ungated test discovery independent of built API artifacts and PG.
@@ -184,26 +184,16 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     await expect(material.getByRole('article')).toHaveCount(3);
     await expect(material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer, { exact: true })).toHaveCSS('white-space', 'pre-wrap');
     await material.getByRole('article').first().scrollIntoViewIfNeeded();
-    await expect(dashboard.getByText(/待确认来源版本 \/ 待组织审批通过/)).toBeVisible();
+    await expect(dashboard.getByText(/待确认来源版本/)).toBeVisible();
     await expect(dashboard.getByText(/风险等级：常规内容/)).toBeVisible();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-uploaded-material.png') });
-    async function approveAndCheck(version: number) {
+    async function confirmSourceAndCheck(version: number) {
     await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill(`synthetic-export-${version}`);
     await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');
     await dashboard.getByRole('button', { name: '确认来源版本', exact: true }).click();
     await expect(dashboard.getByText('本次操作结果：来源已确认', { exact: false })).toBeVisible();
-    await dashboard.getByRole('button', { name: '发起组织审批', exact: true }).click();
-    await expect.poll(async () => (await host.status()).pendingApprovals).toBe(1);
-    await dashboard.getByRole('button', { name: '刷新审批结果', exact: true }).click();
-    await expect(dashboard.getByRole('status').filter({ hasText: '等待组织审批' }).first()).toBeVisible();
-    expect((await host.status()).publications).toBe(0);
+    await expect(dashboard.getByRole('button', { name: '发起组织审批', exact: true })).toHaveCount(0);
     await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toBeDisabled();
-    // Independent provider action: a request alone never approves its own data.
-    host.approveReview();
-    await dashboard.getByRole('button', { name: '刷新审批结果', exact: true }).click();
-    await expect(dashboard.getByRole('status').filter({ hasText: '组织审批已通过' }).first()).toBeVisible();
-    await dashboard.getByRole('status').filter({ hasText: '组织审批已通过' }).first().scrollIntoViewIfNeeded();
-    await dashboard.screenshot({ path: path.join(evidence, `dashboard-approved-v${version}.png`) });
     await dashboard.getByRole('button', { name: '读取初检', exact: true }).click();
     await dashboard.getByRole('button', { name: '冻结本次抽样', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '操作回执：' })).toBeVisible();
@@ -219,7 +209,7 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     await expect(dashboard.getByRole('status').filter({ hasText: '质量检查通过' }).first()).toBeVisible();
     await dashboard.getByRole('button', { name: '刷新候选状态', exact: true }).click();
     }
-    await approveAndCheck(1);
+    await confirmSourceAndCheck(1);
     const old = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
     dashboard.once('dialog', dialog => dialog.accept());
     await dashboard.getByRole('button', { name: '修订当前候选', exact: true }).click();
@@ -229,7 +219,7 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     await settleParse('整批校验未通过');
     const oldPath = `/v1/intake/candidates/${old.key.candidateId}/versions/1`;
     const unchanged = await (await host.requestAs('enabler', oldPath)).json();
-    expect(unchanged).toMatchObject({ key: old.key, state: 'ready', sourceEvidenceVersion: 1, approvalEvidenceVersion: 1 });
+    expect(unchanged).toMatchObject({ key: old.key, state: 'ready', publicationPolicy: 'direct-v1', sourceEvidenceVersion: 1, approvalEvidenceVersion: 0 });
     await selectAndSubmit(path.basename(revisionFile));
     await settleParse('校验通过，候选已形成');
     const revised = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
@@ -240,10 +230,10 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     await expect(material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer + revisionSuffix, { exact: true })).toBeVisible();
     await material.scrollIntoViewIfNeeded();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-revision-v2.png') });
-    await approveAndCheck(2);
+    await confirmSourceAndCheck(2);
     await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
     await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
-    await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动模拟组织审批、逐条人工质量判断');
+    await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '当前候选已发布：' })).toBeVisible();
     const result = await host.status();
@@ -307,6 +297,8 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'shop-b' }))).toMatchObject({ code: 'FORBIDDEN' });
     const final = await host.status();
     expect(final.currentReleaseId).toBe(result.currentReleaseId);
+    expect(final.reviewBindings).toBe(0); expect(final.approvalFacts).toBe(0); expect(final.directPublications).toBe(1);
+    expect(final.requests.filter(p => p.endsWith('/review') || p.endsWith('/review/refresh'))).toHaveLength(0);
     expect(final.requests.some(p => p.startsWith('/v1/announce') || p === '/v1/search')).toBe(false);
     expect(final.requests.filter(p => p === '/v1/intake/sources/source-a/objects')).toHaveLength(5);
     expect(final.requests.filter(p => p === '/v1/intake/sources/source-a/candidates')).toHaveLength(5);
@@ -315,7 +307,7 @@ test('native FAQ upload, revision and cancellation preserve the approved release
     expect(mainStderr).not.toContain("No handler registered for 'product:announce-unread'");
     console.info(JSON.stringify({ status: 'PASS', electron: process.platform, api: 'actual', postgres: 15,
       nativeDialog: 'controlled-path-and-confirmation-responses', upload: 'actual-multipart', issueReport: 'saved-and-read-with-exceljs',
-      approval: 'manual-synthetic-transport', revision: 'same-id-v2-fresh-evidence', cancellation: 'server-confirmed-live-release-unchanged', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
+      publicationPolicy: 'direct-v1', approvalRows: 0, revision: 'same-id-v2-fresh-evidence', cancellation: 'server-confirmed-live-release-unchanged', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
   } catch (error) {
     for (const page of app?.windows() ?? []) {
       const role = page.url().includes('role=dashboard') ? 'dashboard' : page.url().includes('role=query') ? 'query' : null;

@@ -16,7 +16,7 @@ import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
-const EXPECTED_DATABASE_SHA256 = '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013';
+const EXPECTED_DATABASE_SHA256 = 'c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce';
 const BASELINE = Object.freeze({
   contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c',
   sourceGitSha: '1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38',
@@ -211,7 +211,13 @@ const PRIOR_QUALITY = Object.freeze({
   sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
   migrationCount: 26,
 });
-const COMPATIBLE_UPGRADES = Object.freeze([...REVIEWED_UPGRADES, PRIOR_INTAKE, PRIOR_USAGE, PRIOR_QUALITY]);
+const PRIOR_MANAGEMENT = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8',
+  sourceGitSha: '240ae98a47d8b9432559c298f60af6fdc9ba8c4e',
+  sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
+  migrationCount: 30,
+});
+const COMPATIBLE_UPGRADES = Object.freeze([...REVIEWED_UPGRADES, PRIOR_INTAKE, PRIOR_USAGE, PRIOR_QUALITY, PRIOR_MANAGEMENT]);
 const FROZEN_INTAKE_OVERLAYS = Object.freeze([
   {
     "position": 22,
@@ -421,12 +427,23 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (snapshot.manifest?.database?.sha256 !== EXPECTED_DATABASE_SHA256 || sha256(snapshot.database_source) !== EXPECTED_DATABASE_SHA256) {
     throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
   }
+  const usageSource = readFileSync(path.join(projectRoot, 'contracts/upstream/customer-agent',
+    PRIOR_MANAGEMENT.contractSetId, 'schema-v1.21.sql'), 'utf8');
+  if (sha256(usageSource) !== PRIOR_MANAGEMENT.sourceSchemaSha256) throw new Error('Immutable management predecessor digest drifted');
+  const directPrefix = '-- schema.v1.22 — DRAFT confirmed direct publication\n' + usageSource + '\n';
+  if (!snapshot.database_source.startsWith(directPrefix)) throw new Error('Direct predecessor differs from immutable v1.21');
+  const directMatch = snapshot.database_source.slice(directPrefix.length).match(/^-- BEGIN INTAKE DIRECT ([0-9a-f]{64})\n([\s\S]+)-- END INTAKE DIRECT\n$/);
+  if (!directMatch || sha256(directMatch[2]) !== directMatch[1]) throw new Error('Direct increment digest drifted');
+  const directStart = directPrefix.split('\n').length + 1;
+  const directRanges = [{ start_line: directStart, end_line: directStart + directMatch[2].trimEnd().split('\n').length - 1 }];
+  const directMigration = renderUpgradeMigration({ position: 31, id: '0031_intake_direct_v1_22',
+    version: 'schema.v1.22', ranges: directRanges, sourceBody: directMatch[2].trimEnd() }, snapshot);
   const previousPath = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_INTAKE.contractSetId, PRIOR_INTAKE.schemaFile);
   const previous = readFileSync(previousPath, 'utf8');
   if (sha256(previous) !== PRIOR_INTAKE.sourceSchemaSha256) throw new Error('Immutable intake predecessor digest drifted');
   const prefix = '-- schema.v1.21 — DRAFT usage-context additive storage contract\n' + previous + '\n';
-  if (!snapshot.database_source.startsWith(prefix)) throw new Error('Usage predecessor differs from immutable v1.20');
-  const match = snapshot.database_source.slice(prefix.length).match(/^-- BEGIN INTAKE USAGE ([0-9a-f]{64})\n([\s\S]+)-- END INTAKE USAGE\n$/);
+  if (!usageSource.startsWith(prefix)) throw new Error('Usage predecessor differs from immutable v1.20');
+  const match = usageSource.slice(prefix.length).match(/^-- BEGIN INTAKE USAGE ([0-9a-f]{64})\n([\s\S]+)-- END INTAKE USAGE\n$/);
   if (!match || sha256(match[2]) !== match[1]) throw new Error('Usage increment digest drifted');
   const bodyLines = match[2].trimEnd().split('\n');
   const begin = bodyLines.indexOf('BEGIN;');
@@ -434,7 +451,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     || bodyLines.at(-1) !== 'COMMIT;' || bodyLines.filter(line => line === 'COMMIT;').length !== 1) throw new Error('Usage transaction anchors drifted');
   const offset = prefix.split('\n').length + 1;
   const ranges = [{ start_line: offset + begin + 1, end_line: offset + bodyLines.length - 2 }];
-  const upgradeSourceBody = linesForRanges(snapshot.database_source.trimEnd().split('\n'), ranges);
+  const upgradeSourceBody = linesForRanges(usageSource.trimEnd().split('\n'), ranges);
   const priorSnapshot = { contract_set_id: PRIOR_INTAKE.contractSetId, source_git_sha: PRIOR_INTAKE.sourceGitSha,
     manifest: { database: { sha256: PRIOR_INTAKE.sourceSchemaSha256 } } };
   const usageSnapshot = { contract_set_id: PRIOR_USAGE.contractSetId, source_git_sha: PRIOR_USAGE.sourceGitSha,
@@ -452,6 +469,10 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (rollbackMigration.sha256 !== 'da90dd3eaa366037fbbe71f4296697fdf3f9f788954119731926e6500df55e98') throw new Error('Frozen rollback migration source drifted');
   const familyMigration = renderIntakeOverlay(projectRoot, rollbackSnapshot, 28, '0028_intake_family');
   if (familyMigration.sha256 !== '8b241e1b5f808c2278b53351a0d3cbee56f4ac23ca16c65736ba45ace859382e') throw new Error('Frozen family migration source drifted');
+  const capacityMigration = renderIntakeOverlay(projectRoot, rollbackSnapshot, 29, '0029_intake_capacity');
+  if (capacityMigration.sha256 !== '9d56a3ea4b56d5ec1ccbef5bc331c12f5f788da725a2d09030f2ccbe9e2f00ab') throw new Error('Frozen capacity migration source drifted');
+  const roleMigration = renderIntakeOverlay(projectRoot, rollbackSnapshot, 30, '0030_intake_role_ceiling');
+  if (roleMigration.sha256 !== '8843955f79d970bdc5f03469a7bba316c2f1fb8fa070d2b0f61ba9bc1f5144a3') throw new Error('Frozen role migration source drifted');
   const migrations = Object.freeze([
     ...loadBaselineMigrations(projectRoot),
     ...REVIEWED_UPGRADES.map(p => loadPriorReviewedUpgrade(projectRoot, p)),
@@ -467,8 +488,10 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     ...usageMigrations,
     rollbackMigration,
     familyMigration,
-    renderIntakeOverlay(projectRoot, snapshot, 29, '0029_intake_capacity'),
-    renderIntakeOverlay(projectRoot, snapshot, 30, '0030_intake_role_ceiling'),
+    capacityMigration,
+    roleMigration,
+    directMigration,
+    renderIntakeOverlay(projectRoot, snapshot, 32, '0032_intake_direct_publication'),
   ]);
   // A predecessor must precede this snapshot; the current contract is never its own upgrade.
   const currentIndex = COMPATIBLE_UPGRADES.findIndex(p => p.contractSetId === snapshot.contract_set_id);
@@ -478,7 +501,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     contract_set_id: snapshot.contract_set_id,
     source_git_sha: snapshot.source_git_sha,
     source_schema_sha256: snapshot.manifest.database.sha256,
-    upgrade_source_sha256: sha256(upgradeSourceBody),
+    upgrade_source_sha256: sha256(directMatch[2].trimEnd()),
     compatibility: Object.freeze({
       current: 'N',
       prior_signed_baseline: Object.freeze({

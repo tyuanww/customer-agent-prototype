@@ -10,7 +10,7 @@ const impact = { baseReleaseId: 'rel_2', targetReleaseId: 'rel_1', requiresCorre
   { tenantId: 'tenant-a', appId: 'app-a', brandId: 'brand-a', shopId: 'shop-a', sourceId: 'source-a', domain: 'product' as const },
   { tenantId: 'tenant-a', appId: 'app-a', brandId: 'brand-a', shopId: 'shop-b', sourceId: 'source-b', domain: 'product' as const },
 ] };
-it('requires explicit versions, displays every authorized impact and confirms a dangerous publication', async () => {
+it('requires explicit versions, displays every authorized impact and delegates dangerous confirmation to Main', async () => {
   const apply = vi.fn(), onDirty = vi.fn(), user = userEvent.setup();
   const rendered = render(<IntakeRollback view={view()} busy={false} blocked={false} apply={apply} onDirty={onDirty} />);
   expect(screen.getByText(/当前只支持回退到上一发布版本/)).toBeVisible();
@@ -21,12 +21,11 @@ it('requires explicit versions, displays every authorized impact and confirms a 
   expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-preview', baseReleaseId: 'rel_2', targetReleaseId: 'rel_1' });
   rendered.rerender(<IntakeRollback view={view({ impact, canExecute: true })} busy={false} blocked={false} apply={apply} onDirty={onDirty} />);
   expect(screen.getByText(/店铺 shop-a/)).toBeVisible(); expect(screen.getByText(/店铺 shop-b/)).toBeVisible();
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  const confirm = vi.spyOn(window, 'confirm');
   try {
-    await user.click(screen.getByRole('button', { name: '确认回退并发布' })); expect(apply).toHaveBeenCalledTimes(1);
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('上一发布版本 rel_1'));
-    confirm.mockReturnValue(true); await user.click(screen.getByRole('button', { name: '确认回退并发布' }));
-    expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-execute' });
+    await user.click(screen.getByRole('button', { name: '确认回退并发布' }));
+    expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-execute' }); expect(confirm).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '发起回退复核' })).not.toBeInTheDocument();
   } finally { confirm.mockRestore(); }
 });
 it('labels a partial preview honestly and connects correction to the existing upload workflow', async () => {
@@ -43,4 +42,10 @@ it('only offers original-operation recovery while an unknown rollback hides expi
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '查询原回退回执' })); expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-recover' });
   await user.click(screen.getByRole('button', { name: '重试原回退操作' })); expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-retry' });
+});
+it('legacy unknown rollback exposes receipt lookup without an unsafe retry action', async () => {
+  render(<IntakeRollback view={view({ available: false, pending: { action: 'rollback', recovery: 'receipt', retryAllowed: false } })}
+    busy={false} blocked={false} apply={vi.fn()} onDirty={vi.fn()} />);
+  expect(screen.getByRole('button', { name: '查询原回退回执' })).toBeEnabled();
+  expect(screen.queryByRole('button', { name: '重试原回退操作' })).not.toBeInTheDocument();
 });

@@ -71,6 +71,17 @@ async function releaseDeadline(client: IntakeTransaction, releaseId: string, ten
   if (!release.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   if (release.rows[0].revoked) throw new IntakeRejection('APPROVAL_REVOKED', 'FORBIDDEN');
   if (!release.rows[0].ready) throw new IntakeRejection('SOURCE_MISMATCH', 'FORBIDDEN');
+  // Current source bindings and immutable material remain mandatory for both
+  // policies. A new lease cannot make an old mapping current again merely because
+  // direct publication no longer has a short-lived approval observation.
+  const provenance = await client.query(`SELECT 1 FROM content_intake.release_lineage l
+    JOIN content_intake.candidate_versions c ON c.candidate_id=l.candidate_id AND c.version=l.candidate_version
+    JOIN content_intake.sources s ON s.source_id=l.source_id
+    LEFT JOIN content_intake.source_confirmations sc ON sc.candidate_id=c.candidate_id AND sc.candidate_version=c.version
+      AND sc.evidence_version=c.source_evidence_version
+    WHERE l.release_id=$1 AND (s.mode<>'v2-preview' OR s.current_mapping_version<>c.source_version OR c.state<>'published'
+      OR sc.candidate_digest IS DISTINCT FROM c.digest OR sc.object_sha256 IS DISTINCT FROM c.file_sha256) LIMIT 1`, [releaseId]);
+  if (provenance.rowCount) throw new IntakeRejection('SOURCE_MISMATCH', 'FORBIDDEN');
   // Shared with both publication writers: old catalogs cannot bypass the full
   // family/root proof simply because their candidate predates this reader.
   try {
@@ -85,7 +96,7 @@ async function releaseDeadline(client: IntakeTransaction, releaseId: string, ten
     coalesce(bool_or(f.state IS DISTINCT FROM 'approved' OR f.checked_at>clock_timestamp()
       OR f.valid_until<=clock_timestamp() OR f.package_verified_sha256 IS DISTINCT FROM r.package_sha256),false) AS invalid,
     min(f.valid_until) AS until FROM (
-      SELECT review_request_id FROM content_intake.release_lineage WHERE release_id=$1
+      SELECT review_request_id FROM content_intake.release_lineage WHERE release_id=$1 AND publication_policy='approval-v1'
       UNION SELECT review_request_id FROM content_intake.release_rollback_lineage WHERE release_id=$1
     ) l
     LEFT JOIN content_intake.review_bindings r USING(review_request_id)

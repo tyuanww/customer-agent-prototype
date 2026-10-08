@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.19.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.20.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -241,7 +241,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.19.0:components",
+  "$id": "urn:customer-agent:openapi:1.20.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -2248,7 +2248,8 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "revocationGeneration",
         "createdAt",
         "updatedAt",
-        "publishedReleaseId"
+        "publishedReleaseId",
+        "publicationPolicy"
       ],
       "properties": {
         "key": {
@@ -2314,8 +2315,38 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
           "minLength": 1,
           "maxLength": 128
+        },
+        "publicationPolicy": {
+          "type": "string",
+          "enum": [
+            "approval-v1",
+            "direct-v1"
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "publicationPolicy": {
+                "const": "direct-v1"
+              }
+            },
+            "required": [
+              "publicationPolicy"
+            ],
+            "type": "object"
+          },
+          "then": {
+            "properties": {
+              "approvalEvidenceVersion": {
+                "const": 0
+              }
+            },
+            "type": "object"
+          }
+        }
+      ]
     },
     "IntakeCandidateKey": {
       "type": "object",
@@ -5875,9 +5906,9 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "key",
         "baseReleaseId",
         "sourceEvidenceVersion",
-        "approvalEvidenceVersion",
         "title",
-        "summary"
+        "summary",
+        "confirmed"
       ],
       "properties": {
         "operationId": {
@@ -5901,9 +5932,6 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "sourceEvidenceVersion": {
           "$ref": "#/$defs/IntakeVersion"
         },
-        "approvalEvidenceVersion": {
-          "$ref": "#/$defs/IntakeVersion"
-        },
         "title": {
           "type": "string",
           "minLength": 1,
@@ -5913,6 +5941,10 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "type": "string",
           "minLength": 1,
           "maxLength": 2048
+        },
+        "confirmed": {
+          "type": "boolean",
+          "const": true
         }
       }
     },
@@ -9085,8 +9117,8 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "baseReleaseId",
         "targetReleaseId",
         "impactDigest",
-        "approvalEvidenceVersion",
-        "rollbackPlanId"
+        "rollbackPlanId",
+        "confirmed"
       ],
       "properties": {
         "operationId": {
@@ -9113,11 +9145,12 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "minLength": 64,
           "maxLength": 64
         },
-        "approvalEvidenceVersion": {
-          "$ref": "#/$defs/IntakeVersion"
-        },
         "rollbackPlanId": {
           "$ref": "#/$defs/IntakeId"
+        },
+        "confirmed": {
+          "type": "boolean",
+          "const": true
         }
       }
     },

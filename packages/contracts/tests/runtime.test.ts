@@ -46,10 +46,10 @@ describe('generated customer-agent runtime contracts', () => {
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
-      contract_set_id: 'cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8',
-      source_git_sha: '240ae98a47d8b9432559c298f60af6fdc9ba8c4e',
-      openapi_sha256: 'ef4e6df57d9ba934827a2315329aea2e473e12e577441011b78b706243251d38',
-      database_sha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013',
+      contract_set_id: 'cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929',
+      source_git_sha: '6f318d448929d1a87c5dc9e725ea4f90c48a4b97',
+      openapi_sha256: '1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d',
+      database_sha256: 'c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
     });
@@ -70,6 +70,31 @@ describe('generated customer-agent runtime contracts', () => {
         properties: { source_bindings: { 'x-unique-by': 'domain' } },
       },
     });
+  });
+
+  it('requires confirmed direct requests and server-owned candidate policy', () => {
+    const key = { candidateId: 'synthetic-candidate', version: 1, digest: 'a'.repeat(64) };
+    const publish = { operationId: 'synthetic-publish', key, baseReleaseId: null,
+      sourceEvidenceVersion: 1, title: '合成发布', summary: '合成说明', confirmed: true };
+    const rollback = { operationId: 'synthetic-rollback', baseReleaseId: 'release-b',
+      targetReleaseId: 'release-a', impactDigest: 'a'.repeat(64), rollbackPlanId: 'plan-a', confirmed: true };
+    for (const [schema, body] of [['IntakePublish', publish], ['IntakeRollback', rollback]] as const) {
+      expect(validateContractSchema(schema, body).ok).toBe(true);
+      for (const confirmed of [undefined, false, 'true', 1, null]) {
+        expect(validateContractSchema(schema, { ...body, confirmed }).ok).toBe(false);
+      }
+      for (const extra of [{ approvalEvidenceVersion: 1 }, { publicationPolicy: 'direct-v1' }, { actorId: 'director' }]) {
+        expect(validateContractSchema(schema, { ...body, ...extra }).ok).toBe(false);
+      }
+    }
+    const candidate = { key, sourceId: 'source-a', state: 'awaiting-evidence', readinessReasons: [],
+      sourceEvidenceVersion: 0, approvalEvidenceVersion: 0, revocationGeneration: 0,
+      createdAt: '2026-10-08T00:00:00Z', updatedAt: '2026-10-08T00:00:00Z',
+      publishedReleaseId: null, publicationPolicy: 'direct-v1' };
+    expect(validateContractSchema('IntakeCandidate', candidate).ok).toBe(true);
+    expect(validateContractSchema('IntakeCandidate', { ...candidate, approvalEvidenceVersion: 1 }).ok).toBe(false);
+    expect(validateContractSchema('IntakeCandidate', { ...candidate, publicationPolicy: undefined }).ok).toBe(false);
+    expect(validateContractSchema('IntakeCandidate', { ...candidate, publicationPolicy: 'approval-v1', approvalEvidenceVersion: 1 }).ok).toBe(true);
   });
 
   it('compiles every generated component schema on demand', () => {
