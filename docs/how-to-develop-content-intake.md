@@ -39,6 +39,25 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 
 当前额度验证覆盖 actor/source 并发 admission，以及 0029 统一管理的四类对象字节预留、引用保护和明确失败对象释放；10→100 并发准入及 10→100 合成发布历史已验收。取消任务不等于允许删除已登记历史对象；历史保留期与受控历史回收仍待批准，具体命令、口径与证据见[容量核对与历史保留](#容量核对与历史保留第二组)。
 
+## P2 内容管理内的权限配置
+
+现有 FAQ 合成入口的内容管理工作区增加“资料 / 权限配置”局部切换，不新增侧栏业务模块。总监、经理按当前 `mayAllocate` 范围配置 business 授权；主管、组长不获得配置他人的能力。选择已有配置范围和目录返回的具名人员，勾选业务动作、填写生效/失效时间和原因，先“预览权限”再“确认保存权限”。预览明确显示尚未保存，“返回修改”不写授权。撤销须核对授权记录并填写原因；当前姓名不可用的历史记录仍可按编号、范围、时间及原原因识别和撤销，不猜测人员姓名，也不要求手填员工 ID。本切片不提供 delegation、接管或根 allocation 编辑界面。
+
+| 所有者 | 接线与不变量 |
+| --- | --- |
+| API 原 authority / discovery / service | 复用冻结合同的 `GET /v1/intake/grants`、`POST /v1/intake/grants/preview`、`POST /v1/intake/grants`、`PATCH /v1/intake/grants/{grantId}`；主体目录用 `purpose=grant-recipient`，范围来自 authorization。预览只读，保存重验；列表在 SQL 扫描前限定可管理范围，再复用原资格判断，游标不携带别范围授权 ID |
+| `grants-http.ts` / 既有 management HTTP | grants plugin 注入 management 创建的同一个强制产品会话 service，不另建授权实现或服务实例；当前只由显式合成宿主注册 |
+| Main `ContentIntakePermissions` / 权限 IPC | 持有主体和来源 ID、短期选择句柄、会话代际、人员/当前资格最早截止、固定预览和写请求。到期清理，取消拒绝迟到结果，结果未知只按原请求恢复；sender、main-frame 和会话均在 Main 核验 |
+| Dashboard preload / `IntakePermissions` | 仅开放 `dashboardPermissions.current/command/onInvalidated`（`dashboard:permissions-current`、`dashboard:permissions-command`、`dashboard:permissions-invalidated`）；renderer 提交选择与确认意图，没有通用 HTTP、员工 ID 输入或凭据 |
+
+[权限配置增量证据](../evidence/qa/intake-grant-management/README.md)记录实际 HTTP＋受限用途池＋PG15 3 项，以及桌面相关单元/组件 80 项通过。真实 Electron 权限闭环在集成后已通过：具名总监预览取消不生效、保存后另一坐席获得新查询资格、撤销后拒绝；980×680 浅色/深色控件可操作且无横向溢出。最终证据见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)。命令从 `apps/desktop` 运行：
+
+```sh
+CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 ./node_modules/.bin/playwright test tests/e2e/content-intake-permissions-real-stack.spec.ts
+```
+
+用例要求现有 `purpose-candidate` 合成宿主，使用已登记合成总监和具名坐席，验证预览/取消不生效、保存后坐席新查询资格可用、撤销后重新取资格拒绝。它不代表经理身份单独实跑、真实员工名单、生产账号或正式运行装配已验证。版本和原角色上限保持不变。
+
 ## P2 来源确认与历史审批兼容
 
 `confirmSource` 仍按精确键、文件摘要、获取方式、来源确认权限及证据版本 CAS 校验；同源整数不能落后已发布版本，相同整数不能换文件，opaque 由有权人显式核对。理由与结果写入永久私有回执，材料摘要不变。
@@ -316,6 +335,16 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 ```
 
 验证与剩余条件见[本轮补齐](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)及[实验接线说明](../apps/api/experiments/intake-runtime/INTEGRATION.md)。
+
+## 用途能力候选贯穿 HTTP 与本机 Electron
+
+显式 `purpose-candidate` profile 已接入既有合成宿主：环境 LOGIN 通过显式 `SET ROLE` 借用对应 NOLOGIN 用途能力，按实际安装的 32 段 migration ledger 和候选 SQL 校验，业务、usage、worker 使用各自受限连接。组织池本轮只预检，不把它计为组织写入。它复用原 service、解析器和发布/使用消费者，未注册生产 app/server，也未修改正式 migration 或消费锁。
+
+[本轮发布验收](../evidence/qa/intake-release-acceptance/README.md)已有实际 HTTP 5/5（原默认 profile product 回归，以及候选 profile 的产品/活动/售前/售后各一次完整上传→检查→确认直发→另一坐席读取）和 Mac Electron 2/2（product FAQ 原生文件/报告/确认发布/取消/查询复制与回退）。活动缺失失效时间拒绝，并实际回读完整 Excel 报告；真实系统剪贴板已比对。四域分别通过的是 HTTP 层，不是四套桌面 Tab 的独立验收；本轮权限配置 Electron 也已在主集成通过，具名授予和撤销另见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)。对话框响应由测试控制，不替代人工设备、Windows/Linux、Dock 或 Stage Manager 证据。
+
+按上述证据的“可复现入口”运行专项；不要把旧 consumer 探针的无 HTTP/无剪贴板边界套用到此新 profile，也不要把此合成 profile 当成生产 factory。正式受限账号、真实组织与初始目录认领仍未激活。
+
+治理出口和产品接收器已实现 `customer-agent-contract-set/v2`：在 manifest、OpenAPI、DDL 三件之外，以封闭成员集合接收九件 runtime 伴随产物，核对来源 Git blob、路径、字节摘要和安装/provenance 关系，向后兼容 v1。主集成已完成合成跨仓往返的 12 件产物 / 9 个 `runtime_sources` 验证；这是交付工具能力，不是实际候选已导出或接收。OpenAPI 1.21.0/schema.v1.23 仍为 DRAFT、未冻结、未 export、未 intake；当前正式锁仍为 1.20.0/1.22、VERIFIED_NOT_ACTIVATED，runtime/Ddev 未启用。精确候选批准、实际版本化交接和运行许可须分别完成；治理候选最终稳定输入 release 41/41 与 PG253 已通过，已回收到治理 `6a25304`，见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)，不推定其结果或新增产物 hash。
 
 ## 发布二次确认（2026-10-08）
 

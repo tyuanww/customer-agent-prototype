@@ -1,0 +1,27 @@
+{
+  "status": "SCOPED_REVIEW_FIXES_VERIFIED",
+  "fullReview": "INCOMPLETE",
+  "scope": "new permissions slice and v2 intake only; prior role review not repeated",
+  "findings": [
+    {
+      "severity": "P2",
+      "area": "v2 copy staging source binding",
+      "status": "FIXED",
+      "verification": "two deterministic replacement windows; full contract intake35 passed"
+    },
+    {
+      "severity": "P2",
+      "area": "stale write failure clears current recovery",
+      "status": "FIXED",
+      "verification": "stop/retry and new-session late failures; exact request recovery creates one grant"
+    }
+  ],
+  "documentFindings": [
+    "stale governance release-in-progress statement corrected",
+    "organization pool precheck distinguished from business/usage/worker end-to-end"
+  ],
+  "visualFinding": "hidden checkbox and unstyled local switch corrected; actual Electron checked light/dark980x680",
+  "outside": "governance new boundary attempted once, 180s timeout; no conclusion",
+  "codeReviewSource": "local primary plus independent in-host recover_b",
+  "documentationReviewSource": "independent in-host recover_a; final two factual fixes checked by primary"
+}

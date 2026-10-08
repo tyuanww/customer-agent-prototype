@@ -18,9 +18,11 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
 const CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v1';
+const RUNTIME_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v2';
 const CONSUMPTION_SCHEMA = 'customer-agent-contract-consumption/v1';
 const SOURCE_REPOSITORY = 'ai-赋能立项';
 const UPSTREAM_ROOT = 'contracts/upstream/customer-agent';
@@ -30,6 +32,19 @@ const INTAKE_STATUS = 'VERIFIED_NOT_ACTIVATED';
 const OPENAPI_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/openapi.v1.yaml';
 const DATABASE_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/33-schema-v1-草案.sql';
 const OWNER_SOURCE_ROOT = 'business-docs/01-客服Agent项目/30-开发-进行中';
+// The versioned runtime profile has a closed set of companion artifacts. These
+// are immutable contract inputs, not executable hooks or paths supplied by HTTP.
+const RUNTIME_MEMBERS = Object.freeze({
+  installation: ['content-intake-runtime-candidate/installation.generated.json', 'intake-runtime-installation.v1.json'],
+  roles: ['content-intake-runtime-candidate/roles.sql', 'intake-runtime-roles.v1.sql'],
+  organization: ['content-intake-runtime-candidate/organization.sql', 'intake-runtime-organization.v1.sql'],
+  session: ['content-intake-runtime-candidate/session-lock.sql', 'intake-runtime-session.v1.sql'],
+  acl: ['content-intake-runtime-candidate/purpose-acl.sql', 'intake-runtime-acl.v1.sql'],
+  directoryAcl: ['content-intake-runtime-candidate/directory-acl.sql', 'intake-runtime-directory-acl.v1.sql'],
+  directory: ['content-intake-shop-directory-candidate/storage.delta.sql', 'intake-shop-directory.v1.sql'],
+  provenance: ['content-intake-runtime-candidate/provenance.json', 'intake-runtime-provenance.v1.json'],
+  protocol: ['content-intake-runtime-candidate/protocol.json', 'intake-runtime-protocol.v1.json'],
+});
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTRACT_SET_ID_PATTERN = /^cs-ai-c11-openapi-(\d+\.\d+\.\d+)-schema-(\d+\.\d+)-([0-9a-f]{12})$/;
@@ -123,6 +138,7 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
+  const runtimeProfile = rawManifest?.schema === RUNTIME_CONTRACT_SET_SCHEMA;
   assertExactKeys(
     rawManifest,
     [
@@ -134,10 +150,11 @@ function validateManifest(rawManifest) {
       'implementation_version',
       'openapi',
       'database',
+      ...(runtimeProfile ? ['runtime'] : []),
     ],
     'contract-set manifest',
   );
-  if (rawManifest.schema !== CONTRACT_SET_SCHEMA) {
+  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile) {
     throw new Error(`Unsupported contract-set schema: ${String(rawManifest.schema)}`);
   }
   if (rawManifest.source_repository !== SOURCE_REPOSITORY) {
@@ -169,6 +186,7 @@ function validateManifest(rawManifest) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
   // Version and both paths form one reviewed pair; mixed generations fail closed.
+  const runtimePair = openapi.version === '1.21.0' && database.version === 'schema.v1.23';
   const directPair = openapi.version === '1.20.0' && database.version === 'schema.v1.22';
   const managementPair = openapi.version === '1.19.0' && database.version === 'schema.v1.21';
   const qualityPair = openapi.version === '1.18.0' && database.version === 'schema.v1.21';
@@ -179,10 +197,20 @@ function validateManifest(rawManifest) {
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (!directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair) throw new Error('Unsupported contract version pair');
+  if (runtimePair !== runtimeProfile || (!runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
-  if (directPair) {
+  if (runtimePair) {
+    openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.21.yaml`;
+    databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.23.sql`;
+    assertExactKeys(rawManifest.runtime, Object.keys(RUNTIME_MEMBERS), 'runtime artifacts');
+    for (const [key, [sourcePath, file]] of Object.entries(RUNTIME_MEMBERS)) {
+      const descriptor = validateDescriptor(rawManifest.runtime[key], `runtime.${key}`);
+      if (descriptor.version !== '1' || descriptor.source_path !== `${OWNER_SOURCE_ROOT}/${sourcePath}` || descriptor.file !== file) {
+        throw new Error(`runtime.${key} descriptor does not match the runtime profile`);
+      }
+    }
+  } else if (directPair) {
     openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.20.yaml`;
     databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.22.sql`;
   } else if (managementPair) {
@@ -214,7 +242,60 @@ function validateManifest(rawManifest) {
 }
 
 function expectedMembers(manifest) {
-  return [MANIFEST_FILE, manifest.openapi.file, manifest.database.file].sort();
+  return [MANIFEST_FILE, ...contractDescriptors(manifest).map(([, descriptor]) => descriptor.file)].sort();
+}
+
+function contractDescriptors(manifest) {
+  return [['OpenAPI', manifest.openapi], ['Database', manifest.database],
+    ...Object.entries(manifest.runtime ?? {}).map(([key, descriptor]) => [`runtime.${key}`, descriptor])];
+}
+
+/** Verify the installation plan's references as well as the outer file hashes.
+ * Installing SQL and checking the live migration ledger belong to the database
+ * installer. Intake never executes companion SQL or provisions environment roles. */
+function verifyRuntimeReferences(directory, manifest) {
+  if (!manifest.runtime) return;
+  const installation = readJson(path.join(directory, manifest.runtime.installation.file), 'Runtime installation');
+  if (installation.schema !== 'content-intake-installation/v1' || installation.sqlContract !== manifest.database.version
+    || installation.capabilityLogin !== false || installation.environmentCredentialsIncluded !== false
+    || installation.companionAclRequired !== true || installation.referenceMode?.runtimeReady !== false
+    || installation.productMode?.atomicCandidateInstall !== true || installation.productMode?.skipMissingDependencies !== false) {
+    throw new Error('Runtime installation boundary is invalid');
+  }
+  const expectedArtifacts = ['openapi', 'database', ...Object.keys(RUNTIME_MEMBERS)].sort();
+  if (!Array.isArray(installation.requiredBundleArtifacts)
+    || JSON.stringify([...installation.requiredBundleArtifacts].sort()) !== JSON.stringify(expectedArtifacts)) {
+    throw new Error('Runtime installation required artifacts mismatch');
+  }
+  for (const key of ['openapi', 'database']) {
+    if (installation[key]?.path !== manifest[key].source_path || installation[key]?.sha256 !== manifest[key].sha256) {
+      throw new Error(`Runtime installation ${key} reference mismatch`);
+    }
+  }
+  assertExactKeys(installation.sources, Object.keys(RUNTIME_MEMBERS).filter(key => key !== 'installation'), 'Runtime installation sources');
+  for (const [key, descriptor] of Object.entries(manifest.runtime)) {
+    if (key === 'installation') continue;
+    if (installation.sources[key]?.path !== descriptor.source_path || installation.sources[key]?.sha256 !== descriptor.sha256) {
+      throw new Error(`Runtime installation ${key} reference mismatch`);
+    }
+  }
+  const provenance = readJson(path.join(directory, manifest.runtime.provenance.file), 'Runtime provenance');
+  const implementation = installation.productMode.implementation;
+  if (!isRecord(implementation) || implementation.repository !== 'customer-agent-prototype'
+    || !isDeepStrictEqual(implementation, provenance.implementationDependencies)) {
+    throw new Error('Runtime implementation dependencies mismatch');
+  }
+  requireString(implementation.commit, GIT_SHA_PATTERN, 'Runtime implementation commit');
+  requireString(implementation.migrationManifest, HASH_PATTERN, 'Runtime migration manifest');
+  assertExactKeys(implementation.overlayFiles, [
+    '0021_content_intake_v1_20.sql', '0022_intake_legacy_fence.sql', '0023_intake_quality.sql',
+    '0024_intake_publication.sql', '0025_intake_usage_v1_21.sql', '0026_intake_discovery_index.sql',
+    '0027_intake_rollback.sql', '0028_intake_family.sql', '0029_intake_capacity.sql',
+    '0030_intake_role_ceiling.sql', '0031_intake_direct_v1_22.sql', '0032_intake_direct_publication.sql',
+  ], 'Runtime implementation overlays');
+  for (const hash of Object.values(implementation.overlayFiles)) requireString(hash, HASH_PATTERN, 'Runtime overlay hash');
+  const order = ['product-migrations', 'roles', 'organization', 'session', 'directory', 'directoryAcl', 'acl', 'environment-login-bindings'];
+  if (JSON.stringify(installation.productMode.order) !== JSON.stringify(order)) throw new Error('Runtime installation order mismatch');
 }
 
 function assertMember(directory, descriptor, label) {
@@ -242,8 +323,8 @@ export function verifyContractSetDirectory(directory) {
   ) {
     throw new Error(`Contract-set members mismatch: ${actualMembers.join(', ')}`);
   }
-  assertMember(resolvedDirectory, manifest.openapi, 'OpenAPI contract');
-  assertMember(resolvedDirectory, manifest.database, 'Database contract');
+  for (const [label, descriptor] of contractDescriptors(manifest)) assertMember(resolvedDirectory, descriptor, label);
+  verifyRuntimeReferences(resolvedDirectory, manifest);
   return Object.freeze({ directory: resolvedDirectory, manifest });
 }
 
@@ -275,10 +356,7 @@ function verifySourceRepository(sourceRepositoryRoot, manifest) {
   }
   runGit(resolvedRepositoryRoot, ['cat-file', '-e', `${manifest.source_git_sha}^{commit}`]);
 
-  for (const [label, descriptor] of [
-    ['OpenAPI', manifest.openapi],
-    ['Database', manifest.database],
-  ]) {
+  for (const [label, descriptor] of contractDescriptors(manifest)) {
     const committedBytes = runGit(
       resolvedRepositoryRoot,
       ['show', `${manifest.source_git_sha}:${descriptor.source_path}`],
@@ -478,9 +556,13 @@ export async function withVerifiedContractSetSnapshot(
         ...manifest,
         openapi: Object.freeze({ ...manifest.openapi }),
         database: Object.freeze({ ...manifest.database }),
+        ...(manifest.runtime ? { runtime: Object.freeze(Object.fromEntries(Object.entries(manifest.runtime)
+          .map(([key, descriptor]) => [key, Object.freeze({ ...descriptor })]))) } : {}),
       }),
       openapi_source: readFileSync(openapiPath, 'utf8'),
       database_source: readFileSync(databasePath, 'utf8'),
+      ...(manifest.runtime ? { runtime_sources: Object.freeze(Object.fromEntries(Object.entries(manifest.runtime)
+        .map(([key, descriptor]) => [key, readFileSync(path.join(verified.path, descriptor.file), 'utf8')]))) } : {}),
     });
     return await consumer(snapshot);
   } finally {
@@ -539,6 +621,11 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
         );
       }
       const staged = verifyContractSetDirectory(stagingDirectory);
+      // Internal hashes can remain self-consistent after a source-directory
+      // replacement. Bind the copied bytes to the manifest checked against Git.
+      if (!manifestsMatch(staged.manifest, source.manifest)) {
+        throw new Error('Staged contract-set manifest differs from the verified source');
+      }
       const nextLock = consumptionLock(staged);
       renameSync(stagingDirectory, destination);
       writeJsonAtomically(lockPath, nextLock);

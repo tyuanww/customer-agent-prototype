@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -48,6 +49,7 @@ type ContractSetModule = Readonly<{
       manifest: Readonly<Record<string, unknown>>;
       openapi_source: string;
       database_source: string;
+      runtime_sources?: Readonly<Record<string, string>>;
     }) => Result | Promise<Result>,
   ) => Promise<Result>;
   parseCliArguments: (arguments_: string[]) => Readonly<{
@@ -100,7 +102,7 @@ function runGit(repositoryRoot: string, arguments_: string[]): string {
   }).trim();
 }
 
-function createSourceRepository(openapi: string, database: string, marker: string, openapiPath = OPENAPI_SOURCE_PATH, databasePath = DATABASE_SOURCE_PATH): Readonly<{
+function createSourceRepository(openapi: string, database: string, marker: string, openapiPath = OPENAPI_SOURCE_PATH, databasePath = DATABASE_SOURCE_PATH, companions: Record<string, string> = {}): Readonly<{
   repositoryRoot: string;
   sourceGitSha: string;
 }> {
@@ -108,8 +110,12 @@ function createSourceRepository(openapi: string, database: string, marker: strin
   mkdirSync(path.dirname(path.join(repositoryRoot, openapiPath)), { recursive: true });
   writeFileSync(path.join(repositoryRoot, openapiPath), openapi);
   writeFileSync(path.join(repositoryRoot, databasePath), database);
+  for (const [relative, content] of Object.entries(companions)) {
+    mkdirSync(path.dirname(path.join(repositoryRoot, relative)), { recursive: true });
+    writeFileSync(path.join(repositoryRoot, relative), content);
+  }
   runGit(repositoryRoot, ['init', '--quiet']);
-  runGit(repositoryRoot, ['add', '--', openapiPath, databasePath]);
+  runGit(repositoryRoot, ['add', '--', openapiPath, databasePath, ...Object.keys(companions)]);
   runGit(repositoryRoot, [
     '-c', 'user.name=Contract Test',
     '-c', 'user.email=contract-test@example.invalid',
@@ -193,6 +199,176 @@ function createContractSet({
     sourceGitSha,
   };
 }
+
+// A complete synthetic v2 bundle, including a separately committed source tree.
+// These bytes are never SQL-installed and contain no real governance approval.
+function createRuntimeContractSet() {
+  const root = 'business-docs/01-客服Agent项目/30-开发-进行中';
+  const specs: Record<string, [string, string]> = {
+    installation: ['content-intake-runtime-candidate/installation.generated.json','intake-runtime-installation.v1.json'],
+    roles: ['content-intake-runtime-candidate/roles.sql','intake-runtime-roles.v1.sql'],
+    organization: ['content-intake-runtime-candidate/organization.sql','intake-runtime-organization.v1.sql'],
+    session: ['content-intake-runtime-candidate/session-lock.sql','intake-runtime-session.v1.sql'],
+    acl: ['content-intake-runtime-candidate/purpose-acl.sql','intake-runtime-acl.v1.sql'],
+    directoryAcl: ['content-intake-runtime-candidate/directory-acl.sql','intake-runtime-directory-acl.v1.sql'],
+    directory: ['content-intake-shop-directory-candidate/storage.delta.sql','intake-shop-directory.v1.sql'],
+    provenance: ['content-intake-runtime-candidate/provenance.json','intake-runtime-provenance.v1.json'],
+    protocol: ['content-intake-runtime-candidate/protocol.json','intake-runtime-protocol.v1.json'],
+  };
+  const overlayNames = ['0021_content_intake_v1_20.sql','0022_intake_legacy_fence.sql','0023_intake_quality.sql',
+    '0024_intake_publication.sql','0025_intake_usage_v1_21.sql','0026_intake_discovery_index.sql','0027_intake_rollback.sql',
+    '0028_intake_family.sql','0029_intake_capacity.sql','0030_intake_role_ceiling.sql','0031_intake_direct_v1_22.sql','0032_intake_direct_publication.sql'];
+  const implementation = { repository:'customer-agent-prototype',commit:'a'.repeat(40),migrationManifest:'b'.repeat(64),
+    overlayFiles:Object.fromEntries(overlayNames.map(name=>[name,sha256(name)])),bodiesOwner:'product implementation' };
+  const openapi = 'openapi: 3.1.0\ninfo:\n  title: Synthetic runtime package\n';
+  const database = '-- Synthetic reference schema; not runtime installed.\n';
+  const content: Record<string,string> = Object.fromEntries(Object.keys(specs).map(key=>[key,`-- Synthetic ${key}; test only.\n`]));
+  content.provenance = JSON.stringify({implementationDependencies:implementation});
+  content.protocol = JSON.stringify({schema:'content-intake-runtime-protocol/v1',status:'DRAFT'});
+  content.installation = JSON.stringify({ schema:'content-intake-installation/v1',sqlContract:'schema.v1.23',
+    capabilityLogin:false,environmentCredentialsIncluded:false,companionAclRequired:true,
+    referenceMode:{runtimeReady:false},productMode:{atomicCandidateInstall:true,skipMissingDependencies:false,implementation,
+      order:['product-migrations','roles','organization','session','directory','directoryAcl','acl','environment-login-bindings']},
+    requiredBundleArtifacts:['openapi','database',...Object.keys(specs)],
+    openapi:{path:`${root}/openapi.v1.21.yaml`,sha256:sha256(openapi)},database:{path:`${root}/schema.v1.23.sql`,sha256:sha256(database)},
+    sources:Object.fromEntries(Object.entries(specs).filter(([key])=>key!=='installation').map(([key,[relative]])=>[key,{path:`${root}/${relative}`,sha256:sha256(content[key]!)}])),
+  });
+  const source = createSourceRepository(openapi,database,'runtime',`${root}/openapi.v1.21.yaml`,`${root}/schema.v1.23.sql`,
+    Object.fromEntries(Object.entries(specs).map(([key,[relative]])=>[`${root}/${relative}`,content[key]!])));
+  const descriptor = (version:string, source_path:string, file:string, bytes:string) => ({version,source_path,file,sha256:sha256(bytes),bytes:Buffer.byteLength(bytes)});
+  const manifest = { schema:'customer-agent-contract-set/v2',contract_set_id:`cs-ai-c11-openapi-1.21.0-schema-1.23-${source.sourceGitSha.slice(0,12)}`,
+    source_repository:'ai-赋能立项',source_git_sha:source.sourceGitSha,architecture_version:'1.16',implementation_version:'1.21',
+    openapi:descriptor('1.21.0',`${root}/openapi.v1.21.yaml`,'openapi.v1.yaml',openapi),
+    database:descriptor('schema.v1.23',`${root}/schema.v1.23.sql`,'schema-v1.23.sql',database),
+    runtime:Object.fromEntries(Object.entries(specs).map(([key,[relative,file]])=>[key,descriptor('1',`${root}/${relative}`,file,content[key]!)])),
+  };
+  const directory = temporaryDirectory('runtime-contract-bundle');
+  writeFileSync(path.join(directory,manifest.openapi.file),openapi);
+  writeFileSync(path.join(directory,manifest.database.file),database);
+  for (const [key,entry] of Object.entries(manifest.runtime)) writeFileSync(path.join(directory,entry.file),content[key]!);
+  const save = () => writeFileSync(path.join(directory,'contract-set.json'),JSON.stringify(manifest));
+  save();
+  const replace = (key:string,value:string) => {
+    content[key]=value;const entry=manifest.runtime[key]!;
+    entry.sha256=sha256(value);entry.bytes=Buffer.byteLength(value);
+    writeFileSync(path.join(directory,entry.file),value);save();
+  };
+  return {directory,manifest,source,content,replace,save};
+}
+
+describe('versioned runtime bundle intake', () => {
+  it('copies every companion and exposes immutable bytes to the actual locked consumer without activation', async () => {
+    const source=createRuntimeContractSet(),productRoot=createProductRoot();
+    const result=contractSet.ingestContractSet({projectRoot:productRoot,sourceDirectory:source.directory,sourceRepositoryRoot:source.source.repositoryRoot});
+    expect(result).toMatchObject({status:'CREATED',intake_status:'VERIFIED_NOT_ACTIVATED',runtime_activated:false,ddev_authorized:false});
+    expect(readdirSync(result.path)).toHaveLength(12);
+    await contractSet.withVerifiedContractSetSnapshot({projectRoot:productRoot},snapshot=>{
+      expect(snapshot.runtime_sources).toEqual(source.content);
+      expect(Object.isFrozen(snapshot.runtime_sources)).toBe(true);
+      expect(Object.isFrozen(snapshot.manifest.runtime)).toBe(true);
+    });
+    writeFileSync(path.join(result.path,source.manifest.runtime.acl!.file),'-- tampered installed companion\n');
+    expect(()=>contractSet.verifyIngestedContractSet({projectRoot:productRoot})).toThrow(/size mismatch|SHA-256/);
+  });
+
+  it.each(['missing','extra','symlink','tampered'])('rejects %s companion input before creating the product lock',kind=>{
+    const source=createRuntimeContractSet(),productRoot=createProductRoot(),acl=path.join(source.directory,source.manifest.runtime.acl!.file);
+    if(kind==='missing')rmSync(acl);
+    else if(kind==='extra')writeFileSync(path.join(source.directory,'unlisted.sql'),'SELECT 1;');
+    else if(kind==='symlink'){rmSync(acl);symlinkSync(path.join(source.directory,source.manifest.runtime.roles!.file),acl);}
+    else writeFileSync(acl,'-- invalid SQL input\n');
+    expect(()=>contractSet.ingestContractSet({projectRoot:productRoot,sourceDirectory:source.directory,sourceRepositoryRoot:source.source.repositoryRoot})).toThrow();
+    expect(existsSync(path.join(productRoot,'contracts/upstream/customer-agent/contract-set.lock.json'))).toBe(false);
+  });
+
+  it('rejects a rehashed companion that disagrees with the inner installation references',()=>{
+    const source=createRuntimeContractSet();source.replace('acl','-- newly hashed but unbound companion\n');
+    expect(()=>contractSet.verifyContractSetDirectory(source.directory)).toThrow(/acl reference mismatch/);
+  });
+
+  it('rejects inconsistent overlay prerequisites even when the outer installation hash is updated',()=>{
+    const source=createRuntimeContractSet(),installation=JSON.parse(source.content.installation!);
+    installation.productMode.implementation.overlayFiles['0032_intake_direct_publication.sql']='e'.repeat(64);
+    source.replace('installation',JSON.stringify(installation));
+    expect(()=>contractSet.verifyContractSetDirectory(source.directory)).toThrow(/implementation dependencies mismatch/);
+  });
+
+  it('checks every companion against the declared source Git commit, not only the original pair',()=>{
+    const source=createRuntimeContractSet(),installation=JSON.parse(source.content.installation!);
+    source.replace('acl','-- consistent package but absent from declared Git source\n');
+    installation.sources.acl.sha256=source.manifest.runtime.acl!.sha256;
+    source.replace('installation',JSON.stringify(installation));
+    expect(()=>contractSet.verifyContractSetDirectory(source.directory)).not.toThrow();
+    expect(()=>contractSet.ingestContractSet({projectRoot:createProductRoot(),sourceDirectory:source.directory,sourceRepositoryRoot:source.source.repositoryRoot})).toThrow(/declared source Git commit/);
+  });
+
+  it.each([false, true])('rejects source replacement during copying and preserves the previous lock (%s)', hasPriorLock => {
+    const source = createRuntimeContractSet(), productRoot = createProductRoot();
+    const upstream = path.join(productRoot, 'contracts/upstream/customer-agent');
+    const lockPath = path.join(upstream, 'contract-set.lock.json');
+    if (hasPriorLock) {
+      const prior = createContractSet();
+      contractSet.ingestContractSet({ projectRoot: productRoot, sourceDirectory: prior.directory,
+        sourceRepositoryRoot: prior.repositoryRoot });
+    }
+    const previousLock = existsSync(lockPath) ? readFileSync(lockPath, 'utf8') : null;
+    // Intercept only this child process's first copy, after source Git validation.
+    // A child avoids changing Node's shared fs bindings in the Vitest worker.
+    const result = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', `
+      import fs from 'node:fs';
+      import path from 'node:path';
+      import { createHash } from 'node:crypto';
+      import { syncBuiltinESMExports } from 'node:module';
+      import { pathToFileURL } from 'node:url';
+      const [script, sourceDirectory, projectRoot, sourceRepositoryRoot] = process.argv.slice(1);
+      process.argv[1] = 'synthetic-contract-race-harness';
+      const intake = await import(pathToFileURL(script).href);
+      const manifestPath = path.join(sourceDirectory, 'contract-set.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const installation = JSON.parse(fs.readFileSync(path.join(sourceDirectory, manifest.runtime.installation.file), 'utf8'));
+      const replace = (key, content) => {
+        const descriptor = manifest.runtime[key];
+        descriptor.sha256 = createHash('sha256').update(content).digest('hex');
+        descriptor.bytes = Buffer.byteLength(content);
+        fs.writeFileSync(path.join(sourceDirectory, descriptor.file), content);
+      };
+      const original = fs.copyFileSync; let replaced = false;
+      fs.copyFileSync = (from, to, ...options) => {
+        if (!replaced && String(from).startsWith(sourceDirectory + path.sep)) {
+          replaced = true;
+          replace('acl', '-- replacement absent from the declared Git commit\\n');
+          installation.sources.acl.sha256 = manifest.runtime.acl.sha256;
+          replace('installation', JSON.stringify(installation));
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+        }
+        return original(from, to, ...options);
+      };
+      syncBuiltinESMExports();
+      let error = null;
+      try { intake.ingestContractSet({ projectRoot, sourceDirectory, sourceRepositoryRoot }); }
+      catch (failure) { error = String(failure); }
+      finally { fs.copyFileSync = original; syncBuiltinESMExports(); }
+      console.log(JSON.stringify({ replaced, error }));
+    `, path.join(repositoryRoot, 'scripts/customer-agent-contract-set.mjs'), source.directory, productRoot, source.source.repositoryRoot], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    })) as { replaced: boolean; error: string | null };
+    expect(result.replaced).toBe(true);
+    expect(result.error).toContain('Staged contract-set manifest differs from the verified source');
+    expect(existsSync(lockPath) ? readFileSync(lockPath, 'utf8') : null).toBe(previousLock);
+    expect(existsSync(path.join(upstream, source.manifest.contract_set_id))).toBe(false);
+    expect(readdirSync(upstream).some(name => name.startsWith('.contract-intake'))).toBe(false);
+  });
+
+  it('rejects a companion-bearing v1 manifest and v2 paired with old contract generations',()=>{
+    const source=createRuntimeContractSet();
+    source.manifest.schema='customer-agent-contract-set/v1';source.save();
+    expect(()=>contractSet.verifyContractSetDirectory(source.directory)).toThrow(/unexpected fields/);
+    source.manifest.schema='customer-agent-contract-set/v2';source.manifest.openapi.version='1.20.0';
+    source.manifest.database.version='schema.v1.22';source.manifest.database.file='schema-v1.22.sql';
+    source.manifest.contract_set_id=source.manifest.contract_set_id.replace('openapi-1.21.0-schema-1.23','openapi-1.20.0-schema-1.22');source.save();
+    expect(()=>contractSet.verifyContractSetDirectory(source.directory)).toThrow(/version pair/);
+  });
+});
 
 describe('customer-agent contract-set intake', () => {
   it.each([

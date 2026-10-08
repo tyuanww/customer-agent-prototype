@@ -6,6 +6,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import type { ProductAuthService } from '../auth-service.js';
 import { CONTENT_UPLOAD_MAX_BYTES, type ContentObjectStore } from '../content-object-store.js';
 import { createContentIntakeService } from './service.js';
+import { contentIntakeGrantRoutes } from './grants-http.js';
 import type { IntakePool } from './transaction.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import type { IntakePrincipalLabels } from './discovery.js';
@@ -45,6 +46,7 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   const actor = intakeHttpBoundary(app, auth, report);
   const service = createContentIntakeService(pool, store, report, approval,
     { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}), ...(terminalPool ? { terminalPool } : {}) });
+  await app.register(contentIntakeGrantRoutes, { auth, service, ...(report ? { report } : {}) });
   app.get('/v1/intake/sources/:sourceId/management-context', { exposeHeadRoute: false }, async (request, reply) => {
     if (!noQuery(request) || request.body !== undefined || request.headers['transfer-encoding'] !== undefined
       || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) {

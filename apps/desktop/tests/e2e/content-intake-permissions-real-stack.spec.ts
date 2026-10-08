@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,8 @@ test('director previews without saving, grants a named seat query access, then r
   const host = await createIntakeSyntheticHost(options);
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-permissions-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
+  const evidence = path.resolve(desktopRoot, '../../.gstack/intake-permissions', new Date().toISOString().replaceAll(':','-'));
+  mkdirSync(evidence, { recursive: true });
   let app: ElectronApplication | undefined;
   try {
     // Integration seam added by the parallel host task; fail closed on the old
@@ -51,6 +53,16 @@ test('director previews without saving, grants a named seat query access, then r
     const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
     await panel.getByRole('combobox', { name: '人员', exact: true }).selectOption({ label: '合成坐席' });
     await panel.getByRole('checkbox', { name: '查询复制', exact: true }).check();
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.setSize(980, 680));
+    for (const theme of ['light','dark'] as const) {
+      await dashboard.getByTestId('dashboard-theme-trigger').click();
+      await dashboard.getByTestId(`dashboard-theme-${theme}`).click();
+      await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', theme);
+      await expect.poll(() => panel.getByRole('combobox', { name: '人员', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor)).toBe(theme==='dark'?'rgb(28, 27, 32)':'rgb(255, 255, 255)');
+      await expect(panel.getByRole('checkbox', { name: '查询复制', exact: true })).toBeVisible();
+      expect(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await dashboard.screenshot({ path: path.join(evidence, `permissions-${theme}.png`) });
+    }
     const localTime = (offset: number) => {
       const d = new Date(Date.now() + offset); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16);
     };
@@ -75,7 +87,7 @@ test('director previews without saving, grants a named seat query access, then r
     await record.getByRole('button', { name: '确认撤销', exact: true }).click();
     await expect(panel.getByRole('status')).toContainText('已保存');
     expect((await entitlement()).ok).toBe(false);
-    console.info('PASS synthetic director named-seat preview/cancel/save/revoke; fresh query entitlement enabled then denied; purpose-candidate profile');
+    console.info(JSON.stringify({status:'PASS',flow:'director-named-seat-preview-cancel-save-revoke',profile:'purpose-candidate',entitlements:'denied-enabled-denied',appearance:'980x680-light-dark',screenshots:evidence}));
   } finally {
     try { if (app) await closeOwnedElectron(app); }
     finally { try { await host.close(); } finally { rmSync(directory, { recursive: true, force: true }); } }

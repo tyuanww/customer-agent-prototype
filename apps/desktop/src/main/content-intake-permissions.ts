@@ -112,6 +112,9 @@ export class ContentIntakePermissions {
         this.notice='本次操作已保存。请刷新列表查看当前权限；此回执不代表权限永久有效。';
         this.clear();
       }catch(error){
+        // Only the current attempt may settle recovery. An aborted/old-session
+        // failure can arrive after a retry or a new session has started writing.
+        check();
         // A transport/cancellation/malformed response cannot prove no COMMIT.
         if(error instanceof ProductHttpError && ['VALIDATION','FORBIDDEN','NOT_FOUND','CONFLICT','UNAUTHORIZED'].includes(error.code) && error.reason!=='COMMIT_UNKNOWN')this.pending=null;
         throw error;
