@@ -1,0 +1,45 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-assembly/customer-agent-prototype
+
+ ❯ apps/api/tests/intake-runtime-consumers.integration.test.ts (10 tests | 1 failed | 9 skipped) 1073ms
+   ↓ actual service on candidate purpose roles (synthetic PG15) > uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor
+   ↓ actual service on candidate purpose roles (synthetic PG15) > publishes a confirmed corrective rollback through the actual service
+   ↓ actual service on candidate purpose roles (synthetic PG15) > grants through the actual allocator and invalidates saved usage after revocation
+   ↓ actual service on candidate purpose roles (synthetic PG15) > recovers an actually committed publication after a lost COMMIT response
+   ↓ actual service on candidate purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT
+   ↓ actual service on candidate purpose roles (synthetic PG15) > uses the worker pool for actual parser failure and report capacity without business writes
+   × actual service on candidate purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response 1072ms
+     → expected [ 'ROLLBACK', 'release:true' ] to deeply equal [ 'COMMIT', 'release:true' ]
+   ↓ actual service on candidate purpose roles (synthetic PG15) > keeps a real-shaped historical revoked approval unavailable to reads and rollback
+   ↓ actual service on candidate purpose roles (synthetic PG15) > keeps a real-shaped historical expired approval unavailable to reads and rollback
+   ↓ actual service on candidate purpose roles (synthetic PG15) > refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/api/tests/intake-runtime-consumers.integration.test.ts > actual service on candidate purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response
+AssertionError: expected [ 'ROLLBACK', 'release:true' ] to deeply equal [ 'COMMIT', 'release:true' ]
+
+- Expected
++ Received
+
+  [
+-   "COMMIT",
++   "ROLLBACK",
+    "release:true",
+  ]
+
+ ❯ apps/api/tests/intake-runtime-consumers.integration.test.ts:210:29
+    208|     }, trace));
+    209|     expect(await withWorker.parse(actors.enabler!, input.jobId)).toMat…
+    210|     expect(trace.slice(-2)).toEqual(['COMMIT', 'release:true']);
+       |                             ^
+    211|     expect((await admin.query("SELECT state FROM content_intake.object…
+    212|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  17:15:09
+   Duration  1.58s (transform 175ms, setup 0ms, collect 345ms, tests 1.07s, environment 0ms, prepare 43ms)
