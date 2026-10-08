@@ -373,6 +373,9 @@ Main 拥有选择句柄、会话和到期代际、原预览/写请求及未知�
 
 正式交付工具已支持 `customer-agent-contract-set/v2`。九件 runtime 伴随产物为安装清单、roles、organization、session、purpose ACL、directory ACL、directory 存储、provenance 和 protocol；与 manifest/OpenAPI/DDL 合计十二件。产品接收器按封闭成员集合、固定来源路径、Git blob/摘要及安装关联核验，再生成 `runtime_sources`，不把任意输入当执行脚本。主集成的合成出口→接收往返已验证十二件及九个来源记录，证明工具互通，未对真实候选执行冻结/export/intake。
 
+**CSV 接收准备（DRAFT）：** 工具已另支持 1.22.0/schema.v1.24 的 v3 完整 14 件包，增加 CSV storage/protocol 并继续包含原 runtime 依赖；固定成员、源路径、内外摘要和安装顺序均拒绝缺件或混搭。ingest 在写入前从包声明的源 Git SHA 核对独立 FROZEN/APPROVED 记录及 OpenAPI/DDL/安装摘要。安装文件自身保留被批准的 DRAFT 原字节，不用其描述标签代替外部精确批准。来源仓须有完整 Git 历史，防止浅克隆隐藏曾出现后删除的 CSV 批准；完整旧历史的 v1/v2 不受后来 HEAD 的批准记录误伤。接收只生成 VERIFIED_NOT_ACTIVATED，不安装 SQL 或配置账号。治理 `5335107` 的实际 exporter 与产品 CLI 已在临时合成批准仓跑通 export→ingest→verify，见 [CSV 证据](../evidence/qa/intake-csv-candidate/README.md)。当前真实消费锁仍是 1.21/1.23，本次不做正式冻结或接收。
+
+
 OpenAPI 1.21.0/schema.v1.23 仍是 DRAFT；精确字节、最终 release 结果及正式采用条件由治理候选拥有，此处不预写尚未确认的 hash。当前正式消费仍为 OpenAPI 1.20.0/schema.v1.22、VERIFIED_NOT_ACTIVATED，32 段 migration 和 runtime/Ddev 未激活状态不变。下一步是在既有事项内完成精确候选批准与实际版本化交付，再按真实范围和环境条件接入；不增加审批流程、自动同步、历史删除或新的业务范围。完整外部 `/review` 保持 INCOMPLETE。
 
 本轮组合候选已在治理本地提交 `6a25304`（来源 `1b91751`），最终稳定输入完整 test:release 41/41、PG253、合同/出口7与旧direct7通过；OpenAPI 1.21 SHA `bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7`，schema1.23 SHA `4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e`，installation SHA `1683c487d6dc84e84b44d9f2a80ca9ab9cfb941144ace8d3b2cf7f520bb58486`。全部保持 DRAFT；实际冻结/export/intake 尚未发生。产品集成回收、两项恢复/接收缺陷的修复和精确下一决定见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)。

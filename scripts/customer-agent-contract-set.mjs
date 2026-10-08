@@ -23,6 +23,7 @@ import { isDeepStrictEqual } from 'node:util';
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
 const CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v1';
 const RUNTIME_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v2';
+const CSV_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v3';
 const CONSUMPTION_SCHEMA = 'customer-agent-contract-consumption/v1';
 const SOURCE_REPOSITORY = 'ai-赋能立项';
 const UPSTREAM_ROOT = 'contracts/upstream/customer-agent';
@@ -45,6 +46,14 @@ const RUNTIME_MEMBERS = Object.freeze({
   provenance: ['content-intake-runtime-candidate/provenance.json', 'intake-runtime-provenance.v1.json'],
   protocol: ['content-intake-runtime-candidate/protocol.json', 'intake-runtime-protocol.v1.json'],
 });
+const CSV_MEMBERS = Object.freeze({
+  ...RUNTIME_MEMBERS,
+  installation: ['content-intake-csv-candidate/installation.generated.json', 'intake-csv-installation.v1.json'],
+  csv: ['content-intake-csv-candidate/storage.delta.sql', 'intake-csv-format.v1.sql'],
+  csvProtocol: ['content-intake-csv-candidate/protocol.json', 'intake-csv-protocol.v1.json'],
+});
+const CSV_INCREMENT_PATH = `${OWNER_SOURCE_ROOT}/19-P2CSV资料输入合同候选.md`;
+const CSV_APPROVAL_PATH = 'business-docs/01-客服Agent项目/90-评审/2026-10-08_P2CSV输入合同批准.md';
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTRACT_SET_ID_PATTERN = /^cs-ai-c11-openapi-(\d+\.\d+\.\d+)-schema-(\d+\.\d+)-([0-9a-f]{12})$/;
@@ -138,7 +147,8 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
-  const runtimeProfile = rawManifest?.schema === RUNTIME_CONTRACT_SET_SCHEMA;
+  const csvProfile = rawManifest?.schema === CSV_CONTRACT_SET_SCHEMA;
+  const runtimeProfile = csvProfile || rawManifest?.schema === RUNTIME_CONTRACT_SET_SCHEMA;
   assertExactKeys(
     rawManifest,
     [
@@ -186,6 +196,7 @@ function validateManifest(rawManifest) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
   // Version and both paths form one reviewed pair; mixed generations fail closed.
+  const csvPair = openapi.version === '1.22.0' && database.version === 'schema.v1.24';
   const runtimePair = openapi.version === '1.21.0' && database.version === 'schema.v1.23';
   const directPair = openapi.version === '1.20.0' && database.version === 'schema.v1.22';
   const managementPair = openapi.version === '1.19.0' && database.version === 'schema.v1.21';
@@ -197,14 +208,15 @@ function validateManifest(rawManifest) {
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (runtimePair !== runtimeProfile || (!runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
+  if (csvPair !== csvProfile || (runtimePair || csvPair) !== runtimeProfile || (!csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
-  if (runtimePair) {
-    openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.21.yaml`;
-    databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.23.sql`;
-    assertExactKeys(rawManifest.runtime, Object.keys(RUNTIME_MEMBERS), 'runtime artifacts');
-    for (const [key, [sourcePath, file]] of Object.entries(RUNTIME_MEMBERS)) {
+  if (runtimePair || csvPair) {
+    openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v${csvPair ? '1.22' : '1.21'}.yaml`;
+    databasePath = `${OWNER_SOURCE_ROOT}/schema.v${csvPair ? '1.24' : '1.23'}.sql`;
+    const members = csvPair ? CSV_MEMBERS : RUNTIME_MEMBERS;
+    assertExactKeys(rawManifest.runtime, Object.keys(members), 'runtime artifacts');
+    for (const [key, [sourcePath, file]] of Object.entries(members)) {
       const descriptor = validateDescriptor(rawManifest.runtime[key], `runtime.${key}`);
       if (descriptor.version !== '1' || descriptor.source_path !== `${OWNER_SOURCE_ROOT}/${sourcePath}` || descriptor.file !== file) {
         throw new Error(`runtime.${key} descriptor does not match the runtime profile`);
@@ -255,6 +267,8 @@ function contractDescriptors(manifest) {
  * installer. Intake never executes companion SQL or provisions environment roles. */
 function verifyRuntimeReferences(directory, manifest) {
   if (!manifest.runtime) return;
+  const csvProfile = manifest.schema === CSV_CONTRACT_SET_SCHEMA;
+  const members = csvProfile ? CSV_MEMBERS : RUNTIME_MEMBERS;
   const installation = readJson(path.join(directory, manifest.runtime.installation.file), 'Runtime installation');
   if (installation.schema !== 'content-intake-installation/v1' || installation.sqlContract !== manifest.database.version
     || installation.capabilityLogin !== false || installation.environmentCredentialsIncluded !== false
@@ -262,7 +276,7 @@ function verifyRuntimeReferences(directory, manifest) {
     || installation.productMode?.atomicCandidateInstall !== true || installation.productMode?.skipMissingDependencies !== false) {
     throw new Error('Runtime installation boundary is invalid');
   }
-  const expectedArtifacts = ['openapi', 'database', ...Object.keys(RUNTIME_MEMBERS)].sort();
+  const expectedArtifacts = ['openapi', 'database', ...Object.keys(members)].sort();
   if (!Array.isArray(installation.requiredBundleArtifacts)
     || JSON.stringify([...installation.requiredBundleArtifacts].sort()) !== JSON.stringify(expectedArtifacts)) {
     throw new Error('Runtime installation required artifacts mismatch');
@@ -272,7 +286,7 @@ function verifyRuntimeReferences(directory, manifest) {
       throw new Error(`Runtime installation ${key} reference mismatch`);
     }
   }
-  assertExactKeys(installation.sources, Object.keys(RUNTIME_MEMBERS).filter(key => key !== 'installation'), 'Runtime installation sources');
+  assertExactKeys(installation.sources, Object.keys(members).filter(key => key !== 'installation'), 'Runtime installation sources');
   for (const [key, descriptor] of Object.entries(manifest.runtime)) {
     if (key === 'installation') continue;
     if (installation.sources[key]?.path !== descriptor.source_path || installation.sources[key]?.sha256 !== descriptor.sha256) {
@@ -295,6 +309,14 @@ function verifyRuntimeReferences(directory, manifest) {
   ], 'Runtime implementation overlays');
   for (const hash of Object.values(implementation.overlayFiles)) requireString(hash, HASH_PATTERN, 'Runtime overlay hash');
   const order = ['product-migrations', 'roles', 'organization', 'session', 'directory', 'directoryAcl', 'acl', 'environment-login-bindings'];
+  if (csvProfile) {
+    order.splice(order.indexOf('acl'), 0, 'csv');
+    if (installation.productMode.csvInputImplementationRequired !== true
+      || installation.productMode.csvProductionConsumerReady !== false
+      || !isDeepStrictEqual(installation.referenceMode.includes, ['roles', 'organization', 'session', 'directory', 'directoryAcl', 'csv'])) {
+      throw new Error('CSV implementation boundary is invalid');
+    }
+  }
   if (JSON.stringify(installation.productMode.order) !== JSON.stringify(order)) throw new Error('Runtime installation order mismatch');
 }
 
@@ -340,6 +362,38 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
   }
 }
 
+/** The source SHA, not the checkout's current HEAD, owns CSV approval. Installation
+ * status is descriptive; its exact bytes remain separately bound by the approval.
+ * Earlier historical v1/v2 commits remain consumable, while a CSV-era commit may
+ * not omit CSV artifacts by presenting its still-present predecessor files. */
+function verifyCsvSourceApproval(repositoryRoot, manifest) {
+  if (manifest.schema !== CSV_CONTRACT_SET_SCHEMA) {
+    const csvHistory = String(runGit(repositoryRoot,
+      ['log', '--full-history', '-1', '--format=%H', manifest.source_git_sha, '--', CSV_APPROVAL_PATH], 'utf8')).trim();
+    if (csvHistory) throw new Error('CSV source history cannot be downgraded to a previous bundle profile');
+    return;
+  }
+  const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
+  const increment = source(CSV_INCREMENT_PATH), approval = source(CSV_APPROVAL_PATH);
+  if (!/^> 状态：FROZEN · NOT EXPORTED · NOT INTAKE · SYNTHETIC DEVELOPMENT ONLY\r?$/m.test(increment)
+    || !/^> 状态：APPROVED · CONTRACT ONLY · SYNTHETIC DEVELOPMENT ONLY\r?$/m.test(approval)) {
+    throw new Error('CSV source contract must be FROZEN and APPROVED');
+  }
+  const pair = [manifest.openapi.sha256, manifest.database.sha256].sort();
+  for (const [document, anchor, hashes] of [
+    [increment, '**P2 CSV 机器合同增量：**', pair],
+    [increment, '**实际产物必须精确匹配：**', pair],
+    [approval, '**批准产物：**', pair],
+    [increment, '**CSV 安装清单：**', [manifest.runtime.installation.sha256]],
+    [approval, '**批准安装清单：**', [manifest.runtime.installation.sha256]],
+  ]) {
+    const lines = document.split(/\r?\n/).filter(line => line.includes(anchor));
+    if (lines.length !== 1 || !isDeepStrictEqual((lines[0].match(/[0-9a-f]{64}/g) ?? []).sort(), hashes)) {
+      throw new Error(`CSV source approval hashes mismatch at ${anchor}`);
+    }
+  }
+}
+
 function verifySourceRepository(sourceRepositoryRoot, manifest) {
   if (!sourceRepositoryRoot) {
     throw new Error(
@@ -353,6 +407,11 @@ function verifySourceRepository(sourceRepositoryRoot, manifest) {
   ).trim();
   if (realpathSync(gitTopLevel) !== resolvedRepositoryRoot) {
     throw new Error('Source repository root must be the Git top-level directory');
+  }
+  // A shallow boundary can hide an earlier CSV approval that was later deleted.
+  // Negative history assertions are only valid against a complete source graph.
+  if (String(runGit(resolvedRepositoryRoot, ['rev-parse', '--is-shallow-repository'], 'utf8')).trim() !== 'false') {
+    throw new Error('Source repository must have complete Git history; shallow clones are not accepted');
   }
   runGit(resolvedRepositoryRoot, ['cat-file', '-e', `${manifest.source_git_sha}^{commit}`]);
 
@@ -368,6 +427,7 @@ function verifySourceRepository(sourceRepositoryRoot, manifest) {
       throw new Error(`${label} contract does not match the declared source Git commit`);
     }
   }
+  verifyCsvSourceApproval(resolvedRepositoryRoot, manifest);
   return resolvedRepositoryRoot;
 }
 
