@@ -1,0 +1,58 @@
+{
+  "task": "可信组织观察到受限事实写入的接入候选",
+  "base_commit": "0e6aea9e3b10b170f95e1e6114e2ec8d5fdf9872",
+  "version": "0.3.26",
+  "environment": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "vitest": "3.2.7",
+    "postgres": "PostgreSQL 15.18 (Homebrew)",
+    "database": "Pg15Harness one-shot cluster, database name organization_transport, synthetic seed only",
+    "network": "global fetch to http://127.0.0.1:<ephemeral>, no Feishu"
+  },
+  "checks": [
+    {
+      "command": "cd apps/api && pnpm exec vitest run experiments/intake-organization/transport.test.ts --reporter=verbose",
+      "exit_code": 0,
+      "result": "1 file, 23 passed, 0 failed, 0 skipped",
+      "started_at_local": "2026-10-08 16:06:09",
+      "duration_seconds": 2.34,
+      "log": "unit.txt",
+      "log_sha256": "14f396ca9e3295f5a1b8cd7df7332a2eb7b31a2acc4d414017af7eff932c811b"
+    },
+    {
+      "command": "cd apps/api && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm exec vitest run experiments/intake-organization/transport-consumer.integration.test.ts --reporter=verbose",
+      "exit_code": 0,
+      "result": "1 file, 4 passed, 0 failed, 0 skipped",
+      "started_at_local": "2026-10-08 16:05:24",
+      "duration_seconds": 4.62,
+      "log": "pg.txt",
+      "log_sha256": "64ff26c5df41d2f4f48529cc92ba0045cbcb394d5b8983f1f41c927f01c63b36",
+      "note": "Env was set, so describe.skipIf did not skip. Runtime packages were built first: contracts build:runtime, database build:runtime, content-intake build."
+    },
+    {
+      "command": "pnpm exec eslint apps/api/experiments/intake-organization/http-transport.ts apps/api/experiments/intake-organization/synthetic-contact-double.ts apps/api/experiments/intake-organization/transport.test.ts apps/api/experiments/intake-organization/transport-consumer.integration.test.ts",
+      "exit_code": 0,
+      "result": "no findings; eslint wrote an empty log",
+      "log": "eslint.txt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api typecheck",
+      "exit_code": 0,
+      "log": "typecheck.txt",
+      "log_sha256": "50a96f085ac4347857361ccce272773f6ef9b6d09abbe3a0e63af750cbdb5223"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api build",
+      "exit_code": 0,
+      "log": "build.txt",
+      "log_sha256": "24c42b76aecef2c39c8a5639a3536efb936b03bdac9a8f8be50c0e71ffbc7af8",
+      "dist_grep": "apps/api/dist has no createOrganizationHttpTransport, OrganizationTransportError, synthetic-app-token, intake-organization, feishu-observer, or facts-writer"
+    }
+  ],
+  "not_rerun": [
+    "tests/intake-organization-observer.test.ts (19) and tests/intake-organization.integration.test.ts (10); observer and writer bytes match evidence/qa/intake-organization/native-observer/input-sha256.json",
+    "full /review remains INCOMPLETE and was not called"
+  ]
+}
