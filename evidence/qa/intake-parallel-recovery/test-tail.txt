@@ -1,0 +1,24 @@
+✔ renderIndex fails loudly when the page loses a panel or a chip (1.342ms)
+✔ renderIndex refuses a page that links a different repository (0.397584ms)
+✔ renderIndex refuses a page that stopped linking a platform (0.205792ms)
+✔ renderIndex refuses a page carrying two different versions (0.187542ms)
+✔ compareVersions orders numerically rather than as strings (0.116875ms)
+✔ publishedVersion reads the version a page advertises (0.1205ms)
+✔ renderWindows points the redirect at the release asset (0.183ms)
+✔ updateDownloadPages writes both pages once, then reports no changes (1.061584ms)
+✔ --check reports staleness without writing (0.466ms)
+✔ the CLI republishes a stale page from a manifest (116.644333ms)
+✔ updateDownloadPages refuses to walk the page backwards (0.833541ms)
+✔ updateDownloadPages publishes an older release only when told to (0.73375ms)
+✔ the CLI reports the resolved version and refuses a downgrade (114.722333ms)
+✔ only known documentation paths skip runtime lanes; rules retain semantic checks (1.30575ms)
+✔ gate refuses failure, cancellation, skip and missing classifier output (1.039625ms)
+✔ real git diff includes old code path of rename, deletion and new local files (177.2885ms)
+ℹ tests 81
+ℹ suites 14
+ℹ pass 81
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 759.466834

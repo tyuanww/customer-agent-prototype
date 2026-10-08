@@ -1,0 +1,24 @@
+✓ built in 727ms
+vite v6.4.3 building SSR bundle for production...
+transforming...
+✓ 24 modules transformed.
+rendering chunks...
+out/preload/login.cjs       1.48 kB
+out/preload/sop.cjs         7.91 kB
+out/preload/dashboard.cjs  15.68 kB
+out/preload/index.cjs      47.58 kB
+✓ built in 49ms
+vite v6.4.3 building for production...
+transforming...
+✓ 106 modules transformed.
+rendering chunks...
+../../out/renderer/index.html                                        0.45 kB
+../../out/renderer/assets/dashboard-fox-headset-dark-C9mwmYh5.png  655.56 kB
+../../out/renderer/assets/fox-head-DuCgrBSA.png                    706.19 kB
+../../out/renderer/assets/SopApp-CP028QG-.css                        2.84 kB
+../../out/renderer/assets/LoginApp-v_PWWaJd.css                      3.08 kB
+../../out/renderer/assets/index-D0rXesek.css                       162.16 kB
+../../out/renderer/assets/LoginApp-dPtooKvb.js                       9.64 kB
+../../out/renderer/assets/SopApp-B8NBksEv.js                        11.28 kB
+../../out/renderer/assets/index-Cm-YH4tk.js                        703.07 kB
+✓ built in 441ms

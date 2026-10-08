@@ -103,7 +103,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
 
-`apps/api/experiments/intake-organization/facts-writer.ts` 只用于已登记主体的离线组织事实写入验证，复用 content lock、事实历史/版本指针及 revocation generation。测试使用临时受限账号，通过实际登录/使用资格消费者验证失效；不会创建主体或业务 grant，也不进入 dist、HTTP 或生产角色配置。原生字段/分页归一现由同目录 `feishu-observer.ts` 离线候选拥有，以受信同应用主体绑定、双扫描和观察期限生成既有快照；没有生产认证 transport，观察一致性不证明上游原子性。原 writer 与新增观察验证分别见[组织刷新验收](../evidence/qa/intake-organization/README.md)和[原生观察验收](../evidence/qa/intake-organization/native-observer/README.md)。
+`apps/api/experiments/intake-organization/facts-writer.ts` 只用于已登记主体的离线组织事实写入验证，复用 content lock、事实历史/版本指针及 revocation generation。测试使用临时受限账号，通过实际登录/使用资格消费者验证失效；不会创建主体或业务 grant，也不进入 dist、HTTP 或生产角色配置。原生字段/分页归一现由同目录 `feishu-observer.ts` 离线候选拥有，以受信同应用主体绑定、双扫描和观察期限生成既有快照；同目录 `http-transport.ts` 现拥有固定回环 HTTP、令牌内存缓存、限流/响应预算、取消和异常释放，合成消费贯穿原观察及 writer；没有生产认证 transport，观察一致性不证明上游原子性。usage 测试仍用 harness 管理池，不能证明正式受限运行。原 writer 与新增观察验证分别见[组织刷新验收](../evidence/qa/intake-organization/README.md)和[原生观察验收](../evidence/qa/intake-organization/native-observer/README.md)。
 
 `apps/api/src/content-intake/capacity.ts` 是 P2 磁盘容量生命周期的唯一 API 所有者，复用对象存储分配 ID、落盘前准入、持久删除。0029 私有账本在既有内容锁下统一计入输入、报告、普通/回滚审核包；所有调用方在同一业务事务采用。释放先写 tombstone 阻止迟到采用，再在锁外删除文件并同步目录，最后释放额度。未知提交、已登记引用、未知磁盘文件和历史资料不得因超时推断可删除。报告预留被明确拒绝时仍将任务终结，避免占满候选配额。没有新 renderer/HTTP 能力或生产 ACL；规则与实际证据见[容量验收](../evidence/qa/content-intake-p2-capacity/README.md)。
 
@@ -342,3 +342,5 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 
 `apps/api/experiments/intake-runtime/session-lock.sql` 是身份会话锁的离线 SQL 候选，仅由隔离 PG15 测试安装到一次性数据库的隔离 schema。它验证身份 owner 持锁、用途账号仅 EXECUTE 的边界；不属于 migration、生产构建或运行装配，现有 `transaction.ts::lockProductSession` 尚未改接。字段与正式采用条件见[接入交接](reference-content-intake-p2-contract-handoff.md#2026-10-08-接续核对原生输入与会话锁权限)，实际结果见[实验验收](../evidence/qa/intake-runtime-boundary/README.md)。
+
+`apps/api/experiments/intake-runtime/purpose-acl.sql` 与 `purpose-boundary.ts` 是四用途权限的离线 SQL 候选/探针；`assembly.ts::createIntakeRuntimeAssembly` 只检查依赖，缺认领返回 checked-not-activated / ready:false。取消、关闭、并发检查由它拥有，借入连接的生命周期仍由调用方拥有。现有 service 会话锁、四池路由、完整业务写入/分页尚未接线；资格 SQL 副本仅为隔离验证 ACL 与触发器，正式消费者可用后删除。没有生产 HTTP、migration 或应用 ACL 改动。范围、修复与正式化缺口见[并行回收](../evidence/qa/intake-parallel-recovery/README.md)。

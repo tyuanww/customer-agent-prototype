@@ -1,0 +1,24 @@
+        {
+          "start_line": 12797,
+          "end_line": 12897
+        }
+      ],
+      "sha256": "82407ae1c0ce3a3dc975b9b5fe76012b5ab4f19ee5952dafb912a23509c4dcc0",
+      "bytes": 7123,
+      "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
+      "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
+      "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce"
+    },
+    {
+      "position": 32,
+      "id": "0032_intake_direct_publication",
+      "file": "0032_intake_direct_publication.sql",
+      "source_ranges": [],
+      "sha256": "38e72eb66941256861aeb3edddc609cdbbfbc4e1eed56366b370526ad82cbddc",
+      "bytes": 35044,
+      "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
+      "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
+      "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce"
+    }
+  ]
+}
