@@ -10,7 +10,7 @@
 
 **最新角色口径：** 总监、经理配置权限；总监、经理、主管、组长在有效业务授权和负责范围内上传规范 CSV/XLSX 并二次确认发布；主管/组长不能配置他人，普通客服和历史赋能师新操作只查询。角色上限没有再次修改。来源确认和人工质量检查保留，取消的是组织审批。上传→检查→确认发布→另一普通客服查询复制及纠正回退的实际 Electron/HTTP/PG15 合成闭环已通过，见[本轮证据](evidence/qa/intake-direct-publication/README.md)。
 
-**本次审核交接：** 角色代码沿用用户提供的 15/15 可审文件结论，不重做。直发合同轮次的治理 test:release 为 38 步实际通过，直发实现有本机与独立边界复核；本次 A/B/C 回收、追加修复和新验证见[回收记录](evidence/qa/intake-parallel-recovery/README.md)，不混用两个范围。完整 `/review` 仍为 INCOMPLETE，外部超时没有结论。既有审核范围不能冒充本次全部新代码的外部覆盖。
+**本次审核交接：** 角色代码沿用用户提供的 15/15 可审文件结论，不重做。直发合同轮次的治理 test:release 为 38 步实际通过，直发实现有本机与独立边界复核；本次 A/B/C 回收、追加修复和新验证见[回收记录](evidence/qa/intake-parallel-recovery/README.md)，不混用两个范围。2026-10-09 已回收 [任务 B Grok 外审](evidence/qa/intake-legacy-acl-runtime/grok-external-review-2026-10-09.md)，产品 `f6f8cf35..89bca38` 与治理 `231cba56..0125a97` 范围完成，未发现可行动缺陷；原报告/输入/日志摘要已核对。完整 `/review` 仍为 INCOMPLETE，剩余历史范围见[审查记录](evidence/qa/intake-legacy-acl-runtime/review.json)。本轮无代码修复，A/C/D 后续增量另行复审，角色 15/15 不重跑。
 
 **本期剩余工作：**
 

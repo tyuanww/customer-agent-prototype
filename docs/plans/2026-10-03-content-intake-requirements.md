@@ -759,6 +759,8 @@ C 草稿采用同一事务 owner，不新增自提交 procedure：显式 registr
 
 实际接收87项、数据库40项定向及75项PG覆盖、API31项受限回归的结果与首次失败/修复记录见[本轮证据](../../evidence/qa/intake-legacy-acl-runtime/README.md)。原治理17项PG按未变输入复用；既有角色审核不重跑，完整外部/review仍INCOMPLETE。本次桌面交互未改、不重打包或新增原生窗口/Windows结论；旧Mac CSV/XLSX与安装副本证据保留原输入范围。workspace既有预算问题如实保留，不调阈值或清历史。
 
+**任务 B 外审回收（2026-10-09）：** 用户交付的 [Grok 原报告](../../evidence/qa/intake-legacy-acl-runtime/grok-external-review-2026-10-09.md) 覆盖产品 `f6f8cf35..89bca38` 和治理 `231cba56..0125a97`，本次范围完成、未发现可行动缺陷。主 Agent 核对两仓 HEAD/工作树、66/17 文件范围、报告摘要、产品44项输入与18项日志及治理release日志摘要；仅同步证据，不改代码或重跑测试。完整 `/review` 仍 INCOMPLETE；历史待覆盖范围、本次生成物核验方法及未覆盖项由 [review.json](../../evidence/qa/intake-legacy-acl-runtime/review.json) 记录。既有角色审核复用，A/C/D 之后实际新增量需补审，不重审当前已完成区间。
+
 剩余工作继续归入原 TODO：真实资料字段/必要图片文字说明、实际来源/具名负责人绑定及旧目录认领、生产受限账号/密钥与可信刷新、历史保留期和办公 Windows/人工现场验收。Menokin 与首批岗位范围不再列为未知；不把已完成的冻结、导出、接收重复列为待办，不发明业务名单或提前清理历史。
 
 ### 已定位的原始候选
