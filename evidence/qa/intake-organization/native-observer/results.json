@@ -80,7 +80,7 @@
     "observer_tests": 19,
     "actual_pg15_tests": 10,
     "receipt": "capture-receipt.json",
-    "output": "organization-tests.txt",
+    "output": "organization-tests.json",
     "evidence": "qa-evidence.json"
   },
   "artifact_boundary": {

@@ -5,6 +5,7 @@ import { basename, dirname, extname, join } from 'node:path';
 import { dialog, type BrowserWindow } from 'electron';
 import { INTAKE_UPLOAD_MAX_BYTES } from '../shared/content-intake-upload';
 import { ProductHttpError } from './product-http';
+import type { IntakePublicationPrompt } from './content-intake-management';
 
 /** Paths never leave Main. Read one bounded, regular XLSX file; save only to a
  * native user-selected destination, replacing it atomically after a full write.
@@ -22,6 +23,14 @@ export function createIntakeNativeFiles(window: BrowserWindow) {
     finally { dialogPending = false; }
   };
   return {
+    async confirmPublication(prompt: IntakePublicationPrompt, signal: AbortSignal): Promise<boolean> {
+      const choice = await choose(signal, () => dialog.showMessageBox(window, {
+        type: 'warning', title: '确认发布资料', message: `确认发布「${prompt.title}」？`,
+        detail: `来源：${prompt.sourceId}\n候选版本：${prompt.candidateVersion}\n发布成功后，坐席重新查询将使用更新后的内容。`,
+        buttons: ['取消', '确认发布'], defaultId: 0, cancelId: 0, noLink: true,
+      }));
+      return choice.response === 1;
+    },
     async chooseWorkbook(signal: AbortSignal): Promise<{ name: string; bytes: Buffer } | null> {
       live(signal);
       const choice = await choose(signal, () => dialog.showOpenDialog(window, { title: '选择合成 FAQ 工作簿',

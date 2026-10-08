@@ -85,6 +85,29 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     await dashboard.getByRole('button', { name: '提交本轮人工检查' }).click();
     await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })
       .getByRole('status').filter({ hasText: /^操作回执：/ })).toContainText('质量检查通过');
+    // Exercise actual preload -> Main -> native dialog adapter -> HTTP. The
+    // Electron dialog response is controlled here; this is not OS click proof.
+    await dashboard.getByRole('button', { name: '查看材料' }).click();
+    await dashboard.getByRole('textbox', { name: '来源版本' }).fill('synthetic-v1');
+    await dashboard.getByRole('textbox', { name: '来源确认说明' }).fill('已核对合成资料');
+    await dashboard.getByRole('button', { name: '确认来源版本' }).click();
+    await expect(dashboard.getByRole('textbox', { name: '来源版本' })).toHaveValue('');
+    await dashboard.getByRole('button', { name: '发起组织审批' }).click();
+    await dashboard.getByRole('button', { name: '刷新审批结果' }).click();
+    await dashboard.getByRole('textbox', { name: '发布标题' }).fill('合成确认发布');
+    await dashboard.getByRole('textbox', { name: '发布摘要' }).fill('本机合成确认验证');
+    await app.evaluate(({ dialog }) => { dialog.showMessageBox = (async (_window, options) => {
+      if (options.defaultId !== 0 || options.cancelId !== 0 || !options.detail?.includes('来源：source-a')) throw new Error('Invalid publication confirmation');
+      return { response: 0, checkboxChecked: false };
+    }) as typeof dialog.showMessageBox; });
+    await dashboard.getByRole('button', { name: '发布当前候选' }).click();
+    await expect(dashboard.getByRole('button', { name: '发布当前候选' })).toBeEnabled();
+    expect(requests.filter(p => p.endsWith('/publish'))).toHaveLength(0);
+    await expect(dashboard.getByRole('textbox', { name: '发布标题' })).toHaveValue('合成确认发布');
+    await app.evaluate(({ dialog }) => { dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as typeof dialog.showMessageBox; });
+    await dashboard.getByRole('button', { name: '发布当前候选' }).click();
+    await expect(dashboard.getByText(/当前候选已发布：rel_2/)).toBeVisible();
+    expect(requests.filter(p => p.endsWith('/publish'))).toHaveLength(1);
     expect(wire.receipts.size).toBe(2);
     expect(requests.filter(p => p.endsWith('/quality/freeze'))).toHaveLength(1);
     expect(await dashboard.evaluate(() => ({ node: typeof (window as unknown as { require?: unknown }).require, overlay: !!window.customerAgent }))).toEqual({ node: 'undefined', overlay: false });
