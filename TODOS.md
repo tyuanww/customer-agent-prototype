@@ -1,6 +1,6 @@
 # TODOS
 
-## 当前资料接入：沿既有内容管理完成本期收尾（2026-10-08 复核）
+## 当前资料接入：沿既有内容管理完成本期收尾（2026-10-09 并行回收）
 
 用户最新目标为“飞书表格维护 → 导出规范 CSV → 桌面上传校验 → 有发布权限者二次确认后直接发布 → 坐席按店查询/复制”。当前新 intake 已按精确批准接收 CSV 合同，并在同一来源登记、对象、隔离解析与确认直发链上支持规范 CSV 和 XLSX；当前 Mac 开发构建的 CSV 与 XLSX 实际 Electron/HTTP/受限 PG15 合成闭环均已通过。同一版 0.3.26 本地未签名包已实际解包并通过 CSV 全流程合成验收；真实资料、真人系统框作业及 Windows 仍未验收。确认直发合同已在所属仓冻结、导出并接收，合成 API/PG/Main 已接入 direct-v1。本节只归纳剩余验收，不新增需求或签发正式接入许可；详细批准与实施证据以[计划 §0](docs/plans/2026-10-03-content-intake-requirements.md)为准，运行入口见[开发指南](docs/how-to-develop-content-intake.md)。
 
@@ -10,7 +10,11 @@
 
 **最新角色口径：** 总监、经理配置权限；总监、经理、主管、组长在有效业务授权和负责范围内上传规范 CSV/XLSX 并二次确认发布；主管/组长不能配置他人，普通客服和历史赋能师新操作只查询。角色上限没有再次修改。来源确认和人工质量检查保留，取消的是组织审批。上传→检查→确认发布→另一普通客服查询复制及纠正回退的实际 Electron/HTTP/PG15 合成闭环已通过，见[本轮证据](evidence/qa/intake-direct-publication/README.md)。
 
-**本次审核交接：** 角色代码沿用用户提供的 15/15 可审文件结论，不重做。直发合同轮次的治理 test:release 为 38 步实际通过，直发实现有本机与独立边界复核；本次 A/B/C 回收、追加修复和新验证见[回收记录](evidence/qa/intake-parallel-recovery/README.md)，不混用两个范围。2026-10-09 已回收 [任务 B Grok 外审](evidence/qa/intake-legacy-acl-runtime/grok-external-review-2026-10-09.md)，产品 `f6f8cf35..89bca38` 与治理 `231cba56..0125a97` 范围完成，未发现可行动缺陷；原报告/输入/日志摘要已核对。完整 `/review` 仍为 INCOMPLETE，剩余历史范围见[审查记录](evidence/qa/intake-legacy-acl-runtime/review.json)。本轮无代码修复，A/C/D 后续增量另行复审，角色 15/15 不重跑。
+**本次审核交接：** 角色代码沿用用户提供的 15/15 可审文件结论，不重做。直发合同轮次的治理 test:release 为 38 步实际通过，直发实现有本机与独立边界复核；本次 A/B/C 回收、追加修复和新验证见[回收记录](evidence/qa/intake-parallel-recovery/README.md)，不混用两个范围。2026-10-09 已回收 [任务 B Grok 外审](evidence/qa/intake-legacy-acl-runtime/grok-external-review-2026-10-09.md)，产品 `f6f8cf35..89bca38` 与治理 `231cba56..0125a97` 范围完成，未发现可行动缺陷；原报告/输入/日志摘要已核对。完整 `/review` 仍为 INCOMPLETE，剩余历史范围见[审查记录](evidence/qa/intake-legacy-acl-runtime/review.json)。该 B 外审回收轮无代码修复；后续 A/C 增量已交叉复核并修复三项问题，详情见下文，角色 15/15 不重跑。
+
+**2026-10-09 并行收尾：** 已回收分类/预算修复、运行装配候选、Menokin 整理说明和新 Mac 安装副本证据。用户批准源码20 / 冻结合同15 / 证据10 MiB、总量45 MiB；每组独立门禁，不删除合同或证据。装配候选仍只接受合成本机配置，独占五个池及关闭顺序，实际 PG15 23/23；不注册生产 HTTP。规范模板生成→解析→错误报告回读 9/9，真实字段、必要图片文字和具名绑定仍待确认。新未签名包以当前35段迁移完成紧凑尺寸 CSV 安装态业务闭环；原标准1180×760测试因屏幕不足失败，设备状态 PARTIAL。详见[收尾回收](evidence/qa/intake-closeout-20261009/README.md)。
+
+**新增界面审核：** 已使用 gstack design-review / Aside 从产品与 UI 两个角度实际检查，发现3项中等、2项细节问题：权限时间表达、候选下一步、动作层级，以及文案/按钮间距；本轮只审未修，归入现有正式接入和设备验收，不新增业务 TODO。四域导航与整体布局保留，见[设计报告](evidence/qa/intake-closeout-20261009/design-review.md)。Grok 历史 CSV 实际调用因缺 provider 配置未开始；设计 Skill 外部路线认证失败。本机复核不替代缺失外审，完整 /review 仍 INCOMPLETE。
 
 **本期剩余工作：**
 
@@ -21,7 +25,7 @@
 | 正式接入 | 直发、组织输入、用途权限及名称目录已完成版本化接收。会话锁直接调用正式函数，独立用途池逐次校验；合成 host 通过受限组织池完成登记/观察/事实写入，业务/usage/worker 复用原消费者，无 SQL 文本改写桥。权限配置与原五模块工作台接线已接通；目录使用独立资格和窄只读 IPC，旧适配器保持隔离。已收 Menokin/飞书表格/CSV/首批总监经理的范围元信息；已只读核对原文件表头，未读入运行链。CSV 已正式冻结/export/intake 并接通共享解析、原字节上传和确认发布，当前 Mac 开发态 CSV/XLSX 闭环通过，见[CSV 接入证据](evidence/qa/intake-csv-runtime/README.md)；旧非空目录 CHECK 执行权限已精确冻结/export/intake，通过0035追加闭包；受限业务账号的旧8行发布→二次发布→回退及来源/权限/旧审批失效拒绝已实际通过，见[旧目录接入证据](evidence/qa/intake-legacy-acl-runtime/README.md)；剩余还有真实资料字段/必要图片文字说明、真实认证观察/刷新与容量配置、生产账号/密钥/装配、具名主体/来源绑定和旧目录认领 | 按已批准环境验证真实字段、撤权、确认直发/旧审批历史兼容和目录承接；缺前置时拒绝启用，不沿用合成身份或管理员连接池 |
 | 业务与设备验收 | 当前 Mac 正式合同用途池下的上传/报告回读/修订/取消/确认发布/另一坐席真实剪贴板、回退、权限配置与店铺重名/编号切换四项 Electron 合成验收通过；本轮追加四域工作台实际 HTTP/PG15/Electron 读取、版本一致与撤权验收通过，跨导航输入保留和 Query 独立资格也已验证，见[统一工作台证据](evidence/qa/intake-unified-workspace/README.md)。本轮 0.3.26 Universal DMG 已实际展开并运行，打包态完整 XLSX 闭环及 CUA 操作真实文件/取消/确认框均通过，见[Mac 包证据](evidence/qa/intake-mac-package/README.md)。汇总记录保留首轮路径断言失败及一次不明输入，整体 QA verdict 为 inconclusive，不写全部全绿。本次追加 CSV/XLSX 开发态合成回归，并实际重打 0.3.26 本地未签名包、从新 DMG 解包独立副本完成 CSV 全流程 1/1 PASS，见[CSV 安装副本证据](evidence/qa/intake-csv-runtime/README.md)；文件/确认框仍为受控响应，不把该结果当作真人系统窗验收。旧 Windows/WSL 证据不替代这版验收；非开发维护者的编号/修错演练、普通 Windows 账号、可靠拖动和整机断网未完成 | 证据绑定版本/输入/设备；新回退与同题覆盖不借用旧包结果。普通账号及现场断网按用户当前安排等待条件 |
 
-前三项可按接口边界并行准备；共同的合同、迁移编号、发布目录和测试宿主由同一集成负责人协调。Git 交付与业务验收分开：本地 commit 不代表 push、PR、合并、部署或真实数据放行。本轮工作区根规则通过，但冻结快照及实验接收后超过 32 MiB 源码体积预算；记录为未通过检查，未删除历史合同/证据或放宽阈值。
+前三项可按接口边界并行准备；共同的合同、迁移编号、发布目录和测试宿主由同一集成负责人协调。Git 交付与业务验收分开：本地 commit 不代表 push、PR、合并、部署或真实数据放行。旧32 MiB失败记录保留为历史；当前按用户批准的20/15/10分组及45 MiB总量检查，最终集成结果见收尾回收。临时放宽总量仍不能绕过分组门禁。
 
 **已经完成的合成开发：** 权限/委派与撤权规则、Excel 解析及错误报告、持久候选与修订/取消、质量检查、来源确认、历史审批兼容及原操作恢复、确认直发、店铺与商品/场景 FAQ 查询复制、纠正回退、显式同题覆盖与通用回落。完成范围及限制见[回退验收](evidence/qa/content-intake-p2-rollback/README.md)、[同题覆盖及复审](evidence/qa/content-intake-p2-family/README.md)、[杭州验收](evidence/qa/content-intake-p2-hangzhou/README.md)。这不等于真实组织接入或全部 FAQ 退出条件完成。
 

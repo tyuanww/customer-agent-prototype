@@ -107,6 +107,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 `apps/api/src/content-intake/organization/` 单一拥有事实 writer、原生字段/分页观察和版本化登记刷新，复用 content lock、事实历史/版本指针及 revocation generation；0033 已接收冻结组织存储与 provenance 同事务义务。只接受可信服务注入的组织 transport 和受限组织池，不创建主体或业务 grant。`experiments/intake-organization/http-transport.ts` 仍拥有固定回环 HTTP、响应预算和取消释放；应用级 session owner 按租户/app 共享令牌代次、失效、关闭及配额，借用 transport 不得重置配额。正式飞书 transport 仍未装配，双扫描不证明上游原子性。实际合成受限池结果见[本轮接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)，[旧组织刷新](../evidence/qa/intake-organization/README.md)和[旧原生观察](../evidence/qa/intake-organization/native-observer/README.md)仅保留对应历史输入的证据。
 
+`apps/api/experiments/intake-runtime/runtime-candidate.ts` 是合成装配候选的单一生命周期所有者：只接受显式本机Unix socket、五个不同登录角色、受控对象目录和同tenant/app的合成身份/组织输入，拥有启动校验、回环HTTP、共享组织令牌/配额和关闭顺序。既有auth拥有会话，组织模块拥有登记观察/事实写入，business/usage/worker service继续拥有业务，候选不重新实现授权或发布。它保留私有actor且额外要求当前scope的有效组织登记；这不替代真实OAuth租户证明或可信registrar的一致绑定。候选不进入API dist、不被生产app/server导入，实际23项PG15和关闭异常边界见[装配证据](../evidence/qa/intake-runtime-closeout/README.md)。
+
 `apps/api/src/content-intake/capacity.ts` 是 P2 磁盘容量生命周期的唯一 API 所有者，复用对象存储分配 ID、落盘前准入、持久删除。0029 私有账本在既有内容锁下统一计入输入、报告、普通/回滚审核包；所有调用方在同一业务事务采用。释放先写 tombstone 阻止迟到采用，再在锁外删除文件并同步目录，最后释放额度。未知提交、已登记引用、未知磁盘文件和历史资料不得因超时推断可删除。报告预留被明确拒绝时仍将任务终结，避免占满候选配额。没有新 renderer/HTTP 能力或生产 ACL；规则与实际证据见[容量验收](../evidence/qa/content-intake-p2-capacity/README.md)。
 
 产品迁移 `0028_intake_family` 拥有完整原生目录的显式家族关系与冲突证明，正常发布/回退通过同一 publications 触发器执行；usage在签资格和每页读取时复用私有校验。解析包只解释K列显式编号，API材料保存合同字段；usage按授权、时间、商品/场景先筛选，再以选中组合的完整覆盖选择店铺稿/通用回落，最后分页。没有renderer规则副本、标题推断或第二current；旧发布遇family明确拒绝，应用ACL仍关闭。

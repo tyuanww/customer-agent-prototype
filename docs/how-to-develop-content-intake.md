@@ -1,6 +1,6 @@
 # 如何验证合成资料导入
 
-本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。FAQ 原生文件选择、参与人确认、上传校验、报告保存、确认直发与坐席查询已接通。OpenAPI 1.21.0/schema.v1.23 组合合同已冻结并完整版本化接收，新候选按 direct-v1 执行；剩余原生设备人工验收和正式运行接入仍待完成。当前剩余范围见 [TODOS](../TODOS.md)，已取得的平台证据见[杭州分层验收](../evidence/qa/content-intake-p2-hangzhou/README.md)。
+本入口验证已授权的合成开发，不读真实工作簿、员工或飞书凭据。P1 探针不启动桌面/API/数据库；下方 P2 命令启动独立 Unix socket PostgreSQL，退出后移除该临时集群。FAQ 原生文件选择、参与人确认、上传校验、报告保存、确认直发与坐席查询已接通。当前 OpenAPI 1.22.0/schema.v1.25 合同及35段迁移已冻结并完整版本化接收，新候选按 direct-v1 执行；剩余原生设备人工验收和正式运行接入仍待完成。当前剩余范围见 [TODOS](../TODOS.md)，已取得的平台证据见[杭州分层验收](../evidence/qa/content-intake-p2-hangzhou/README.md)。
 
 ## 运行
 
@@ -22,6 +22,8 @@ ZIP 前检逐条约束展开量、局部/中央文件名一致和规范 ASCII �
 - `packages/content-intake`：ExcelJS 4.4.0（MIT）、yauzl 3.4.0（MIT）、saxes 6.0.0（ISC），固定模板及错误坐标、前置预算、模板/报告实物与子进程生命周期。没有通用列映射或客户原表兼容分支。
 - `apps/api/experiments/content-intake-p1`：权限交集、委派模型、候选材料、风险与人工证据/提交点判定。复用已有 test-support JCS/SHA；不进 API dist、不注册 HTTP、不增加数据库权限。
 - P2 `apps/api/src/content-intake` 复用正式 validator、对象存储与该解析包，隔离实库执行器、合成 HTTP 和桌面 Main/preload/界面已消费；生产 app/server 尚未注册新路径。
+
+独立合成装配候选由 `apps/api/experiments/intake-runtime/runtime-candidate.ts` 提供，只供显式本机测试，不读取 `.env` 或启用生产入口。实际校验命令与23项PG15结果见[候选证据](../evidence/qa/intake-runtime-closeout/README.md)；需要复验时使用其中的门控命令，不把其合成provider或账号移入真实运行。Menokin规范整理映射和四域模板验证见[整理说明](reference-intake-menokin-readiness.md)。
 
 ## CSV 与 XLSX 输入
 
