@@ -14,7 +14,8 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
   // Keep ungated test discovery independent of built API artifacts and PG.
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
   const { readIssueReport } = await import('../../../../packages/content-intake/tests/fixtures.ts');
-  const host = await createIntakeSyntheticHost({ prepareCandidate: false });
+  const profile = process.env.CUSTOMER_AGENT_INTAKE_PURPOSE_CANDIDATE === '1' ? 'purpose-candidate' : 'existing';
+  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile });
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-real-stack-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
   const evidence = process.env.INTAKE_REAL_STACK_SCREENSHOT_DIR
@@ -55,11 +56,12 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
         return { canceled: false, filePaths: [selected] };
       };
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.reportFile });
+      const confirmations = [0, 1];
       dialog.showMessageBox = (async (_window, options) => {
         if (options.defaultId !== 0 || options.cancelId !== 0 || !options.detail?.includes('source-a')) {
           throw new Error('Publication confirmation lost its safe default or source binding');
         }
-        return { response: 1, checkboxChecked: false };
+        return { response: confirmations.shift() ?? 0, checkboxChecked: false };
       }) as typeof dialog.showMessageBox;
     }, { badFile, goodFile, revisionFile, reportFile });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
@@ -234,6 +236,12 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
     await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
+    const beforeCancel = (await host.status()).requests.filter(p => p.endsWith('/publish')).length;
+    await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
+    await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toBeEnabled();
+    expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);
+    expect((await host.status()).publications).toBe(0);
+    await expect(dashboard.getByRole('textbox', { name: '发布标题', exact: true })).toHaveValue('合成桌面实链发布');
     await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '当前候选已发布：' })).toBeVisible();
     const result = await host.status();
@@ -294,6 +302,19 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await query.getByTestId('copy-button-1').click();
     await expect(query.getByTestId('toast')).toContainText('已复制');
     expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(firstAnswer);
+    if (profile === 'purpose-candidate') {
+      const shown = await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }));
+      expect(shown.ok).toBe(true);
+      if (!shown.ok) throw new Error('Expected qualified rows before synthetic revocation');
+      const oldKey = shown.rows[0]!.key;
+      await host.revokeSyntheticQuery();
+      expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }))).toMatchObject({ ok: false });
+      await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
+      expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), oldKey)).toMatchObject({ ok: false });
+      expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(firstAnswer);
+      const use = (await host.status()).purposeQueries;
+      expect(use.business).toBeGreaterThan(10); expect(use.usage).toBeGreaterThan(10); expect(use.worker).toBeGreaterThan(10);
+    }
     expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'shop-b' }))).toMatchObject({ code: 'FORBIDDEN' });
     const final = await host.status();
     expect(final.currentReleaseId).toBe(result.currentReleaseId);
@@ -305,7 +326,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     expect(final.requests.filter(p => /^\/v1\/intake\/parse-jobs\/[^/]+\/report$/.test(p))).toHaveLength(1);
     expect(rendererErrors).toEqual([]);
     expect(mainStderr).not.toContain("No handler registered for 'product:announce-unread'");
-    console.info(JSON.stringify({ status: 'PASS', electron: process.platform, api: 'actual', postgres: 15,
+    console.info(JSON.stringify({ status: 'PASS', profile, purposeQueries: final.purposeQueries, electron: process.platform, api: 'actual', postgres: 15,
       nativeDialog: 'controlled-path-and-confirmation-responses', upload: 'actual-multipart', issueReport: 'saved-and-read-with-exceljs',
       publicationPolicy: 'direct-v1', approvalRows: 0, revision: 'same-id-v2-fresh-evidence', cancellation: 'server-confirmed-live-release-unchanged', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
   } catch (error) {
@@ -320,6 +341,8 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     try { if (app) await closeOwnedElectron(app); }
     finally {
       await host.close(); rmSync(directory, { recursive: true, force: true });
+      expect(host.resources().poolConnections.every(n => n === 0)).toBe(true);
+      expect(host.resources().identityListening).toBe(false);
       expect(existsSync(host.root)).toBe(false); expect(existsSync(directory)).toBe(false);
       console.info(JSON.stringify({ status: 'OWNED_RESOURCES_REMOVED', hostDirectory: host.root, desktopDirectory: directory }));
     }

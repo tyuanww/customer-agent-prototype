@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { IntakeRejection, type IntakePool } from '../../src/content-intake/transaction.js';
+import type { IntakePool } from '../../src/content-intake/transaction.js';
 
 // One offline compatibility seam, not a SQL router. All business rules, actor
 // WeakMap identity and transaction certainty handling stay in their actual modules.
@@ -16,8 +16,10 @@ export function assertConsumerSource(source: string): void {
 }
 
 /** Borrowed pool; never changes credentials, roles, lifecycle, parameters or any
- * other SQL. Source drift rejects before returning an adapter. No production import. */
-export async function createSyntheticConsumerPool(pool: IntakePool): Promise<IntakePool> {
+ * other SQL. Source drift rejects before returning an adapter. The consumer owns
+ * its rejection class, so built and source modules cannot split error identity. */
+export async function createSyntheticConsumerPool(pool: IntakePool, sessionUnavailable: () => Error, schema: 'intake_runtime_probe' | 'intake_runtime' = 'intake_runtime_probe'): Promise<IntakePool> {
+  if (!['intake_runtime_probe', 'intake_runtime'].includes(schema)) throw new Error('CONSUMER_LOCK_SCHEMA');
   assertConsumerSource(await readFile(new URL('../../src/content-intake/transaction.ts', import.meta.url), 'utf8'));
   return { connect: async () => {
     const client = await pool.connect();
@@ -28,10 +30,10 @@ export async function createSyntheticConsumerPool(pool: IntakePool): Promise<Int
       }
       return async (sql: string, params?: unknown[]) => {
         if (sql !== SESSION_SQL) return target.query(sql, params);
-        try { return await target.query('SELECT intake_runtime_probe.lock_product_session($1,$2) AS expires_at', params); }
+        try { return await target.query(`SELECT ${schema}.lock_product_session($1,$2) AS expires_at`, params); }
         catch (error) {
           if (error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SESSION_UNAVAILABLE') {
-            throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+            throw sessionUnavailable();
           }
           throw error;
         }

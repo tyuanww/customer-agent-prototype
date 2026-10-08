@@ -12,7 +12,7 @@ import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
 import { authenticatedProductSession, createProductAuthService } from '../src/product-auth-service.js';
-import type { IntakePool, IntakeResult } from '../src/content-intake/transaction.js';
+import { IntakeRejection, type IntakePool, type IntakeResult } from '../src/content-intake/transaction.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
 import { createSyntheticConsumerPool, verifyConsumerPurpose } from '../experiments/intake-runtime/consumer-pool.js';
 
@@ -68,7 +68,7 @@ describe.skipIf(!enabled)('actual service on candidate purpose roles (synthetic 
     for (const [pool, purpose] of [[business, 'business'], [usage, 'usage'], [worker, 'worker'], [organization, 'org_writer']] as const) {
       await verifyConsumerPurpose(pool, purpose);
     }
-    businessPool = await createSyntheticConsumerPool(business); usagePool = await createSyntheticConsumerPool(usage);
+    businessPool = await createSyntheticConsumerPool(business, () => new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED')); usagePool = await createSyntheticConsumerPool(usage, () => new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED'));
     store = createContentObjectStore(path.join(harness.root, db.name));
     service = configured(); reader = configured(usagePool);
     await admin.query('CREATE ROLE synthetic_consumer_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_consumer_auth');

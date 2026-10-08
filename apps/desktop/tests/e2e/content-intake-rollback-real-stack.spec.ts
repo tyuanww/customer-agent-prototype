@@ -12,7 +12,8 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
   test.setTimeout(180_000);
   const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
-  const host = await createIntakeSyntheticHost({ prepareCandidate: false });
+  const profile = process.env.CUSTOMER_AGENT_INTAKE_PURPOSE_CANDIDATE === '1' ? 'purpose-candidate' : 'existing';
+  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile });
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-rollback-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
   const evidence = path.resolve(desktopRoot, '../../.gstack/intake-synthetic', `rollback-${new Date().toISOString().replace(/[:.]/g, '-')}`);
@@ -137,6 +138,8 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
   } finally {
     try { if (app) await closeOwnedElectron(app); }
     finally { await host.close(); rmSync(directory, { recursive: true, force: true }); }
+    expect(host.resources().poolConnections.every(n => n === 0)).toBe(true);
+    expect(host.resources().identityListening).toBe(false);
     expect(existsSync(host.root)).toBe(false); expect(existsSync(directory)).toBe(false);
   }
 });

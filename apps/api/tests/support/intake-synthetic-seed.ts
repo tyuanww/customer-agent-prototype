@@ -10,7 +10,7 @@ export const INTAKE_SYNTHETIC_IDENTITIES = [
 
 /** Explicit throwaway bootstrap. These synthetic identities and the empty
  * intake catalog are never adopted by a production factory or an existing DB. */
-export async function seedIntakeSyntheticHost(admin: Client) {
+export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product') {
   await admin.query('BEGIN');
   try {
     for (const [id, role] of INTAKE_SYNTHETIC_IDENTITIES) {
@@ -22,7 +22,7 @@ export async function seedIntakeSyntheticHost(admin: Client) {
       await admin.query(`INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a',$1,1,$2) ON CONFLICT DO NOTHING`, [`job-${role}`, role]);
     }
     for (const suffix of ['a', 'b']) {
-      await admin.query(`INSERT INTO content_intake.scopes VALUES ($1,'tenant-a','app-a','brand-a',$2,'product')`, [`scope-${suffix}`, `shop-${suffix}`]);
+      await admin.query(`INSERT INTO content_intake.scopes VALUES ($1,'tenant-a','app-a','brand-a',$2,$3)`, [`scope-${suffix}`, `shop-${suffix}`, domain]);
       await admin.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ($1,$2,1,'v2-preview')`, [`source-${suffix}`, `scope-${suffix}`]);
       await admin.query(`INSERT INTO content_intake.source_mappings VALUES ($1,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))`, [`source-${suffix}`]);
     }

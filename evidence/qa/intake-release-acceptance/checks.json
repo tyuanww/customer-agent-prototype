@@ -1,0 +1,101 @@
+{
+  "status": "PASS_SCOPED_SYNTHETIC_ACCEPTANCE",
+  "baseCommit": "cff9fa9b611a5f77de465b3a5ee1022c64027d9c",
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "24.19.0",
+    "postgres": "15.18",
+    "packageManager": "pnpm 11.19.0 lock; direct existing bins; no install"
+  },
+  "results": {
+    "httpCases": 5,
+    "electronCases": 2,
+    "candidateGuardCases": 1,
+    "adapterCases": 3,
+    "existingAssemblyCases": 7,
+    "directorLogin": true
+  },
+  "logs": {
+    "http-four-domains.log": "42a75d17ebace321ff440bf7a54796a3a6ac61fb221c5072a791e592a652122f",
+    "electron-mac.log": "e74d586cc5b1d74e4383db90427891d525357a9f942756d7414d4b19f929e553",
+    "candidate-guards.log": "0737ccaf613f47d58eca8cc7031442e7fc279b76c529a28e149dfd87415225ec",
+    "default-unit.log": "7b10d532a072bc68a02504cac926a5f89c83f1dbf8a6b09f1997fefdf49a8773",
+    "director-login.log": "b1e8242ac0d05362061a1c9b6bacc05f1121500b9eb2a7af8e9b9b4854518a40",
+    "lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "api-typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "desktop-typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "api-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "desktop-build.log": "0daa66ab91f3c2375429301ed8d477c2146b3f44f468918dbb8077a73cc9b1c8",
+    "lint-delta.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "inputs": {
+    "apps/api/experiments/intake-runtime/consumer-pool.ts": "5b829c4d86d01f95d5875aae44045b7c3d76a0a6b5e1dd7aa89d7665cefe9ba1",
+    "apps/api/src/content-intake/management-http.ts": "9f1402cebf74e747a0f832622df12f55058be8e28f20ccc372f6fac60b47de81",
+    "apps/api/tests/intake-runtime-consumer-pool.test.ts": "6c0440c08b3b94c46d30ce7c5936037b87d8687d01afc8874fbbaa533f975e60",
+    "apps/api/tests/intake-runtime-consumers.integration.test.ts": "e1da4284f27f865627e9d70f36c4e9b2620e3653d6f056b30b0d5fad6f537375",
+    "apps/api/tests/support/intake-synthetic-host.ts": "b705a53250b7e6f869e44e9050f691d89daa167ad0382c72690ba1b3c34d14c0",
+    "apps/api/tests/support/intake-synthetic-seed.ts": "797e870961ffe88b5441432a6c7358d704fbd546470cd49b9961481ec348bdf3",
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "5535c2b7848a4d1e7a1e9e607914d965d73c547bc66a1e73f43f51ebc7d27504",
+    "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts": "d9dae9441a5867bdae77187a86af9405c367e5ec1329e2d21d69cefa2af90dc0",
+    "scripts/intake-synthetic/host.test.ts": "02e24c5769a549fd223790f6adb469535985de8842d94b18fcf2fcac5cf35394",
+    "apps/api/tests/intake-runtime-candidate.integration.test.ts": "720ee658572977b0a9f9e0658e572996ae60d5318fa45c5c43d99c056c681641",
+    "apps/api/tests/support/intake-runtime-candidate.ts": "9dcb530f4416de3bd35324210b8baa96bb95fe091a52fdf1638b4b73527102c9",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/directory-acl.sql": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/organization.sql": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/roles.sql": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/manifest.json": "c911f74fd3840ac993c6f31630ae73b7378fe40c4269eb0a0805b5b29eeebdba",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/session-lock.sql": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/purpose-acl.sql": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/storage.delta.sql": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78",
+    "apps/api/src/content-intake/service.ts": "5741b3c5982714f5703506868da0682bc7e2764c53a82c56440ad1e267895ea3",
+    "apps/api/src/content-intake/transaction.ts": "8464bc5dcb0b7cb4d025940b2d6f505fe58bf369bb82f34385963f2ed4a1436e",
+    "apps/api/src/content-intake/capacity.ts": "8c6c8815e0315509f2ced03ca8a0962cfc3da6e4773259ff298ee823dbd8d160",
+    "apps/api/src/content-intake/usage-http.ts": "1933ccb548c4635ee6032f993bc7e00c20e305dfd4b55a922a5a6461240401e6",
+    "apps/desktop/out/main/index.js": "3214807db940a31bede48c0aa414bef1abe91d009341689a5dc88f6ab1e9f6bb",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/README.md": "2c3e0f5d6548b45007f8d7c3a6db2608f258bbc9db6e00444a587ddfd3f1f23e"
+  },
+  "candidateSQL": {
+    "roles.sql": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+    "organization.sql": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+    "session-lock.sql": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+    "storage.delta.sql": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+    "directory-acl.sql": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+    "purpose-acl.sql": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05"
+  },
+  "screenshots": {
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-revision-v2.png": "6fee99fc2cea5bf8b4b24911f5c8e576677770e34b9259389d52057304da94b8",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-cancelled.png": "540f486da759bd71835e921c8672253a21c077d438871ed6f69113d7e52cc38e",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-intake-declaration-dark.png": "88414aab21dde652bc4cfdc3d9ebf9e5ffb0a914c6a4bd13124ffe5fb2bb1dac",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-intake-dark.png": "2519ef9d2bbe7debe362f6b247b0f92195c61923dbe568a5af3adccf1e8f126c",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-intake-start.png": "38c4102002587f4c897d8d2dcf2c7ff1c23654c08bab44ec96ee760031b4a3e9",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-published.png": "a06ac6c23877c3d73aaac9d266245060548d56548455fb5bf972d4ceaf71b6b7",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/query-published-faq.png": "ead2477ced221e22cd0344551be0caf11df9203a9dc552a9194d8623f00216af",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-uploaded-material.png": "dfddfab6830170c16301719a3d4e9aa503de191e873253ba626ca4e8d00478c7",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-upload-error-report.png": "e71e54406f25f813ce7862aa5815a93cea64cb88494b76331641896ed1aa33cd",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-intake-minimum-dark.png": "5c89314b1653387c8b56ce9a105c4489a986aad2c58d4c29c12bb9aac2be5d71",
+    ".gstack/intake-synthetic/2026-10-08T10-25-35-119Z/dashboard-intake-light.png": "a1d6ae64cc19a70d1788745d97ea5506e01975a7478450426b641966470d63b3",
+    ".gstack/intake-synthetic/rollback-2026-10-08T10-25-50-232Z/rollback-light.png": "d24e6c0d3c496853f6c1cf0935bd290587cb64c93aba401447ec88bbc7449146",
+    ".gstack/intake-synthetic/rollback-2026-10-08T10-25-50-232Z/rollback-ordinary-seat.png": "d1d74f4c0725b1afdb942dad53607274591a52809340b6e276f393a58d5826bc",
+    ".gstack/intake-synthetic/rollback-2026-10-08T10-25-50-232Z/rollback-dark.png": "37bafee73d974db189c8b62fc55926c8131b77bd7aa292fe2e6fcf3fc54440ae"
+  },
+  "notClaimed": [
+    "production factory or ACL activated",
+    "versioned contract freeze/export/intake",
+    "real Feishu identities or real shop data",
+    "Windows/Linux/Stage Manager/manual native dialog interaction",
+    "A permissions UI integration",
+    "full external review passed"
+  ],
+  "evidenceNotes": {
+    "governanceInstallationManifestSHA256": "1683c487d6dc84e84b44d9f2a80ca9ab9cfb941144ace8d3b2cf7f520bb58486",
+    "review": "full external review remains INCOMPLETE",
+    "postElectronTargetedChanges": [
+      "director test identity selection allowlist",
+      "campaign XLSX report consumer assertion",
+      "rollback test whitespace",
+      "candidate/evidence documentation"
+    ]
+  }
+}
