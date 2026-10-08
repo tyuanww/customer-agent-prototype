@@ -3,6 +3,7 @@ import { parseContractSchema, type components } from '@customer-agent/contracts'
 import { parseFamilyReference, type ParseResult } from '@customer-agent/content-intake';
 import { canonicalJson, type CanonicalJsonValue } from '../idempotency.js';
 import { IntakeRejection } from './transaction.js';
+import { sourceInputFormat } from './input-format.js';
 import type { Source } from './authority.js';
 
 type C = components['schemas'];
@@ -52,6 +53,8 @@ export function materialFromParse(input: {
 }): C['IntakeMaterial'] {
   const { parsed, source, previous, now } = input;
   if (!parsed.ok || parsed.issues.length) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+  const format = sourceInputFormat(source);
+  if (parsed.policyVersion !== source.ruleVersion || input.object.mime !== format.mime) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION');
   const before = new Map(previous.map(e => [e.businessEntryId, e]));
   const entries = new Map(before);
   const questionOwners = new Map(previous.flatMap(e => e.questions.map(q => [q.id, e.businessEntryId] as const)));
@@ -122,7 +125,7 @@ export function materialFromParse(input: {
     canonicalEncodingVersion: 'candidate-p1.1', scope: source.scope, sourceVersion: source.version,
     sourceClaim: { versionKind: 'unknown', versionValue: null, acquisition: 'controlled-synthetic-export', fileSha256: input.object.sha256 },
     templateVersion: source.templateVersion, ruleVersion: source.ruleVersion, mappingVersion: source.mappingVersion,
-    selectedSheets: ['来源', 'FAQ', '相似问法'], object: input.object,
+    selectedSheets: format.selectedSheets, object: input.object,
     entries: [...entries.values()].sort((a, b) => a.businessEntryId < b.businessEntryId ? -1 : a.businessEntryId > b.businessEntryId ? 1 : 0),
     differences: differences.sort((a, b) => a.businessEntryId < b.businessEntryId ? -1 : a.businessEntryId > b.businessEntryId ? 1 : 0),
     contributors: [...input.contributors].sort(), baseReleaseId: input.baseReleaseId, media: [],

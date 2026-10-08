@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Client } from 'pg';
+import { CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 
 export const INTAKE_SYNTHETIC_IDENTITIES = [
   ['director', 'director', '合成总监'],
@@ -10,7 +11,7 @@ export const INTAKE_SYNTHETIC_IDENTITIES = [
 
 /** Explicit throwaway bootstrap. These synthetic identities and the empty
  * intake catalog are never adopted by a production factory or an existing DB. */
-export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product') {
+export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product', inputFormat: 'xlsx' | 'csv' = 'xlsx') {
   await admin.query('BEGIN');
   try {
     for (const [id, role] of INTAKE_SYNTHETIC_IDENTITIES) {
@@ -24,7 +25,9 @@ export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' |
     for (const suffix of ['a', 'b']) {
       await admin.query(`INSERT INTO content_intake.scopes VALUES ($1,'tenant-a','app-a','brand-a',$2,$3)`, [`scope-${suffix}`, `shop-${suffix}`, domain]);
       await admin.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ($1,$2,1,'v2-preview')`, [`source-${suffix}`, `scope-${suffix}`]);
-      await admin.query(`INSERT INTO content_intake.source_mappings VALUES ($1,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))`, [`source-${suffix}`]);
+      await admin.query('INSERT INTO content_intake.source_mappings VALUES ($1,1,$2,$3,$4,$5)', inputFormat === 'csv'
+        ? [`source-${suffix}`, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_STRUCTURE_SHA256]
+        : [`source-${suffix}`, 'faq-p1.1', 'intake-p1.1', 'mapping-p1.1', 'a'.repeat(64)]);
     }
     for (const action of ['query', 'content-manage', 'import', 'source-confirm', 'review', 'publish', 'candidate-cancel', 'rollback']) {
       await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)

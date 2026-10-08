@@ -46,10 +46,10 @@ describe('generated customer-agent runtime contracts', () => {
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
-      contract_set_id: 'cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551',
-      source_git_sha: 'e35c0c01b5510ffcff75f2b19ba441ad53a9b504',
-      openapi_sha256: 'bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7',
-      database_sha256: '4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e',
+      contract_set_id: 'cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251',
+      source_git_sha: 'adbc7b1ce251816fc02957a0042742ae2d053f9a',
+      openapi_sha256: '3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94',
+      database_sha256: 'c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
     });

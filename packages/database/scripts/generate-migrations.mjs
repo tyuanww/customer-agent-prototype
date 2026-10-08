@@ -539,7 +539,7 @@ const PRIOR_DIRECT = Object.freeze({
   migrationCount: 32,
 });
 
-export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+function buildRuntimeMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
   if (snapshot?.manifest?.database?.sha256 === EXPECTED_DATABASE_SHA256) {
     return buildDirectMigrationOutputs(snapshot, { projectRoot });
   }
@@ -594,6 +594,71 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   });
   const outputs = new Map(prior.outputs);
   outputs.set(`packages/database/migrations/${runtime.file}`, runtime.sql);
+  outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
+  return Object.freeze({ manifest, migrations, outputs });
+}
+
+const CSV_DATABASE_SHA256 = 'c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5';
+const CSV_INSTALLATION_SHA256 = 'e7bee22391c96c498d96e20e868cbf90429405ac3793eeb02bbc93e817939a28';
+const PRIOR_RUNTIME = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551',
+  sourceGitSha: 'e35c0c01b5510ffcff75f2b19ba441ad53a9b504',
+  sourceSchemaSha256: RUNTIME_DATABASE_SHA256,
+  migrationCount: 33,
+});
+
+export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+  if (snapshot?.manifest?.database?.sha256 !== CSV_DATABASE_SHA256) {
+    return buildRuntimeMigrationOutputs(snapshot, { projectRoot });
+  }
+  if (typeof snapshot.database_source !== 'string' || sha256(snapshot.database_source) !== CSV_DATABASE_SHA256) {
+    throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
+  }
+  const sources = snapshot.runtime_sources;
+  if (typeof sources?.installation !== 'string' || sha256(sources.installation) !== CSV_INSTALLATION_SHA256) {
+    throw new Error('CSV installation manifest is missing or drifted');
+  }
+  const installation = JSON.parse(sources.installation);
+  for (const [name, descriptor] of Object.entries(installation.sources)) {
+    if (typeof sources[name] !== 'string' || sha256(sources[name]) !== descriptor.sha256) {
+      throw new Error(`CSV companion is missing or drifted: ${name}`);
+    }
+  }
+  const priorRoot = path.join(projectRoot, 'contracts/upstream/customer-agent', PRIOR_RUNTIME.contractSetId);
+  const priorManifest = JSON.parse(readFileSync(path.join(priorRoot, 'contract-set.json'), 'utf8'));
+  const priorSource = readFileSync(path.join(priorRoot, 'schema-v1.23.sql'), 'utf8');
+  const prior = buildRuntimeMigrationOutputs({
+    contract_set_id: PRIOR_RUNTIME.contractSetId, source_git_sha: PRIOR_RUNTIME.sourceGitSha,
+    manifest: priorManifest, database_source: priorSource,
+    runtime_sources: Object.fromEntries(Object.entries(priorManifest.runtime).map(([name, descriptor]) =>
+      [name, readFileSync(path.join(priorRoot, descriptor.file), 'utf8')])),
+  }, { projectRoot });
+  const expectedSource = '-- schema.v1.24 — DRAFT CSV format; frozen predecessor follows unchanged\n'
+    + priorSource + `\n-- BEGIN INTAKE CSV ${installation.sources.csv.sha256}\n`
+    + sources.csv + '-- END INTAKE CSV\n';
+  if (snapshot.database_source !== expectedSource) throw new Error('CSV predecessor or increment differs from immutable v1.23');
+  // 0033 already installed the approved capabilities. Replaying its CREATE ROLE
+  // or ACL installation would mutate applied history; only the new format guard
+  // is appended, atomically with its ledger row and before environment startup.
+  const csv = renderUpgradeMigration({ position: 34, id: '0034_intake_csv_v1_24',
+    version: 'schema.v1.24 CSV input format', ranges: [], sourceBody: sources.csv.trimEnd() }, snapshot);
+  const migrations = Object.freeze([...prior.migrations, csv]);
+  const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME];
+  const manifest = Object.freeze({
+    ...prior.manifest,
+    contract_set_id: snapshot.contract_set_id, source_git_sha: snapshot.source_git_sha,
+    source_schema_sha256: CSV_DATABASE_SHA256, upgrade_source_sha256: sha256(sources.csv.trimEnd()),
+    compatibility: Object.freeze({ ...prior.manifest.compatibility,
+      prior_reviewed_upgrades: Object.freeze(compatibleUpgrades.map(p => Object.freeze({
+        contract_set_id: p.contractSetId, source_git_sha: p.sourceGitSha,
+        source_schema_sha256: p.sourceSchemaSha256, migration_count: p.migrationCount,
+      }))),
+    }),
+    migrations: Object.freeze(migrations.map(({ sql: _sql, ...migration }) => migration)),
+  });
+  const outputs = new Map(prior.outputs);
+  outputs.set(`packages/database/migrations/${csv.file}`, csv.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });

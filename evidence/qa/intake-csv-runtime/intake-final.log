@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop
+
+ ✓ tests/unit/customer-agent-contract-set.test.ts (53 tests) 5259ms
+   ✓ CSV v3 bundle intake preparation > consumes all fourteen immutable artifacts without activating CSV or installing SQL  365ms
+   ✓ CSV v3 bundle intake preparation > checks declared-SHA CSV history and refuses downgraded sources even after deletion; shallow=false  336ms
+
+ Test Files  1 passed (1)
+      Tests  53 passed (53)
+   Start at  23:50:42
+   Duration  5.67s (transform 39ms, setup 92ms, collect 25ms, tests 5.26s, environment 183ms, prepare 33ms)
+

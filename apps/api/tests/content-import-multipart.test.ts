@@ -81,11 +81,17 @@ describe('frozen intake upload multipart', () => {
     expect(result.operationId).toBe('synthetic-upload');
     expect(await collect(result.file)).toEqual(original);
   });
-  it.each(['extra', 'duplicate', 'csv', 'missing', 'unterminated', 'epilogue'])('rejects malformed or extra parts: %s', async mode => {
+  it('preserves CSV BOM and trailing CRLF while reporting the declared source type', async () => {
+    const original = Buffer.from('\ufeff"标题","正文"\r\n"合成","第一行\r\n第二行"\r\n');
+    const p = parts(original); p[1]!.type = 'text/csv';
+    const result = await parse(form(p));
+    expect(result.sourceType).toBe('csv'); expect(await collect(result.file)).toEqual(original);
+  });
+  it.each(['extra', 'duplicate', 'pdf', 'missing', 'unterminated', 'epilogue'])('rejects malformed or extra parts: %s', async mode => {
     const p = parts();
     if (mode === 'extra') p.push({ name: 'sha256', body: 'claimed' });
     if (mode === 'duplicate') p.push(p[0]!);
-    if (mode === 'csv') p[1]!.type = 'text/csv';
+    if (mode === 'pdf') p[1]!.type = 'application/pdf';
     if (mode === 'missing') p.pop();
     let bytes = form(p);
     if (mode === 'unterminated') bytes = bytes.subarray(0, bytes.length - 6);

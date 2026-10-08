@@ -1,0 +1,282 @@
+{
+  "status": "CSV_SYNTHETIC_PASS_LEGACY_ACL_BLOCKED",
+  "baseline": "54f428ca8296aba9a75d2205439b3063cfef8c9b",
+  "version": "0.3.26",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgresql": "15.18",
+    "arch": "arm64",
+    "os": "macOS 26.5.2"
+  },
+  "csvFrozen": true,
+  "csvExported": true,
+  "csvIntake": true,
+  "runtimeActivated": false,
+  "ddevAuthorized": false,
+  "contractSet": "cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251",
+  "checks": {
+    "parser": {
+      "passed": 97,
+      "log": "test-reviewed-final.log"
+    },
+    "databaseTargeted": {
+      "passed": 57,
+      "log": "db-targeted-final.log"
+    },
+    "databaseFullPg15": {
+      "passed": 40,
+      "log": "db-postgres-final.log"
+    },
+    "apiFinalTargeted": {
+      "passed": 57,
+      "log": "csv-formal-api-reviewed-final.log"
+    },
+    "desktopUnitComponent": {
+      "passed": 120,
+      "log": "intake-csv-desktop-unit.log"
+    },
+    "desktopActualCsv": {
+      "passed": 1,
+      "log": "intake-csv-desktop-e2e-csv.log"
+    },
+    "desktopActualXlsx": {
+      "passed": 1,
+      "log": "intake-csv-desktop-e2e-xlsx.log"
+    },
+    "apiHistoricalFull": {
+      "passed": 150,
+      "failed": 2,
+      "discoveryCountCorrectedAndPassed": true,
+      "legacyNonemptyInheritance": "BLOCKED_FROZEN_ACL_MISSING_HELPERS"
+    },
+    "lint": {
+      "exitCode": 0,
+      "log": "lint-final.log"
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "log": "typecheck-final.log"
+    },
+    "test": {
+      "exitCode": 0,
+      "defaultSkipped": {
+        "database": 23,
+        "api": 329,
+        "desktop": 7
+      },
+      "firstRun": "FAIL_STALE_CURRENT_CONTRACT_SNAPSHOT_EXPECTATION",
+      "finalRun": "PASS",
+      "log": "test-reviewed-final.log"
+    },
+    "intakeToolCurrentSnapshot": {
+      "passed": 53,
+      "exactApprovedHashes": true,
+      "log": "intake-final.log"
+    },
+    "docs": {
+      "exitCode": 0,
+      "markdownFiles": 238,
+      "log": "docs-final.log"
+    },
+    "previousMigrations": {
+      "count": 33,
+      "byteIdenticalToBaseline": true
+    },
+    "build": {
+      "exitCode": 0,
+      "log": "build-final.log"
+    },
+    "workspace": {
+      "exitCode": 1,
+      "remainderMiB": 38.8,
+      "budgetMiB": 32,
+      "overMiB": 6.75,
+      "rootPolicy": "PASS",
+      "log": "workspace-final.log"
+    },
+    "dependencyAudit": {
+      "reusedFrom": "../intake-csv-candidate/dependency-audit-summary.json",
+      "unchangedPackageVersion": "csv-parse@7.0.3",
+      "changedOnly": "development-to-runtime dependency classification",
+      "wholeWorkspaceClean": false
+    },
+    "draftLegacyAclProbe": {
+      "passed": 1,
+      "skipped": 151,
+      "formalProductFixed": false,
+      "frozenOrIntake": false,
+      "sqlSha256": "6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584",
+      "retainedRows": 8,
+      "rollbackRetested": false,
+      "log": "draft-legacy-acl-probe.log"
+    },
+    "macPackageCsv": {
+      "packageExitCode": 0,
+      "passed": 1,
+      "version": "0.3.26",
+      "isPackaged": true,
+      "unsigned": true,
+      "archRuntime": "arm64",
+      "artifactArchitectures": [
+        "x86_64",
+        "arm64"
+      ],
+      "inputFiles": 227,
+      "inputsUnchanged": true,
+      "nativeDialogHumanAcceptance": false,
+      "evidence": "package-checks.json",
+      "log": "package-e2e.log"
+    },
+    "diffCheck": {
+      "exitCode": 0,
+      "rawLogAttributes": "Only evidence/qa/intake-csv-runtime/*.log preserves exact output bytes and intentional whitespace; source checks unchanged."
+    }
+  },
+  "review": {
+    "method": "local core plus independent review",
+    "externalCompleteReview": "INCOMPLETE",
+    "fixedFindings": [
+      "0034 upgrade expected arrays",
+      "SOURCE_FORMAT_MISMATCH error mapping",
+      "preserve SOURCE_MISMATCH for unknown vocabulary"
+    ],
+    "remaining": [
+      "Frozen runtime ACL pure CHECK function EXECUTE closure for legacy nonempty directory"
+    ]
+  },
+  "logs": {
+    "build-final.log": "08e7a7aee2870012d3fc698cd989cf53cc11e6e68f983cb70e731f0d3a1d3a13",
+    "codegen.log": "854c28e8e123fd0b8819d16e23e352f102125521ba36158d2293fce225ad681b",
+    "contract-verify.log": "e370dae3e3b03b372b9cac99376d7b2262d2aff48cb39fdf5c0283a769d8e86e",
+    "csv-formal-api-format-final.log": "f4f5c312f7a8ecf838914c10c2be60bd14eb0c3108d42ee9866812a796fb6147",
+    "csv-formal-api-reviewed-final.log": "80cc235d2af7b952bb3a3fe7d191bd58a832840d36fb4f0eb52c14af3288c1b0",
+    "db-postgres-final.log": "65ad3a0942a91be8e376b7a83a5cd5b2d4a59183f4f0c3c86534bb2b55b43b5d",
+    "db-targeted-final.log": "1c11cc3569f28e91102ee122c29c385ca28bab87548f851a2f3902d881a36f67",
+    "db-upgrade.log": "97b6fd84c2368470043cb99ac71123b4b34f3a6e8a946c0bd7e088e79369e799",
+    "discovery-route-final.log": "831c9694e4a9cc5829fe06cd21281078d71b496625320ad4597d1469c2f5965e",
+    "docs-final.log": "8677d5c7a505a57ee65af35df2f8ef05270f8c206f2bcb46567e7f880d012268",
+    "draft-legacy-acl-probe.log": "fcd5ee2339cef7444f096d169f9b281d6f2b26657895c7b903d201e91e3dfd90",
+    "intake-csv-desktop-e2e-csv.log": "c7915e781a8a35f96dd017332e0d0b8e14c15d13e7e554626439e8bd05307d52",
+    "intake-csv-desktop-e2e-xlsx.log": "66fb61305010d7e954a3526720879d4df83eb31f01449d45d0d0c11b1704430a",
+    "intake-csv-desktop-unit.log": "3594ff4c001f8463d918c301c00344103e5bd4251a42d40e364b2e8b791de50e",
+    "intake-final.log": "fea41885ccc07f9571ab30dc641b91d7107a47131c880424db899e1070994ddb",
+    "intake.log": "7af9a492b87adda2f2e1dc4d09e90946d29912cc8cd0a363e04f2e9f474afa70",
+    "legacy-permission-failure.log": "7dff7f71e3a02a1c312146eb6d5258200a53c01a1ea8a33971da9b88324846f3",
+    "lint-final.log": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+    "package-build.log": "7cdce5215cf0a0fb4ac304614decf9045d029586defe87fa49107a006925f682",
+    "package-e2e.log": "f1cd56b14a8bb885a0b8c66d51543a6138387d85c9fcd1fc294a9c8c25d6749f",
+    "package-install.log": "eb2d88c7dec011bc4713d9d606fbfb3b17f66849262b64978eed7e4cfc000129",
+    "test-final.log": "d3c0104db182f2d2bb297ddc96bee5ff964e0f25c57d381a0bb1071689331210",
+    "test-reviewed-final.log": "4c9742f3f010c6b18dcba54a5a5cbbc28ad30612d37fe56cabf9fbfe5548d6f0",
+    "typecheck-final.log": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+    "workspace-final.log": "bb63f99308dd82365d6a4b7158c8db90d5be34f54db425b768b64442dbf25ee4"
+  },
+  "commands": {
+    "root": [
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test",
+      "pnpm build",
+      "pnpm docs:check",
+      "pnpm workspace:check"
+    ],
+    "apiFinal": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 ./node_modules/.bin/vitest run tests/intake-csv-http.integration.test.ts tests/intake-runtime-consumers.integration.test.ts tests/content-intake-material.test.ts tests/content-import-multipart.test.ts tests/intake-transaction-runtime.test.ts",
+    "desktopCsv": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts",
+    "desktopXlsx": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts"
+  },
+  "inputs": {
+    "apps/api/src/content-import-multipart.ts": "5a8f4475336a9e0280f695ee5a08e06d53d3b81bc21284c0180d0f0514b944bc",
+    "apps/api/src/content-intake/authority.ts": "de05d233acef0091e69ef9b391f4a11666610d1c985c99fbc35c5f2c24d9dfaa",
+    "apps/api/src/content-intake/files.ts": "ff4c00b5fc1d1007fa0e8ea61ff2b1655aa3f7fdb7c9dee1394d6f374eba579c",
+    "apps/api/src/content-intake/input-format.ts": "4f8ef2c9550a9dd31e42faef8f227f9446f8f268d2ba8dfaf103f9578f17b83c",
+    "apps/api/src/content-intake/material.ts": "7e0a56aaaa32c47318ae43dacffca75c27721ef28cc468334170dd4c2ad48385",
+    "apps/api/src/content-intake/service.ts": "5488a6dc5dd51976e869881d4a92cbf77e248c4c45305041ad108d40e392546b",
+    "apps/api/src/content-intake/transaction.ts": "9906ed543c4e30329a2b768d95ebe11929279be0721f7dee3dc06be73b0736ae",
+    "apps/api/tests/content-import-multipart.test.ts": "e488f78eedccd2e6f299eeee441dda13b1f1ff7f02950af61ae84ac19e47d02e",
+    "apps/api/tests/content-intake-material.test.ts": "5741d35a44597e2abe28b88391e4552fc0890a88ee7ad2ccf2a87ee99de81947",
+    "apps/api/tests/content-intake.integration.test.ts": "d40ad2bada3f753dc0f3f7e57898796922b90f588771aae6153930ea834718f0",
+    "apps/api/tests/intake-csv-http.integration.test.ts": "1c2aa296b1c2ab49dc02013c3e2aca17b259eed81b5f414287f23d2dc54d71a2",
+    "apps/api/tests/intake-runtime-consumers.integration.test.ts": "4004327fc91a2f23982a9c332bbda1dcd62a0afb7536bed6342b8eecdd952152",
+    "apps/api/tests/intake-transaction-runtime.test.ts": "38583379f6fe39d50a02de8e7538793f6764b409a30b9d6c72be52f61107cea3",
+    "apps/api/tests/support/intake-synthetic-host.ts": "a7c9eda7c6fa44c5a9089f138af9c75956432c0cbefd84b9c40c674b6c69428b",
+    "apps/api/tests/support/intake-synthetic-seed.ts": "f772c13b7c0690a52ea27f10ba3e155717410564b57b0e6b4a29f936d9db8ba2",
+    "apps/desktop/src/main/content-intake-management.ts": "7dee86c87d78f2260dee2c007c74e67867ea8b0ce750a672a2fccfe9f62bf88d",
+    "apps/desktop/src/main/content-intake-native-files.ts": "45d90f9d6c2a44f433c0caaeb510a24a35ad2fd810f3ee1b132fbc427679b1e1",
+    "apps/desktop/src/main/content-intake-upload.ts": "32f7b74f64cb5b9de6b6ef31c21f4c354722adac47f4e3860be9fff1e83cac05",
+    "apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx": "42419157fbc532d50515afb8fb3b35a9b6390211450309fe9eab6673a0c088ee",
+    "apps/desktop/src/shared/content-intake-upload.ts": "cd57f4985f30a4e268cb85b2f1da2c229c2cb2251a4cc61a67c22cdad4ad5b8e",
+    "apps/desktop/tests/component/intake-upload.test.tsx": "d172cd17a8bb2bb6fe40509e4d64caef21c13ef192c333df3acbce95153fab5a",
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "1f72d14ac95ea0dc0addc98b4c3a6f861ec71ede0e5b43e6f8a28556eb2ceb08",
+    "apps/desktop/tests/fixtures/intake-management-data.ts": "c157587e77d2c3cb0bd7931185b7b5589f7c47860bbb2a1cf57fbec7a6d1a20a",
+    "apps/desktop/tests/fixtures/intake-permissions-data.ts": "34e7632ec5a70c5a3c873d2a714f4e83eafb4607635f39b0b23d5d668890e3d3",
+    "apps/desktop/tests/unit/content-intake-management.test.ts": "86a6415bd2ebec93c2a0731d4d8331a76c853727a5ffd40f504184bac10c53bf",
+    "apps/desktop/tests/unit/content-intake-native-files.test.ts": "5cf92b9312d60b2cf3c0c27ff73546994d4e9f1fe786a2c690ee6feab6262a64",
+    "apps/desktop/tests/unit/content-intake-upload.test.ts": "d4686290e4781ffbae8638a6f4b8c3cefd51369e2db81346074331f573aa258b",
+    "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": "2e3398bb693dd0ed6a67d03ccb32b6675ca1feb84af8a8a7b58a8358ec78a6e4",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "493d7d74a1b4d102562d102c6c639c8afb946d2b64d0ca2a403543fd3ca20f70",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/contract-set.json": "0bb26dccad0c3007435cff0666a5033f4ee439504c70fe47eead66f8e9a6d977",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-csv-format.v1.sql": "f88db715af84ff0a4dc056ab3a37fdaf71cdd0ae439a78b2d565952a1b93b535",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-csv-installation.v1.json": "e7bee22391c96c498d96e20e868cbf90429405ac3793eeb02bbc93e817939a28",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-csv-protocol.v1.json": "ff83a005795f6a5bdd6597329d93c5fdc132267613886b701193bdf8583b62ca",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-acl.v1.sql": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-directory-acl.v1.sql": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-organization.v1.sql": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-protocol.v1.json": "4546e98510add2b02b97baaca5bdd9603208502b891fe3e92a3f3bc3ed4f6030",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-provenance.v1.json": "7b3699b3fbd94918c11f9250f643b6e896a634cbf262d022dc6b56c422a56c5c",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-roles.v1.sql": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-runtime-session.v1.sql": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/intake-shop-directory.v1.sql": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/openapi.v1.yaml": "3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251/schema-v1.24.sql": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
+    "packages/content-intake/README.md": "9632191576ff8b39e2559e49926dd89297d7c754d320bdbc4d2684beec7ac1a5",
+    "packages/content-intake/experiments/csv/README.md": "2c419bce35cf0aa9865fbc115cd5b8cf98111670e0fd65b4c5f376b378e1067c",
+    "packages/content-intake/experiments/csv/candidate.ts": null,
+    "packages/content-intake/package.json": "5d122b28151f8958f879aabfac83154362b52504f88085877b70076f6c8e1460",
+    "packages/content-intake/src/csv.ts": "28765fbdd327707afbd8ff49a908aecc462c2389c7c1316f438b49611b292488",
+    "packages/content-intake/src/parser-process.ts": "bc230a5a16e40e062552b793ebfd288b1a84651e1a45ef1a238650c57cf9a885",
+    "packages/content-intake/src/policy.ts": "36cd7120fc4602614287599bf93656d903875baf7d8a8ba8f41244bc2ecfe14c",
+    "packages/content-intake/src/runner.ts": "f2632f1fa61176d5b9642140c6540b07dc66d19f265d2a5ed05387873fd6885a",
+    "packages/content-intake/src/workbook.ts": "67e773e9a67e778237524d6cc4f2a1beb9be581c98ff9ec76c96950a9a37cdd7",
+    "packages/content-intake/tests/csv-candidate.test.ts": "2bebbd1714362e1bee8ba22ce0a0dd7a20d2c95c0d39687992bc71f76b866ad6",
+    "packages/contracts/openapi/bundle.generated.yaml": "37b18d0cf385a6851aaba94680acbe5a0b9421b32c03b3e1f38d228e3f079183",
+    "packages/contracts/src/generated/codegen-manifest.generated.json": "1fd6ab86087933145c1c0899c5e0740bd4f79f0521728d3ae4fb7fd9a5b537dd",
+    "packages/contracts/src/generated/openapi.generated.ts": "fc1a68ee3f4f0344a7613503fe854bb10ff4ce633dfe9417ae1b649b84c99fc6",
+    "packages/contracts/src/generated/provenance.generated.ts": "a7aa1096e1f307f5e3b65d807e794b52e1bd5c089b003890d7f0d0c3e20a8c5b",
+    "packages/contracts/src/generated/runtime-schema.generated.ts": "d2070c004ad9782db49c7cb6e074f91e5c30c5676c09343ddcf72ed6ab89e3cc",
+    "packages/contracts/tests/runtime.test.ts": "89f94a3683a017eeb22d3c75f8853fc768174ffb42c6353a5e52236047489d07",
+    "packages/database/migrations/0034_intake_csv_v1_24.sql": "2f2e8963c461b0a3d720d5dbc42734851779a073bf71b07bc37d0c335416f31a",
+    "packages/database/migrations/manifest.generated.json": "f48f6056a26888bc1ba89dbe3e0380bf80d8049d0eb470c0756977f9587060a2",
+    "packages/database/scripts/generate-migrations.mjs": "0e1a7588bf48ac0ffea42543f61a43a9c4e0f58e7918ca9614806af520d5caf1",
+    "packages/database/src/generated/migrations.generated.ts": "3caa146300bb94a5ae7426f8538ec59e09b96e3f4d51e408d0c4ec6e76ab572a",
+    "packages/database/src/verifier.ts": "5483ef3ec4dadf40d8f9e5cbf61da762e9cc3c2df882e2545b9e0dae6b9a46a2",
+    "packages/database/tests/generator.test.ts": "07dba7f30a14fa47ef899d6102681627ad83501165e846a294ec362aa391efad",
+    "packages/database/tests/planner.test.ts": "2357881f3c71fbbf9837d0648beeb08d1d62ff1dea3c3a5fb27cf1e42e931b43",
+    "packages/database/tests/postgres.integration.test.ts": "4b7ed49a55b0ac475c4c4c90479beccdf13f06f2a95550ebd3ef6ace70b4fe18",
+    "packages/database/tests/verifier-runtime.integration.test.ts": "82a6d0d6845113b515e8663499001a9ffee56836e5c2b93e7029cd97626dcc48",
+    "pnpm-lock.yaml": "2644b175dc2d784f232de0ea6a3198a39d11a650777dba26c42b8c09218e9e10",
+    ".gitattributes": "1d1563ef501acb2773093ff4a43ccd25ae7d806855d54cb9dc745afe581db9cc"
+  },
+  "evidenceReuse": {
+    "desktopHappyPaths": "CSV/XLSX actual Electron passes preceded only the final API error-normalization change. Main and happy-path inputs were unchanged; the affected failure behavior was reverified by 57 API tests.",
+    "governanceRelease": "CSV freeze/export reused the prior 35 PG and 44 release steps for unchanged inputs; changed approval/lifecycle checks ran separately. The new ACL candidate is not covered by that reuse.",
+    "notRerun": [
+      "historical role review 15/15",
+      "timed-out external review",
+      "Windows acceptance",
+      "human native file/confirmation dialog acceptance"
+    ]
+  },
+  "governanceAclCandidate": {
+    "status": "DRAFT_NOT_FROZEN_NOT_EXPORTED_NOT_INTAKE",
+    "sqlSha256": "6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584",
+    "schemaVersion": "1.25",
+    "schemaSha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
+    "installationSha256": "fbc601f305013b54e5273e3c4b97faf009f348c3db6a6b4c9f397cfd87707418",
+    "requiredFunctions": 8,
+    "pgChecksPassed": 17,
+    "staticChecksPassed": 3,
+    "exporterIntakeSuccessorSupport": "NOT_IMPLEMENTED",
+    "currentProductLockChanged": false
+  }
+}

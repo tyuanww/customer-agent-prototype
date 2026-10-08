@@ -1,8 +1,8 @@
-# 标准 FAQ CSV 合成候选
+# 标准 FAQ CSV 合成样例
 
-状态为 `DRAFT`。本目录不进入包 `dist`、公开 exports、正式 parser runner、HTTP 或 Main；同步解析仅用于离线实验。正式接线仍须合同所属仓冻结、export 和产品 intake，再由隔离 parser 运行，不能把同步解析放在 Main 事件循环。
+本目录保留原字节合成样例。经过精确候选批准、冻结、export/intake 后，唯一实现已迁到 `../../src/csv.ts`，由包 exports 和现有隔离 runner 消费；这里没有第二份 parser。API 从登记来源构造固定上下文，Main 只读取有限原件字节上传，不能在 Main 事件循环同步解析。
 
-`candidate.ts` 直接处理原始 CSV 字节，复用 `src/faq-rules.ts` 的 FAQ / 问法规则，不转换成 XLSX。输出绑定原始 SHA-256、`text/csv`、`faq-csv-v1`、`intake-csv-v1`、`faq-csv-columns-v1` 及 `selectedSheets: ["CSV"]`；CSV 是逻辑数据集名，不声称存在 Excel 工作表。`runtimeActivated: false` 与 `candidateStatus: DRAFT` 是实验状态，旧 `isParseResult` 因 policy 不同会拒绝此结果。
+`parseCsv` 直接处理原始 CSV 字节，复用 `src/faq-rules.ts` 的 FAQ / 问法规则，不转换成 XLSX。输出绑定原始 SHA-256、`text/csv`、`faq-csv-v1`、`intake-csv-v1`、`faq-csv-columns-v1` 及 `selectedSheets: ["CSV"]`；CSV 是逻辑数据集名，不声称存在 Excel 工作表。静态合同接收与合成接线不等于真实数据或生产激活。
 
 ## 文件格式
 
@@ -27,4 +27,4 @@ pnpm --filter @customer-agent/content-intake test
 pnpm --filter @customer-agent/content-intake typecheck
 ```
 
-测试实际消费 CSV 产物并复开错误报告，覆盖原字节哈希、BOM、三种记录分隔、引用多行、来源对齐、字段重复、问法状态、活动期限、格式/资源拒绝、旧策略拒绝，以及既有 XLSX 行为回归。这里尚无 CSV 的原生选择、上传、服务端独立重算、发布、另一坐席查询复制或安装包验证。
+测试实际消费 CSV 产物并复开错误报告，覆盖原字节哈希、BOM、三种记录分隔、引用多行、来源对齐、字段重复、问法状态、活动期限、格式/资源拒绝、预期策略拒绝，以及既有 XLSX 行为回归。当前原生选择、HTTP 上传、独立复算、确认发布与另一坐席消费的实际证据由[当前计划](../../../../docs/plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)统一记录；不要从解析单测推断安装包或真实资料验收完成。

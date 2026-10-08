@@ -1,0 +1,30 @@
+{
+  "status": "PASS",
+  "version": "0.3.26",
+  "artifacts": [
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/artifacts/客服话术浮窗 Demo-0.3.26-mac-universal-UNSIGNED.dmg",
+      "bytes": 223997852,
+      "sha256": "8b174e8949aaf3bda65d0a79df2cc30434ecd9f465a7e9a2ca06c5a9ab4fc6df"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/artifacts/客服话术浮窗 Demo-0.3.26-mac-universal-UNSIGNED.zip",
+      "bytes": 223264248,
+      "sha256": "df94019e158d55c9e341b4353e60e3360b2ba95a4aa0505a8b1ee429f703bc73"
+    }
+  ],
+  "app": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/installed/客服话术浮窗 Demo.app",
+  "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+  "architectures": [
+    "x86_64",
+    "arm64"
+  ],
+  "source": "readonly DMG then ditto to owned directory",
+  "app_asar_sha256": "7f65cea4aded4e5c0f443751d1dce262216fe40486e10f23aaef8e31427dec56",
+  "copied_asar_matches_build": true,
+  "codesign_verify_exit": 1,
+  "codesign_verify_output": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/installed/客服话术浮窗 Demo.app: code object is not signed at all",
+  "inputs_unchanged": 227,
+  "dmg_detached": true,
+  "finished_at": "2026-10-08T16:02:09.277341+00:00"
+}

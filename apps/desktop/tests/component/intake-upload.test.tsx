@@ -61,11 +61,24 @@ it('shows total issues separately from the bounded page and saves the complete r
   expect(screen.getByText(/共 125 个问题，当前显示 1 个/)).toBeInTheDocument();
   expect(screen.getByText(/最近读取的服务端状态：校验未通过/)).toBeInTheDocument();
   expect(screen.getByRole('cell', { name: '1 / 3' })).toBeInTheDocument();
-  expect(screen.getByText(/本批尚未形成可审批候选/)).toBeInTheDocument();
+  expect(screen.getByText(/本批尚未形成候选/)).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '保存完整错误报告' }));
   expect(apply).toHaveBeenCalledWith({ action: 'upload-save-report' });
-  await user.click(screen.getByRole('button', { name: '选择 Excel 文件' }));
+  await user.click(screen.getByRole('button', { name: '选择 CSV / Excel 文件' }));
   expect(apply).toHaveBeenLastCalledWith({ action: 'upload-choose' });
+});
+it('shows CSV record coordinates and offers a pathless choice for either supported format', async () => {
+  const apply = vi.fn(), user = userEvent.setup();
+  render(<IntakeUpload view={upload({ file: { name: 'synthetic-faq.csv', bytes: 1024 }, phase: 'failed', canSubmit: false,
+    job: { state: 'failed', totalIssues: 1, excludedSheetCount: 0, excludedMediaCount: 0,
+      issues: [{ code: 'REQUIRED', message: '补齐必填内容后整批重新上传', location: { sheet: 'CSV', row: 3, column: 8 } }] } })}
+    busy={false} blocked={false} refreshBlocked={false} stopping={false} apply={apply} />);
+  expect(screen.getByText(/标准 CSV（UTF-8）或 Excel（XLSX）模板/)).toBeInTheDocument();
+  expect(screen.getByText(/CSV 行号按记录计算/)).toBeInTheDocument();
+  expect(screen.getByRole('cell', { name: '3 / 8' })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '资料校验结果' })).toHaveTextContent('本批尚未形成候选');
+  await user.click(screen.getByRole('button', { name: '选择 CSV / Excel 文件' }));
+  expect(apply).toHaveBeenCalledWith({ action: 'upload-choose' });
 });
 it('keeps stopping available during a busy request and never labels it server cancellation', async () => {
   const apply = vi.fn(), user = userEvent.setup();
@@ -115,7 +128,7 @@ it('protects an already opened candidate from a new native file selection while 
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command,
     current: async () => ({ ok: true, view }), onInvalidated: () => () => undefined };
   render(<IntakeManagement />);
-  expect(await screen.findByRole('button', { name: '选择 Excel 文件' })).toBeDisabled();
+  expect(await screen.findByRole('button', { name: '选择 CSV / Excel 文件' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '保存完整错误报告' })).toBeEnabled();
   expect(screen.getByRole('button', { name: '查看材料' })).toBeEnabled();
 });
@@ -156,7 +169,7 @@ it('re-reads Main after an upload IPC failure and preserves declarations only in
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command, current, onInvalidated: () => () => undefined };
   render(<IntakeManagement />);
   await screen.findByRole('combobox', { name: '整理责任人' }); await declare(user);
-  await user.click(screen.getByRole('button', { name: '选择 Excel 文件' }));
+  await user.click(screen.getByRole('button', { name: '选择 CSV / Excel 文件' }));
   await waitFor(() => expect(current).toHaveBeenCalled());
   await act(async () => fail());
   await screen.findByRole('alert');
@@ -189,7 +202,7 @@ it.each(['revoked', 'unavailable'] as const)('does not retain personal material 
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command, current, onInvalidated: () => () => undefined };
   render(<IntakeManagement />);
   await screen.findByRole('combobox', { name: '整理责任人' }); await declare(user);
-  await user.click(screen.getByRole('button', { name: '选择 Excel 文件' }));
+  await user.click(screen.getByRole('button', { name: '选择 CSV / Excel 文件' }));
   await screen.findByRole('alert');
   expect(screen.queryByRole('combobox', { name: '整理责任人' })).not.toBeInTheDocument();
   expect(screen.queryByText('synthetic-faq.xlsx')).not.toBeInTheDocument();
@@ -201,7 +214,7 @@ it('offers only local discard when revision details are hidden after import revo
   render(<IntakeUpload view={upload({ authorized: false, sources: [], sourceSelection: null, file: null,
     revisionOf: null, principals: [], canChoose: false, canSubmit: false, canReset: true })}
     busy={false} blocked={false} refreshBlocked={false} stopping={false} apply={apply} />);
-  expect(screen.getByRole('button', { name: '选择 Excel 文件' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '选择 CSV / Excel 文件' })).toBeDisabled();
   await user.click(screen.getByRole('button', { name: '清除本地上传准备' }));
   expect(apply).toHaveBeenCalledWith({ action: 'upload-reset' });
 });

@@ -1,23 +1,23 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import { INTAKE_REPORT_MAX_BYTES, INTAKE_UPLOAD_MAX_BYTES, isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadPhase, type IntakeUploadView } from '../shared/content-intake-upload';
+import { INTAKE_REPORT_MAX_BYTES, INTAKE_UPLOAD_MAX_BYTES, intakeInputMime, isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadPhase, type IntakeUploadView } from '../shared/content-intake-upload';
 import type { IntakeAccess } from './content-intake-access';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 
 type C = components['schemas'];
 type Session = Pick<ProductSession, 'view' | 'subscribe' | 'request'>;
-type Workbook = { name: string; bytes: Buffer };
+type InputFile = { name: string; bytes: Buffer };
+type SelectedInput = InputFile & { mime: C['IntakeObject']['mime'] };
 type Principal = C['IntakePrincipalPage']['items'][number] & { selection: string };
-type Pending = { kind: 'upload'; operationId: string; file: Workbook } | { kind: 'receive'; body: C['IntakeReceive'] };
+type Pending = { kind: 'upload'; operationId: string; file: SelectedInput } | { kind: 'receive'; body: C['IntakeReceive'] };
 type Request = (path: string, options?: Parameters<Session['request']>[2]) => Promise<unknown>;
 export type IntakeNativeFiles = {
-  chooseWorkbook(signal: AbortSignal): Promise<Workbook | null>;
+  chooseInputFile(signal: AbortSignal): Promise<InputFile | null>;
   saveReport(bytes: Buffer, signal: AbortSignal): Promise<boolean>;
 };
 // 100 issues × (512 message + 64 code + 64 sheet) × up to 6 JSON-escape bytes, plus metadata.
 const JOB_BYTES = 512 * 1024;
-const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const reject = (code: 'STALE' | 'CONFLICT' | 'FORBIDDEN' | 'VALIDATION'): never => { throw new ProductHttpError(code); };
 const sameContext = (a: C['IntakeManagementContext'], b: C['IntakeManagementContext']) =>
   a.sourceId === b.sourceId && a.sourceVersion === b.sourceVersion && a.baseReleaseId === b.baseReleaseId
@@ -36,7 +36,7 @@ export class ContentIntakeUpload {
   private sources = new Map<string, string>();
   private sourceId: string | null = null;
   private priorKey: C['IntakeCandidateKey'] | null = null;
-  private file: Workbook | null = null;
+  private file: SelectedInput | null = null;
   private context: C['IntakeManagementContext'] | null = null;
   private principals: Principal[] = [];
   private preparer: string | null = null;
@@ -171,9 +171,9 @@ export class ContentIntakeUpload {
       if (pending.kind === 'upload') {
         this.phase = 'uploading';
         const form = new FormData(); form.append('operationId', pending.operationId);
-        form.append('file', new Blob([new Uint8Array(pending.file.bytes)], { type: MIME }), 'faq.xlsx');
+        form.append('file', new Blob([new Uint8Array(pending.file.bytes)], { type: pending.file.mime }), pending.file.mime === 'text/csv' ? 'faq.csv' : 'faq.xlsx');
         const object = parseContractSchema('IntakeObject', await request(`${this.sourcePath()}/objects`, { form, timeoutMs: 30_000 }));
-        if (object.sourceId !== this.sourceId || object.bytes !== pending.file.bytes.length
+        if (object.sourceId !== this.sourceId || object.mime !== pending.file.mime || object.bytes !== pending.file.bytes.length
           || object.sha256 !== createHash('sha256').update(pending.file.bytes).digest('hex')) return reject('STALE');
         this.object = object;
       } else {
@@ -264,16 +264,17 @@ export class ContentIntakeUpload {
       if (command.action === 'upload-choose') {
         if (parsing(this.job)) return reject('CONFLICT');
         const previous = this.phase; this.phase = 'choosing';
-        const picked = await this.native.chooseWorkbook(controller.signal); assertActive();
+        const picked = await this.native.chooseInputFile(controller.signal); assertActive();
         if (!picked) { this.phase = previous; return null; }
-        if (!Buffer.isBuffer(picked.bytes) || picked.bytes.length < 4 || picked.bytes.length > INTAKE_UPLOAD_MAX_BYTES
-          || picked.bytes.readUInt32LE(0) !== 0x04034b50 || !/\.xlsx$/i.test(picked.name)
+        const mime = intakeInputMime(picked.name);
+        if (!mime || !Buffer.isBuffer(picked.bytes) || picked.bytes.length < 1 || picked.bytes.length > INTAKE_UPLOAD_MAX_BYTES
+          || (mime !== 'text/csv' && (picked.bytes.length < 4 || picked.bytes.readUInt32LE(0) !== 0x04034b50))
           || /[\\/]/.test(picked.name) || [...picked.name].some(c => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127) || picked.name.length > 255) return reject('VALIDATION');
         // A completed revision has consumed its old key. A new accepted file
         // starts a separate candidate; cancelled pickers and failed revisions
         // keep their target. Only beginRevision can bind another old version.
         if (this.job?.state === 'validated') this.priorKey = null;
-        this.clearDraft(); this.file = { name: picked.name, bytes: Buffer.from(picked.bytes) }; this.phase = 'confirming';
+        this.clearDraft(); this.file = { name: picked.name, bytes: Buffer.from(picked.bytes), mime }; this.phase = 'confirming';
         await this.loadDeclaration(request, await this.readContext(request));
       } else if (command.action === 'upload-submit') {
         if (!this.file || this.job || !this.context) return reject('STALE');

@@ -1,6 +1,6 @@
 # 合成 FAQ 规范解析
 
-`parseWorkbook(bytes, fixedContext)` 用 ExcelJS 读取标准 FAQ 模板，返回规范行、相似问法、排除页统计与错误坐标。`createTemplate` / `writeIssueReport` 生成可重新打开的 XLSX。`createParseRunner().parse` 拥有单个解析子进程、超时、取消与退出；取消完成后才释放槽位。
+`parseWorkbook(bytes, fixedContext)` 用 ExcelJS 读取标准 FAQ 工作簿；`parseCsv(bytes, fixedContext)` 原生读取标准 CSV。两者复用 FAQ / 问法规则，返回规范行和错误坐标。`createTemplate` / `writeIssueReport` 生成可重新打开的 XLSX。`createParseRunner().parse` 拥有单个解析子进程、超时、取消与退出；取消完成后才释放槽位。
 
 这是 P1 技术验证与 P2 API 合成事务共用的规范解析包。API 事务执行器通过 runner 消费；隔离合成 HTTP 与桌面 Main/preload/界面已接通上传、校验及报告读取，renderer 不直接运行解析器。正式生产服务尚未装配。来源事实由调用方固定；权限、风险与审批摘要归 API。任何阻断项返回空结果，不能把好行单独发出去。公式、宏、外部关系不执行；所选页的图片/附件暂时阻断并说明，排除页图片可计数。词项存在性及持久候选由 API 事务模块校验；完整媒体语义尚未支持。不能把这里的格式通过当成可发布。
 
@@ -10,4 +10,6 @@
 
 运行、限制与实际证据见[开发配方](../../docs/how-to-develop-content-intake.md)；历史 P1 差集见[合同差集](../../docs/reference-content-intake-p1-contract-gap.md)，当前接收及消费状态见[P2 合同交接](../../docs/reference-content-intake-p2-contract-handoff.md)。
 
-CSV 候选位于 `experiments/`，与 XLSX 复用 `src/faq-rules.ts` 的业务校验。它使用独立的 `faq-csv-v1` / `intake-csv-v1`，保留原始 CSV 字节的摘要；不进入包的 `dist`、exports、现有 runner 或 HTTP。当前正式消费者仍只接受 XLSX，候选解析成功不表示 CSV 已能上传发布。所属仓精确版本冻结、export/intake 与消费者接线的剩余条件见[当前计划 §0.53](../../docs/plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)。
+CSV 的 `faq-csv-v1` / `intake-csv-v1` 已随 OpenAPI 1.22.0 / schema.v1.24 正式冻结并静态接收，唯一解析实现位于 `src/csv.ts`。`createCsvTemplate` 生成固定 23 列标准文件；`experiments/csv/synthetic-template.csv` 保留为原字节合成样例。runner 按可信上下文的模板版本选解析器，不能由文件名、客户端 MIME 或文件内来源字段决定范围。API 从已登记完整格式元组校验 MIME、映射与结构摘要，再从对象存储独立重算原字节摘要；CSV 不转换为 XLSX。调用同步 `parseCsv` 仅适用于隔离子进程或受控离线验证，不能放入 Main / HTTP 事件循环。
+
+`isParseResult` 可读取两种已支持规则版本的历史报告；runner 另外传入本次预期规则，拒绝格式串线的进程输出。CSV 的问题坐标为逻辑记录号，首条数据为第 2 行，多行字段不增加记录号；报告仍为实际 XLSX。完整接线及合成验收的证据边界见[当前计划 §0.53](../../docs/plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)，不构成真实资料或生产运行激活。

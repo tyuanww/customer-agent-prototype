@@ -56,7 +56,7 @@ export class ContentIntakeManagement {
     this.epoch = session.view().sessionEpoch;
     this.quality = new ContentIntakeQuality(session);
     this.upload = new ContentIntakeUpload(session, nativeFiles ?? {
-      chooseWorkbook: async () => { throw new ProductHttpError('UNAVAILABLE'); },
+      chooseInputFile: async () => { throw new ProductHttpError('UNAVAILABLE'); },
       saveReport: async () => { throw new ProductHttpError('UNAVAILABLE'); },
     });
     this.unsubscribe = session.subscribe(() => {

@@ -1,0 +1,169 @@
+{
+  "status": "PASS",
+  "scope": "Current Mac installed unsigned artifact, CSV synthetic runtime only",
+  "recorded_at": "2026-10-08T16:06:18.010633+00:00",
+  "version": "0.3.26",
+  "head_at_build": "54f428ca8296aba9a75d2205439b3063cfef8c9b",
+  "branch": "codex/intake-organization",
+  "worktree_changes_included": true,
+  "input_manifest": "evidence/qa/intake-csv-runtime/package-inputs.json",
+  "unchanged_package_inputs": 227,
+  "installed_artifact": "evidence/qa/intake-csv-runtime/package-installed-artifact.json",
+  "runtime_identity": "evidence/qa/intake-csv-runtime/package-identity.json",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "macos": "26.5.2",
+    "macos_build": "25F84",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "electron": "43.4.0",
+    "postgres": "15.18"
+  },
+  "commands": [
+    {
+      "command": "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/.bun/bin:$PATH pnpm package:mac:local",
+      "exit_code": 0,
+      "log": "package-build.log"
+    },
+    {
+      "command": "hdiutil attach -readonly -nobrowse <new DMG>; ditto <mounted app> <owned installed directory>; hdiutil detach <owned mount>",
+      "exit_code": 0,
+      "log": "package-install.log",
+      "command_note": "Display summary; actual arguments and outputs are recorded in the log."
+    },
+    {
+      "command": "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/.bun/bin:$PATH CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE='/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo' INTAKE_REAL_STACK_SCREENSHOT_DIR=/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/e2e pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts",
+      "exit_code": 0,
+      "tests": {
+        "passed": 1,
+        "failed": 0,
+        "seconds": 21.8
+      },
+      "log": "package-e2e.log"
+    }
+  ],
+  "result": {
+    "status": "PASS",
+    "profile": "purpose-runtime",
+    "inputFormat": "csv",
+    "purposeQueries": {
+      "business": 2157,
+      "usage": 427,
+      "worker": 40,
+      "organization": 30
+    },
+    "electron": "darwin",
+    "api": "actual",
+    "postgres": 15,
+    "nativeDialog": "controlled-path-and-confirmation-responses",
+    "upload": "actual-multipart",
+    "issueReport": "saved-and-read-with-exceljs",
+    "publicationPolicy": "direct-v1",
+    "approvalRows": 0,
+    "revision": "same-id-v2-fresh-evidence",
+    "cancellation": "server-confirmed-live-release-unchanged",
+    "ordinarySeat": true,
+    "releaseId": "rel_2",
+    "screenshots": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-csv-mac-package-20261009/e2e"
+  },
+  "owned_resources_removed": {
+    "status": "OWNED_RESOURCES_REMOVED",
+    "hostDirectory": "/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-Hr0OeT",
+    "desktopDirectory": "/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-f4l7tg"
+  },
+  "owned_resources_absent_after_test": true,
+  "dmg_detached": true,
+  "logs": [
+    {
+      "path": "evidence/qa/intake-csv-runtime/package-build.log",
+      "sha256": "7cdce5215cf0a0fb4ac304614decf9045d029586defe87fa49107a006925f682",
+      "bytes": 30817
+    },
+    {
+      "path": "evidence/qa/intake-csv-runtime/package-install.log",
+      "sha256": "eb2d88c7dec011bc4713d9d606fbfb3b17f66849262b64978eed7e4cfc000129",
+      "bytes": 1389
+    },
+    {
+      "path": "evidence/qa/intake-csv-runtime/package-e2e.log",
+      "sha256": "f1cd56b14a8bb885a0b8c66d51543a6138387d85c9fcd1fc294a9c8c25d6749f",
+      "bytes": 1528
+    },
+    {
+      "path": "evidence/qa/intake-csv-runtime/package-identity.json",
+      "sha256": "88c6167036481a12b19fe87999b9f8d12c62a95968b9a8c92b84725c6ee3a87f",
+      "bytes": 583
+    }
+  ],
+  "screenshots": [
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-cancelled.png",
+      "sha256": "095cc03ea10b21aa1b0272f8022abd8ee6d95e8a043412a59edc7870578e358d",
+      "bytes": 202914
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-intake-dark.png",
+      "sha256": "1e2d697f0fe11e622116f15f4c871a102a9d6cc6b3690b1609a61cab03836204",
+      "bytes": 249712
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-intake-declaration-dark.png",
+      "sha256": "b2d0a88dbba021d96a72c944166a6d9b9cf19841bd0f2e0d08c6d854ac51d27d",
+      "bytes": 232047
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-intake-light.png",
+      "sha256": "6ef2d53fd5f8e2be21b4ea819f3d8ac10982e301deac3e73209b969ff95d2c52",
+      "bytes": 247569
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-intake-minimum-dark.png",
+      "sha256": "338fb4bada8548240a2a8ee029a0b99b316b61e551036b9d71aa59f951c72da0",
+      "bytes": 239200
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-intake-start.png",
+      "sha256": "2707a1d4776db357a426ebdd8cc7f3318f2104f14f4d0eea39651da49edcfe77",
+      "bytes": 247242
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-published.png",
+      "sha256": "3642e938114ae13879413743fd7b3da1fd9ba697884f310c19cc337d3f5eaff7",
+      "bytes": 216401
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-revision-v2.png",
+      "sha256": "abdef200468a4a6e8ea2bc5e97774a342ed2c098a90ed434d420ac231af16e7e",
+      "bytes": 208632
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-upload-error-report.png",
+      "sha256": "cc47b8a81e78b98804f317b0b233186d3b7f78c9103c71148a80aff2d94ed862",
+      "bytes": 291876
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/dashboard-uploaded-material.png",
+      "sha256": "f50ed2378c38f54d0c964515b1f2522f23d1f9622ac744d7508f857a793051fa",
+      "bytes": 214830
+    },
+    {
+      "path": ".gstack/qa-reports/intake-csv-mac-package-20261009/e2e/query-published-faq.png",
+      "sha256": "5ea351d6aeb7fcc3ea36800586de8606016dcfb7b5436dd8ab1b224dec2b6a1a",
+      "bytes": 240318
+    }
+  ],
+  "test_source": {
+    "path": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+    "sha256": "1f72d14ac95ea0dc0addc98b4c3a6f861ec71ede0e5b43e6f8a28556eb2ceb08"
+  },
+  "limits": [
+    "Synthetic data only; actual HTTP/PG15 through local synthetic host, not real Feishu or customer data.",
+    "Native file selection, save, and confirmation responses are controlled by the test; this is not manual OS interaction evidence.",
+    "Actual CSV uploads and saved XLSX issue report were consumed by assertions and deleted with test-owned temporary data; durable evidence is the test source, log, runtime identity and screenshots.",
+    "No signing, notarization, remote publication, production configuration or Windows execution.",
+    "Existing XLSX packaged run and unrelated historical checks were not repeated.",
+    "Full external /review remains INCOMPLETE; separate workspace budget result is not replaced by package success.",
+    "This fresh-content CSV run does not validate old nonempty directory claim ACL."
+  ]
+}

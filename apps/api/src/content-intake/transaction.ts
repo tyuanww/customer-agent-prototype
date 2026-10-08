@@ -186,7 +186,9 @@ export function createIntakeTransactions(pool: IntakePool,
       try { report(diagnosticId, error); } catch { /* Diagnostics must not change transaction certainty. */ }
       if (committing) return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
       const rejection = error instanceof IntakeRejection ? error
-        : error instanceof ContractValidationError ? new IntakeRejection('FILE_INVALID', 'VALIDATION')
+        : error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SOURCE_FORMAT_MISMATCH'
+          ? new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION')
+          : error instanceof ContractValidationError ? new IntakeRejection('FILE_INVALID', 'VALIDATION')
           : new IntakeRejection('COMMIT_UNKNOWN', 'INTERNAL_ERROR');
       return { ok: false, code: rejection.code, reason: rejection.reason, commit: broken ? 'unknown' : 'rolled_back', diagnosticId };
     } finally {

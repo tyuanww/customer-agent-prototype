@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
-import { INTAKE_POLICY as P, failedParse, isParseResult, type ParseContext, type ParseResult } from './policy.js';
+import { INTAKE_POLICY as P, failedParse, isParseResult, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, TEMPLATE_VERSION, type IntakeParseContext, type ParseResult } from './policy.js';
 
 export type ProcessResult = Readonly<{ result: ParseResult; elapsedMs: number; maxRssKiB: number; networkAttempts: number }>;
 /** Owns one bounded parsing process at a time. Cancel/timeout resolve only after exit,
@@ -11,9 +11,11 @@ export type ProcessResult = Readonly<{ result: ParseResult; elapsedMs: number; m
 export function createParseRunner() {
   let active = false;
   return {
-    async parse(bytes: Buffer, context: ParseContext, options: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<ProcessResult> {
+    async parse(bytes: Buffer, context: IntakeParseContext, options: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<ProcessResult> {
       const started = performance.now();
-      const failed = (code: string): ProcessResult => ({ result: failedParse(code), elapsedMs: performance.now() - started, maxRssKiB: 0, networkAttempts: 0 });
+      const policyVersion = context?.templateVersion === CSV_TEMPLATE_VERSION ? CSV_POLICY_VERSION : P.version;
+      const failed = (code: string): ProcessResult => ({ result: failedParse(code, policyVersion), elapsedMs: performance.now() - started, maxRssKiB: 0, networkAttempts: 0 });
+      if (!context || ![CSV_TEMPLATE_VERSION, TEMPLATE_VERSION].includes(context.templateVersion)) return failed('INVALID_CONTEXT');
       if (options.signal?.aborted) return failed('CANCELLED');
       if (active) return failed('BUSY');
       if (bytes.length > P.fileBytes) return failed('FILE_TOO_LARGE');
@@ -45,7 +47,7 @@ export function createParseRunner() {
             if (reason || code !== 0) { resolve(failed(reason ?? 'PROCESS_FAILURE')); return; }
             try {
               const message = JSON.parse(Buffer.concat(output).toString('utf8'));
-              if (!isParseResult(message.result) || !Number.isFinite(message.maxRssKiB)
+              if (!isParseResult(message.result, policyVersion) || !Number.isFinite(message.maxRssKiB)
                 || message.maxRssKiB < 0 || message.networkAttempts !== 0) throw new Error('INVALID_OUTPUT');
               resolve({ result: message.result, maxRssKiB: message.maxRssKiB, networkAttempts: 0, elapsedMs: performance.now() - started });
             } catch { resolve(failed('PROCESS_FAILURE')); }

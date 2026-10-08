@@ -3,7 +3,7 @@ import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
-import { INTAKE_POLICY, TEMPLATE_VERSION, type ParseResult } from '@customer-agent/content-intake';
+import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import type { ContentObjectStore, PersistedContentObject } from '../content-object-store.js';
@@ -12,6 +12,7 @@ import { createIntakeTransactions, IntakeRejection, type IntakePool, type Intake
 import { authorize, changeGrant, createGrants, previewGrants, source } from './authority.js';
 import { cancelCandidate, cancellationReceipt, historicalCandidate, freezeParsed, getJob, readCandidate, receive } from './candidate.js';
 import { digest } from './material.js';
+import { sourceInputFormat } from './input-format.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
 import { createIntakeRollback } from './rollback.js';
@@ -126,11 +127,13 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       if (j.actor_id !== who.id) throw new IntakeRejection('MATERIAL_CHANGED');
       if (j.state === 'validated') return { candidate: await readCandidate(client, who, j.result_candidate_id!, Number(j.result_candidate_version), 'import') };
       if (j.state !== 'reading' && j.state !== 'parsing') throw new IntakeRejection('MATERIAL_CHANGED');
-      if (src.templateVersion !== TEMPLATE_VERSION || src.ruleVersion !== INTAKE_POLICY.version) throw new IntakeRejection('TEMPLATE_VERSION', 'VALIDATION');
-      const objects = await client.query<{ sha256: string; bytes: string }>('SELECT sha256,bytes FROM content_intake.objects WHERE object_id=$1', [j.object_id]);
+      if (src.version !== Number(j.source_version)) throw new IntakeRejection('SOURCE_MISMATCH');
+      const format = sourceInputFormat(src);
+      const objects = await client.query<{ sha256: string; bytes: string; mime: string }>('SELECT sha256,bytes,mime FROM content_intake.objects WHERE object_id=$1', [j.object_id]);
+      if (objects.rows[0]?.mime !== format.mime) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION');
       await client.query("UPDATE content_intake.parse_jobs SET state='parsing' WHERE job_id=$1", [id]);
       return { job: j, source: src, object: objects.rows[0]! };
-    }, v => v as { candidate: C['IntakeCandidate'] } | { job: import('./candidate.js').Job; source: import('./authority.js').Source; object: { sha256: string; bytes: string } });
+    }, v => v as { candidate: C['IntakeCandidate'] } | { job: import('./candidate.js').Job; source: import('./authority.js').Source; object: { sha256: string; bytes: string; mime: string } });
     if (!prepared.ok) {
       // A queued HTTP admission can lose its session before a worker starts.
       // Close only that actor's still-pending job; this grants no business write
@@ -148,12 +151,9 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     try {
       const bytes = await store.readPayload(prepared.value.job.object_id);
       if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) throw new Error('OBJECT_CHANGED');
-      const scope = prepared.value.source.scope;
-      parsed = (await runner.parse(bytes, { sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? 'brand',
-        scopeKind: scope.shopId === null ? 'brand' : 'shop',
-        domain: scope.domain, sheet: 'FAQ', templateVersion: TEMPLATE_VERSION }, signal ? { signal } : {})).result;
+      parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
     } catch {
-      parsed = { ok: false, policyVersion: INTAKE_POLICY.version, rows: [], questions: [], excluded: [], expandedBytes: 0, mediaCount: 0,
+      parsed = { ...failedParse('OBJECT_UNAVAILABLE', prepared.value.source.ruleVersion === CSV_POLICY_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version),
         issues: [{ code: 'OBJECT_UNAVAILABLE', sheet: '', row: 0, column: '', fix: '对象不可读取或指纹变化，请重新上传' }] };
     }
     const frozen = parsed.ok ? await run(actor, 'freeze', null, null, async (client, who) => {

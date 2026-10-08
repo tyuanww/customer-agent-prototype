@@ -137,14 +137,17 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // evidence must not be weakened without failing this exact verifier.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
-const EXPECTED_ACL_MANIFEST_ENTRIES = 537;
-const EXPECTED_ACL_MANIFEST_SHA256 = 'aaabfeda8877ef28c5d8d3aa7a6c8143e41254c221497778d9d4d11a231ec1a9';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 3085;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = 'fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 250;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '71a71dfbb803858ea4c7728fb04d625e2b3038c531194d177e9510007c158662';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 105;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = '3f262813591fee4cd2938bbd7078d55f02664942eef253fd093271f33cc1ca71';
+// 0034 adds five invoker format functions (default PUBLIC EXECUTE remains
+// behind the sealed schema), four INSERT guards, and CSV input constraints.
+// No table grants, runtime roles or existing function bodies change.
+const EXPECTED_ACL_MANIFEST_ENTRIES = 542;
+const EXPECTED_ACL_MANIFEST_SHA256 = '95c8860d441fdb7429364476c09938e1935f8aa5383a9743a84b89399ff8f6b5';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 3090;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = 'c31a0c03694ec13c86ba15eb596c6b47c5164335712d839bc53cc0fb40e0de03';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 255;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '51ec728928940da3bbd28767d8727727518574d124c24330e64eb5189a38d26b';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -785,7 +788,7 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 97 || inventory.views !== 7 || inventory.functions !== 250 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 97 || inventory.views !== 7 || inventory.functions !== 255 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 17 || roles.safe !== 17 || roles.memberships !== 0) {

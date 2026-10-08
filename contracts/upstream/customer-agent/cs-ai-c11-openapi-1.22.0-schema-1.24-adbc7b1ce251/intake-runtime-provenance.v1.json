@@ -1,0 +1,45 @@
+{
+  "status": "DRAFT",
+  "sourceRepository": "customer-agent-prototype",
+  "sourceCommit": "cff9fa9b611a5f77de465b3a5ee1022c64027d9c",
+  "sourceInputs": {
+    "apps/api/experiments/intake-organization/REGISTERED-INPUT.md": "e030d428b2e5c264055a01921a511e67a6babcd5a85f477b845ce24757ce9a9a",
+    "apps/api/experiments/intake-organization/registered-input.sql": "f3bfa7c120720ba573b66f5899e4274a8702345678a8f496af6501fc7762f168",
+    "apps/api/experiments/intake-runtime/session-lock.sql": "4e8928fd8bc2efd2e8ec45d2fc3d08e000fa82373f6c237a9472d3fc549efca1",
+    "apps/api/experiments/intake-runtime/purpose-acl.sql": "4bb27efc556c9931b70386c29982db68dd2ee9e050feccc1dd6772a160fae23c",
+    "apps/api/experiments/intake-runtime/consumer-acl.sql": "90a2f756fb4bdba374b6060d823cc4896003294bce83895f48924bd29adb81cd",
+    "apps/api/experiments/intake-runtime/PURPOSE-ACL.md": "6b4f587a1f9f6ca6db106a05fadae3fb4cef2ef89546431ccb2f8be4353dd2b2",
+    "apps/api/experiments/intake-runtime/INTEGRATION.md": "947c2026ac2fe7b78da918d92897368f9f49b4f2cb7095314cd9a0c545ea5e78"
+  },
+  "changes": [
+    "Combine organization, capability and directory protocols in OpenAPI1.21/schema1.23",
+    "Rename intake_org_candidate to intake_organization and intake_runtime_probe to intake_runtime",
+    "Register only NOLOGIN capability roles; environment LOGIN and credentials are separate",
+    "Use formal mapping version feishu-contact-job-title-v1",
+    "Drop historical purpose_gap: it describes the superseded probe matrix, not current consumers",
+    "Preserve frozen function bodies; only existing function ownership/security properties change",
+    "Add append-only organization registration CAS and same-transaction provenance SQL invariants; enqueue evidence obligation at insert so RESET ROLE cannot bypass deferred validation",
+    "Add explicit NOREPLICATION plus real environment LOGIN/current capability boundary checks",
+    "Split product-only runtime ACL from reference core instead of copying product publication functions into governance"
+  ],
+  "implementationDependencies": {
+    "repository": "customer-agent-prototype",
+    "commit": "cff9fa9b611a5f77de465b3a5ee1022c64027d9c",
+    "migrationManifest": "0aed48efa48d9eb14f4a7bc620f0c3b7d04968fcecd0a742af3eaca75fa0daf5",
+    "overlayFiles": {
+      "0021_content_intake_v1_20.sql": "7c19bf3f97fecb5af61c92131c0ce2a5f5f42822d2e104bb4202d96e292c73db",
+      "0022_intake_legacy_fence.sql": "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03",
+      "0023_intake_quality.sql": "c3b37131c28b76b2453e24d5f432e70329c478a7f90d34c95598518124e50136",
+      "0024_intake_publication.sql": "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2",
+      "0025_intake_usage_v1_21.sql": "f270f787323a65baf3727337dcc34c1ff3f7a0bac0baf79a1894a7f7ae9591f4",
+      "0026_intake_discovery_index.sql": "c96e289e3ae19d600913b80796f3051eb7c19c5f544e1b8b9e17d5f5f1cd911f",
+      "0027_intake_rollback.sql": "da90dd3eaa366037fbbe71f4296697fdf3f9f788954119731926e6500df55e98",
+      "0028_intake_family.sql": "8b241e1b5f808c2278b53351a0d3cbee56f4ac23ca16c65736ba45ace859382e",
+      "0029_intake_capacity.sql": "9d56a3ea4b56d5ec1ccbef5bc331c12f5f788da725a2d09030f2ccbe9e2f00ab",
+      "0030_intake_role_ceiling.sql": "8843955f79d970bdc5f03469a7bba316c2f1fb8fa070d2b0f61ba9bc1f5144a3",
+      "0031_intake_direct_v1_22.sql": "82407ae1c0ce3a3dc975b9b5fe76012b5ab4f19ee5952dafb912a23509c4dcc0",
+      "0032_intake_direct_publication.sql": "38e72eb66941256861aeb3edddc609cdbbfbc4e1eed56366b370526ad82cbddc"
+    },
+    "bodiesOwner": "product implementation; no duplicate function definitions in governance"
+  }
+}

@@ -1,9 +1,9 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551",
-  "source_git_sha": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
-  "source_schema_sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e",
-  "upgrade_source_sha256": "395a3c0f5965a094dda1cfbbbbf95ff3fd8e64af0a57568b7bedec2281aaecc9",
+  "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251",
+  "source_git_sha": "adbc7b1ce251816fc02957a0042742ae2d053f9a",
+  "source_schema_sha256": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
+  "upgrade_source_sha256": "2f9f5e463619c149e250947d75ed49f8cb157d0838dd1e5a1c6cf78963f19842",
   "compatibility": {
     "current": "N",
     "prior_signed_baseline": {
@@ -78,6 +78,12 @@
         "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
         "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce",
         "migration_count": 32
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551",
+        "source_git_sha": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
+        "source_schema_sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e",
+        "migration_count": 33
       }
     ]
   },
@@ -599,6 +605,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551",
       "source_git_sha": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
       "source_schema_sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e"
+    },
+    {
+      "position": 34,
+      "id": "0034_intake_csv_v1_24",
+      "file": "0034_intake_csv_v1_24.sql",
+      "source_ranges": [],
+      "sha256": "2f2e8963c461b0a3d720d5dbc42734851779a073bf71b07bc37d0c335416f31a",
+      "bytes": 5709,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251",
+      "source_git_sha": "adbc7b1ce251816fc02957a0042742ae2d053f9a",
+      "source_schema_sha256": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5"
     }
   ]
 }

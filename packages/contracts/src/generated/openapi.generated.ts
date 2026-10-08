@@ -543,8 +543,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 接收受控 XLSX 对象
-         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         * 接收来源已登记格式的原始 XLSX 或 CSV 对象
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。来源版本决定唯一允许格式；不依据扩展名、MIME 或文件内范围授予权限。CSV 原始字节保留，服务端独立复算 SHA-256 并按 CSV 协议解析，不转换为 XLSX 后冒充原件。来源登记与 MIME/模板/规则/结构组合不符返回 SOURCE_FORMAT_MISMATCH。
          */
         post: operations["uploadIntakeObject"];
         delete?: never;
@@ -586,7 +586,7 @@ export interface paths {
         };
         /**
          * 下载带来源及稳定编号说明的统一模板
-         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。
+         * @description 合成开发候选；服务端从产品会话取主体，按精确来源范围重验权限。未知字段拒绝。按已登记来源模板版本返回 XLSX 或 UTF-8 CSV；CSV 只有固定有序 23 列，来源元信息预填且不授予范围。
          */
         get: operations["downloadIntakeTemplate"];
         put?: never;
@@ -1923,7 +1923,37 @@ export interface components {
                 required: boolean;
                 alt: string;
             }[];
-        };
+        } & ({
+            /** @constant */
+            templateVersion: "faq-p1.1";
+            /** @constant */
+            ruleVersion: "intake-p1.1";
+            object?: {
+                /** @constant */
+                mime?: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            };
+            /** @constant */
+            selectedSheets: [
+                "来源",
+                "FAQ",
+                "相似问法"
+            ];
+        } | {
+            /** @constant */
+            templateVersion: "faq-csv-v1";
+            /** @constant */
+            ruleVersion: "intake-csv-v1";
+            /** @constant */
+            mappingVersion?: "faq-csv-columns-v1";
+            object?: {
+                /** @constant */
+                mime?: "text/csv";
+            };
+            /** @constant */
+            selectedSheets: [
+                "CSV"
+            ];
+        });
         IntakeOperationReceipt: components["schemas"]["IntakeReceipt"] | components["schemas"]["IntakeRollbackReceipt"];
         /** @description 全目录回退的独立人工审核材料绑定和最长5分钟核验事实。unavailable 不续期，不可仅凭 approved 忽略 validUntil；提交仍由服务端重验。 */
         IntakeRollbackReview: {
@@ -2138,7 +2168,37 @@ export interface components {
                 required: boolean;
                 alt: string;
             }[];
-        };
+        } & ({
+            /** @constant */
+            templateVersion: "faq-p1.1";
+            /** @constant */
+            ruleVersion: "intake-p1.1";
+            object?: {
+                /** @constant */
+                mime?: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            };
+            /** @constant */
+            selectedSheets: [
+                "来源",
+                "FAQ",
+                "相似问法"
+            ];
+        } | {
+            /** @constant */
+            templateVersion: "faq-csv-v1";
+            /** @constant */
+            ruleVersion: "intake-csv-v1";
+            /** @constant */
+            mappingVersion?: "faq-csv-columns-v1";
+            object?: {
+                /** @constant */
+                mime?: "text/csv";
+            };
+            /** @constant */
+            selectedSheets: [
+                "CSV"
+            ];
+        });
         IntakeRisk: {
             /** @enum {string} */
             policyVersion: "risk-p1.1";
@@ -2243,7 +2303,7 @@ export interface components {
             sha256: string;
             bytes: number;
             /** @enum {string} */
-            mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" | "text/csv";
             sourceId: string;
         };
         IntakeVocabularyWrite: {
@@ -2282,7 +2342,21 @@ export interface components {
             ruleVersion: string;
             mappingVersion: string;
             structureDigest: string;
-        };
+        } & ({
+            /** @constant */
+            templateVersion: "faq-p1.1";
+            /** @constant */
+            ruleVersion: "intake-p1.1";
+        } | {
+            /** @constant */
+            templateVersion: "faq-csv-v1";
+            /** @constant */
+            ruleVersion: "intake-csv-v1";
+            /** @constant */
+            mappingVersion?: "faq-csv-columns-v1";
+            /** @constant */
+            structureDigest?: "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165";
+        });
         IntakeSource: {
             scope: components["schemas"]["IntakeSourceScope"];
             version: components["schemas"]["IntakeVersion"];
@@ -2293,7 +2367,21 @@ export interface components {
             /** @enum {string} */
             contentIntakeMode: "legacy" | "v2-preview" | "v2-active";
             modeVersion: components["schemas"]["IntakeVersion"];
-        };
+        } & ({
+            /** @constant */
+            templateVersion: "faq-p1.1";
+            /** @constant */
+            ruleVersion: "intake-p1.1";
+        } | {
+            /** @constant */
+            templateVersion: "faq-csv-v1";
+            /** @constant */
+            ruleVersion: "intake-csv-v1";
+            /** @constant */
+            mappingVersion?: "faq-csv-columns-v1";
+            /** @constant */
+            structureDigest?: "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165";
+        });
         IntakePolicy: {
             /** @enum {string} */
             policyVersion: "intake-p1.1";
@@ -2331,6 +2419,28 @@ export interface components {
             ticketMaxAgeSeconds: 60;
             /** @enum {boolean} */
             selectedMediaSupported: false;
+            inputFormats: [
+                {
+                    mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                    templateVersion: "faq-p1.1";
+                    ruleVersion: "intake-p1.1";
+                    selectedSheets: [
+                        "来源",
+                        "FAQ",
+                        "相似问法"
+                    ];
+                },
+                {
+                    mime: "text/csv";
+                    templateVersion: "faq-csv-v1";
+                    ruleVersion: "intake-csv-v1";
+                    mappingVersion: "faq-csv-columns-v1";
+                    structureDigest: "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165";
+                    selectedSheets: [
+                        "CSV"
+                    ];
+                }
+            ];
         };
         IntakeGrantChange: {
             operationId: string;
@@ -2412,7 +2522,7 @@ export interface components {
             message: string;
             details: {
                 /** @enum {string} */
-                reason: "ORG_FACTS_UNAVAILABLE" | "PERMISSION_CHANGED" | "SCOPE_DENIED" | "ROLE_CEILING" | "GRANT_AUTHORITY_DENIED" | "SELF_ESCALATION" | "REDELEGATION_DENIED" | "NO_STEWARD" | "SOURCE_MISMATCH" | "SOURCE_ORDER_UNKNOWN" | "FILE_INVALID" | "FILE_LIMIT" | "TEMPLATE_VERSION" | "EMPTY_DATA" | "QUOTA_EXCEEDED" | "AWAITING_APPROVAL" | "APPROVAL_UNAVAILABLE" | "HUMAN_REVIEW_REQUIRED" | "APPROVAL_BINDING" | "ATTACHMENT_UNVERIFIED" | "MATERIAL_CHANGED" | "BASE_CHANGED" | "APPROVAL_CHANGED" | "APPROVAL_REVOKED" | "TICKET_EXPIRED" | "TICKET_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "COMMIT_UNKNOWN" | "ALREADY_PUBLISHED" | "MODE_CONFLICT" | "UPGRADE_REQUIRED" | "VOCABULARY_IN_USE" | "MEANING_CHANGED" | "LEASE_EXPIRED" | "NO_SHOP" | "CHOOSE_SHOP" | "SHOP_DIRECTORY_CURSOR" | "SHOP_DIRECTORY_SESSION" | "SHOP_DISPLAY_MISSING" | "SHOP_DIRECTORY_CHANGED" | "SHOP_DIRECTORY_EXPIRED" | "SHOP_DIRECTORY_UNAVAILABLE";
+                reason: "ORG_FACTS_UNAVAILABLE" | "PERMISSION_CHANGED" | "SCOPE_DENIED" | "ROLE_CEILING" | "GRANT_AUTHORITY_DENIED" | "SELF_ESCALATION" | "REDELEGATION_DENIED" | "NO_STEWARD" | "SOURCE_MISMATCH" | "SOURCE_ORDER_UNKNOWN" | "FILE_INVALID" | "FILE_LIMIT" | "TEMPLATE_VERSION" | "EMPTY_DATA" | "QUOTA_EXCEEDED" | "AWAITING_APPROVAL" | "APPROVAL_UNAVAILABLE" | "HUMAN_REVIEW_REQUIRED" | "APPROVAL_BINDING" | "ATTACHMENT_UNVERIFIED" | "MATERIAL_CHANGED" | "BASE_CHANGED" | "APPROVAL_CHANGED" | "APPROVAL_REVOKED" | "TICKET_EXPIRED" | "TICKET_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "COMMIT_UNKNOWN" | "ALREADY_PUBLISHED" | "MODE_CONFLICT" | "UPGRADE_REQUIRED" | "VOCABULARY_IN_USE" | "MEANING_CHANGED" | "LEASE_EXPIRED" | "NO_SHOP" | "CHOOSE_SHOP" | "SHOP_DIRECTORY_CURSOR" | "SHOP_DIRECTORY_SESSION" | "SHOP_DISPLAY_MISSING" | "SHOP_DIRECTORY_CHANGED" | "SHOP_DIRECTORY_EXPIRED" | "SHOP_DIRECTORY_UNAVAILABLE" | "SOURCE_FORMAT_MISMATCH";
                 diagnosticId: string;
             };
         };
@@ -6823,7 +6933,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 接收受控 XLSX 对象 */
+            /** @description 接收来源已登记格式的原始 XLSX 或 CSV 对象 */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7119,6 +7229,7 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
                 };
             };
             /** @description 按 error.code / details.reason 采取规定恢复动作；不披露资源权限或存在性。 */

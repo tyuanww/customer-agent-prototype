@@ -1,0 +1,51 @@
+{
+  "status": "LOCAL_DIFF_REVIEW_COMPLETE_WITH_FROZEN_ACL_BLOCKER",
+  "baseline": "54f428ca8296aba9a75d2205439b3063cfef8c9b",
+  "method": [
+    "primary integration review",
+    "independent local /review",
+    "independent targeted error-normalization recheck"
+  ],
+  "scope": [
+    "shared CSV/XLSX policy, parser, runner and actual report consumption",
+    "API source format, raw objects, materials and transaction errors",
+    "Main bounded native files, original request recovery and UI consumption",
+    "14-file contract intake, codegen, immutable 0034 migration and PG verifier",
+    "affected unit/integration/Electron tests and documentation"
+  ],
+  "fixed": [
+    {
+      "finding": "Three old-prefix expected arrays omitted 0034",
+      "evidence": "db-postgres-final.log: 40 PASS"
+    },
+    {
+      "finding": "New source format error was not propagated from API and exact SQL guard",
+      "evidence": "csv-formal-api-reviewed-final.log: 57 PASS"
+    },
+    {
+      "finding": "Unknown vocabulary was accidentally classified as source format",
+      "evidence": "Restored SOURCE_MISMATCH; targeted material and full root test pass"
+    },
+    {
+      "finding": "Current repository snapshot assertion still pointed to 1.21/1.23",
+      "evidence": "intake-final.log: 53 PASS; test-reviewed-final.log PASS"
+    }
+  ],
+  "remaining": [
+    {
+      "finding": "Frozen 0033 NOLOGIN function owner lacks eight existing pure CHECK helper EXECUTE privileges when copying nonempty legacy content",
+      "status": "FORMAL_PRODUCT_BLOCKED_DRAFT_SUCCESSOR_VALIDATED",
+      "baselineLog": "legacy-permission-failure.log",
+      "candidateProbeLog": "draft-legacy-acl-probe.log",
+      "formallyFixed": false
+    }
+  ],
+  "externalCompleteReview": "INCOMPLETE",
+  "historicalRoleReview15of15": "REUSED_NOT_RERUN",
+  "forbiddenClaims": [
+    "all external reviews passed",
+    "production activation",
+    "real source intake",
+    "baseline legacy copy fixed by a test-only grant"
+  ]
+}

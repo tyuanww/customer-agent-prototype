@@ -1,0 +1,17 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop
+
+ ✓ tests/unit/content-intake-upload.test.ts (41 tests) 47ms
+ ✓ tests/unit/content-intake-management.test.ts (35 tests) 339ms
+ ✓ tests/unit/content-intake-native-files.test.ts (9 tests) 32ms
+ ✓ tests/unit/content-intake-management-ipc.test.ts (1 test) 2ms
+ ✓ tests/component/intake-management.test.tsx (11 tests) 1036ms
+ ✓ tests/component/intake-upload.test.tsx (15 tests) 489ms
+ ✓ tests/component/intake-permissions.test.tsx (1 test) 185ms
+ ✓ tests/unit/content-intake-permissions.test.ts (7 tests) 95ms
+
+ Test Files  8 passed (8)
+      Tests  120 passed (120)
+   Start at  23:30:04
+   Duration  4.52s (transform 249ms, setup 429ms, collect 608ms, tests 2.22s, environment 524ms, prepare 181ms)
+
