@@ -1,0 +1,30 @@
+# 标准 FAQ CSV 合成候选
+
+状态为 `DRAFT`。本目录不进入包 `dist`、公开 exports、正式 parser runner、HTTP 或 Main；同步解析仅用于离线实验。正式接线仍须合同所属仓冻结、export 和产品 intake，再由隔离 parser 运行，不能把同步解析放在 Main 事件循环。
+
+`candidate.ts` 直接处理原始 CSV 字节，复用 `src/faq-rules.ts` 的 FAQ / 问法规则，不转换成 XLSX。输出绑定原始 SHA-256、`text/csv`、`faq-csv-v1`、`intake-csv-v1`、`faq-csv-columns-v1` 及 `selectedSheets: ["CSV"]`；CSV 是逻辑数据集名，不声称存在 Excel 工作表。`runtimeActivated: false` 与 `candidateStatus: DRAFT` 是实验状态，旧 `isParseResult` 因 policy 不同会拒绝此结果。
+
+## 文件格式
+
+- UTF-8，可带文件开头 BOM；BOM 计入原件 SHA-256。非法 UTF-8、NUL、ZIP/XLSX 字节拒绝。
+- 使用 `csv-parse/sync`，逗号分隔、双引号引用及双写引号转义；记录分隔显式支持 CRLF、LF、CR。引用字段内部的换行、逗号和引号原样保留；正文不 trim、不执行以 `=` 开头的文本。
+- 固定 23 列：来源五列 + 原 FAQ 十五列 + `问法编号` / `问法` / `问法状态`。表头名称、顺序及列数必须完全匹配，每条记录的来源五字段均与可信调用方 context 对齐。
+- 每条 FAQ 可以没有问法，最后三列同时留空。存在多个问法时，重复填写完全相同的十五个 FAQ 字段，每行一条问法。相同条目的 FAQ 字段不一致、重复无问法行、无问法与有问法行混用，均整批拒绝。问法编号全文件唯一，保留独立编号与启停状态。
+- 结构摘要为 `SHA256(UTF8(JSON.stringify(CSV_HEADERS)))`，无 JSON 空白；值为 `daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165`。
+
+## 预算与错误
+
+原始字节最多 10 MiB，最多 5,000 条数据记录（不含表头），合并后 FAQ + 问法最多 5,000 条。复用包内单元格 32,767、总文字 3,000,000、总格数 200,000 的预算；字符计数为 JavaScript UTF-16 code unit 数。文字与格数预算包括表头、重复来源和重复 FAQ 字段，不能靠重复记录合并绕过。库解析阶段设置 `max_record_size = 23 × 32,767` 作为记录缓冲保护（库内部包含当前字段 UTF-8 字节计数）；精确单元格和总文字预算仍由字段回调按 UTF-16 校验。字段回调在库将字段追加进记录数组前拒绝第 24 列，纯逗号输入不能先分配出数百万空字段。23 列和记录上限使实际格数更窄，仍保留总格数检查。
+
+任何阻断错误都不返回部分可用内容。问题坐标中的 `sheet` 固定为 `CSV`、模板列为 A～W；超列错误仍报告实际列（例如第 24 列为 X），行号是逻辑记录号（表头为 1），不会把引用字段内部换行误计为新记录。无可定位记录的字节/上下文错误行号为 0；超出物理记录预算报告首个违规记录。共享的归一化行数预算错误继续使用原策略边界行号。错误报告仍为实际可重开的 XLSX，仅含坐标、错误码及修正说明，不复制原始输入文本。
+
+## 可消费合成产物与验证
+
+[`synthetic-template.csv`](synthetic-template.csv) 是固定合成来源的可解析示例，含两条 FAQ 和两条独立问法，不能作为真实来源登记或业务资料。文件由生成器同款全字段引用编码产生；`createCsvTemplate` 可生成同格式空模板或合成记录。
+
+```sh
+pnpm --filter @customer-agent/content-intake test
+pnpm --filter @customer-agent/content-intake typecheck
+```
+
+测试实际消费 CSV 产物并复开错误报告，覆盖原字节哈希、BOM、三种记录分隔、引用多行、来源对齐、字段重复、问法状态、活动期限、格式/资源拒绝、旧策略拒绝，以及既有 XLSX 行为回归。这里尚无 CSV 的原生选择、上传、服务端独立重算、发布、另一坐席查询复制或安装包验证。
