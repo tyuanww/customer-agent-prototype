@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.20.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.21.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -110,6 +110,8 @@ export const COMPONENT_SCHEMA_NAMES = [
   "IntakeRollbackReviewRequest",
   "IntakeScope",
   "IntakeSelectionIds",
+  "IntakeShopDirectory",
+  "IntakeShopDisplay",
   "IntakeSnapshot",
   "IntakeSource",
   "IntakeSourceClaim",
@@ -241,7 +243,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.20.0:components",
+  "$id": "urn:customer-agent:openapi:1.21.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -4911,7 +4913,13 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
                 "MEANING_CHANGED",
                 "LEASE_EXPIRED",
                 "NO_SHOP",
-                "CHOOSE_SHOP"
+                "CHOOSE_SHOP",
+                "SHOP_DIRECTORY_CURSOR",
+                "SHOP_DIRECTORY_SESSION",
+                "SHOP_DISPLAY_MISSING",
+                "SHOP_DIRECTORY_CHANGED",
+                "SHOP_DIRECTORY_EXPIRED",
+                "SHOP_DIRECTORY_UNAVAILABLE"
               ]
             },
             "diagnosticId": {
@@ -9501,6 +9509,61 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
       "minItems": 0,
       "maxItems": 100,
       "uniqueItems": true
+    },
+    "IntakeShopDirectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor",
+        "validUntil"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeShopDisplay"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        }
+      }
+    },
+    "IntakeShopDisplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shopId",
+        "displayName",
+        "displayVersion"
+      ],
+      "properties": {
+        "shopId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\s\\u0000-\\u001f\\u007f\\u2028\\u2029](?:[^\\u0000-\\u001f\\u007f\\u2028\\u2029]*[^\\s\\u0000-\\u001f\\u007f\\u2028\\u2029])?$"
+        },
+        "displayVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        }
+      }
     },
     "IntakeSnapshot": {
       "type": "object",

@@ -11,7 +11,7 @@ test('director previews without saving, grants a named seat query access, then r
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
   test.setTimeout(180_000);
   const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
-  const options = { prepareCandidate: false as const, profile: 'purpose-candidate' as const };
+  const options = { prepareCandidate: false as const, profile: 'purpose-runtime' as const };
   const host = await createIntakeSyntheticHost(options);
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-permissions-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -87,7 +87,7 @@ test('director previews without saving, grants a named seat query access, then r
     await record.getByRole('button', { name: '确认撤销', exact: true }).click();
     await expect(panel.getByRole('status')).toContainText('已保存');
     expect((await entitlement()).ok).toBe(false);
-    console.info(JSON.stringify({status:'PASS',flow:'director-named-seat-preview-cancel-save-revoke',profile:'purpose-candidate',entitlements:'denied-enabled-denied',appearance:'980x680-light-dark',screenshots:evidence}));
+    console.info(JSON.stringify({status:'PASS',flow:'director-named-seat-preview-cancel-save-revoke',profile:'purpose-runtime',entitlements:'denied-enabled-denied',appearance:'980x680-light-dark',screenshots:evidence}));
   } finally {
     try { if (app) await closeOwnedElectron(app); }
     finally { try { await host.close(); } finally { rmSync(directory, { recursive: true, force: true }); } }

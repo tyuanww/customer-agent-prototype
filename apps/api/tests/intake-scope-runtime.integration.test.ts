@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { Pool, type Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations } from '@customer-agent/database';
+import { applyHistoricalIntakeMigrations } from './support/intake-historical-migrations.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { assessIntakeRuntimeAssembly, readShopAuthorization, type AssemblyClient } from '../experiments/intake-runtime/assembly.js';
-import { createOrganizationFactsWriter } from '../experiments/intake-organization/facts-writer.js';
+import { createOrganizationFactsWriter } from '../src/content-intake/organization/facts-writer.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
 
 // Disposable cluster only. shop-a/shop-b and the empty rel_native_base catalog
@@ -26,7 +26,7 @@ describe.skipIf(!enabled)('intake scope runtime assembly refusals (synthetic onl
     harness.start();
     const db = harness.createDatabase('intake_scope_runtime');
     admin = await harness.connect(db.config);
-    await applyDatabaseMigrations(admin);
+    await applyHistoricalIntakeMigrations(admin);
     await seedIntakeSyntheticHost(admin);
     await admin.query(`CREATE ROLE synthetic_usage_probe LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOINHERIT;
       CREATE ROLE synthetic_facts_writer LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOINHERIT;

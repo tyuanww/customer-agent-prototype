@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。本期资料接入保持 `v0.3.26`，P2 合同消费锁已推进到 OpenAPI `1.20.0` / `schema.v1.22`；`packages/database` 当前为三十二段，前三十段 SQL 与来源保持不变，`0031` 接收冻结发布政策 DDL，`0032` 接入确认直发事务。API 已按服务端固定的 `direct-v1` 创建新候选，保留来源确认和质量检查；发布／回退不再创建人工审批，通过 Main 原生二次确认表达操作意图，最终权限、范围、版本和原子提交由 API / SQL 复核。旧 `approval-v1` 候选必须显式修订后才能首次直发；已发布历史与混合目录继续保留旧审批谱系和失效规则，旧未知操作只查原回执。显式 FAQ 合成 profile 已接线 XLSX 上传、候选修订／取消、质量检查、来源确认、确认发布及坐席查询复制；未装配审批 provider，不开放生产路由或新应用 ACL。实现、验证与剩余接入条件见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。本期资料接入保持 `v0.3.26`，P2 合同消费锁已推进到 OpenAPI `1.21.0` / `schema.v1.23`；`packages/database` 当前为三十三段，前32段 SQL 与来源保持不变，`0031` 接收冻结发布政策 DDL，`0032` 接入确认直发事务，`0033` 原子安装已批准的组织、会话、目录及用途权限伴随合同。API 已按服务端固定的 `direct-v1` 创建新候选，保留来源确认和质量检查；发布／回退不再创建人工审批，通过 Main 原生二次确认表达操作意图，最终权限、范围、版本和原子提交由 API / SQL 复核。旧 `approval-v1` 候选必须显式修订后才能首次直发；已发布历史与混合目录继续保留旧审批谱系和失效规则，旧未知操作只查原回执。显式 FAQ 合成 profile 已接线 XLSX 上传、候选修订／取消、质量检查、来源确认、确认发布及坐席查询复制；未装配审批 provider，不开放生产路由或新应用 ACL。实现、验证与剩余接入条件见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
 
 ## 1. 先看整体
 
@@ -95,23 +95,23 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
 | `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；合成宿主显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；标签不由账号推导，缺失整页失败；目录不是授权或同一时刻快照，不新增姓名表或真实员工读取 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
-| `packages/database/` | 在同一已验证快照内确定性生成三十二段 migration：0031 为冻结 schema.v1.22 增量，0032 为私有直发事务 overlay；前三十段保持原字节；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成三十三段 migration：0031/0032 为直发增量，0033 原子安装冻结运行伴随合同；前32段保持原字节；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
 | `docs/`、`evidence/qa/` | 可读合同、教程、验证方法和冻结证据 | 可执行源码、运行时缓存 |
 
-历史 OpenAPI1.19 管理上下文未新增 DDL，当时26段 SQL 的来源和校验和保持不变。当前1.20/schema1.22消费保留前三十段，已有三十行账本只追加0031、0032。迁移规划器仍允许同 DDL、不同合同身份的已审前序，但逐行来源和校验和不得改写；旧1.17与1.18的同目录兼容证据保留。证据见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
+历史 OpenAPI1.19 管理上下文未新增 DDL，当时26段 SQL 的来源和校验和保持不变。当前1.21/schema1.23消费保留前32段，已有三十二行账本只追加0033。迁移规划器仍允许同 DDL、不同合同身份的已审前序，但逐行来源和校验和不得改写；旧1.17与1.18的同目录兼容证据保留。证据见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
 
-`apps/api/experiments/intake-organization/facts-writer.ts` 只用于已登记主体的离线组织事实写入验证，复用 content lock、事实历史/版本指针及 revocation generation。测试使用临时受限账号，通过实际登录/使用资格消费者验证失效；不会创建主体或业务 grant，也不进入 dist、HTTP 或生产角色配置。原生字段/分页归一现由同目录 `feishu-observer.ts` 离线候选拥有，以受信同应用主体绑定、双扫描和观察期限生成既有快照；同目录 `http-transport.ts` 拥有固定回环 HTTP、响应预算和取消释放；应用级 session owner 按租户/app 共享令牌签发代次、失效、关闭及配额，借用 transport 不得重置配额。`registered-refresh.ts` 拥有版本化 open_id 绑定与观察 provenance，使用候选表并借入原 writer 的同一事务追加证据；撤销同时停用事实，重放只确认历史。没有生产认证 transport，双扫描不证明上游原子性。组织专项的 usage 仍用 harness 管理池；另有下述实际用途 consumer 验证，不能混为完整生产装配。原 writer 与新增观察验证分别见[组织刷新验收](../evidence/qa/intake-organization/README.md)和[原生观察验收](../evidence/qa/intake-organization/native-observer/README.md)。
+`apps/api/src/content-intake/organization/` 单一拥有事实 writer、原生字段/分页观察和版本化登记刷新，复用 content lock、事实历史/版本指针及 revocation generation；0033 已接收冻结组织存储与 provenance 同事务义务。只接受可信服务注入的组织 transport 和受限组织池，不创建主体或业务 grant。`experiments/intake-organization/http-transport.ts` 仍拥有固定回环 HTTP、响应预算和取消释放；应用级 session owner 按租户/app 共享令牌代次、失效、关闭及配额，借用 transport 不得重置配额。正式飞书 transport 仍未装配，双扫描不证明上游原子性。实际合成受限池结果见[本轮接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)，[旧组织刷新](../evidence/qa/intake-organization/README.md)和[旧原生观察](../evidence/qa/intake-organization/native-observer/README.md)仅保留对应历史输入的证据。
 
 `apps/api/src/content-intake/capacity.ts` 是 P2 磁盘容量生命周期的唯一 API 所有者，复用对象存储分配 ID、落盘前准入、持久删除。0029 私有账本在既有内容锁下统一计入输入、报告、普通/回滚审核包；所有调用方在同一业务事务采用。释放先写 tombstone 阻止迟到采用，再在锁外删除文件并同步目录，最后释放额度。未知提交、已登记引用、未知磁盘文件和历史资料不得因超时推断可删除。报告预留被明确拒绝时仍将任务终结，避免占满候选配额。没有新 renderer/HTTP 能力或生产 ACL；规则与实际证据见[容量验收](../evidence/qa/content-intake-p2-capacity/README.md)。
 
 产品迁移 `0028_intake_family` 拥有完整原生目录的显式家族关系与冲突证明，正常发布/回退通过同一 publications 触发器执行；usage在签资格和每页读取时复用私有校验。解析包只解释K列显式编号，API材料保存合同字段；usage按授权、时间、商品/场景先筛选，再以选中组合的完整覆盖选择店铺稿/通用回落，最后分页。没有renderer规则副本、标题推断或第二current；旧发布遇family明确拒绝，应用ACL仍关闭。
 
-产品迁移 `0031_intake_direct_v1_22` 接收不可变发布政策、确认时间及跨政策复合外键；`0032_intake_direct_publication` 接替0024／0027中的私有发布与回退运行函数，复用同一 release/catalog/lineage/current/公告原子事务。新操作要求 confirmed，票据不伪造审核人；混合目录按原政策继承真实旧审批及来源／内容失效门。服务器记录确认受理时间，当前操作人权限和最早截止仍在最终事务复核。函数保持 security-invoker 和原 ACL，应用无 EXECUTE；API 同时写永久回执并在 COMMIT 前重验截止，旧未知操作不得改写成新直发。字段/证据映射见[P2 交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
+产品迁移 `0031_intake_direct_v1_22` 接收不可变发布政策、确认时间及跨政策复合外键；`0032_intake_direct_publication` 接替0024／0027中的私有发布与回退运行函数，复用同一 release/catalog/lineage/current/公告原子事务。新操作要求 confirmed，票据不伪造审核人；混合目录按原政策继承真实旧审批及来源／内容失效门。服务器记录确认受理时间，当前操作人权限和最早截止仍在最终事务复核。0032当时保留security-invoker；0033后按冻结用途ACL交NOLOGIN属主以SECURITY DEFINER执行，旧app_*没有新增EXECUTE；API 同时写永久回执并在 COMMIT 前重验截止，旧未知操作不得改写成新直发。字段/证据映射见[P2 交接](reference-content-intake-p2-contract-handoff.md#候选到发布底座的映射差集)。
 
 产品迁移 `0023_intake_quality` 拥有不可变候选质量计划/逐条检查及质量状态投影，不签发发布资格，应用 ACL 不变。
 
@@ -217,9 +217,9 @@ v1.17 migrated PG15
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
-`customer-agent-contract-set/v2` 工具仅为 1.21.0/schema.v1.23 组合候选增补九件封闭运行伴随输入（共十二件包），逐件绑定源 Git、安装清单、外层 SHA 和消费锁；暂存副本必须与已核验源 manifest 完全一致。受锁消费者提供只读 `runtime_sources`，静态接收不执行 SQL 或代替运行安装器校验迁移账本。当前只通过跨仓合成包往返，实际候选未冻结/export/intake，正式锁不变。
+`customer-agent-contract-set/v2` 工具仅为 1.21.0/schema.v1.23 组合候选增补九件封闭运行伴随输入（共十二件包），逐件绑定源 Git、安装清单、外层 SHA 和消费锁；暂存副本必须与已核验源 manifest 完全一致。受锁消费者提供只读 `runtime_sources`，静态接收不执行 SQL 或代替运行安装器校验迁移账本。治理 `e35c0c0` 已冻结并导出完整包，产品已实际 intake；生成器验证前32段安装依赖后追加0033，消费锁仍 VERIFIED_NOT_ACTIVATED。
 
-合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，不准落库与 `dashboardOps` 已接到同一产品会话，方案为 APPROVED。真实 `approved_redacted/pilot_recorded` 与正式运行激活仍受各自批准门约束；飞书登录 provider 已存在，P2 原生组织刷新仍限离线合成实验；本期确认直发不装配审批 transport，旧审批只保留历史读取和失效约束。
+合同快照只由 `scripts/customer-agent-contract-set.mjs` 接收和复核：目录成员、来源 commit、字节数与 OpenAPI / DDL SHA-256 任一不符即失败。`packages/contracts` 在该验证之后生成并校验组件合同；它不修改消费锁，`runtime_activated=false` 继续成立。`apps/api` 读取 provenance 和 HTTP component validators；D2 main 使用该包的运行时 validator；shared 仅导入合同类型，renderer/preload 不加载合同运行时。当前 `/v1` 已实现合成产品身份、内容导入与审核发布、公告、synthetic-only Search + Events 主链、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop；桌面 D1 会话/HTTP adapter 已实现，D2 搜索与复制已接线，不准落库与 `dashboardOps` 已接到同一产品会话，方案为 APPROVED。真实 `approved_redacted/pilot_recorded` 与正式运行激活仍受各自批准门约束；飞书登录 provider 已存在，P2 原生组织观察/登记刷新/writer 已进入 src 单一所有者并仅由合成 host 装配；本期确认直发不装配审批 transport，旧审批只保留历史读取和失效约束。
 
 ## 5. 测试和验证层级
 
@@ -345,8 +345,10 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 `apps/api/tests/backend-runtime.e2e.test.ts` 在同一 PG15 进程链上跑导入、worker、审核、发布、回退，并用桌面 `ProductSession` / `ProductAnnounce` / `ProductSearch` 经 loopback 查询与复制。回退后旧候选 STALE；退出后本地会话清空。不经 Dashboard，不启动跨仓 runner。
 
 
-`apps/api/experiments/intake-runtime/session-lock.sql` 是身份会话锁的离线 SQL 候选，仅由隔离 PG15 测试安装到一次性数据库的隔离 schema。它验证身份 owner 持锁、用途账号仅 EXECUTE 的边界；不属于 migration、生产构建或运行装配，现有 `transaction.ts::lockProductSession` 尚未改接。字段与正式采用条件见[接入交接](reference-content-intake-p2-contract-handoff.md#2026-10-08-接续核对原生输入与会话锁权限)，实际结果见[实验验收](../evidence/qa/intake-runtime-boundary/README.md)。
+`content-intake/transaction.ts` 是唯一内容事务 owner，直接调用冻结 `intake_runtime.lock_product_session`；ZA003/SESSION_UNAVAILABLE 映射为未授权。各业务 owner 可注册事务内最终不变量检查，但不得自行 COMMIT；最终事实/最早截止仍由事务 owner 复核。
 
-`apps/api/experiments/intake-runtime/purpose-acl.sql` 与 `purpose-boundary.ts` 是四用途权限的离线 SQL 候选/探针；`assembly.ts::createIntakeRuntimeAssembly` 只检查依赖，缺认领返回 checked-not-activated / ready:false。取消、关闭、并发检查由它拥有，借入连接的生命周期仍由调用方拥有。`consumer-pool.ts` 是后续实际消费者实验：先核对 transaction 源码指纹，只转换唯一会话锁 SQL，其余查询使用原 service；`consumer-acl.sql` 单独补齐实际业务/worker 所需的受限权限。`service.ts` 默认池不变，可选 `terminalPool` 仅供失败收尾及 report 容量处理，池生命周期仍属调用方。`capacity.ts` 在 COMMIT 开始后遇错丢弃连接、保留占用，不再发送 ROLLBACK。业务和 usage 分别创建原 service 实例，组织继续使用原 writer，不复制发布或分页逻辑。旧资格 SQL 探针保留历史证据，正式 intake 后由实际消费者替换。没有生产 HTTP、migration、factory 或应用 ACL 改动。范围与验证见[本轮补齐](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)。
+`content-intake/runtime-pool.ts` 唯一拥有四用途连接的显式 SET ROLE/assert_purpose、借出失败销毁及关停；连接配置由调用者显式提供，不创建角色或读取环境凭据。业务/usage 分别创建原 service，worker 只服务既有失败收尾和报告容量。组织 `organization/{facts-writer,feishu-observer,registered-refresh}.ts` 隐藏可信绑定、观察及写入/恢复，在受限组织连接内消费冻结 schema/mapping；HTTP transport 仍留实验目录，无生产飞书接线。
 
-本轮独立合成 host 的 `purpose-candidate` 通过测试专用 installer 原子装入精确治理候选，四个 LOGIN 连接各 SET ROLE 到唯一 NOLOGIN 能力并校验用途；六份 SQL 位于 `experiments/intake-runtime/acceptance-candidate`，不会进入 API dist 或正式 migration。management 唯一 service 同时拥有候选与授权 HTTP；worker 仍只承担既有失败收尾。四域实际 HTTP、Mac 上传/发布/回退/查询复制及权限配置证据见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)。
+`shop-directory.ts` 借用原内容事务及真实 ProductSession，会话锁后 prepare 有界目录，最终 finish 和 deadline 通过才返回。Main `content-intake-access.ts` 完整消费分页并要求名称 shopId 集合与已授权 shops 相等，名称失败保留编号与可见提示；Query 只投影显示名，同名附 ID，不改变授权或新建 IPC。
+
+独立合成 host 的 `purpose-runtime` 使用正式33段迁移及四个低权 LOGIN，实际组织登记/观察/写入后启动业务、usage、worker 消费者；没有 SQL 改写桥或候选重复安装。旧 experiments SQL/probe 测试显式固定旧32段基线，仅保留历史实验边界。当前实现/证据见[正式合同合成接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。生产 app/server 注册、真实配置、真实数据和原工作台统一接线仍未完成。

@@ -685,8 +685,8 @@ describe('customer-agent contract-set intake', () => {
 
     expect(verified).toMatchObject({
       status: 'VERIFIED',
-      contract_set_id: 'cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929',
-      source_git_sha: '6f318d448929d1a87c5dc9e725ea4f90c48a4b97',
+      contract_set_id: 'cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551',
+      source_git_sha: 'e35c0c01b5510ffcff75f2b19ba441ad53a9b504',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       ddev_authorized: false,
       runtime_activated: false,
@@ -696,13 +696,13 @@ describe('customer-agent contract-set intake', () => {
       implementation_version: '1.22',
     });
     expect(sha256(manifestBytes)).toBe(
-      '1db23189fe6f088f312e5753f5a517dbf4fc4d386da0febeaa0ec3958265608c',
+      'a15e0193a8e577e9f1c4a1c52b5b7cba7a11674e3cd157c1eb135fa5e4f2aa1a',
     );
     expect(sha256(readFileSync(path.join(verified.path, 'openapi.v1.yaml')))).toBe(
-      '1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d',
+      'bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7',
     );
-    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.22.sql')))).toBe(
-      'c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce',
+    expect(sha256(readFileSync(path.join(verified.path, 'schema-v1.23.sql')))).toBe(
+      '4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e',
     );
   });
 });

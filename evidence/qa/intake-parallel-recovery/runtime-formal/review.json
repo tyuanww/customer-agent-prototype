@@ -1,0 +1,66 @@
+{
+  "schema": "intake-runtime-adoption-review/v1",
+  "productBase": "326af87ef36baf61dcafab74aefa721df65c01d5",
+  "status": "SCOPED_REVIEW_COMPLETE",
+  "fullExternalReview": "INCOMPLETE",
+  "coverage": [
+    {
+      "reviewer": "root and recover_c",
+      "scope": "Pinned full-v2 inputs, old32 immutable SQL/descriptors, 0033 runner-owned atomic installation, generated provenance",
+      "result": "no unresolved finding"
+    },
+    {
+      "reviewer": "recover_c independent, recover_b implementation",
+      "scope": "Formal purpose pool ownership, checkout/close/idle failure, transaction final checks",
+      "result": "idle error event finding fixed; actual PG terminate/reconnect verified"
+    },
+    {
+      "reviewer": "recover_c independent, recover_a implementation",
+      "scope": "Directory authentication/permissions, pagination/time, server-output decode and recovery",
+      "result": "server schema failure classification fixed to 503; no unresolved finding after final read-only re-review"
+    },
+    {
+      "reviewer": "root integration review",
+      "scope": "Runtime verifier exact state/ACL and legal LOGIN membership, tests and generated source alignment",
+      "result": "no unresolved finding"
+    },
+    {
+      "reviewer": "recover_c independent, root documentation",
+      "scope": "Current contract/migration counts, source hashes, ownership and commands in existing current docs",
+      "result": "architecture old security-invoker sentence corrected to historical0032/current0033 split"
+    },
+    {
+      "reviewer": "root final staged review",
+      "scope": "Empty-range generated header correction",
+      "result": "Only0033 comment line2 changed; executed SQL and old32 unchanged. Generator31 and actualPG3 regression pass."
+    }
+  ],
+  "fixedFindings": [
+    {
+      "id": "pool-idle-error",
+      "owner": "apps/api/src/content-intake/runtime-pool.ts",
+      "verification": "evidence/qa/intake-runtime-formal/intake-formal-runtime-round2.log"
+    },
+    {
+      "id": "directory-server-schema",
+      "owner": "apps/api/src/content-intake/shop-directory.ts",
+      "verification": "evidence/qa/intake-shop-directory/api-pg-invalid-output.log"
+    },
+    {
+      "id": "architecture-current-function-owner",
+      "owner": "docs/reference-project-architecture.md",
+      "verification": "final diff and documentation consistency check"
+    }
+  ],
+  "sourceManifest": "source-sha256.json",
+  "logsManifest": "logs.json",
+  "excluded": [
+    "Completed prior15/15 role audit not repeated; role ceilings unchanged",
+    "Full external /review not repeated or claimed complete",
+    "Production identity, customer/employee data, device/manual acceptance outside current synthetic evidence"
+  ],
+  "knownLimitations": [
+    "workspace:check source budget exceeds32MiB; no budget relaxation or history cleanup",
+    "No production HTTP/Feishu configuration activation"
+  ]
+}

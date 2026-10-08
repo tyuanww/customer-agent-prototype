@@ -46,6 +46,12 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
     }, Math.max(0, Math.min(2_147_483_647, Date.parse(context.validUntil) - Date.now())));
     return () => clearTimeout(timer);
   }, [context.validUntil]);
+  useEffect(() => {
+    if (!context.shopNamesValidUntil) return;
+    const timer = setTimeout(() => setContext(current => ({ ...current, shopNames: [], shopNamesValidUntil: null })),
+      Math.max(0, Math.min(2_147_483_647, Date.parse(context.shopNamesValidUntil)-Date.now())));
+    return () => clearTimeout(timer);
+  }, [context.shopNamesValidUntil]);
   const invalidate = useCallback(() => { sequence.current++; }, []);
   useEffect(() => {
     invalidate(); setContext(emptyIntakeQueryContext()); setError(''); setBusy(false);

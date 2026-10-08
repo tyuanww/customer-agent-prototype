@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createFeishuOrganizationObserver } from './feishu-observer.js';
+import { createFeishuOrganizationObserver } from '../../src/content-intake/organization/feishu-observer.js';
 import { createOrganizationHttpSessionOwner, createOrganizationHttpTransport, type OrganizationAppToken } from './http-transport.js';
 import { startSyntheticContactDouble } from './synthetic-contact-double.js';
 

@@ -192,6 +192,7 @@ export function createPurposePrivilegeProbe(pool: IntakePool, report: (diagnosti
       let authorityDeadline = Infinity;
       const transaction: IntakeTransaction = {
         query: client.query.bind(client),
+        beforeCommit() { throw new Error('HISTORICAL_PROBE_FINALIZER_UNSUPPORTED'); },
         validUntil(until) {
           if (!Number.isFinite(until)) throw new IntakeRejection('PERMISSION_CHANGED');
           authorityDeadline = Math.min(authorityDeadline, until);

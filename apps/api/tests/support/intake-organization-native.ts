@@ -1,4 +1,4 @@
-import type { OrganizationTransport } from '../../experiments/intake-organization/feishu-observer.js';
+import type { OrganizationTransport } from '../../src/content-intake/organization/feishu-observer.js';
 
 /** Invented native-shaped contact responses; never copied from a tenant. */
 export function nativeOrganizationFixture() {

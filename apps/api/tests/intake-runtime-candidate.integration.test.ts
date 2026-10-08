@@ -8,23 +8,16 @@ import { createTemplate } from '@customer-agent/content-intake';
 import { createContentIntakeService } from '../src/content-intake/service.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
-import { installIntakeRuntimeCandidate } from './support/intake-runtime-candidate.js';
 import type { IntakeResult } from '../src/content-intake/transaction.js';
 function value<T>(result: IntakeResult<T>): T { if (!result.ok) throw new Error(JSON.stringify(result)); return result.value; }
 
-it.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('candidate install pins actual overlay ledger and LOGIN capability guards block cross-purpose and forged cancellation outcomes', async () => {
+it.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('formal runtime migration installs LOGIN capability guards block cross-purpose and forged cancellation outcomes', async () => {
   const pg = new Pg15Harness(); pg.start();
   const db = pg.createDatabase('candidate_boundary');
   const admin = await pg.connect(db.config), owner = new Pool({ ...db.config, max: 1 });
   let login: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
   try {
     await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin);
-    await admin.query('BEGIN');
-    await admin.query("UPDATE customer_agent_meta.schema_migrations SET migration_sha256=repeat('0',64) WHERE position=1");
-    await expect(installIntakeRuntimeCandidate(admin)).rejects.toThrow('CANDIDATE_INSTALLED_OVERLAY_DRIFT');
-    await admin.query('ROLLBACK');
-    expect((await admin.query("SELECT to_regnamespace('intake_runtime') AS n")).rows[0].n).toBeNull();
-    await installIntakeRuntimeCandidate(admin);
     await admin.query('CREATE ROLE synthetic_guard LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT intake_business TO synthetic_guard');
     login = await pg.connect({ ...db.config, user: 'synthetic_guard' });
     await expect(login.query("SELECT intake_runtime.assert_purpose('business')")).rejects.toMatchObject({ code: '42501' });

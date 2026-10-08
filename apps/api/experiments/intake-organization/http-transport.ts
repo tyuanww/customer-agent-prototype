@@ -1,5 +1,5 @@
 import { parseContractSchema } from '@customer-agent/contracts';
-import type { OrganizationTransport } from './feishu-observer.js';
+import type { OrganizationTransport } from '../../src/content-intake/organization/feishu-observer.js';
 
 /**
  * Offline loopback transport for the existing organization observer.

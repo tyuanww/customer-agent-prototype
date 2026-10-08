@@ -1,9 +1,9 @@
 {
   "schema": "customer-agent-database-migrations/v2",
-  "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
-  "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
-  "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce",
-  "upgrade_source_sha256": "914bd08247226f0fdec1e39ce891df55d3740a5b27c3ae9a705baed252679ce0",
+  "contract_set_id": "cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551",
+  "source_git_sha": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
+  "source_schema_sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e",
+  "upgrade_source_sha256": "395a3c0f5965a094dda1cfbbbbf95ff3fd8e64af0a57568b7bedec2281aaecc9",
   "compatibility": {
     "current": "N",
     "prior_signed_baseline": {
@@ -72,6 +72,12 @@
         "source_git_sha": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
         "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
         "migration_count": 30
+      },
+      {
+        "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
+        "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
+        "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce",
+        "migration_count": 32
       }
     ]
   },
@@ -582,6 +588,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
       "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
       "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce"
+    },
+    {
+      "position": 33,
+      "id": "0033_intake_runtime_v1_23",
+      "file": "0033_intake_runtime_v1_23.sql",
+      "source_ranges": [],
+      "sha256": "0cbc24c3f6ffbe877c6cd5f3f55fdf71a9af67aac069e04c4544bde74f463e1b",
+      "bytes": 80365,
+      "contract_set_id": "cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551",
+      "source_git_sha": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
+      "source_schema_sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e"
     }
   ]
 }

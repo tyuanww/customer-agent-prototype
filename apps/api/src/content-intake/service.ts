@@ -1,3 +1,4 @@
+import { createIntakeShopDirectory } from './shop-directory.js';
 import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
@@ -181,6 +182,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     ...createIntakeRollback(run),
     ...createIntakePublication(run),
     ...createIntakeUsage(run),
+    ...createIntakeShopDirectory(run),
     ...createIntakeDiscovery(run, options.principalLabels),
     ...createIntakeQualityAccess(run),
     ...createIntakeFiles(run, store, capacity, report),

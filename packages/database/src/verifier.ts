@@ -129,17 +129,22 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // 0030 replaces the private authorization_deadline body only. No new table and no application-role ACL.
 // 0031 adds immutable policy/confirmation columns, composite foreign keys and shape constraints.
 // 0032 replaces five private publishing/lineage functions; ACL and triggers stay identical.
-// No application role gains content_intake USAGE or table/function access.
+// 0033 adds the approved NOLOGIN runtime capabilities, organization/locked directory
+// protocols and the companion ACL after all existing product function bodies.
+// The original app_* roles still do not gain content_intake access. Runtime
+// LOGIN memberships are checked separately from immutable object ACLs.
+// Trigger definitions include WHEN and deferrability: same-transaction organization
+// evidence must not be weakened without failing this exact verifier.
 // Domain USAGE adds four existing default PUBLIC entries, not schema/table access.
 // Their CHECKs and full definitions are separate from table constraints and columns.
-const EXPECTED_ACL_MANIFEST_ENTRIES = 225;
-const EXPECTED_ACL_MANIFEST_SHA256 = '6128b6cc566759e78dd15f876411458ff79bda7205c2c6dbaf0cce9c8d0d67da';
-const EXPECTED_OBJECT_MANIFEST_ENTRIES = 2837;
-const EXPECTED_OBJECT_MANIFEST_SHA256 = '95651e9136340adf1379c5f9aa5ebeabdc1980984637f4f1a0bfbbe7cea96825';
-const EXPECTED_FUNCTION_SECURITY_ENTRIES = 225;
-const EXPECTED_FUNCTION_SECURITY_SHA256 = '4d6d47123400c992b392024f24c0058fa74f517a6392318ed5cec809fc0f8bfc';
-const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 85;
-const EXPECTED_TRIGGER_MANIFEST_SHA256 = '075d4d3d5f0fae41b8d9c7be5c83c2c59da0f775aa85161c7b9217fbefc693a9';
+const EXPECTED_ACL_MANIFEST_ENTRIES = 537;
+const EXPECTED_ACL_MANIFEST_SHA256 = 'aaabfeda8877ef28c5d8d3aa7a6c8143e41254c221497778d9d4d11a231ec1a9';
+const EXPECTED_OBJECT_MANIFEST_ENTRIES = 3085;
+const EXPECTED_OBJECT_MANIFEST_SHA256 = 'fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca';
+const EXPECTED_FUNCTION_SECURITY_ENTRIES = 250;
+const EXPECTED_FUNCTION_SECURITY_SHA256 = '71a71dfbb803858ea4c7728fb04d625e2b3038c531194d177e9510007c158662';
+const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 105;
+const EXPECTED_TRIGGER_MANIFEST_SHA256 = '3f262813591fee4cd2938bbd7078d55f02664942eef253fd093271f33cc1ca71';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -179,30 +184,48 @@ export async function verifyMigrationCatalogue(
 
   const inventoryResult = await verifyQuery<InventoryRow>(client, `
       SELECT
-        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake') AND relation.relkind IN ('r','p')) AS tables,
-        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake') AND relation.relkind='v') AS views,
-        (SELECT count(*)::int FROM pg_catalog.pg_proc procedure JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake')) AS functions,
+        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake','intake_organization','intake_runtime') AND relation.relkind IN ('r','p')) AS tables,
+        (SELECT count(*)::int FROM pg_catalog.pg_class relation JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake','intake_organization','intake_runtime') AND relation.relkind='v') AS views,
+        (SELECT count(*)::int FROM pg_catalog.pg_proc procedure JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake','intake_organization','intake_runtime')) AS functions,
         (SELECT extversion FROM pg_catalog.pg_extension WHERE extname='pgcrypto') AS pgcrypto,
         (SELECT extversion FROM pg_catalog.pg_extension WHERE extname='pg_trgm') AS pg_trgm
     `);
+  // Fixed capability roles are immutable. Environment LOGIN membership is a
+  // separate input: only one direct, non-admin capability grant is permitted,
+  // without INHERIT or high-power role attributes. Owners never admit members.
   const roleResult = await verifyQuery<RoleRow>(client, `
-      SELECT
-        count(*)::int AS total,
-        count(*) FILTER (
-          WHERE NOT role.rolcanlogin AND NOT role.rolsuper AND NOT role.rolcreatedb
-            AND NOT role.rolcreaterole AND NOT role.rolreplication AND NOT role.rolbypassrls
-        )::int AS safe,
-        (
-          SELECT count(*)::int
-          FROM pg_catalog.pg_auth_members membership
-          JOIN pg_catalog.pg_roles member_role ON member_role.oid=membership.member
-          JOIN pg_catalog.pg_roles granted_role ON granted_role.oid=membership.roleid
-          WHERE member_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read')
-             OR granted_role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read')
-        ) AS memberships
-      FROM pg_catalog.pg_roles role
-      WHERE role.rolname IN ('cs_ai_definer','app_runtime','app_content_admin','app_import_worker','app_work_order_worker','app_owner_acceptance_registrar','app_backend_auth','app_backend_review','app_backend_worker','app_owner_read')
-    `);
+    WITH required_roles(name, runtime, permits_environment_member) AS (VALUES
+      ('cs_ai_definer',false,false), ('app_runtime',false,false),
+      ('app_content_admin',false,false), ('app_import_worker',false,false),
+      ('app_work_order_worker',false,false), ('app_owner_acceptance_registrar',false,false),
+      ('app_backend_auth',false,false), ('app_backend_review',false,false),
+      ('app_backend_worker',false,false), ('app_owner_read',false,false),
+      ('intake_runtime_fn_owner',true,false), ('intake_directory_fn_owner',true,false),
+      ('intake_usage',true,true), ('intake_business',true,true),
+      ('intake_worker',true,true), ('intake_org_writer',true,true),
+      ('intake_directory_key_operator',true,true)
+    )
+    SELECT count(*)::int AS total,
+      count(*) FILTER (WHERE NOT role.rolcanlogin AND NOT role.rolsuper AND NOT role.rolcreatedb
+        AND NOT role.rolcreaterole AND NOT role.rolreplication AND NOT role.rolbypassrls
+        AND (NOT required.runtime OR NOT role.rolinherit))::int AS safe,
+      (SELECT count(*)::int
+       FROM pg_catalog.pg_auth_members membership
+       JOIN pg_catalog.pg_roles member_role ON member_role.oid=membership.member
+       JOIN pg_catalog.pg_roles granted_role ON granted_role.oid=membership.roleid
+       LEFT JOIN required_roles member_required ON member_required.name=member_role.rolname
+       LEFT JOIN required_roles granted_required ON granted_required.name=granted_role.rolname
+       WHERE (member_required.name IS NOT NULL OR granted_required.name IS NOT NULL)
+         AND NOT (member_required.name IS NULL AND COALESCE(granted_required.permits_environment_member,false)
+           AND member_role.rolcanlogin AND NOT member_role.rolinherit AND NOT member_role.rolsuper
+           AND NOT member_role.rolcreatedb AND NOT member_role.rolcreaterole
+           AND NOT member_role.rolreplication AND NOT member_role.rolbypassrls
+           AND NOT membership.admin_option
+           AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members extra
+             WHERE extra.member=membership.member AND extra.roleid<>membership.roleid))) AS memberships
+    FROM required_roles required
+    JOIN pg_catalog.pg_roles role ON role.rolname=required.name
+  `);
   const aclResult = await verifyQuery<ManifestRow>(client, `
     WITH acl_entries(entry) AS (
       SELECT format(
@@ -217,7 +240,7 @@ export async function verifyMigrationCatalogue(
         COALESCE(namespace.nspacl, acldefault('n', namespace.nspowner))
       ) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake','intake_organization','intake_runtime')
         AND acl.grantee <> namespace.nspowner
 
       UNION ALL
@@ -241,7 +264,7 @@ export async function verifyMigrationCatalogue(
         )
       )) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake','intake_organization','intake_runtime')
         AND relation.relkind IN ('r','p','v','m','S','f')
         AND acl.grantee <> relation.relowner
 
@@ -261,7 +284,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace
       CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake','intake_organization','intake_runtime')
         AND attribute.attnum > 0
         AND NOT attribute.attisdropped
         AND acl.grantee <> relation.relowner
@@ -283,7 +306,7 @@ export async function verifyMigrationCatalogue(
         COALESCE(procedure.proacl, acldefault('f', procedure.proowner))
       ) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake','intake_organization','intake_runtime')
         AND acl.grantee <> procedure.proowner
 
       UNION ALL
@@ -302,7 +325,7 @@ export async function verifyMigrationCatalogue(
         COALESCE(type_object.typacl, acldefault('T', type_object.typowner))
       ) acl
       LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
-      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake')
+      WHERE namespace.nspname IN ('public','customer_agent_meta','backend_identity','backend_review','content_intake','intake_organization','intake_runtime')
         AND type_object.typtype='d' AND acl.grantee <> type_object.typowner
 
       UNION ALL
@@ -677,7 +700,7 @@ export async function verifyMigrationCatalogue(
       JOIN pg_catalog.pg_namespace namespace ON namespace.oid=procedure.pronamespace
       JOIN pg_catalog.pg_roles owner_role ON owner_role.oid=procedure.proowner
       JOIN pg_catalog.pg_language language_object ON language_object.oid=procedure.prolang
-      WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake')
+      WHERE namespace.nspname IN ('public','backend_identity','backend_review','content_intake','intake_organization','intake_runtime')
     )
     SELECT
       COALESCE(string_agg(entry, E'\\n' ORDER BY entry), '') AS manifest,
@@ -687,7 +710,7 @@ export async function verifyMigrationCatalogue(
   const triggerResult = await verifyQuery<ManifestRow>(client, `
     WITH trigger_entries(entry) AS (
       SELECT format(
-        '%s.%s|%s|%s.%s(%s)|%s|%s',
+        '%s.%s|%s|%s.%s(%s)|%s|%s|definition=%s',
         table_namespace.nspname,
         relation.relname,
         trigger.tgname,
@@ -695,14 +718,15 @@ export async function verifyMigrationCatalogue(
         procedure.proname,
         pg_get_function_identity_arguments(procedure.oid),
         trigger.tgtype,
-        trigger.tgenabled
+        trigger.tgenabled,
+        pg_catalog.pg_get_triggerdef(trigger.oid, false)
       )
       FROM pg_catalog.pg_trigger trigger
       JOIN pg_catalog.pg_class relation ON relation.oid=trigger.tgrelid
       JOIN pg_catalog.pg_namespace table_namespace ON table_namespace.oid=relation.relnamespace
       JOIN pg_catalog.pg_proc procedure ON procedure.oid=trigger.tgfoid
       JOIN pg_catalog.pg_namespace function_namespace ON function_namespace.oid=procedure.pronamespace
-      WHERE table_namespace.nspname IN ('public','backend_identity','backend_review','content_intake') AND NOT trigger.tgisinternal
+      WHERE table_namespace.nspname IN ('public','backend_identity','backend_review','content_intake','intake_organization','intake_runtime') AND NOT trigger.tgisinternal
     )
     SELECT
       COALESCE(string_agg(entry, E'\\n' ORDER BY entry), '') AS manifest,
@@ -761,10 +785,10 @@ export async function verifyMigrationCatalogue(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 86 || inventory.views !== 7 || inventory.functions !== 225 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== 97 || inventory.views !== 7 || inventory.functions !== 250 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
-  if (!roles || roles.total !== 10 || roles.safe !== 10 || roles.memberships !== 0) {
+  if (!roles || roles.total !== 17 || roles.safe !== 17 || roles.memberships !== 0) {
     failures.push('capability role safety');
   }
   if (!acl || acl.entries !== EXPECTED_ACL_MANIFEST_ENTRIES || sha256(acl.manifest) !== EXPECTED_ACL_MANIFEST_SHA256) {
@@ -789,7 +813,7 @@ export async function verifyMigrationCatalogue(
     || trigger.entries !== EXPECTED_TRIGGER_MANIFEST_ENTRIES
     || sha256(trigger.manifest) !== EXPECTED_TRIGGER_MANIFEST_SHA256
   ) {
-    failures.push(`exact trigger table/function/event/enabled manifest [${trigger?.entries ?? 'missing'}:${trigger ? sha256(trigger.manifest) : 'missing'}]`);
+    failures.push(`exact trigger table/function/event/enabled/definition manifest [${trigger?.entries ?? 'missing'}:${trigger ? sha256(trigger.manifest) : 'missing'}]`);
   }
   if (REQUIRED_SCHEMA_COMMENT_FRAGMENTS.some((fragment) => !schemaComment.includes(fragment))) {
     failures.push('schema evidence-boundary comment');

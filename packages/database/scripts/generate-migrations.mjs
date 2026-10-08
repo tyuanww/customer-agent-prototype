@@ -376,7 +376,7 @@ function renderUpgradeMigration(descriptor, snapshot) {
   const { position, id, version, ranges, sourceBody } = descriptor;
   const sql = [
     `-- ${GENERATED_HEADER}`,
-    `-- ${id}; source ${version} lines ${ranges.map((r) => `${r.start_line}-${r.end_line}`).join(', ')}`,
+    `-- ${id}; source ${version}${ranges.length ? ` lines ${ranges.map((r) => `${r.start_line}-${r.end_line}`).join(', ')}` : ''}`,
     `-- contract_set_id=${snapshot.contract_set_id}`,
     `-- source_git_sha=${snapshot.source_git_sha}`,
     `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
@@ -420,7 +420,7 @@ function renderCatalogue(manifest, migrations, compatibleUpgrades) {
   return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
-export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+function buildDirectMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
   if (!snapshot || typeof snapshot.database_source !== 'string') {
     throw new Error('Verified contract snapshot is missing database_source');
   }
@@ -521,6 +521,79 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   for (const migration of migrations) {
     outputs.set(`packages/database/migrations/${migration.file}`, migration.sql);
   }
+  outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
+  return Object.freeze({ manifest, migrations, outputs });
+}
+
+// The approved runtime bundle is installed after the existing product function
+// bodies. Rebuilding the full reference schema would replace those bodies and
+// invalidate installed ledger checksums, so this one migration owns the entire
+// companion installation transaction; environment LOGIN bindings stay outside.
+const RUNTIME_DATABASE_SHA256 = '4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e';
+const RUNTIME_INSTALLATION_SHA256 = '1683c487d6dc84e84b44d9f2a80ca9ab9cfb941144ace8d3b2cf7f520bb58486';
+const PRIOR_DIRECT = Object.freeze({
+  contractSetId: 'cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929',
+  sourceGitSha: '6f318d448929d1a87c5dc9e725ea4f90c48a4b97',
+  sourceSchemaSha256: EXPECTED_DATABASE_SHA256,
+  migrationCount: 32,
+});
+
+export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+  if (snapshot?.manifest?.database?.sha256 === EXPECTED_DATABASE_SHA256) {
+    return buildDirectMigrationOutputs(snapshot, { projectRoot });
+  }
+  if (typeof snapshot?.database_source !== 'string'
+    || snapshot.manifest?.database?.sha256 !== RUNTIME_DATABASE_SHA256
+    || sha256(snapshot.database_source) !== RUNTIME_DATABASE_SHA256) {
+    throw new Error('Database contract SHA-256 drifted; explicitly review and version the migration generator');
+  }
+  const sources = snapshot.runtime_sources;
+  if (typeof sources?.installation !== 'string' || sha256(sources.installation) !== RUNTIME_INSTALLATION_SHA256) {
+    throw new Error('Runtime installation manifest is missing or drifted');
+  }
+  const installation = JSON.parse(sources.installation);
+  for (const [name, descriptor] of Object.entries(installation.sources)) {
+    if (typeof sources[name] !== 'string' || sha256(sources[name]) !== descriptor.sha256) {
+      throw new Error(`Runtime companion is missing or drifted: ${name}`);
+    }
+  }
+  const prior = buildDirectMigrationOutputs({
+    contract_set_id: PRIOR_DIRECT.contractSetId, source_git_sha: PRIOR_DIRECT.sourceGitSha,
+    manifest: { database: { sha256: EXPECTED_DATABASE_SHA256 } },
+    database_source: readFileSync(path.join(projectRoot, 'contracts/upstream/customer-agent',
+      PRIOR_DIRECT.contractSetId, 'schema-v1.22.sql'), 'utf8'),
+  }, { projectRoot });
+  const dependency = installation.productMode.implementation;
+  if (sha256(prior.outputs.get(MANIFEST_PATH)) !== dependency.migrationManifest
+    || Object.entries(dependency.overlayFiles).some(([file, digest]) =>
+      sha256(prior.outputs.get(`packages/database/migrations/${file}`)) !== digest)) {
+    throw new Error('Approved runtime product migration dependency drifted');
+  }
+  const companionOrder = installation.productMode.order.slice(1, -1);
+  const sourceBody = [
+    `-- installation_sha256=${RUNTIME_INSTALLATION_SHA256}`,
+    ...companionOrder.map(name => `-- companion=${name}; sha256=${installation.sources[name].sha256}\n${sources[name].trimEnd()}`),
+  ].join('\n\n');
+  const runtime = renderUpgradeMigration({ position: 33, id: '0033_intake_runtime_v1_23',
+    version: 'schema.v1.23 runtime companions (atomic product installation)', ranges: [], sourceBody }, snapshot);
+  const migrations = Object.freeze([...prior.migrations, runtime]);
+  const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT];
+  const manifest = Object.freeze({
+    ...prior.manifest,
+    contract_set_id: snapshot.contract_set_id, source_git_sha: snapshot.source_git_sha,
+    source_schema_sha256: RUNTIME_DATABASE_SHA256,
+    upgrade_source_sha256: sha256(sourceBody),
+    compatibility: Object.freeze({ ...prior.manifest.compatibility,
+      prior_reviewed_upgrades: Object.freeze(compatibleUpgrades.map(p => Object.freeze({
+        contract_set_id: p.contractSetId, source_git_sha: p.sourceGitSha,
+        source_schema_sha256: p.sourceSchemaSha256, migration_count: p.migrationCount,
+      }))),
+    }),
+    migrations: Object.freeze(migrations.map(({ sql: _sql, ...migration }) => migration)),
+  });
+  const outputs = new Map(prior.outputs);
+  outputs.set(`packages/database/migrations/${runtime.file}`, runtime.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });

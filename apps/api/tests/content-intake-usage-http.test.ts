@@ -24,7 +24,7 @@ async function host(result: IntakeResult<C['IntakeEntitlement']> = { ok: true, v
   const sources = vi.fn(async (): Promise<IntakeResult<C['IntakeSourceList']>> => ({ ok: true, value: { items: [], nextCursor: null } }));
   const report = vi.fn();
   const app = Fastify({ logger: false, exposeHeadRoutes: false }); apps.push(app);
-  await app.register(contentIntakeUsageRoutes, { auth, usage: { issueEntitlement, snapshot, authorizations, sources, vocabulary: async () => ({ ok: true, value: { items: [], nextCursor: null } }) }, report });
+  await app.register(contentIntakeUsageRoutes, { auth, usage: { shopDirectory: async () => ({ok:true,value:{items:[],nextCursor:null,validUntil:new Date(Date.now()+60000).toISOString()}}), issueEntitlement, snapshot, authorizations, sources, vocabulary: async () => ({ ok: true, value: { items: [], nextCursor: null } }) }, report });
   return { app, auth, issueEntitlement, snapshot, authorizations, sources, report };
 }
 const headers = { authorization: 'Bearer synthetic-token' };
@@ -103,3 +103,7 @@ it.each([['authorization', 'authorizations', 'IntakeAuthorization'], ['sources',
     expect((f[method].mock.calls as unknown[][])[1]).toEqual([actor, { limit: ['1', '2'], userId: 'spoof' }]);
     expect((await f.app.inject({ method: 'HEAD', url: `/v1/intake/${route}`, headers })).statusCode).toBe(404);
   });
+
+it('uses the directory session reason and preserves no-store for unauthenticated reads',async()=>{
+ const f=await host();const response=await f.app.inject({url:'/v1/intake/shop-directory'});expect(response.statusCode).toBe(401);expect(response.json().error.details.reason).toBe('SHOP_DIRECTORY_SESSION');expect(response.headers['cache-control']).toBe('no-store');
+});

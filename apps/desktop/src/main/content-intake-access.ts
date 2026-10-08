@@ -5,6 +5,9 @@ type C = components['schemas'];
 export type IntakeAccess = {
   validUntil: string;
   shops: string[];
+  shopNames?: { id: string; label: string }[];
+  shopNamesValidUntil?: string | null;
+  shopNamesDeadline?: number;
   sources: C['IntakeSource'][];
   capabilities: C['IntakeAuthorization']['capabilities'];
 };
@@ -12,8 +15,8 @@ export type IntakeAccess = {
 /** Main-only discovery. All pages and both lists must agree before any menu is
  * returned. This is an expiring selection hint, never permission to read/copy;
  * ContentIntakeUsage must still obtain a server qualification for the selection.
- * Shop names are not in the current contract: preserve IDs instead of inventing
- * display names or treating a brand-wide grant as access to every shop.
+ * Names use their own expiring read-only directory. Failure preserves IDs; neither
+ * a name nor a brand-wide grant may introduce access to another shop.
  */
 export async function loadIntakeAccess(session: IntakeUsageSession, signal?: AbortSignal): Promise<IntakeAccess & { factsVersion: number; policyVersion: number; revocationGeneration: number }> {
   const initial = session.view(), controller = new AbortController();
@@ -92,8 +95,48 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
       if (!cap || Object.entries(src.scope).some(([key, value]) => Reflect.get(cap.scope, key) !== value)) throw new IntakeUsageError('STALE');
       if (src.contentIntakeMode === 'v2-preview' && src.scope.shopId !== null && cap.actions.includes('query')) shops.add(src.scope.shopId);
     }
+    // Names are an optional display projection. A missing/changed directory must
+    // never remove authorized IDs, grant a new ID, or retain a partial name set.
+    let shopNames: { id: string; label: string }[] = [], shopNamesValidUntil: string | null = null, shopNamesDeadline = 0;
+    if (shops.size) {
+      try {
+        const names = new Map<string,string>(), seen = new Set<string>();
+        const nameStarted=performance.now(), nameStartedAt=Date.now();
+        let nameCursor: string | null = null, nameUntil: string | null = null, nameDeadline = Infinity, nameBytes = 0;
+        do {
+          assertActive();
+          if (seen.size >= 50) throw new IntakeUsageError('LIMIT');
+          const query = new URLSearchParams({ limit:'100', ...(nameCursor ? { cursor:nameCursor } : {}) });
+          const response = await session.request(initial.sessionEpoch, `/v1/intake/shop-directory?${query}`,
+            { signal:controller.signal, maxResponseBytes:128*1024 });
+          assertActive();
+          const size = Buffer.byteLength(JSON.stringify(response.value) ?? ''); nameBytes += size;
+          if (size > 128*1024 || nameBytes > 8*1024*1024) throw new IntakeUsageError('LIMIT');
+          const page = parseContractSchema('IntakeShopDirectory', response.value);
+          if (nameUntil !== null && page.validUntil !== nameUntil) throw new IntakeUsageError('STALE');
+          if (nameUntil === null) { nameUntil = page.validUntil; nameDeadline = nameStarted+Math.max(0,Date.parse(nameUntil)-nameStartedAt); }
+          if (Date.now() >= Date.parse(nameUntil) || performance.now() >= nameDeadline) throw new IntakeUsageError('EXPIRED');
+          for (const item of page.items) {
+            if (!shops.has(item.shopId) || names.has(item.shopId)) throw new IntakeUsageError('STALE');
+            names.set(item.shopId,item.displayName);
+          }
+          nameCursor = page.nextCursor;
+          if (nameCursor) {
+            if (!page.items.length || seen.has(nameCursor)) throw new IntakeUsageError('STALE');
+            seen.add(nameCursor);
+          }
+        } while (nameCursor);
+        if (names.size !== shops.size) throw new IntakeUsageError('STALE');
+        shopNames = [...names].map(([id,label])=>({id,label})); shopNamesValidUntil = nameUntil; shopNamesDeadline = nameDeadline;
+      } catch {
+        // Only optional names degrade. Session/explicit cancellation still fails
+        // the entire read; the current authorized ID projection is kept below.
+        assertActive();
+      }
+    }
     assertActive();
-    return { factsVersion: after.factsVersion, policyVersion: after.policyVersion, revocationGeneration: after.revocationGeneration, validUntil: after.validUntil, shops: [...shops].sort(), sources, capabilities: after.capabilities };
+    if (Date.now() >= Date.parse(after.validUntil) || performance.now() >= deadline) throw new IntakeUsageError('EXPIRED');
+    return { factsVersion: after.factsVersion, policyVersion: after.policyVersion, revocationGeneration: after.revocationGeneration, validUntil: after.validUntil, shops: [...shops].sort(), shopNames, shopNamesValidUntil, shopNamesDeadline, sources, capabilities: after.capabilities };
   } catch (error) {
     assertActive();
     if (error instanceof IntakeUsageError) throw error;

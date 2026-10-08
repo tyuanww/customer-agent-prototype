@@ -12,7 +12,7 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
   test.setTimeout(180_000);
   const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
-  const profile = process.env.CUSTOMER_AGENT_INTAKE_PURPOSE_CANDIDATE === '1' ? 'purpose-candidate' : 'existing';
+  const profile = process.env.CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME === '1' ? 'purpose-runtime' : 'existing';
   const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile });
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-rollback-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));

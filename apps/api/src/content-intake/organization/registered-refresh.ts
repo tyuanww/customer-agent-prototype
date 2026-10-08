@@ -1,13 +1,13 @@
 import { parseContractSchema } from '@customer-agent/contracts';
 import type { PoolClient } from 'pg';
-import { canonical, digest } from '../../src/content-intake/material.js';
-import { clock, type IntakePool } from '../../src/content-intake/transaction.js';
+import { canonical, digest } from '../material.js';
+import { clock, type IntakePool } from '../transaction.js';
 import { createFeishuOrganizationObserver, type OrganizationTransport } from './feishu-observer.js';
 import { createOrganizationFactsWriter, OrganizationFactsRejected, type OrganizationFactsSnapshot } from './facts-writer.js';
 
 type Scope = { tenantId: string; appId: string };
 type Binding = Scope & { principalId: string; openId: string; bindingVersion: number; enabled: boolean; validUntil: string; bindingDigest: string };
-type Provenance = { mappingVersion: 'feishu-contact-job-title-v1-experiment'; directoryDigest: string; observedUntil: string };
+type Provenance = { mappingVersion: 'feishu-contact-job-title-v1'; directoryDigest: string; observedUntil: string };
 export type RegisteredObservation = { kind: 'observation'; binding: Binding; snapshot: OrganizationFactsSnapshot; provenance: Provenance }
   | { kind: 'revocation'; binding: Binding; snapshot: OrganizationFactsSnapshot };
 const rejected = () => new OrganizationFactsRejected('SUBJECT_UNAVAILABLE');
@@ -27,7 +27,7 @@ function checkedBinding(raw: Binding): Binding {
   return { ...base, bindingDigest: raw.bindingDigest };
 }
 
-/** DRAFT registration/provenance attachment. Registered rows are the only source
+/** Versioned registration/provenance attachment. Registered rows are the only source
  * of open_id; a refresh caller supplies only a principal ID. Rebinding an active
  * registration is forbidden: revoke (including fact invalidation), then register.
  * Five pages per scan is an explicit candidate capacity, not an upstream snapshot
@@ -37,17 +37,17 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
   const scope = { tenantId: id(rawScope.tenantId), appId: id(rawScope.appId) };
   const keys = (principalId: string) => [scope.tenantId, scope.appId, principalId];
   async function current(client: PoolClient, principalId: string): Promise<Binding | undefined> {
-    const result = await client.query(`SELECT b.* FROM intake_org_candidate.current_bindings c
-      JOIN intake_org_candidate.bindings b USING(tenant_id,app_id,principal_id,binding_version)
+    const result = await client.query(`SELECT b.* FROM intake_organization.current_bindings c
+      JOIN intake_organization.bindings b USING(tenant_id,app_id,principal_id,binding_version)
       WHERE c.tenant_id=$1 AND c.app_id=$2 AND c.principal_id=$3`, keys(principalId));
     const row = result.rows[0];
     return row ? checkedBinding({ ...scope, principalId, openId: row.open_id, bindingVersion: Number(row.binding_version),
       enabled: row.enabled, validUntil: row.valid_until.toISOString(), bindingDigest: row.binding_digest }) : undefined;
   }
   async function insertBinding(client: PoolClient, value: Binding) {
-    await client.query(`INSERT INTO intake_org_candidate.bindings VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+    await client.query(`INSERT INTO intake_organization.bindings VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
       [...keys(value.principalId), value.bindingVersion, value.bindingDigest, value.openId, value.enabled, value.validUntil]);
-    await client.query(`INSERT INTO intake_org_candidate.current_bindings VALUES($1,$2,$3,$4,$5)
+    await client.query(`INSERT INTO intake_organization.current_bindings VALUES($1,$2,$3,$4,$5)
       ON CONFLICT(tenant_id,app_id,principal_id) DO UPDATE SET binding_version=EXCLUDED.binding_version,open_id=EXCLUDED.open_id`,
     [...keys(value.principalId), value.bindingVersion, value.openId]);
   }
@@ -78,7 +78,7 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
         await client.query('BEGIN');
         await client.query("SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='5s'");
         await client.query('SELECT backend_review.lock_content()');
-        const saved = await client.query('SELECT binding_digest FROM intake_org_candidate.bindings WHERE tenant_id=$1 AND app_id=$2 AND principal_id=$3 AND binding_version=$4', [...keys(principalId), next.bindingVersion]);
+        const saved = await client.query('SELECT binding_digest FROM intake_organization.bindings WHERE tenant_id=$1 AND app_id=$2 AND principal_id=$3 AND binding_version=$4', [...keys(principalId), next.bindingVersion]);
         if (saved.rows[0]?.binding_digest === next.bindingDigest) {
           committing = true; await client.query('COMMIT'); return { ok: true as const, binding: next, status: 'replayed' };
         }
@@ -124,7 +124,7 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
         if (request.kind === 'observation') {
           const p = request.provenance;
           if (!p || Object.keys(p).sort().join() !== ['mappingVersion','directoryDigest','observedUntil'].sort().join()
-            || p.mappingVersion !== 'feishu-contact-job-title-v1-experiment' || !/^[0-9a-f]{64}$/.test(p.directoryDigest)
+            || p.mappingVersion !== 'feishu-contact-job-title-v1' || !/^[0-9a-f]{64}$/.test(p.directoryDigest)
             || Date.parse(iso(p.observedUntil)) < Date.parse(request.snapshot.checkedAt)
             || Date.parse(p.observedUntil) >= Date.parse(request.snapshot.validUntil)) throw rejected();
         } else if (request.snapshot.enabled !== false || Object.hasOwn(request, 'provenance')) throw rejected();
@@ -132,7 +132,7 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
       const requestDigest = digest(canonical(request));
       return createOrganizationFactsWriter(pool, scope, undefined, async (client, input, version, replay) => {
         if (replay) {
-          const saved = await client.query('SELECT request_digest FROM intake_org_candidate.observations WHERE principal_id=$1 AND facts_version=$2', [input.principalId, version]);
+          const saved = await client.query('SELECT request_digest FROM intake_organization.observations WHERE principal_id=$1 AND facts_version=$2', [input.principalId, version]);
           if (saved.rows[0]?.request_digest !== requestDigest) throw conflict();
           return; // Receipt recovery acknowledges history; it never restores authority.
         }
@@ -147,7 +147,7 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
         }
         const p = request.kind === 'observation' ? request.provenance : null;
         if (p && Date.parse(p.observedUntil) > await clock(client)) throw rejected();
-        await client.query(`INSERT INTO intake_org_candidate.observations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        await client.query(`INSERT INTO intake_organization.observations VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [input.principalId, version, scope.tenantId, scope.appId, binding.bindingVersion, requestDigest,
             request.kind, p?.mappingVersion ?? null, p?.directoryDigest ?? null, p?.observedUntil ?? null]);
       })(request.snapshot);

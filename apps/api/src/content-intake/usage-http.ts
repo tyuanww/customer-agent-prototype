@@ -10,7 +10,7 @@ import { intakeFailure, intakeHttpBoundary, intakePageQuery, sendIntake } from '
  */
 export const contentIntakeUsageRoutes: FastifyPluginAsync<{
   auth: ProductAuthService;
-  usage: Pick<ReturnType<typeof createContentIntakeService>, 'issueEntitlement' | 'snapshot' | 'authorizations' | 'sources' | 'vocabulary'>;
+  usage: Pick<ReturnType<typeof createContentIntakeService>, 'issueEntitlement' | 'snapshot' | 'authorizations' | 'sources' | 'vocabulary' | 'shopDirectory'>;
   report?: (diagnosticId: string, error: unknown) => void;
 }> = async (app, { auth, usage, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
@@ -23,10 +23,13 @@ export const contentIntakeUsageRoutes: FastifyPluginAsync<{
     return sendIntake(reply, await usage.issueEntitlement(actor(request), request.body), 'IntakeEntitlement');
   });
   for (const [path, method, schema] of [
+    ['shop-directory', 'shopDirectory', 'IntakeShopDirectory'],
     ['snapshot', 'snapshot', 'IntakeSnapshot'],
     ['authorization', 'authorizations', 'IntakeAuthorization'],
     ['sources', 'sources', 'IntakeSourceList'],
   ] as const) app.get(`/v1/intake/${path}`, { exposeHeadRoute: false }, async (request, reply) => {
+    if (path==='shop-directory' && (request.body !== undefined || request.headers['transfer-encoding'] !== undefined
+      || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0'))) return intakeFailure(reply,'VALIDATION','SHOP_DIRECTORY_CURSOR');
     return sendIntake(reply, await usage[method](actor(request), intakePageQuery(request)), schema);
   });
 };

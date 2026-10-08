@@ -8,9 +8,9 @@ export type IntakeQueryRow = {
 };
 export type IntakeQuerySelection = { productIds: string[]; scenarioIds: string[] };
 export type IntakeQueryOption = { id: string; label: string };
-export type IntakeQueryContext = IntakeQuerySelection & { shops: string[]; shopId: string | null;
+export type IntakeQueryContext = IntakeQuerySelection & { shops: string[]; shopNames: IntakeQueryOption[]; shopNamesValidUntil: string | null; shopId: string | null;
   products: IntakeQueryOption[]; scenarios: IntakeQueryOption[]; validUntil: string | null };
-export const emptyIntakeQueryContext = (): IntakeQueryContext => ({ shops: [], shopId: null,
+export const emptyIntakeQueryContext = (): IntakeQueryContext => ({ shops: [], shopNames: [], shopNamesValidUntil: null, shopId: null,
   products: [], scenarios: [], productIds: [], scenarioIds: [], validUntil: null });
 const ids = (v: unknown): v is string[] => Array.isArray(v) && v.length <= 100
   && v.every(id => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) && new Set(v).size === v.length;
@@ -56,9 +56,12 @@ export function isIntakeCopyRequest(value: unknown): value is { key: string } {
   return exactKeys(value, ['key']) && isIntakeText(value.key);
 }
 export function isIntakeContextResult(value: unknown): value is IntakeQueryResult<IntakeQueryContext> {
-  return isIntakeFailure(value) || (exactKeys(value, ['ok', 'shops', 'shopId', 'products', 'scenarios', 'productIds', 'scenarioIds', 'validUntil']) && value.ok === true
+  return isIntakeFailure(value) || (exactKeys(value, ['ok', 'shops', 'shopNames', 'shopNamesValidUntil', 'shopId', 'products', 'scenarios', 'productIds', 'scenarioIds', 'validUntil']) && value.ok === true
     && Array.isArray(value.shops) && value.shops.length <= 5000 && value.shops.every(s => isIntakeText(s))
     && new Set(value.shops).size === value.shops.length
+    && options(value.shopNames) && value.shopNames.every(n => (value.shops as string[]).includes(n.id) && n.label===n.label.trim() && [...n.label].every(char => { const cp=char.codePointAt(0)!;return cp>31 && cp!==127 && cp!==0x2028 && cp!==0x2029; }))
+    && (value.shopNamesValidUntil === null ? value.shopNames.length === 0
+      : typeof value.shopNamesValidUntil === 'string' && Number.isFinite(Date.parse(value.shopNamesValidUntil)) && value.shopNames.length === value.shops.length)
     && options(value.products) && options(value.scenarios) && ids(value.productIds) && ids(value.scenarioIds)
     && value.productIds.every(id => (value.products as IntakeQueryOption[]).some((v: IntakeQueryOption) => v.id === id))
     && value.scenarioIds.every(id => (value.scenarios as IntakeQueryOption[]).some((v: IntakeQueryOption) => v.id === id))

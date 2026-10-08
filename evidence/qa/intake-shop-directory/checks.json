@@ -1,0 +1,186 @@
+[
+  {
+    "name": "desktop",
+    "cwd": "apps/desktop",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/unit/content-intake-access.test.ts",
+      "tests/unit/content-intake-query.test.ts",
+      "tests/unit/content-intake-query-ipc.test.ts",
+      "tests/component/intake-shop-directory.test.tsx",
+      "tests/component/QueryApp.test.tsx"
+    ],
+    "exitCode": 0,
+    "sha256": "c2c4b96996fd8fdf46060479f109d6d1ff52105857543c69ce0c12f9c938ceb0"
+  },
+  {
+    "name": "api-http",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/content-intake-usage-http.test.ts"
+    ],
+    "exitCode": 0,
+    "sha256": "b7e69e7bc23cfaf86a18cb38330bdeeb88ad837acfbd64484fc24376dd2df800"
+  },
+  {
+    "name": "api-pg",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/intake-shop-directory.integration.test.ts"
+    ],
+    "exitCode": 1,
+    "sha256": "b55cda501f55cf0af825bf622396758b5303f90a1775930d0634d4fd8686f7e7"
+  },
+  {
+    "name": "api-pg-final",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/intake-shop-directory.integration.test.ts"
+    ],
+    "env": {
+      "CUSTOMER_AGENT_API_PG15_INTEGRATION": "1"
+    },
+    "exitCode": 0,
+    "sha256": "8cd861f9aad4183d49ab70824d68075c272a70fad6e4adf555eb71494a63fea7"
+  },
+  {
+    "name": "desktop-final",
+    "cwd": "apps/desktop",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/unit/content-intake-access.test.ts",
+      "tests/unit/content-intake-query.test.ts",
+      "tests/unit/content-intake-query-ipc.test.ts",
+      "tests/component/intake-shop-directory.test.tsx"
+    ],
+    "exitCode": 0,
+    "sha256": "afc74f386b78b35b722d856226d69564c651f3c4a3809b0a1b361ccaf1e2dbed"
+  },
+  {
+    "name": "desktop-types",
+    "cwd": ".",
+    "command": [
+      "apps/desktop/node_modules/.bin/tsc",
+      "--noEmit",
+      "-p",
+      "apps/desktop/tsconfig.json"
+    ],
+    "exitCode": 2,
+    "sha256": "fdf7e0b7c1748307b1e1d9ce38df7c4f2fd80538575ae4fb4aa2b240d2fd31b2"
+  },
+  {
+    "name": "api-types",
+    "cwd": ".",
+    "command": [
+      "apps/api/node_modules/.bin/tsc",
+      "--noEmit",
+      "-p",
+      "apps/api/tsconfig.json"
+    ],
+    "exitCode": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "api-pg-recovery",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/intake-shop-directory.integration.test.ts"
+    ],
+    "exitCode": 0,
+    "sha256": "b14892b043514780f121791cb9cbf2a7ad70df1e7f8347d197f80cfb303b23d9"
+  },
+  {
+    "name": "desktop-types-final",
+    "cwd": "apps/desktop",
+    "command": [
+      "./node_modules/.bin/tsc",
+      "--noEmit"
+    ],
+    "exitCode": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "lint-final",
+    "cwd": ".",
+    "command": [
+      "./node_modules/.bin/eslint",
+      "apps/api/src/content-intake/shop-directory.ts",
+      "apps/api/src/content-intake/service.ts",
+      "apps/api/src/content-intake/usage-http.ts",
+      "apps/api/src/content-intake/http-boundary.ts",
+      "apps/api/tests/intake-shop-directory.integration.test.ts",
+      "apps/api/tests/support/intake-synthetic-directory.ts",
+      "apps/api/tests/content-intake-usage-http.test.ts",
+      "apps/desktop/src/main/content-intake-access.ts",
+      "apps/desktop/src/main/content-intake-query.ts",
+      "apps/desktop/src/shared/content-intake-query.ts",
+      "apps/desktop/src/renderer/features/search/use-intake-shops.ts",
+      "apps/desktop/src/renderer/features/search/IntakeQueryFilters.tsx",
+      "apps/desktop/tests/unit/content-intake-access.test.ts",
+      "apps/desktop/tests/component/intake-shop-directory.test.tsx",
+      "apps/desktop/tests/e2e/content-intake-shop-directory-real-stack.spec.ts"
+    ],
+    "exitCode": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "api-pg-invalid-output",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/vitest",
+      "run",
+      "tests/intake-shop-directory.integration.test.ts",
+      "tests/content-intake-usage-http.test.ts"
+    ],
+    "env": {
+      "CUSTOMER_AGENT_API_PG15_INTEGRATION": "1"
+    },
+    "exitCode": 0,
+    "sha256": "bac534fc050f4eb5fb11d22ce5d115fa93fea9f94a49030ae7ebc30380f3ada5",
+    "changedInputSha256": {
+      "apps/api/src/content-intake/shop-directory.ts": "813317a93953cf0ad913c042e87ac51487addc245b936b126019416b0ee0b0e3",
+      "apps/api/tests/intake-shop-directory.integration.test.ts": "1c1c98cd85899d8195a12db59741d174edc847d0aeb1cf5b38f9f05040f73050"
+    }
+  },
+  {
+    "name": "lint-invalid-output",
+    "cwd": ".",
+    "command": [
+      "./node_modules/.bin/eslint",
+      "apps/api/src/content-intake/shop-directory.ts",
+      "apps/api/tests/intake-shop-directory.integration.test.ts"
+    ],
+    "env": {},
+    "exitCode": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "changedInputSha256": {
+      "apps/api/src/content-intake/shop-directory.ts": "813317a93953cf0ad913c042e87ac51487addc245b936b126019416b0ee0b0e3",
+      "apps/api/tests/intake-shop-directory.integration.test.ts": "1c1c98cd85899d8195a12db59741d174edc847d0aeb1cf5b38f9f05040f73050"
+    }
+  },
+  {
+    "name": "api-types-invalid-output",
+    "cwd": "apps/api",
+    "command": [
+      "./node_modules/.bin/tsc",
+      "--noEmit"
+    ],
+    "env": {},
+    "exitCode": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "changedInputSha256": {
+      "apps/api/src/content-intake/shop-directory.ts": "813317a93953cf0ad913c042e87ac51487addc245b936b126019416b0ee0b0e3",
+      "apps/api/tests/intake-shop-directory.integration.test.ts": "1c1c98cd85899d8195a12db59741d174edc847d0aeb1cf5b38f9f05040f73050"
+    }
+  }
+]

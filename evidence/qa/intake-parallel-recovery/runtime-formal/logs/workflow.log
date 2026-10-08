@@ -1,0 +1,118 @@
+$ node --test scripts/verification-policy.test.mjs scripts/synthetic-stack/stack.test.ts scripts/dev-help.test.mjs scripts/update-download-page.test.mjs scripts/ops/health-check.test.mjs
+✔ pnpm help:dev prints the golden path and a missing-script next step (34.622417ms)
+✔ dev-help --check stays aligned with the printed copy (32.598916ms)
+✔ the probe targets /ready, never the dependency-free /health (0.68975ms)
+✔ the unit does not keep its failure counter in the private /tmp (0.248917ms)
+✔ the timer fires every minute and starts shortly after boot (0.158625ms)
+✔ an unreachable configuration fails loudly instead of probing a default (10.80425ms)
+✔ an empty webhook fails loudly (18.882875ms)
+✔ a healthy endpoint alerts nobody and leaves the counter empty (87.225334ms)
+✔ alerts once, on the third consecutive failure, then stays quiet (181.629709ms)
+✔ recovery clears the counter so a later outage alerts again (216.027959ms)
+✔ the production stack stays in the foreground and restarts on child failure (0.417916ms)
+✔ the watchdog never uses flock, which may not exist on the host (1.191084ms)
+✔ the watchdog restarts via the stack unit's own command, and does not reseed (0.086583ms)
+✔ the watchdog unit carries the same environment the stack unit does (0.121917ms)
+✔ the watchdog timer starts after the stack has had a chance (0.108959ms)
+✔ a healthy stack makes the watchdog exit silently without restarting (18.675708ms)
+▶ synthetic seed content
+  ✔ declares a scope for every row that the catalog can label (0.589459ms)
+  ✔ keeps every catalog reference contract-safe (0.133459ms)
+  ✔ marks campaign rows with a bounded window (0.085375ms)
+✔ synthetic seed content (1.345125ms)
+▶ stack profile
+  ✔ builds loopback-only API environment with distinct login roles (1.036042ms)
+  ✔ enables Feishu OAuth while keeping the loopback password origin (0.264125ms)
+  ✔ writes only loopback origins to the packaged desktop profile (0.653834ms)
+  ✔ follows Electron Linux userData, including XDG_CONFIG_HOME (0.09725ms)
+  ✔ rejects a profile file that is not the current version or root (1.222333ms)
+✔ stack profile (3.449916ms)
+▶ process ownership
+  ✔ records and re-reads the current process signature (10.891667ms)
+  ✔ refuses to signal a stale record instead of killing an unrelated pid (3.629167ms)
+  ✔ reports a free and a busy loopback port (6.484ms)
+  ✔ rejects an unsafe process name (3.215917ms)
+  ✔ keeps the marker file out of the seed path (0.07025ms)
+✔ process ownership (24.459167ms)
+▶ anomaly checks
+  ✔ refuses to put non-Latin-1 text into an Authorization header (0.85325ms)
+  ✔ keeps rollback staleness on the desktop adapter, not raw adoption HTTP (0.62475ms)
+  ✔ reads the source-suspend id from argv[4] (0.129459ms)
+✔ anomaly checks (1.6675ms)
+▶ synthetic identity password
+  ✔ grants a seeded binding and rejects unknown credentials without enumerating (183.523417ms)
+  ✔ no longer accepts the historical hardcoded password (65.087417ms)
+  ✔ refuses to start when the account file is absent, instead of seeding a default (0.760083ms)
+✔ synthetic identity password (249.482875ms)
+▶ identity admission
+  ✔ admits loopback Host headers and rejects a public one (0.095083ms)
+  ✔ permits an extra hostname only when explicitly configured (0.045583ms)
+  ✔ refuses to load accounts from a missing file instead of seeding a default (0.523458ms)
+✔ identity admission (0.721292ms)
+▶ stack content env
+  ✔ reads a real deployment database name and content constants (0.166208ms)
+  ✔ treats an absent file as "use the synthetic defaults" (0.210875ms)
+  ✔ fails closed on a present but invalid file rather than falling back (0.478167ms)
+  ✔ rejects a misspelled key instead of ignoring it (0.064541ms)
+  ✔ rejects duplicate keys and a non-identifier database name (0.076875ms)
+  ✔ keeps two stacks off each other's ports, not merely on different offsets (0.498084ms)
+✔ stack content env (1.586667ms)
+▶ stack production env
+  ✔ reads the portable secrets a production stack cannot invent (0.134583ms)
+  ✔ treats an absent file as "run with the synthetic secrets" (0.206792ms)
+  ✔ refuses every value the stack root can derive instead of merging it (0.775458ms)
+  ✔ fails closed on an empty value and a malformed profile name (0.107084ms)
+  ✔ lets a portable key replace the synthetic constant (0.084916ms)
+  ✔ refuses a key set in both api.env and content.env (0.0745ms)
+✔ stack production env (1.45675ms)
+▶ stack profile reuse
+  ✔ adopts a profile it can use (0.381334ms)
+  ✔ refuses a profile whose database name would reach CREATE DATABASE (1.010917ms)
+✔ stack profile reuse (1.425459ms)
+▶ stack seed policy
+  ✔ never seeds a stack that declares its own database (0.045375ms)
+✔ stack seed policy (0.083333ms)
+▶ stack database wiring
+  ✔ never falls back to the module constant for the database name (0.273084ms)
+✔ stack database wiring (0.29425ms)
+▶ stack production wiring
+  ✔ applies api.env, because stack.ts is the production entry point (0.101583ms)
+✔ stack production wiring (0.121416ms)
+▶ stack start modes
+  ✔ can start without importing the synthetic catalog (0.090917ms)
+  ✔ keeps production children attached for systemd supervision (0.100542ms)
+✔ stack start modes (0.214ms)
+▶ process identity survives a clock correction
+  ✔ treats a record as live when the signature drifted but the command line matches (9.712042ms)
+  ✔ still refuses a record whose pid belongs to a different command (3.210375ms)
+  ✔ does not claim ownership when the record carries no command line (2.138959ms)
+✔ process identity survives a clock correction (15.127167ms)
+✔ platformOf maps exactly the three linked platforms (0.623416ms)
+✔ formatSizeMb and formatDateZh match the printed page (12.397291ms)
+✔ manifestFromRelease keeps linked assets, drops the zip, and requires all three (2.143834ms)
+✔ renderIndex rewrites version, date, sizes, checksums and every URL (1.031125ms)
+✔ renderIndex and renderWindows are idempotent (0.3185ms)
+✔ renderIndex fails loudly when the page loses a panel or a chip (0.832666ms)
+✔ renderIndex refuses a page that links a different repository (0.174541ms)
+✔ renderIndex refuses a page that stopped linking a platform (0.166042ms)
+✔ renderIndex refuses a page carrying two different versions (0.161458ms)
+✔ compareVersions orders numerically rather than as strings (0.105542ms)
+✔ publishedVersion reads the version a page advertises (0.096333ms)
+✔ renderWindows points the redirect at the release asset (0.159ms)
+✔ updateDownloadPages writes both pages once, then reports no changes (1.191459ms)
+✔ --check reports staleness without writing (0.87ms)
+✔ the CLI republishes a stale page from a manifest (111.751334ms)
+✔ updateDownloadPages refuses to walk the page backwards (1.164833ms)
+✔ updateDownloadPages publishes an older release only when told to (1.060625ms)
+✔ the CLI reports the resolved version and refuses a downgrade (114.0715ms)
+✔ only known documentation paths skip runtime lanes; rules retain semantic checks (1.104333ms)
+✔ gate refuses failure, cancellation, skip and missing classifier output (0.842834ms)
+✔ real git diff includes old code path of rename, deletion and new local files (187.610916ms)
+ℹ tests 81
+ℹ suites 14
+ℹ pass 81
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 580.019333

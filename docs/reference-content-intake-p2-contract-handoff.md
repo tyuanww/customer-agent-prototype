@@ -2,11 +2,11 @@
 
 > 状态：**治理合同已提交并 export · 产品 intake / codegen / 追加迁移已验收 · 仅限合成开发 · 三方公开交付 EVD 待齐**。2026-10-08 复核；产品依赖 P1 `d9e68ace6c1cb61c691e85bed6d7af42b0fa144e`。
 > 本页把已确认需求映射到下一份正式合同需要表达的资源、约束与验收，不签发合同版本、阶段门或真实运行权限。当前任务与授权只在[需求计划 §0](plans/2026-10-03-content-intake-requirements.md)维护。
-> 当前消费为 OpenAPI 1.20.0 / schema.v1.22，精确来源由消费锁与不可变 manifest 拥有；API、Main/Query 已在显式合成 profile 接入确认直发与旧审批历史兼容。生产 HTTP/ACL 尚未接入；新增组织传输/用途权限实验和店铺名称 DRAFT 的回收范围见下表及文末。
+> 当前消费为 OpenAPI 1.21.0 / schema.v1.23，精确来源由消费锁与不可变 manifest 拥有；API、Main/Query 已在显式合成 profile 接入确认直发与旧审批历史兼容。生产 HTTP/ACL 尚未接入；组织/用途权限/店铺名称已完成精确冻结、完整导出与接收，当前边界见下表及文末。
 
 ## 当前消费状态（2026-10-08）
 
-下文 §1–§6 与 §7 初始交接保留各次历史时点和数字，不把当时的“下一步”“未接线”当成今日待办。当前消费锁为 OpenAPI 1.20.0 / schema.v1.22、VERIFIED_NOT_ACTIVATED；产品内部迁移已追加至 0032。新候选与回退确认直发；approval-v1 只保留历史有效性约束，不要求新审批 transport。不能把上游 schema 版本与本仓迁移段数混为一谈。
+下文 §1–§6 与 §7 初始交接保留各次历史时点和数字，不把当时的“下一步”“未接线”当成今日待办。当前消费锁为 OpenAPI 1.21.0 / schema.v1.23、VERIFIED_NOT_ACTIVATED；产品内部迁移已追加至 0033。新候选与回退确认直发；approval-v1 只保留历史有效性约束，不要求新审批 transport。不能把上游 schema 版本与本仓迁移段数混为一谈。
 
 | 能力 | 当前状态与证据 |
 | --- | --- |
@@ -14,12 +14,12 @@
 | 权限配置界面 | 现有内容管理内增加局部权限面板；复用冻结 grants 列表/只读预览/保存/撤销与具名主体目录，management 唯一 service 注册独立 grants plugin。HTTP＋PG15 3 项、桌面相关单元/组件 80 项通过；权限 Electron 已在主集成通过，见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)；原独立结果见[权限配置证据](../evidence/qa/intake-grant-management/README.md) |
 | 纠正回退 | 0032、API、Main 已接入确认直发，保留旧谱系有效性及原子新发布；实际 Electron→HTTP→PG15 已验证，见[直发验收](../evidence/qa/intake-direct-publication/README.md)；[原回退证据](../evidence/qa/content-intake-p2-rollback/README.md)保留历史范围 |
 | 显式同题覆盖 | 0028 完整目录守卫及按店/商品/场景的覆盖与通用回落已验证；见[家族证据](../evidence/qa/content-intake-p2-family/README.md) |
-| 坐席界面 | 店铺选择、商品/场景多选、适用 FAQ 查询及原文复制已接通并完成[选择器合成验收](../evidence/qa/content-intake-p2-query-filters/README.md)；正式店铺显示名仍待下方合同候选批准与版本化 intake |
+| 坐席界面 | 店铺选择、商品/场景多选、适用 FAQ 查询及原文复制已接通并完成[选择器合成验收](../evidence/qa/content-intake-p2-query-filters/README.md)；店铺显示名已接入 API/Main/Query，名称不完整或失效保留编号并提示；本轮分页、更名、重名及撤权结果见[正式接入证据](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md) |
 | 对象容量 | 0029 与 API 已实现四类对象持久预留/采用/释放、未知提交保护及只读账本干跑；10→100 并发准入、10→100 合成发布历史与双来源 CAS 重审已验证，见[容量证据](../evidence/qa/content-intake-p2-capacity/README.md)；历史保留期与受控历史清理仍待批准 |
 | 平台 | Mac 开发态及指定版本 Windows/WSL 已取得分层结果；[杭州证据](../evidence/qa/content-intake-p2-hangzhou/README.md)不覆盖后续回退、家族及商品/场景选择等新增切片，普通账号、可靠拖动、整机断网仍未确认 |
-| 组织与权限准备 | 组织版本绑定/原子撤销/provenance 与共享令牌候选已补；原组织专项 usage 仍用管理池。后续 purpose-candidate 已用受限业务/usage/worker 池贯穿四域 HTTP，Mac FAQ/回退 Electron 2/2 通过，见[发布验收](../evidence/qa/intake-release-acceptance/README.md)；组织池该轮只预检。正式 transaction/factory/ACL 尚未接线，合成通过不等于生产运行装配 |
-| 版本化交付工具 | 治理 exporter / 产品 intake 已支持 contract-set/v2 的封闭 runtime 伴随产物；合成跨仓往返验证 12 件产物与 9 个 runtime_sources。实际 1.21.0/schema.v1.23 仍 DRAFT、未冻结、未 export、未 intake；正式消费锁不变 |
-| 退出条件 | 正式店铺名称合同、历史保留期及批准后的历史清理/磁盘核对、真实组织、旧审批历史失效依据（如有）、生产最小 ACL/factory、旧目录认领及业务/设备验收仍待完成；合成 CAS 已验证额外重审次数，不代表实际人工等待耗时；范围汇总见 [TODOS](../TODOS.md) |
+| 组织与权限接入 | 组织观察/登记刷新/writer 已迁入 src 单一所有者，正式用途池逐次 SET ROLE/assert_purpose，transaction 直接调用正式会话锁；合成 host 实际使用受限组织池写入合成事实。业务/usage/worker 沿用原消费者，不再改写 SQL；生产 app/server 与真实 transport 保持关闭 |
+| 版本化交付 | 治理冻结源 `e35c0c0`，实际完整包12件、运行伴随9件；产品 intake/codegen 236个组件及0033增量已接收。全部绑定批准摘要和前32段依赖，runtime/Ddev仍false；见[本轮证据](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md) |
+| 退出条件 | 真实目录登记范围/密钥、历史保留期及批准后的历史清理/磁盘核对、真实组织、旧审批历史失效依据（如有）、生产低权账号/factory、旧目录认领及业务/设备验收仍待完成；合成 CAS 已验证额外重审次数，不代表实际人工等待耗时；范围汇总见 [TODOS](../TODOS.md) |
 
 ## 1. 交接范围与基线
 
@@ -221,7 +221,7 @@ Main 已通过实际 ProductHttp/ProductSession 消费冻结质量 HTTP，负责
 
 已冻结的 `IntakeSource.scope.shopId` 是稳定标识，没有可展示的店铺名称；不能把来源 ID、岗位或 fixture 映射当正式名称。商品/场景已经具备 `IntakeVocabularyList`，本轮直接实现其读取，不增加重复词表合同。
 
-**当前候选：** 治理仓 OpenAPI 1.21.0/schema.v1.23 仍为 DRAFT，回收修复及冻结条件见[文末](#并行候选回收2026-10-08)。候选提供只读店铺目录，返回每条 `{shopId, displayName, displayVersion}` 及 `nextCursor`；`displayName` 非空、最多 256 字，缺失整次失败，重名仍可通过 ID 区分。目录需绑定当前产品会话和租户/app，限定当前有 query 授权的 shop 来源；品牌级授权不能自行展开全公司店铺。页面上限 100，游标与会话、完整目录修订和截止绑定，重命名、撤权或身份变化使旧游标失效。多来源同店必须给出一致名称版本。
+**候选设计留档：** 此节记录最初 DRAFT 时点；该精确组合现已冻结并由产品接收，实际状态见[文末](#组合合同实际接收2026-10-08)。候选提供只读店铺目录，返回每条 `{shopId, displayName, displayVersion}` 及 `nextCursor`；`displayName` 非空、最多 256 字，缺失整次失败，重名仍可通过 ID 区分。目录需绑定当前产品会话和租户/app，限定当前有 query 授权的 shop 来源；品牌级授权不能自行展开全公司店铺。页面上限 100，游标与会话、完整目录修订和截止绑定，重命名、撤权或身份变化使旧游标失效。多来源同店必须给出一致名称版本。
 
 选择独立只读目录而不是给每个 Source 重复塞名称，可避免同店跨来源名称漂移；Main 将其与当前有权店铺集合对齐，仅替换显示文案，查询和复制继续使用 shopId 和原 entitlement。不得让名称服务授予业务权限，也不新增 renderer 通用 HTTP 能力。
 
@@ -350,6 +350,8 @@ factory 的可验收输入为：获准环境标识、受限连接配置、受控
 
 ### 并行候选回收（2026-10-08）
 
+以下保留冻结前的回收时点；当前已接收状态以本文首节及最后一节为准。
+
 A/B 已按原提交加追加修复接收到产品实验目录，C 只接收到治理候选；精确提交与实际验证见[回收记录](../evidence/qa/intake-parallel-recovery/README.md)。这些工作不改变当前已消费的 OpenAPI 1.20.0/schema.v1.22 或正式应用 ACL。
 
 - **组织可信输入：** 固定回环 HTTP 已接原 observer/writer/资格消费者，拥有限流、字节/时间预算、取消和请求释放；未知提交重放原快照。后续候选已加入同应用 open_id 版本化登记、原子撤销及映射版本/目录摘要/观察截止的同事务持久化，未知提交重放原观察；共享 token owner 按租户/app 隔离签发代次和限流。候选将每次目录扫描限定为最多五页、每页 50 条，超限直接拒绝；共享配额不足也不排队或无限重试。正式 token 供应、可信登记来源、新鲜度及容量方案仍待所属仓治理。组织专项的 usage 消费使用 harness 管理池，受限 usage 的实际验证见 B，不混算两个环境。
@@ -373,3 +375,9 @@ Main 拥有选择句柄、会话和到期代际、原预览/写请求及未知�
 OpenAPI 1.21.0/schema.v1.23 仍是 DRAFT；精确字节、最终 release 结果及正式采用条件由治理候选拥有，此处不预写尚未确认的 hash。当前正式消费仍为 OpenAPI 1.20.0/schema.v1.22、VERIFIED_NOT_ACTIVATED，32 段 migration 和 runtime/Ddev 未激活状态不变。下一步是在既有事项内完成精确候选批准与实际版本化交付，再按真实范围和环境条件接入；不增加审批流程、自动同步、历史删除或新的业务范围。完整外部 `/review` 保持 INCOMPLETE。
 
 本轮组合候选已在治理本地提交 `6a25304`（来源 `1b91751`），最终稳定输入完整 test:release 41/41、PG253、合同/出口7与旧direct7通过；OpenAPI 1.21 SHA `bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7`，schema1.23 SHA `4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e`，installation SHA `1683c487d6dc84e84b44d9f2a80ca9ab9cfb941144ace8d3b2cf7f520bb58486`。全部保持 DRAFT；实际冻结/export/intake 尚未发生。产品集成回收、两项恢复/接收缺陷的修复和精确下一决定见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)。
+
+## 组合合同实际接收（2026-10-08）
+
+上文 DRAFT/未冻结/未接线均属于各轮历史时点。用户精确批准 `6a25304` 后，治理 `e35c0c01b5510ffcff75f2b19ba441ad53a9b504` 冻结并实际完整导出；产品消费同源 `cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551`。批准三摘要保持不变，机器 DRAFT 注解不改写，正式状态由治理批准记录拥有。0033按同一事务安装六件SQL，前32段与旧角色上限不变。完整验证、审查及剩余条件见[本轮证据](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。
+
+`GET /v1/intake/shop-directory` 已由usage服务注册于合成宿主；目录prepare/finish处于原内容事务。Main逐页读完并核对店铺集合相等后才显示名称，名称截止独立于查询资格，失败只回退编号。环境LOGIN/维护名单/真实名称/密钥托管仍待正式运行条件，不能从岗位自动展开全租户范围。

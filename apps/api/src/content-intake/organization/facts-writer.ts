@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { parseContractSchema } from '@customer-agent/contracts';
-import { canonical, digest } from '../../src/content-intake/material.js';
-import { clock, type IntakePool } from '../../src/content-intake/transaction.js';
+import { canonical, digest } from '../material.js';
+import { clock, type IntakePool } from '../transaction.js';
 
 export type OrganizationFactsSnapshot = {
   principalId: string; expectedFactsVersion: number; departmentIds: string[];
@@ -12,7 +12,7 @@ export type RefreshResult = { ok: true; status: 'applied' | 'replayed'; factsVer
   | { ok: false; reason: Failure; commit: 'rolled_back' | 'unknown' };
 export class OrganizationFactsRejected extends Error { constructor(readonly reason: Failure) { super(reason); } }
 const Rejected = OrganizationFactsRejected;
-/** Experiment-only association owner. It runs under the writer's content lock,
+/** Registration evidence association owner. It runs under the writer's content lock,
  * after its fact CAS, before its final deadline check/COMMIT. It must perform only
  * database evidence work; throwing rolls the whole write back. It never owns the
  * fact payload, facts version, deadline, transaction, or recovery decision. */
@@ -39,7 +39,7 @@ function snapshot(raw: unknown): OrganizationFactsSnapshot {
     departmentIds,jobId:id(r.jobId),enabled:r.enabled,checkedAt,validUntil };
 }
 
-/** Offline experiment, excluded from API dist and HTTP registration. The caller is
+/** Internal trusted writer; no HTTP registration. The caller is
  * a trusted organization observer, not a logged-in actor. This accepts only an
  * already registered principal, never creates identity/roles/grants, and cannot
  * authenticate a native provider's timestamps or detect stale upstream caches.

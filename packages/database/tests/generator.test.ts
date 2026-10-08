@@ -44,6 +44,7 @@ const contractRoot = path.join(projectRoot, 'contracts/upstream/customer-agent',
 const manifest = JSON.parse(readFileSync(path.join(contractRoot, 'contract-set.json'), 'utf8')) as {
   source_git_sha: string;
   database: Readonly<{ sha256: string; file: string }>;
+  runtime: Readonly<Record<string, Readonly<{ sha256: string; file: string }>>>;
 };
 const databaseSource = readFileSync(path.join(contractRoot, manifest.database.file), 'utf8');
 let generator: GeneratorModule;
@@ -59,7 +60,9 @@ function snapshot(source = databaseSource): Readonly<Record<string, unknown>> {
     contract_set_id: contractSetId,
     source_git_sha: manifest.source_git_sha,
     database_source: source,
-    manifest: { database: manifest.database },
+    manifest,
+    runtime_sources: Object.fromEntries(Object.entries(manifest.runtime).map(([name, descriptor]) =>
+      [name, readFileSync(path.join(contractRoot, descriptor.file), 'utf8')])),
   };
 }
 
@@ -82,31 +85,49 @@ function prepareExistingPublication(root: string): void {
 }
 
 describe('database migration generator', () => {
-  it('changes only catalogue provenance across successive the direct contract intake', () => {
+  it('preserves all thirty-two predecessor migrations and stamps only the runtime addition', () => {
     const prior = generator.buildDatabaseMigrationOutputs(snapshot());
     const sourceGitSha = 'a'.repeat(40);
     const next = generator.buildDatabaseMigrationOutputs({ ...snapshot(),
-      contract_set_id: `cs-ai-c11-openapi-1.20.0-schema-1.22-${sourceGitSha.slice(0, 12)}`, source_git_sha: sourceGitSha });
-    expect(next.migrations).toHaveLength(32);
-    expect(next.migrations.slice(0,30)).toEqual(prior.migrations.slice(0,30));
-    expect(next.migrations[30]?.source_git_sha).toBe(sourceGitSha);
-    expect(next.migrations[31]?.source_git_sha).toBe(sourceGitSha);
+      contract_set_id: `cs-ai-c11-openapi-1.21.0-schema-1.23-${sourceGitSha.slice(0, 12)}`, source_git_sha: sourceGitSha });
+    expect(next.migrations).toHaveLength(33);
+    expect(next.migrations.slice(0,32)).toEqual(prior.migrations.slice(0,32));
+    expect(next.migrations[32]?.source_git_sha).toBe(sourceGitSha);
     for (const [file, bytes] of next.outputs) {
-      if (file.endsWith('.sql') && !file.endsWith('0031_intake_direct_v1_22.sql') && !file.endsWith('0032_intake_direct_publication.sql')) expect(bytes).toBe(prior.outputs.get(file));
+      if (file.endsWith('.sql') && !file.endsWith('0033_intake_runtime_v1_23.sql')) expect(bytes).toBe(prior.outputs.get(file));
     }
     const metadata = JSON.parse(next.outputs.get('packages/database/migrations/manifest.generated.json')!);
     expect(metadata.compatibility.prior_reviewed_upgrades.at(-1)).toEqual({
-      contract_set_id: 'cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8',
-      source_git_sha: '240ae98a47d8b9432559c298f60af6fdc9ba8c4e',
-      source_schema_sha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013', migration_count: 30,
+      contract_set_id: 'cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929',
+      source_git_sha: '6f318d448929d1a87c5dc9e725ea4f90c48a4b97',
+      source_schema_sha256: 'c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce', migration_count: 32,
     });
+    expect(prior.migrations.slice(30,32).map(m => m.sha256)).toEqual([
+      '82407ae1c0ce3a3dc975b9b5fe76012b5ab4f19ee5952dafb912a23509c4dcc0',
+      '38e72eb66941256861aeb3edddc609cdbbfbc4e1eed56366b370526ad82cbddc',
+    ]);
+    expect(prior.migrations[32]?.sql.match(/-- companion=([^;]+)/g)).toEqual([
+      '-- companion=roles', '-- companion=organization', '-- companion=session',
+      '-- companion=directory', '-- companion=directoryAcl', '-- companion=acl',
+    ]);
   });
 
-  it('preserves all thirty migrations and appends direct storage and transactions', () => {
+  it.each(['installation', 'roles', 'organization', 'session', 'directory', 'directoryAcl', 'acl', 'provenance', 'protocol'])(
+    'rejects missing or changed runtime companion %s before generating outputs', name => {
+      const input = snapshot();
+      const sources = input.runtime_sources as Record<string, string>;
+      const missing = { ...sources }; delete missing[name];
+      for (const runtime_sources of [missing, { ...sources, [name]: sources[name] + '\n-- drift' }]) {
+        expect(() => generator.buildDatabaseMigrationOutputs({ ...input, runtime_sources })).toThrow(/missing or drifted/);
+      }
+    },
+  );
+
+  it('preserves immutable migrations and appends one atomic runtime installation', () => {
     const first = generator.buildDatabaseMigrationOutputs(snapshot());
     const second = generator.buildDatabaseMigrationOutputs(snapshot());
 
-    expect(first.migrations).toHaveLength(32);
+    expect(first.migrations).toHaveLength(33);
     expect(first.migrations.map(({ id }) => id)).toEqual([
       '0001_extensions',
       '0002_identity_and_content',
@@ -126,7 +147,7 @@ describe('database migration generator', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23',
     ]);
     expect([...first.outputs]).toEqual([...second.outputs]);
     expect(first.migrations.slice(0,24).map(m => m.sha256)).toEqual(["4876b7ef62bb033b4b7b487e06e88a525b9cb8b3e32e82e6516124b7fc8eca62", "62322728f1621c75b2cc0f66ac20e65710a916c714caa84761a93108b71e1b64", "c109b3c7ec79c73cb6e3748808aca9296ed1c96e5d8fc91ab0046c80fd2b50d4", "ff68d5969e28a9d4d7eed963906f2fc3783f4c34b5ec1fa347ea87c3bc0b2f6a", "715db39163e2a99d10a88126a4bded14c75f4fb4ba1ec97dcba573265babdf02", "f5b369165b5e5f0e21801f8fd8eb2c4589ee26ca0761327811f4ed5c5903d4ca", "7cf632ec4123b9031893646b0b67348cf5a89dd3fe89ec544dccecb576513189", "f883a929a8742e0f71a498e70de410124e8c25fd2fdee6a492047201475990f2", "a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e", "026497120b6ad6d7d885de47d54335bb8891d8b45e2da010cc85eae6ea7b6818", "8f5337b69b1a10fb85013694699e683c99e14399fa3471bd970eb89ac8591a0f", "3bc06f81ed596049e0539a679e066b7a6c2d1814314c3d2ba9fd4d65f469be18", "8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2", "ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339", "e7ac1d9c5f487336b63ed4a8abeb66031dbcd3189286fbd2d07b97407685613b", "d574ebd891e3a7db771e6f6a5fb7a85f6e6d3614c7880f2dea4b4bb642d6b447", "eb3ccbf3f04c4005393fc757b8f1e03d55a5078837b2b8eb9dbac72d83116788", "c89d76992850aa562a3d24618bccb39a941a8bc88136342505a9edea5440acba", "e4720feabd0a9b92d8d5cc22fcb6dcce75cf6e8136c0b2d9365d0d7c1cf18cd7", "fd261530461c20aca90c5468997a695d67921fe53ff74b39de2c0a5f6b80d678", "7c19bf3f97fecb5af61c92131c0ce2a5f5f42822d2e104bb4202d96e292c73db", "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03", "c3b37131c28b76b2453e24d5f432e70329c478a7f90d34c95598518124e50136", "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2"]);

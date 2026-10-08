@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { Pool, type Client, type PoolClient } from 'pg';
+import type { Client, PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
@@ -12,9 +11,9 @@ import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
 import { authenticatedProductSession, createProductAuthService } from '../src/product-auth-service.js';
-import { IntakeRejection, type IntakePool, type IntakeResult } from '../src/content-intake/transaction.js';
+import { type IntakePool, type IntakeResult } from '../src/content-intake/transaction.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
-import { createSyntheticConsumerPool, verifyConsumerPurpose } from '../experiments/intake-runtime/consumer-pool.js';
+import { createIntakePurposePool, type IntakePurposePool, type IntakePurpose } from '../src/content-intake/runtime-pool.js';
 
 type C = components['schemas'];
 type Service = ReturnType<typeof createContentIntakeService>;
@@ -23,9 +22,10 @@ const context = { shopId: 'shop-a', contextGeneration: 1, productIds: [], scenar
 const rows = (body = '第一行。\n第二行。') => ['one', 'two', 'three'].map(id =>
   [`faq-${id}`, `合成问题${id}`, body, '', '', '分类', '', '启用', '', '', '', '内部说明', '', '', 'false']);
 
-describe.skipIf(!enabled)('actual service on candidate purpose roles (synthetic PG15)', () => {
+describe.skipIf(!enabled)('actual service on formal purpose roles (synthetic PG15)', () => {
   let harness: Pg15Harness, admin: Client, auth: ProductAuthService;
-  let business: Pool, usage: Pool, worker: Pool, organization: Pool;
+  type TestPool = IntakePurposePool & { query: PoolClient['query'] };
+  let business: TestPool, usage: TestPool, worker: TestPool, organization: TestPool;
   let businessPool: IntakePool, usagePool: IntakePool;
   let service: Service, reader: Service, store: ReturnType<typeof createContentObjectStore>;
   let actors: Record<string, AuthenticatedUser>;
@@ -60,15 +60,14 @@ describe.skipIf(!enabled)('actual service on candidate purpose roles (synthetic 
     admin = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
     await seedIntakeSyntheticHost(admin);
-    for (const name of ['session-lock.sql', 'purpose-acl.sql', 'consumer-acl.sql']) {
-      await admin.query(await readFile(new URL(`../experiments/intake-runtime/${name}`, import.meta.url), 'utf8'));
-    }
-    const pool = (user: string) => new Pool({ ...db.config, user, max: 2 });
-    business = pool('intake_business'); usage = pool('intake_usage'); worker = pool('intake_worker'); organization = pool('intake_org_writer');
-    for (const [pool, purpose] of [[business, 'business'], [usage, 'usage'], [worker, 'worker'], [organization, 'org_writer']] as const) {
-      await verifyConsumerPurpose(pool, purpose);
-    }
-    businessPool = await createSyntheticConsumerPool(business, () => new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED')); usagePool = await createSyntheticConsumerPool(usage, () => new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED'));
+    const pool = async (purpose: IntakePurpose): Promise<TestPool> => {
+      const user = `synthetic_${purpose}`, capability = purpose === 'organization' ? 'intake_org_writer' : `intake_${purpose}`;
+      await admin.query(`CREATE ROLE ${user} LOGIN NOINHERIT; GRANT ${capability} TO ${user}`);
+      const owned = createIntakePurposePool({ ...db.config, user, max: 2 }, purpose);
+      return Object.assign(owned, { query: async (sql: string, args?: unknown[]) => { const client = await owned.connect(); try { return await client.query(sql, args); } finally { client.release(); } } }) as TestPool;
+    };
+    business = await pool('business'); usage = await pool('usage'); worker = await pool('worker'); organization = await pool('organization');
+    businessPool = business; usagePool = usage;
     store = createContentObjectStore(path.join(harness.root, db.name));
     service = configured(); reader = configured(usagePool);
     await admin.query('CREATE ROLE synthetic_consumer_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_consumer_auth');
@@ -130,6 +129,18 @@ describe.skipIf(!enabled)('actual service on candidate purpose roles (synthetic 
     expect(JSON.stringify({ entitlement, result })).not.toContain('osl_');
     return { entitlement, result };
   }
+  it('evicts a terminated idle connection and admits a new one through the purpose guard', async () => {
+    const client = await usage.connect(); const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    client.release();
+    await admin.query('SELECT pg_terminate_backend($1)', [pid]);
+    await expect.poll(() => usage.totalCount).toBe(0);
+    const next = await usage.connect();
+    try {
+      expect((await next.query('SELECT pg_backend_pid() AS pid, current_user AS role')).rows[0]).toMatchObject({ role: 'intake_usage' });
+      expect((await next.query('SELECT pg_backend_pid() AS pid')).rows[0].pid).not.toBe(pid);
+    } finally { next.release(); }
+  });
+
   it('uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor', async () => {
     const published = await publish('success');
     const used = await readAll();
@@ -258,8 +269,8 @@ describe.skipIf(!enabled)('actual service on candidate purpose roles (synthetic 
     expect((await readAll()).result).toHaveLength(3);
   });
   it('refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected', async () => {
-    await expect(verifyConsumerPurpose(usage, 'business')).rejects.toThrow('CONSUMER_PURPOSE_MISMATCH');
-    await expect(verifyConsumerPurpose({ connect: async () => ({ query: admin.query.bind(admin), release: () => undefined }) } as unknown as IntakePool, 'usage')).rejects.toThrow();
+    await expect(usage.query("SELECT intake_runtime.assert_purpose('business')")).rejects.toMatchObject({ code: '42501' });
+    await expect(admin.query("SELECT intake_runtime.assert_purpose('usage')")).rejects.toMatchObject({ code: '42501' });
     expect(await reader.issueEntitlement({ ...actors.agent! }, context)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
     const rawRoot = `INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
       VALUES('forged-root','allocation','director','director','tenant-a','app-a','scope-a','publish',clock_timestamp(),clock_timestamp()+interval '1 hour','x','director')`;

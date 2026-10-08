@@ -1,0 +1,38 @@
+{
+  "capturedAt": "2026-10-08T11:02:11.946294+00:00",
+  "scope": "Fresh synthetic PG15 runtime verifier, generator independent read-only review",
+  "inputs": {
+    "packages/database/src/verifier.ts": "74ebe95b671e3a62db4525ad8a43513e350bd7ad6b5ea420dc236c4f3f2ea92a",
+    "packages/database/tests/verifier-runtime.integration.test.ts": "cd81f3bfd73fe240b6be3008d27cf47758990e443d1b37e2dc0f0869a3635b4b",
+    "packages/database/scripts/generate-migrations.mjs": "bb2240cf43fd9764c115775dd9e94764aba75e5ebc40153801145c92581bbaf1",
+    "packages/database/migrations/0033_intake_runtime_v1_23.sql": "9f32d82763193ea6da946eb4b9d105ab9ca7b5208846940771f15c5ec5ab28e3",
+    "packages/database/migrations/manifest.generated.json": "fceb97dd1c8b1792cac3433d31eb9351a82985b175a6a496d05c28760fea865f"
+  },
+  "checks": {
+    "postgres": {
+      "tests": 21,
+      "exit": 0,
+      "command": "CUSTOMER_AGENT_DB_PG15_INTEGRATION=1 CUSTOMER_AGENT_PG15_BIN=<PG15 bin> packages/database/node_modules/.bin/vitest run packages/database/tests/verifier-runtime.integration.test.ts"
+    },
+    "lint": {
+      "exit": 0,
+      "files": [
+        "packages/database/src/verifier.ts",
+        "packages/database/tests/verifier-runtime.integration.test.ts"
+      ]
+    },
+    "typecheck": {
+      "exit": 0,
+      "command": "packages/database/node_modules/.bin/tsc --noEmit (cwd packages/database)"
+    },
+    "first32": {
+      "sqlUnchanged": true,
+      "manifestDescriptorsUnchanged": true
+    }
+  },
+  "logs": {
+    "before-fingerprint-update.log": "cd268750331e162ee1267b9b4c1dd1f1e980996cc0b7f94520f47fea09bc41b3",
+    "pg-final.log": "274cb3652e08091ed74ed94d90204502e28ea0f59ed1c7fe2dbd923c3de832eb"
+  },
+  "runtimeActivated": false
+}

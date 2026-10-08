@@ -1,31 +1,29 @@
 import { parseContractSchema } from '@customer-agent/contracts';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { Pool, type Client } from 'pg';
+import type { Client } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createContentIntakeService } from '../src/content-intake/service.js';
-import { IntakeRejection } from '../src/content-intake/transaction.js';
 import { contentIntakeManagementRoutes } from '../src/content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from '../src/content-intake/usage-http.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createProductAuthService } from '../src/product-auth-service.js';
 import type { ProductAuthService } from '../src/auth-service.js';
 import { seedIntakeSyntheticHost, INTAKE_SYNTHETIC_IDENTITIES } from './support/intake-synthetic-seed.js';
-import { createSyntheticConsumerPool } from '../experiments/intake-runtime/consumer-pool.js';
+import { createIntakePurposePool, type IntakePurposePool } from '../src/content-intake/runtime-pool.js';
 const enabled=process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION==='1';
 describe.skipIf(!enabled)('business permission HTTP and PG15 (synthetic)',()=>{
- let harness:Pg15Harness,admin:Client,pool:Pool,auth:ProductAuthService,app:FastifyInstance,origin:string;
+ let harness:Pg15Harness,admin:Client,pool:IntakePurposePool,auth:ProductAuthService,app:FastifyInstance,origin:string;
  const tokens:Record<string,string>={};const diagnostics:unknown[]=[];
  const report=(_id:string,error:unknown)=>diagnostics.push(error);
  beforeEach(async()=>{
   harness=new Pg15Harness();harness.start();const db=harness.createDatabase('grant_ui');admin=await harness.connect(db.config);
   await applyDatabaseMigrations(admin);await seedIntakeSyntheticHost(admin);
-  for(const file of ['session-lock.sql','purpose-acl.sql','consumer-acl.sql'])await admin.query(await readFile(new URL(`../experiments/intake-runtime/${file}`,import.meta.url),'utf8'));
-  pool=new Pool({...db.config,user:'intake_business',max:2});const restricted=await createSyntheticConsumerPool(pool,()=>new IntakeRejection('SCOPE_DENIED'));
+  await admin.query('CREATE ROLE synthetic_business LOGIN NOINHERIT; GRANT intake_business TO synthetic_business');
+  pool=createIntakePurposePool({...db.config,user:'synthetic_business',max:2},'business');const restricted=pool;
   await admin.query('CREATE ROLE synthetic_grant_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_grant_auth');
   auth=await createProductAuthService({connectionString:`postgresql://synthetic_grant_auth@localhost/${db.name}?${new URLSearchParams({host:harness.socket,port:String(harness.port)})}`,poolMax:1,connectionTimeoutMs:2000,readinessTimeoutMs:3000},
     {authorizeUrl:s=>`http://127.0.0.1/auth?state=${s}`,exchange:async c=>c,close:()=>undefined},'mock');
