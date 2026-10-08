@@ -71,7 +71,7 @@ Error: Test timed out in 5000ms.
 If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
  ❯ tests/intake-runtime-assembly.test.ts:124:3
     122|   });
-    123| 
+    123|
     124|   it('reserves the startup attempt before awaiting the parser', async …
        |   ^
     125|     const fixture = request();
@@ -84,4 +84,3 @@ If this is a long-running test, pass a timeout value as the last argument or con
       Tests  4 failed | 11 skipped (15)
    Start at  16:40:36
    Duration  5.66s (transform 376ms, setup 0ms, collect 840ms, tests 6.07s, environment 0ms, prepare 121ms)
-

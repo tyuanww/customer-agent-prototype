@@ -72,4 +72,4 @@ PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH \
 
 vitest 和 eslint 退出码 0。`apps/api` 下 `./node_modules/.bin/tsc --noEmit` 仍被已有测试宿主对缺失 `apps/api/dist` 的导入阻塞，全部诊断只落在 `tests/support/intake-synthetic-host.ts`，不是完整 typecheck PASS：[原始诊断](typecheck-recovery.log)。未修改共享宿主或为通过检查生成 dist；主 Agent 集成时统一 build/typecheck。没有运行完整 `/review`、旧角色审核或工作区体积检查。
 
-修复后 `purpose-acl.sql` SHA-256：`4bb27efc556c9931b70386c29982db68dd2ee9e050feccc1dd6772a160fae23c`。修复后 vitest 日志 SHA-256：`ea4f5b62ec80cc2cdad596c28c65b547d7fb71e1059fd6241e4c782387461b1b`。
+修复后 `purpose-acl.sql` SHA-256：`4bb27efc556c9931b70386c29982db68dd2ee9e050feccc1dd6772a160fae23c`。修复后 vitest 日志 SHA-256：`06b7daa6205c20a56f6cf274898219af4e0b3546706b4b654bc525bf82a54aea`。仓内新增日志仅裁去行尾空白与多余 EOF 空行，未删改测试输出；未规范化原件仍在 `/tmp/intake-runtime-recovery-{red,green,typecheck}.log`。
