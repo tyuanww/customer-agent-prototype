@@ -470,6 +470,22 @@ pnpm test:intake:desktop
 另一个 [Electron 管理 wire 测试](../apps/desktop/tests/e2e/content-intake-management.spec.ts)使用自有合成 HTTP 替身，验证未知质量回执恢复、原生确认取消/提交与 sandbox 边界；它不替代上述真实 HTTP/PG 发布产物被另一客服消费的证据。
 
 
+## FAQ Mac 安装副本合成验收
+
+先按[打包约束](reference-packaging-and-signing.md)运行 `pnpm package:mac:local`，从实际 DMG/ZIP 解包到专用目录，核对副本与构建 app.asar 摘要，不覆盖已安装应用。既有完整场景可显式选择该副本：
+
+```sh
+CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 \
+CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 \
+CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE='/绝对路径/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo' \
+pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts
+```
+
+测试为自有 userData 写 `synthetic-stack.json`，用打包态文件 profile 接到一次性回环 HTTP/PG15，故意把开发环境地址置为不可用，并校验版本、`isPackaged`、实际 executable 与 userData。没有指定 executable 时沿用既有开发态场景。解析器属于 API 子进程，不宣称在桌面包内。文件/确认框仍用受控响应；真人 OS 验收、Windows、签名/公证及真实资料另验。
+
+本轮另有 CUA 操作真实文件选择与取消/确认系统框的窄探针，最终取消零写入、确认一条发布；这是工具操作的实机证据，不是非开发维护者的人工作业验收。产物、命令、首次路径别名断言失败和不明输入记录见[Mac 包证据](../evidence/qa/intake-mac-package/README.md)。CSV 尚未通过此链，不能用 XLSX 结果代替。
+
+
 ## FAQ 统一工作台
 
 `pnpm test:intake:desktop` 包含原上传/回退/权限配置/店铺目录，以及[四域工作台测试](../apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts)。实际受限 HTTP/PG15 先发布资料，Electron 的话术库按产品/活动/售前/售后归类读取同一产物；系统同步展示相同发布版本，撤权后刷新清空正文。Dashboard 刷新不能破坏 Query 的既有合法复制资格，禁止走旧公告/内容/话术/SOP适配器。原上传和权限测试还验证跨导航保留未提交输入及预览。完整截图保存在 ignored `.gstack/intake-workspace/`；光暗和最小窗口证据不替代办公 Windows 与人工系统窗验收。

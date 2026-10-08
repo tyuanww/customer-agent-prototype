@@ -1,0 +1,13 @@
+{
+  "version": "0.3.26",
+  "source": "readonly DMG mounted then ditto copied into owned directory",
+  "app": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/installed/客服话术浮窗 Demo.app",
+  "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-mac-package-20261008/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+  "dmg_sha256": "6d6da87e74b6c7dfe417771a6cb32d105c0fe4de8d6e8a9b64937431845fa33e",
+  "zip_sha256": "4a3a0f2253907c6210b2b1e3ad66871fee6b4f33f59d75f2bc2473137be08bd5",
+  "app_asar_sha256": "05a9dee72ab47af7c3d467e2aaeb0f1a09a106b2e0370c353221316e1c8e1f45",
+  "copied_asar_matches_build": true,
+  "dmg_bytes": 223985973,
+  "zip_bytes": 223261622
+}
+"disk4" ejected.
