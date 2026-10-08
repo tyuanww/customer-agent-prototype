@@ -16,6 +16,7 @@
 | 坐席界面 | 店铺选择、商品/场景多选、适用 FAQ 查询及原文复制已接通并完成[选择器合成验收](../evidence/qa/content-intake-p2-query-filters/README.md)；正式店铺显示名仍待下方合同候选批准与版本化 intake |
 | 对象容量 | 0029 与 API 已实现四类对象持久预留/采用/释放、未知提交保护及只读账本干跑；10→100 并发准入、10→100 合成发布历史与双来源 CAS 重审已验证，见[容量证据](../evidence/qa/content-intake-p2-capacity/README.md)；历史保留期与受控历史清理仍待批准 |
 | 平台 | Mac 开发态及指定版本 Windows/WSL 已取得分层结果；[杭州证据](../evidence/qa/content-intake-p2-hangzhou/README.md)不覆盖后续回退、家族及商品/场景选择等新增切片，普通账号、可靠拖动、整机断网仍未确认 |
+| 组织与权限准备 | 组织刷新及会话锁各 8 项 PG15 离线验证已通过；单次受控只读职位来源已获用户认可，见下方[当前字段映射](#职位来源与登录授权的当前映射2026-10-08)。实验与观察均不等于生产装配 |
 | 退出条件 | 正式店铺名称合同、历史保留期及批准后的历史清理/磁盘核对、真实组织/审批、生产最小 ACL/factory、旧目录认领及业务/设备验收仍待完成；合成 CAS 已验证额外重审次数，不代表实际人工等待耗时；范围汇总见 [TODOS](../TODOS.md) |
 
 ## 1. 交接范围与基线
@@ -226,7 +227,7 @@ Main 已通过实际 ProductHttp/ProductSession 消费冻结质量 HTTP，负责
 
 ## 7. 第三组：运行接入交接（2026-10-08，候选，未激活）
 
-本组把已有“正式接入”待办细化为实施输入，不新增功能范围。核对基线为产品提交 `51a271b`，继续使用 OpenAPI 1.19.0 / schema.v1.21 与产品迁移 0029。以下是产品消费者要求及待治理的接入方案，不是正式配置、角色授权、真实租户验证或生产启用记录；当前批准及后续入口见[计划 §0.47](plans/2026-10-03-content-intake-requirements.md#047-第三组运行接入交接2026-10-08)。
+本组把已有“正式接入”待办细化为实施输入，不新增功能范围。核对基线为产品提交 `51a271b`，继续使用 OpenAPI 1.19.0 / schema.v1.21 与产品迁移 0029。以下是产品消费者要求及待治理的接入方案，不是正式配置、角色授权、真实租户验证或生产启用记录；当前批准及后续入口见[计划 §0.50](plans/2026-10-03-content-intake-requirements.md#050-职位来源确认与当前收尾范围2026-10-08)；后续受控只读字段观察见本节末尾，不等于运行接入验收。
 
 ### 主体映射与组织事实输入
 
@@ -236,7 +237,7 @@ Main 已通过实际 ProductHttp/ProductSession 消费冻结质量 HTTP，负责
 | --- | --- | --- |
 | 登录绑定 / 既有认证模块 | `principals.user_id` 唯一并引用已登记 `subject_bindings.user_id`；受保护调用须保留认证对象的私有会话引用 | 明确登录绑定与 principal 的可信对应关系；不从 renderer 接身份，不把克隆 DTO 当会话。未登记主体拒绝，登录成功不自动登记业务权限 |
 | 同人关系 / 组织事实维护者 | `(tenant_id, app_id, identity_scope, person_key)` 唯一；关键审核按已确认同人关系排除贡献人 | 明确 ID 命名空间及跨账号归一依据；不能直接把不同应用标识认作同一人，也不能以姓名去重。只提供合成映射作开发输入，真实映射在获准环境登记 |
-| 组织事实 / 独立刷新写入者（待实现） | `principal_id/facts_version/department_ids/job_id/enabled/checked_at/valid_until/facts_digest`；部门 1–100 个，版本只增不改历史，当前指针由 principal 持有；有效期至多五分钟 | 原生字段来源、部门/岗位标识、摘要规范、乱序/重复刷新和停用处理须明确。按既有内容锁原子追加事实及推进指针/撤销代际；失败不续期。当前到期/禁用拒绝消费，不代表刷新器或事件监听已实现 |
+| 组织事实 / 独立刷新写入者（离线实验已验，生产未接线） | `principal_id/facts_version/department_ids/job_id/enabled/checked_at/valid_until/facts_digest`；部门 1–100 个，版本只增不改历史，当前指针由 principal 持有；有效期至多五分钟 | 职位来源方向已确认，见下方当前映射；正式部门/岗位映射版本、摘要规范与可信观察仍须明确。按既有内容锁原子追加事实及推进指针/撤销代际；失败不续期。当前到期/禁用拒绝消费及离线刷新实验，不代表生产原生观察或事件监听已实现 |
 | 岗位规则 / 获准业务规则维护者 | 按 tenant/app、部门 ID 和精确 `job_id` 匹配 `role_rules`；多个不同角色匹配时不能选最高职级；策略版本单独 CAS | 提供经批准的部门/岗位映射。岗位能力上限、业务 grant、分配资格分开；不因“经理”等名称授予全公司范围 |
 | 店铺/来源与业务权限 / 既有授权模块 | `scope` 与 `source` 显式登记，业务动作、分配资格及委派资格分别判断 | 提供获准范围、初始维护者及撤权/接管责任；有登录/岗位不等于有店铺 grant。店铺显示名另走已列合同候选，不阻塞稳定 ID 的合成验证 |
 
@@ -283,24 +284,38 @@ factory 的可验收输入为：获准环境标识、受限连接配置、受控
 | 缺 bootstrap、同域旧成员未认领拒绝，current 不变 | 同一测试的 `refuses missing bootstrap and unmapped legacy-domain rows`；同一实跑日志 | 正式旧目录认领执行器或业务认领签收 |
 | 新表/函数对现有应用角色封闭，迁移及 ACL 后验 | [数据库验收](../evidence/qa/content-intake-p2-capacity/README.md)及所链 PG 日志 | 生产最小角色已建、非 owner 全流程已通过 |
 
-本组只核对源码、冻结合同和上述已运行证据，不新增或重跑未变化的功能测试。后续顺序：确认组织事实/审批的输入合同与用途权限方案 → 用合成原生响应和非 owner PG 连接完成离线实现 → 取得具体环境和真实输入授权后做受控联调。现场账号/拖动/整机断网继续按原安排；SOP/P3、历史删除和自动同步不进入本组。
+本组初始交接只核对源码、冻结合同和上述已运行证据；后续离线实验与单次只读观察分别见下文，未变化的功能测试不重跑。后续顺序：确认组织事实/审批的输入合同与用途权限方案 → 用合成原生响应和非 owner PG 连接完成离线实现 → 取得具体环境和真实输入授权后做受控联调。现场账号/拖动/整机断网继续按原安排；SOP/P3、历史删除和自动同步不进入本组。
 
 
 ### 2026-10-08 接续核对：原生输入与会话锁权限
 
-治理工作树 `codex/content-intake-p2-contracts@240ae98` 干净；核对 `13-P2资料接入合同候选.md`、`2026-10-04_P2内容接入合同批准.md` 和 `2026-10-07_P2管理上下文合同批准.md`。批准只覆盖冻结合同及合成开发，明确未开放新应用 ACL、生产 factory、真实组织/审批与 active。产品消费锁仍是 1.19.0/schema1.21、VERIFIED_NOT_ACTIVATED。本轮没有改治理仓或正式快照，也没有读取凭据/员工资料。
+治理工作树 `codex/content-intake-p2-contracts@240ae98` 干净；核对 `13-P2资料接入合同候选.md`、`2026-10-04_P2内容接入合同批准.md` 和 `2026-10-07_P2管理上下文合同批准.md`。批准只覆盖冻结合同及合成开发，明确未开放新应用 ACL、生产 factory、真实组织/审批与 active。产品消费锁仍是 1.19.0/schema1.21、VERIFIED_NOT_ACTIVATED。该离线实验阶段没有改治理仓或正式快照，也没有读取凭据/员工资料；后续单独获准的只读字段观察见下方，不能混用两阶段授权。
 
-公开技术资料只证明原生字段结构；本轮未把字段存在当作可信输入证明。核对来源是飞书官方 SDK（2026-10-08 读取，非本项目合同）：
+以下保留离线实验阶段的公开模型差异，并按官方接口说明补充时间类型；公开字段结构不是可信输入证明，SDK 类型也不能代替原生 wire 合同（2026-10-08 核对，非本项目冻结合同）。岗位来源的后续确认见下一小节：
 
 | 输入 | 已核实的结构及与消费者的差异 | 进入正式映射前须明确 |
 | --- | --- | --- |
 | 组织 | [Contact User 模型](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/contact/v3/model/user.py) 有 open_id/user_id/union_id、department_ids、job_title、job_level_id、job_family_id，未列名为 job_id 的字段；不能把后三者任一直接等同本仓精确岗位键 | 岗位事实的权威来源和稳定标识、部门 ID 类型、同人归一命名空间及映射版本。若用自定义字段或人工映射，需要明确维护者与变更失效规则；姓名、登录角色和管理员标记均不授予业务权 |
 | 启用状态/新鲜度 | [UserStatus 模型](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/contact/v3/model/user_status.py) 列出五个可选布尔字段；本仓需要明确 enabled 和至多五分钟的完整观察 | 明确缺字段、冻结/离职/未激活等组合的失败策略，以及观察起点、缓存、请求身份和失败不续期；字段模型本身不证明缓存与时间戳可信 |
 | 审批实例 | [实例响应](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/get_instance_response_body.py) 有 approval_code/instance_code/uuid、字符串 form、task_list/timeline 及撤回关联；tenant/app 并非可直接照抄的响应字段 | tenant/app 由认证请求边界绑定；批准具体定义/节点、表单控件及完整附件字节取回协议；不将原生 JSON 直接作为内部规范化协议 |
-| 人工决定 | [Task](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/instance_task.py) 有 id/node_id/custom_node_id/type/status、人员标识和整数时间；[Timeline](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/instance_timeline.py) 有 task_id/node_key/type/create_time 与人员标识 | 明确节点键对应、枚举/时间单位及人工性依据；不能从字段名推断 HUMAN。转交、会签、多任务、撤回和重新提交须有确定策略；当前单个 HUMAN/PASS 消费者无法未经评审就自动挑最后一条通过 |
+| 人工决定 | [Task](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/instance_task.py) 有 id/node_id/custom_node_id/type/status、人员标识与时间模型；[Timeline](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/api/approval/v4/model/instance_timeline.py) 有 task_id/node_key/type/create_time 与人员标识 | [官方实例接口](https://open.feishu.cn/document/server-docs/approval-v4/instance/get)的原生 task/timeline 时间是毫秒时间戳字符串，不能从 SDK 的整数类型推断 wire 类型或单位。还须明确节点键对应、枚举及人工性依据，不能从字段名推断 HUMAN。转交、会签、多任务、撤回和重新提交须有确定策略；当前单个 HUMAN/PASS 消费者无法未经评审就自动挑最后一条通过 |
 
 **受限权限的实际障碍：** `transaction.ts::lockProductSession` 对 sessions 和 subject_bindings 做 `FOR SHARE`。临时 PG15 证明 SELECT-only 账号被 42501 拒绝；只加 sessions 的 UPDATE 会在 subject_bindings 继续失败。为这两张表授予 `UPDATE(revoked_at)` / `UPDATE(enabled)` 虽能取锁，也允许反向撤销管理员停用。这是未启用的候选权限方案风险，不是声称线上已存在同样授权。现有 API 会回滚且不进入业务回调，外部结果为 INTERNAL_ERROR / COMMIT_UNKNOWN、commit=rolled_back；运维诊断保留 42501。运行 factory 应在启用前检查依赖，不能靠增权消除错误。
 
 **两个边界方案：** A 给业务账号身份安全列 UPDATE；B 身份所有者提供固定查询的窄锁函数，仅返回原会话截止，业务账号仅 EXECUTE。选择 B 作为离线候选，隐藏身份表读取和锁权限；不去掉锁，也不复用认证 owner 池。`apps/api/experiments/intake-runtime/session-lock.sql` 仅由测试安装到一次性数据库的隔离 schema；NOLOGIN、非超级用户函数 owner 独占必要表权，函数固定 search_path、精确校验私有会话 hash+user、拒绝失效身份、持锁到调用事务结束并重验等待后的截止。私有 hash 必须由既有认证对象解析，不新增 HTTP 字段。调用方仍须遵守内容锁顺序及事务末尾最早截止校验。
 
 [8 项实测及限制](../evidence/qa/intake-runtime-boundary/README.md)覆盖非 owner 调用、缺权拒绝、两表锁竞争、等待中到期及越权矩阵。SQL 不在 migration/生产构建中，现有 transaction 消费者未改接候选；不能据此声称完整坐席受限签发/分页、管理/worker 权限或生产装配完成。正式采用须先在身份合同所属治理仓审核函数语义、owner/执行角色与错误合同，冻结 export/intake 后再接线并验收完整用途矩阵。原生可信输入及初始旧目录认领仍按本节原有缺项办理，不新增业务 TODO。
+
+### 职位来源与登录授权的当前映射（2026-10-08）
+
+用户认可当次只读观察中的职位来源。观察范围、聚合及授权限制由[计划 §0.50](plans/2026-10-03-content-intake-requirements.md#050-职位来源确认与当前收尾范围2026-10-08)保存；本节只拥有技术映射，不登记真实人员或应用标识。当前选择通讯录用户职位与职务目录，不要求重建登录或另建应用；HR 尚未实查，不记为已验证来源。
+
+| 来源与身份 | 可读取 / 现有行为 | 到内部事实的映射与剩余边界 |
+| --- | --- | --- |
+| 既有产品登录；用户 OAuth | `feishu-identity-provider` 授权请求为 `auth:user.id:read`；code 换用户 token，再取 `open_id` 与显示名 | 只建立已有登录绑定。显示名不授权；组织事实读取是同应用的独立应用身份能力，不要求把通讯录 scope 加进登录 URL。CLI 默认应用与目标应用不同，不能沿用其缺权结论 |
+| [用户详情](https://open.feishu.cn/document/server-docs/contact-v3/user/get)；应用身份 | `open_id`、`department_ids`、`job_title`、`status`；对应用户基本/组织架构/受雇信息权限 | 使用明确 tenant/app/ID 类型的命名空间关联已登记 principal；部门 ID 类型保持一致，不跨应用复制 open_id，不以姓名去重。缺字段/禁用/不完整观察不产生新资格 |
+| [职务列表](https://open.feishu.cn/document/contact-v3/job_title/list)；应用身份，`contact:job_title:readonly` | 分页目录的 `job_title_id/name/is_enabled` | 以原始 `user.job_title` 精确匹配唯一启用 `name`，取得稳定 `job_title_id`，作为内部精确 `job_id` 的映射输入。空值、无匹配、重复或停用均不能猜测；不模糊归类、不按职级取最高。正式映射版本、变更失效与完整分页观察仍须实现/治理 |
+| 用户部门 ID 与[部门详情](https://open.feishu.cn/document/server-docs/contact-v3/department/get) | 当次可以读取 ID；部门名称查询仍缺 `contact:department.base:readonly` | 用户组织架构权限不等于部门名称权限；缺名称不推翻职位来源可行性，也不阻塞按 ID 的独立合成验证。名称不得由员工或岗位名臆造 |
+| 内部岗位能力 / 店铺业务 grant | 现有 `role_rules` 与独立业务授权按新鲜事实分别判定 | 职务目录提供来源事实，不提供本产品角色或店铺范围。仍须业务批准精确规则、初始维护者、店铺/来源、动作及委派；用户对职位的认可不代替这些批准 |
+
+当次读取成功不能证明持续观察的新鲜度或原子性。正式观察方仍须绑定请求身份、完整分页、观察起止及缓存策略；失败不续期，事实追加沿既有内容锁/CAS，组织变化按现有失效规则处理。不得把会话中查询到的真实人员改造成测试 fixture。常规可自审、关键须独立有权非贡献人、审批与发布分离的既有业务规则不变；“首期单个人工节点”仍是建议，具体审批模板与节点尚待确认。

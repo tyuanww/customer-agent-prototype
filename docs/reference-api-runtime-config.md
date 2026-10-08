@@ -10,7 +10,7 @@
 
 `demo | formal-dev | test | single-host | multi-instance | production`
 
-当前可启动集合只有 `formal-dev | test`。不得用 `NODE_ENV` 或多个布尔 flag 拼出未命名环境。
+当前配置层接受 `formal-dev | test | production`，都只允许 loopback；实际启动还需通过私有配置和依赖检查。`production` 名称不授予部署、真实数据或 runtime activation 权限，P2 intake 的生产装配另按其计划办理。不得用 `NODE_ENV` 或多个布尔 flag 拼出未命名环境。
 
 | Profile | 当前结果 | 原因 |
 | --- | --- | --- |
@@ -19,7 +19,7 @@
 | `test` | 允许 | 同上；允许端口 `0` 做 ephemeral 测试 |
 | `single-host` | 拒启 | DB、storage、auth、readiness 与部署门尚未闭合 |
 | `multi-instance` | 拒启 | 共享存储、并发、worker 与 readiness 尚未闭合 |
-| `production` | 拒启 | Feishu auth、DB、storage、runtime activation 与部署均未放行 |
+| `production` | 配置层允许 | 与 formal-dev 相同的 mock/Feishu 配置门及 loopback 限制；不代表环境部署或正式能力激活获准 |
 
 `AUTH_MODE=feishu` 仅在 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_REDIRECT_URI` 全部合法时启动，并由组合根安装飞书 provider；缺任一项仍 `auth_mode_not_available`。不通过“接受配置但不注册鉴权”的方式伪造正式能力。监听地址与 PG DSN 仍只接受 loopback。
 
@@ -35,9 +35,9 @@
 | `AUTH_SESSION_MODE` | 可省略或 `mock` 保留进程内合成登录；`product` 显式启用持久产品会话。其它值、未选择 product 却提供产品身份配置均拒启 | 合法 product 模式可进入公开 config |
 | `AUTH_DATABASE_URL` | product 必填；独立无特权登录账号仅属于 app_backend_auth，与 runtime/admin 同库且登录名不同 | 仅私有 bootstrap |
 | `AUTH_DB_POOL_MAX` | product 默认 2；runtime 此时默认 16（配置审核池时改为 12），admin 默认 2；API 进程启用的池合计最多 20，并给独立 worker 进程预留 2 | 不进入公开 config |
-| `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN` | `AUTH_MODE=mock` 的 product 必填；精确 http://127.0.0.1:port，无凭据、路径、query 或 fragment。`AUTH_MODE=feishu` 时不使用 | 不回显原值 |
+| `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN` | `AUTH_MODE=mock` 的 product 必填；精确 http://127.0.0.1:port，无凭据、路径、query 或 fragment。`AUTH_MODE=feishu` 时可选，用于组合既有 loopback 口令提供方；提供时仍须合法 | 不回显原值 |
 | `CUSTOMER_AGENT_API_HOST` | 可省略，固定默认 `127.0.0.1`；其它值拒启 | 不回显原值 |
-| `CUSTOMER_AGENT_API_PORT` | formal-dev 默认 `3100`；两者范围均为 `1024..65535`，test 另可用 `0` 做 ephemeral 监听 | 不回显非法原值 |
+| `CUSTOMER_AGENT_API_PORT` | `formal-dev/production` 默认 `3100`，`test` 默认 `0`；显式非零端口范围均为 `1024..65535`，只有 test 可用 `0` 做 ephemeral 监听，product 会话须显式使用非零端口 | 不回显非法原值 |
 | `CUSTOMER_AGENT_BUILD_VERSION` | 可省略，默认 `dev-m0`；1–64 位安全版本字符 | 仅合法值进入 `/health.version` |
 | `DATABASE_URL` | 必填；runtime 登录 DSN，只接受 loopback PostgreSQL URL、非空登录名与数据库路径；不得带 fragment 或驱动控制参数 | 只保留在私有 bootstrap config，不回显原值 |
 | `CONTENT_ADMIN_DATABASE_URL` | 必填；独立 `app_content_admin` 登录 DSN，格式同上；DSN/登录名必须与 runtime 不同，但解析后的精确 host/port/database 目标必须相同（不把 `localhost` 与 `127.0.0.1` 猜成同一实例）。T4 发布/回退复用该池，不另开连接 | 同上 |
@@ -99,7 +99,7 @@ API startup 不运行 migration，也不读取私有 migration ledger。schema �
 
 ## 5. T1 合成产品会话边界
 
-仍只允许 formal-dev/test 与 loopback，不激活 single-host/production profile。product 会话的实际启动需要非零 API 端口，提供方 callback 固定为该端口的 `/v1/auth/callback`。启动组合必须显式提供产品身份服务；默认 mock 服务不能满足此条件。数据库身份查询和所有现有业务路由统一异步认证；数据库失败为 503，不转成 mock 成功或“密码错误”。
+T1 初始切片仅允许 formal-dev/test 与 loopback；当前 profile/Feishu 条件见 §1，身份所有者及可选口令组合见[架构参考](reference-project-architecture.md#t1-身份所有权)。以下保留当时的合成提供方边界，不外推为当前只能合成登录。product 会话的实际启动需要非零 API 端口，提供方 callback 固定为该端口的 `/v1/auth/callback`。启动组合必须显式提供产品身份服务；默认 mock 服务不能满足此条件。数据库身份查询和所有现有业务路由统一异步认证；数据库失败为 503，不转成 mock 成功或“密码错误”。
 
 产品身份模块拥有独立 auth pool，连接等待沿用共享配置，SQL statement/query 上限 3s/3.5s；每次事务先核对无特权登录和唯一能力角色，再 SET LOCAL ROLE app_backend_auth。它不向客户端暴露数据库角色，不直接读取身份私表。提供方只允许本机合成 wire，单次交换 5s 可取消、响应最多 4096 bytes、拒绝重定向和非 synthetic 收据。关闭时取消提供方请求并关闭所有能力池。
 

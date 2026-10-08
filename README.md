@@ -110,7 +110,7 @@ curl --fail --silent http://127.0.0.1:3100/health
 curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/发布、announce 读取、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop（不准落库、SOP 树、话术 pending_review 草稿、检索账、软件目录）；部署型 profile 和 Feishu auth 在监听前拒启。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter 与 Dashboard `dashboardOps`。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
+`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/发布、announce 读取、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop（不准落库、SOP 树、话术 pending_review 草稿、检索账、软件目录）；`single-host/multi-instance` 仍在监听前拒启，配置层已接受 `formal-dev/test/production`，但固定只绑 loopback；已支持配置齐全的 `AUTH_MODE=feishu` 登录，缺配置拒启。profile 名称不代表部署授权或 runtime activation。该登录能力不包含 P2 原生组织刷新或飞书审批 transport。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter 与 Dashboard `dashboardOps`。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 W4 数据库包只接受调用方提供的已连接 migration-owner `pg.Client`；下面的命令只生成/核验不可变 catalogue，并在隔离临时 PostgreSQL 15 cluster 中测试，不会访问共享本机或生产数据库：
 
@@ -265,6 +265,6 @@ pnpm package:mac
 
 ## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search、query/impression/adoption/escalate 的事务与幂等，以及通过正式 PostgreSQL 搜索主链执行的 50 条纯合成 runner；runner 只报告 `NOT_SIGNED` 原始分母，不证明真实业务准确率。查询文本仍不落库。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已合并合成桌面 adapter，不等于正式运行激活。真实飞书鉴权、storage/content readiness 与 runtime activation 仍未放行。向量检索、自动学习与自动发送仍需专项批准。本切片已批准 MiniMax 仅用于检索规划与已有 id 重排；生成话术仍禁止。把现有原型「换成 adapter 就能接库」仍不成立：已合并的是合成 loopback adapter，后续还需正式运行 adapter、飞书会话、正式内容/数据门与独立真实 G1a。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search、query/impression/adoption/escalate 的事务与幂等，以及通过正式 PostgreSQL 搜索主链执行的 50 条纯合成 runner；runner 只报告 `NOT_SIGNED` 原始分母，不证明真实业务准确率。查询文本仍不落库。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已合并合成桌面 adapter，不等于正式运行激活。已有飞书 OAuth provider 可在受控配置下用于登录；其身份能力不等于 P2 组织/审批接入或正式 runtime activation 获准，storage/content readiness 仍须由各自依赖实证。向量检索、自动学习与自动发送仍需专项批准。本切片已批准 MiniMax 仅用于检索规划与已有 id 重排；生成话术仍禁止。把现有原型「换成 adapter 就能接库」仍不成立：已合并的是合成 loopback adapter，后续还需对应功能的正式运行 adapter、组织/审批可信映射、正式内容/数据门与独立真实 G1a。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。
