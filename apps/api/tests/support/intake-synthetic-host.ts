@@ -18,11 +18,13 @@ import { createContentObjectStore } from '../../dist/content-object-store.js';
 import { createContentIntakeService } from '../../dist/content-intake/service.js';
 import { contentIntakeManagementRoutes } from '../../dist/content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
-import { IntakeRejection } from '../../dist/content-intake/transaction.js';
+import { IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
+import { installIntakeRuntimeCandidate } from './intake-runtime-candidate.ts';
 import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-synthetic-seed.ts';
 
 type C = components['schemas'];
-export type IntakeSyntheticIdentity = 'enabler' | 'reviewer' | 'agent';
+export type IntakeSyntheticDomain = 'product' | 'campaign' | 'presale' | 'aftersale';
+export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'agent';
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -30,28 +32,49 @@ export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
 ]);
 
 /** Workbook bytes for native file-picker journeys; all text is synthetic. */
-export function createIntakeSyntheticWorkbook({ missingAnswer = false, answerSuffix = '' } = {}) {
-  return createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain: 'product', sheet: 'FAQ', templateVersion: 'faq-p1.1' },
+export function createIntakeSyntheticWorkbook({ missingAnswer = false, answerSuffix = '', domain = 'product', missingExpiry = false }: { missingAnswer?: boolean; answerSuffix?: string; domain?: IntakeSyntheticDomain; missingExpiry?: boolean } = {}) {
+  return createTemplate({ sourceId: 'source-a', brandId: 'brand-a', scope: 'shop-a', domain, sheet: 'FAQ', templateVersion: 'faq-p1.1' },
     INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, missingAnswer && i === 1 ? '' : faq.answer + answerSuffix,
-      '', '', '合成分类', '', '启用', '', '', '', '合成内部说明', '', '', 'false']));
+      '', '', '合成分类', '', '启用', '', domain === 'campaign' && !missingExpiry ? '2099-01-01T00:00:00Z' : '', '', '合成内部说明', '', '', 'false']));
 }
 
 type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
-export function createIntakeSyntheticHost(options: { prepareCandidate: false }): Promise<HostState>;
-export function createIntakeSyntheticHost(): Promise<PreparedHost>;
-export function createIntakeSyntheticHost(options?: { prepareCandidate: false }): Promise<HostState> {
-  return startIntakeSyntheticHost(options?.prepareCandidate !== false);
+type SyntheticProfile = 'existing' | 'purpose-candidate';
+export function createIntakeSyntheticHost(options: { prepareCandidate: false; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain }): Promise<HostState>;
+export function createIntakeSyntheticHost(options?: { prepareCandidate?: true; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain }): Promise<PreparedHost>;
+export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain }): Promise<HostState> {
+  return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product');
 }
 
 /** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
  * files, existing DB, production factory or real provider is ever consumed.
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
-async function startIntakeSyntheticHost(prepareCandidate: boolean) {
+async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain) {
   const pg = new Pg15Harness();
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
-  let pool: Pool | undefined;
+  let pool: IntakePool | undefined;
+  let usagePool: IntakePool | undefined, terminalPool: IntakePool | undefined;
+  const ownedPools: Pool[] = [];
+  const purposeQueries: Record<string, number> = {};
+  function ownPool(raw: Pool, purpose: string, capability?: string): IntakePool {
+    ownedPools.push(raw); purposeQueries[purpose] = 0;
+    return { connect: async () => {
+      const client = await raw.connect();
+      if (capability) {
+        try {
+          await client.query(`SET ROLE ${capability}`);
+          await client.query('SELECT intake_runtime.assert_purpose($1)', [purpose === 'org_writer' ? 'organization' : purpose]);
+        } catch (error) { client.release(true); throw error; }
+      }
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return (sql: string, parameters?: unknown[]) => { purposeQueries[purpose] = purposeQueries[purpose]! + 1; return target.query(sql, parameters); };
+        const value: unknown = Reflect.get(target, key);
+        return typeof value === 'function' ? value.bind(target) : value;
+      } });
+    } };
+  }
   let auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined;
   const app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
   let apiOrigin = '', identityOrigin = '', selectedIdentity: IntakeSyntheticIdentity = 'enabler';
@@ -86,7 +109,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
     for (const cleanup of [() => app.close(), () => new Promise<void>((resolve, reject) => {
       if (!identity.listening) { resolve(); return; }
       identity.closeAllConnections(); identity.close(error => error ? reject(error) : resolve());
-    }), () => auth?.close(), () => pool?.end(), () => admin?.end(), () => pg.stop()]) {
+    }), () => auth?.close(), ...ownedPools.map(pool => () => pool.end()), () => admin?.end(), () => pg.stop()]) {
       try { await cleanup(); } catch (error) { failures.push(error); }
     }
     sessions.clear(); loginCodes.clear();
@@ -113,9 +136,28 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
   }
   try {
     pg.start(); const database = pg.createDatabase('intake_desktop');
-    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin);
+    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, domain);
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
-    pool = new Pool({ ...database.config, max: 4 });
+    if (profile === 'purpose-candidate') {
+      // Candidate installer is confined to this disposable test database. Replace
+      // this installation boundary after versioned intake, never in app/server.
+      await installIntakeRuntimeCandidate(admin);
+      const { createSyntheticConsumerPool } = await import('../../experiments/intake-runtime/consumer-pool.ts');
+      const roles = {} as Record<'business' | 'usage' | 'worker' | 'org_writer', IntakePool>;
+      for (const purpose of ['business', 'usage', 'worker', 'org_writer'] as const) {
+        const capability = `intake_${purpose}`, login = `synthetic_${purpose}`;
+        await admin.query(`CREATE ROLE ${login} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT ${capability} TO ${login}`);
+        roles[purpose] = ownPool(new Pool({ ...database.config, user: login, max: 2 }), purpose, capability);
+        const checked = await roles[purpose].connect(); checked.release();
+      }
+      const unavailable = () => new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
+      pool = await createSyntheticConsumerPool(roles.business, unavailable, 'intake_runtime');
+      usagePool = await createSyntheticConsumerPool(roles.usage, unavailable, 'intake_runtime');
+      terminalPool = roles.worker;
+    } else {
+      pool = ownPool(new Pool({ ...database.config, max: 4 }), 'existing');
+      usagePool = pool;
+    }
     await new Promise<void>((resolve, reject) => { identity.once('error', reject); identity.listen(0, '127.0.0.1', () => resolve()); });
     identityOrigin = `http://127.0.0.1:${(identity.address() as AddressInfo).port}`;
     auth = await createProductAuthService({ connectionString: `postgresql://synthetic_intake_auth@localhost/${database.name}?${new URLSearchParams({ host: pg.socket, port: String(pg.port) })}`,
@@ -136,15 +178,15 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
     });
     const store = createContentObjectStore(path.join(pg.root, 'objects'));
     const report = (id: string, error: unknown) => { diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
-    const usage = createContentIntakeService(pool, store, report, undefined, { requireProductSession: true });
+    const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
-    await app.register(contentIntakeManagementRoutes, { auth, pool, store, report,
+    await app.register(contentIntakeManagementRoutes, { auth, pool, store, report, ...(terminalPool ? { terminalPool } : {}),
       principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
         ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2] ?? null : null });
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
     let prepared: { candidate: C['IntakeCandidate']; object: C['IntakeObject'] } | null = null;
     if (prepareCandidate) {
-      const workbook = await createIntakeSyntheticWorkbook();
+      const workbook = await createIntakeSyntheticWorkbook({ domain });
       const form = new FormData(); form.set('operationId', 'synthetic-prepare-upload'); form.set('file', new Blob([new Uint8Array(workbook)], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       }), 'synthetic-faq.xlsx');
@@ -174,8 +216,14 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
       apiOrigin, identityOrigin, root: pg.root, expiresAt: (facts.rows[0].expires as Date).toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       selectIdentity(value: IntakeSyntheticIdentity) {
-        if (!['enabler', 'reviewer', 'agent'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+        if (!['director', 'enabler', 'reviewer', 'agent'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
+      async revokeSyntheticQuery() {
+        if (closed || profile !== 'purpose-candidate') throw new Error('Synthetic candidate control unavailable');
+        await admin!.query(`UPDATE content_intake.grants SET version=version+1,revoked_at=clock_timestamp(),last_change_reason='synthetic acceptance revoke'
+          WHERE grant_id='business-agent-query' AND revoked_at IS NULL`);
+      },
+      resources() { return { closed, identityListening: identity.listening, poolConnections: ownedPools.map(pool => pool.totalCount) }; },
       async status() {
         const current = await admin!.query('SELECT current_release_id FROM public.content_current WHERE id=1');
         const published = await admin!.query('SELECT count(*)::integer AS count FROM content_intake.publications');
@@ -184,7 +232,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean) {
           (SELECT count(*)::integer FROM content_intake.publications WHERE publication_policy='direct-v1') AS direct,
           (SELECT count(*)::integer FROM content_intake.review_bindings r LEFT JOIN content_intake.approval_current c USING(review_request_id)
             LEFT JOIN content_intake.approval_facts f USING(review_request_id,facts_version) WHERE f.state IS DISTINCT FROM 'approved') AS pending`);
-        return { currentReleaseId: current.rows[0].current_release_id as string, publications: published.rows[0].count as number,
+        return { profile, domain, purposeQueries: { ...purposeQueries }, currentReleaseId: current.rows[0].current_release_id as string, publications: published.rows[0].count as number,
           pendingApprovals: evidence.rows[0].pending as number, reviewBindings: evidence.rows[0].bindings as number,
           approvalFacts: evidence.rows[0].facts as number, directPublications: evidence.rows[0].direct as number,
           diagnostics: [...diagnostics], requests: [...requests] };

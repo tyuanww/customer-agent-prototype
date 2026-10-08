@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-release-acceptance/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-runtime-consumer-pool.test.ts (3 tests) 3ms
+ ✓ tests/intake-runtime-assembly.test.ts (7 tests) 3ms
+
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+   Start at  18:28:42
+   Duration  516ms (transform 173ms, setup 0ms, collect 497ms, tests 6ms, environment 0ms, prepare 97ms)
+

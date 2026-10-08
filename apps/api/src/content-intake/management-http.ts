@@ -39,11 +39,12 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   auth: ProductAuthService; pool: IntakePool; store: ContentObjectStore;
   approval?: ApprovalAdapter;
   principalLabels?: IntakePrincipalLabels;
+  terminalPool?: IntakePool;
   report?: (diagnosticId: string, error: unknown) => void;
-}> = async (app, { auth, pool, store, approval, principalLabels, report }) => {
+}> = async (app, { auth, pool, store, approval, principalLabels, terminalPool, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
   const service = createContentIntakeService(pool, store, report, approval,
-    { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}) });
+    { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}), ...(terminalPool ? { terminalPool } : {}) });
   app.get('/v1/intake/sources/:sourceId/management-context', { exposeHeadRoute: false }, async (request, reply) => {
     if (!noQuery(request) || request.body !== undefined || request.headers['transfer-encoding'] !== undefined
       || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) {

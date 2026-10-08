@@ -1,0 +1,13 @@
+
+Running 2 tests using 1 worker
+
+(node:25869) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"status":"OWNED_RESOURCES","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-g0BKyw","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-KyIctx"}
+{"status":"PASS","profile":"purpose-candidate","purposeQueries":{"business":2221,"usage":375,"worker":40,"org_writer":0},"electron":"darwin","api":"actual","postgres":15,"nativeDialog":"controlled-path-and-confirmation-responses","upload":"actual-multipart","issueReport":"saved-and-read-with-exceljs","publicationPolicy":"direct-v1","approvalRows":0,"revision":"same-id-v2-fresh-evidence","cancellation":"server-confirmed-live-release-unchanged","ordinarySeat":true,"releaseId":"rel_2","screenshots":"/Users/hutou/.codex/worktrees/intake-release-acceptance/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T10-25-35-119Z"}
+{"status":"OWNED_RESOURCES_REMOVED","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-g0BKyw","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-KyIctx"}
+  ✓  1 tests/e2e/content-intake-real-stack.spec.ts:11:1 › native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG (15.6s)
+{"status":"PASS","flow":"rollback-confirmed-publication-ordinary-seat","http":"actual","postgres":15,"target":"rel_2","base":"rel_3","newRelease":"rel_4","publicationPolicy":"direct-v1","approvalRows":0,"screenshots":"/Users/hutou/.codex/worktrees/intake-release-acceptance/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-08T10-25-50-232Z"}
+  ✓  2 tests/e2e/content-intake-rollback-real-stack.spec.ts:10:1 › confirmed rollback creates a new release whose historical FAQ is consumed by another seat (6.0s)
+
+  2 passed (21.8s)
