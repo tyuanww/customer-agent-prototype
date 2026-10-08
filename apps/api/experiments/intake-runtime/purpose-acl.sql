@@ -64,7 +64,7 @@ GRANT EXECUTE ON FUNCTION backend_review.lock_content()
 GRANT EXECUTE ON FUNCTION content_intake.authorization_deadline(text, text, text, text, timestamptz)
   TO intake_usage, intake_business, intake_runtime_fn_owner;
 GRANT EXECUTE ON FUNCTION content_intake.quality_state(text, bigint) TO intake_business, intake_runtime_fn_owner;
-GRANT EXECUTE ON FUNCTION content_intake.assert_family_catalog(text) TO intake_usage;
+GRANT EXECUTE ON FUNCTION content_intake.assert_family_catalog(text) TO intake_usage, intake_runtime_fn_owner;
 GRANT EXECUTE ON FUNCTION content_intake.entitlement_context_required() TO intake_usage;
 GRANT EXECUTE ON FUNCTION content_intake.entitlement_lease_guard() TO intake_usage;
 GRANT EXECUTE ON FUNCTION content_intake.selection_ids_valid(text[]) TO intake_usage;
@@ -77,6 +77,8 @@ GRANT EXECUTE ON FUNCTION public.owner_acceptance_release_ready(text) TO intake_
 GRANT EXECUTE ON FUNCTION public.owner_acceptance_instant(jsonb) TO intake_usage;
 -- PUBLIC execute was revoked. Hashing stays in the issuing statement; the token column is not selected.
 GRANT EXECUTE ON FUNCTION public.digest(bytea, text) TO intake_usage, intake_runtime_fn_owner;
+-- Publication hashes JSON text and mints a commit ticket; bytea-only digest is insufficient.
+GRANT EXECUTE ON FUNCTION public.digest(text, text), public.gen_random_bytes(integer) TO intake_runtime_fn_owner;
 GRANT EXECUTE ON FUNCTION public.jsonb_jcs(jsonb) TO intake_runtime_fn_owner;
 
 GRANT SELECT ON
@@ -234,6 +236,14 @@ BEGIN
     OR NOT has_function_privilege(who, 'content_intake.quality_state(text,bigint)', 'EXECUTE')
     OR NOT has_table_privilege(who, 'content_intake.quality_plans', 'SELECT')
   ) THEN gaps := array_append(gaps, 'business_read'); END IF;
+  IF p_purpose = 'business' THEN
+    IF NOT has_function_privilege('intake_runtime_fn_owner', 'public.digest(text,text)', 'EXECUTE') THEN
+      gaps := array_append(gaps, 'definer_digest_text'); END IF;
+    IF NOT has_function_privilege('intake_runtime_fn_owner', 'public.gen_random_bytes(integer)', 'EXECUTE') THEN
+      gaps := array_append(gaps, 'definer_ticket_random'); END IF;
+    IF NOT has_function_privilege('intake_runtime_fn_owner', 'content_intake.assert_family_catalog(text)', 'EXECUTE') THEN
+      gaps := array_append(gaps, 'definer_family'); END IF;
+  END IF;
   IF p_purpose = 'worker' AND (
     NOT has_column_privilege(who, 'content_intake.parse_jobs', 'state', 'UPDATE')
     OR NOT has_column_privilege(who, 'content_intake.object_reservations', 'state', 'UPDATE')

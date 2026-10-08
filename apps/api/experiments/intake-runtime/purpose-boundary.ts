@@ -11,11 +11,14 @@ import {
 import type { CanonicalJsonValue } from '../../src/idempotency.js';
 import { authenticatedProductSession } from '../../src/product-auth-service.js';
 
-/** Offline purpose boundary. Excluded from API dist and HTTP registration.
- * Session identity comes only from the authenticated private session. This file
- * does not register a factory, open application ACL, or write command receipts.
- * The qualification statements below are the temporary seat path until
- * lockProductSession in the shared transaction owner is switched; see INTEGRATION.md.
+/** Offline privilege probes only. Excluded from API dist and HTTP registration.
+ * They are not the actual service, snapshot pager, or copy consumer. Identity
+ * comes only from the authenticated private session. No receipts are written.
+ * The qualification SQL copy is needed only to exercise lease/context triggers
+ * under these candidate ACLs while the actual service's session lock remains
+ * incompatible. Remove it when a governed lock/ACL intake and purpose pool routing
+ * let actual service qualification, non-empty snapshot/copy and invalidation tests
+ * replace the probe. Changing the lock alone does not prove those consumers.
  */
 
 type SessionLock = { hash: string; validUntil: number };
@@ -134,7 +137,7 @@ function binding(sessionHash: string, request: UsageRequest, scopes: readonly Sc
 }
 
 /** Same terminal writes as the unexported worker finish. No grant, publish, or identity write. */
-export async function finishParseTerminal(pool: IntakePool, jobId: string, actorUserId: string,
+export async function probeParseFailureWrites(pool: IntakePool, jobId: string, actorUserId: string,
   stored: { objectId: string; sha256: string; sizeBytes: number }): Promise<{ finished: true }> {
   const client = await pool.connect();
   let broken = false;
@@ -171,7 +174,7 @@ export async function finishParseTerminal(pool: IntakePool, jobId: string, actor
   } finally { client.release(broken); }
 }
 
-export function createPurposeBoundary(pool: IntakePool, report: (diagnosticId: string, error: unknown) => void = () => undefined) {
+export function createPurposePrivilegeProbe(pool: IntakePool, report: (diagnosticId: string, error: unknown) => void = () => undefined) {
   async function run<T>(actor: AuthenticatedUser,
     work: (client: IntakeTransaction, who: Principal, session: SessionLock) => Promise<T>): Promise<IntakeResult<T>> {
     const hash = authenticatedProductSession(actor);
@@ -219,7 +222,7 @@ export function createPurposeBoundary(pool: IntakePool, report: (diagnosticId: s
 
   return {
     run,
-    issueUsageQualification(actor: AuthenticatedUser, raw: unknown) {
+    probeQualificationWrites(actor: AuthenticatedUser, raw: unknown) {
       return run(actor, async (client, who, session) => {
         const request = parseContractSchema('IntakeEntitlementRequest', raw);
         const usage: UsageRequest = {
@@ -266,9 +269,9 @@ export function createPurposeBoundary(pool: IntakePool, report: (diagnosticId: s
       });
     },
     /** Empty-catalog keyset only. The formal snapshot page stays inside usage.ts. */
-    pageEmptyLineage(actor: AuthenticatedUser, releaseId: string) {
+    probeEmptyCatalogReads(actor: AuthenticatedUser, shopId: string, releaseId: string) {
       return run(actor, async (client, who, _session) => {
-        await scopesFor(client, who, 'shop-a');
+        await scopesFor(client, who, shopId);
         const page = await client.query<{ source_id: string; business_entry_id: string }>(`SELECT source_id,business_entry_id
           FROM content_intake.release_lineage WHERE release_id=$1 AND (source_id,business_entry_id) > ($2::text,$3::text)
           ORDER BY source_id COLLATE "C", business_entry_id COLLATE "C" LIMIT 1`, [releaseId, '', '']);
@@ -279,7 +282,7 @@ export function createPurposeBoundary(pool: IntakePool, report: (diagnosticId: s
         return { rows: page.rowCount ?? page.rows.length, approvalInvalid: facts.rows[0]?.invalid === true };
       });
     },
-    readCopyEligibility(actor: AuthenticatedUser, sourceId: string) {
+    probeQueryAuthorization(actor: AuthenticatedUser, sourceId: string) {
       return run(actor, async (client, who, _session) => {
         const src = await source(client, sourceId);
         const until = await authorize(client, who, 'query', src);

@@ -166,8 +166,9 @@ export class IntakeRuntimeAssemblyRefusal extends Error {
   }
 }
 
-export type RuntimeAssemblyRunning = {
-  readonly state: 'running';
+export type RuntimeAssemblyChecked = {
+  readonly state: 'checked-not-activated';
+  readonly ready: false;
   readonly legacyAdopted: false;
   readonly reason: 'CLAIM_MANIFEST_ABSENT';
   readonly catalogObjects: number;
@@ -232,67 +233,86 @@ function gapList(value: unknown): readonly string[] {
 export function createIntakeRuntimeAssembly(input: unknown) {
   const request = readRequest(input);
   let closed = false;
-  let running = false;
+  let checked = false;
   let controller: AbortController | null = null;
   return {
-    async start(): Promise<RuntimeAssemblyRunning> {
+    async start(): Promise<RuntimeAssemblyChecked> {
       if (closed) throw new IntakeRuntimeAssemblyRefusal('CLOSED');
-      if (running) throw new IntakeRuntimeAssemblyRefusal('ALREADY_RUNNING');
+      if (checked || controller) throw new IntakeRuntimeAssemblyRefusal('ALREADY_RUNNING');
       controller = new AbortController();
       const signal = controller.signal;
-      let parsed = false;
-      try { parsed = await request.parser.probe(signal); }
-      catch (error) {
+      // Reserve the attempt before the first await. A query cannot be aborted by
+      // this client interface, so discard its result before doing any next work.
+      const checkActive = () => {
         if (closed) throw new IntakeRuntimeAssemblyRefusal('CLOSED');
-        if (signal.aborted || (error instanceof Error && error.name === 'AbortError')) throw new IntakeRuntimeAssemblyRefusal('CANCELLED');
-        throw error;
-      }
-      if (closed) throw new IntakeRuntimeAssemblyRefusal('CLOSED');
-      if (signal.aborted) throw new IntakeRuntimeAssemblyRefusal('CANCELLED');
-      if (!parsed) throw new IntakeRuntimeAssemblyRefusal('PARSER_UNAVAILABLE');
-      for (const purpose of PURPOSE_NAMES) {
-        let rows: { rows: Row[] };
-        try { rows = await request.connections[purpose].query('SELECT intake_runtime_probe.purpose_gap($1) AS gap', [purpose]); }
+        if (signal.aborted) throw new IntakeRuntimeAssemblyRefusal('CANCELLED');
+      };
+      const read = async (client: AssemblyClient, sql: string, params?: readonly unknown[]) => {
+        checkActive();
+        const result = await client.query(sql, params);
+        checkActive();
+        return result;
+      };
+      try {
+        let parsed = false;
+        try { parsed = await request.parser.probe(signal); }
         catch (error) {
-          if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('PURPOSE_PRIVILEGE_MISSING');
+          if (closed) throw new IntakeRuntimeAssemblyRefusal('CLOSED');
+          if (signal.aborted || (error instanceof Error && error.name === 'AbortError')) throw new IntakeRuntimeAssemblyRefusal('CANCELLED');
           throw error;
         }
-        const gaps = gapList(rows.rows[0]?.gap);
-        if (gaps.length) throw new IntakeRuntimeAssemblyRefusal('PURPOSE_PRIVILEGE_MISSING', gaps);
+        if (closed) throw new IntakeRuntimeAssemblyRefusal('CLOSED');
+        if (signal.aborted) throw new IntakeRuntimeAssemblyRefusal('CANCELLED');
+        if (!parsed) throw new IntakeRuntimeAssemblyRefusal('PARSER_UNAVAILABLE');
+        for (const purpose of PURPOSE_NAMES) {
+          let rows: { rows: Row[] };
+          try { rows = await read(request.connections[purpose], 'SELECT intake_runtime_probe.purpose_gap($1) AS gap', [purpose]); }
+          catch (error) {
+            if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('PURPOSE_PRIVILEGE_MISSING');
+            throw error;
+          }
+          const gaps = gapList(rows.rows[0]?.gap);
+          if (gaps.length) throw new IntakeRuntimeAssemblyRefusal('PURPOSE_PRIVILEGE_MISSING', gaps);
+        }
+        let modes: { rows: Row[] };
+        try { modes = await read(request.connections.usage, SOURCE_MODE_SQL); }
+        catch (error) {
+          if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('ASSEMBLY_UNREADABLE');
+          throw error;
+        }
+        const preview = count(modes.rows[0]?.preview, 'preview');
+        const other = count(modes.rows[0]?.other, 'other');
+        if (preview < 1 || other !== 0) throw new IntakeRuntimeAssemblyRefusal('SOURCE_MODE_UNUSABLE');
+        let owner: { rows: Row[] };
+        try { owner = await read(request.connections.usage, OWNER_SQL); }
+        catch (error) {
+          if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('FUNCTION_OWNER_UNUSABLE');
+          throw error;
+        }
+        const ownerRow = owner.rows[0];
+        if (!ownerRow || flag(ownerRow.rolcanlogin, 'rolcanlogin') || flag(ownerRow.rolsuper, 'rolsuper')
+          || flag(ownerRow.rolcreaterole, 'rolcreaterole') || flag(ownerRow.rolcreatedb, 'rolcreatedb')
+          || flag(ownerRow.rolbypassrls, 'rolbypassrls')) throw new IntakeRuntimeAssemblyRefusal('FUNCTION_OWNER_UNUSABLE');
+        let catalog: { rows: Row[] };
+        try { catalog = await read(request.catalog, CATALOG_COUNT_SQL); }
+        catch (error) {
+          if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('OBJECT_CATALOG_UNREADABLE');
+          throw error;
+        }
+        const catalogObjects = count(catalog.rows[0]?.objects, 'objects');
+        checked = true;
+        return Object.freeze({
+          state: 'checked-not-activated', ready: false, legacyAdopted: false, reason: 'CLAIM_MANIFEST_ABSENT',
+          catalogObjects, claimManifest: null,
+        });
+      } finally {
+        controller = null;
       }
-      let modes: { rows: Row[] };
-      try { modes = await request.connections.usage.query(SOURCE_MODE_SQL); }
-      catch (error) {
-        if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('ASSEMBLY_UNREADABLE');
-        throw error;
-      }
-      const preview = count(modes.rows[0]?.preview, 'preview');
-      const other = count(modes.rows[0]?.other, 'other');
-      if (preview < 1 || other !== 0) throw new IntakeRuntimeAssemblyRefusal('SOURCE_MODE_UNUSABLE');
-      let owner: { rows: Row[] };
-      try { owner = await request.connections.usage.query(OWNER_SQL); }
-      catch (error) {
-        if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('FUNCTION_OWNER_UNUSABLE');
-        throw error;
-      }
-      const ownerRow = owner.rows[0];
-      if (!ownerRow || flag(ownerRow.rolcanlogin, 'rolcanlogin') || flag(ownerRow.rolsuper, 'rolsuper')
-        || flag(ownerRow.rolcreaterole, 'rolcreaterole') || flag(ownerRow.rolcreatedb, 'rolcreatedb')
-        || flag(ownerRow.rolbypassrls, 'rolbypassrls')) throw new IntakeRuntimeAssemblyRefusal('FUNCTION_OWNER_UNUSABLE');
-      let catalog: { rows: Row[] };
-      try { catalog = await request.catalog.query(CATALOG_COUNT_SQL); }
-      catch (error) {
-        if (permissionDenied(error)) throw new IntakeRuntimeAssemblyRefusal('OBJECT_CATALOG_UNREADABLE');
-        throw error;
-      }
-      running = true;
-      return Object.freeze({
-        state: 'running', legacyAdopted: false, reason: 'CLAIM_MANIFEST_ABSENT',
-        catalogObjects: count(catalog.rows[0]?.objects, 'objects'), claimManifest: null,
-      });
     },
+    // Connections are borrowed. Neither cancel nor close shuts down their pools;
+    // the caller owns those lifecycles. Only this check and its parser signal stop.
     cancel(): void { controller?.abort(); },
-    close(): void { closed = true; running = false; controller?.abort(); },
+    close(): void { closed = true; checked = false; controller?.abort(); },
     adoptLegacy(): never { throw new IntakeRuntimeAssemblyRefusal('LEGACY_ADOPTION_REFUSED'); },
   };
 }
