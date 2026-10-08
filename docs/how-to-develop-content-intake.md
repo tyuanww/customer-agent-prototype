@@ -281,12 +281,14 @@ node scripts/content-retention.ts --group intake-objects --dsn "$SYNTHETIC_DATAB
 pnpm --filter @customer-agent/api test:intake:organization
 ```
 
-该命令构建已有运行依赖，运行 19 项原生组织观察测试及一次性 PG15 中的 10 项合成测试；需要 Node 24 和现有 PG15 harness。实验写入器位于 `apps/api/experiments/intake-organization/facts-writer.ts`，不进入 API dist，不注册 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式运行角色与迁移不变。
+该命令构建已有运行依赖，覆盖 19 项原生观察、10 项 writer PG、24 项回环 HTTP transport 和 4 项 HTTP→观察→writer→资格消费 PG 测试；需要 Node 24 和现有 PG15 harness。实验写入器位于 `apps/api/experiments/intake-organization/facts-writer.ts`，不进入 API dist，不注册 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式运行角色与迁移不变。
 
 输入要求、提交未知恢复、验证证据与缺口见[组织刷新验收](../evidence/qa/intake-organization/README.md)。这里的 snapshot 是可信观察方提供的内部实验输入，不是飞书原始响应，也不是允许 renderer 调用的接口。重试须保留原快照和 expectedFactsVersion，历史成功不表示当前权限有效；没有观察到新事实时不能人为修改时间延长有效期。
 
 
 该入口现同时覆盖原生形状合成响应 → 精确职务映射 → 既有受限写入器 → 当前使用资格消费者。新观察模块与原 writer 一样排除在 API dist 之外；失败不产出可写快照，未知写入必须重试成功观察时保留的原快照。该命令不读取真实通讯录，不能证明生产认证、限流、上游缓存/原子快照或即时离职事件。具体边界见[组织观察交接](reference-content-intake-p2-contract-handoff.md#原生组织观察离线切片2026-10-08)及[本轮证据](../evidence/qa/intake-organization/native-observer/README.md)。
+
+新增 `http-transport.ts` 仅接受固定 `http://127.0.0.1:端口`，令牌由合成调用方注入并只在内存短期缓存；禁止重定向、隐式重试和环境凭据。请求/响应预算、限流、取消及异常释放由 transport 拥有；正式飞书 origin/认证装配保持关闭。四项 PG 消费用例经过已有资格服务，但 usage 仍使用 harness 管理池，不能据此声称完整用途受限装配通过。证据及修复见[HTTP 观察验收](../evidence/qa/intake-organization/http-transport/README.md)与[回收记录](../evidence/qa/intake-parallel-recovery/README.md)。
 
 ## 正式用途权限：会话锁离线候选
 
@@ -295,6 +297,19 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 ```
 
 使用现有 PG15 harness 新建隔离集群，只装载合成身份/空目录。测试先证明现有会话锁 SELECT-only 拒绝，以及为锁授予身份安全列 UPDATE 的风险，再安装 experiments 中的窄函数并以非 owner 账号验证取锁/截止/撤销/权限；测试结束关闭临时集群。SQL 仅是候选，不得复制到已有数据库或生产 migration。通过不代表完整受限用途账号或生产 factory 已具备，详细结论见[证据](../evidence/qa/intake-runtime-boundary/README.md)。
+
+## 用途权限与装配依赖离线检查
+
+先构建运行产物，再在一次性 PG15 上执行本专项；依赖和锁文件未变化时不安装。
+
+```sh
+pnpm build:services
+CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/intake-runtime-assembly.test.ts tests/intake-runtime-assembly.integration.test.ts
+```
+
+`purpose-acl.sql` 仅由测试安装四用途 LOGIN 与 NOLOGIN 函数属主，不是 migration 或生产 bootstrap。`createIntakeRuntimeAssembly` 检查 parser/权限/来源模式/目录等依赖；缺认领仅返回 `checked-not-activated`、`ready:false`，没有启动服务。检查中关闭/取消拒绝迟到结果，并发启动拒绝；连接由调用方借入并负责关闭，本模块不能中止已发出的 DB 查询。
+
+`createPurposePrivilegeProbe` 是暂时的 SQL 权限探针，不替代实际服务。现有 service 仍因旧会话锁返回 42501；正式治理/intake 与四池接线后，须用实际资格、非空分页、复制和失效用例替换并删除探针副本。质量计划/授权写入、完整发布/回退成功和真实形状 approval-v1 失效行尚未验证。当前 15 项检查及进一步条件见[用途权限验收](../evidence/qa/intake-runtime-assembly/README.md)和[实验接线说明](../apps/api/experiments/intake-runtime/INTEGRATION.md)。
 
 ## 发布二次确认（2026-10-08）
 

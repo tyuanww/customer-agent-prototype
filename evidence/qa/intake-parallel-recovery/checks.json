@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-08",
+  "version": "0.3.26",
+  "environment": {
+    "os": "macOS arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "dependencyInstall": false
+  },
+  "productBase": "576e3b0dbd1819510d35430e736b656e50c19cd5",
+  "integratedCodeHead": "1dd2ba98640032ed5bc79c60386a7fc1e2ddcfcb",
+  "inputHashes": "inputs.json",
+  "checks": [
+    {
+      "command": "pnpm build",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 0,
+      "rawLog": ".gstack/parallel-recovery/build.log",
+      "rawLogSha256": "9b7b67d1af6bb4357563e37ce856582b6dd690ebe9359dd30f836d69047086a3",
+      "tail": "build-tail.txt",
+      "tailSha256": "54da2d672561cb2b3ef61565f44c3a121de2897b61e5e74b3eaba52564789f68"
+    },
+    {
+      "command": "pnpm lint",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 0,
+      "rawLog": ".gstack/parallel-recovery/lint.log",
+      "rawLogSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "tail": "lint-tail.txt",
+      "tailSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 0,
+      "rawLog": ".gstack/parallel-recovery/typecheck.log",
+      "rawLogSha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+      "tail": "typecheck-tail.txt",
+      "tailSha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run experiments/intake-organization/transport.test.ts experiments/intake-organization/transport-consumer.integration.test.ts tests/intake-runtime-assembly.test.ts tests/intake-runtime-assembly.integration.test.ts tests/intake-scope-runtime.integration.test.ts",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 0,
+      "rawLog": ".gstack/parallel-recovery/targeted.log",
+      "rawLogSha256": "3569bf5d7f58e220c2e3031f9a5bdde1dcc6e427652304bde03db0b58864199a",
+      "tail": "targeted-tail.txt",
+      "tailSha256": "b20eddfa6a5840cfd4c755228ef6cc29a323e6cf2280621da26b7a42b727a03c"
+    },
+    {
+      "command": "pnpm test",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 0,
+      "rawLog": ".gstack/parallel-recovery/test.log",
+      "rawLogSha256": "d43153e435cf9ca9011b68208564f288db50b5bd69104e1ba5f789799582bbdb",
+      "tail": "test-tail.txt",
+      "tailSha256": "2a6dfe473763c649cb4846b353a788f5468a63695115443af0acf61a366d058f"
+    },
+    {
+      "command": "pnpm contracts:verify && pnpm contracts:codegen:check && pnpm db:migrations:check",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 0,
+      "rawLog": ".gstack/parallel-recovery/contracts.log",
+      "rawLogSha256": "006e428aa27e9004ce0f0f03e0aab86bda2f21e4567e407856ae4466da47ffb6",
+      "tail": "contracts-tail.txt",
+      "tailSha256": "012355ccde3a5ca6a2d4d1625467a11a4ac992566611fc11020fc7d67d97ab14"
+    },
+    {
+      "command": "pnpm docs:check",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 0,
+      "rawLog": ".gstack/parallel-recovery/docs.log",
+      "rawLogSha256": "62e1f0d04f755e3f0b480421f87b8520fdc2e3faebd2aa1bb0f851b28990e591",
+      "tail": "docs-tail.txt",
+      "tailSha256": "62e1f0d04f755e3f0b480421f87b8520fdc2e3faebd2aa1bb0f851b28990e591"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+      "exitCode": 1,
+      "rawLog": ".gstack/parallel-recovery/workspace.log",
+      "rawLogSha256": "99bf4110d36aa2de234d80b7493cef5d331e54514220906cdf1b86ab943efa4c",
+      "tail": "workspace-tail.txt",
+      "tailSha256": "99bf4110d36aa2de234d80b7493cef5d331e54514220906cdf1b86ab943efa4c"
+    }
+  ],
+  "targetedResult": "47/47 PASS: A 24 unit+4 PG, B 7 unit+8 PG, existing no-claim 4 PG",
+  "ordinaryTestLimit": "API 288 and desktop 7 environment-gated cases skipped; not PG/GUI pass evidence",
+  "review": "INCOMPLETE: scoped native recovery completed; no new external review; original role 15/15 reused",
+  "buildBoundary": "production modules/contracts/32 migrations/lockfiles unchanged; no experiment entry symbols in apps/api/dist",
+  "workspaceBudget": "FAIL: 32.6 MiB / 32.0 MiB, approximately 600 KiB over; root policy PASS",
+  "governance": {
+    "base": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
+    "original": "7e4a3bdbd866cd078856c85b9572a3bad735c9bb",
+    "fix": "70dab62ec1c4e399390192a0e069a30afd5c38b1",
+    "integrationHead": "45f5c0d9b7a1b1cf20f6fd0dd302dd6ac45d86f7",
+    "integrationOriginal": "103a05b",
+    "status": "DRAFT_NOT_FROZEN_NOT_EXPORTED_NOT_INTAKE",
+    "evidence": "/Users/hutou/Desktop/ai-content-intake-p2-contracts/business-docs/01-客服Agent项目/30-开发-进行中/content-intake-shop-directory-candidate/recovery-checks.json",
+    "evidenceSha256": "d911ce009fe16ee9529aa25f20371ace27bc031f8a3cf002a49251043a8e26a9",
+    "verification": "140/140 PG and 3/3 final contract tests; generation/lint/docs PASS; release 41/41 exit 0 with documented COMPOSITE coverage",
+    "releaseCoverage": "COMPOSITE: final RETURN clock guard and PG test were added after release started. All unaffected steps are reused. Final-byte PG140, contract3, generation and OpenAPI lint separately passed; release later repeats final candidate checks. This is not claimed as one immutable final-input full-suite run.",
+    "warnings": 23,
+    "inputsAndLogs": "All candidate input hashes and 12 indexed raw log hashes verified; logs copied unchanged to integration output/content-intake-shop-directory-contract",
+    "treeEquality": "git diff 70dab62 HEAD is empty; frozen OpenAPI1.20/schema1.22 original hashes match"
+  }
+}
