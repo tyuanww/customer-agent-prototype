@@ -281,7 +281,7 @@ node scripts/content-retention.ts --group intake-objects --dsn "$SYNTHETIC_DATAB
 pnpm --filter @customer-agent/api test:intake:organization
 ```
 
-该命令构建已有运行依赖，覆盖 19 项原生观察、10 项 writer PG、24 项回环 HTTP transport 和 4 项 HTTP→观察→writer→资格消费 PG 测试；需要 Node 24 和现有 PG15 harness。实验写入器位于 `apps/api/experiments/intake-organization/facts-writer.ts`，不进入 API dist，不注册 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式运行角色与迁移不变。
+该命令构建已有运行依赖，覆盖原生观察、writer PG、回环 HTTP、共享令牌生命周期、版本化登记/provenance 与原子撤销测试；当前数量及结果以[本轮补齐证据](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)为准，需要 Node 24 和现有 PG15 harness。实验写入器位于 `apps/api/experiments/intake-organization/facts-writer.ts`，不进入 API dist，不注册 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式运行角色与迁移不变。
 
 输入要求、提交未知恢复、验证证据与缺口见[组织刷新验收](../evidence/qa/intake-organization/README.md)。这里的 snapshot 是可信观察方提供的内部实验输入，不是飞书原始响应，也不是允许 renderer 调用的接口。重试须保留原快照和 expectedFactsVersion，历史成功不表示当前权限有效；没有观察到新事实时不能人为修改时间延长有效期。
 
@@ -309,7 +309,13 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 `purpose-acl.sql` 仅由测试安装四用途 LOGIN 与 NOLOGIN 函数属主，不是 migration 或生产 bootstrap。`createIntakeRuntimeAssembly` 检查 parser/权限/来源模式/目录等依赖；缺认领仅返回 `checked-not-activated`、`ready:false`，没有启动服务。检查中关闭/取消拒绝迟到结果，并发启动拒绝；连接由调用方借入并负责关闭，本模块不能中止已发出的 DB 查询。
 
-`createPurposePrivilegeProbe` 是暂时的 SQL 权限探针，不替代实际服务。现有 service 仍因旧会话锁返回 42501；正式治理/intake 与四池接线后，须用实际资格、非空分页、复制和失效用例替换并删除探针副本。质量计划/授权写入、完整发布/回退成功和真实形状 approval-v1 失效行尚未验证。当前 15 项检查及进一步条件见[用途权限验收](../evidence/qa/intake-runtime-assembly/README.md)和[实验接线说明](../apps/api/experiments/intake-runtime/INTEGRATION.md)。
+`createPurposePrivilegeProbe` 保留旧 SQL 探针的证据边界。未经候选锁适配的旧 service 仍会返回 42501；后续实际 consumer 测试通过精确锁 SQL 适配和独立 `consumer-acl.sql`，使用原 service 的上传、解析、质量、授权、确认发布、回退及非空分页逻辑。业务/usage 各借用途池，失败收尾借可选 `terminalPool`；默认池行为不变，COMMIT 未知不回滚或释放占用。运行下列专项后，必须区分原生 service 与真实 HTTP/桌面剪贴板：本专项消费 multipart 字节和认证主体，但不启动生产 HTTP，也不操作系统剪贴板。正式治理/intake、factory 和应用 ACL 仍未接入；旧探针待正式替换后移除。
+
+```sh
+CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/intake-runtime-consumers.integration.test.ts
+```
+
+验证与剩余条件见[本轮补齐](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)及[实验接线说明](../apps/api/experiments/intake-runtime/INTEGRATION.md)。
 
 ## 发布二次确认（2026-10-08）
 

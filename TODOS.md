@@ -4,7 +4,7 @@
 
 用户最新目标为“飞书维护 → 导出统一 Excel → 桌面上传校验 → 有发布权限者二次确认后直接发布 → 坐席按店查询/复制”。确认直发合同已在所属仓冻结、导出并接收，合成 API/PG/Main 已接入 direct-v1。本节只归纳剩余验收，不新增需求或签发正式接入许可；详细批准与实施证据以[计划 §0](docs/plans/2026-10-03-content-intake-requirements.md)为准，运行入口见[开发指南](docs/how-to-develop-content-intake.md)。
 
-**当前安排：** 用户已批准精确候选的冻结、export/intake 与合成接入。治理提交 `6f318d4` 导出 OpenAPI 1.20.0/schema.v1.22；产品消费 `cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929`，仍为 VERIFIED_NOT_ACTIVATED。新候选/回退确认直发、不创建审批；历史 approval-v1 资料保留原有效性约束。组织 HTTP 观察与用途权限候选已回收修复，仍限离线合成实验；店铺名称合同仍为 DRAFT，不代表真实运行装配。
+**当前安排：** 用户已批准精确候选的冻结、export/intake 与合成接入。治理提交 `6f318d4` 导出 OpenAPI 1.20.0/schema.v1.22；产品消费 `cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929`，仍为 VERIFIED_NOT_ACTIVATED。新候选/回退确认直发、不创建审批；历史 approval-v1 资料保留原有效性约束。本轮已补齐组织登记/provenance/共享令牌、实际 service 用途消费及店铺目录生命周期候选，见[第二轮回收](evidence/qa/intake-parallel-recovery/runtime-completion/README.md)。组织/权限仍限离线合成候选；店铺名称合同仍为 DRAFT，不代表真实运行装配。
 
 **最新角色口径：** 总监、经理配置权限；总监、经理、主管、组长在有效业务授权和负责范围内上传 Excel 并二次确认发布；主管/组长不能配置他人，普通客服和历史赋能师新操作只查询。角色上限没有再次修改。来源确认和人工质量检查保留，取消的是组织审批。上传→检查→确认发布→另一普通客服查询复制及纠正回退的实际 Electron/HTTP/PG15 合成闭环已通过，见[本轮证据](evidence/qa/intake-direct-publication/README.md)。
 
@@ -14,9 +14,9 @@
 
 | 工作 | 已具备与尚缺的边界 | 完成标准 |
 | --- | --- | --- |
-| FAQ 查询适用条件 | 商品/场景多选已接通 API 词表 → Main 选择 → Query，并完成换条件/换店/失效的合成验证；正式店铺显示名的 OpenAPI 1.21.0/schema.v1.23 候选已回收修复但仍为 DRAFT，维护人轮换/签名 key 等冻结条件未齐；批准与版本化 intake 尚未发生，具体候选见[合同交接](docs/reference-content-intake-p2-contract-handoff.md#第一组店铺显示名差集2026-10-08候选未冻结) | [选择器合成验收已通过](evidence/qa/content-intake-p2-query-filters/README.md)；名称合同批准后完成重名/更名/撤权/分页显示验证 |
+| FAQ 查询适用条件 | 商品/场景多选已接通 API 词表 → Main 选择 → Query，并完成换条件/换店/失效的合成验证；正式店铺显示名的 OpenAPI 1.21.0/schema.v1.23 候选已回收修复但仍为 DRAFT，维护人轮换、私有 key 生命周期和可信会话调用已进入候选；实际 registrar/维护范围及密钥托管方案待确认，精确批准与版本化 intake 尚未发生，具体候选见[合同交接](docs/reference-content-intake-p2-contract-handoff.md#第一组店铺显示名差集2026-10-08候选未冻结) | [选择器合成验收已通过](evidence/qa/content-intake-p2-query-filters/README.md)；名称合同批准后完成重名/更名/撤权/分页显示验证 |
 | 容量与并发收尾 | 四类对象统一预留/采用/释放、未知提交保护、只读账本干跑已实现；10→100 并发与 10→100 合成发布历史、双来源 CAS 重审已验证，见[第二组证据](evidence/qa/content-intake-p2-capacity/README.md) | 剩余是历史保留期批准及批准后的历史清理/磁盘核对；当前不删历史，不把合成性能等同生产容量承诺 |
-| 正式接入 | 直发合同冻结/export/intake 与合成发布/回退/读取已接通；角色上限不变。组织回环 HTTP 已接既有观察/受限 writer；usage 消费测试仍用管理池。四用途权限探针已修复生命周期/属主权限，但实际 service 仍在旧会话锁处 42501，完整业务写入/非空分页/历史失效尚未验证，见[并行回收](evidence/qa/intake-parallel-recovery/README.md)。没有认领清单时，[装配探针](evidence/qa/intake-scope-runtime/README.md)拒绝空目录或管理员连接池。剩余为正式认证观察/刷新、生产受限权限/装配、初始店铺来源授权和旧目录认领 | 按已批准环境验证真实字段、撤权、确认直发/旧审批历史兼容和目录承接；缺前置时拒绝启用，不沿用合成身份或管理员连接池 |
+| 正式接入 | 直发合同冻结/export/intake 与合成发布/回退/读取已接通；角色上限不变。组织候选已补绑定登记/撤销、provenance 同事务与共享 token/配额；其 usage 测试仍用管理池。另有实际 service 在候选用途池下完成上传、解析、质量/授权、确认发布/回退、非空分页及历史失效；worker 失败收尾和 COMMIT 未知保护已补，见[第二轮回收](evidence/qa/intake-parallel-recovery/runtime-completion/README.md)。没有认领清单时，[装配探针](evidence/qa/intake-scope-runtime/README.md)拒绝空目录或管理员连接池。剩余为正式认证观察/刷新、生产受限权限/装配、初始店铺来源授权和旧目录认领 | 按已批准环境验证真实字段、撤权、确认直发/旧审批历史兼容和目录承接；缺前置时拒绝启用，不沿用合成身份或管理员连接池 |
 | 业务与设备验收 | 已有 Mac 开发态和指定版本 Windows/WSL 合成证据；非开发维护者的编号/修错演练、普通 Windows 账号、可靠拖动和整机断网未完成 | 证据绑定版本/输入/设备；新回退与同题覆盖不借用旧包结果。普通账号及现场断网按用户当前安排等待条件 |
 
 前三项可按接口边界并行准备；共同的合同、迁移编号、发布目录和测试宿主由同一集成负责人协调。Git 交付与业务验收分开：本地 commit 不代表 push、PR、合并、部署或真实数据放行。本轮工作区根规则通过，但冻结快照及实验接收后超过 32 MiB 源码体积预算；记录为未通过检查，未删除历史合同/证据或放宽阈值。
