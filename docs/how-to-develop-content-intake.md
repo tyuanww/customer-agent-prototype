@@ -280,3 +280,13 @@ node scripts/content-retention.ts --group intake-objects --dsn "$SYNTHETIC_DATAB
 ```
 
 命令以只读一致快照返回已登记对象数量/字节、各预留状态的数量/占用及保护原因。`releasing` 表示已明确失败/重复对象的可重试释放；`reserved`/`persisted` 可能仍在进行或提交结果未知，必须保留。该输出是数据库账本核对，不代表完成整个磁盘的孤儿扫描；未知磁盘对象不删。`--apply`、与旧组混用、缺显式 DSN 均拒绝。历史保留期仍待确认，本轮没有批准历史删除或后台清理调度。验证明细与已知限制见[第二组证据](../evidence/qa/content-intake-p2-capacity/README.md)。
+
+## 组织事实刷新离线验证
+
+```sh
+pnpm --filter @customer-agent/api test:intake:organization
+```
+
+该命令构建已有运行依赖，在一次性 PG15 中运行 8 项合成测试；需要 Node 24 和现有 PG15 harness。实验写入器位于 `apps/api/experiments/intake-organization/facts-writer.ts`，不进入 API dist，不注册 HTTP、不查询飞书或读取环境凭据。临时非 owner 账号只负责已登记主体的事实追加与版本/代际推进；实际登录、岗位/业务授权及使用资格消费者沿用现有实现。正式运行角色与迁移不变。
+
+输入要求、提交未知恢复、验证证据与缺口见[组织刷新验收](../evidence/qa/intake-organization/README.md)。这里的 snapshot 是可信观察方提供的内部实验输入，不是飞书原始响应，也不是允许 renderer 调用的接口。重试须保留原快照和 expectedFactsVersion，历史成功不表示当前权限有效；没有观察到新事实时不能人为修改时间延长有效期。

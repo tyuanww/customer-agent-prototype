@@ -1,0 +1,22 @@
+{
+  "base": "29fc709",
+  "scope": "offline synthetic organization facts writer; no runtime registration",
+  "runtime": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15",
+    "host": "macOS arm64"
+  },
+  "sha256": {
+    "apps/api/experiments/intake-organization/facts-writer.ts": "ade4fec8a5c79d75716149fc09c3d38d836ab3513818f09db829a4aa583f0ca8",
+    "apps/api/tests/intake-organization.integration.test.ts": "fb48a3808e2d0f46f6e5f96afb168116edb9c74eae57a0e6efba4f2a109739e1",
+    "apps/api/package.json": "e2708c3045c1bab445dd6393c52d4a8b2a330b7b8d37641ee3de034f61f64664",
+    "apps/api/tsconfig.build.json": "9072c6cfb121e8ea0cf1d68a261522dd964b54b9e5fb69e8a8ca3c35afea5e1f",
+    "apps/api/tests/support/intake-synthetic-seed.ts": "453a55cdc9a9e330ef72e89673b3a4f6de3f361b470f490ff6406f4bf4a96bd2",
+    "apps/api/src/content-intake/transaction.ts": "8464bc5dcb0b7cb4d025940b2d6f505fe58bf369bb82f34385963f2ed4a1436e",
+    "apps/api/src/content-intake/authority.ts": "36356e2c97ddbd4e64c067bd6016edf4837caed48d4ec28783c0656da1139313",
+    "apps/api/src/content-intake/usage.ts": "3085ee36b4a052a54f2b928680ca7c4e6347fcee50e7d87de3b4b3b03ec3aebf",
+    "apps/api/src/content-intake/material.ts": "c635b152e23f757885e47d57b4c5bde578fa82de9ec615bd35b5a8979db1bd1a",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78"
+  }
+}
