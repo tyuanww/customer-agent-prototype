@@ -1,5 +1,6 @@
 import {
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -447,6 +448,97 @@ describe('workspace hygiene', () => {
     expect(result.violations).toEqual([
       expect.objectContaining({ key: 'workspace-remainder', budgetBytes: 1 }),
     ]);
+  });
+
+  it.each([
+    { key: 'frozen-contracts', relativePath: 'contracts/upstream/frozen/input.sql', capMiB: 15 },
+    { key: 'frozen-evidence', relativePath: 'evidence/qa/frozen.log', capMiB: 10 },
+    { key: 'source-inputs', relativePath: 'apps/desktop/src/big.ts', capMiB: 20 },
+  ])('rejects $key growth even with unused aggregate headroom', ({ key, relativePath, capMiB }) => {
+    const root = createWorkspaceFixture();
+    const target = path.join(root, relativePath);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, Buffer.alloc(capMiB * 1024 * 1024 + 4096, 'x'));
+
+    const result = checkWorkspaceBudget(root);
+    expect(result.remainderBudgetBytes).toBe(45 * 1024 * 1024);
+    expect(result.remainderBytes).toBeLessThan(result.remainderBudgetBytes);
+    expect(result.pass).toBe(false);
+    expect(result.violations).toContainEqual(expect.objectContaining({ key, budgetBytes: capMiB * 1024 * 1024 }));
+    // The legacy one-time aggregate override cannot bypass a group gate.
+    expect(checkWorkspaceBudget(root, { remainderBudgetBytes: 64 * 1024 * 1024 }).pass).toBe(false);
+  });
+
+  it('counts hard-linked retained input once across contract and evidence groups', () => {
+    const root = createWorkspaceFixture();
+    const contractPath = path.join(root, 'contracts/upstream/frozen/input.sql');
+    mkdirSync(path.dirname(contractPath), { recursive: true });
+    writeFileSync(contractPath, Buffer.alloc(1024 * 1024, 'x'));
+    const before = checkWorkspaceBudget(root);
+    linkSync(contractPath, path.join(root, 'evidence/qa/same-input.sql'));
+    const after = checkWorkspaceBudget(root);
+
+    expect(after.pass).toBe(true);
+    expect(after.remainderBytes - before.remainderBytes).toBeLessThan(4096);
+    expect(after.sourceBudgetGroups.reduce((sum, group) => sum + group.bytes, 0)).toBe(after.remainderBytes);
+  });
+
+  it('does not follow a symlinked ancestor when grouping frozen contracts', () => {
+    const root = createWorkspaceFixture();
+    const external = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-external-contracts-'));
+    fixtures.push(external);
+    mkdirSync(path.join(external, 'upstream'));
+    writeFileSync(path.join(external, 'upstream/input.sql'), Buffer.alloc(16 * 1024 * 1024, 'x'));
+    symlinkSync(external, path.join(root, 'contracts'));
+
+    const result = checkWorkspaceBudget(root);
+    expect(result.pass).toBe(true);
+    expect(result.remainderBytes).toBeLessThan(1024 * 1024);
+    expect(result.sourceBudgetGroups.find(group => group.key === 'frozen-contracts')?.bytes).toBe(0);
+  });
+
+  it('counts only the symlink itself when a grouped leaf points outside the workspace', () => {
+    const root = createWorkspaceFixture();
+    const external = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-external-evidence-'));
+    fixtures.push(external);
+    writeFileSync(path.join(external, 'outside.bin'), Buffer.alloc(11 * 1024 * 1024, 'x'));
+    rmSync(path.join(root, 'evidence'), { recursive: true, force: true });
+    symlinkSync(external, path.join(root, 'evidence'));
+
+    const result = checkWorkspaceBudget(root);
+    expect(result.pass).toBe(true);
+    expect(result.remainderBytes).toBeLessThan(1024 * 1024);
+    expect(result.sourceBudgetGroups.find(group => group.key === 'frozen-evidence')?.bytes).toBeLessThan(4096);
+  });
+
+  it('keeps an explicitly tighter aggregate budget even when every group fits', () => {
+    const root = createWorkspaceFixture();
+    writeFileSync(path.join(root, 'apps/desktop/src/code.ts'), Buffer.alloc(2 * 1024 * 1024, 'x'));
+    const result = checkWorkspaceBudget(root, { remainderBudgetBytes: 1024 * 1024 });
+
+    expect(result.pass).toBe(false);
+    expect(result.violations).toEqual([
+      expect.objectContaining({ key: 'workspace-remainder', budgetBytes: 1024 * 1024 }),
+    ]);
+  });
+
+  it('passes retained inputs within all three approved groups and the aggregate', () => {
+    const root = createWorkspaceFixture();
+    for (const [relativePath, mib] of [
+      ['apps/desktop/src/code.ts', 19],
+      ['contracts/upstream/frozen/input.sql', 14],
+      ['evidence/qa/frozen.log', 9],
+    ] as const) {
+      const target = path.join(root, relativePath);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, Buffer.alloc(mib * 1024 * 1024, 'x'));
+    }
+    const result = checkWorkspaceBudget(root);
+
+    expect(result.pass).toBe(true);
+    expect(result.violations).toHaveLength(0);
+    expect(result.remainderBytes).toBeGreaterThan(42 * 1024 * 1024);
+    expect(result.sourceBudgetGroups.map(group => group.key)).toEqual(['frozen-contracts', 'frozen-evidence', 'source-inputs']);
   });
 
   it('rejects invalid or negative source budgets instead of silently passing', () => {

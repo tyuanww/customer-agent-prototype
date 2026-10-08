@@ -35,7 +35,14 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // This budget covers source, tests, docs and checked-in assets only. Generated
 // packages and reinstallable dependencies are reported separately and are not
 // allowed to make the source budget fail.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 32 * 1024 * 1024;
+// Approved 2026-10-09: each retained input remains budgeted. A group cannot
+// borrow unused space from another group, even with a larger aggregate override.
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 45 * 1024 * 1024;
+export const SOURCE_BUDGET_GROUPS = Object.freeze([
+  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 15 * 1024 * 1024 }),
+  Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10 * 1024 * 1024 }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 20 * 1024 * 1024 }),
+]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
   'release/local-unsigned',
@@ -506,12 +513,23 @@ export function workspaceInventory(projectRoot) {
     ...category,
     bytes: measureAllocatedBytes(path.join(resolvedRoot, category.path), seen),
   }));
-  let remainderBytes = 0;
+  // These are budgeted groups, not exclusions. Use the same inode set as the
+  // whole inventory so hard links and rebuildable output are counted once.
+  const sourceBudgetGroups = SOURCE_BUDGET_GROUPS.filter((group) => group.path).map((group) => ({
+    ...group,
+    // Entering a nested group directly must not follow an ancestor symlink.
+    // Leave that link for the original root traversal to count without following.
+    bytes: workspaceDirectoryStatus(resolvedRoot, path.posix.dirname(group.path)) === 'safe'
+      ? measureAllocatedBytes(path.join(resolvedRoot, group.path), seen) : 0,
+  }));
+  let sourceInputBytes = 0;
   for (const entry of readdirSync(resolvedRoot)) {
     if (!claimedTopLevel.has(entry)) {
-      remainderBytes += measureAllocatedBytes(path.join(resolvedRoot, entry), seen);
+      sourceInputBytes += measureAllocatedBytes(path.join(resolvedRoot, entry), seen);
     }
   }
+  sourceBudgetGroups.push({ ...SOURCE_BUDGET_GROUPS.at(-1), bytes: sourceInputBytes });
+  const remainderBytes = sourceBudgetGroups.reduce((sum, group) => sum + group.bytes, 0);
   categories.push({
     key: 'workspace-remainder',
     label: 'source, tests, docs, assets and small build inputs',
@@ -523,6 +541,7 @@ export function workspaceInventory(projectRoot) {
     root: resolvedRoot,
     totalBytes: categories.reduce((sum, category) => sum + category.bytes, 0),
     categories,
+    sourceBudgetGroups,
   };
 }
 
@@ -545,6 +564,9 @@ export function checkWorkspaceBudget(
         budgetBytes: remainderBudgetBytes,
       }]
     : [];
+  violations.push(...inventory.sourceBudgetGroups
+    .filter((group) => group.bytes > group.budgetBytes)
+    .map(({ key, bytes, budgetBytes }) => ({ key, bytes, budgetBytes })));
   return {
     ...inventory,
     remainderBytes,
@@ -658,6 +680,9 @@ function runCli() {
       + `(remainder ${formatBytes(result.remainderBytes)} / `
       + `${formatBytes(result.remainderBudgetBytes)})`,
     );
+    for (const group of result.sourceBudgetGroups) {
+      console.log(`${group.key}: ${formatBytes(group.bytes)} / ${formatBytes(group.budgetBytes)}`);
+    }
     if (!result.pass) {
       for (const violation of result.violations) {
         console.error(

@@ -272,7 +272,7 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 | CodeGraph 索引 | `.codegraph/` | 本地工具状态，不进业务提交 |
 | 用户参考 ZIP | `clawd-on-desk-0.15.0.zip` | 只读、忽略、不得复制资源进仓 |
 
-`pnpm workspace:check` 只给源码、测试、文档和已纳入资产设置预算，不把依赖和本地工具缓存误算成代码膨胀。它还验证根 workspace 门面不声明版本，并要求 `.gstack/package-json-path` 唯一指向 `apps/desktop/package.json`，避免发布版本与安装包版本分叉。清理器是精确 allowlist，遇到未知路径或符号链接会停止。
+`pnpm workspace:check` 对所有保留输入实行三个独立 allocated-byte 预算：源码/测试/文档/资产/迁移/生成源码与配置 20 MiB、冻结合同 `contracts/upstream/` 15 MiB、冻结证据 `evidence/` 10 MiB，总量 45 MiB；任一分组或总量超限均失败。依赖、各已知包构建输出和精确派生图标单独统计，不误算成源码增长，也不借此排除未知文件或冻结历史。分组共享 inode 计数以避免重复统计硬链接，实际字节构成与批准依据见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。它还验证根 workspace 门面不声明版本，并要求 `.gstack/package-json-path` 唯一指向 `apps/desktop/package.json`，避免发布版本与安装包版本分叉。清理器是精确 allowlist，遇到未知路径或符号链接会停止。
 
 ## 7. 当前架构评价
 

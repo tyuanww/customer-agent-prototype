@@ -19,6 +19,14 @@ export type WorkspaceCategory = Readonly<{
   bytes: number;
 }>;
 
+export type WorkspaceSourceBudget = Readonly<{
+  key: 'frozen-contracts' | 'frozen-evidence' | 'source-inputs';
+  path: string | null;
+  budgetBytes: number;
+  bytes: number;
+}>;
+export const SOURCE_BUDGET_GROUPS: readonly Omit<WorkspaceSourceBudget, 'bytes'>[];
+
 export type CleanupResult = Readonly<{
   root: string;
   scope: CleanupScope;
@@ -61,6 +69,7 @@ export function workspaceInventory(projectRoot: string): Readonly<{
   root: string;
   totalBytes: number;
   categories: readonly WorkspaceCategory[];
+  sourceBudgetGroups: readonly WorkspaceSourceBudget[];
 }>;
 export function checkWorkspaceBudget(
   projectRoot: string,
@@ -69,6 +78,7 @@ export function checkWorkspaceBudget(
   root: string;
   totalBytes: number;
   categories: readonly WorkspaceCategory[];
+  sourceBudgetGroups: readonly WorkspaceSourceBudget[];
   remainderBytes: number;
   remainderBudgetBytes: number;
   violations: readonly Readonly<{
