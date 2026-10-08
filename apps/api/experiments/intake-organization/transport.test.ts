@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createServer } from 'node:http';
+import type { AddressInfo, Socket } from 'node:net';
 import { createFeishuOrganizationObserver } from './feishu-observer.js';
 import { createOrganizationHttpTransport, type OrganizationTokenSupplier } from './http-transport.js';
 import { startSyntheticContactDouble } from './synthetic-contact-double.js';
@@ -209,6 +211,34 @@ describe('loopback organization transport', () => {
     const observed = await observe();
     expect(observed).toEqual({ ok: false, reason: 'DEPENDENCY_UNAVAILABLE' });
     expect(JSON.stringify(observed)).not.toContain('secret-message');
+  });
+
+  it('closes a response rejected during header validation without observer cleanup', async () => {
+    let responseClosed = false;
+    const sockets = new Set<Socket>();
+    const server = createServer((_request, response) => {
+      response.on('close', () => { responseClosed = true; });
+      // Valid HTTP numeric length, but outside this transport's accepted format.
+      response.writeHead(200, { 'content-length': '000000000000001' });
+      response.flushHeaders();
+      // Keep the body pending so success cannot be mistaken for remote closure.
+    });
+    server.on('connection', socket => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const client = createOrganizationHttpTransport({
+        origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+        tokenSupplier: tokens(), requestTimeoutMs: 1_000,
+      });
+      await expect(client.user('synthetic-open-agent', new AbortController().signal)).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+      await waitFor(() => responseClosed);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
   });
 
   it('refuses the eleventh job-title call in a published minute and does not reopen the window by rewinding the clock', async () => {

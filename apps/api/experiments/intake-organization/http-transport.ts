@@ -47,7 +47,7 @@ export class OrganizationTransportError extends Error {
   }
 }
 
-/** Injected app-identity credential. The transport never fetches or stores one. */
+/** Injected app-identity credential; cached only in memory until expiry, never fetched or persisted here. */
 export type OrganizationAppToken = { token: string; expiresAtMs: number };
 export type OrganizationTokenSupplier = {
   current(signal: AbortSignal): Promise<OrganizationAppToken>;
@@ -246,6 +246,9 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
       }
     } finally {
       clearTimeout(timer);
+      // Header validation can fail before readBounded owns the response body.
+      // Every exit must release this request without relying on observer cleanup.
+      timeoutController.abort();
     }
   }
 
