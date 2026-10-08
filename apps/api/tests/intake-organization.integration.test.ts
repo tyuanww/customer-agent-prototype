@@ -4,6 +4,8 @@ import { Pool, type Client } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
+import { createFeishuOrganizationObserver } from '../experiments/intake-organization/feishu-observer.js';
+import { nativeOrganizationFixture } from './support/intake-organization-native.js';
 import { createOrganizationFactsWriter } from '../experiments/intake-organization/facts-writer.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -140,6 +142,36 @@ describe.skipIf(!enabled)('offline organization refresh through frozen storage a
     expect(await service.snapshot(actor,{entitlementId:old.entitlementId})).toMatchObject({ok:false});
     expect(await state()).toMatchObject({revocation_generation:'1'});
     expect((await admin.query("SELECT count(*) FROM content_intake.grants WHERE recipient_id='agent' AND revoked_at IS NULL")).rows[0].count).toBe('1');
+  });
+
+  it('consumes native-shaped observations through the restricted writer and revokes real usage on status/department change',async()=>{
+    const f=nativeOrganizationFixture();
+    const now=async()=>((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time as Date).getTime();
+    const observe=createFeishuOrganizationObserver(scope,f.transport,now);
+    const binding={...scope,principalId:'agent',openId:f.person.open_id,expectedFactsVersion:1};
+    const old=await entitlement();
+    const first=await observe(binding);expect(first).toMatchObject({ok:true});if(!first.ok)throw new Error(first.reason);
+    expect(await write(first.snapshot)).toMatchObject({ok:true,status:'applied'});
+    f.person.status.is_frozen=true;
+    const disabled=await observe({...binding,expectedFactsVersion:2});expect(disabled).toMatchObject({ok:true});if(!disabled.ok)throw new Error(disabled.reason);
+    expect(await write(disabled.snapshot)).toMatchObject({ok:true,status:'applied'});
+    expect(await service.snapshot(actor,{entitlementId:old.entitlementId})).toMatchObject({ok:false,reason:'ORG_FACTS_UNAVAILABLE'});
+    expect(await write(first.snapshot)).toMatchObject({ok:true,status:'replayed',currentFactsVersion:3});
+    f.person.status.is_frozen=false;f.person.department_ids=['unmapped-department'];
+    const moved=await observe({...binding,expectedFactsVersion:3});expect(moved).toMatchObject({ok:true});if(!moved.ok)throw new Error(moved.reason);
+    expect(await write(moved.snapshot)).toMatchObject({ok:true,status:'applied'});
+    expect(await service.issueEntitlement(actor,{shopId:'shop-a',contextGeneration:2,productIds:[],scenarioIds:[],releaseId:null})).toMatchObject({ok:false});
+    expect(await state()).toMatchObject({current_facts_version:'4',revocation_generation:'2'});
+  });
+
+  it('produces no writable snapshot when a later directory page fails; facts and expiry remain unchanged',async()=>{
+    const f=nativeOrganizationFixture(), original=f.transport.jobTitles;
+    f.transport.jobTitles=async(token,signal)=>token ? JSON.stringify({code:999,msg:'synthetic denied'}) : original(token,signal);
+    const before=(await admin.query("SELECT facts_version,checked_at,valid_until FROM content_intake.principal_facts WHERE principal_id='agent'")).rows;
+    const observed=await createFeishuOrganizationObserver(scope,f.transport,async()=>Date.now())({...scope,principalId:'agent',openId:f.person.open_id,expectedFactsVersion:1});
+    expect(observed).toEqual({ok:false,reason:'DEPENDENCY_UNAVAILABLE'});
+    expect((await admin.query("SELECT facts_version,checked_at,valid_until FROM content_intake.principal_facts WHERE principal_id='agent'")).rows).toEqual(before);
+    expect(await state()).toMatchObject({current_facts_version:'1',revocation_generation:'0'});
   });
 
   it('has no write authority over identity, role policy, grants, history or publication',async()=>{

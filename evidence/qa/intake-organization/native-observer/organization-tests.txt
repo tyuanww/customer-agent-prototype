@@ -1,0 +1,21 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-organization-observer.test.ts (19 tests) 31ms
+ ✓ tests/intake-organization.integration.test.ts (10 tests) 10138ms
+   ✓ offline organization refresh through frozen storage and real usage > refreshes with a non-owner writer; exact replay changes no deadline or generation and old lease stays bounded  990ms
+   ✓ offline organization refresh through frozen storage and real usage > disables actual usage and an old enabled replay cannot restore it; role changes revoke the old qualification  881ms
+   ✓ offline organization refresh through frozen storage and real usage > rejects stale, future, expired, malformed and cross-scope snapshots without mutation  853ms
+   ✓ offline organization refresh through frozen storage and real usage > serializes concurrent snapshots and refuses a newer version with an older observation  852ms
+   ✓ offline organization refresh through frozen storage and real usage > recovers a lost commit using the exact immutable version after writer recreation  858ms
+   ✓ offline organization refresh through frozen storage and real usage > rolls back an observation that expires after writing but before commit  1977ms
+   ✓ offline organization refresh through frozen storage and real usage > department changes remove access and do not rewrite grants or silently choose a role  860ms
+   ✓ offline organization refresh through frozen storage and real usage > consumes native-shaped observations through the restricted writer and revokes real usage on status/department change  867ms
+   ✓ offline organization refresh through frozen storage and real usage > produces no writable snapshot when a later directory page fails; facts and expiry remain unchanged  989ms
+   ✓ offline organization refresh through frozen storage and real usage > has no write authority over identity, role policy, grants, history or publication  1012ms
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  13:11:10
+   Duration  10.73s (transform 247ms, setup 0ms, collect 751ms, tests 10.17s, environment 0ms, prepare 105ms)
+
