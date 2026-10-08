@@ -37,7 +37,7 @@ CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin pnpm --filter @custom
 
 业务授权、分配母资格和相关主体事实的截止时间由事务模块收集，在写回执后、COMMIT 前统一用数据库时钟复核；新负责人撤权/接管只检查当前资格，发新授权仍须覆盖整段期限。base 检查同时取得既有发布 advisory lock，保护尚无 current 行的首次导入；旧写影响集合由下述 0022 共存门独立校验，不能仅凭 base 检查替代。
 
-当前额度验证覆盖 actor/source 并发 admission 和保守的 1GiB 已登记对象总量门。上传已有单对象与请求边界，但对象/审核包/失败报告尚无统一持久字节预留、引用保护及 retention 回收；十倍历史存量负载尚未验收；取消任务不自动释放磁盘，不能把本阶段称为完整暂存容量治理。已确认无引用的失败报告清理由后续受控 retention 流程承担。
+当前额度验证覆盖 actor/source 并发 admission，以及 0029 统一管理的四类对象字节预留、引用保护和明确失败对象释放；10→100 并发准入及 10→100 合成发布历史已验收。取消任务不等于允许删除已登记历史对象；历史保留期与受控历史回收仍待批准，具体命令、口径与证据见[容量核对与历史保留](#容量核对与历史保留第二组)。
 
 ## P2 来源与审批证据
 
@@ -138,7 +138,7 @@ node scripts/probe-intake-family-sql.mjs --output .gstack/family-sql-check.json
 
 资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 停止使用并处理审批；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。Main 的 `ContentIntakeUsage` 已拥有完整分页、当前店/选择、迟到回调、原文复制与失效通知；单资格自然到期和精确 FORBIDDEN/LEASE_EXPIRED 只影响该资格，其他有效句柄仍受自己的原截止约束，真正会话/权限/审批失效才清除全部句柄。失败不会复活或延长资格。根级合成 HTTP 探针现在通过实际 `ProductHttp` / `ProductSession` 消费该模块；凭据仅驻留隔离进程内存，测试替换本机员工显示名读取，不读取用户 profile。合成 profile 的 Main factory、白名单 IPC 和 renderer 已接线；生产 factory 与未覆盖设备项仍待验收；此前持久化和最终复审见[使用资格上下文验收](../evidence/qa/content-intake-p2-usage-context/README.md)。
 
-封闭路由适配器 `apps/api/src/content-intake/usage-http.ts` 只由隔离合成宿主注册四个正式路径：`GET /v1/intake/authorization`、`GET /v1/intake/sources`、`POST /v1/intake/entitlements` 与 `GET /v1/intake/snapshot`。复用当前产品认证，原样保留私有 actor 引用；不接受额外身份/选择字段，重复查询参数不覆盖，错误统一为 `IntakeError` 并返回 `no-store`。生产 app/server 工厂未注册它。
+封闭路由适配器 `apps/api/src/content-intake/usage-http.ts` 只由隔离合成宿主注册五个正式路径：`GET /v1/intake/authorization`、`GET /v1/intake/sources`、`GET /v1/intake/sources/{sourceId}/vocabulary`、`POST /v1/intake/entitlements` 与 `GET /v1/intake/snapshot`。复用当前产品认证，原样保留私有 actor 引用；不接受额外身份/选择字段，重复查询参数不覆盖，错误统一为 `IntakeError` 并返回 `no-store`。生产 app/server 工厂未注册它。
 
 `ProductHttp` 默认响应上限仍为 1 MiB；Main 的目录请求显式传入 32 MiB 总预算的剩余额度，每次 HTTP 读取也受同一剩余额度限制。合法 100 条长话术页可超过旧默认上限；没有截断或自动重试。错误诊断只写 HTTP 状态、已知错误类型/errno 和耗时，路径、游标、资格 ID、凭据与上游消息不进入日志。
 
@@ -159,7 +159,7 @@ Main `loadIntakeAccess(session,signal?)` 收齐两张列表并再次完整核对
 
 该切片连接“合成会话 → 授权店铺/商品/场景 → 已发布适用 FAQ → 原文复制”。开发态设置 `CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2`，同时提供不同端口的 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 与 `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`（只能是 `http://127.0.0.1:<port>`）。然后运行 `pnpm dev`。未配置 flag 维持既有行为；flag 拼错、缺 origin 或使用远程 origin 都拒绝启动。
 
-打包配置解析器支持在 `synthetic-stack.json` 的 `synthetic-local` 对象中添加 `"contentIntake":"faq-v2"`，指定版本已有 Windows 打包态验收，见[杭州记录](../evidence/qa/content-intake-p2-hangzhou/README.md)；不能推断后续回退/同题覆盖已在该包验收。标准 synthetic-stack 服务尚未注册新四条路由，不能只加 flag 就声称完整服务可用；需要已经登记合成来源/权限/发布物的隔离宿主和已批准会话入口。可复现原生验收用下述仓库测试，它自己创建两个 loopback 合成 wire 服务与独立 userData，退出清理，不访问生产服务：
+打包配置解析器支持在 `synthetic-stack.json` 的 `synthetic-local` 对象中添加 `"contentIntake":"faq-v2"`，指定版本已有 Windows 打包态验收，见[杭州记录](../evidence/qa/content-intake-p2-hangzhou/README.md)；不能推断后续回退/同题覆盖已在该包验收。标准 synthetic-stack 服务尚未注册上述五条使用路由，不能只加 flag 就声称完整服务可用；需要已经登记合成来源/权限/发布物的隔离宿主和已批准会话入口。可复现原生验收用下述仓库测试，它自己创建两个 loopback 合成 wire 服务与独立 userData，退出清理，不访问生产服务：
 
 ```sh
 pnpm --filter @customer-agent/desktop build

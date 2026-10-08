@@ -155,4 +155,6 @@ pnpm workspace:check
 
 ## P2 资料接入（隔离合成消费者）
 
-当前消费锁为 OpenAPI 1.19.0 / schema.v1.21；使用资格的持久上下文由先前 1.17 增量引入。认证模块用私有 WeakMap 保存成功认证的会话引用，DTO/响应不携带该键；`content-intake/usage.ts` 在事务内锁定并重查会话、批量核验选择范围，原子保存资格和上下文。分页只接受 entitlementId/cursor/limit，重启后从数据库重建绑定；退出、会话清理及缺失旧上下文均拒绝。`test:intake:transactions` 包含真实合成登录、PG 发布与桌面 Main 消费者经测试专用 loopback HTTP 的跨进程验证；生产 HTTP 注册、应用 ACL 与真实飞书 transport 尚未完成。原生上传、质量检查、审批发布、修订/取消、纠正回退和店铺通用 FAQ 查询已通过隔离 HTTP 接入桌面；0028 另验证显式同题覆盖。命令、现行能力与平台证据边界见[合成开发指南](../../docs/how-to-develop-content-intake.md)，历史资格证据见[使用资格持久化验收](../../evidence/qa/content-intake-p2-usage-context/README.md)。
+当前消费锁为 OpenAPI 1.19.0 / schema.v1.21；使用资格的持久上下文由先前 1.17 增量引入。认证模块用私有 WeakMap 保存成功认证的会话引用，DTO/响应不携带该键；`content-intake/usage.ts` 在事务内锁定并重查会话、批量核验选择范围，原子保存资格和上下文。分页只接受 entitlementId/cursor/limit，重启后从数据库重建绑定；退出、会话清理及缺失旧上下文均拒绝。`test:intake:transactions` 包含真实合成登录、PG 发布与桌面 Main 消费者经测试专用 loopback HTTP 的跨进程验证；生产 HTTP 注册、应用 ACL 与真实飞书 transport 尚未完成。原生上传、质量检查、审批发布、修订/取消、纠正回退和按店铺/商品/场景筛选的 FAQ 查询已通过隔离 HTTP 接入桌面；0028 另验证显式同题覆盖。`GET /v1/intake/sources/{sourceId}/vocabulary` 复用冻结合同，按当前会话与来源 query 权限提供分页词项，供 Main 构造选择菜单。命令、现行能力与平台证据边界见[合成开发指南](../../docs/how-to-develop-content-intake.md)，历史资格证据见[使用资格持久化验收](../../evidence/qa/content-intake-p2-usage-context/README.md)。
+
+`content-intake/capacity.ts` 与私有迁移 `0029_intake_capacity` 统一拥有输入 XLSX、失败报告、普通/回滚审核包的持久字节预留、业务事务采用与失败释放。未知提交及已登记引用保持保护；只读核对沿用 `scripts/content-retention.ts --group intake-objects`，须显式提供合成测试 DSN，拒绝 `--apply`。命令与保留边界见[容量核对说明](../../docs/how-to-develop-content-intake.md#容量核对与历史保留第二组)；该机制没有新增生产 ACL 或历史删除许可。

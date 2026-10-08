@@ -6,16 +6,17 @@
 
 ## 当前消费状态（2026-10-08）
 
-下文 §5–§6 保留各次交接的历史时点和数字，不把当时的“下一步”“未接线”当成今日待办。当前消费锁仍为 OpenAPI 1.19.0 / schema.v1.21、VERIFIED_NOT_ACTIVATED；产品内部迁移已追加至 0028，不能把上游 schema 版本与本仓迁移段数混为一谈。
+下文 §5–§6 保留各次交接的历史时点和数字，不把当时的“下一步”“未接线”当成今日待办。当前消费锁仍为 OpenAPI 1.19.0 / schema.v1.21、VERIFIED_NOT_ACTIVATED；产品内部迁移已追加至 0029，不能把上游 schema 版本与本仓迁移段数混为一谈。
 
 | 能力 | 当前状态与证据 |
 | --- | --- |
 | 权限、持久候选、质量/审批/发布 HTTP 与 Main/preload/管理界面 | 已在隔离合成环境贯通原生上传、报告、修订/取消、逐条质量、来源确认、合成人工审批和发布；见[开发指南](how-to-develop-content-intake.md) |
 | 纠正回退 | 0027、API、Main 与管理界面已接通独立复核和原子新发布；实际 Electron→HTTP→PG15 已验证，见[回退证据](../evidence/qa/content-intake-p2-rollback/README.md) |
 | 显式同题覆盖 | 0028 完整目录守卫及按店/商品/场景的覆盖与通用回落已验证；见[家族证据](../evidence/qa/content-intake-p2-family/README.md) |
-| 坐席界面 | 店铺通用 FAQ 查询/原文复制已接通；商品/场景筛选及正式店铺显示名合同仍待完成，不能以底层资格支持替代 UI 验收 |
-| 平台 | Mac 开发态及指定版本 Windows/WSL 已取得分层结果；[杭州证据](../evidence/qa/content-intake-p2-hangzhou/README.md)不覆盖后续回退/家族，普通账号、可靠拖动、整机断网仍未确认 |
-| 退出条件 | 统一对象字节预留与清理、完整历史负载/业务重审成本、真实组织/审批、生产最小 ACL/factory、旧目录认领及业务验收仍待完成；范围汇总见 [TODOS](../TODOS.md) |
+| 坐席界面 | 店铺选择、商品/场景多选、适用 FAQ 查询及原文复制已接通并完成[选择器合成验收](../evidence/qa/content-intake-p2-query-filters/README.md)；正式店铺显示名仍待下方合同候选批准与版本化 intake |
+| 对象容量 | 0029 与 API 已实现四类对象持久预留/采用/释放、未知提交保护及只读账本干跑；10→100 并发准入、10→100 合成发布历史与双来源 CAS 重审已验证，见[容量证据](../evidence/qa/content-intake-p2-capacity/README.md)；历史保留期与受控历史清理仍待批准 |
+| 平台 | Mac 开发态及指定版本 Windows/WSL 已取得分层结果；[杭州证据](../evidence/qa/content-intake-p2-hangzhou/README.md)不覆盖后续回退、家族及商品/场景选择等新增切片，普通账号、可靠拖动、整机断网仍未确认 |
+| 退出条件 | 正式店铺名称合同、历史保留期及批准后的历史清理/磁盘核对、真实组织/审批、生产最小 ACL/factory、旧目录认领及业务/设备验收仍待完成；合成 CAS 已验证额外重审次数，不代表实际人工等待耗时；范围汇总见 [TODOS](../TODOS.md) |
 
 ## 1. 交接范围与基线
 
