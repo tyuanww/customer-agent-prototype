@@ -1,0 +1,48 @@
+# 用途装配候选
+
+2026-10-08。产品版本保持 0.3.26。工作区从 `0e6aea9e3b10b170f95e1e6114e2ec8d5fdf9872` 分出 `codex/intake-runtime-assembly-candidate`。只使用一次性 PG15 里的合成身份。没有真实组织、客户、员工、凭据或业务库。
+
+这是正式合同前的实验。11 项专项通过不表示用途 ACL 已冻结，也不表示生产装配获准。旧会话锁 8 项和无认领清单 4 项没有重跑，不能把它们记成这次的 PASS。
+
+## 命令
+
+在 `apps/api` 下，PATH 含 `$HOME/homebrew/opt/node@24/bin` 和 `$HOME/homebrew/bin`。依赖目录是指向集成工作区的符号链接，没有执行 `pnpm install`。
+
+```sh
+./node_modules/.bin/eslint \
+  experiments/intake-runtime/assembly.ts \
+  experiments/intake-runtime/purpose-boundary.ts \
+  tests/intake-runtime-assembly.test.ts \
+  tests/intake-runtime-assembly.integration.test.ts
+CUSTOMER_AGENT_API_PG15_INTEGRATION=1 \
+  ./node_modules/.bin/vitest run \
+  tests/intake-runtime-assembly.test.ts \
+  tests/intake-runtime-assembly.integration.test.ts
+```
+
+环境：Mac arm64、Node v24.19.0、pnpm 11.19.0、PostgreSQL 15.18 Homebrew、vitest 3.2.7。集成测试自己 `Pg15Harness.start()`、建库 `intake_runtime_assembly`、迁移、`seedIntakeSyntheticHost`，结束后关闭集群。
+
+结果：**11/11 PASS**（单测 4，PG15 7）。日志 [vitest-final.log](vitest-final.log)，sha256 `2c1391fb3b10484e339d3c841927f61740830116dc53a812d104ac7ab559c750`。日志只有测试摘要，没有租约 token、会话密钥或连接口令。
+
+eslint 退出码 0。`tsc --noEmit` 对本任务文件没有新错误。既有 `tests/support/intake-synthetic-host.ts` 仍因缺少 `apps/api/dist` 报模块找不到；没有为了消掉它生成 dist 或改该文件。没有跑全仓 `pnpm test`、`pnpm build` 或 `workspace:check`。新增源码、测试和这份日志共 83877 字节；两份说明和本 README 另计。基线 `workspace:check` 已超 32 MiB 约 331 KiB。没有删除历史证据，也没有放宽阈值。
+
+## 输入哈希
+
+| 文件 | sha256 |
+| --- | --- |
+| `purpose-acl.sql` | `849d46d06d392f5bd52b64307401e649492f9ec8dd172fc817b189a38eab7856` |
+| `purpose-boundary.ts` | `fb0bbb1d74609cd0083056837c3c29740ca50036ab03fad2a83b6fab9dd2a1aa` |
+| `assembly.ts` | `c437adc9dc1eedb09968e0e1d80d3c132d1b907fc87c624ffc337832001f76a7` |
+| `session-lock.sql`（未改） | `4e8928fd8bc2efd2e8ec45d2fc3d08e000fa82373f6c237a9472d3fc549efca1` |
+| `intake-runtime-assembly.test.ts` | `a02b8e8b22d044d6a8d203983eb3e7bbdf61c3240db38e7fb573ca01d8ac5703` |
+| `intake-runtime-assembly.integration.test.ts` | `c0ec965d78d13f6da4c0e559e34c4eb9e86c98190651664242e91d489bb40668` |
+
+权限矩阵和接线差异见 [PURPOSE-ACL.md](../../../apps/api/experiments/intake-runtime/PURPOSE-ACL.md)、[INTEGRATION.md](../../../apps/api/experiments/intake-runtime/INTEGRATION.md)。
+
+## 未验证
+
+- 正式 snapshot 分页闭包、完整发布成功、质量计划写入、授权写入。
+- approval-v1 的真实失效行。usage 不能插入 `approval_facts` 已验证。
+- 治理冻结、export、intake、正式迁移号、生产账号和真实来源清单。
+- 完整外部 `/review` 仍是 INCOMPLETE。没有为消除该标记再次调用。
+- 旧角色审核 15/15 没有重做。
