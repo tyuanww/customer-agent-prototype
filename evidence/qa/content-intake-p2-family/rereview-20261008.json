@@ -1,0 +1,332 @@
+{
+  "reviewedCommit": "c308396a94295c7b7337c442fe0f49a3b33aca98",
+  "date": "2026-10-08",
+  "skill": "open-code-review-delegate",
+  "mode": "commit",
+  "reviewer": "host",
+  "externalModelCalls": 0,
+  "newSubagents": 0,
+  "summary": {
+    "total_files": 21,
+    "reviewed_files": 21,
+    "skipped_files": 0,
+    "coverage_rate": 1,
+    "unresolvedFindings": 0,
+    "newCodeFixes": 0
+  },
+  "checklist": [
+    {
+      "path": "apps/api/src/content-intake/material.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "c635b152e23f757885e47d57b4c5bde578fa82de9ec615bd35b5a8979db1bd1a"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "7eac4221559dac6c475d5812febbf77faab8b4c3a92c627e9b25837c663126cb"
+    },
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "3085ee36b4a052a54f2b928680ca7c4e6347fcee50e7d87de3b4b3b03ec3aebf"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/guard-explain-after.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "9dda1f782b7064bd4789c1de1c2c94eb124db633e7d1670c043278a548cfd660"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/guard-explain-before.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "453000dfc738207665625ca56ddc141462fac861f6b8d24f227ef0b835106993"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/pg-inputs.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "5adc02559a2e91e4ae172a059dfb589944add3a7254ca2f37f3c13e3f23c592f"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/pg-verification.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "d923736ef3d847400355c2c073b95010fa3a0f351d03fa2441f838a3a07ead6a"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/review.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "24245b8436cb8c58e5e6194aa62fef4d4e8df7a692cfb2ff0041686b554613d7"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/sql-probe.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "157a33876c4e8fbc62852317933e92041fd996625a7ae869c9780bb338c2589a"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/verification.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "d3d41a9bf1cd7c7d45701e24ad4357048618823a367f35165de829ff4cec7608"
+    },
+    {
+      "path": "packages/content-intake/scripts/probe-issue-report.mjs",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "608b56737a88e9a76ef6a3df7f4a733f052edb0de0df794aa16153af06b1e5b9"
+    },
+    {
+      "path": "packages/content-intake/src/policy.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "bb5598b55ff267e77824e1c84ecf3c7be1f4cf855706d58ba448aa28a27755d7"
+    },
+    {
+      "path": "packages/content-intake/src/workbook.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "37c233b43b1736ec7b5dc3d1df66d41e0004addee21f2e6dfe3e2fe5d3a96312"
+    },
+    {
+      "path": "packages/content-intake/tests/fixtures.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "91bda45e71c33f5e3844063a7d99392023167bf34542c858253303c967d0d793"
+    },
+    {
+      "path": "packages/database/migrations/0028_intake_family.sql",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "8b241e1b5f808c2278b53351a0d3cbee56f4ac23ca16c65736ba45ace859382e"
+    },
+    {
+      "path": "packages/database/overlays/0028_intake_family.sql",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "c9ee31814b6c611dbb98e83ddf1fa5a9a0c92eeba58415ba394186f346ec5c7e"
+    },
+    {
+      "path": "packages/database/scripts/generate-migrations.mjs",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "8290775439392ef03cdcb1515338a98e28fc89a4c641b1ffa1ed1b7546bfe6ae"
+    },
+    {
+      "path": "packages/database/src/verifier.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "ec55fe89732b19c041ae420729d5589ab347287bcb44c4472e3b0a2c006b2a90"
+    },
+    {
+      "path": "packages/database/tests/support/family-catalog.ts",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "f6e517b08c5a6c77869a8fbe244f179319e692e81dfb38d0f2d4ea633da55a3c"
+    },
+    {
+      "path": "scripts/probe-intake-family-sql.mjs",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "d1e4ecdb61f1b0f5e71e7bab5c3abddab4d2230bb5295bebd5911a745780a812"
+    },
+    {
+      "path": "scripts/probe-intake-usage-consumer.mjs",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "448c642c12423ecbfcd75b262a5c8691edb88eb539abc4a9393d24e1a8a36e22"
+    }
+  ],
+  "rules": {
+    "schema_version": "1",
+    "groups": [
+      {
+        "group_id": 1,
+        "source": "system",
+        "pattern": "**/*.{ts,js,tsx,jsx,mjs,cjs}",
+        "files": [
+          "apps/api/src/content-intake/material.ts",
+          "apps/api/src/content-intake/service.ts",
+          "apps/api/src/content-intake/usage.ts",
+          "packages/content-intake/scripts/probe-issue-report.mjs",
+          "packages/content-intake/src/policy.ts",
+          "packages/content-intake/src/workbook.ts",
+          "packages/content-intake/tests/fixtures.ts",
+          "packages/database/scripts/generate-migrations.mjs",
+          "packages/database/src/verifier.ts",
+          "packages/database/tests/support/family-catalog.ts",
+          "scripts/probe-intake-family-sql.mjs",
+          "scripts/probe-intake-usage-consumer.mjs"
+        ],
+        "rule": "#### Obvious Typos or Spelling Errors\n- Spelling errors in variable names, function names, component names, or Props property names\n- Strings in log or error messages containing spelling errors that affect readability\n\n#### Dead Code\n- Code blocks that will never be executed (e.g., branches where the condition is always false, code after a return statement)\n- Variables that are declared but never read or referenced\n- Large blocks of commented-out code (with no apparent intent to retain)\n\n#### Code Quality Checks\n- **Duplicate Code**: Check for common logic that can be extracted\n- **Code Comments**: Complex business logic should have clear explanatory comments (avoid commenting obvious code)\n- **Hardcoding**: Business-related hardcoded strings are prohibited, especially URL paths and business numbers; simple UI text may be relaxed\n- **Variable Declarations**: Using `var` is strictly prohibited; use `let` or `const`\n- **Equality Comparisons**: Using `==` and `!=` is prohibited; use strict equality `===` and `!==`\n- **TypeScript Types**: Avoid using `any` type; if necessary, provide a comment explaining the reason\n- **Null Checks**: Perform null checks when accessing values or destructuring to avoid null pointer exceptions\n- **Ternary Expressions**: Nested ternary expressions are not allowed\n\n#### React Best Practices\n- **Hooks Usage**: Verify compliance with Hooks rules (only call at the top level, only call in React functions)\n- **State Management**: Ensure state is placed at the appropriate level; avoid unnecessary state lifting\n- **Side Effect Handling**: Verify useEffect correctly handles dependencies and cleanup functions\n- **Performance Optimization**: Verify proper use of React.memo, useMemo, useCallback (based on performance analysis; avoid over-optimization)\n- **Render Side Effects**: Side effects in React component render methods are strictly prohibited (e.g., API calls, DOM manipulation)\n- **Inline Styles**: Avoid using inline `style` attributes, except for dynamic styles\n- **Inner Components**: Declaring new components inside a component is prohibited; use render methods instead (e.g., `renderItem`, not `<Item/>`)\n\n#### Async Handling Standards\n- **Error Handling**: Async functions must include proper error handling with user-friendly error messages\n- **Prefer async/await**: Prefer async/await over Promises; callback hell is prohibited\n- **Async in Loops**: Distinguish between independent async operations (use `Promise.all` for parallelism) and dependent async operations (use sequential execution); prefer `Promise.all` for performance\n\n#### Code Security Checks\n- **XSS Protection**: Verify that user input is properly escaped\n- **innerHTML Safety**: Using innerHTML to directly insert user input is prohibited; use textContent or apply XSS protection\n- **Code Injection Protection**: Using eval(), Function() constructor, and string argument forms of setTimeout/setInterval is strictly prohibited\n- **Dangerous Methods**: Using document.write() is prohibited as it causes page reflow and security issues\n- **Sensitive Information**: Check whether API keys or sensitive data are exposed\n- **Prototype Chain Safety**: Modifying native object prototypes (e.g., Array.prototype, Object.prototype) is prohibited"
+      },
+      {
+        "group_id": 2,
+        "source": "system",
+        "pattern": "**/*.{json,json5}",
+        "files": [
+          "evidence/qa/content-intake-p2-family/guard-explain-after.json",
+          "evidence/qa/content-intake-p2-family/guard-explain-before.json",
+          "evidence/qa/content-intake-p2-family/pg-inputs.json",
+          "evidence/qa/content-intake-p2-family/pg-verification.json",
+          "evidence/qa/content-intake-p2-family/review.json",
+          "evidence/qa/content-intake-p2-family/sql-probe.json",
+          "evidence/qa/content-intake-p2-family/verification.json"
+        ],
+        "rule": "Check JSON files for spelling errors in json-keys; ignore the content of json-values."
+      },
+      {
+        "group_id": 3,
+        "source": "system",
+        "pattern": "default",
+        "files": [
+          "packages/database/migrations/0028_intake_family.sql",
+          "packages/database/overlays/0028_intake_family.sql"
+        ],
+        "rule": "#### Correctness\nIs the logic correct? Are there missing boundary conditions?\nAre exceptions handled properly?\nIs it thread-safe in concurrent scenarios?\n\n#### Security\nAre there security vulnerabilities such as SQL injection or XSS?\nIs sensitive information handled correctly?\nIs permission validation complete?\n\n#### Performance\nAre there obvious performance issues (e.g., N+1 queries, unnecessary loops)?\nAre resources properly released?\n\n#### Maintainability\nIs the code clear and easy to understand?\nDo names accurately express intent?\nDoes it follow the project’s existing code style and architecture patterns?\n\n#### Test Coverage\nDo critical logic paths have corresponding test cases?\nDo test cases cover boundary conditions?"
+      }
+    ]
+  },
+  "excluded_files": [
+    {
+      "path": "apps/api/tests/content-intake-material.test.ts",
+      "status": "modified",
+      "insertions": 48,
+      "deletions": 5,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "insertions": 253,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-family-http.test.ts",
+      "status": "added",
+      "insertions": 48,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "insertions": 16,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "insertions": 15,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/README.md",
+      "status": "added",
+      "insertions": 44,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/content-intake/tests/workbook.test.ts",
+      "status": "modified",
+      "insertions": 46,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/README.md",
+      "status": "modified",
+      "insertions": 3,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/database/migrations/manifest.generated.json",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/src/generated/migrations.generated.ts",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/generator.test.ts",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 6,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/planner.test.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 5,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/postgres.integration.test.ts",
+      "status": "modified",
+      "insertions": 211,
+      "deletions": 26,
+      "exclude_reason": "default_path"
+    }
+  ],
+  "supplementalReview": {
+    "testsAndDocuments": "All 14 excluded files inspected for behavioral coverage, migration generation, documentation scope and result claims.",
+    "logs": "Seven committed logs are omitted by OCR ignore rules; inspected separately and all artifact digests verified."
+  },
+  "focus": [
+    "Explicit K grammar and authoritative scopeKind; malformed/brand/self-source rejection",
+    "Material version/digest includes family pair; missing rows inherit and empty K clears",
+    "Full-catalog root/tenant/app/brand/domain/protected and applicability guard",
+    "Half-open overlap components, wildcard pairs, sparse-axis candidate completeness",
+    "Publication and rollback atomic trigger; private invoker ACL; legacy rejection",
+    "Selection coverage before keyset pagination; partial multi-select fallback and lease boundaries",
+    "Actual HTTP/Main consumer and stale copy handles; no claimed real system clipboard",
+    "Failure evidence, normalization hashes, input binding and limited performance claims"
+  ],
+  "evidenceReuse": {
+    "sourceHashesMatched": 27,
+    "artifactHashesMatched": 12,
+    "integrationInputHashesMatched": 682,
+    "priorMigrationBytesUnchanged": 27,
+    "priorMigrationMetadataUnchanged": 27,
+    "checksReused": [
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test",
+      "pnpm build",
+      "database test:all: 27 unit, 1 package, 33 PG",
+      "Affected family/usage PG integration: 40 passed",
+      "SQL probe: 114 passed"
+    ],
+    "reason": "All runtime, tests, build inputs and stored logs unchanged; no runtime code edit in this review. Documentation/coverage record checks run for this commit."
+  },
+  "findings": [],
+  "limits": [
+    "This is a host review, not a new external model review.",
+    "Historical full API run remains 192/193 with timeout; later affected 40 tests passed, not a full new 193/193 run.",
+    "Production integration/ACL, storage lifecycle and onsite acceptance remain outside this review and pending."
+  ]
+}
