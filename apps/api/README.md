@@ -1,18 +1,18 @@
 # `@customer-agent/api`
 
-本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、冻结 `schema.v1.17` 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。G1A-E0 的仓外输入验证和离线评测只位于 `tests/support/g1a-e0/`，不会进入本包正式构建。合成搜索判定实验位于 `experiments/search-decision/`，同样不进入 `dist` 或正式候选包；它复用 `src/search-decision.ts` 与 `src/search-relations.ts` 的判定诊断，不再改写产品规则；来源注解与需求判定只在实验内使用。
+本包是 Application API 运行时。受控配置通过后，Node 24 会在本机 loopback 启动 Fastify；`GET /health` 证明进程存活，`GET /ready` 通过私有 runtime `pg.Pool` 核对 PostgreSQL 15、受锁 schema 指纹、受控检索依赖清单与 runtime/definer/parameter 有效权限边界。DEV-M1 W3/W4 已把合成范围的 `/v1/search`、`/v1/events/adoption` 与 `/v1/events/escalate` 接入同一 runtime pool：查询幂等、候选曝光和终态/辅助事件由事务仓储统一控制；W5 又以同一 SearchBackend/SQL 主链建立 50 条纯合成运行器。mock auth、策略只读路由与独立 admin pool 的 Owner-only 策略写入口继续保持。G1A-E0 的仓外输入验证和离线评测只位于 `tests/support/g1a-e0/`，不会进入本包正式构建。合成搜索判定实验位于 `experiments/search-decision/`，同样不进入 `dist` 或正式候选包；它复用 `src/search-decision.ts` 与 `src/search-relations.ts` 的判定诊断，不再改写产品规则；来源注解与需求判定只在实验内使用。
 
 当前开发边界：
 
-- 只允许 `CUSTOMER_AGENT_PROFILE=formal-dev|test`、`AUTH_MODE=mock` 和 `127.0.0.1`。
+- 配置支持 `CUSTOMER_AGENT_PROFILE=formal-dev|test|production`、`AUTH_MODE=mock|feishu`，监听仍限 `127.0.0.1`；选用飞书须通过对应身份配置校验。配置可解析不代表新资料接入或真实数据已获运行许可。
 - `demo` 属于桌面合成运行链，不允许启动本服务。
-- `single-host`、`multi-instance`、`production` 与 `AUTH_MODE=feishu` 尚未具备后续依赖，监听前失败关闭。
+- `single-host`、`multi-instance` 尚未开放；不支持的组合或缺失依赖在监听前失败关闭。
 - `/health` 不访问数据库；`/ready` 的 database/schema 仍由 runtime 探针证明，auth/storage/content 由各自 owner 证明。未接线的 object store 或 announce 能力保持 `not_ready`。
 - auth 由所选身份服务返回实际状态；T2–T5 已接通合成导入、worker/审核、发布/回退、announce current/snapshot/ack。storage readiness 必须实际 persist/read/verify，content readiness 必须实际执行无副作用的 `search_recommendable_scripts`。真实飞书导入与运行激活仍未实现。
 - `/v1/search` 仅接受 `collection_mode=synthetic`，原始输入只在 HTTP 边界内参与版本化 HMAC，`query_events` 固定以 `text_storage_status=suppressed` 记录，不持久化查询原文或其可关联文本 hash。搜索、query、impression 与幂等完成同事务提交；来源门失败先回滚，再由独立短事务写安全拒绝审计。
 - `/v1/events/adoption` 的 `adopted` 只表示候选成功复制，且每个 query 仅允许一个 terminal；`/v1/events/escalate` 是非终态辅助动作，同一 `(query_id, action)` 返回同一事实。无状态 `collection_disabled` 搜索不会留下 query/idempotency，后续事件返回 404。
 - coach / owner 可调用冻结 `GET /v1/metrics/iteration-tasks` 与 `POST /v1/events/iteration-tasks/{task_id}/start|close`；空列表合法；agent 403；start/close 必须 `Idempotency-Key` 与 `expected_version`；关闭不等于已发布。不发明 `/tickets`。不因「话术不准」自动开单。
-- migration 自动执行、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
+- 服务不自动执行 migration；飞书 OAuth 与既有 D1–D5 桌面 adapter 已有独立实现。P2 真实组织/审批、生产资料接入与运行激活仍未完成，不能从既有登录能力推断放行。
 - 启动与 readiness 失败只输出稳定字段，不回显环境变量值、token、DSN、SQL 或异常正文。
 - 同一时刻只运行一个 readiness 探针；连接等待与 readiness 响应分别由 `DB_CONNECTION_TIMEOUT_MS`、`DB_READINESS_TIMEOUT_MS` 控制，timer 与单调时钟都会拒绝 deadline 后才完成的成功结果。
 - schema 探针锁定 13 个 search/传递函数、2 个视图、`pgcrypto.digest` extension owner、双向角色成员与当前数据库/全部用户 schema 的精确有效 ACL；任意非 owner 的 `public CREATE` 失败关闭。
@@ -22,7 +22,7 @@
 
 ## 本地运行
 
-先准备一个已应用十四段 migration 的本机隔离 PostgreSQL 15 数据库，并分别提供属于 `app_runtime` 与 `app_content_admin` 的两个登录角色。连接串和 HMAC key 只通过本机环境注入，不写入仓库：
+先通过[数据库控制面](../../packages/database/README.md)准备与当前消费锁及产品迁移匹配的本机隔离 PostgreSQL 15 数据库，并分别提供属于 `app_runtime` 与 `app_content_admin` 的两个登录角色。连接串和 HMAC key 只通过本机环境注入，不写入仓库：
 
 ```bash
 CUSTOMER_AGENT_PROFILE=formal-dev \
@@ -58,7 +58,7 @@ curl --silent --include http://127.0.0.1:3100/ready
 
 在上述本机开发配置上显式设置 `AUTH_SESSION_MODE=product`，并提供独立 `AUTH_DATABASE_URL`（仅属于 `app_backend_auth` 的无特权登录角色）及 `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN=http://127.0.0.1:<port>`。完整变量约束见配置 SSOT。没有提供这两项时拒启，不能退回 mock-login。`AUTH_MODE` 仍为 `mock`，如实说明身份来源是合成提供方；产品会话模式不接受 X-Mock-User/Role，也不注册 `/v1/auth/mock-login`。
 
-T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/auth/me` → logout。会话落在 PostgreSQL，数据库仅存 token 摘要；兑换成功响应丢失后重新登录，不能重放获取 bearer。提供方是本机合成测试服务，其 `/exchange` 只返回 `{provider: "synthetic", binding_id: "synthetic_..."}`，不存在真实飞书适配。实际启动入口及此 wire 已在隔离 PG15 合成集成测试贯通；本节不提供真实凭据或运行激活。
+T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/auth/me` → logout。会话落在 PostgreSQL，数据库仅存 token 摘要；兑换成功响应丢失后重新登录，不能重放获取 bearer。提供方是本机合成测试服务，其 `/exchange` 只返回 `{provider: "synthetic", binding_id: "synthetic_..."}`，该合成提供方不调用真实飞书；独立 `feishu-identity-provider` 拥有 OAuth 身份接口，不拥有 P2 组织事实或审批同步。实际启动入口及此 wire 已在隔离 PG15 合成集成测试贯通；本节不提供真实凭据或运行激活。
 
 ## 合成内容导入（T2）
 
@@ -96,7 +96,7 @@ Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用�
 - `GET /v1/metrics/retrieval?window=current_release|last_7d`：coach / owner。
 - `GET /v1/software/releases` 与 `/current`：仅 owner；UNSIGNED 必须 `signed=false`；禁止 `latest.yml`。
 
-缺会话 401，角色不够 403，版本冲突 409。桌面经 `dashboardOps` 与 overlay `productSearch.reportInaccuracy` 消费同一端口。过敏 SOP 停手文案尚未校验。
+缺会话 401，角色不够 403，版本冲突 409。桌面经 `dashboardOps` 与 overlay `productSearch.reportInaccuracy` 消费同一端口。导入和 PATCH 均校验过敏步骤：title 或 body 含“过敏”时，body 必须同时含“停手”和“确认”。
 
 ## 合成整链产物（T6）
 
@@ -153,4 +153,6 @@ pnpm workspace:check
 
 此格式取代旧 `G1A_E0_REPORT` 输出。仓外旧 v4 消费者冻结，不能解析此新版本；配套 v5 调用产品读取器，保留原授权、沙箱及排他保存边界。历史真实配置和报告不自动迁移；新候选合并后按具体批准绑定匹配版本。`pnpm test:g1a:e0:ci` 会在纯合成包上实跑 PG、导出、独立 CLI 消费、落盘回读及失败清理，并拒绝真实输入环境变量、零用例或跳过。
 
-P2 使用资格现已消费 OpenAPI 1.17.0 / schema.v1.21。认证模块用私有 WeakMap 保存成功认证的会话引用，DTO/响应不携带该键；`content-intake/usage.ts` 在事务内锁定并重查会话、批量核验选择范围，原子保存资格和上下文。分页只接受 entitlementId/cursor/limit，重启后从数据库重建绑定；退出、会话清理及缺失旧上下文均拒绝。`test:intake:transactions` 包含真实合成登录、PG 发布与桌面 Main 消费者经测试专用 loopback HTTP 的跨进程验证；没有生产 HTTP 注册、应用 ACL、真实飞书 transport 或原生窗口验收。证据见[使用资格持久化验收](../../evidence/qa/content-intake-p2-usage-context/README.md)。
+## P2 资料接入（隔离合成消费者）
+
+当前消费锁为 OpenAPI 1.19.0 / schema.v1.21；使用资格的持久上下文由先前 1.17 增量引入。认证模块用私有 WeakMap 保存成功认证的会话引用，DTO/响应不携带该键；`content-intake/usage.ts` 在事务内锁定并重查会话、批量核验选择范围，原子保存资格和上下文。分页只接受 entitlementId/cursor/limit，重启后从数据库重建绑定；退出、会话清理及缺失旧上下文均拒绝。`test:intake:transactions` 包含真实合成登录、PG 发布与桌面 Main 消费者经测试专用 loopback HTTP 的跨进程验证；生产 HTTP 注册、应用 ACL 与真实飞书 transport 尚未完成。原生上传、质量检查、审批发布、修订/取消、纠正回退和店铺通用 FAQ 查询已通过隔离 HTTP 接入桌面；0028 另验证显式同题覆盖。命令、现行能力与平台证据边界见[合成开发指南](../../docs/how-to-develop-content-intake.md)，历史资格证据见[使用资格持久化验收](../../evidence/qa/content-intake-p2-usage-context/README.md)。
