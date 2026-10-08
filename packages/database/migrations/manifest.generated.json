@@ -538,6 +538,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8",
       "source_git_sha": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
       "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013"
+    },
+    {
+      "position": 30,
+      "id": "0030_intake_role_ceiling",
+      "file": "0030_intake_role_ceiling.sql",
+      "source_ranges": [],
+      "sha256": "8843955f79d970bdc5f03469a7bba316c2f1fb8fa070d2b0f61ba9bc1f5144a3",
+      "bytes": 1835,
+      "contract_set_id": "cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8",
+      "source_git_sha": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
+      "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013"
     }
   ]
 }

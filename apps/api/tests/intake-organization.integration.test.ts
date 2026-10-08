@@ -73,7 +73,7 @@ describe.skipIf(!enabled)('offline organization refresh through frozen storage a
     expect(await service.snapshot(actor,{entitlementId:old.entitlementId})).toMatchObject({ok:false,reason:'ORG_FACTS_UNAVAILABLE'});
     expect(await write(enabledInput)).toMatchObject({ok:true,status:'replayed',currentFactsVersion:3});
     expect(await service.authorizations(actor,{})).toMatchObject({ok:false,reason:'ORG_FACTS_UNAVAILABLE'});
-    expect(await write(await observation(3,{jobId:'job-enabler'}))).toMatchObject({ok:true});
+    expect(await write(await observation(3,{jobId:'job-lead'}))).toMatchObject({ok:true});
     expect(await service.snapshot(actor,{entitlementId:old.entitlementId})).toMatchObject({ok:false,reason:'PERMISSION_CHANGED'});
     expect(await state()).toMatchObject({revocation_generation:'2'});
     // Re-enabling cannot invent import rights for a previously query-only seat.

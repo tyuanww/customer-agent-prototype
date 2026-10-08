@@ -338,4 +338,6 @@ factory 的可验收输入为：获准环境标识、受限连接配置、受控
 
 产品 Main 的原生二次确认已完成：默认取消、请求冻结、取消保留表单、迟到确认拒绝、未知操作恢复不重复确认，未新增 IPC 或改写旧 HTTP wire。[验证记录](../evidence/qa/intake-publication-confirmation/README.md)包含完整检查与实际 Electron/HTTP/PG 合成闭环；原生弹窗响应受控，不是人工设备勾选。
 
-治理仓现有工作树 `codex/content-intake-p2-contracts` 已形成 `17-P2权限配置与确认直发合同候选.md`、OpenAPI1.20.0/schema1.22 的 DRAFT 候选，未冻结/export/intake。新请求必需 confirmed=true、拒绝审批版本；新 direct-v1 候选不生成审批证据，旧 approval-v1 历史和失效规则保留。客服总监/经理直接配置权限复用已有 grants 事务；岗位不代替已登记业务范围。当前消费锁仍1.19/1.21，完整直发尚未实现；后续必须同时适配发布/纠正回退、目录与使用资格、Main/UI，不能只移除审核按钮。精确版本对、治理本地提交及核验见[计划 §0.51](plans/2026-10-03-content-intake-requirements.md#051-原生组织观察离线消费验证2026-10-08)。
+治理仓 `codex/content-intake-p2-contracts` 的直发候选仍是 DRAFT，未冻结、未 export、未 intake。OpenAPI 1.20.0 SHA-256 仍是 `1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d`（直发 wire 未改）。schema.v1.22 SHA-256 现为 `c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce`，增量末尾替换了 `authorization_deadline`。旧 schema `3b7d7e67fcf18b9d00cbb916220b862b4f6b4f1e942d6bf367d66dd20dd60c0f` 只覆盖上一版草稿。新请求仍是 confirmed=true、拒绝审批版本；direct-v1 不生成审批证据，旧 approval-v1 不改写。
+
+产品侧已在现有 grant 接口和 migration `0030` 落实两岗配置、四岗业务上限；历史 grant 保留，enabler/agent 的旧非 query 授权不再放行新操作。当前消费锁仍是 1.19/1.21，发布/回退/使用资格/Main 仍执行审批合同。确认弹窗已完成，不能单独当成免审批发布。完整直发必须等这版草稿冻结并 export/intake 后，再同时改发布、纠正回退、目录和使用资格。细节见[计划 §0.53](plans/2026-10-03-content-intake-requirements.md#053-角色上限与直发候选2026-10-08)。

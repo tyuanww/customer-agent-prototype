@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto';
 import type { Client } from 'pg';
 
 export const INTAKE_SYNTHETIC_IDENTITIES = [
-  ['director', 'director', '合成总监'], ['enabler', 'enabler', '合成整理人'],
-  ['reviewer', 'enabler', '合成复核人'], ['agent', 'agent', '合成坐席'],
+  ['director', 'director', '合成总监'],
+  // id 是历史夹具名，当前职务角色是 lead。
+  ['enabler', 'lead', '合成整理人'],
+  ['reviewer', 'supervisor', '合成复核人'], ['agent', 'agent', '合成坐席'],
 ] as const;
 
 /** Explicit throwaway bootstrap. These synthetic identities and the empty

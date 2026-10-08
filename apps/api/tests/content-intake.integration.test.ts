@@ -92,7 +92,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query('BEGIN');
     principalLabels.clear();
     for (const [id, role, display] of [['director','director','合成总监'], ['manager','manager','合成经理'], ['supervisor','supervisor','合成主管'],
-      ['enabler','enabler','合成整理人'], ['other','enabler','合成其他贡献人'], ['reviewer','enabler','合成复核人'], ['agent','agent','合成坐席']] as const) {
+      // id 是历史夹具名，当前职务角色是 lead。
+      ['enabler','lead','合成整理人'], ['other','lead','合成其他贡献人'], ['reviewer','supervisor','合成复核人'], ['agent','agent','合成坐席']] as const) {
       principalLabels.set(id, display);
       await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
         VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('a',64),true,'owner')`, [id, `user-${id}`]);
@@ -101,6 +102,13 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`, [id, `job-${role}`]);
       await admin.query(`INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a',$1,1,$2) ON CONFLICT DO NOTHING`, [`job-${role}`, role]);
     }
+    principalLabels.set('legacy-enabler', '合成历史赋能师');
+    await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+      VALUES ('legacy-enabler','synthetic','tenant-a','legacy-enabler','user-legacy-enabler',repeat('a',64),true,'owner')`);
+    await admin.query(`INSERT INTO content_intake.principals VALUES ('legacy-enabler','user-legacy-enabler','tenant-a','app-a','confirmed-synthetic','legacy-enabler',1,0)`);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('legacy-enabler',1,ARRAY['dept-a'],'job-enabler',true,
+      statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`);
+    await admin.query(`INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-enabler',1,'enabler') ON CONFLICT DO NOTHING`);
     for (const [id, shop] of [['a','shop-a'], ['b','shop-b'], ['brand',null]] as const) {
       await admin.query(`INSERT INTO content_intake.scopes VALUES ($1,'tenant-a','app-a','brand-a',$2,'product')`, [`scope-${id}`, shop]);
       await admin.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ($1,$2,1,'v2-preview')`, [`source-${id}`, `scope-${id}`]);
@@ -114,6 +122,12 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
           VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '10 minutes',clock_timestamp()+interval '1 hour','合成业务授权','director',$4)`, [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
       }
+    }
+    // Historical rows stay. The enabler ceiling makes import unusable and leaves query usable.
+    for (const action of ['import', 'query']) {
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+        VALUES ($1,'business','director','legacy-enabler','tenant-a','app-a','scope-a','source-a',$2,clock_timestamp()-interval '10 minutes',clock_timestamp()+interval '1 hour','合成历史授权','director',$3)`,
+      [`legacy-enabler-${action}`, action, `root-${action}`]);
     }
     await admin.query('COMMIT');
     policyVersion = Number((await admin.query('SELECT version FROM content_intake.policy_versions')).rows[0].version);
@@ -1223,7 +1237,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
           VALUES ('short-context-import','business','director','enabler','tenant-a','app-a','scope-a','source-a','import',
           clock_timestamp()-interval '1 second',clock_timestamp()+interval '250 milliseconds','合成短期导入权','director','root-import')`);
       }
-      if (kind === 'facts') await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-enabler',true,
+      if (kind === 'facts') await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-lead',true,
         clock_timestamp(),clock_timestamp()+interval '250 milliseconds',repeat('b',64)); UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='enabler'`);
       const response = await fetch(`${host.origin}/v1/intake/sources/source-a/management-context`, { headers: host.headers });
       expect(response.status).toBe(403); parseContractSchema('IntakeError', await response.json());
@@ -1363,7 +1377,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       const response = await fetch(`${host.origin}/v1/intake/principals?${new URLSearchParams(directoryQuery)}`, { headers: host.headers });
       expect(response.status).toBe(200); expect(response.headers.get('cache-control')).toBe('no-store');
       const page = parseContractSchema('IntakePrincipalPage', await response.json());
-      expect(page.items.map(item => item.principalId)).toEqual(['agent', 'director', 'enabler', 'manager', 'other', 'reviewer', 'supervisor']);
+      expect(page.items.map(item => item.principalId)).toEqual(['agent', 'director', 'enabler', 'legacy-enabler', 'manager', 'other', 'reviewer', 'supervisor']);
       expect(page.items.find(item => item.principalId === 'reviewer')).toMatchObject({ enabled: false, displayLabel: '合成复核人' });
       expect(page.items.find(item => item.principalId === 'manager')).toMatchObject({ factsVersion: 1 });
       expect(page.items.every(item => Object.keys(item).sort().join(',') === 'displayLabel,enabled,factsVersion,principalId,validUntil')).toBe(true);
@@ -1383,7 +1397,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   it('principals: grant recipients include first-time targets, exclude stale/ineligible/self identities and advance an empty filtered page', async () => {
     await registerDirectoryIdentity('A-disabled', { enabled: false });
     await registerDirectoryIdentity('B-unmapped', { role: 'unmapped' });
-    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',2,ARRAY['dept-a'],'job-enabler',true,
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',2,ARRAY['dept-a'],'job-supervisor',true,
       clock_timestamp()-interval '2 minutes',clock_timestamp()-interval '1 minute',repeat('b',64));
       UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='reviewer'`);
     const logged = await seat('director'), query = { sourceId: 'source-a', purpose: 'grant-recipient', limit: 1 };
@@ -1392,7 +1406,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const second = value(await service.principals(logged.actor, { ...query, cursor: first.nextCursor }));
     expect(second.items).toEqual([]); expect(second.nextCursor).not.toBe(first.nextCursor);
     const all = value(await service.principals(logged.actor, { ...query, limit: 100 }));
-    expect(all.items.map(item => item.principalId)).toEqual(['agent', 'enabler', 'manager', 'other', 'supervisor']);
+    expect(all.items.map(item => item.principalId)).toEqual(['agent', 'enabler', 'legacy-enabler', 'manager', 'other', 'supervisor']);
     expect(value(await service.principals((await seat('enabler')).actor, directoryQuery)).items.find(item => item.principalId === 'reviewer')?.validUntil).toBeDefined();
     expect(await service.principals((await seat('enabler')).actor, query)).toMatchObject({ ok: false, code: 'NOT_FOUND' });
     // Choice does not create a grant; the existing transaction accepts a fresh
@@ -1447,9 +1461,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(scans).toEqual([{ limit: 101, count: 101 }]); expect(identityQueries).toBe(3); // actor, bulk page, final actor
       const next = await fetch(`${host.origin}/v1/intake/principals?${new URLSearchParams({ ...directoryQuery, limit: '100', cursor: page.nextCursor! })}`, { headers: host.headers });
       const second = parseContractSchema('IntakePrincipalPage', await next.json());
-      expect(second.items).toHaveLength(8); expect(second.nextCursor).toBeNull();
+      expect(second.items).toHaveLength(9); expect(second.nextCursor).toBeNull();
       const ids = [...page.items, ...second.items].map(item => item.principalId);
-      expect(new Set(ids).size).toBe(108); expect(ids).toEqual([...ids].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))));
+      expect(new Set(ids).size).toBe(109); expect(ids).toEqual([...ids].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))));
       console.log(JSON.stringify({ probe: 'principals-capacity', items: ids.length, firstPageBytes: Buffer.byteLength(text), cursorLength: page.nextCursor!.length, scans }));
     } finally { await host.app.close(); }
   }, 60_000);
@@ -1498,7 +1512,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         VALUES ('short-directory-import','business','director','enabler','tenant-a','app-a','scope-a','source-a','import',
         clock_timestamp()-interval '1 second',clock_timestamp()+interval '250 milliseconds','合成短期导入权','director','root-import')`);
     }
-    if (kind === 'facts') await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-enabler',true,
+    if (kind === 'facts') await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-lead',true,
       clock_timestamp(),clock_timestamp()+interval '250 milliseconds',repeat('b',64)); UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='enabler'`);
     let delayed = false;
     const slow: IntakePool = { connect: async () => {
@@ -1633,14 +1647,24 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await service.authorizations(user,{})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
   });
 
-  it('discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation', async () => {
+  it('discovery: shows allocation separately and keeps non-allocator ceilings empty', async () => {
     const director=value(await service.authorizations((await seat('director')).actor,{})).capabilities[0]!;
     expect(director.actions).toEqual([]);expect(director.mayAllocate).toHaveLength(8);expect(director.mayDelegate).toHaveLength(8);
-    value(await service.grantBatch(actor('director'),batch('agent','publish','delegation','discovery-delegation')));
+    value(await service.grantBatch(actor('director'),batch('manager','publish','delegation','discovery-delegation')));
+    const manager=value(await service.authorizations((await seat('manager')).actor,{})).capabilities[0]!;
+    expect(manager.actions).toEqual([]);expect(manager.mayAllocate).toEqual(['publish']);expect(manager.mayDelegate).toEqual([]);
+    expect(await service.grantBatch(actor('director'),batch('agent','publish','delegation','discovery-agent'))).toMatchObject({ok:false,reason:'ROLE_CEILING'});
+    const lead=value(await service.authorizations((await seat('enabler')).actor,{})).capabilities[0]!;
+    expect(lead.mayAllocate).toEqual([]);expect(lead.mayDelegate).toEqual([]);
+    const legacy=value(await service.authorizations((await seat('legacy-enabler')).actor,{})).capabilities[0]!;
+    expect(legacy.actions).toEqual(['query']);expect(legacy.mayAllocate).toEqual([]);expect(legacy.mayDelegate).toEqual([]);
+    await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id)
+      VALUES ('supervisor-allocation','allocation','director','supervisor','tenant-a','app-a','scope-a','source-a','publish',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成主管分配凭证','director')`);
+    const supervisor=value(await service.authorizations((await seat('supervisor')).actor,{})).capabilities;
+    expect(supervisor.every(c=>c.mayAllocate.length===0&&c.mayDelegate.length===0)).toBe(true);
     const agent=value(await service.authorizations((await seat()).actor,{})).capabilities[0]!;
-    expect(agent.actions).toEqual(['query']);expect(agent.mayAllocate).toEqual(['publish']);expect(agent.mayDelegate).toEqual([]);
+    expect(agent.actions).toEqual(['query']);expect(agent.mayAllocate).toEqual([]);expect(agent.mayDelegate).toEqual([]);
     expect(await service.authorization((await seat()).actor,'source-a','publish')).toMatchObject({ok:false});
-    expect(value(await service.authorizations((await seat('supervisor')).actor,{})).capabilities).toEqual([]);
   });
 
   it('discovery: signs paging to a live session, route, complete projection and service lifetime', async () => {
@@ -3090,7 +3114,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     value(await service.authorization(actor('agent'), 'source-a', 'query'));
     expect(await service.authorization(actor('director'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
     for (const id of ['source-b','source-brand','missing']) expect(await service.authorization(actor('enabler'), id, 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
-    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-enabler',1,'agent') ON CONFLICT (tenant_id,app_id,department_id,job_id) DO UPDATE SET role='agent'");
+    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-lead',1,'agent') ON CONFLICT (tenant_id,app_id,department_id,job_id) DO UPDATE SET role='agent'");
     expect(await service.authorization(actor('enabler'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
     await admin.query("UPDATE backend_identity.subject_bindings SET enabled=false WHERE user_id='user-enabler'");
     expect(await service.authorization(actor('enabler'), 'source-a', 'query')).toMatchObject({ ok: false, reason: 'ORG_FACTS_UNAVAILABLE' });
@@ -3106,27 +3130,24 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await service.grantBatch(actor('director'), batch('director'))).toMatchObject({ ok: false, reason: 'SELF_ESCALATION' });
     expect(await service.grantBatch(actor('director'), { ...good, policyVersion: 999 })).toMatchObject({ ok: false, reason: 'PERMISSION_CHANGED' });
     expect(await service.grantBatch(actor('director'), { ...good, items: [{ ...good.items[0]!, scope: { ...scope, shopId: 'shop-b' } }] })).toMatchObject({ ok: false, code: 'NOT_FOUND' });
-    const delegation = value(await service.grantBatch(actor('director'), batch('enabler', 'import', 'delegation'))).items[0]!;
-    const delegated = batch('manager', 'import', 'business', 'delegated');
+    const delegation = value(await service.grantBatch(actor('director'), batch('manager', 'import', 'delegation'))).items[0]!;
+    const delegated = batch('supervisor', 'import', 'business', 'delegated');
     delegated.items[0]!.expiresAt = new Date(Date.parse(delegation.expiresAt)-1000).toISOString();
-    value(await service.grantBatch(actor('enabler'), delegated));
-    expect(await service.grantBatch(actor('enabler'), batch('manager','import','delegation','again'))).toMatchObject({ ok: false, reason: 'REDELEGATION_DENIED' });
+    value(await service.grantBatch(actor('manager'), delegated));
+    expect(await service.grantBatch(actor('manager'), batch('director','import','delegation','again'))).toMatchObject({ ok: false, reason: 'GRANT_AUTHORITY_DENIED' });
     const revoked = value(await service.changeGrant(actor('director'), delegation.grantId,
       { operationId: 'revoke', expectedVersion: 1, change: 'revoke', stewardPrincipalId: null, reason: '合成撤资格' }));
     expect(revoked.version).toBe(2);
     const child = (await admin.query("SELECT * FROM content_intake.grants WHERE parent_grant_id=$1", [delegation.grantId])).rows[0];
-    expect(child).toMatchObject({ issuer_id: 'enabler', revoked_at: null, steward_id: null, version: '2', reason: '合成授权', last_change_reason: '合成撤资格' });
-    value(await service.authorization(actor('manager'), 'source-a', 'import'));
-    expect(await service.grantBatch(actor('enabler'), { ...delegated, operationId: 'after-revocation' })).toMatchObject({ ok: false, reason: 'GRANT_AUTHORITY_DENIED' });
+    expect(child).toMatchObject({ issuer_id: 'manager', revoked_at: null, steward_id: null, version: '2', reason: '合成授权', last_change_reason: '合成撤资格' });
+    value(await service.authorization(actor('supervisor'), 'source-a', 'import'));
+    expect(await service.grantBatch(actor('manager'), { ...delegated, operationId: 'after-revocation' })).toMatchObject({ ok: false, reason: 'GRANT_AUTHORITY_DENIED' });
     expect((await admin.query('SELECT count(*) FROM content_intake.grant_history WHERE grant_id=$1', [child.grant_id])).rows[0].count).toBe('2');
-    // Delegation is independent of the recipient's own business ceiling (§12.1).
-    const agentDelegation = value(await service.grantBatch(actor('director'), batch('agent', 'import', 'delegation', 'agent-allocator'))).items[0]!;
-    const byAgent = batch('manager', 'import', 'business', 'agent-distributes');
-    byAgent.items[0]!.expiresAt = new Date(Date.parse(agentDelegation.expiresAt)-1000).toISOString();
-    value(await service.grantBatch(actor('agent'), byAgent));
+    for (const recipient of ['agent', 'enabler', 'supervisor', 'legacy-enabler']) {
+      expect(await service.grantBatch(actor('director'), batch(recipient, 'import', 'delegation', `deny-${recipient}`)))
+        .toMatchObject({ ok: false, reason: 'ROLE_CEILING' });
+    }
     expect(await service.authorization(actor('agent'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
-    expect(await service.grantBatch(actor('agent'), batch('other', 'import', 'delegation', 'agent-redelegates')))
-      .toMatchObject({ ok: false, reason: 'REDELEGATION_DENIED' });
   });
 
   it('recovers lost COMMIT responses using the original durable operation and rejects payload changes', async () => {
@@ -3184,15 +3205,31 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect((await admin.query('SELECT count(*) FROM content_intake.parse_jobs')).rows[0].count).toBe('0');
   });
 
-  it('allows a newly qualified supervisor to take over and revoke existing business grants', async () => {
+  it('rejects a supervisor allocation for new grants while a director can take over and revoke', async () => {
     await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id)
       VALUES ('new-supervisor','allocation','director','supervisor','tenant-a','app-a','scope-a','source-a','import',clock_timestamp()-interval '1 second',clock_timestamp()+interval '10 minutes','合成新任范围负责人','director')`);
-    const takeover = { operationId: 'new-steward', expectedVersion: 1, change: 'takeover' as const, stewardPrincipalId: 'supervisor', reason: '合成接管' };
-    const changed = value(await service.changeGrant(actor('supervisor'), 'business-enabler-import', takeover));
-    expect(changed).toMatchObject({ issuerPrincipalId: 'director', stewardPrincipalId: 'supervisor', version: 2, revokedAt: null });
+    const takeover = { operationId: 'new-steward', expectedVersion: 1, change: 'takeover' as const, stewardPrincipalId: 'director', reason: '合成接管' };
+    expect(await service.changeGrant(actor('supervisor'), 'business-enabler-import', takeover)).toMatchObject({ ok: false, reason: 'REDELEGATION_DENIED' });
+    expect(await service.grantBatch(actor('supervisor'), batch('manager'))).toMatchObject({ ok: false, reason: 'REDELEGATION_DENIED' });
+    expect((await admin.query("SELECT revoked_at FROM content_intake.grants WHERE grant_id='new-supervisor'")).rows[0].revoked_at).toBeNull();
+    const changed = value(await service.changeGrant(actor('director'), 'business-enabler-import', takeover));
+    expect(changed).toMatchObject({ issuerPrincipalId: 'director', stewardPrincipalId: 'director', version: 2, revokedAt: null });
     value(await service.authorization(actor('enabler'), 'source-a', 'import'));
-    value(await service.changeGrant(actor('supervisor'), changed.grantId, { ...takeover, operationId: 'new-steward-revoke', expectedVersion: 2, change: 'revoke', stewardPrincipalId: null }));
+    value(await service.changeGrant(actor('director'), changed.grantId, { ...takeover, operationId: 'new-steward-revoke', expectedVersion: 2, change: 'revoke', stewardPrincipalId: null }));
     expect(await service.authorization(actor('enabler'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    expect((await admin.query("SELECT revoked_at IS NULL AS live FROM content_intake.grants WHERE grant_id='new-supervisor'")).rows[0].live).toBe(true);
+  });
+
+  it('keeps a historical enabler business grant and rejects new import, publish and allocation', async () => {
+    const row = (await admin.query("SELECT grant_id,kind,action,revoked_at FROM content_intake.grants WHERE grant_id='legacy-enabler-import'")).rows[0];
+    expect(row).toMatchObject({ kind: 'business', action: 'import', revoked_at: null });
+    expect(await service.authorization(actor('legacy-enabler'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    expect(await service.authorization(actor('legacy-enabler'), 'source-a', 'publish')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    expect(await service.grantBatch(actor('legacy-enabler'), batch('manager', 'query', 'business', 'legacy-assign'))).toMatchObject({ ok: false, reason: 'REDELEGATION_DENIED' });
+    expect(await service.grantBatch(actor('director'), batch('legacy-enabler', 'import', 'business', 'legacy-new-import'))).toMatchObject({ ok: false, reason: 'ROLE_CEILING' });
+    expect(await service.grantBatch(actor('director'), batch('legacy-enabler', 'publish', 'business', 'legacy-new-publish'))).toMatchObject({ ok: false, reason: 'ROLE_CEILING' });
+    value(await service.authorization(actor('legacy-enabler'), 'source-a', 'query'));
+    expect((await admin.query("SELECT count(*) FROM content_intake.grants WHERE grant_id='legacy-enabler-import' AND revoked_at IS NULL")).rows[0].count).toBe('1');
   });
 
   it('fences legacy publication while admitting against an empty current pointer', async () => {
@@ -3326,7 +3363,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await service.grantBatch(actor('director'), { ...batch('manager'), actorPrincipalId: 'director' })).toMatchObject({ ok: false, code: 'VALIDATION' });
     await admin.query('BEGIN');
     await admin.query('SELECT backend_review.lock_content()');
-    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-enabler',true,
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('enabler',2,ARRAY['dept-a'],'job-lead',true,
       statement_timestamp()-interval '10 seconds',statement_timestamp()+interval '0.2 seconds',repeat('b',64))`);
     await admin.query("UPDATE content_intake.principals SET current_facts_version=2 WHERE principal_id='enabler'");
     const waiting = service.authorization(actor('enabler'), 'source-a', 'import');
@@ -3386,9 +3423,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     value(await service.grantBatch(actor('director'),batch('manager','review','business','late-review-grant')));
     provider.approve('manager',beforeGrant);
     expect(await refresh(c,'before-grant')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
-    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-enabler',2,'agent') ON CONFLICT (tenant_id,app_id,department_id,job_id) DO UPDATE SET role='agent',policy_version=2");
+    await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-supervisor',2,'agent') ON CONFLICT (tenant_id,app_id,department_id,job_id) DO UPDATE SET role='agent',policy_version=2");
     const duringAgentRole = new Date((await admin.query('SELECT clock_timestamp() AS time')).rows[0].time).toISOString();
-    await admin.query("UPDATE content_intake.role_rules SET role='enabler',policy_version=3 WHERE job_id='job-enabler'");
+    await admin.query("UPDATE content_intake.role_rules SET role='supervisor',policy_version=3 WHERE job_id='job-supervisor'");
     provider.approve('reviewer',duringAgentRole);
     expect(await refresh(c,'before-role')).toMatchObject({ ok:false,reason:'HUMAN_REVIEW_REQUIRED' });
     expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
@@ -3612,10 +3649,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id,steward_id)
         VALUES ('fractional-expiry','business','director','reviewer','tenant-a','app-a','scope-a','source-a','review',clock_timestamp(),$1::timestamptz+interval '0.2 milliseconds','合成自然到期','root-review','director')`,[at]);
     } else {
-      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',2,ARRAY['dept-a'],'job-enabler',$2,
+      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',2,ARRAY['dept-a'],'job-supervisor',$2,
         $1::timestamptz+CASE WHEN $2 THEN interval '-10 milliseconds' ELSE interval '0.2 milliseconds' END,
         $1::timestamptz+CASE WHEN $2 THEN interval '0.2 milliseconds' ELSE interval '1 minute' END,repeat('b',64))`,[at,kind === 'facts-expire']);
-      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',3,ARRAY['dept-a'],'job-enabler',true,
+      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('reviewer',3,ARRAY['dept-a'],'job-supervisor',true,
         $1::timestamptz+interval '1 millisecond',$1::timestamptz+interval '1 minute',repeat('c',64))`,[at]);
       await admin.query("UPDATE content_intake.principals SET current_facts_version=3 WHERE principal_id='reviewer'");
     }
