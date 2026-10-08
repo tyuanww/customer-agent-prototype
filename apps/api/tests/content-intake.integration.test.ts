@@ -1462,6 +1462,47 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await host.app.close(); }
   }, 30_000);
 
+  it('vocabulary: paginates current labels for an ordinary seat, isolates scope and rejects changed or foreign cursors through HTTP', async () => {
+    for (const [id, scopeId, kind, active] of [
+      ['a-brand','scope-brand','product',true], ['b-product','scope-a','product',true],
+      ['c-scene','scope-a','scenario',true], ['hidden-shop','scope-b','product',true], ['inactive','scope-a','product',false],
+    ] as const) {
+      await admin.query("INSERT INTO content_intake.vocabulary VALUES ($1,$2,$3,repeat('a',64),$4)",[id,scopeId,kind,active]);
+      await admin.query("INSERT INTO content_intake.vocabulary_displays VALUES ($1,1,'合成词项')",[id]);
+    }
+    const logged = await seat(), app = Fastify();
+    await app.register(contentIntakeUsageRoutes, { auth: auth!, usage: service });
+    const headers = { authorization: `Bearer ${logged.token}` };
+    const url = '/v1/intake/sources/source-a/vocabulary';
+    try {
+      expect((await app.inject({ url })).statusCode).toBe(401);
+      for (const query of ['?unknown=1','?limit=101','?limit=1&limit=2','?cursor=']) {
+        expect((await app.inject({ url: url+query, headers })).statusCode).toBe(400);
+      }
+      expect((await app.inject({ method:'HEAD',url,headers })).statusCode).toBe(404);
+      const firstResponse = await app.inject({ url: url+'?limit=1', headers });
+      expect(firstResponse.statusCode,firstResponse.body).toBe(200);
+      const first = parseContractSchema('IntakeVocabularyList',firstResponse.json());
+      expect(first.items.map(v=>v.id)).toEqual(['a-brand']);
+      const nextUrl = url+'?'+new URLSearchParams({limit:'1',cursor:first.nextCursor!});
+      const second = await app.inject({url:nextUrl,headers});
+      expect(second.statusCode,second.body).toBe(200);
+      expect(second.json().items.map((v: C['IntakeVocabulary'])=>v.id)).toEqual(['b-product']);
+      const all = value(await service.vocabulary(logged.actor,'source-a',{}));
+      expect(all.items.map(v=>v.id)).toEqual(['a-brand','b-product','c-scene']);
+      expect(await service.vocabulary(logged.actor,'source-b',{})).toMatchObject({ok:false});
+      const otherSession = await seat('agent','other');
+      expect(await service.vocabulary(otherSession.actor,'source-a',{limit:1,cursor:first.nextCursor})).toMatchObject({ok:false});
+      expect(await service.vocabulary(logged.actor,'source-a',{limit:2,cursor:first.nextCursor})).toMatchObject({ok:false});
+      await admin.query("INSERT INTO content_intake.vocabulary_displays VALUES ('b-product',2,'合成新名称')");
+      expect((await app.inject({url:nextUrl,headers})).statusCode).toBe(409);
+      expect(value(await service.vocabulary(logged.actor,'source-a',{})).items[1]!.displayName).toBe('合成新名称');
+      value(await service.changeGrant(actor('director'),'business-agent-query',{operationId:'vocabulary-revoke',expectedVersion:1,change:'revoke',reason:'合成撤权',stewardPrincipalId:null}));
+      expect((await app.inject({url,headers})).statusCode).not.toBe(200);
+      expect(diagnostics.every(error => error instanceof Error && ['FILE_INVALID','SCOPE_DENIED','PERMISSION_CHANGED'].includes(error.message))).toBe(true);
+    } finally { await app.close(); }
+  });
+
   it('discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants', async () => {
     const user=(await seat()).actor;
     const first=value(await service.authorizations(user,{}));
@@ -2261,7 +2302,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         return reply.code(204).send();
       });
       await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:{
-        authorizations:service.authorizations,sources:service.sources,
+        authorizations:service.authorizations,sources:service.sources,vocabulary:service.vocabulary,
         issueEntitlement:async(current,body)=>{
           if(expireNext) {
             await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,

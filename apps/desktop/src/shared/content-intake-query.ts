@@ -6,7 +6,22 @@ export type IntakeQueryRow = {
   kind: 'intake'; key: string; rank: 1 | 2 | 3; title: string; answerText: string;
   applicabilityNote: string; riskNote: string; releaseId: string; validUntil: string;
 };
-export type IntakeQueryContext = { shops: string[]; shopId: string | null };
+export type IntakeQuerySelection = { productIds: string[]; scenarioIds: string[] };
+export type IntakeQueryOption = { id: string; label: string };
+export type IntakeQueryContext = IntakeQuerySelection & { shops: string[]; shopId: string | null;
+  products: IntakeQueryOption[]; scenarios: IntakeQueryOption[]; validUntil: string | null };
+export const emptyIntakeQueryContext = (): IntakeQueryContext => ({ shops: [], shopId: null,
+  products: [], scenarios: [], productIds: [], scenarioIds: [], validUntil: null });
+const ids = (v: unknown): v is string[] => Array.isArray(v) && v.length <= 100
+  && v.every(id => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) && new Set(v).size === v.length;
+export function isIntakeSelection(value: unknown): value is IntakeQuerySelection {
+  return exactKeys(value, ['productIds', 'scenarioIds']) && ids(value.productIds) && ids(value.scenarioIds);
+}
+function options(value: unknown): value is IntakeQueryOption[] {
+  return Array.isArray(value) && value.length <= 5000 && new Set(value.map(v => v?.id)).size === value.length
+    && value.every(v => exactKeys(v, ['id','label']) && isIntakeText(v.id,128)
+      && typeof v.label === 'string' && v.label.trim().length > 0 && [...v.label].length <= 256);
+}
 const messages = {
   VALIDATION: '请检查输入；客户问题最多 500 字。',
   STALE: '查询已取消或上下文已改变，请重新查询。',
@@ -41,9 +56,13 @@ export function isIntakeCopyRequest(value: unknown): value is { key: string } {
   return exactKeys(value, ['key']) && isIntakeText(value.key);
 }
 export function isIntakeContextResult(value: unknown): value is IntakeQueryResult<IntakeQueryContext> {
-  return isIntakeFailure(value) || (exactKeys(value, ['ok', 'shops', 'shopId']) && value.ok === true
+  return isIntakeFailure(value) || (exactKeys(value, ['ok', 'shops', 'shopId', 'products', 'scenarios', 'productIds', 'scenarioIds', 'validUntil']) && value.ok === true
     && Array.isArray(value.shops) && value.shops.length <= 5000 && value.shops.every(s => isIntakeText(s))
     && new Set(value.shops).size === value.shops.length
+    && options(value.products) && options(value.scenarios) && ids(value.productIds) && ids(value.scenarioIds)
+    && value.productIds.every(id => (value.products as IntakeQueryOption[]).some((v: IntakeQueryOption) => v.id === id))
+    && value.scenarioIds.every(id => (value.scenarios as IntakeQueryOption[]).some((v: IntakeQueryOption) => v.id === id))
+    && (value.validUntil === null || (typeof value.validUntil === 'string' && Number.isFinite(Date.parse(value.validUntil))))
     && (value.shopId === null || (isIntakeText(value.shopId) && value.shops.includes(value.shopId))));
 }
 export function isIntakeSearchResult(value: unknown): value is IntakeQueryResult<{ rows: IntakeQueryRow[] }> {
@@ -60,6 +79,7 @@ export type IntakeQueryApi = {
   mode(): Promise<IntakeQueryResult<{ enabled: boolean }>>;
   access(): Promise<IntakeQueryResult<IntakeQueryContext>>;
   selectShop(request: { shopId: string }): Promise<IntakeQueryResult<IntakeQueryContext>>;
+  selectConditions(request: IntakeQuerySelection): Promise<IntakeQueryResult<IntakeQueryContext>>;
   search(request: { queryText: string }): Promise<IntakeQueryResult<{ rows: IntakeQueryRow[] }>>;
   copy(request: { key: string }): Promise<IntakeQueryResult<{ copied: true }>>;
   cancel(): Promise<IntakeQueryResult<{ cancelled: true }>>;

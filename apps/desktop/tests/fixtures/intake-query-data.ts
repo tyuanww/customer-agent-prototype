@@ -16,7 +16,9 @@ export function intakeQueryData() {
     effectiveFrom: '2020-01-01T00:00:00Z', effectiveTo: null, applicabilityNote: '仅限合成通用场景',
     familySourceId: null, familyBusinessEntryId: null, brandNonOverridable: false, category: '分类', riskNote: '单独风险说明',
   }));
+  const vocabulary: C['IntakeVocabulary'][] = [];
   let serial = 0;
+  const selections = new Map<string, C['IntakeEntitlementRequest']>();
   const leases = new Map<string, C['IntakeEntitlement']>();
   const respond = (path: string, body?: unknown): unknown => {
     if (state.revoked) throw { code: 'FORBIDDEN', reason: 'PERMISSION_CHANGED' };
@@ -28,20 +30,24 @@ export function intakeQueryData() {
       capabilities: sources.map(s => ({ scope: s.scope, actions: ['query'], mayAllocate: [], mayDelegate: [], validUntil: factsUntil })),
     };
     if (url.pathname.endsWith('/sources')) return { items: sources, nextCursor: null };
+    if (url.pathname.endsWith('/vocabulary')) return { items: vocabulary, nextCursor: null };
     if (url.pathname.endsWith('/entitlements')) {
       const req = body as C['IntakeEntitlementRequest'];
-      if (!sources.some(s => s.scope.shopId === req.shopId) || req.productIds.length || req.scenarioIds.length) throw { code: 'FORBIDDEN' };
+      if (!sources.some(s => s.scope.shopId === req.shopId) || req.productIds.some(id => !vocabulary.some(v => v.id === id && v.kind === 'product')) || req.scenarioIds.some(id => !vocabulary.some(v => v.id === id && v.kind === 'scenario'))) throw { code: 'FORBIDDEN' };
       const ent: C['IntakeEntitlement'] = { entitlementId: `ent-${++serial}`, releaseId: state.release, shopId: req.shopId,
         contextGeneration: req.contextGeneration, revocationGeneration: 0, validUntil, scopes: [source(req.shopId).scope] };
-      leases.set(ent.entitlementId, ent); return ent;
+      leases.set(ent.entitlementId, ent); selections.set(ent.entitlementId, structuredClone(req)); return ent;
     }
     if (url.pathname.endsWith('/snapshot')) {
       const ent = leases.get(url.searchParams.get('entitlementId')!)!;
+      const selection = selections.get(ent.entitlementId)!;
+      const filtered = entries.filter(e => (!e.productRefs.length || e.productRefs.some(r => selection.productIds.includes(r.id)))
+        && (!e.scenarioRefs.length || e.scenarioRefs.some(r => selection.scenarioIds.includes(r.id))));
       return { releaseId: ent.releaseId, entitlementId: ent.entitlementId, contextGeneration: ent.contextGeneration,
-        faq: entries.map(entry => ({ sourceId: source(ent.shopId).scope.sourceId, entry: { ...entry, answerText: `${ent.shopId} ${entry.answerText}` } })),
-        sopNodes: [], sopEdges: [], media: [], vocabulary: [], nextCursor: null };
+        faq: filtered.map(entry => ({ sourceId: source(ent.shopId).scope.sourceId, entry: { ...entry, answerText: `${ent.shopId} ${entry.answerText}` } })),
+        sopNodes: [], sopEdges: [], media: [], vocabulary, nextCursor: null };
     }
     throw new Error('Unexpected synthetic route');
   };
-  return { state, entries, respond };
+  return { state, entries, vocabulary, respond };
 }

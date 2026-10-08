@@ -211,3 +211,14 @@ Main 已通过实际 ProductHttp/ProductSession 消费冻结质量 HTTP，负责
 管理上下文复用现有 discovery、source/authorize 和事务，不另建状态仓或 current 指针。有效产品会话且拥有 import 才可读取来源版本、本人身份与发布基线；内容锁后取得发布锁，事务结束前复核最早截止。该读不是授权或提交票据，receive 仍 CAS。实际HTTP→Main ProductSession→receive→解析候选已有合成验证，尚无新上传 UI。代码、测试与审查证据见[本切片验收](../evidence/qa/content-intake-p2-management-context/README.md)。
 
 下一切片由 Main 持有原生文件、上传对象/操作键、解析任务与错误报告，Dashboard 只提交选择与确认意图，来源上下文和参与人目录从 API 获取；复用既有候选/审批/质量/发布界面。真实飞书、生产factory/ACL、v2-active与跨平台人工验收继续分别待办。
+
+
+### 第一组店铺显示名差集（2026-10-08，候选，未冻结）
+
+已冻结的 `IntakeSource.scope.shopId` 是稳定标识，没有可展示的店铺名称；不能把来源 ID、岗位或 fixture 映射当正式名称。商品/场景已经具备 `IntakeVocabularyList`，本轮直接实现其读取，不增加重复词表合同。
+
+**建议最小变更：** 在治理仓评审只读店铺目录，返回每条 `{shopId, displayName, displayVersion}` 及 `nextCursor`；`displayName` 非空、最多 256 字，缺失整次失败，重名仍可通过 ID 区分。目录需绑定当前产品会话和租户/app，限定当前有 query 授权的 shop 来源；品牌级授权不能自行展开全公司店铺。页面上限 100，游标与会话、完整目录修订和截止绑定，重命名、撤权或身份变化使旧游标失效。多来源同店必须给出一致名称版本。
+
+选择独立只读目录而不是给每个 Source 重复塞名称，可避免同店跨来源名称漂移；Main 将其与当前有权店铺集合对齐，仅替换显示文案，查询和复制继续使用 shopId 和原 entitlement。不得让名称服务授予业务权限，也不新增 renderer 通用 HTTP 能力。
+
+**进入实施前：** 治理仓明确组织目录名称的写入所有者、刷新时限/失败策略和字段版本，批准后 export → 产品仓版本化 intake/codegen → Main 显示接线。验收覆盖同名/更名/空名、跨租户、品牌授权、跨页目录变化、撤权/退出/过期；显示变化不改变 shopId。此条只是具体候选，不代表合同批准、真实组织数据接入或新 OpenAPI 版本已发布。当前继续清楚显示店铺编号。

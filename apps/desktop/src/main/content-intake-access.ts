@@ -104,3 +104,53 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
     unsubscribe(); signal?.removeEventListener('abort', abort); controller.abort();
   }
 }
+
+/** Complete menu for the chosen shop; the entitlement endpoint remains the
+ * authority. Do not discover options from a generic-only content snapshot. */
+export async function loadIntakeVocabulary(session: IntakeUsageSession, access: IntakeAccess, shopId: string, signal: AbortSignal) {
+  const initial = session.view(), started = performance.now();
+  const budget = Math.max(0, Date.parse(access.validUntil) - Date.now());
+  const check = () => {
+    if (signal.aborted || !session.view().signedIn || session.view().sessionEpoch !== initial.sessionEpoch) throw new IntakeUsageError('STALE');
+    if (Date.now() >= Date.parse(access.validUntil) || performance.now() - started >= budget) throw new IntakeUsageError('EXPIRED');
+  };
+  const allowed = new Set(access.capabilities.filter(c => c.actions.includes('query')).map(c => c.scope.sourceId));
+  const sources = access.sources.filter(s => s.contentIntakeMode === 'v2-preview' && allowed.has(s.scope.sourceId));
+  const brands = new Set(sources.filter(s => s.scope.shopId === shopId).map(s => s.scope.brandId));
+  const selected = sources.filter(s => brands.has(s.scope.brandId) && (s.scope.shopId === shopId || s.scope.shopId === null));
+  const terms = new Map<string, C['IntakeVocabulary']>();
+  let bytes = 0;
+  for (const src of selected) {
+    let cursor: string | null = null;
+    const cursors = new Set<string>(), seen = new Set<string>();
+    do {
+      check();
+      if (cursors.size >= 50 || bytes >= 8 * 1024 * 1024) throw new IntakeUsageError('LIMIT');
+      const query = new URLSearchParams({ limit: '100', ...(cursor ? { cursor } : {}) });
+      const response = await session.request(initial.sessionEpoch,
+        `/v1/intake/sources/${encodeURIComponent(src.scope.sourceId)}/vocabulary?${query}`,
+        { signal, maxResponseBytes: 8 * 1024 * 1024 - bytes });
+      check(); bytes += Buffer.byteLength(JSON.stringify(response.value) ?? '');
+      const page = parseContractSchema('IntakeVocabularyList', response.value);
+      for (const term of page.items) {
+        const scope = term.scope;
+        if (!term.active || seen.has(term.id) || scope.sourceId !== null
+          || scope.tenantId !== src.scope.tenantId || scope.appId !== src.scope.appId || scope.brandId !== src.scope.brandId
+          || scope.domain !== src.scope.domain || (scope.shopId !== null && scope.shopId !== src.scope.shopId)) throw new IntakeUsageError('FORBIDDEN');
+        seen.add(term.id);
+        const previous = terms.get(term.id);
+        if (previous && JSON.stringify(previous) !== JSON.stringify(term)) throw new IntakeUsageError('STALE');
+        terms.set(term.id, term);
+        if (terms.size > 5000) throw new IntakeUsageError('LIMIT');
+      }
+      cursor = page.nextCursor;
+      if (cursor && (!page.items.length || cursors.has(cursor))) throw new IntakeUsageError('STALE');
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+  }
+  check();
+  if (bytes >= 8 * 1024 * 1024) throw new IntakeUsageError('LIMIT');
+  const options = (kind: 'product' | 'scenario') => [...terms.values()].filter(t => t.kind === kind)
+    .sort((a,b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0).map(t => ({ id: t.id, label: t.displayName }));
+  return { products: options('product'), scenarios: options('scenario') };
+}

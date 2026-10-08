@@ -14,6 +14,7 @@ it('guards all FAQ capabilities with trusted Query main-frame identity, exact pa
   try {
     for (const [channel, args] of [
       [C.INTAKE_QUERY_MODE, []], [C.INTAKE_QUERY_ACCESS, []], [C.INTAKE_QUERY_SELECT, [{ shopId: 'shop-a' }]],
+      [C.INTAKE_QUERY_CONDITIONS, [{ productIds: [], scenarioIds: [] }]],
       [C.INTAKE_QUERY_SEARCH, [{ queryText: '洁面' }]], [C.INTAKE_QUERY_COPY, [{ key: 'opaque' }]], [C.INTAKE_QUERY_CANCEL, []],
     ] as const) {
       const invoke = handlers.get(channel)!;

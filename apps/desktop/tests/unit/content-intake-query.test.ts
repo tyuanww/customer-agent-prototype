@@ -16,7 +16,7 @@ afterEach(() => vi.useRealTimers());
 it('uses authorized shops, deterministic Top 3 and only Main-owned original text; no-hit is empty', async () => {
   const f = setup();
   try {
-    expect(await f.query.access()).toEqual({ shops: ['shop-a', 'shop-b'], shopId: null });
+    expect(await f.query.access()).toMatchObject({ shops: ['shop-a', 'shop-b'], shopId: null });
     await expect(f.query.search('洁面')).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(f.query.access('not-authorized')).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await f.query.access('shop-a');
@@ -31,7 +31,7 @@ it('uses authorized shops, deterministic Top 3 and only Main-owned original text
     expect(() => f.query.copy(rows[0].key)).toThrow('STALE');
   } finally { f.query.dispose(); }
 });
-it.each(['cancel', 'switch', 'logout', 'destroy'])('isolates late snapshot after %s', async action => {
+it.each(['cancel', 'switch', 'conditions', 'logout', 'destroy'])('isolates late snapshot after %s', async action => {
   const f = setup();
   try {
     await f.query.access('shop-a');
@@ -48,6 +48,7 @@ it.each(['cancel', 'switch', 'logout', 'destroy'])('isolates late snapshot after
     const rejected = expect(pending).rejects.toMatchObject({ code: 'STALE' });
     await vi.waitUntil(() => paging);
     if (action === 'cancel') f.query.cancel();
+    if (action === 'conditions') f.query.selectConditions({ productIds: [], scenarioIds: [] });
     if (action === 'switch') await f.query.access('shop-b');
     if (action === 'logout') { f.view.signedIn = false; f.view.sessionEpoch++; f.callbacks.forEach(fn => fn()); }
     if (action === 'destroy') f.query.dispose();
@@ -76,7 +77,7 @@ it('withdraws expired rows, rejects revoked permissions, and recovers without tr
 });
 it('returns zero shops and rechecks discovery after losing a scope', async () => {
   const f = setup();
-  try { f.state.empty = true; expect(await f.query.access()).toEqual({ shops: [], shopId: null }); }
+  try { f.state.empty = true; expect(await f.query.access()).toMatchObject({ shops: [], shopId: null }); }
   finally { f.query.dispose(); }
 });
 
@@ -90,7 +91,7 @@ it('typing cancellation does not abort discovery, but replacement selection does
     f.session.request = async (...args) => { if (!delayed) { delayed = true; await waiting; } return original(...args); };
     const menu = f.query.access(); await vi.waitUntil(() => delayed);
     f.query.cancel(); release();
-    expect(await menu).toEqual({ shops: ['shop-a', 'shop-b'], shopId: null });
+    expect(await menu).toMatchObject({ shops: ['shop-a', 'shop-b'], shopId: null });
     await f.query.access('shop-a');
     expect((await f.query.search('洁面'))[0].answerText).toContain('shop-a');
   } finally { f.query.dispose(); }
@@ -109,4 +110,38 @@ it('rechecks qualification after ranking and refuses an excessive index instead 
     f.entries.splice(0, f.entries.length, ...Array.from({ length: 100 }, (_, i) => ({ ...entry, businessEntryId: `large-${i}`, answerText: '合'.repeat(10000), questions: [] })));
     await expect(f.query.search('洁面')).rejects.toMatchObject({ code: 'LIMIT' });
   } finally { rank.mockRestore(); f.query.dispose(); }
+});
+
+it('uses registered menu IDs in fresh qualifications, clears old copy keys and resets conditions on shop changes', async () => {
+  const f = setup();
+  for (const kind of ['product','scenario'] as const) f.vocabulary.push({ id: kind, kind, displayVersion: 1,
+    displayName: `合成${kind}`, meaningDigest: 'a'.repeat(64), active: true,
+    scope: { tenantId:'tenant',appId:'app',brandId:'brand',shopId:null,domain:'product',sourceId:null } });
+  f.entries[0].productRefs = [{ id:'product',displayVersion:1 }];
+  f.entries[0].scenarioRefs = [{ id:'scenario',displayVersion:1 }];
+  try {
+    expect((await f.query.access('shop-a')).products).toEqual([{id:'product',label:'合成product'}]);
+    const generic = await f.query.search('洁面'); expect(generic.map(r=>r.title)).not.toContain('洁面用法 0');
+    const selected = f.query.selectConditions({productIds:['product'],scenarioIds:['scenario']});
+    expect(selected.productIds).toEqual(['product']); expect(() => f.query.copy(generic[0].key)).toThrow('STALE');
+    expect((await f.query.search('洁面'))[0].title).toBe('洁面用法 0');
+    expect(() => f.query.selectConditions({productIds:['scenario'],scenarioIds:[]})).toThrow('FORBIDDEN');
+    expect(() => f.query.selectConditions({productIds:['unknown'],scenarioIds:[]})).toThrow('FORBIDDEN');
+    expect((await f.query.access('shop-b')).productIds).toEqual([]);
+    expect((await f.query.search('洁面')).map(r=>r.title)).not.toContain('洁面用法 0');
+  } finally { f.query.dispose(); }
+});
+it('rejects foreign/duplicate menu pages and an expired menu before issuing qualification', async () => {
+  const f = setup();
+  try {
+    f.vocabulary.push({ id:'foreign',kind:'product',displayVersion:1,displayName:'合成',meaningDigest:'a'.repeat(64),active:true,
+      scope:{tenantId:'tenant',appId:'app',brandId:'other-brand',shopId:null,domain:'product',sourceId:null} });
+    await expect(f.query.access('shop-a')).rejects.toMatchObject({code:'FORBIDDEN'});
+    f.vocabulary[0].scope.brandId='brand'; f.vocabulary.push(structuredClone(f.vocabulary[0]));
+    await expect(f.query.access('shop-a')).rejects.toMatchObject({code:'FORBIDDEN'});
+    f.vocabulary.length=0; await f.query.access('shop-a');
+    vi.useFakeTimers({toFake:['Date']}); vi.setSystemTime(Date.now()+600_001);
+    expect(()=>f.query.selectConditions({productIds:[],scenarioIds:[]})).toThrow('EXPIRED');
+    await expect(f.query.search('洁面')).rejects.toMatchObject({code:'EXPIRED'});
+  } finally { f.query.dispose(); }
 });
