@@ -11,12 +11,14 @@
 | 能力 | 当前状态与证据 |
 | --- | --- |
 | 权限、持久候选、质量/确认发布 HTTP 与 Main/preload/管理界面 | 已在隔离合成环境贯通上传、报告、修订/取消、逐条质量、来源确认、二次确认直发与另一客服查询复制；见[直发验收](../evidence/qa/intake-direct-publication/README.md) |
+| 权限配置界面 | 现有内容管理内增加局部权限面板；复用冻结 grants 列表/只读预览/保存/撤销与具名主体目录，management 唯一 service 注册独立 grants plugin。HTTP＋PG15 3 项、桌面相关单元/组件 80 项通过；权限 Electron 已在主集成通过，见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)；原独立结果见[权限配置证据](../evidence/qa/intake-grant-management/README.md) |
 | 纠正回退 | 0032、API、Main 已接入确认直发，保留旧谱系有效性及原子新发布；实际 Electron→HTTP→PG15 已验证，见[直发验收](../evidence/qa/intake-direct-publication/README.md)；[原回退证据](../evidence/qa/content-intake-p2-rollback/README.md)保留历史范围 |
 | 显式同题覆盖 | 0028 完整目录守卫及按店/商品/场景的覆盖与通用回落已验证；见[家族证据](../evidence/qa/content-intake-p2-family/README.md) |
 | 坐席界面 | 店铺选择、商品/场景多选、适用 FAQ 查询及原文复制已接通并完成[选择器合成验收](../evidence/qa/content-intake-p2-query-filters/README.md)；正式店铺显示名仍待下方合同候选批准与版本化 intake |
 | 对象容量 | 0029 与 API 已实现四类对象持久预留/采用/释放、未知提交保护及只读账本干跑；10→100 并发准入、10→100 合成发布历史与双来源 CAS 重审已验证，见[容量证据](../evidence/qa/content-intake-p2-capacity/README.md)；历史保留期与受控历史清理仍待批准 |
 | 平台 | Mac 开发态及指定版本 Windows/WSL 已取得分层结果；[杭州证据](../evidence/qa/content-intake-p2-hangzhou/README.md)不覆盖后续回退、家族及商品/场景选择等新增切片，普通账号、可靠拖动、整机断网仍未确认 |
-| 组织与权限准备 | 组织版本绑定/原子撤销/provenance 与共享令牌候选已补；实际 service 经候选窄锁与用途池完成业务链和旧资料失效，见[第二轮回收](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)。原组织专项 usage 仍用管理池；正式 transaction/factory/ACL 仍未接线，职位观察或合成通过不等于运行装配 |
+| 组织与权限准备 | 组织版本绑定/原子撤销/provenance 与共享令牌候选已补；原组织专项 usage 仍用管理池。后续 purpose-candidate 已用受限业务/usage/worker 池贯穿四域 HTTP，Mac FAQ/回退 Electron 2/2 通过，见[发布验收](../evidence/qa/intake-release-acceptance/README.md)；组织池该轮只预检。正式 transaction/factory/ACL 尚未接线，合成通过不等于生产运行装配 |
+| 版本化交付工具 | 治理 exporter / 产品 intake 已支持 contract-set/v2 的封闭 runtime 伴随产物；合成跨仓往返验证 12 件产物与 9 个 runtime_sources。实际 1.21.0/schema.v1.23 仍 DRAFT、未冻结、未 export、未 intake；正式消费锁不变 |
 | 退出条件 | 正式店铺名称合同、历史保留期及批准后的历史清理/磁盘核对、真实组织、旧审批历史失效依据（如有）、生产最小 ACL/factory、旧目录认领及业务/设备验收仍待完成；合成 CAS 已验证额外重审次数，不代表实际人工等待耗时；范围汇总见 [TODOS](../TODOS.md) |
 
 ## 1. 交接范围与基线
@@ -355,3 +357,19 @@ A/B 已按原提交加追加修复接收到产品实验目录，C 只接收到�
 - **店铺名称：** 治理 OpenAPI 1.21.0/schema.v1.23 为 DRAFT，独立只读目录不改变授权范围。回收修复游标 session hash 外泄与篡改，使用独立服务端私有签名 key；补等待后截止、名称字符一致性、维护人停用拒绝。后续草稿补受控登记资格、维护人 CAS/撤销/轮换与不可改历史，私有 key 注入/撤销/轮换按 keyId/version 派生游标签名；可信 consumer 按全局内容锁→实际会话→目录操作→最终截止→COMMIT 执行。登记者与名称维护人都须当前唯一映射为总监/经理，再分别叠加显式 registrar/steward 范围；岗位本身不授予全租户目录权，换岗或停用后拒绝写入。真实维护人/登记责任范围、密钥托管及精确版本批准仍是正式采用条件；候选通过不等于冻结、export/intake 或产品名称消费者接线。
 
 当前追加补齐的提交、实际验证及局限见[第二轮回收](../evidence/qa/intake-parallel-recovery/runtime-completion/README.md)。上述剩余部分沿用既有“正式接入”和“店铺名称”事项，不增加业务范围。原角色 15/15 审核不重跑；完整外部 `/review` 仍为 INCOMPLETE。
+
+### 内容管理权限配置与正式交付工具增量（2026-10-08）
+
+权限配置属于用户既有需求，本轮没有新增角色或合同。界面沿用内容管理局部“资料 / 权限配置”切换；总监、经理只能在当前分配资格内选择已确认的具名主体并配置 business 动作，不提供根 allocation、delegation 或接管新界面。普通客服仍只有 query 上限，原 grant 历史不删除。
+
+服务复用 OpenAPI 1.20 已冻结的 `GET/POST /v1/intake/grants`、`POST /v1/intake/grants/preview` 和 `PATCH /v1/intake/grants/{grantId}`。原 authority 拥有批量校验和保存/撤销，预览共用校验且不写数据库；discovery 列表在扫描前限制当前可管理范围。HTTP plugin 注入 management 唯一 service。主体目录 `purpose=grant-recipient` 与 authorization 共同提供短期界面选择，不能把目录可见或预览成功当成已生效授权。
+
+Main 拥有选择句柄、会话和到期代际、原预览/写请求及未知提交恢复；Dashboard 独立 preload 只开放 permissions current/command/invalidated 窄能力。姓名隐藏或过期不会泄露隐藏人员资料，已有可管理授权仍可凭记录编号、范围、时间与原原因核对后撤销。详细使用方法与模块位置见[开发指南](how-to-develop-content-intake.md#p2-内容管理内的权限配置)。定向 HTTP/PG 与桌面单元/组件证据已取得；本次权限 Electron 已在主集成通过具名总监预览取消、保存生效和撤销拒绝新资格；经理不冒称独立实跑，也不重复旧角色 15/15 审核。
+
+用途能力候选现已超出原离线 probe：显式 purpose-candidate 宿主使用环境 LOGIN→NOLOGIN capability 及候选安装账本校验，实际四域 HTTP 和 Mac FAQ/回退 Electron 的证据见[本轮发布验收](../evidence/qa/intake-release-acceptance/README.md)。其中原生文件读写、报告回读和系统剪贴板发生；组织池只预检、对话框响应受控，不能推断真实组织写入、人工设备操作或四套桌面界面验收。生产配置/账号、旧目录认领和真实店铺名单没有由合成通过自动补齐。
+
+正式交付工具已支持 `customer-agent-contract-set/v2`。九件 runtime 伴随产物为安装清单、roles、organization、session、purpose ACL、directory ACL、directory 存储、provenance 和 protocol；与 manifest/OpenAPI/DDL 合计十二件。产品接收器按封闭成员集合、固定来源路径、Git blob/摘要及安装关联核验，再生成 `runtime_sources`，不把任意输入当执行脚本。主集成的合成出口→接收往返已验证十二件及九个来源记录，证明工具互通，未对真实候选执行冻结/export/intake。
+
+OpenAPI 1.21.0/schema.v1.23 仍是 DRAFT；精确字节、最终 release 结果及正式采用条件由治理候选拥有，此处不预写尚未确认的 hash。当前正式消费仍为 OpenAPI 1.20.0/schema.v1.22、VERIFIED_NOT_ACTIVATED，32 段 migration 和 runtime/Ddev 未激活状态不变。下一步是在既有事项内完成精确候选批准与实际版本化交付，再按真实范围和环境条件接入；不增加审批流程、自动同步、历史删除或新的业务范围。完整外部 `/review` 保持 INCOMPLETE。
+
+本轮组合候选已在治理本地提交 `6a25304`（来源 `1b91751`），最终稳定输入完整 test:release 41/41、PG253、合同/出口7与旧direct7通过；OpenAPI 1.21 SHA `bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7`，schema1.23 SHA `4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e`，installation SHA `1683c487d6dc84e84b44d9f2a80ca9ab9cfb941144ace8d3b2cf7f520bb58486`。全部保持 DRAFT；实际冻结/export/intake 尚未发生。产品集成回收、两项恢复/接收缺陷的修复和精确下一决定见[三线收尾](../evidence/qa/intake-parallel-recovery/three-part-completion/README.md)。

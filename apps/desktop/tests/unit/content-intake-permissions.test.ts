@@ -1,5 +1,6 @@
 import { expect,it,vi,afterEach } from 'vitest';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
+import { ProductHttpError } from '../../src/main/product-http';
 import { isIntakePermissionCommand } from '../../src/shared/content-intake-permissions';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 afterEach(()=>vi.useRealTimers());
@@ -40,4 +41,48 @@ it('cancels pending reads, discards late results and invalidates prior-session s
 it('rejects actor/grant IDs and arbitrary actions at renderer boundary',()=>{
  expect(isIntakePermissionCommand({action:'save',actor:'director'})).toBe(false);expect(isIntakePermissionCommand({action:'revoke',grantId:'g',reason:'r'})).toBe(false);
  expect(isIntakePermissionCommand({action:'preview',person:'h',actions:['review'],startsAt:'x',expiresAt:'y',reason:'r'})).toBe(false);
+});
+
+it.each(['stopped retry', 'new session'] as const)('late rejected writes cannot erase recovery for the %s', async transition => {
+ const f=intakePermissionsData(),originalRequest=f.session.request,originalSubscribe=f.session.subscribe;
+ let notifySession!:()=>void,rejectFirst!:(error:Error)=>void,releaseSecond!:()=>void;
+ const bodies:unknown[]=[];
+ f.session.subscribe=listener=>{notifySession=listener;return originalSubscribe(listener);};
+ f.session.request=async(epoch,path,options)=>{
+  if(path==='/v1/intake/grants' && options.body){
+   bodies.push(structuredClone(options.body));
+   if(bodies.length===1)await new Promise<void>((_resolve,reject)=>{rejectFirst=reject;});
+   if(bodies.length===2)await new Promise<void>(resolve=>{releaseSecond=resolve;});
+  }
+  return originalRequest(epoch,path,options);
+ };
+ const main=new ContentIntakePermissions(f.session);
+ try{
+  const initial=await main.command({action:'refresh'});await main.command(f.command(initial.people[0]!.selection));
+  const first=main.command({action:'save'}),staleFailure=expect(first).rejects.toMatchObject({code:'STALE'});
+  await vi.waitFor(()=>expect(rejectFirst).toBeTypeOf('function'));
+  if(transition==='stopped retry'){
+   await main.command({action:'stop'});expect(main.view().pending).toBe(true);
+  }else{
+   f.logout();expect(main.view().pending).toBe(false);
+   // Reauthentication owns a new epoch: never replay the old session's body.
+   f.session.view=()=>({signedIn:true,sessionEpoch:3});notifySession();
+   const current=await main.command({action:'refresh'});await main.command(f.command(current.people[0]!.selection));
+  }
+  const current=main.command({action:transition==='stopped retry'?'retry':'save'});
+  const unknownFailure=expect(current).rejects.toMatchObject({code:'UNAVAILABLE'});
+  await vi.waitFor(()=>expect(releaseSecond).toBeTypeOf('function'));
+  rejectFirst(new ProductHttpError('FORBIDDEN'));await staleFailure;
+  expect(main.view().pending).toBe(true);expect(main.view().busy).toBe(true);
+  // The active attempt commits but loses its response; only its exact body may
+  // recover that receipt, even though an old request just failed definitively.
+  f.setUnknown();releaseSecond();await unknownFailure;
+  expect(main.view().pending).toBe(true);expect(main.closeRisk()).toBe(true);
+  await main.command({action:'retry'});
+  expect(main.view().pending).toBe(false);expect(main.closeRisk()).toBe(false);
+  expect(f.grants).toHaveLength(1);expect(bodies).toHaveLength(3);
+  expect(bodies[2]).toEqual(bodies[1]);
+  if(transition==='stopped retry')expect(bodies[1]).toEqual(bodies[0]);
+  else expect(bodies[1]).not.toEqual(bodies[0]);
+ }finally{main.dispose();}
 });

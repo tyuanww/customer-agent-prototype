@@ -121,7 +121,7 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
 export function IntakeManagement() {
   const [page,setPage]=useState<'materials'|'permissions'>('materials');
   return <>
-    {window.dashboardPermissions && <div className="intake-toolbar" role="group" aria-label="内容管理工作区">
+    {window.dashboardPermissions && <div className="intake-management intake-toolbar intake-workspace-switch" role="group" aria-label="内容管理工作区">
       <button aria-pressed={page==='materials'} onClick={()=>setPage('materials')}>资料</button>
       <button aria-pressed={page==='permissions'} onClick={()=>setPage('permissions')}>权限配置</button>
     </div>}

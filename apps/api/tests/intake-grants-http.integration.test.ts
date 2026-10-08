@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createContentIntakeService } from '../src/content-intake/service.js';
-import { contentIntakeGrantRoutes } from '../src/content-intake/grants-http.js';
+import { IntakeRejection } from '../src/content-intake/transaction.js';
 import { contentIntakeManagementRoutes } from '../src/content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from '../src/content-intake/usage-http.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
@@ -25,7 +25,7 @@ describe.skipIf(!enabled)('business permission HTTP and PG15 (synthetic)',()=>{
   harness=new Pg15Harness();harness.start();const db=harness.createDatabase('grant_ui');admin=await harness.connect(db.config);
   await applyDatabaseMigrations(admin);await seedIntakeSyntheticHost(admin);
   for(const file of ['session-lock.sql','purpose-acl.sql','consumer-acl.sql'])await admin.query(await readFile(new URL(`../experiments/intake-runtime/${file}`,import.meta.url),'utf8'));
-  pool=new Pool({...db.config,user:'intake_business',max:2});const restricted=await createSyntheticConsumerPool(pool);
+  pool=new Pool({...db.config,user:'intake_business',max:2});const restricted=await createSyntheticConsumerPool(pool,()=>new IntakeRejection('SCOPE_DENIED'));
   await admin.query('CREATE ROLE synthetic_grant_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_grant_auth');
   auth=await createProductAuthService({connectionString:`postgresql://synthetic_grant_auth@localhost/${db.name}?${new URLSearchParams({host:harness.socket,port:String(harness.port)})}`,poolMax:1,connectionTimeoutMs:2000,readinessTimeoutMs:3000},
     {authorizeUrl:s=>`http://127.0.0.1/auth?state=${s}`,exchange:async c=>c,close:()=>undefined},'mock');
@@ -33,7 +33,7 @@ describe.skipIf(!enabled)('business permission HTTP and PG15 (synthetic)',()=>{
    await auth.callback(new URL(login.authorize_url).searchParams.get('state')!,id);tokens[id]=(await auth.exchange(login.login_id,verifier))!.access_token;}
   const store=createContentObjectStore(path.join(harness.root,db.name));const principalLabels=({principalId}:{principalId:string})=>INTAKE_SYNTHETIC_IDENTITIES.find(r=>r[0]===principalId)?.[2]??null;
   const service=createContentIntakeService(restricted,store,report,undefined,{requireProductSession:true,principalLabels});
-  app=Fastify();await app.register(contentIntakeGrantRoutes,{auth,service,report});
+  app=Fastify();
   await app.register(contentIntakeUsageRoutes,{auth,usage:service,report});await app.register(contentIntakeManagementRoutes,{auth,pool:restricted,store,principalLabels,report});
   origin=await app.listen({host:'127.0.0.1',port:0});diagnostics.length=0;
  },60000);
