@@ -18,6 +18,8 @@
 
 **新增界面审核与修正：** 前轮 gstack design-review / Aside 发现的3项中等、2项细节问题已按原需求修正：本机时间与时区、候选当前步骤、发布/撤销层级、检查文案和按钮间距。独立复核另发现并修正回退期间导航误导。126项定向组件/单元通过；实际 Electron/HTTP/受限 PG15 权限及四域5/5、紧凑尺寸 CSV 完整业务流程1/1通过，修后 Aside 深浅主题实看无新增页面错误。见[修正证据](evidence/qa/intake-ui-closeout-20261009/README.md)。新 UI 已重打 0.3.26 Universal 未签名包并从 DMG 解包，实际安装态权限1、四域4、店铺1、回退1、紧凑高度 CSV 全流程1共8项通过，另有开发启动回归1项；见[UI 修正版安装副本证据](evidence/qa/intake-ui-mac-package-20261009/README.md)。标准尺寸、真人系统框与 Windows 仍待验收，设备状态 PARTIAL。四域导航与范围保留，不新增业务 TODO。Grok provider 与设计外部认证条件未变，没有重试；完整 /review 仍 INCOMPLETE。
 
+**本轮 `/review` 收口状态：** 承接干净的 `c72e020`，当前两次本地代码提交修复了授权结果未知后遭资格拒绝、以及停止等待后首次重试遭资格拒绝时丢失原操作的问题，并统一回退历史时间/按钮布局、修正上传恢复注释。第二条先有失败测试再修复；定向 55/55、根 lint/typecheck/test/build、分组 workspace:check 通过。gstack 两条合成 HTTP/PG15 smoke 及当前桌面恢复探针退出 0；九类 specialist/Red Team 仅按所读范围复核，不能当作全分支逐行审核。Claude 宿主技能要求的 native 对抗与非 Grok 外部有效结论仍缺，上一轮 Claude Code 配置诊断/超时未有修复证据，未重复调用。完整 `/review`、CSV 外审均保持 INCOMPLETE；既有设备、真实接入和历史审查限制不变。命令、退出状态和精确剩余条件见[本轮证据](evidence/qa/intake-legacy-acl-runtime/gstack-review-closeout-2026-10-09.md)。
+
 **本期剩余工作：**
 
 | 工作 | 已具备与尚缺的边界 | 完成标准 |

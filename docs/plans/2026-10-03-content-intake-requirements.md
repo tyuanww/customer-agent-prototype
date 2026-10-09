@@ -783,6 +783,8 @@ D `953a555` → `b1531fc` 已在[Menokin 整理说明](../reference-intake-menok
 
 **上传竞争与规则锁接入条件（2026-10-09，承接 18ff7cf）：** 上一段是 `1c5d5e1` 定向补证当时的限制。本轮在同一产品分支用真实管理 HTTP 和临时 PG15 补测，不改行为代码、0030 或规则维护业务，版本保持 0.3.26。闸门包在对象存储 `persist` 返回之后：此时临时 reservation 已是 reserved，上传事务尚未 BEGIN。第二会话再用正式 `changeGrant` 或组织事实写入器 COMMIT，然后放行；这与约 754 行“替换最终 SELECT 返回行”的旧测试分开。五条结果：mode 重放 409 MODE_CONFLICT，原对象 adopted、回执不变、新 reservation released；撤权或岗位改为 job-agent 若先于最终授权，则 404 SCOPE_DENIED、零对象、零回执、reservation released；上传先 201 再在重放闸门内撤权或改岗位，原对象保持，重放 404，临时 reservation released。同一命令两遍通过，状态形态一致。来源 mode 三种真实锁序的输入字节与 `final-targeted/mode-order.json` 一致，复用不重跑。`record_policy_history` 定义不含 `lock_content`；四类 NOLOGIN 运行账号对 `role_rules` 无写权限，仓内没有正式规则写入 API。因此不报当前登录角色漏洞。既有“正式接入”增加一条：未来规则维护者须使用同锁并做交错验收。完整 `/review` 仍 INCOMPLETE。真实飞书、真实客户/员工数据、生产配置和 Windows 人工验收仍是单独门禁。可核对覆盖账本是 [coverage-ledger.json](../../evidence/qa/intake-legacy-acl-runtime/coverage-ledger.json)；OCR 可审覆盖率不是这份 `/review` 的通过结论。
 
+**本轮 gstack `/review` 门禁与修复（2026-10-09，承接 c72e020）：** 按当前 1013 路径大差异选择八类 specialist 和 Red Team，并在合成 API/PG15 做上传成功与拒绝两条 smoke；桌面授权恢复先以失败测试复现“停止等待后首次重试遭资格拒绝会清掉原操作”，修复为停止在途写入时保守保留结果未知，再以同原请求恢复且无重复授权验证。另已修复先前未知提交后资格拒绝的同类状态、回退历史时间/按钮布局及上传注释。当前定向 55/55、根 lint/typecheck/test/build、分组 workspace:check 退出 0；以前五条真实上传竞争与三条来源锁序按输入复用，未重跑。原代码增量和第二次停止修复均已本地提交，版本仍为 0.3.26。完整 `/review` **仍 INCOMPLETE**：本机 Codex 对抗不等于已安装 Claude 宿主技能的 native 对抗，非 Grok 外部来源的上次配置诊断/120 秒超时未消除，巨型分支也未在本轮逐行语义审查；未完成的计划/设备与正式接入探针不写为通过。精确命令和剩余条件见[审查收口记录](../../evidence/qa/intake-legacy-acl-runtime/gstack-review-closeout-2026-10-09.md)。
+
 ### 已定位的原始候选
 
 本机已找到五份 XLSX；均属于既有忽略目录，`git ls-files -- faq` 为空。结构核查由仓外工作目录中的独立只读脚本完成，只输出结构与聚合，没有将文件送入产品导入模块、外部模型或数据库。
