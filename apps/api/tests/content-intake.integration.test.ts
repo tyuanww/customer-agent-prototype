@@ -2853,9 +2853,39 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       }
       const rejected = await publisher.publish(user,request);
       expect(rejected).toMatchObject({ ok:false });
+      if (gate==='publisher-revoked') expect(rejected).toMatchObject({ code:'NOT_FOUND',reason:'SCOPE_DENIED' });
       expect(rejected).not.toMatchObject({ code:'INTERNAL_ERROR' });
       await noPublication();
     });
+
+  it('hides a candidate when publish authority is revoked between preparation and final admission', async () => {
+    await publicationBase();
+    const { request } = await publishable('revoked-after-prepare');
+    const { user } = await restrictedPublisher();
+    let revoked = false;
+    const betweenTransactions: IntakePool = { async connect() {
+      const client = await publicationPool!.connect();
+      return new Proxy(client,{ get(target,key) {
+        if (key === 'query') return async (sql: string,args?: unknown[]) => {
+          const result = await target.query(sql,args);
+          if (sql === 'COMMIT' && !revoked) {
+            revoked = true;
+            value(await service.changeGrant(actor('director'),'business-enabler-publish',{
+              operationId:'revoke-between-publish-transactions',expectedVersion:1,change:'revoke',reason:'合成发布撤权',stewardPrincipalId:null }));
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target,key);
+        return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const publishing = createContentIntakeService(betweenTransactions,store,(_id,error)=>diagnostics.push(error),undefined,
+      { requireProductSession:true });
+    const rejected = await publishing.publish(user,request);
+    expect(revoked).toBe(true);
+    expect(rejected).toMatchObject({ ok:false,code:'NOT_FOUND',reason:'SCOPE_DENIED',commit:'rolled_back' });
+    await noPublication();
+  });
 
   it('rolls back ticket, catalog, candidate, current and release on a late announcement failure', async () => {
     await publicationBase();const { c,request }=await publishable();

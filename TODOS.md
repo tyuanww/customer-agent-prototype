@@ -20,6 +20,12 @@
 
 **本轮 `/review` 收口状态：** 承接干净的 `c72e020`，当前两次本地代码提交修复了授权结果未知后遭资格拒绝、以及停止等待后首次重试遭资格拒绝时丢失原操作的问题，并统一回退历史时间/按钮布局、修正上传恢复注释。第二条先有失败测试再修复；定向 55/55、根 lint/typecheck/test/build、分组 workspace:check 通过。gstack 两条合成 HTTP/PG15 smoke 及当前桌面恢复探针退出 0；九类 specialist/Red Team 仅按所读范围复核，不能当作全分支逐行审核。Claude 宿主技能要求的 native 对抗与非 Grok 外部有效结论仍缺，上一轮 Claude Code 配置诊断/超时未有修复证据，未重复调用。完整 `/review`、CSV 外审均保持 INCOMPLETE；既有设备、真实接入和历史审查限制不变。命令、退出状态和精确剩余条件见[本轮证据](evidence/qa/intake-legacy-acl-runtime/gstack-review-closeout-2026-10-09.md)。
 
+**A1–A5 修复提交补记：** 在 `468375e` 上补齐 API 回滚失败不能再伪装为确定拒绝、桌面真实 404／无 pending 重试、结果未知关闭提醒及 POST/PATCH 原请求恢复；已按 API `eda5ab7`、桌面 `15bcc6c` 两个功能组本地提交，版本仍为 0.3.26，两笔提交后代码工作树干净。提交后确认 13 个原文件差异和 1 个新文件摘要与已测输入完全相同，复用 API 12/12、桌面 67/67、两条 PG15 管理 HTTP、最终 Electron/HTTP/PG 与根检查证据；没有把复用写成提交后重跑。两笔提交的暂存范围、脱敏扫描和精确审查限制见[同一审查记录](evidence/qa/intake-legacy-acl-runtime/gstack-review-closeout-2026-10-09.md#a1a5-修复提交的后续绑定2026-10-09)。完整分支 `/review` 仍 INCOMPLETE。正式接入仍按下表和[既有 Menokin 整理对照](docs/reference-intake-menokin-readiness.md#真实整理前只缺这些内容)补具名主体、来源登记、资料语义与历史关系，不新增 TODO 或接入真实资料。
+
+**正式绑定本轮答复：** 用户确认权威飞书来源和具名总监／经理尚未指定；旧目录认领及历史保留期尚未提供批准记录。建议先只读列出旧内容与新来源的对应关系，无法确认的保持原状；在负责人和保留期限获批前不删除历史，也不启用真实导入。这是待确认的处理建议，不是已经生效的保留政策。
+
+**外审补审后的当前增量（已定向审查、本地提交）：** Grok 的 379 条旧账本记录经独立核对，路径/哈希和 27 条同 blob 复用关系成立；大量 QA 只读顶层状态，不能据此关闭完整 `/review`。F1 的预览模式旧写共存不违反 E14 的 active 围栏；S1–S4 保持疑似。F2 的“准备后撤权”在实际 PG15 合成测试中先复现为 403，再仅于 API 发布错误映射改成资源级 404。OCR 对唯一可审行为源码提出一条多层三元表达式意见，已改为清晰分支；排除的测试、文档与日志逐份补核。修后定向 lint/typecheck/build 和 PG15 2/2 通过。E1 原五规格 exit 1 的历史记录不改写；本轮同一组合在当前 Mac 合成环境 8/8 通过，脱敏日志见[五规格复跑](evidence/qa/intake-unified-workspace/electron-five-spec-rerun-2026-10-09.log)。原根 lint/typecheck/test/build 与分组体积预算退出 0；文档同步另经 docs:check。审查及提交范围见[同一审查记录](evidence/qa/intake-legacy-acl-runtime/gstack-review-closeout-2026-10-09.md#grok-语义补审核对与-f2e1-定向推进2026-10-09)。完整 `/review`、真实资料和设备验收继续按既有条件管理。
+
 **本期剩余工作：**
 
 | 工作 | 已具备与尚缺的边界 | 完成标准 |

@@ -175,7 +175,7 @@ node scripts/probe-intake-family-sql.mjs --output .gstack/family-sql-check.json
 
 Main `loadIntakeAccess(session,signal?)` 收齐两张列表并再次完整核对权限，返回 `{validUntil,shops,sources,capabilities}`；只作过期即失效的选择提示，不能拿它查询/复制。复读核对可见的权限变化，并非跨 HTTP 原子快照；来源独立更新及读完后的变更由后续资格签发重新核验。沿用 `ContentIntakeUsage.select/refresh` 签发当前店资格。发现读取最多每张表 50 页、三次列表读取合计 8 MiB；达到预算显式失败，不保证所有字段均取最大长度时可容纳 5000 个来源。取消、会话变更、重复分页、错范围和读间撤权均不输出部分菜单。品牌通用范围不是可选店，未获 query 资格的分配者也不会获得可查询店铺。
 
-当前合同没有店铺展示名；Main 保留真实的合成店铺 ID，UI 的正式命名目录尚待合同接入。生产工厂仍未注册新能力；仅下述显式 loopback 合成 profile 接入了 Main/renderer。实库及实际桌面会话消费通过既有 `test:intake:transactions` 入口运行，详见[本轮验收](../evidence/qa/content-intake-p2-discovery/README.md)。
+该早期发现合同没有店铺展示名；当前已接入 0033 的名称目录，Main 仍以稳定店铺 ID 作为授权依据，名称只用于显示。生产工厂仍未注册新能力；仅下述显式 loopback 合成 profile 接入了 Main/renderer。实库及实际桌面会话消费通过既有 `test:intake:transactions` 入口运行，详见[本轮验收](../evidence/qa/content-intake-p2-discovery/README.md)及下方[正式用途合同贯穿合成 HTTP 与本机 Electron](#正式用途合同贯穿合成-http-与本机-electron)。
 
 ## P2 桌面 Query 合成入口
 
@@ -358,11 +358,11 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 ## 正式用途合同贯穿合成 HTTP 与本机 Electron
 
-显式 `purpose-runtime` 使用正式33段迁移；四个环境LOGIN只借各自NOLOGIN能力，每次取连接都经过 `assert_purpose`。组织池实际完成合成绑定登记、双扫描观察及带provenance事实写入；业务/usage/worker复用原service。旧候选安装器和SQL改写桥不在这条运行链上，生产app/server不注册新路径。
+显式 `purpose-runtime` 使用当前完整的35段迁移；四个环境LOGIN只借各自NOLOGIN能力，每次取连接都经过 `assert_purpose`。组织池实际完成合成绑定登记、双扫描观察及带provenance事实写入；业务/usage/worker复用原service。旧候选安装器和SQL改写桥不在这条运行链上，生产app/server不注册新路径。
 
 ```sh
 pnpm build
-CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-shop-directory-real-stack.spec.ts
+CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-shop-directory-real-stack.spec.ts tests/e2e/content-intake-workspace-real-stack.spec.ts
 ```
 
-名称目录仅服务查询可见性。Main完整读取所有页，核对 shopId 与已授权店铺集合一致后展示名称；同名附编号，更名/失效重新加载，失败保留编号并提示。名录不会新增授权，也不延长查询资格。实际测试数量、日志和失败边界见[正式合同合成接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。真实维护/登记范围、密钥托管、生产账号与实时飞书仍不在这些合成命令内。
+名称目录仅服务查询可见性。Main完整读取所有页，核对 shopId 与已授权店铺集合一致后展示名称；同名附编号，更名/失效重新加载，失败保留编号并提示。名录不会新增授权，也不延长查询资格。当前五规格组合的 Mac 合成复跑为 8/8，通过日志见[五规格复跑](../evidence/qa/intake-unified-workspace/electron-five-spec-rerun-2026-10-09.log)；原专项的数量、日志和失败边界仍见[正式合同合成接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。真实维护/登记范围、密钥托管、生产账号与实时飞书仍不在这些合成命令内。
