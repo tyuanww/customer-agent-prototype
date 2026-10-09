@@ -1,0 +1,566 @@
+{
+  "createdAt": "2026-10-09T05:33:07.023Z",
+  "results": [
+    {
+      "phase": "before-select",
+      "status": "executed",
+      "evidence": {
+        "phase": "before-select",
+        "sqlEvents": [
+          {
+            "at": "2026-10-09T05:33:04.710Z",
+            "kind": "source-select",
+            "n": 1,
+            "modes": [
+              "v2-preview"
+            ],
+            "rewritten": false
+          },
+          {
+            "at": "2026-10-09T05:33:04.756Z",
+            "kind": "source-select",
+            "n": 1,
+            "modes": [
+              "v2-preview"
+            ],
+            "rewritten": false
+          },
+          {
+            "at": "2026-10-09T05:33:04.759Z",
+            "kind": "receipt-insert",
+            "rewritten": false
+          },
+          {
+            "at": "2026-10-09T05:33:04.803Z",
+            "kind": "source-select",
+            "n": 2,
+            "modes": [
+              "v2-preview"
+            ],
+            "rewritten": false
+          }
+        ],
+        "rewroteRows": false,
+        "controlledSubstitute": false,
+        "realSecondSession": true,
+        "commitReturnedAt": "2026-10-09T05:33:04.805Z",
+        "boundary": {
+          "kind": "before-select",
+          "at": "2026-10-09T05:33:04.759Z",
+          "after": "receipt-insert-returned",
+          "finalSelectIssued": false
+        },
+        "lockAtBoundary": {
+          "watchMs": 42,
+          "samples": 2,
+          "last": {
+            "at": "2026-10-09T05:33:04.803Z",
+            "rows": [
+              {
+                "pid": 83688,
+                "usename": "synthetic_intake_auth",
+                "state": "idle",
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "query": "COMMIT",
+                "locktype": null,
+                "classid": null,
+                "objid": null,
+                "lockmode": null,
+                "granted": null,
+                "blocking": []
+              },
+              {
+                "pid": 83697,
+                "usename": "gate_owner",
+                "state": "idle in transaction",
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "query": "INSERT INTO backend_review.receipts(actor_user_id,operation,request_key,request_hash,response) VALUES ($1,$2,$3,$4,$5::jsonb)",
+                "locktype": "advisory",
+                "classid": 724019,
+                "objid": 1,
+                "lockmode": "ExclusiveLock",
+                "granted": true,
+                "blocking": []
+              },
+              {
+                "pid": 83699,
+                "usename": "gate_owner",
+                "state": "active",
+                "wait_event_type": "Lock",
+                "wait_event": "advisory",
+                "query": "UPDATE content_intake.sources SET mode='legacy', mode_version=mode_version+1 WHERE source_id='source-a'",
+                "locktype": "advisory",
+                "classid": 724019,
+                "objid": 1,
+                "lockmode": "ExclusiveLock",
+                "granted": false,
+                "blocking": [
+                  83697
+                ]
+              }
+            ]
+          },
+          "anyWait": true
+        },
+        "nextSql": " SELECT s.*, src.current_mapping_version, src.mode, m.template_version,m.rule_version,m.mapping_version,m.structure_digest FROM content_intake.sources src JOIN content_intake.scope",
+        "finalSelectStartedAt": "2026-10-09T05:33:04.803Z",
+        "http": {
+          "status": 201,
+          "body": {
+            "objectId": "obj_729ff371ea91dc3f7cbd37c9eb05b6d439897fe1bb047619bfb88f1ece31bc8f",
+            "sourceId": "source-a",
+            "sha256": "6cabbbc10d482268c32dd74787fa92129f50307534475e753a94b14b93583a6e",
+            "bytes": 9863,
+            "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          }
+        },
+        "afterHttpBeforeModeChange": {
+          "mode": [
+            {
+              "source_id": "source-a",
+              "mode": "legacy",
+              "mode_version": "2"
+            }
+          ],
+          "objects": [
+            {
+              "object_id": "obj_729ff371ea91dc3f7cbd37c9eb05b6d439897fe1bb047619bfb88f1ece31bc8f",
+              "source_id": "source-a",
+              "purpose": "input",
+              "sha256": "6cabbbc10d482268c32dd74787fa92129f50307534475e753a94b14b93583a6e",
+              "bytes": "9863"
+            }
+          ],
+          "receipts": [
+            {
+              "actor_user_id": "user-enabler",
+              "operation": "intake:upload",
+              "request_key": "mode-before-select"
+            }
+          ],
+          "reservations": [
+            {
+              "object_id": "obj_729ff371ea91dc3f7cbd37c9eb05b6d439897fe1bb047619bfb88f1ece31bc8f",
+              "source_id": "source-a",
+              "state": "adopted"
+            }
+          ]
+        },
+        "updater": {
+          "ok": true,
+          "beginAt": "2026-10-09T05:33:04.761Z",
+          "updateReturnedAt": "2026-10-09T05:33:04.806Z",
+          "commitReturnedAt": "2026-10-09T05:33:04.808Z",
+          "elapsedMs": 47,
+          "sqlstate": null
+        },
+        "afterModeChange": {
+          "mode": [
+            {
+              "source_id": "source-a",
+              "mode": "legacy",
+              "mode_version": "2"
+            }
+          ],
+          "objects": [
+            {
+              "object_id": "obj_729ff371ea91dc3f7cbd37c9eb05b6d439897fe1bb047619bfb88f1ece31bc8f",
+              "source_id": "source-a",
+              "purpose": "input",
+              "sha256": "6cabbbc10d482268c32dd74787fa92129f50307534475e753a94b14b93583a6e",
+              "bytes": "9863"
+            }
+          ],
+          "receipts": [
+            {
+              "actor_user_id": "user-enabler",
+              "operation": "intake:upload",
+              "request_key": "mode-before-select"
+            }
+          ],
+          "reservations": [
+            {
+              "object_id": "obj_729ff371ea91dc3f7cbd37c9eb05b6d439897fe1bb047619bfb88f1ece31bc8f",
+              "source_id": "source-a",
+              "state": "adopted"
+            }
+          ]
+        },
+        "actualCommitOrder": "after-upload-commit"
+      }
+    },
+    {
+      "phase": "after-select",
+      "status": "executed",
+      "evidence": {
+        "phase": "after-select",
+        "sqlEvents": [
+          {
+            "at": "2026-10-09T05:33:05.831Z",
+            "kind": "source-select",
+            "n": 1,
+            "modes": [
+              "v2-preview"
+            ],
+            "rewritten": false
+          },
+          {
+            "at": "2026-10-09T05:33:05.860Z",
+            "kind": "source-select",
+            "n": 1,
+            "modes": [
+              "v2-preview"
+            ],
+            "rewritten": false
+          },
+          {
+            "at": "2026-10-09T05:33:05.862Z",
+            "kind": "receipt-insert",
+            "rewritten": false
+          },
+          {
+            "at": "2026-10-09T05:33:05.862Z",
+            "kind": "source-select",
+            "n": 2,
+            "modes": [
+              "v2-preview"
+            ],
+            "rewritten": false
+          }
+        ],
+        "rewroteRows": false,
+        "controlledSubstitute": false,
+        "realSecondSession": true,
+        "commitReturnedAt": "2026-10-09T05:33:05.907Z",
+        "boundary": {
+          "kind": "after-select",
+          "at": "2026-10-09T05:33:05.862Z",
+          "after": "final-source-select-returned",
+          "nextNotYetIssued": true
+        },
+        "lockAtBoundary": {
+          "watchMs": 43,
+          "samples": 2,
+          "last": {
+            "at": "2026-10-09T05:33:05.906Z",
+            "rows": [
+              {
+                "pid": 83765,
+                "usename": "synthetic_intake_auth",
+                "state": "idle",
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "query": "COMMIT",
+                "locktype": null,
+                "classid": null,
+                "objid": null,
+                "lockmode": null,
+                "granted": null,
+                "blocking": []
+              },
+              {
+                "pid": 83766,
+                "usename": "gate_owner",
+                "state": "idle in transaction",
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "query": " SELECT s.*, src.current_mapping_version, src.mode, m.template_version,m.rule_version,m.mapping_version,m.structure_digest FROM content_intake.sources src JOIN content_intake.scopes s USING(scope_id) JOIN content_intake.",
+                "locktype": "advisory",
+                "classid": 724019,
+                "objid": 1,
+                "lockmode": "ExclusiveLock",
+                "granted": true,
+                "blocking": []
+              },
+              {
+                "pid": 83767,
+                "usename": "gate_owner",
+                "state": "active",
+                "wait_event_type": "Lock",
+                "wait_event": "advisory",
+                "query": "UPDATE content_intake.sources SET mode='legacy', mode_version=mode_version+1 WHERE source_id='source-a'",
+                "locktype": "advisory",
+                "classid": 724019,
+                "objid": 1,
+                "lockmode": "ExclusiveLock",
+                "granted": false,
+                "blocking": [
+                  83766
+                ]
+              }
+            ]
+          },
+          "anyWait": true
+        },
+        "nextSql": "SELECT clock_timestamp() AS time",
+        "http": {
+          "status": 201,
+          "body": {
+            "objectId": "obj_c7a246ff2b489c301290e5e3e723d31eec6198a2350539b30da6f11ed097d693",
+            "sourceId": "source-a",
+            "sha256": "6cabbbc10d482268c32dd74787fa92129f50307534475e753a94b14b93583a6e",
+            "bytes": 9863,
+            "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          }
+        },
+        "afterHttpBeforeModeChange": {
+          "mode": [
+            {
+              "source_id": "source-a",
+              "mode": "v2-preview",
+              "mode_version": "1"
+            }
+          ],
+          "objects": [
+            {
+              "object_id": "obj_c7a246ff2b489c301290e5e3e723d31eec6198a2350539b30da6f11ed097d693",
+              "source_id": "source-a",
+              "purpose": "input",
+              "sha256": "6cabbbc10d482268c32dd74787fa92129f50307534475e753a94b14b93583a6e",
+              "bytes": "9863"
+            }
+          ],
+          "receipts": [
+            {
+              "actor_user_id": "user-enabler",
+              "operation": "intake:upload",
+              "request_key": "mode-after-select"
+            }
+          ],
+          "reservations": [
+            {
+              "object_id": "obj_c7a246ff2b489c301290e5e3e723d31eec6198a2350539b30da6f11ed097d693",
+              "source_id": "source-a",
+              "state": "adopted"
+            }
+          ]
+        },
+        "updater": {
+          "ok": true,
+          "beginAt": "2026-10-09T05:33:05.863Z",
+          "updateReturnedAt": "2026-10-09T05:33:05.908Z",
+          "commitReturnedAt": "2026-10-09T05:33:05.908Z",
+          "elapsedMs": 45,
+          "sqlstate": null
+        },
+        "afterModeChange": {
+          "mode": [
+            {
+              "source_id": "source-a",
+              "mode": "legacy",
+              "mode_version": "2"
+            }
+          ],
+          "objects": [
+            {
+              "object_id": "obj_c7a246ff2b489c301290e5e3e723d31eec6198a2350539b30da6f11ed097d693",
+              "source_id": "source-a",
+              "purpose": "input",
+              "sha256": "6cabbbc10d482268c32dd74787fa92129f50307534475e753a94b14b93583a6e",
+              "bytes": "9863"
+            }
+          ],
+          "receipts": [
+            {
+              "actor_user_id": "user-enabler",
+              "operation": "intake:upload",
+              "request_key": "mode-after-select"
+            }
+          ],
+          "reservations": [
+            {
+              "object_id": "obj_c7a246ff2b489c301290e5e3e723d31eec6198a2350539b30da6f11ed097d693",
+              "source_id": "source-a",
+              "state": "adopted"
+            }
+          ]
+        },
+        "actualCommitOrder": "after-upload-commit"
+      }
+    },
+    {
+      "phase": "after-commit",
+      "status": "executed",
+      "evidence": {
+        "phase": "after-commit",
+        "sqlEvents": [],
+        "rewroteRows": false,
+        "controlledSubstitute": false,
+        "realSecondSession": true,
+        "http": {
+          "status": 201,
+          "body": {
+            "objectId": "obj_1360f101ea2e80ff9587b03b8a3615d073ea5b57035912df280f19070be47b3b",
+            "sourceId": "source-a",
+            "sha256": "100c032f0742316bdcc4836f079770e8f14c04b489d28ed016fb5b54ff5108ca",
+            "bytes": 9863,
+            "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          }
+        },
+        "afterHttpBeforeModeChange": {
+          "mode": [
+            {
+              "source_id": "source-a",
+              "mode": "v2-preview",
+              "mode_version": "1"
+            }
+          ],
+          "objects": [
+            {
+              "object_id": "obj_1360f101ea2e80ff9587b03b8a3615d073ea5b57035912df280f19070be47b3b",
+              "source_id": "source-a",
+              "purpose": "input",
+              "sha256": "100c032f0742316bdcc4836f079770e8f14c04b489d28ed016fb5b54ff5108ca",
+              "bytes": "9863"
+            }
+          ],
+          "receipts": [
+            {
+              "actor_user_id": "user-enabler",
+              "operation": "intake:upload",
+              "request_key": "mode-after-commit"
+            }
+          ],
+          "reservations": [
+            {
+              "object_id": "obj_1360f101ea2e80ff9587b03b8a3615d073ea5b57035912df280f19070be47b3b",
+              "source_id": "source-a",
+              "state": "adopted"
+            }
+          ]
+        },
+        "lockAtBoundary": {
+          "watchMs": 0,
+          "anyWait": false,
+          "last": {
+            "at": "2026-10-09T05:33:06.836Z",
+            "rows": [
+              {
+                "pid": 83803,
+                "usename": "synthetic_intake_auth",
+                "state": "idle",
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "query": "COMMIT",
+                "locktype": null,
+                "classid": null,
+                "objid": null,
+                "lockmode": null,
+                "granted": null,
+                "blocking": []
+              },
+              {
+                "pid": 83804,
+                "usename": "gate_owner",
+                "state": "idle",
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "query": "COMMIT",
+                "locktype": null,
+                "classid": null,
+                "objid": null,
+                "lockmode": null,
+                "granted": null,
+                "blocking": []
+              }
+            ]
+          },
+          "note": "update starts only after HTTP returned"
+        },
+        "updater": {
+          "ok": true,
+          "beginAt": "2026-10-09T05:33:06.836Z",
+          "commitReturnedAt": "2026-10-09T05:33:06.837Z",
+          "elapsedMs": 1,
+          "sqlstate": null,
+          "session": "admin-after-http"
+        },
+        "boundary": {
+          "kind": "after-commit",
+          "at": "2026-10-09T05:33:06.836Z",
+          "after": "http-returned"
+        },
+        "afterModeChange": {
+          "mode": [
+            {
+              "source_id": "source-a",
+              "mode": "legacy",
+              "mode_version": "2"
+            }
+          ],
+          "objects": [
+            {
+              "object_id": "obj_1360f101ea2e80ff9587b03b8a3615d073ea5b57035912df280f19070be47b3b",
+              "source_id": "source-a",
+              "purpose": "input",
+              "sha256": "100c032f0742316bdcc4836f079770e8f14c04b489d28ed016fb5b54ff5108ca",
+              "bytes": "9863"
+            }
+          ],
+          "receipts": [
+            {
+              "actor_user_id": "user-enabler",
+              "operation": "intake:upload",
+              "request_key": "mode-after-commit"
+            }
+          ],
+          "reservations": [
+            {
+              "object_id": "obj_1360f101ea2e80ff9587b03b8a3615d073ea5b57035912df280f19070be47b3b",
+              "source_id": "source-a",
+              "state": "adopted"
+            }
+          ]
+        },
+        "replay": {
+          "status": 409,
+          "body": {
+            "error": {
+              "code": "CONFLICT",
+              "message": "资料请求未完成。",
+              "details": {
+                "reason": "MODE_CONFLICT",
+                "diagnosticId": "intake_47d6f0ba-c44c-44aa-8b36-3300353252b1"
+              }
+            }
+          }
+        },
+        "afterReplay": {
+          "mode": [
+            {
+              "source_id": "source-a",
+              "mode": "legacy",
+              "mode_version": "2"
+            }
+          ],
+          "objects": [
+            {
+              "object_id": "obj_1360f101ea2e80ff9587b03b8a3615d073ea5b57035912df280f19070be47b3b",
+              "source_id": "source-a",
+              "purpose": "input",
+              "sha256": "100c032f0742316bdcc4836f079770e8f14c04b489d28ed016fb5b54ff5108ca",
+              "bytes": "9863"
+            }
+          ],
+          "receipts": [
+            {
+              "actor_user_id": "user-enabler",
+              "operation": "intake:upload",
+              "request_key": "mode-after-commit"
+            }
+          ],
+          "reservations": [
+            {
+              "object_id": "obj_1360f101ea2e80ff9587b03b8a3615d073ea5b57035912df280f19070be47b3b",
+              "source_id": "source-a",
+              "state": "adopted"
+            }
+          ]
+        },
+        "actualCommitOrder": "after-http"
+      }
+    }
+  ]
+}

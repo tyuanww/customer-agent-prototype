@@ -103,5 +103,26 @@
       }
     ],
     "subsequentChanges": "Only actual code increments after the reviewed heads require new incremental coverage; this receipt does not cover future A/C/D implementations."
+  },
+  "targetedFinalAudit": {
+    "source": "User-provided Grok read-only handoff; the main agent checked repository heads, source and result-file hashes, the source write-lock trigger, and selected result contents without rerunning the experiments.",
+    "report": "grok-final-targeted-handoff-2026-10-09.md",
+    "reportSha256": "1f31db6374b081c6ae6e5e960ab66182ab1a7583e72f311b8202240c2c473c5e",
+    "archivedOutputs": "final-targeted/ (mode-order.json, hash-compare.json, bait.json, family-probe.json and CSV/runtime/shop stdout); byte-identical to the selected synthetic outputs named in the handoff. The earlier privilege-probe dynamic attempt failed on its own bait table permission; bait.json is the corrected rerun.",
+    "productHead": "1c5d5e1401f5dc9fe2d47de333f37ed6c29c8e51",
+    "governanceHead": "0125a97c284a78262a52a67b3d9834107a0f59bc",
+    "findings": "No new actionable defect in the bounded scope; this does not certify full /review or production use.",
+    "verifiedEvidence": [
+      "Actual synthetic PG15 mode-order result: three HTTP cases; source writes in the first two windows waited on source_write_lock and committed after the upload, while the third update followed the HTTP response.",
+      "Eighteen governance PG inputs matched their recorded bytes and SHA-256; zero mismatch.",
+      "User-reported CSV 35/35, runtime closure 17/17, shop directory 253/253 and family probe 114/114; the main agent matched the supplied output hashes and spot-checked summaries, without rerunning these suites.",
+      "Scoped privilege and corrected pg_temp bait probes did not establish an executable escalation path for the named roles and functions."
+    ],
+    "limits": [
+      "The other 86 governance and 97 product SECURITY DEFINER functions with public or pg_temp in search_path were inventoried, not dynamically exercised one by one.",
+      "Approved schema and OpenAPI bytes and additive lineage match; the unchanged predecessor text was not read line by line for semantics.",
+      "Replay rejection temporary-reservation release, grant revocation and role-change races were not executed in this round.",
+      "Real data, production HTTP and Windows/manual device acceptance remain outside this synthetic audit."
+    ]
   }
 }
