@@ -2,6 +2,8 @@
 
 `parseWorkbook(bytes, fixedContext)` 用 ExcelJS 读取标准 FAQ 工作簿；`parseCsv(bytes, fixedContext)` 原生读取标准 CSV。两者复用 FAQ / 问法规则，返回规范行和错误坐标。`createTemplate` / `writeIssueReport` 生成可重新打开的 XLSX。`createParseRunner().parse` 拥有单个解析子进程、超时、取消与退出；取消完成后才释放槽位。
 
+`parseSopWorkbook(bytes, fixedContext)` 是当前首期 SOP 的合成候选，不由 runner 或生产 API 选择。它只接受登记上下文中的六个工作表，按工作表行收集非空文字并保留列顺序与换行，把同一行的内嵌 PNG/JPEG/GIF 提取为受限附件元数据；图片所在行没有文字时整批拒绝。SOP 分类保留原工作表名称，版本优先使用明确的“版本/版本号”字段，否则使用原文件 SHA-256。这个候选尚未进入冻结合同、HTTP、数据库或桌面运行链；FAQ、售前、售后、活动仍使用现有 23 列 CSV/XLSX 解析器。
+
 这是 P1 技术验证与 P2 API 合成事务共用的规范解析包。API 事务执行器通过 runner 消费；隔离合成 HTTP 与桌面 Main/preload/界面已接通上传、校验及报告读取，renderer 不直接运行解析器。正式生产服务尚未装配。来源事实由调用方固定；权限、风险与审批摘要归 API。任何阻断项返回空结果，不能把好行单独发出去。公式、宏、外部关系不执行；所选页的图片/附件暂时阻断并说明，排除页图片可计数。词项存在性及持久候选由 API 事务模块校验；完整媒体语义尚未支持。不能把这里的格式通过当成可发布。
 
 `archive.ts` 在 ExcelJS 对象模型分配前流式检查成员、实际展开量、XML/稀疏坐标/单值预算。独立进程只收到字节和固定上下文，环境为空；网络观测拦截常用 Node 入口。此观测不等于 OS 网络沙箱，V8 heap 参数也不等于 RSS/Buffer 上限。
