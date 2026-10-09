@@ -1,6 +1,6 @@
 {
   "schema": "intake-coverage-ledger/v1",
-  "builtAgainst": "25c535e7d5b4871c8307d97da89488ed8da4dee3",
+  "builtAgainst": "3bbf065ed97fbc466f9f40eaf0d0eb873daa84b4",
   "branch": "codex/intake-organization",
   "mergeBase": "8ab309fcd9c494b7343ed88bacb253205d36575f",
   "ocr": {
@@ -18,7 +18,13 @@
       "excluded": 263
     },
     "rule": "ocr delegate rule --format json，7 批，每批最多 80 个可审路径，退出码都是 0。审查判断由本轮执行者做。OCR 没有调用 LLM。原始输出在目标 scratch 的 ocr-rule-00.json 到 ocr-rule-06.json。",
-    "coverageRateIsNotReviewPass": true
+    "coverageRateIsNotReviewPass": true,
+    "at3bbf065": {
+      "reviewable": 510,
+      "excluded": 263,
+      "addedReviewable": "evidence/qa/intake-legacy-acl-runtime/coverage-ledger.json",
+      "note": "相对 18ff7cf 的 509/263 只多账本自身。账本 where 仍是 ledger-self。这不是 /review PASS。"
+    }
   },
   "ranges": [
     {
@@ -37,6 +43,11 @@
       "evidence": "测试与状态证据。行为代码、0030、VERSION 未改。"
     },
     {
+      "range": "18ff7cf1d810eaa29598a8a2a36e481c711468b6..3bbf065ed97fbc466f9f40eaf0d0eb873daa84b4",
+      "disposition": "semantic_read",
+      "evidence": "git log --oneline 该区间只有 25c535e 与 3bbf065。git diff --name-only 五文件：TODOS.md、apps/api/tests/content-intake.integration.test.ts、docs/plans/2026-10-03-content-intake-requirements.md、evidence/qa/intake-legacy-acl-runtime/review.json、evidence/qa/intake-legacy-acl-runtime/coverage-ledger.json。无行为代码、无 0030、无 VERSION。这五份文件在 files 里已是 semantic_read。本行把区间本身写明。写入本行的后续账本提交不在此区间内，它只记录处置。completeReview 仍是 INCOMPLETE。"
+    },
+    {
       "range": "54f428ca8296aba9a75d2205439b3063cfef8c9b..f6f8cf35ef9a9007cddade8a0c7fa4b648bef9a1",
       "disposition": "exact_reuse",
       "evidence": "blob 仍等于 f6f8cf35 的文件精确复用 intake-csv-runtime/review.json 的本地 diff 审查。该文件 externalCompleteReview 仍是 INCOMPLETE。"
@@ -45,9 +56,9 @@
   "completeReview": "INCOMPLETE",
   "counts": {
     "exact_reuse": 89,
-    "uncovered": 60,
+    "uncovered": 0,
     "hash_check": 769,
-    "semantic_read": 6,
+    "semantic_read": 66,
     "excluded": 89
   },
   "whereCounts": {
@@ -67,14 +78,14 @@
     {
       "path": "apps/api/experiments/content-intake-p1/approval.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "P1 进程内实验。materialDigest 由服务端完整快照算差异，调用方不能另交一份 diff 降级风险。verifyApproval 不发网络请求，只消费已取得的附件字节摘要；审批 JSON 的 tenant/app 必须等于适配器上下文。canCommit 在票据过期、主体版本变化、基线变化、证据或来源确认变化时失败关闭。不在 API dist/路由上。未见当前登录角色可触发缺陷。"
     },
     {
       "path": "apps/api/experiments/content-intake-p1/permissions.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "P1 实验权限交集。角色必须唯一，否则 roleOf 为 null 并 ROLE_CEILING。fresh 要求 5 分钟内且 enabled。covers 不把 null shop 当成全店，null source 只覆盖同一 shop/domain。authorize 不因签发人后来失去分配权而作废已发业务授权，但仍查接收方当前上限与撤销。canAssign 拒绝自我升级，director/manager 才能分配。不进入正式路由。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/experiments/intake-organization/http-transport.ts",
@@ -142,8 +153,8 @@
     {
       "path": "apps/api/experiments/intake-runtime/acceptance-candidate/storage.delta.sql",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "验收候选 SQL，文件头写明不给应用角色 EXECUTE 或表权。全文只有触发器 EXECUTE FUNCTION，没有 format/动态 SQL。search_path 固定 pg_catalog。steward/display 写入要会话标记，否则触发器拒绝。SECURITY DEFINER 的 rotate_shop_directory_key 不读产品会话，但是操作员入口；本文件只 REVOKE ALL FROM PUBLIC，没有 GRANT。正式 0033 才把该函数授给 intake_directory_key_operator，不在这 60 个文件的运行时登录角色里。不把候选 SQL 记成当前登录漏洞，也不改 0033。"
     },
     {
       "path": "apps/api/experiments/intake-runtime/assembly.ts",
@@ -211,14 +222,14 @@
     {
       "path": "apps/api/src/content-import-repository.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "旧导入 enqueue/status/cancel。幂等走参数化 idempotency_claim，租约 60 秒。COMMIT 失败把 08/57P01/57P02 标 OVERLOADED+unknown，不重试成成功。来源拒绝另开连接记审计，审计失败返回 OVERLOADED。cancel 不先拿 admission 锁，避免与 0022 内容锁死锁；非正整数 ID 返回 404。readSourceRefs 失败返回空数组，调用方不能把它当成“源不存在已证明”。SQL 参数化。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/approval-adapter.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "合成审批 transport。route 必须等于构造时的 tenant/app/definition/node。observe 要求实例与 binding 一致、form canonical 等于 reviewForm。APPROVED 必须是 HUMAN、单一 PASS，附件字节与 sha 等于 binding，且不超过 packageBytes 与 INTAKE_POLICY.outputBytes。30 秒 AbortController。不接受 URL，真实飞书未实现。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/authority.ts",
@@ -230,8 +241,8 @@
     {
       "path": "apps/api/src/content-intake/candidate.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "getJob 后 authorize import。currentBase 在内容锁之后再取发布 advisory 锁和 content_current FOR UPDATE。receive 要求 v2-preview。配额 actor 10、source 100、进行中 job 同数、tenant 1GiB。freezeParsed 只允许 parsing 且 publication_policy=direct-v1。cancel 拒绝 published/publishing/unknown/invalidated。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/capacity.ts",
@@ -242,14 +253,14 @@
     {
       "path": "apps/api/src/content-intake/discovery.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "有界菜单，不是授权决定。来源超过 5000 则 FILE_LIMIT。授权截止走 authorization_deadline。游标 HMAC 绑定 session.hash，密钥进程内随机；签名或修订不符则 PERMISSION_CHANGED。managementContext 在 import authorize 之后再取发布锁。principals 先分页再过滤。缺 displayLabel 则 ORG_FACTS_UNAVAILABLE，不从 user id 推导姓名。SQL 全部参数化。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/evidence.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "confirmSource 在事务内核对 evidenceVersion、对象 sha、采集与原因。更新的已发布确认与整数版本冲突则 SOURCE_MISMATCH。INSERT 后 source_evidence_version 与 revocation_generation 加一，再 syncCandidateReadiness。requestReview/refreshReview 经 content-manage 上下文后一律 MODE_CONFLICT。direct 档不建包。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/files.ts",
@@ -317,38 +328,38 @@
     {
       "path": "apps/api/src/content-intake/publication.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "publish 先 publish-prepare，再 content_intake.publish_candidate。validUntil 取回滚谱系上最短 approval valid_until。仅 ZA001/ZA003/ZA005 且 message 在拒绝集合才映射 IntakeRejection。operationReceipt 按 actor、动作和 request_key 读历史回执，重放不是当前读权限。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/quality-access.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "query 拒绝多余键。digest/viewHash 必须 64 hex，limit 1–100。游标 HMAC 绑定 session.hash、principal、policy、source version、key、viewHash、phase、limit；timingSafeEqual。过期或签名错返回 MATERIAL_CHANGED。重启后游标失效是失败关闭。回执只接受 quality-freeze/quality-check。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/quality.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "质量总体用材料 digest 绑定 key。critical 把每条活条目标成 high。preview 调总体清单哈希与 sample_ids。已冻结计划与当前 canonical 不符则 MATERIAL_CHANGED。check 要求独立审查者，检查集合与冻结 id/contentHash 精确一致，正文 octet_length 卡 8MiB。通过质量不是发布许可。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/reviewer.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "critical 要求贡献者行齐全、identity_scope 相同且 person_key 不同，否则 HUMAN_REVIEW_REQUIRED，失败关闭。historicalReviewer 拒绝决定时间晚于 checkedAt、同一毫秒内后续事实/角色/授权变更、非单一非 agent 角色，以及不早于 checkpoint 出生的 review grant。SQL 参数化。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/rollback.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "preview_rollback 之后对每个 scope authorize rollback。plan 行 actor 必须匹配。impactDigest 不符则 MATERIAL_CHANGED。requiresCorrectiveCandidate 则 SCOPE_DENIED。request/refresh 解析后 plan(..., true) 再抛 MODE_CONFLICT。ZA002 映射 NOT_FOUND。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/runtime-pool.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "purpose 闭集映射到四类 NOLOGIN 角色，SET ROLE 不是调用方 SQL，随后 assert_purpose。失败 client.release(true)。end() 不回滚已借出的工作。无配置加载、无 HTTP 注册。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-intake/service.ts",
@@ -381,8 +392,8 @@
     {
       "path": "apps/api/src/content-intake/usage.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "issueEntitlement 锁产品会话与发布 advisory。选择的每个产品/场景词必须在允许 brand/tenant 内且 active。releaseDeadline 查 source gate、owner acceptance、revocation、lineage 与家族目录。游标只是 base64url 的资格摘要与 id，注释写明不是授权。隐藏家族用 multirange。超词表上限时已有行截断分页，零行则 FILE_LIMIT。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/content-object-store.ts",
@@ -394,20 +405,20 @@
     {
       "path": "apps/api/src/idempotency.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "canonicalJson 拒绝非有限数并按键排序。prepareIdempotencyHashes 用 HMAC-SHA256，version 与 canonical 以 NUL 分隔，轮换保留多版本摘要。只产出摘要，不在这里比较。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/src/product-auth-service.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "池名 cs-ai-synthetic-product-auth，statement_timeout 3 秒。每次查询 BEGIN 后核当前 LOGIN 不是 super/createdb/createrole/replication/bypassrls，且唯一成员是 NOLOGIN app_backend_auth，再 SET LOCAL ROLE。未知 COMMIT 不重试。issueBoundSession 只允许 synthetic_coach|owner|quality，且 actor.role 必须是 coach。authenticate 拒绝 mockUser/mockRole，token 必须 bearer 且 43 位 URL-safe。sessionReferences 是 WeakMap。日志不打 token。未见当前可触发缺陷。"
     },
     {
       "path": "apps/api/tests/support/intake-approval.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "测试替身。按 createUuid 去重，附件另存一份字节并用两段流回放。approve 只写合成 HUMAN/PASS。注释写明不联系飞书、不读凭证。不是运行时路由。"
     },
     {
       "path": "apps/api/tests/support/intake-historical-migrations.ts",
@@ -461,8 +472,8 @@
     {
       "path": "apps/desktop/src/main/content-intake-catalog-ipc.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "只信 dashboard role 的 trusted main frame。命令经 isIntakeCatalogCommand。不接受查询选择、剪贴板、原始资格、URL 或身份。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/content-intake-catalog.ts",
@@ -474,8 +485,8 @@
     {
       "path": "apps/desktop/src/main/content-intake-management-ipc.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "只信 dashboard main frame。命令经 isIntakeManagementCommand。mode 只报告 session 是否存在。关闭风险区分 pending 与未提交；强制关闭不撤销服务端。reason 文案是闭集。每窗口一个管理对象，destroyed 时 dispose。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/content-intake-management.ts",
@@ -494,8 +505,8 @@
     {
       "path": "apps/desktop/src/main/content-intake-permissions-ipc.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "只接受 dashboard WebContents 且 isTrustedMainFrameSender。命令经 isIntakePermissionCommand。无会话则“尚未接入”。关闭风险用原生 dialog，关闭不撤销服务器已受理操作。ROLE_CEILING 单独文案。每窗口一个对象，destroyed 时 dispose。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/content-intake-permissions.ts",
@@ -507,26 +518,26 @@
     {
       "path": "apps/desktop/src/main/content-intake-quality.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "Main 持有 candidate key、完整样本和草稿。refresh 按 digest/viewHash/phase 分页，页不超过 500、总字节不超过 32MiB。重复 cursor、跨 key/phase/manifest 则 STALE，未完成不暴露部分结果。setCheck 只接受 scriptId/defect/reason，contentHash 来自服务器样本；已有检查不能改。freeze/submit 用 randomUUID；retry 复用原 body。确定性拒绝清 pending，COMMIT_UNKNOWN 与畸形成功保留。recover 读原 operationId。登出或 epoch 变化 reset。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/content-intake-query-ipc.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "只信 query role 的 trusted main frame。模式、选择、搜索、复制、取消都经 isIntake* 校验。无会话则 UNAVAILABLE。每 sender 一个 ContentIntakeQuery，destroyed 时 dispose。错误映射 IntakeUsageError.code，否则 UNAVAILABLE。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/content-intake-query.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "菜单不是资格。access 每次 loadIntakeAccess；所选 shop 不在名单则 FORBIDDEN。search 先 usage.refresh()。目录超过 5000 或索引字节超过 2MiB 则整查拒绝 LIMIT，不静默截断。BM25 只返回 Top 3。复制只允许本代 shown.keys。会话 epoch 变化清空。setImmediate 后再查 generation/catalog。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/content-intake-rollback.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "计划与回执留在 Main。执行前原生 confirm；确认回调返回后必须仍是同一 plan 且 allowed(currentAccess)。legacy 无 confirmed 或带 approvalEvidenceVersion 的 body 禁止改写成 direct。request/refresh review 直接 MODE_CONFLICT。首次确定性拒绝（非 COMMIT_UNKNOWN）清 pending；未知提交保留原 operationId。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/content-intake-upload.ts",
@@ -538,26 +549,26 @@
     {
       "path": "apps/desktop/src/main/content-intake-usage.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "选择只有 shop/product/scenario。entitlement 必须 shop 匹配且 scopes 不含别的 shop。snapshot 拒绝 sopNodes/sopEdges/media、不 active 词、跨 source、重复 identity、重复 cursor。行 key 是 randomUUID，不把服务端 id 当复制授权。copy 只在 live() 且 key 存在时写剪贴板。LEASE_EXPIRED 只本地过期；其它权限失败 invalidate 全部 handle。离线失败可保留已完成 handle 到原 deadline。上限 500 页 / 32MiB。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/desktop-lifecycle.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "关机或控制器未就绪时 second-instance 为 ignore/defer，不激活。dashboardEnabled===false 则只 openSearch。openDashboard 失败交给 onFailure，不抛到未处理。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/desktop-menu-model.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "动作闭集只有 open-search、open-dashboard、quit。编辑项只映射系统 role 与当前 editFlags。dashboardEnabled 为 false 时不出现工作台项。托盘图标只从 appPath/resourcesPath 的 fox-head.png 解析，不接受调用方 URL。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/desktop-shell.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "菜单 click 只调用上述三个动作。右键菜单在 popup 前 beginNativeContextMenu，失败也 releaseBlurGuard。托盘图标空或创建失败则降级，不改窗口信任。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/main.ts",
@@ -569,26 +580,26 @@
     {
       "path": "apps/desktop/src/main/overlay-controller.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "浮窗经 createOverlayChromeWindow：contextIsolation、sandbox、nodeIntegration false。bindWindowLifecycle 与打开 Dashboard 都调用 lockRendererWindow，拒绝新窗口、will-navigate 和 webview。布局序号必须匹配未完成的本会话。生产入口只把 resolveRendererDevServerUrl 的结果传入：打包后为 undefined，开发只接受无 userinfo 的 loopback。关闭查询窗在未允许退出时 preventDefault 并 dismiss。未见当前登录角色可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/product-http.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "loopback 仅 http://127.0.0.1:<port>，禁 userinfo/path/query/hash/隐式端口。公网只接受 https 主机名，禁 IP、localhost、非 443。路径必须 /v1/，禁 ..、:// 和反斜杠。超时 1–30000，默认 5 秒。响应上限默认 1MiB、最大 32MiB，由 Main 给，渲染器不控。额外头白名单四个名字。redirect=error。xlsx 须 OOXML 且 ZIP 本地头 0x04034b50。失败日志只打 status/code/ms。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/product-runtime-config.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "打包配置只读 userData 下的普通文件，拒绝 symlink 和超过 4096 字节。synthetic-local 只接受两个不同的 http://127.0.0.1 源；product-remote 只接受两个不同的 https 公网源；离线必须恰好只有 mode。缺文件、非法、不可读都失败关闭，不用环境变量代替。种子离线文件用 wx，不覆盖已有文件。开发半对源直接抛错，不退回 S0。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/main/product-session.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "token 留在 Main。access_token 必须 43 位 URL-safe。会话 15 分钟，时钟偏差最多 +2 分钟，过期即 invalidate。identify 调 /v1/auth/me，角色闭集 agent|coach|owner。login 是 PKCE S256，login_id 必须 login_ 加 43 位。exchange 202 则等 2 秒。失败且已换到 token 则 POST logout。总时限 120 秒。request 要求 epoch 匹配，UNAUTHORIZED 时 invalidate。store 异常时 view 为 UNAVAILABLE，不留半套凭证。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/preload/content-intake-query.ts",
@@ -614,68 +625,68 @@
     {
       "path": "apps/desktop/src/preload/index.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "contextBridge 暴露 customerAgent。每个 invoke 先做类型守卫和 exactKeys，非法输入直接失败或空操作，不把未校验 payload 送进 main。监听只转发已通过 is* 的事件。没有 nodeIntegration、eval，也不把 token 放进 window。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/App.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "按窗口 role 挂 Fox/Dashboard/Login/Sop/Query。QueryEntry 先读 intakeQuery.mode()；无桥则停在未启用，失败显示重试，不回退到夹具检索或旧网络路径。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/DashboardApp.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "管理模式只来自 dashboardIntake.mode()；失败或加载中不挂业务模块。legacy 的登录显示来自 dashboardContent.session()，名字用 sessionDisplayName。检索 fetch/eval/innerHTML/Bearer/clipboard 无匹配。其余是导航宽度和主题，不发放资格。内容页挂 IntakeManagement。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/QueryApp.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "intake 查询只在已登录、已选 shop、文本不超过 500 字时调用 intakeQuery.search({queryText})，不附带授权。复制走 intakeQuery.copy({key})、productSearch.copyAdopt 或 copyText。资格失效清结果。登录/登出忽略更旧的 sessionEpoch。检索 fetch/eval/innerHTML/Bearer 无匹配。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/data/dashboard-manifest.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "deepFreeze 的演示导航和合成概览文案。标了 DEMO · 合成数据。检索 fetch、http、token、eval 无匹配。不读取会话，也不授予范围。"
     },
     {
       "path": "apps/desktop/src/renderer/features/dashboard/IntakeLibrary.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "命令只有 select-shop、refresh、cancel、select-conditions。资格到期或店铺名到期就清空行或名称，不保留过期快照。onInvalidated 丢弃视图后再读 Main 的 current()。选择最多 100 项，列表只显示前 100 个匹配。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "命令经 dashboardIntake.command/current。上传停止与普通命令分代，迟到响应不能替换已停止的视图。current() 只投影 Main 内存。失效时清脏输入，只保留 Main 拥有的未知回执。发布、撤销、冻结、检查都是意图，不带文件字节或 operationId。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/features/dashboard/IntakePermissions.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "人员、动作、时间和原因来自视图闭集或本机时间字段。保存前要预览。撤销要原因。结果未确认时只允许按原请求重试。时间换成 ISO 后仍由服务器核对。无 dashboardPermissions 桥则不可用。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/features/dashboard/IntakeRollback.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "只收集两个不超过 128 的发布编号并发 rollback-preview/execute/recover/retry/discard。影响超出授权时只给 rollback-correct，不执行整库回退。pending 期间不能换计划。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "只发 upload-source/choose/reset/submit/retry/stop/refresh/save-report/open。文件名和字节数来自视图，不接收路径或 HTTP。提交只带整理人与改稿人选择。确认放弃本地准备时说明已提交任务不会撤销。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/features/dashboard/intake-management.css",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "72 行布局样式。没有 url()、expression()、@import、javascript: 或 behavior。不携带数据，也不做信任决定。"
     },
     {
       "path": "apps/desktop/src/renderer/features/dashboard/intake-time.ts",
@@ -687,32 +698,32 @@
     {
       "path": "apps/desktop/src/renderer/features/search/IntakeFaqCard.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "展示 Main 给出的 IntakeQueryRow，复制按钮把该行交回父组件。没有 HTML 插入或网络。资格时间只做本地显示。"
     },
     {
       "path": "apps/desktop/src/renderer/features/search/IntakeQueryFilters.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "店铺、商品、场景只是选择意图。商品/场景最多选 100，下拉只画前 100 个匹配。名称过期就显示编号。错误文案来自状态，不用 innerHTML。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/renderer/features/search/QueryCapsule.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "输入 maxLength 用共享 MAX_QUERY_CHARS。查询、收起、打开工作台、智能检索开关都是回调。intake 模式不渲染旧的智能检索开关。没有网络或剪贴板。"
     },
     {
       "path": "apps/desktop/src/renderer/features/search/QueryResultsPane.tsx",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "按 phase 画空、错误或卡片。intake 行走 IntakeFaqCard，其它走 ScriptCard。复制和 SOP 打开都是回调。没有 HTML 插入或网络。"
     },
     {
       "path": "apps/desktop/src/renderer/features/search/types.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "查询结果类型。isIntakeRow 只认 kind==='intake'。没有 I/O。"
     },
     {
       "path": "apps/desktop/src/renderer/features/search/use-intake-shops.ts",
@@ -724,8 +735,8 @@
     {
       "path": "apps/desktop/src/renderer/styles/app.css",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "样式表。检索 url(、expression(、@import、javascript:、behavior: 均无匹配。不携带信任决定。未把它当成逐条视觉规范审查。"
     },
     {
       "path": "apps/desktop/src/shared/content-intake-catalog.ts",
@@ -737,8 +748,8 @@
     {
       "path": "apps/desktop/src/shared/content-intake-management.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "isIntakeManagementCommand 用 exactKeys 和长度/枚举闭集。rollback 两个 id 必须不同且不超过 128。confirm-source 版本是不超过 19 位的整数。publish 标题和摘要有界。operationId、digest、grant 不从渲染器来。未见当前可触发缺陷。"
     },
     {
       "path": "apps/desktop/src/shared/content-intake-permissions.ts",
@@ -764,8 +775,8 @@
     {
       "path": "apps/desktop/src/shared/contracts.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "渲染器可见的是 CustomerAgentApi 类型和文案。IPC 白名单在这里再导出。渲染器没有 HTTP 或 token。"
     },
     {
       "path": "apps/desktop/src/shared/ipc-channels.ts",
@@ -784,8 +795,8 @@
     {
       "path": "apps/desktop/tests/support/owned-electron.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "测试收尾只关闭本用例启动的 Electron。5 秒后 Windows 用 taskkill /T /F 杀原生 PID，其它平台 SIGKILL 仍在跑的子进程。先把原生对话框替成返回 1。不是产品运行时。"
     },
     {
       "path": "contracts/upstream/customer-agent/contract-set.lock.json",
@@ -3211,14 +3222,14 @@
     {
       "path": "packages/content-intake/scripts/probe.mjs",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "合成探针。默认写到仓库 .gstack/content-intake-p1，或操作员给的目录。断言解析、取消和 networkAttempts=0、dbQueries=0。证据自证 SHA。不是 API 或桌面信任边界，也不接触飞书或生产合同。"
     },
     {
       "path": "packages/content-intake/src/archive.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "上传前检查每个 ZIP 成员。拒绝路径穿越、加密、宏、外部关系、坐标膨胀和展开/媒体/单元格上限。本地文件名必须与中央目录 ASCII 名一致。XML 只走 saxes，拒绝 doctype。不执行宏、超链接或图片。未见当前可触发缺陷。"
     },
     {
       "path": "packages/content-intake/src/csv.ts",
@@ -3286,8 +3297,8 @@
     {
       "path": "packages/contracts/scripts/generate-contracts.mjs",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "拒绝非 #/ 的 OpenAPI $ref。输出路径必须留在项目根内且路径上没有符号链接。CLI 只接受 --check，其它参数直接失败。runtime_activated 固定 false。原子写入用 wx 临时文件再 rename。未见当前可触发缺陷。"
     },
     {
       "path": "packages/database/migrations/0020_coach_publish_v1_19.sql",
@@ -3481,8 +3492,8 @@
     {
       "path": "packages/database/src/planner.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "目录身份、哈希、git sha 和合同号都要匹配模式。每段 SQL 的 sha256 必须等于正文，且以 GENERATED FILE 开头。谱系不能在声明的基线外变化。状态读取要求 PostgreSQL 15。无账本但库非空则 MIGRATION_UNTRACKED_SCHEMA。不执行调用方拼的 SQL。未见当前可触发缺陷。"
     },
     {
       "path": "packages/database/src/runner.ts",
@@ -3501,8 +3512,8 @@
     {
       "path": "packages/database/tests/support/family-catalog.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "测试夹具。只在当前事务 SET LOCAL session_replication_role=replica 种历史坏数据，结束前设回 origin。公共写入测试不在这里。不是运行时迁移。"
     },
     {
       "path": "pnpm-workspace.yaml",
@@ -3514,8 +3525,8 @@
     {
       "path": "scripts/content-retention.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "操作员工具。查询全部参数化。只有 failed-imports 可删，且 --apply 的 --confirm 必须等于本次干跑批次数，按收集到的 id 在事务里删除。published/stuck/orphan 只列出。intake-objects 必须单独 --dsn、只读、禁止 --apply。不猜测数据库。不是登录角色路径。"
     },
     {
       "path": "scripts/customer-agent-contract-set.mjs",
@@ -3534,8 +3545,8 @@
     {
       "path": "scripts/intake-synthetic/run.ts",
       "where": "reviewable",
-      "disposition": "uncovered",
-      "evidence": "当前 blob 不在已复核的审查集合：15255042..ec00a1f、定向补审条目、f6f8cf35..89bca38、54f428ca..f6f8cf35。本轮未逐行重读。这是未覆盖，不是静默跳过，也不能写成 /review PASS。"
+      "disposition": "semantic_read",
+      "evidence": "argv 必须为空。stdin 只接受 status、identity enabler|reviewer|agent、quit。身份只影响下一次合成登录。宿主到期后停并删自己的 PG/对象，不删另起 Electron 的桌面目录。不接受路径、SQL 或 URL。"
     },
     {
       "path": "scripts/probe-intake-family-sql.mjs",
@@ -7494,7 +7505,7 @@
       "path": "evidence/qa/intake-legacy-acl-runtime/coverage-ledger.json",
       "where": "ledger-self",
       "disposition": "semantic_read",
-      "evidence": "本文件由本轮按 OCR preview、git diff 与既有审查指针生成。它记录处置，不是行为代码，也不把 OCR coverage_rate 写成 /review PASS。"
+      "evidence": "本文件记录 OCR preview、git diff 与审查处置。2026-10-09 把此前 60 个 uncovered 作者文件改为 semantic_read，并写入区间 18ff7cf..3bbf065。它不是行为代码。completeReview 保持 INCOMPLETE，OCR 可审覆盖率不是 /review PASS。"
     }
   ]
 }
