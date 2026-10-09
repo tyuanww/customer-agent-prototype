@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-10-09T02:12:57.769440+00:00",
+  "head": "25c0bd55eb9c6fc6d86323a5a133a51f7258d93f",
+  "commands": [
+    {
+      "command": "pnpm exec eslint apps/desktop/tests/support/intake-electron.ts apps/desktop/tests/e2e/content-intake-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-shop-directory-real-stack.spec.ts",
+      "exit_code": 0,
+      "log": "eslint.log"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec tsc --noEmit",
+      "exit_code": 0,
+      "log": "typecheck.log"
+    }
+  ],
+  "business_assertion_and_cleanup_tails_unchanged": [
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+    "apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts",
+    "apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts",
+    "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts",
+    "apps/desktop/tests/e2e/content-intake-shop-directory-real-stack.spec.ts"
+  ],
+  "inputs": {
+    "apps/desktop/tests/support/intake-electron.ts": "3b91e27d302e66047ab8a71b8294f43ca1a28fe050821870a4cc1f04346c9f19",
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "7a325f5424f08312a2c64387548f002162944c04155a1341ac6857b3ea67d239",
+    "apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts": "571341848fba427eb8b92c29e52f9ad45a2bea0c51aef08bdccffe938c9f2fa3",
+    "apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts": "be5c11054c35d86448c003cfea0a64ee486b4605cf4d0cd6f8d880fa5e64f396",
+    "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts": "d37b2eed191f63533f610d5fb3759c4bc606831e832e8a3140cce819982cff34",
+    "apps/desktop/tests/e2e/content-intake-shop-directory-real-stack.spec.ts": "bc83fd0c15cd60e4940ae188e785116e2095b53a69f1d7c8d40091358acbfc37"
+  },
+  "logs": {
+    "eslint.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "typecheck.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "scope": "No build or E2E executed by this agent. Main agent owns installed execution and evidence collection."
+}

@@ -1,0 +1,234 @@
+[
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-permissions/2026-10-09T02-14-13.586Z/packaged-identity.json",
+    "sha256": "f53426cd25836cea165b6d7e9b5caa1acf73211fca6ec6596679bb352d3ec0e5",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-permissions-electron-CYx9by",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-09T02-14-25-282Z/packaged-identity.json",
+    "sha256": "fb8a717bcb96fadc8734519a4a61e50e8918a5cf4701fd385538d4914cb9a325",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-rollback-electron-R2p6y2",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-shop-directory/2026-10-09T02-14-30-855Z/packaged-identity.json",
+    "sha256": "a7a69f6ec07861db052cbaa3d4239718bbf3826b76155b0de4bec1a4471ab525",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-shop-names-electron-WL6JCu",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/packaged-identity.json",
+    "sha256": "a346f5e08ca7dcdf128f281e4df671716186cd1df1979e6e5061bade299f53d4",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-4jRC4H",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-09T02-14-33-313Z/packaged-identity.json",
+    "sha256": "24868c667334a5bd75dfd0a09b38dcdc812eabb7aa02fb6be4b8a30763e0f1ee",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-workspace-electron-lm0Sln",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-09T02-14-37-248Z/packaged-identity.json",
+    "sha256": "75914ef2e020230dadbd2b93369533cb171992c6774675aef537b3045d79133d",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-workspace-electron-IoTjK9",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-09T02-14-41-211Z/packaged-identity.json",
+    "sha256": "0d722e9ff8ba341e1e5a136f9da1ea8919309c545de8cccc7f409d490dc884ae",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-workspace-electron-51VOVU",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-09T02-14-45-119Z/packaged-identity.json",
+    "sha256": "7fd2ea85d29d7e254a15b1ed9194fcbbe27c95d59a8755f733f271d453449848",
+    "userDataAbsentAfterTest": true,
+    "identity": {
+      "packaged": true,
+      "version": "0.3.26",
+      "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+      "appPath": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "userData": "/private/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-workspace-electron-Nj3FRd",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 960,
+            "height": 600
+          },
+          "workArea": {
+            "x": 0,
+            "y": 30,
+            "width": 960,
+            "height": 485
+          },
+          "scaleFactor": 2
+        }
+      ]
+    }
+  }
+]

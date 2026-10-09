@@ -2,17 +2,19 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
+import { launchIntakeElectron } from '../support/intake-electron';
 
 test('real Query shows registered duplicate shop names while selection and qualification keep distinct IDs',async()=>{
  test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E!=='1','Explicit PG15/Electron synthetic gate');test.setTimeout(180000);
  const {createIntakeSyntheticHost}=await import('../../../api/tests/support/intake-synthetic-host.ts');
  const host=await createIntakeSyntheticHost({prepareCandidate:false,profile:'purpose-runtime',duplicateShopNames:true});host.selectIdentity('agent');
  const directory=mkdtempSync(path.join(tmpdir(),'intake-shop-names-electron-')),desktopRoot=fileURLToPath(new URL('../..',import.meta.url));
+ const evidence=path.resolve(desktopRoot,'../../.gstack/intake-shop-directory',new Date().toISOString().replace(/[:.]/g,'-'));
  let app:ElectronApplication|undefined;
  try{
-  app=await electron.launch({cwd:desktopRoot,args:[`--user-data-dir=${directory}`,'out/main/index.js','--demo-e2e'],env:{...process.env,DEMO_E2E:'1',CUSTOMER_AGENT_DESKTOP_API_ORIGIN:host.apiOrigin,CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN:host.identityOrigin,CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE:'faq-v2'}});
+  app=await launchIntakeElectron({desktopRoot,userDataDirectory:directory,apiOrigin:host.apiOrigin,identityOrigin:host.identityOrigin,evidenceDirectory:evidence});
   await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=query'))).toBe(true);
   const query=app.windows().find(w=>w.url().includes('role=query'))!;await query.waitForFunction(()=>Boolean(window.customerAgent?.intakeQuery));
   await app.evaluate(({app})=>app.focus({steal:true}));await query.evaluate(()=>window.customerAgent!.openSearch());

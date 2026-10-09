@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
+import { launchIntakeElectron } from '../support/intake-electron';
 
 /** Real Electron + production preload/Main + HTTP modules + isolated PG15.
  * Identity is an explicit synthetic transport; direct publication creates no approvals. This does not claim
@@ -11,11 +12,6 @@ import { closeOwnedElectron } from '../support/owned-electron';
 test('native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
   test.setTimeout(180_000);
-  const packagedExecutable = process.env.CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE;
-  if (packagedExecutable) {
-    expect(path.isAbsolute(packagedExecutable)).toBe(true);
-    expect(existsSync(packagedExecutable)).toBe(true);
-  }
   // Keep ungated test discovery independent of built API artifacts and PG.
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, createIntakeSyntheticCsv, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
   const { readIssueReport } = await import('../../../../packages/content-intake/tests/fixtures.ts');
@@ -47,25 +43,8 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     writeFileSync(revisionFile, await createInput({ answerSuffix: revisionSuffix }));
     writeFileSync(badFile, await createInput({ missingAnswer: true }));
     writeFileSync(goodFile, await createInput());
-    // A packaged app must resolve the existing profile file, never the development
-    // origin variables. Reuse the same scenario against the installed artifact.
-    if (packagedExecutable) writeFileSync(path.join(directory, 'synthetic-stack.json'), JSON.stringify({
-      mode: 'synthetic-local', apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, contentIntake: 'faq-v2',
-    }), { mode: 0o600 });
-    app = await electron.launch({ cwd: desktopRoot, executablePath: packagedExecutable,
-      args: [`--user-data-dir=${directory}`, ...(packagedExecutable ? [] : ['out/main/index.js']), '--demo-e2e'], env: {
-      ...process.env, DEMO_E2E: '1', CUSTOMER_AGENT_DESKTOP_API_ORIGIN: packagedExecutable ? 'http://127.0.0.1:1' : host.apiOrigin,
-      CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: packagedExecutable ? 'http://127.0.0.1:2' : host.identityOrigin,
-      CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
-    } });
-    if (packagedExecutable) {
-      const identity = await app.evaluate(({ app }) => ({ packaged: app.isPackaged, version: app.getVersion(),
-        executable: process.execPath, appPath: app.getAppPath(), userData: app.getPath('userData') }));
-      expect(identity).toMatchObject({ packaged: true, executable: packagedExecutable,
-        version: JSON.parse(readFileSync(path.join(desktopRoot, 'package.json'), 'utf8')).version });
-      expect(realpathSync(identity.userData)).toBe(realpathSync(directory));
-      writeFileSync(path.join(evidence, 'packaged-identity.json'), JSON.stringify(identity, null, 2));
-    }
+    app = await launchIntakeElectron({ desktopRoot, userDataDirectory: directory,
+      apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
     app.process().stderr?.on('data', chunk => { mainStderr += String(chunk); });
     const observe = (page: Page) => {
       page.on('pageerror', error => rendererErrors.push(error.message));

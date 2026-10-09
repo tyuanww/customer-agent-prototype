@@ -2,8 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
+import { launchIntakeElectron } from '../support/intake-electron';
 
 const domains = { product: '产品话术', campaign: '活动话术', presale: '售前流程', aftersale: '售后流程' } as const;
 for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, string][]) {
@@ -43,10 +44,8 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
         baseReleaseId: 'rel_native_base', sourceEvidenceVersion: 1, confirmed: true, title: '合成工作台发布', summary: domain }));
       expect(receipt.state).toBe('published');
       host.selectIdentity('agent');
-      app = await electron.launch({ cwd: desktopRoot, args: [`--user-data-dir=${directory}`, 'out/main/index.js', '--demo-e2e'], env: {
-        ...process.env, DEMO_E2E: '1', CUSTOMER_AGENT_DESKTOP_API_ORIGIN: host.apiOrigin,
-        CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: host.identityOrigin, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
-      } });
+      app = await launchIntakeElectron({ desktopRoot, userDataDirectory: directory,
+        apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
       const observe = (page: import('@playwright/test').Page) => page.on('pageerror', error => errors.push(error.message));
       app.on('window', observe); app.windows().forEach(observe);
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
