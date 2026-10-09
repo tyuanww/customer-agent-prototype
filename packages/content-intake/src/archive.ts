@@ -5,8 +5,9 @@ import { posix } from 'node:path';
 import { INTAKE_POLICY as P, IntakeFailure } from './policy.js';
 
 /** Inspect every member, including excluded sheets, before the object-model parser can
- * allocate sparse rows or inflate buffers. No XML, macro, hyperlink or image is executed. */
-export async function inspectArchive(bytes: Buffer): Promise<{ expandedBytes: number; mediaCount: number; resourceSheets: readonly string[] }> {
+ * allocate sparse rows or inflate buffers. No XML, macro, hyperlink or image is executed.
+ * SOP may retain external hyperlink labels as text, but never follows those links. */
+export async function inspectArchive(bytes: Buffer, options: Readonly<{ allowExternalHyperlinks?: boolean }> = {}): Promise<{ expandedBytes: number; mediaCount: number; resourceSheets: readonly string[] }> {
   if (bytes.length > P.fileBytes) throw new IntakeFailure('FILE_TOO_LARGE');
   if (bytes.length < 4 || bytes.readUInt32LE(0) !== 0x04034b50) throw new IntakeFailure('INVALID_XLSX');
   const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
@@ -84,7 +85,11 @@ export async function inspectArchive(bytes: Buffer): Promise<{ expandedBytes: nu
             const local = tag.name.split(':').at(-1);
             if (local === 'Relationship') {
               const mode = tag.attributes.TargetMode, target = String(tag.attributes.Target ?? '');
-              if ((mode !== undefined && mode !== 'Internal') || /^(?:[a-z][a-z0-9+.-]*:|[/\\])/iu.test(target)) throw new IntakeFailure('EXTERNAL_RESOURCE');
+              const type = String(tag.attributes.Type ?? '');
+              const externalHyperlink = options.allowExternalHyperlinks === true
+                && type.endsWith('/hyperlink') && mode === 'External';
+              if ((!externalHyperlink && mode !== undefined && mode !== 'Internal')
+                || (!externalHyperlink && /^(?:[a-z][a-z0-9+.-]*:|[/\\])/iu.test(target))) throw new IntakeFailure('EXTERNAL_RESOURCE');
               if (name === 'xl/_rels/workbook.xml.rels') relations.set(String(tag.attributes.Id), target);
             }
             if (name === 'xl/workbook.xml' && local === 'sheet') sheets.set(String(tag.attributes.name), String(tag.attributes['r:id']));
