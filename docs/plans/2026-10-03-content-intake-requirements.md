@@ -791,6 +791,8 @@ D `953a555` → `b1531fc` 已在[Menokin 整理说明](../reference-intake-menok
 
 **Grok 旧账本补审后的定向收口（2026-10-09，本地提交）：** 对 379 条的独立核对确认哈希与同 blob 复用关系；`semantic_read` 里的 QA 顶层扫描与大合同片段阅读不等于全文语义审查。F1 的合成 `v2-preview`/旧写并存不构成 E14 的 `v2-active` 围栏缺陷；S1–S4 仍仅疑似。F2 在发布准备通过后、最终 SQL 前撤权会返回 403，已用合成 PG15 先复现再将资源级拒绝映为 404。OCR 对唯一可审源码提出一条多层三元表达式意见，已改为清晰分支；测试、文档与日志由主 Agent 逐份补核。修后定向 lint/typecheck/build、PG15 2/2 通过。E1 的旧五规格失败记录保留；当前同组合 Mac 合成复跑 8/8 通过，脱敏日志见[五规格复跑](../../evidence/qa/intake-unified-workspace/electron-five-spec-rerun-2026-10-09.log)。原根 lint/typecheck/test/build、workspace:check 退出 0；文档同步经 docs:check。增量审查及本地提交不改变完整 `/review` 的 INCOMPLETE，也不替代正式身份/资料和目标设备验收。
 
+**整分支有界复核后的失败确定性补齐（2026-10-09，本地实施）：** 新发现容量预留/持久化的 `COMMIT` 响应丢失被上传接口误报为确定回滚，组织登记/事实写入的 `ROLLBACK` 响应丢失也被误报为确定回滚。两条合成 PG15 红测先复现后修复：容量未知经 HTTP 返回 `503/COMMIT_UNKNOWN`，组织两入口返回 `DEPENDENCY_UNAVAILABLE/unknown`，连接丢弃，不据失败码假定确定回滚；容量预留阶段尚无上传回执，原 operationId 不能定位临时 reservation，不能声称自动恢复。正常上传幂等与组织登记刷新另有 2/2 PG15 回归。桌面 CSV/XLSX 共用文件错误提示已修正。根 lint/typecheck/test/build 及分组 workspace:check 通过，见[定向证据](../../evidence/qa/intake-legacy-acl-runtime/review-failure-certainty-2026-10-09.md)。这不是生产断线实测或完整 `/review` 通过；回退部分失权按整单策略拒绝保持 403、全失权保持 404，含准备后撤权的合成 HTTP/PG15 2/2 通过；治理仓另记合同解释，不更改已冻结机器合同。`externalCompleteReview` 保持 INCOMPLETE，真实身份/资料、标准尺寸真人系统框与 Windows 条件不变。
+
 ### 已定位的原始候选
 
 本机已找到五份 XLSX；均属于既有忽略目录，`git ls-files -- faq` 为空。结构核查由仓外工作目录中的独立只读脚本完成，只输出结构与聚合，没有将文件送入产品导入模块、外部模型或数据库。

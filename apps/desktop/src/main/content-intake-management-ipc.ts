@@ -33,8 +33,8 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     AWAITING_APPROVAL: '历史内容未具备有效审批，不能直接复用；请显式修订或重新导入并完成检查。',
     HUMAN_REVIEW_REQUIRED: '当前人工检查资格不满足；关键稿须由有权且未参与改稿的人检查。',
     QUALITY_NOT_PASSED: '质量检查尚未通过，请完成本轮检查并刷新候选状态。',
-    FILE_LIMIT: '文件超过限制。请选择不大于 10 MiB 的合成 XLSX 工作簿，并整批修正后重新上传。',
-    FILE_INVALID: '文件格式或内容无效，请重新导出标准 XLSX 模板。',
+    FILE_LIMIT: '文件超过限制。请选择不大于 10 MiB 的规范 CSV 或 XLSX 文件，并整批修正后重新上传。',
+    FILE_INVALID: '文件格式或内容无效，请按当前来源格式重新导出规范 CSV 或 XLSX 文件。',
     APPROVAL_REVOKED: '历史组织审批已撤回，相关内容不能恢复；请显式修订或重新导入并检查。',
   };
   const failure = (code: string, manager?: ContentIntakeManagement, reason?: string): IntakeManagementReply => ({ ok: false, code,

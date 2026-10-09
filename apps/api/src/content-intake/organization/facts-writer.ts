@@ -102,7 +102,8 @@ export function createOrganizationFactsWriter(pool: IntakePool, scope: { tenantI
       if (!(error instanceof Rejected)) {
         try { report(error); } catch { /* Diagnostics cannot turn an unknown commit into a claimed rollback. */ }
       }
-      return {ok:false,reason:error instanceof Rejected?error.reason:'DEPENDENCY_UNAVAILABLE',commit:committing?'unknown':'rolled_back'};
+      if (broken) return {ok:false,reason:'DEPENDENCY_UNAVAILABLE',commit:'unknown'};
+      return {ok:false,reason:error instanceof Rejected?error.reason:'DEPENDENCY_UNAVAILABLE',commit:'rolled_back'};
     } finally { client?.release(broken); }
   };
 }

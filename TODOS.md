@@ -26,6 +26,8 @@
 
 **外审补审后的当前增量（已定向审查、本地提交）：** Grok 的 379 条旧账本记录经独立核对，路径/哈希和 27 条同 blob 复用关系成立；大量 QA 只读顶层状态，不能据此关闭完整 `/review`。F1 的预览模式旧写共存不违反 E14 的 active 围栏；S1–S4 保持疑似。F2 的“准备后撤权”在实际 PG15 合成测试中先复现为 403，再仅于 API 发布错误映射改成资源级 404。OCR 对唯一可审行为源码提出一条多层三元表达式意见，已改为清晰分支；排除的测试、文档与日志逐份补核。修后定向 lint/typecheck/build 和 PG15 2/2 通过。E1 原五规格 exit 1 的历史记录不改写；本轮同一组合在当前 Mac 合成环境 8/8 通过，脱敏日志见[五规格复跑](evidence/qa/intake-unified-workspace/electron-five-spec-rerun-2026-10-09.log)。原根 lint/typecheck/test/build 与分组体积预算退出 0；文档同步另经 docs:check。审查及提交范围见[同一审查记录](evidence/qa/intake-legacy-acl-runtime/gstack-review-closeout-2026-10-09.md#grok-语义补审核对与-f2e1-定向推进2026-10-09)。完整 `/review`、真实资料和设备验收继续按既有条件管理。
 
+**当前失败确定性补齐（本地实施）：** 整分支有界复核发现容量 `COMMIT` 丢回执与组织 `ROLLBACK` 丢回执被误写成确定回滚；已用临时 PG15 先得到两条失败测试，再修为 `COMMIT_UNKNOWN/unknown`，上传 HTTP 返回 503。容量预留阶段尚无上传回执，原 operationId 不能定位该临时 reservation，仍须按既有容量/保留流程核对；不能宣称自动恢复。顺手修正 CSV 错误仍提示只用 XLSX 的文案。定向故障 3/3、正常上传与组织刷新 2/2、根 lint/typecheck/test/build、分组 workspace:check 实际通过；仅使用合成输入。回退部分失权按整单策略拒绝保持 403、全部失权保持 404，含准备后撤权的合成 HTTP/PG15 回归 2/2 通过；解释记录在治理仓，冻结机器合同未改。命令、断言和限制见[失败确定性定向证据](evidence/qa/intake-legacy-acl-runtime/review-failure-certainty-2026-10-09.md)。完整 `/review` 及外部结论仍 INCOMPLETE，真实接入与设备条件未变。
+
 **本期剩余工作：**
 
 | 工作 | 已具备与尚缺的边界 | 完成标准 |
