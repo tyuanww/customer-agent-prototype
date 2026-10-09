@@ -19,6 +19,7 @@ import { createContentIntakeService } from '../src/content-intake/service.js';
 import { contentIntakeUsageRoutes } from '../src/content-intake/usage-http.js';
 import { contentIntakeManagementRoutes } from '../src/content-intake/management-http.js';
 import type { IntakePool, IntakeResult } from '../src/content-intake/transaction.js';
+import { createOrganizationFactsWriter } from '../src/content-intake/organization/facts-writer.js';
 import type { IntakePrincipalLabels } from '../src/content-intake/discovery.js';
 import { authenticateRequestHeaders, type AuthenticatedUser, type ProductAuthService } from '../src/auth-service.js';
 import { createProductAuthService, authenticatedProductSession } from '../src/product-auth-service.js';
@@ -781,6 +782,228 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:upload' AND request_key='mode-before-commit'")).rows[0].count).toBe('0');
       expect((await admin.query("SELECT state FROM content_intake.object_reservations WHERE source_id='source-a'")).rows.map(row => row.state)).toEqual(['released']);
     } finally { await host.app.close(); }
+  }, 40_000);
+
+  /** Pause after the temporary reservation is committed and before the upload
+   * transaction's final authorization. The second session then COMMITs on its
+   * own connection. This does not rewrite a SELECT result. */
+  function holdStore() {
+    let release = (): void => undefined;
+    let hold: Promise<void> = Promise.resolve();
+    const gated = { ...store, persist: async (
+      bytes: Parameters<typeof store.persist>[0], type: Parameters<typeof store.persist>[1], options?: Parameters<typeof store.persist>[2],
+    ) => {
+      const object = await store.persist(bytes, type, options);
+      await hold;
+      return object;
+    } };
+    return { gated, arm() { hold = new Promise<void>(resolve => { release = resolve; }); }, release() { release(); } };
+  }
+  async function waitReserved() {
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const rows = (await admin.query<{ object_id: string; state: string }>(
+        `SELECT object_id,state FROM content_intake.object_reservations WHERE state='reserved'`)).rows;
+      if (rows.length) return rows;
+      if (Date.now() >= deadline) throw new Error('RESERVED_OBJECT_DID_NOT_OPEN');
+      await new Promise(resolve => setTimeout(resolve, 15));
+    }
+  }
+  async function uploadLedger(operationId: string) {
+    const objects = (await admin.query<{ object_id: string; sha256: string }>(
+      `SELECT object_id,sha256 FROM content_intake.objects WHERE purpose='input' ORDER BY object_id`)).rows;
+    const reservations = (await admin.query<{ object_id: string; state: string }>(
+      `SELECT object_id,state FROM content_intake.object_reservations ORDER BY object_id`)).rows;
+    const receipts = (await admin.query<{ object_id: string }>(
+      `SELECT response->>'objectId' AS object_id FROM backend_review.receipts WHERE operation='intake:upload' AND request_key=$1`,
+      [operationId])).rows;
+    return { objects, reservations, receipts };
+  }
+  async function commitJob(jobId: string) {
+    const current = (await admin.query<{ now: Date; version: string; checked_at: Date }>(`
+      SELECT clock_timestamp() AS now, p.current_facts_version AS version, f.checked_at
+      FROM content_intake.principals p JOIN content_intake.principal_facts f
+        ON f.principal_id=p.principal_id AND f.facts_version=p.current_facts_version
+      WHERE p.principal_id='enabler'`)).rows[0]!;
+    const checkedAt = new Date(Math.max(current.checked_at.getTime() + 1000, current.now.getTime() - 1000));
+    if (checkedAt.getTime() >= current.now.getTime()) throw new Error('JOB_CLOCK_WINDOW');
+    const write = createOrganizationFactsWriter(pool, { tenantId: 'tenant-a', appId: 'app-a' });
+    const result = await write({ principalId: 'enabler', expectedFactsVersion: Number(current.version), departmentIds: ['dept-a'],
+      jobId, enabled: true, checkedAt: checkedAt.toISOString(), validUntil: new Date(checkedAt.getTime() + 120_000).toISOString() });
+    expect(result, JSON.stringify(result)).toMatchObject({ ok: true, status: 'applied' });
+    const committed = (await admin.query<{ at: Date; job_id: string; version: string }>(`
+      SELECT clock_timestamp() AS at, f.job_id, p.current_facts_version AS version
+      FROM content_intake.principals p JOIN content_intake.principal_facts f
+        ON f.principal_id=p.principal_id AND f.facts_version=p.current_facts_version
+      WHERE p.principal_id='enabler'`)).rows[0]!;
+    return { at: committed.at.toISOString(), jobId: committed.job_id, factsVersion: Number(committed.version) };
+  }
+  async function commitImportRevoke(operationId: string) {
+    const changed = value(await service.changeGrant(actor('director'), 'business-enabler-import', {
+      operationId, expectedVersion: 1, change: 'revoke', reason: '合成撤权', stewardPrincipalId: null }));
+    const row = (await admin.query<{ at: Date; revoked: Date | null }>(
+      `SELECT clock_timestamp() AS at, revoked_at AS revoked FROM content_intake.grants WHERE grant_id='business-enabler-import'`)).rows[0]!;
+    expect(changed.revokedAt).not.toBeNull();
+    expect(row.revoked).not.toBeNull();
+    return { at: row.at.toISOString(), grantId: changed.grantId, revokedAt: row.revoked!.toISOString() };
+  }
+
+  it('real PG15 releases a replay reservation after the current source mode commits, without rewriting SELECT rows', async () => {
+    const privileges = (await admin.query<{ role: string; insert: boolean; update: boolean; delete: boolean; truncate: boolean }>(`
+      SELECT role, has_table_privilege(role,'content_intake.role_rules','INSERT') AS insert,
+        has_table_privilege(role,'content_intake.role_rules','UPDATE') AS update,
+        has_table_privilege(role,'content_intake.role_rules','DELETE') AS delete,
+        has_table_privilege(role,'content_intake.role_rules','TRUNCATE') AS truncate
+      FROM unnest(ARRAY['intake_usage','intake_business','intake_worker','intake_org_writer']) AS role
+      ORDER BY role`)).rows;
+    expect(privileges).toEqual([
+      { role: 'intake_business', insert: false, update: false, delete: false, truncate: false },
+      { role: 'intake_org_writer', insert: false, update: false, delete: false, truncate: false },
+      { role: 'intake_usage', insert: false, update: false, delete: false, truncate: false },
+      { role: 'intake_worker', insert: false, update: false, delete: false, truncate: false },
+    ]);
+    const history = (await admin.query<{ def: string }>(`SELECT pg_get_functiondef('content_intake.record_policy_history()'::regprocedure) AS def`)).rows[0]!.def;
+    expect(history.includes('lock_content')).toBe(false);
+    const gate = holdStore();
+    const host = await managementHost(gate.gated);
+    try {
+      const bytes = await httpWorkbook();
+      const created = await host.upload(bytes, 'mode-replay-release');
+      expect(created.status, await created.clone().text()).toBe(201);
+      const object = parseContractSchema('IntakeObject', await created.json());
+      gate.arm();
+      const pending = host.upload(bytes, 'mode-replay-release');
+      const opened = await waitReserved();
+      expect(opened.map(row => row.object_id)).not.toContain(object.objectId);
+      const mode = await admin.query(`UPDATE content_intake.sources SET mode='legacy',mode_version=mode_version+1 WHERE source_id='source-a' RETURNING mode`);
+      expect(mode.rows[0].mode).toBe('legacy');
+      const modeAt = (await admin.query<{ at: Date }>('SELECT clock_timestamp() AS at')).rows[0]!.at.toISOString();
+      gate.release();
+      const denied = await pending;
+      const body = await denied.json();
+      const ledger = await uploadLedger('mode-replay-release');
+      console.log(JSON.stringify({ probe: 'pg15-commit-order', case: 'mode-replay-release', substitutedSelect: false,
+        inputSha256: digest(bytes), commitOrder: ['upload-committed', 'mode-committed', 'replay-returned'], modeCommittedAt: modeAt,
+        status: denied.status, body, ledger }));
+      expect(denied.status).toBe(409);
+      expect(body).toMatchObject({ error: { details: { reason: 'MODE_CONFLICT' } } });
+      expect(ledger.objects).toEqual([{ object_id: object.objectId, sha256: object.sha256 }]);
+      expect(ledger.receipts).toEqual([{ object_id: object.objectId }]);
+      expect(ledger.reservations).toEqual([
+        { object_id: object.objectId, state: 'adopted' },
+        { object_id: opened[0]!.object_id, state: 'released' },
+      ].sort((a, b) => a.object_id < b.object_id ? -1 : 1));
+    } finally { gate.release(); await host.app.close(); }
+  }, 40_000);
+
+  it('real PG15 rolls back an upload when grant revocation commits before final authorization', async () => {
+    const gate = holdStore();
+    const host = await managementHost(gate.gated);
+    try {
+      const bytes = await httpWorkbook();
+      gate.arm();
+      const pending = host.upload(bytes, 'grant-before-final');
+      const opened = await waitReserved();
+      const revoked = await commitImportRevoke('grant-before-final-revoke');
+      gate.release();
+      const denied = await pending;
+      const body = await denied.json();
+      const ledger = await uploadLedger('grant-before-final');
+      console.log(JSON.stringify({ probe: 'pg15-commit-order', case: 'grant-before-final', substitutedSelect: false,
+        inputSha256: digest(bytes), commitOrder: ['grant-committed', 'upload-returned'], change: revoked,
+        status: denied.status, body, opened, ledger }));
+      expect(denied.status).toBe(404);
+      expect(body).toMatchObject({ error: { details: { reason: 'SCOPE_DENIED' } } });
+      expect(ledger.objects).toEqual([]);
+      expect(ledger.receipts).toEqual([]);
+      expect(ledger.reservations).toEqual([{ object_id: opened[0]!.object_id, state: 'released' }]);
+    } finally { gate.release(); await host.app.close(); }
+  }, 40_000);
+
+  it('real PG15 returns the committed object when upload commits before grant revocation, then releases the denied replay', async () => {
+    const gate = holdStore();
+    const host = await managementHost(gate.gated);
+    try {
+      const bytes = await httpWorkbook();
+      const created = await host.upload(bytes, 'grant-upload-first');
+      expect(created.status, await created.clone().text()).toBe(201);
+      const object = parseContractSchema('IntakeObject', await created.json());
+      expect((await uploadLedger('grant-upload-first')).reservations).toEqual([{ object_id: object.objectId, state: 'adopted' }]);
+      gate.arm();
+      const pending = host.upload(bytes, 'grant-upload-first');
+      const opened = await waitReserved();
+      const revoked = await commitImportRevoke('grant-upload-first-revoke');
+      gate.release();
+      const denied = await pending;
+      const body = await denied.json();
+      const ledger = await uploadLedger('grant-upload-first');
+      console.log(JSON.stringify({ probe: 'pg15-commit-order', case: 'grant-upload-first', substitutedSelect: false,
+        inputSha256: digest(bytes), commitOrder: ['upload-committed', 'grant-committed', 'replay-returned'], change: revoked,
+        status: denied.status, body, ledger }));
+      expect(denied.status).toBe(404);
+      expect(body).toMatchObject({ error: { details: { reason: 'SCOPE_DENIED' } } });
+      expect(ledger.objects).toEqual([{ object_id: object.objectId, sha256: object.sha256 }]);
+      expect(ledger.receipts).toEqual([{ object_id: object.objectId }]);
+      expect(ledger.reservations).toEqual([
+        { object_id: object.objectId, state: 'adopted' },
+        { object_id: opened[0]!.object_id, state: 'released' },
+      ].sort((a, b) => a.object_id < b.object_id ? -1 : 1));
+    } finally { gate.release(); await host.app.close(); }
+  }, 40_000);
+
+  it('real PG15 rolls back an upload when the organization job commits before final authorization', async () => {
+    const gate = holdStore();
+    const host = await managementHost(gate.gated);
+    try {
+      const bytes = await httpWorkbook();
+      gate.arm();
+      const pending = host.upload(bytes, 'job-before-final');
+      const opened = await waitReserved();
+      const job = await commitJob('job-agent');
+      expect(job.jobId).toBe('job-agent');
+      gate.release();
+      const denied = await pending;
+      const body = await denied.json();
+      const ledger = await uploadLedger('job-before-final');
+      console.log(JSON.stringify({ probe: 'pg15-commit-order', case: 'job-before-final', substitutedSelect: false,
+        inputSha256: digest(bytes), commitOrder: ['job-committed', 'upload-returned'], change: job,
+        status: denied.status, body, opened, ledger }));
+      expect(denied.status).toBe(404);
+      expect(body).toMatchObject({ error: { details: { reason: 'SCOPE_DENIED' } } });
+      expect(ledger.objects).toEqual([]);
+      expect(ledger.receipts).toEqual([]);
+      expect(ledger.reservations).toEqual([{ object_id: opened[0]!.object_id, state: 'released' }]);
+    } finally { gate.release(); await host.app.close(); }
+  }, 40_000);
+
+  it('real PG15 returns the committed object when upload commits before the job change, then releases the denied replay', async () => {
+    const gate = holdStore();
+    const host = await managementHost(gate.gated);
+    try {
+      const bytes = await httpWorkbook();
+      const created = await host.upload(bytes, 'job-upload-first');
+      expect(created.status, await created.clone().text()).toBe(201);
+      const object = parseContractSchema('IntakeObject', await created.json());
+      gate.arm();
+      const pending = host.upload(bytes, 'job-upload-first');
+      const opened = await waitReserved();
+      const job = await commitJob('job-agent');
+      gate.release();
+      const denied = await pending;
+      const body = await denied.json();
+      const ledger = await uploadLedger('job-upload-first');
+      console.log(JSON.stringify({ probe: 'pg15-commit-order', case: 'job-upload-first', substitutedSelect: false,
+        inputSha256: digest(bytes), commitOrder: ['upload-committed', 'job-committed', 'replay-returned'], change: job,
+        status: denied.status, body, ledger }));
+      expect(denied.status).toBe(404);
+      expect(body).toMatchObject({ error: { details: { reason: 'SCOPE_DENIED' } } });
+      expect(ledger.objects).toEqual([{ object_id: object.objectId, sha256: object.sha256 }]);
+      expect(ledger.receipts).toEqual([{ object_id: object.objectId }]);
+      expect(ledger.reservations).toEqual([
+        { object_id: object.objectId, state: 'adopted' },
+        { object_id: opened[0]!.object_id, state: 'released' },
+      ].sort((a, b) => a.object_id < b.object_id ? -1 : 1));
+    } finally { gate.release(); await host.app.close(); }
   }, 40_000);
 
   it('management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS', async () => {

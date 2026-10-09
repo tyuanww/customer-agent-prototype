@@ -124,5 +124,23 @@
       "Replay rejection temporary-reservation release, grant revocation and role-change races were not executed in this round.",
       "Real data, production HTTP and Windows/manual device acceptance remain outside this synthetic audit."
     ]
+  },
+  "pg15CommitOrder20261009": {
+    "base": "18ff7cf1d810eaa29598a8a2a36e481c711468b6",
+    "behaviorCodeChanged": false,
+    "migration0030DiffEmpty": true,
+    "ruleWriteApiAdded": false,
+    "method": "Real management HTTP against temporary PostgreSQL 15. The second session COMMITs a source mode change, import grant revocation, or organization job change after the temporary reservation is reserved and before the upload transaction begins. SELECT rows are not substituted. finally/discard source is not the proof.",
+    "cases": [
+      "mode replay after committed legacy mode: 409 MODE_CONFLICT; adopted object and receipt unchanged; new reservation released",
+      "grant revocation before final authorization: 404 SCOPE_DENIED; zero objects; zero receipts; reservation released",
+      "upload committed before grant revocation: 201 object kept; replay 404; temporary reservation released",
+      "job change to job-agent before final authorization: 404 SCOPE_DENIED; zero objects; zero receipts; reservation released",
+      "upload committed before job change: 201 object kept; replay 404; temporary reservation released"
+    ],
+    "runs": "Same vitest -t real PG15 command twice; structural final state matched. Object ids, diagnostic ids, and workbook SHA-256 may differ because synthetic xlsx bytes include time.",
+    "modeOrder": "Reused final-targeted/mode-order.json. Input bytes of files.ts, transaction.ts, authority.ts, and management-http.ts matched the 1c5d5e1 record; 1c5d5e1..18ff7cf diff for those files plus 0021, 0022, and 0030 was empty. Not rerun.",
+    "roleRules": "record_policy_history does not call lock_content. intake_usage, intake_business, intake_worker, and intake_org_writer have no INSERT, UPDATE, DELETE, or TRUNCATE on role_rules. There is no formal rule-write API. This is not a vulnerability of the current login roles. Formal activation condition: a future rule maintainer must take the same content lock and pass an interleaving acceptance. 0030 was not modified and no rule-maintenance feature was added.",
+    "completeReview": "INCOMPLETE"
   }
 }
