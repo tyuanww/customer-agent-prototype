@@ -2,13 +2,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { IntakeLibrary } from '../../src/renderer/features/dashboard/IntakeLibrary';
+import { formatIntakeTime } from '../../src/renderer/features/dashboard/intake-time';
 import type { IntakeCatalogCommand, IntakeCatalogReply, IntakeCatalogView } from '../../src/shared/content-intake-catalog';
 import { ContentIntakeCatalog } from '../../src/main/content-intake-catalog';
 import { IntakeUsageError, type IntakeUsageSession } from '../../src/main/content-intake-usage';
 import { intakeQueryData } from '../fixtures/intake-query-data';
 import { emptyIntakeQueryContext } from '../../src/shared/content-intake-query';
 
-afterEach(() => { cleanup(); delete window.dashboardIntakeCatalog; vi.useRealTimers(); });
+afterEach(() => { cleanup(); delete window.dashboardIntakeCatalog; vi.useRealTimers(); vi.unstubAllEnvs(); });
 function data(): IntakeCatalogView {
  const until=new Date(Date.now()+60_000).toISOString();
  return {signedIn:true,busy:false,validUntil:until,releaseId:'rel_synthetic',context:{...emptyIntakeQueryContext(),
@@ -29,6 +30,27 @@ function setup() {
  window.dashboardIntakeCatalog={command,current:vi.fn(async():Promise<IntakeCatalogReply>=>({ok:true,view:structuredClone(view)})),onInvalidated:fn=>{listeners.add(fn);return()=>{listeners.delete(fn);};}};
  return {command,listeners,setView:(v:IntakeCatalogView)=>{view=v;}};
 }
+it('shows entry dates and the read deadline in the same local time zone with an explicit offset',async()=>{
+ vi.stubEnv('TZ','America/New_York');vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-01-15T14:59:00Z'));
+ const f=setup(),view=data();view.rows[0]!.effectiveFrom='2026-01-15T15:00:00Z';view.rows[0]!.effectiveTo='2026-01-15T16:00:00Z';
+ f.command.mockResolvedValueOnce({ok:true,view});const {rerender}=render(<IntakeLibrary active="wording"/>);
+ expect(await screen.findByRole('article',{name:'合成标题 product'})).toHaveTextContent('生效 2026年01月15日 10:00:00（UTC-05:00） · 失效 2026年01月15日 11:00:00（UTC-05:00）');
+ rerender(<IntakeLibrary active="announce"/>);
+ expect(screen.getByText(/可用版本 rel_synthetic/)).toHaveTextContent('资格截止 2026年01月15日 10:00:00（UTC-05:00）');
+ expect(f.command).toHaveBeenCalledTimes(1);
+});
+it('shows missing and invalid entry times explicitly instead of inventing a date',async()=>{
+ const f=setup(),view=data();view.rows[0]!.effectiveFrom='';view.rows[0]!.effectiveTo='not-a-date';
+ f.command.mockResolvedValueOnce({ok:true,view});render(<IntakeLibrary active="wording"/>);
+ const row=await screen.findByRole('article',{name:'合成标题 product'});
+ expect(row).toHaveTextContent('生效 未提供时间 · 失效 时间无效');
+ expect(row).not.toHaveTextContent(/1970|Invalid Date/);
+});
+it('does not turn an absent optional timestamp into the Unix epoch',()=>{
+ expect(formatIntakeTime(null)).toBe('未提供时间');
+ expect(formatIntakeTime(undefined)).toBe('未提供时间');
+ expect(formatIntakeTime('  ')).toBe('未提供时间');
+});
 it('browses four scoped domains and shares the same complete read with the available-version page',async()=>{
  const f=setup(),user=userEvent.setup();const {rerender}=render(<IntakeLibrary active="wording"/>);
  await screen.findByRole('article',{name:'合成标题 product'});

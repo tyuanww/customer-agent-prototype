@@ -80,7 +80,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       {view.canStop && <button disabled={stopping} onClick={() => apply({ action: 'upload-stop' })}>停止本机等待</button>}
       {view.canRefresh && <button disabled={readingDisabled || refreshBlocked} onClick={() => apply({ action: 'upload-refresh' })}>刷新解析进度</button>}
       {view.canSaveReport && <button disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</button>}
-      {view.canOpen && <button className="dash-action-primary" disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>打开候选继续审核</button>}
+      {view.canOpen && <button className="dash-action-primary" disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>查看候选并完成检查</button>}
     </div>
     {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；形成候选后再按其权限处理。</p>}
     {view.job && <section aria-label="资料校验结果">

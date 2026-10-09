@@ -65,3 +65,8 @@
 .intake-library .intake-catalog-conditions summary { cursor: pointer; }
 .intake-library .intake-card h2 { margin-top: 0; }
 @media (max-width: 760px) { .intake-catalog-filter-grid { grid-template-columns: 1fr; } }
+
+.intake-current-step { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.intake-current-step > div { flex: 1 1 320px; }
+.intake-current-step h2 { margin-bottom: 4px; }
+.intake-management h2[id] { scroll-margin-top: 16px; }

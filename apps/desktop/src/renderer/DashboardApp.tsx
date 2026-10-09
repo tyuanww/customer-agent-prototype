@@ -1259,7 +1259,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
               <header className="dash-module-head"><h1>管理概览</h1></header>
               <p>资料上传、检查与确认发布在内容管理中完成，总监和经理可在其中配置权限。</p>
               <div className="intake-toolbar"><button className="dash-action-primary" onClick={() => setActive('content')}>打开内容管理</button>
-                <button onClick={() => setActive('wording')}>浏览可用话术</button></div>
+                <button className="dash-reset" onClick={() => setActive('wording')}>浏览可用话术</button></div>
               <p className="dash-scope">经营统计与待办指标未接入。</p>
             </section>}
             {active === 'sop' && <section className="dash-module" data-testid="module-sop">

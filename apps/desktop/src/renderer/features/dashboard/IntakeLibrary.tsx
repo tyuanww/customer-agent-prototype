@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { IntakeCatalogCommand, IntakeCatalogRow, IntakeCatalogView } from '@shared/content-intake-catalog';
 import type { IntakeQueryOption } from '@shared/content-intake-query';
+import { formatIntakeTime } from './intake-time';
 import './intake-management.css';
 
 const domains: readonly { id: IntakeCatalogRow['domain']; label: string }[] = [
@@ -125,7 +126,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
       {!disabled && context?.shopId && !fresh && <p role="status">当前没有可展示的有效资料，请刷新可用资料。</p>}
       {active==='announce' ? <>
         <h2>当前条件下可用发布版本</h2>
-        {fresh && <p role="status">可用版本 {view!.releaseId} · 本次读取 {rows.length} 条 · 资格截止 {view!.validUntil}</p>}
+        {fresh && <p role="status">可用版本 {view!.releaseId} · 本次读取 {rows.length} 条 · 资格截止 {formatIntakeTime(view!.validUntil)}</p>}
         <p>版本来自当前条件下的读取结果，不代表全库同步、公告已读或四库变更统计。</p>
         <h2>软件版本更新</h2><p>未接入。</p>
       </> : <>
@@ -141,7 +142,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
             <h2>{row.title}</h2><p className="intake-answer">{row.answerText}</p>
             {row.applicabilityNote && <p>适用说明：{row.applicabilityNote}</p>}{row.riskNote && <p>风险提示：{row.riskNote}</p>}
             {row.category && <p>分类：{row.category}</p>}
-            <p>条目版本 {row.scriptVersion} · 生效 {row.effectiveFrom}{row.effectiveTo ? ` · 失效 ${row.effectiveTo}` : ''}</p>
+            <p>条目版本 {row.scriptVersion} · 生效 {formatIntakeTime(row.effectiveFrom)}{row.effectiveTo ? ` · 失效 ${formatIntakeTime(row.effectiveTo)}` : ''}</p>
           </article>)}
         </section>
       </>}
