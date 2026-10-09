@@ -1,0 +1,11 @@
+--- content-intake-real-stack.spec.ts
++++ intake-ui-package-compact-temporary.spec.ts
+@@ -139,7 +139,7 @@
+     }
+     await resizeDashboard(980, 680);
+     await captureWorkspace('dashboard-intake-minimum-dark');
+-    await resizeDashboard(1180, 760);
++    await resizeDashboard(1180, 680);
+     await appearance('light');
+     expect(sourceChoice).toBeTruthy(); await sources.selectOption(sourceChoice!);
+     async function selectAndSubmit(filename: string) {

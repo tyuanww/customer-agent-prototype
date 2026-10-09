@@ -2,8 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
+import { launchIntakeElectron } from '../support/intake-electron';
 
 /** Synthetic identity only. The capability-candidate host must register grants
  * against its existing service. No renderer/IPC/network stubs replace the flow. */
@@ -31,10 +32,8 @@ test('director previews without saving, grants a named seat query access, then r
       body: JSON.stringify({ shopId: 'shop-a', contextGeneration: ++generation, productIds: [], scenarioIds: [], releaseId: null }),
     });
     expect((await entitlement()).ok).toBe(false);
-    app = await electron.launch({ cwd: desktopRoot, args: [`--user-data-dir=${directory}`, 'out/main/index.js', '--demo-e2e'], env: {
-      ...process.env, DEMO_E2E: '1', CUSTOMER_AGENT_DESKTOP_API_ORIGIN: host.apiOrigin,
-      CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: host.identityOrigin, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
-    } });
+    app = await launchIntakeElectron({ desktopRoot, userDataDirectory: directory,
+      apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.product));

@@ -487,12 +487,17 @@ CSV 用例保留 BOM、逗号、引号及多行正文原字节，回读 `CSV!H3`
 CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 \
 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 \
 CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE='/绝对路径/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo' \
-pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts
+pnpm --filter @customer-agent/desktop exec playwright test \
+  tests/e2e/content-intake-real-stack.spec.ts \
+  tests/e2e/content-intake-permissions-real-stack.spec.ts \
+  tests/e2e/content-intake-workspace-real-stack.spec.ts \
+  tests/e2e/content-intake-rollback-real-stack.spec.ts \
+  tests/e2e/content-intake-shop-directory-real-stack.spec.ts
 ```
 
-测试为自有 userData 写 `synthetic-stack.json`，用打包态文件 profile 接到一次性回环 HTTP/PG15，故意把开发环境地址置为不可用，并校验版本、`isPackaged`、实际 executable 与 userData。没有指定 executable 时沿用既有开发态场景。解析器属于 API 子进程，不宣称在桌面包内。文件/确认框仍用受控响应；真人 OS 验收、Windows、签名/公证及真实资料另验。
+五个测试文件共八个场景（上传、权限、四域、回退、店铺）共用 [安装/开发测试启动入口](../apps/desktop/tests/support/intake-electron.ts)。它为自有 userData 以 `0600` 和禁止覆盖方式写 `synthetic-stack.json`，用打包态文件 profile 接到一次性回环 HTTP/PG15，故意把开发环境地址置为不可用，并校验版本、`isPackaged`、实际 executable 与 userData；每个安装场景保存身份及原生显示器几何。没有指定 executable 时沿用既有开发态场景；显式指定空值、相对路径或无效文件则拒绝，不能悄悄改测开发构建。初始化失败由入口关闭自有 Electron，成功后仍由原测试清理应用、PG 和临时目录。解析器属于 API 子进程，不宣称在桌面包内。文件/确认框仍用受控响应；真人 OS 验收、Windows、签名/公证及真实资料另验。
 
-本轮另有 CUA 操作真实文件选择与取消/确认系统框的窄探针，最终取消零写入、确认一条发布；这是工具操作的实机证据，不是非开发维护者的人工作业验收。产物、命令、首次路径别名断言失败和不明输入记录见[Mac 包证据](../evidence/qa/intake-mac-package/README.md)。CSV 已在本次重新生成的 0.3.26 本地未签名包中完成独立副本实际闭环，见[CSV 安装副本证据](../evidence/qa/intake-csv-runtime/README.md)。运行上面的副本命令时再显式设置 `CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`；不指定时仍为 XLSX。新 CSV 包的文件/确认框使用受控响应，不继承旧包的 CUA 或人工作业结论。
+本轮另有 CUA 操作真实文件选择与取消/确认系统框的窄探针，最终取消零写入、确认一条发布；这是工具操作的实机证据，不是非开发维护者的人工作业验收。产物、命令、首次路径别名断言失败和不明输入记录见[Mac 包证据](../evidence/qa/intake-mac-package/README.md)。CSV 已在本次重新生成的 0.3.26 本地未签名包中完成独立副本实际闭环，见[CSV 安装副本证据](../evidence/qa/intake-csv-runtime/README.md)。运行上面的副本命令时再显式设置 `CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`；不指定时仍为 XLSX。新 CSV 包的文件/确认框使用受控响应，不继承旧包的 CUA 或人工作业结论。 后续 UI 修正版包已按上述统一入口通过权限、四域、店铺和回退7项，CSV紧凑高度场景另1项通过；[证据](../evidence/qa/intake-ui-mac-package-20261009/README.md)保留标准尺寸未通过和设备PARTIAL。`CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`只控制主上传用例，不把其他场景的XLSX准备改成CSV。
 
 
 ## FAQ 统一工作台
