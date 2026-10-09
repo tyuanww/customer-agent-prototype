@@ -500,6 +500,8 @@ pnpm --filter @customer-agent/desktop exec playwright test \
 本轮另有 CUA 操作真实文件选择与取消/确认系统框的窄探针，最终取消零写入、确认一条发布；这是工具操作的实机证据，不是非开发维护者的人工作业验收。产物、命令、首次路径别名断言失败和不明输入记录见[Mac 包证据](../evidence/qa/intake-mac-package/README.md)。CSV 已在本次重新生成的 0.3.26 本地未签名包中完成独立副本实际闭环，见[CSV 安装副本证据](../evidence/qa/intake-csv-runtime/README.md)。运行上面的副本命令时再显式设置 `CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`；不指定时仍为 XLSX。新 CSV 包的文件/确认框使用受控响应，不继承旧包的 CUA 或人工作业结论。 后续 UI 修正版包已按上述统一入口通过权限、四域、店铺和回退7项，CSV紧凑高度场景另1项通过；[证据](../evidence/qa/intake-ui-mac-package-20261009/README.md)保留标准尺寸未通过和设备PARTIAL。`CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`只控制主上传用例，不把其他场景的XLSX准备改成CSV。
 
 
+当前显示环境已能容纳 1180×760：本地提交 `332119e` 重新生成的 0.3.26 DMG 解包副本，以未改动的原版标准尺寸 CSV 测试 1/1 和其余四文件 7/7 完成[Mac 标准尺寸安装态合成补证](../evidence/qa/intake-standard-mac-package-20261009/README.md)。此前 960×600 环境下的失败记录仍保留；新结果只证明自动化合成场景，原生框响应仍由测试控制。
+
 ## FAQ 统一工作台
 
 `pnpm test:intake:desktop` 包含原上传/回退/权限配置/店铺目录，以及[四域工作台测试](../apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts)。实际受限 HTTP/PG15 先发布资料，Electron 的话术库按产品/活动/售前/售后归类读取同一产物；系统同步展示相同发布版本，撤权后刷新清空正文。Dashboard 刷新不能破坏 Query 的既有合法复制资格，禁止走旧公告/内容/话术/SOP适配器。原上传和权限测试还验证跨导航保留未提交输入及预览。完整截图保存在 ignored `.gstack/intake-workspace/`；光暗和最小窗口证据不替代办公 Windows 与人工系统窗验收。
