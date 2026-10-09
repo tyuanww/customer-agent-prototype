@@ -714,6 +714,75 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await host.app.close(); }
   }, 40_000);
 
+  it('management HTTP returns a committed upload when its source mode changes after COMMIT', async () => {
+    let changed = false;
+    const afterCommit: IntakePool = { async connect() {
+      const client = await pool.connect(); let registering = false;
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, args?: unknown[]) => {
+          if (sql.includes('INSERT INTO content_intake.objects')) registering = true;
+          const result = await target.query(sql, args);
+          if (sql === 'COMMIT' && registering && !changed) {
+            changed = true;
+            await admin.query("UPDATE content_intake.sources SET mode='legacy',mode_version=mode_version+1 WHERE source_id='source-a'");
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, key); return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const host = await managementHost(store, afterCommit);
+    try {
+      const bytes = await httpWorkbook();
+      const response = await host.upload(bytes, 'mode-after-commit');
+      expect(changed).toBe(true);
+      expect(response.status, await response.clone().text()).toBe(201);
+      const object = parseContractSchema('IntakeObject', await response.json());
+      expect(object.sha256).toBe(digest(bytes));
+      expect((await admin.query('SELECT object_id FROM content_intake.objects WHERE object_id=$1', [object.objectId])).rows).toHaveLength(1);
+      expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [object.objectId])).rows[0].state).toBe('adopted');
+      // Existing operations remain bounded by current source authority.
+      const denied = await host.upload(bytes, 'mode-after-commit');
+      expect(denied.status).toBe(409);
+      expect(await denied.json()).toMatchObject({ error: { details: { reason: 'MODE_CONFLICT' } } });
+      await admin.query("UPDATE content_intake.sources SET mode='v2-preview',mode_version=mode_version+1 WHERE source_id='source-a'");
+      expect(await (await host.upload(bytes, 'mode-after-commit')).json()).toEqual(object);
+      expect((await admin.query("SELECT count(*) FROM content_intake.objects WHERE purpose='input'")).rows[0].count).toBe('1');
+    } finally { await host.app.close(); }
+  }, 40_000);
+
+  it('management HTTP rolls back upload and receipt when final source validation rejects before COMMIT', async () => {
+    let rejected = false;
+    const beforeCommit: IntakePool = { async connect() {
+      const client = await pool.connect(); let registering = false; let receiptWritten = false;
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, args?: unknown[]) => {
+          if (sql.includes('INSERT INTO content_intake.objects')) registering = true;
+          const result = await target.query(sql, args);
+          if (registering && sql.includes('INSERT INTO backend_review.receipts')) receiptWritten = true;
+          // The source owner normally serializes changes under lock_content.
+          // Substitute a changed mode at the final read to test the rollback path.
+          if (receiptWritten && !rejected && sql.includes('FROM content_intake.sources src')) {
+            rejected = true;
+            return { ...result, rows: result.rows.map(row => ({ ...row, mode: 'legacy' })) };
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, key); return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const host = await managementHost(store, beforeCommit);
+    try {
+      const response = await host.upload(await httpWorkbook(), 'mode-before-commit');
+      expect(rejected).toBe(true);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ error: { details: { reason: 'MODE_CONFLICT' } } });
+      expect((await admin.query("SELECT count(*) FROM content_intake.objects WHERE purpose='input'")).rows[0].count).toBe('0');
+      expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:upload' AND request_key='mode-before-commit'")).rows[0].count).toBe('0');
+      expect((await admin.query("SELECT state FROM content_intake.object_reservations WHERE source_id='source-a'")).rows.map(row => row.state)).toEqual(['released']);
+    } finally { await host.app.close(); }
+  }, 40_000);
+
   it('management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS', async () => {
     const old = await candidate();
     const host = await managementHost();
