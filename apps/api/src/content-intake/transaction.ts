@@ -180,17 +180,22 @@ export function createIntakeTransactions(pool: IntakePool,
       await client.query('COMMIT');
       return { ok: true, value };
     } catch (error) {
+      let rollbackFailure: unknown;
       if (client && !committing) {
-        try { await client.query('ROLLBACK'); } catch { broken = true; }
+        try { await client.query('ROLLBACK'); } catch (failure) { broken = true; rollbackFailure = failure; }
       } else if (client) broken = true;
-      try { report(diagnosticId, error); } catch { /* Diagnostics must not change transaction certainty. */ }
-      if (committing) return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
+      try { report(diagnosticId, rollbackFailure === undefined ? error
+        : new AggregateError([error, rollbackFailure], 'intake transaction rollback failed')); }
+      catch { /* Diagnostics must not change transaction certainty. */ }
+      // A failed ROLLBACK cannot certify absence of a receipt or write either.
+      // Keep the public code/reason aligned with the unknown commit state.
+      if (committing || broken) return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
       const rejection = error instanceof IntakeRejection ? error
         : error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SOURCE_FORMAT_MISMATCH'
           ? new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION')
           : error instanceof ContractValidationError ? new IntakeRejection('FILE_INVALID', 'VALIDATION')
           : new IntakeRejection('COMMIT_UNKNOWN', 'INTERNAL_ERROR');
-      return { ok: false, code: rejection.code, reason: rejection.reason, commit: broken ? 'unknown' : 'rolled_back', diagnosticId };
+      return { ok: false, code: rejection.code, reason: rejection.reason, commit: 'rolled_back', diagnosticId };
     } finally {
       client?.release(broken);
     }
