@@ -7,7 +7,7 @@ import { ProductHttpError } from './product-http';
 type C = components['schemas'];
 type Source = { selection: string; source: C['IntakeSource']; actions: C['IntakeAction'][] };
 type Person = C['IntakePrincipalPage']['items'][number] & { selection: string; deadline: number };
-type Pending = { path: string; method: 'POST' | 'PATCH'; body: C['IntakeGrantBatch'] | C['IntakeGrantChange'] };
+type Pending = { path: string; method: 'POST' | 'PATCH'; body: C['IntakeGrantBatch'] | C['IntakeGrantChange']; uncertain: boolean };
 const reject = () => { throw new ProductHttpError('STALE'); };
 const label = (s: C['IntakeScope']) => `${s.shopId ?? '品牌通用'} · ${{product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'}[s.domain]} · ${s.sourceId ?? '该范围全部来源'}`;
 
@@ -116,7 +116,13 @@ export class ContentIntakePermissions {
         // failure can arrive after a retry or a new session has started writing.
         check();
         // A transport/cancellation/malformed response cannot prove no COMMIT.
-        if(error instanceof ProductHttpError && ['VALIDATION','FORBIDDEN','NOT_FOUND','CONFLICT','UNAUTHORIZED'].includes(error.code) && error.reason!=='COMMIT_UNKNOWN')this.pending=null;
+        const definitive = error instanceof ProductHttpError && ['VALIDATION','FORBIDDEN','NOT_FOUND','CONFLICT','UNAUTHORIZED'].includes(error.code) && error.reason!=='COMMIT_UNKNOWN';
+        if(definitive && !pending.uncertain)this.pending=null;
+        else {
+          // A later qualification rejection cannot settle an earlier unknown COMMIT.
+          pending.uncertain=true;
+          if(definitive)this.notice='先前操作结果仍未确认；当前资格已拒绝重试。请由有权人员核对授权列表，资格恢复后仍使用原请求确认。';
+        }
         throw error;
       }
     };
@@ -141,12 +147,12 @@ export class ContentIntakePermissions {
           parseContractSchema('IntakeGrantList',await request('/v1/intake/grants/preview',{method:'POST',body}));
           if(!this.fresh())return reject();this.preview=body;this.previewDeadline=Math.min(this.deadline,person.deadline);this.armExpiry();this.previewView={person:person.displayLabel,actions:command.actions,scope:label(selected.source.scope),startsAt:command.startsAt,expiresAt:command.expiresAt,reason:command.reason};
         }
-        if(command.action==='save') {if(!this.preview || performance.now()>=this.previewDeadline)return reject();this.pending={path:'/v1/intake/grants',method:'POST',body:this.preview};await write();}
+        if(command.action==='save') {if(!this.preview || performance.now()>=this.previewDeadline)return reject();this.pending={path:'/v1/intake/grants',method:'POST',body:this.preview,uncertain:false};await write();}
         if(command.action==='revoke') {
           const selected=this.grants.find(g=>g.selection===command.selection);
           if(!selected || !this.view().grants.find(g=>g.selection===command.selection)?.canRevoke)return reject();
           this.pending={path:`/v1/intake/grants/${encodeURIComponent(selected.grant.grantId)}`,method:'PATCH',body:parseContractSchema('IntakeGrantChange',{
-            operationId:randomUUID(),expectedVersion:selected.grant.version,change:'revoke',stewardPrincipalId:null,reason:command.reason})};await write();
+            operationId:randomUUID(),expectedVersion:selected.grant.version,change:'revoke',stewardPrincipalId:null,reason:command.reason}),uncertain:false};await write();
         }
       }
       check();this.active=null;return this.view();

@@ -21,12 +21,23 @@ it('requires explicit versions, displays every authorized impact and delegates d
   expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-preview', baseReleaseId: 'rel_2', targetReleaseId: 'rel_1' });
   rendered.rerender(<IntakeRollback view={view({ impact, canExecute: true })} busy={false} blocked={false} apply={apply} onDirty={onDirty} />);
   expect(screen.getByText(/店铺 shop-a/)).toBeVisible(); expect(screen.getByText(/店铺 shop-b/)).toBeVisible();
+  const close = screen.getByRole('button', { name: '关闭回退计划' });
+  expect(screen.getByRole('button', { name: '确认回退并发布' }).parentElement).toBe(close.parentElement);
+  expect(close.parentElement).toHaveClass('intake-toolbar');
   const confirm = vi.spyOn(window, 'confirm');
   try {
     await user.click(screen.getByRole('button', { name: '确认回退并发布' }));
     expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-execute' }); expect(confirm).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: '发起回退复核' })).not.toBeInTheDocument();
   } finally { confirm.mockRestore(); }
+});
+it('shows historical review timestamps in local time with an explicit UTC offset',()=>{
+  render(<IntakeRollback view={view({ impact, hasReview: true, review: {
+    state: 'approved', checkedAt: '2026-10-09T06:00:00.000Z', validUntil: '2026-10-09T06:01:00.000Z', instanceCode: 'synthetic-review',
+  } })} busy={false} blocked={false} apply={vi.fn()} onDirty={vi.fn()} />);
+  const text=screen.getByText(/最近核验：/).textContent ?? '';
+  expect(text).toMatch(/最近核验：.*（UTC[+-]\d{2}:\d{2}） · 有效至：.*（UTC[+-]\d{2}:\d{2}）/);
+  expect(text).not.toContain('2026-10-09T06:00:00.000Z');
 });
 it('labels a partial preview honestly and connects correction to the existing upload workflow', async () => {
   const apply = vi.fn(), user = userEvent.setup();

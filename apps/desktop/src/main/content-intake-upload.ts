@@ -184,8 +184,8 @@ export class ContentIntakeUpload {
       this.pending = null;
     } catch (error) {
       // An uncertain replay must keep its identity even if current permission or
-      // material now rejects it. Only a first definitive input rejection is safe
-      // to edit. In particular an upload can commit before its final auth check.
+      // material now rejects it. A new upload runs its final check before COMMIT;
+      // only a first definitive input rejection is safe to edit.
       if (this.pending === pending && !retry && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
         && (error.code === 'VALIDATION' || error.code === 'CONFLICT')) {
         this.pending = null; this.confirmed = false; this.phase = 'confirming';

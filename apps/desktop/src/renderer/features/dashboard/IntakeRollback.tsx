@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView } from '@shared/content-intake-management';
+import { formatIntakeTime } from './intake-time';
 const labels: Record<string, string> = { creating: '审批创建结果待确认', pending: '待审批', approved: '审批已通过', rejected: '审批未通过', revoked: '审批已撤回', unavailable: '审批结果尚未核验', published: '回退已发布', unknown: '回退结果待确认', failed: '回退未完成', cancelled: '回退已取消' };
 /** Rollback publishes a new version of the entire catalog. Its controls only send
  * human intent; Main retains material identity and any uncertain operation. */
@@ -38,11 +39,13 @@ export function IntakeRollback({ view, busy, blocked, apply, onDirty }: { view: 
             <button disabled={disabled} onClick={() => apply({ action: 'rollback-read-review' })}>读取历史回退审批</button>
           </div>}
           {review && <div role="status"><p>{labels[review.state]}{review.instanceCode ? ` · 审批编号 ${review.instanceCode}` : ''}</p>
-            <p>最近核验：{review.checkedAt ?? '尚未核验'} · 有效至：{review.validUntil ?? '尚无有效核验'}。此处只读，不延长有效期。</p></div>}
-          <button className="intake-danger" disabled={disabled || !rollback.canExecute}
-            onClick={() => apply({ action: 'rollback-execute' })}>确认回退并发布</button>
+            <p>最近核验：{review.checkedAt ? formatIntakeTime(review.checkedAt) : '尚未核验'} · 有效至：{review.validUntil ? formatIntakeTime(review.validUntil) : '尚无有效核验'}。此处只读，不延长有效期。</p></div>}
         </>}
-        <button disabled={disabled} onClick={reset}>关闭回退计划</button>
+        <div className="intake-toolbar">
+          {!impact.requiresCorrectiveCandidate && <button className="intake-danger" disabled={disabled || !rollback.canExecute}
+            onClick={() => apply({ action: 'rollback-execute' })}>确认回退并发布</button>}
+          <button disabled={disabled} onClick={reset}>关闭回退计划</button>
+        </div>
       </>}
     </>}
   </section>;
