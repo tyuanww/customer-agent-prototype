@@ -68,7 +68,12 @@ export class ContentIntakePermissions {
         revoked:g.revokedAt!==null,canRevoke:g.kind==='business' && g.revokedAt===null})):[],
       preview:fresh && performance.now()<this.previewDeadline?this.previewView:null,pending:!!this.pending,notice:this.notice };
   }
-  private stop() { this.generation++; this.active?.abort(); this.active=null; }
+  private stop() {
+    // A stopped write may already have committed; its stale response cannot
+    // settle the original operation before a later qualification rejection.
+    if (this.active && this.pending) this.pending.uncertain=true;
+    this.generation++; this.active?.abort(); this.active=null;
+  }
   dispose() { this.disposed=true; this.stop(); this.clear(); this.pending=null; this.unsubscribe(); this.listeners.clear(); }
   async command(command: IntakePermissionCommand): Promise<IntakePermissionView> {
     if (command.action==='stop') { this.stop(); this.preview=null; this.previewView=null; this.notice=this.pending?'已停止本机等待；服务端结果仍须按原请求确认。':'已停止读取。'; return this.view(); }
