@@ -781,6 +781,8 @@ D `953a555` → `b1531fc` 已在[Menokin 整理说明](../reference-intake-menok
 
 **最终定向外审核对（2026-10-09）：** 用户交回的 [Grok 补证全文](../../evidence/qa/intake-legacy-acl-runtime/grok-final-targeted-handoff-2026-10-09.md) 固定产品 `1c5d5e1`、治理 `0125a97`，两仓实验前后均干净。主 Agent 核对来源文件及结果文件 SHA、PG 锁记录和 `0022` 的 `source_write_lock` 触发器；真实合成 PG15 管理 HTTP 的三个 mode 更新安排均得到 201 和已采用对象。前两个窗口的来源更新会话确实等候同一 advisory 锁，更新在上传 COMMIT 后才提交；这验证锁序，不是验证 legacy 已在最终 SELECT 前提交而事务仍放行。第三种更新在 HTTP 返回后，重放得到 MODE_CONFLICT。治理 18 项输入字节/hash 全匹配；Grok 执行 CSV 35/35、运行闭包 17/17、目录 253/253、家族探针 114/114，主 Agent 只核对原始摘要和关键输出，不冒称亲自重跑。点名的无特权/usage 身份列 UPDATE 与函数执行拒绝、pg_temp 诱饵实验未见可执行越权；另 86/97 个 public/pg_temp DEFINER 仅盘点未逐个动态测试。schema/OpenAPI 的已批准哈希与追加链证明字节身份，不等于旧正文逐行语义审查。没有新可行动代码缺陷；重放拒绝后的临时 reservation、资格撤销/岗位变化竞争和真实资料/设备仍未验证。完整 `/review` 保持 INCOMPLETE，真实接入仍按上文“正式接入”条件，不新增业务需求。
 
+**上传竞争与规则锁接入条件（2026-10-09，承接 18ff7cf）：** 上一段是 `1c5d5e1` 定向补证当时的限制。本轮在同一产品分支用真实管理 HTTP 和临时 PG15 补测，不改行为代码、0030 或规则维护业务，版本保持 0.3.26。闸门包在对象存储 `persist` 返回之后：此时临时 reservation 已是 reserved，上传事务尚未 BEGIN。第二会话再用正式 `changeGrant` 或组织事实写入器 COMMIT，然后放行；这与约 754 行“替换最终 SELECT 返回行”的旧测试分开。五条结果：mode 重放 409 MODE_CONFLICT，原对象 adopted、回执不变、新 reservation released；撤权或岗位改为 job-agent 若先于最终授权，则 404 SCOPE_DENIED、零对象、零回执、reservation released；上传先 201 再在重放闸门内撤权或改岗位，原对象保持，重放 404，临时 reservation released。同一命令两遍通过，状态形态一致。来源 mode 三种真实锁序的输入字节与 `final-targeted/mode-order.json` 一致，复用不重跑。`record_policy_history` 定义不含 `lock_content`；四类 NOLOGIN 运行账号对 `role_rules` 无写权限，仓内没有正式规则写入 API。因此不报当前登录角色漏洞。既有“正式接入”增加一条：未来规则维护者须使用同锁并做交错验收。完整 `/review` 仍 INCOMPLETE。真实飞书、真实客户/员工数据、生产配置和 Windows 人工验收仍是单独门禁。
+
 ### 已定位的原始候选
 
 本机已找到五份 XLSX；均属于既有忽略目录，`git ls-files -- faq` 为空。结构核查由仓外工作目录中的独立只读脚本完成，只输出结构与聚合，没有将文件送入产品导入模块、外部模型或数据库。
