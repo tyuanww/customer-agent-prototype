@@ -1264,7 +1264,7 @@ G01–G24 继续按原层级执行，其中所有“完整缺行自动下架”�
 
 候选机器合同为 `sop-xlsx-v1`，仍是 `DRAFT · NOT FROZEN · NOT EXPORTED · NOT INTAKE`，并明确 `productionConsumerReady=false`、`syntheticOnly=true`。候选已经固化本期已确认的六个工作表、按行保留文字和换行、同一行多图片附件、图片无文字时拒绝、显式版本列优先且否则取文件 SHA-256、同来源同版本幂等，以及外部超链接只保留标签而不跟随读取。既有 ops-loop 的 SOP CSV 合同和 FAQ/售前/售后/活动的 CSV/XLSX 合同没有改变。
 
-治理候选的 `npm --prefix sites run test:docs:fast`、候选 JSON/SQL 静态检查和 `npm --prefix sites run test:release` 均有成功证据；release 使用既有质量计划，候选尚未接入生成器，因此不能把该基线通过写成 SOP 合同冻结或产品消费证据。暂存差异检查和 `gstack-redact` 也通过。产品解析器的合成测试和证据沿用本节前文，不因治理候选同步而重跑。下一道准确门禁是评审并批准 HTTP、对象/附件生命周期、来源绑定、发布/回退与存储边界，之后按治理仓正规路径冻结、导出并 intake；只有完成这些步骤，才可接生产 runner，再做上传→检查→确认发布→第二坐席查询/预览的合成闭环。真实飞书、真实资料、生产配置、Windows 和完整 `/review` 仍未完成；`externalCompleteReview` 继续保持 `INCOMPLETE`。本节是状态同步，不新增业务范围或 TODO。
+治理候选的 `npm --prefix sites run test:docs:fast`、候选 JSON/SQL 静态检查、`npm --prefix sites run test:intake-sop-media-boundary`（3/3）和 `npm --prefix sites run test:release` 均有成功证据；边界检查器已在治理仓提交 `68d90c2` 并纳入 release 质量计划。release 使用既有质量计划，候选尚未接入生成器，因此不能把该基线通过写成 SOP 合同冻结或产品消费证据。暂存差异检查和 `gstack-redact` 也通过。产品解析器的合成测试和证据沿用本节前文，不因治理候选同步而重跑。下一道准确门禁是评审并批准 HTTP、对象/附件生命周期、来源绑定、发布/回退与存储边界，之后按治理仓正规路径冻结、导出并 intake；只有完成这些步骤，才可接生产 runner，再做上传→检查→确认发布→第二坐席查询/预览的合成闭环。真实飞书、真实资料、生产配置、Windows 和完整 `/review` 仍未完成；`externalCompleteReview` 继续保持 `INCOMPLETE`。本节是状态同步，不新增业务范围或 TODO。
 
 
 <!-- autoplan-accepted:ceo -->
