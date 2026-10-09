@@ -11,7 +11,7 @@ import { authorize, source } from './authority.js';
 import { candidateContext, getJob, jobView, readCandidate } from './candidate.js';
 import { digest } from './material.js';
 import { sourceInputFormat } from './input-format.js';
-import { IntakeRejection, type createIntakeTransactions, type IntakeResult } from './transaction.js';
+import { IntakeRejection, type createIntakeTransactions, type IntakeResult, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
 type Run = ReturnType<typeof createIntakeTransactions>;
@@ -37,12 +37,14 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
     return { ok: false, code: rejection.code, reason: rejection.reason, diagnosticId, commit: 'rolled_back' };
   }
   const busy = () => failed(new IntakeRejection('QUOTA_EXCEEDED', 'OVERLOADED'));
-  const checkSource = (actor: AuthenticatedUser, sourceId: string) => run(actor, 'upload-authorize', null, null, async (client, who) => {
+  async function allowedSource(client: IntakeTransaction, who: Principal, sourceId: string) {
     const src = await source(client, parseContractSchema('IntakeId', sourceId));
     await authorize(client, who, 'import', src);
     if (src.mode !== 'v2-preview') throw new IntakeRejection('MODE_CONFLICT');
     return sourceInputFormat(src);
-  }, v => v as ReturnType<typeof sourceInputFormat>);
+  }
+  const checkSource = (actor: AuthenticatedUser, sourceId: string) => run(actor, 'upload-authorize', null, null,
+    (client, who) => allowedSource(client, who, sourceId), v => v as ReturnType<typeof sourceInputFormat>);
 
   async function state(actor: AuthenticatedUser, id: string) {
     return run(actor, 'job-report', null, null, async (client, who) => {
@@ -91,21 +93,27 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
         const object = stored;
         const registered = await run<C['IntakeObject']>(actor, 'upload', { sourceId, sha256: object.sha256, bytes: object.sizeBytes }, operationId,
           async (client, who) => {
-            const src = await source(client, sourceId);
-            await authorize(client, who, 'import', src);
-            if (src.mode !== 'v2-preview') throw new IntakeRejection('MODE_CONFLICT');
-            const format = sourceInputFormat(src);
+            const format = await allowedSource(client, who, sourceId);
             if (format.sourceType !== object.sourceType) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION');
             await client.query(`INSERT INTO content_intake.objects(object_id,source_id,actor_id,tenant_id,app_id,object_key,sha256,bytes,mime,purpose,received_at)
               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'input',clock_timestamp())`,
             [object.objectId, sourceId, who.id, who.tenantId, who.appId, `intake/${object.objectId}`, object.sha256, object.sizeBytes, format.mime]);
             await capacity.adopt(client, object);
+            // Source mode and import authority can change while bytes are stored.
+            // A definitive rejection must roll back the object and its receipt.
+            client.beforeCommit(async () => {
+              const current = await allowedSource(client, who, sourceId);
+              if (current.sourceType !== object.sourceType) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION');
+            });
             return { objectId: object.objectId, sourceId, sha256: object.sha256, bytes: object.sizeBytes, mime: format.mime };
           }, v => parseContractSchema('IntakeObject', v));
         // A replay references the original object; this new temporary copy is
         // unreferenced. Never reclaim after an uncertain DB commit/rollback.
         reclaim = registered.ok ? registered.value.objectId !== object.objectId : registered.commit === 'rolled_back';
         if (!registered.ok) return registered;
+        // A newly committed upload has an object ID the caller must receive.
+        // A replay bypasses the work callback, so recheck its current authority.
+        if (!reclaim) return registered;
         const stillAllowed = await checkSource(actor, sourceId);
         return stillAllowed.ok ? registered : stillAllowed;
       } catch (error) { return failed(error); }
