@@ -2,18 +2,53 @@ import { expect,it,vi,afterEach } from 'vitest';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { ProductHttpError } from '../../src/main/product-http';
 import { isIntakePermissionCommand } from '../../src/shared/content-intake-permissions';
+import { isDefinitiveRollback } from '../../src/shared/content-intake-recovery';
+import type { ProductErrorCode } from '../../src/shared/product-session';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 afterEach(()=>vi.useRealTimers());
+it.each(['VALIDATION','FORBIDDEN','UNAUTHORIZED','CONFLICT','GONE'] as ProductErrorCode[])('recognizes pre-commit %s as definitive but not COMMIT_UNKNOWN',code=>{
+ expect(isDefinitiveRollback(code)).toBe(true);
+ expect(isDefinitiveRollback(code,'COMMIT_UNKNOWN')).toBe(false);
+});
+it('preserves recovery for transport uncertainty',()=>{
+ expect(isDefinitiveRollback('UNAVAILABLE')).toBe(false);
+ expect(isDefinitiveRollback('CANCELLED')).toBe(false);
+});
 it('keeps IDs and original batch in Main; preview unsaved, unknown retry exact, stale selections rejected',async()=>{
  const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session);
  try{
   const view=await main.command({action:'refresh'});expect(view.busy).toBe(false);expect(view.people[0]!.label).toBe('合成坐席');expect(JSON.stringify(view)).not.toContain('registered-agent');
   await expect(main.command(f.command('registered-agent'))).rejects.toThrow();
   const preview=await main.command(f.command(view.people[0]!.selection));expect(preview.preview?.person).toBe('合成坐席');expect(f.receipts.size).toBe(0);
-  f.setUnknown();await expect(main.command({action:'save'})).rejects.toThrow();expect(main.view().pending).toBe(true);await expect(main.command({action:'refresh'})).rejects.toThrow();
+  f.setUnknown();await expect(main.command({action:'save'})).rejects.toThrow();expect(main.view().pending).toBe(true);expect(main.view().resultUnknown).toBe(true);await expect(main.command({action:'refresh'})).rejects.toThrow();
   await main.command({action:'retry'});expect(main.view().pending).toBe(false);expect(f.grants).toHaveLength(1);
-  const writes=f.requests.filter(r=>r.path==='/v1/intake/grants');expect(writes).toHaveLength(2);expect(writes[0]!.body).toEqual(writes[1]!.body);
+  const writes=f.requests.filter(r=>r.path==='/v1/intake/grants');expect(writes).toHaveLength(2);expect(writes[0]).toEqual(writes[1]);expect(writes[0]!.method).toBe('POST');
+  expect([...f.receipts.keys()]).toEqual([(writes[0]!.body as {operationId:string}).operationId]);
   const current=await main.command({action:'refresh'});await expect(main.command(f.command(view.people[0]!.selection))).rejects.toThrow();expect(current.grants[0]!.canRevoke).toBe(true);
+ }finally{main.dispose();}
+});
+it('rejects retry without a pending operation as a typed conflict',async()=>{
+ const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session);
+ try{
+  await expect(main.command({action:'retry'})).rejects.toMatchObject({code:'CONFLICT'});
+  expect(main.view().pending).toBe(false);
+  expect(main.view().resultUnknown).toBe(false);
+  expect(f.requests).toHaveLength(0);
+ }finally{main.dispose();}
+});
+it('releases a fresh grant request after a definitive 404 scope rejection',async()=>{
+ const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session),original=f.session.request;
+ try{
+  const view=await main.command({action:'refresh'});await main.command(f.command(view.people[0]!.selection));
+  f.session.request=async(epoch,path,options)=>{
+   if(path==='/v1/intake/grants' && options.body)throw new ProductHttpError('GONE','SCOPE_DENIED');
+   return original(epoch,path,options);
+  };
+  await expect(main.command({action:'save'})).rejects.toMatchObject({code:'GONE',reason:'SCOPE_DENIED'});
+  expect(main.view().pending).toBe(false);
+  expect(f.receipts.size).toBe(0);
+  f.session.request=original;
+  await main.command({action:'refresh'});
  }finally{main.dispose();}
 });
 it('keeps an uncertain grant operation when a later qualification rejection cannot read its receipt',async()=>{
@@ -64,6 +99,35 @@ it('keeps the original grant request when stopping after a possible commit prece
   await main.command({action:'retry'});
   expect(main.view().pending).toBe(false);expect(f.grants).toHaveLength(1);
   expect(bodies).toHaveLength(3);expect(bodies[1]).toEqual(bodies[0]);expect(bodies[2]).toEqual(bodies[0]);
+  expect([...f.receipts.keys()]).toEqual([(bodies[0] as {operationId:string}).operationId]);
+ }finally{main.dispose();}
+});
+it('keeps the exact revoke operation through stop, forbidden retry, then receipt recovery',async()=>{
+ const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session),original=f.session.request;
+ let release!:()=>void,attempts=0;const writes:{path:string;method:string|undefined;body:unknown}[]=[];
+ try{
+  const initial=await main.command({action:'refresh'});await main.command(f.command(initial.people[0]!.selection));await main.command({action:'save'});
+  const saved=await main.command({action:'refresh'}),originalGrantId=saved.grants[0]!.reference;
+  f.session.request=async(epoch,path,options)=>{
+   if(path.startsWith('/v1/intake/grants/') && options.body){
+    writes.push({path,method:(options as {method?:string}).method,body:structuredClone(options.body)});attempts++;
+    if(attempts===1){const committed=await original(epoch,path,options);await new Promise<void>(resolve=>{release=resolve;});return committed;}
+    if(attempts===2)throw new ProductHttpError('FORBIDDEN');
+   }
+   return original(epoch,path,options);
+  };
+  const first=main.command({action:'revoke',selection:saved.grants[0]!.selection,reason:'合成撤销'}),stale=expect(first).rejects.toMatchObject({code:'STALE'});
+  await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+  expect(f.grants[0]!.revokedAt).not.toBeNull();expect(f.receipts.size).toBe(2);
+  await main.command({action:'stop'});release();await stale;
+  await expect(main.command({action:'retry'})).rejects.toMatchObject({code:'FORBIDDEN'});
+  expect(main.view().pending).toBe(true);
+  await main.command({action:'retry'});
+  expect(main.view().pending).toBe(false);
+  expect(writes).toHaveLength(3);expect(writes[1]).toEqual(writes[0]);expect(writes[2]).toEqual(writes[0]);
+  expect(writes[0]).toMatchObject({path:`/v1/intake/grants/${originalGrantId}`,method:'PATCH'});
+  expect(new Set(f.receipts.keys())).toEqual(new Set([(f.requests.find(r=>r.path==='/v1/intake/grants')!.body as {operationId:string}).operationId,(writes[0]!.body as {operationId:string}).operationId]));
+  expect(f.grants).toHaveLength(1);expect(f.grants[0]!.grantId).toBe(originalGrantId);expect(f.grants[0]!.version).toBe(2);
  }finally{main.dispose();}
 });
 it('revokes an identifiable grant record after its current name disappears without exposing hidden identity',async()=>{

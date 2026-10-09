@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { ProductHttpError } from './product-http';
 import type { QualityPage } from '../shared/content-intake-management';
+import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import type { ProductSession } from './product-session';
 
 type C = components['schemas'];
@@ -194,8 +195,8 @@ export class ContentIntakeQuality {
       catch (error) {
         // Definitive rejection permits correction. Transport/unknown-commit and
         // malformed success preserve the original operation for recovery.
-        if (firstAttempt && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
-          && ['VALIDATION', 'FORBIDDEN', 'UNAUTHORIZED', 'CONFLICT', 'GONE'].includes(error.code) && this.pending === operation) this.pending = null;
+        if (firstAttempt && error instanceof ProductHttpError && isDefinitiveRollback(error.code,error.reason)
+          && this.pending === operation) this.pending = null;
         throw error;
       }
       assertActive(); return this.accept(raw, operation);

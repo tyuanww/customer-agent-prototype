@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { INTAKE_REPORT_MAX_BYTES, INTAKE_UPLOAD_MAX_BYTES, intakeInputMime, isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadPhase, type IntakeUploadView } from '../shared/content-intake-upload';
+import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import type { IntakeAccess } from './content-intake-access';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
@@ -186,8 +187,8 @@ export class ContentIntakeUpload {
       // An uncertain replay must keep its identity even if current permission or
       // material now rejects it. A new upload runs its final check before COMMIT;
       // only a first definitive input rejection is safe to edit.
-      if (this.pending === pending && !retry && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
-        && (error.code === 'VALIDATION' || error.code === 'CONFLICT')) {
+      if (this.pending === pending && !retry && error instanceof ProductHttpError
+        && isDefinitiveRollback(error.code,error.reason) && (error.code === 'VALIDATION' || error.code === 'CONFLICT')) {
         this.pending = null; this.confirmed = false; this.phase = 'confirming';
         this.notice = '未接受本次输入，请刷新确认信息，或整批修正后重新选择文件。';
       }
