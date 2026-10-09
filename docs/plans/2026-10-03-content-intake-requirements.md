@@ -1247,6 +1247,18 @@ G01–G24 继续按原层级执行，其中所有“完整缺行自动下架”�
 
 当前缺口是技术/现场证据：B1 最新版及负责人、B4 租户字段/可见范围；原生审批定义的人工节点/附件保真；撤销传播实测；正式合同差集与 intake。B2/B3/B5 的业务选择已关闭，不再询问。真实能力/数据/上线仍按各自批准，先用合成样本开发验证。
 
+### 0.54 SOP 合成候选治理合同准备（2026-10-10）
+
+用户已确认下一阶段顺序：先准备 SOP 合成候选的治理合同，随后再接生产 runner。治理仓 `codex/content-intake-p2-contracts@de5ab06` 已提交候选材料：
+
+- `business-docs/01-客服Agent项目/30-开发-进行中/20-P2 SOP工作簿媒体合同候选.md`
+- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/protocol.json`
+- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/verification.md`
+
+候选机器合同为 `sop-xlsx-v1`，仍是 `DRAFT · NOT FROZEN · NOT EXPORTED · NOT INTAKE`，并明确 `productionConsumerReady=false`、`syntheticOnly=true`。候选已经固化本期已确认的六个工作表、按行保留文字和换行、同一行多图片附件、图片无文字时拒绝、显式版本列优先且否则取文件 SHA-256、同来源同版本幂等，以及外部超链接只保留标签而不跟随读取。既有 ops-loop 的 SOP CSV 合同和 FAQ/售前/售后/活动的 CSV/XLSX 合同没有改变。
+
+治理候选的 `npm --prefix sites run test:docs:fast` 和 `npm --prefix sites run test:release` 均有成功证据；后者是在仅修订阻断错误码列表之前完成，修订后已重新通过 JSON 解析、文档快测、暂存差异检查和 `gstack-redact`，没有把元数据修订写成再次完成完整 release。产品解析器的合成测试和证据沿用本节前文，不因治理文档同步而重跑。下一道准确门禁是评审并批准 HTTP、对象/附件生命周期、来源绑定、发布/回退与存储边界，之后按治理仓正规路径冻结、导出并 intake；只有完成这些步骤，才可接生产 runner，再做上传→检查→确认发布→第二坐席查询/预览的合成闭环。真实飞书、真实资料、生产配置、Windows 和完整 `/review` 仍未完成；`externalCompleteReview` 继续保持 `INCOMPLETE`。本节是状态同步，不新增业务范围或 TODO。
+
 
 <!-- autoplan-accepted:ceo -->
 - 保持 U01–U03 的五模块与角色/流程边界；按 §11 的唯一所有者实现，优先复用身份、发布、回退与检索现有主链，禁止模块形成第二个正式发布指针。
