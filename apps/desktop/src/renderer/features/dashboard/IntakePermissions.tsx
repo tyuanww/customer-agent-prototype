@@ -32,7 +32,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
     <div className="intake-toolbar"><button disabled={disabled || !!view?.preview} onClick={()=>void apply({action:'refresh'})}>刷新权限列表</button>
       <button disabled={!busy && !view?.busy} onClick={()=>void apply({action:'stop'})}>停止等待</button></div>
     {error && <p role="alert">{error}</p>}{view?.notice && <p role="status">{view.notice}</p>}
-    {view?.pending && <div className="intake-notice"><p>结果尚未确认。请按原请求重试，不要重复新建授权。</p><button disabled={busy} onClick={()=>void apply({action:'retry'})}>按原请求确认结果</button></div>}
+    {view?.pending && <div className="intake-notice"><p>{view.resultUnknown?'授权结果可能已提交。请按原请求确认，不要重复新建授权。若现在关闭窗口或退出，本机原请求会丢失；请由有权人员核对授权列表。':'正在确认授权结果；请勿重复新建授权。'}</p><button disabled={busy} onClick={()=>void apply({action:'retry'})}>按原请求确认结果</button></div>}
     {view && !view.signedIn && <p>请先登录。</p>}
     {view?.signedIn && !view.available && !view.pending && <p>当前没有可配置范围，或读取资格已到期。请刷新核对。</p>}
     {view?.available && <>

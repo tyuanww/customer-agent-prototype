@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { IntakeRollbackCommand, IntakeRollbackView } from '../shared/content-intake-management';
+import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import type { IntakeAccess } from './content-intake-access';
 import { ProductHttpError } from './product-http';
 type C = components['schemas'];
@@ -97,8 +98,8 @@ export class ContentIntakeRollback {
     let raw: unknown;
     try { raw = await request('/v1/intake/rollback', operation.body); }
     catch (error) {
-      if (first && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
-        && ['VALIDATION','FORBIDDEN','UNAUTHORIZED','CONFLICT','GONE'].includes(error.code) && this.operation === operation) this.operation = null;
+      if (first && error instanceof ProductHttpError && isDefinitiveRollback(error.code,error.reason)
+        && this.operation === operation) this.operation = null;
       throw error;
     }
     this.accept(raw, operation);

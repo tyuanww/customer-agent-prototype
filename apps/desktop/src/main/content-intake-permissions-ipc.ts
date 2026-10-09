@@ -17,8 +17,11 @@ export function registerContentIntakePermissionsIpc(session: ProductSession | nu
     if(!owner){
       const win=BrowserWindow.fromWebContents(wc);if(!win || win.isDestroyed())return {ok:false,message:'窗口不可用。',view:null};
       owner=new ContentIntakePermissions(session);owners.set(wc,owner);const owned=owner;
-      const closing=(event:{preventDefault():void})=>{if(owned.closeRisk() && dialog.showMessageBoxSync(win,{type:'warning',title:'关闭权限配置',
-        message:'仍有未保存预览或结果待确认的操作。关闭不会撤销服务器已受理的操作。',buttons:['继续核对','仍然关闭'],defaultId:0,cancelId:0,noLink:true})!==1)event.preventDefault();};
+      const closing=(event:{preventDefault():void})=>{if(!owned.closeRisk())return;
+        const unknown=owned.view().resultUnknown;
+        if(dialog.showMessageBoxSync(win,{type:'warning',title:'关闭权限配置',
+          message:unknown?'授权操作可能已提交。关闭后原请求会丢失，无法按原请求重试；请由有权人员核对授权列表，确认结果后再操作。':'仍有未保存的权限预览或读取。关闭会丢弃本机内容。',
+          buttons:unknown?['继续核对','已知需人工核对，仍然关闭']:['返回编辑','仍然关闭'],defaultId:0,cancelId:0,noLink:true})!==1)event.preventDefault();};
       win.on('close',closing);owned.subscribe(()=>{if(!wc.isDestroyed())wc.send('dashboard:permissions-invalidated');});
       wc.once('destroyed',()=>{win.removeListener('close',closing);owners.delete(wc);owned.dispose();});
     }
@@ -27,7 +30,10 @@ export function registerContentIntakePermissionsIpc(session: ProductSession | nu
   });
   const allowClose=()=>{
     if(![...owners.values()].some(owner=>owner.closeRisk()))return true;
-    return dialog.showMessageBoxSync({type:'warning',title:'退出权限配置',message:'仍有未保存预览或结果待确认的权限操作。退出不会撤销服务端操作。',buttons:['继续核对','仍然退出'],defaultId:0,cancelId:0,noLink:true})===1;
+    const unknown=[...owners.values()].some(owner=>owner.view().resultUnknown);
+    return dialog.showMessageBoxSync({type:'warning',title:'退出权限配置',
+      message:unknown?'授权操作可能已提交。退出后原请求会丢失，无法按原请求重试；请由有权人员核对授权列表，确认结果后再操作。':'仍有未保存的权限预览或读取。退出会丢弃本机内容。',
+      buttons:unknown?['继续核对','已知需人工核对，仍然退出']:['返回编辑','仍然退出'],defaultId:0,cancelId:0,noLink:true})===1;
   };
   return {allowClose,dispose:()=>{for(const owner of owners.values())owner.dispose();owners.clear();for(const channel of channels)ipcMain.removeHandler(channel);}};
 }

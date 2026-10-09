@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { isIntakeManagementCommand, type IntakeManagementCommand, type IntakeManagementView, type IntakeRollbackCommand } from '../shared/content-intake-management';
 import { isIntakeUploadCommand } from '../shared/content-intake-upload';
+import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { ContentIntakeUpload } from './content-intake-upload';
 import { loadIntakeAccess, type IntakeAccess } from './content-intake-access';
 import { ContentIntakeRollback } from './content-intake-rollback';
@@ -315,8 +316,8 @@ export class ContentIntakeManagement {
     let raw: unknown;
     try { raw = await request(`${this.address({ key: operation.body.key })}/${suffix}`, operation.body); }
     catch (error) {
-      if (firstAttempt && error instanceof ProductHttpError && error.reason !== 'COMMIT_UNKNOWN'
-        && ['VALIDATION','FORBIDDEN','UNAUTHORIZED','CONFLICT','GONE'].includes(error.code) && this.workflowPending === operation) this.workflowPending = null;
+      if (firstAttempt && error instanceof ProductHttpError && isDefinitiveRollback(error.code,error.reason)
+        && this.workflowPending === operation) this.workflowPending = null;
       throw error;
     }
     this.acceptWorkflow(raw, operation);

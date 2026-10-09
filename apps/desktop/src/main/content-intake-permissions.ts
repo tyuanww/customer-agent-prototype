@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { IntakePermissionCommand, IntakePermissionView } from '../shared/content-intake-permissions';
+import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { loadIntakeAccess } from './content-intake-access';
 import type { IntakeUsageSession } from './content-intake-usage';
 import { ProductHttpError } from './product-http';
@@ -66,7 +67,8 @@ export class ContentIntakePermissions {
       actions:fresh?this.selected?.actions??[]:[],grants:fresh?this.grants.map(({selection,grant:g})=>({selection,reference:g.grantId,startsAt:g.startsAt,reason:g.reason,
         person:names.get(g.recipientPrincipalId)??'当前姓名不可用',action:g.action,scope:label(g.scope),expiresAt:g.expiresAt,
         revoked:g.revokedAt!==null,canRevoke:g.kind==='business' && g.revokedAt===null})):[],
-      preview:fresh && performance.now()<this.previewDeadline?this.previewView:null,pending:!!this.pending,notice:this.notice };
+      preview:fresh && performance.now()<this.previewDeadline?this.previewView:null,pending:!!this.pending,
+      resultUnknown:!!this.pending && (this.pending.uncertain || !!this.active),notice:this.notice };
   }
   private stop() {
     // A stopped write may already have committed; its stale response cannot
@@ -79,6 +81,7 @@ export class ContentIntakePermissions {
     if (command.action==='stop') { this.stop(); this.preview=null; this.previewView=null; this.notice=this.pending?'已停止本机等待；服务端结果仍须按原请求确认。':'已停止读取。'; return this.view(); }
     if (this.active || this.disposed || !this.session.view().signedIn) return reject();
     if (this.pending && command.action!=='retry') throw new ProductHttpError('CONFLICT');
+    if (command.action==='retry' && !this.pending) throw new ProductHttpError('CONFLICT');
     if (command.action==='discard') { this.preview=null;this.previewView=null;return this.view(); }
     const controller = new AbortController(), gen=++this.generation, epoch=this.session.view().sessionEpoch;
     this.active=controller; this.notice=null;
@@ -111,7 +114,8 @@ export class ContentIntakePermissions {
       if(!this.fresh())return reject();this.armExpiry();
     };
     const write=async()=>{
-      const pending=this.pending!;
+      const pending=this.pending;
+      if(!pending)return reject();
       try {const raw=await request(pending.path,{method:pending.method,body:pending.body});
         parseContractSchema(pending.method==='POST'?'IntakeGrantList':'IntakeGrant',raw);this.pending=null;this.preview=null;this.previewView=null;
         this.notice='本次操作已保存。请刷新列表查看当前权限；此回执不代表权限永久有效。';
@@ -121,7 +125,7 @@ export class ContentIntakePermissions {
         // failure can arrive after a retry or a new session has started writing.
         check();
         // A transport/cancellation/malformed response cannot prove no COMMIT.
-        const definitive = error instanceof ProductHttpError && ['VALIDATION','FORBIDDEN','NOT_FOUND','CONFLICT','UNAUTHORIZED'].includes(error.code) && error.reason!=='COMMIT_UNKNOWN';
+        const definitive = error instanceof ProductHttpError && isDefinitiveRollback(error.code,error.reason);
         if(definitive && !pending.uncertain)this.pending=null;
         else {
           // A later qualification rejection cannot settle an earlier unknown COMMIT.

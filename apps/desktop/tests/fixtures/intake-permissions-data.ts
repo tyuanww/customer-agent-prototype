@@ -8,11 +8,11 @@ export function intakePermissionsData() {
  const source:C['IntakeSource']={scope,version:1,templateVersion:'faq-p1.1',ruleVersion:'intake-p1.1',mappingVersion:'mapping-1',structureDigest:'a'.repeat(64),contentIntakeMode:'v2-preview',modeVersion:1};
  const person:C['IntakePrincipalPage']['items'][number]={principalId:'registered-agent',displayLabel:'合成坐席',factsVersion:1,validUntil:until,enabled:true};
  let signedIn=true,epoch=1,unknown=false,omitPerson=false;
- const listeners=new Set<()=>void>(),requests:{path:string;body:unknown}[]=[];
+ const listeners=new Set<()=>void>(),requests:{path:string;method:string|undefined;body:unknown}[]=[];
  const grants:C['IntakeGrant'][]=[];const receipts=new Map<string,unknown>();
  const session:IntakeUsageSession={view:()=>({signedIn,sessionEpoch:epoch}),subscribe:fn=>{listeners.add(fn);return()=>{listeners.delete(fn);};},
   request:async(_epoch,path,options)=>{
-   requests.push({path,body:options.body});let value:unknown;
+   requests.push({path,method:(options as {method?:string}).method,body:options.body});let value:unknown;
    if(path.startsWith('/v1/intake/authorization'))value={factsVersion:1,revocationGeneration:0,policyVersion:1,validUntil:until,
     capabilities:[{scope,actions:[],mayAllocate:['query'],mayDelegate:[],validUntil:until}],nextCursor:null};
    else if(path.startsWith('/v1/intake/sources?'))value={items:[source],nextCursor:null};
@@ -27,7 +27,7 @@ export function intakePermissionsData() {
    }else if(path.startsWith('/v1/intake/grants/created-business')){
     const change=options.body as C['IntakeGrantChange'];const g=grants[0]!;
     value=receipts.get(change.operationId)??{...g,version:2,revokedAt:new Date().toISOString(),lastChangeReason:change.reason,stewardPrincipalId:null};
-    receipts.set(change.operationId,value);grants[0]=value as C['IntakeGrant'];
+    if(!receipts.has(change.operationId)){receipts.set(change.operationId,value);grants[0]=value as C['IntakeGrant'];}
    }else if(path.startsWith('/v1/intake/grants?'))value={items:grants,nextCursor:null};
    else throw new Error(`unexpected path ${path}`);
    return {status:200,value:structuredClone(value)};

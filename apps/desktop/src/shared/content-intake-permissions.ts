@@ -12,7 +12,7 @@ export type IntakePermissionView = {
   people: { selection: string; label: string }[]; actions: Action[];
   grants: { selection: string; reference: string; person: string; action: Action; scope: string; startsAt: string; reason: string; expiresAt: string; revoked: boolean; canRevoke: boolean }[];
   preview: { person: string; actions: Action[]; scope: string; startsAt: string; expiresAt: string; reason: string } | null;
-  pending: boolean; notice: string | null;
+  pending: boolean; resultUnknown: boolean; notice: string | null;
 };
 export type IntakePermissionReply = { ok: true; view: IntakePermissionView } | { ok: false; message: string; view: IntakePermissionView | null };
 export type IntakePermissionApi = { current(): Promise<IntakePermissionReply>; command(command: IntakePermissionCommand): Promise<IntakePermissionReply>; onInvalidated(listener: () => void): () => void };
