@@ -56,7 +56,14 @@ export function createIntakePublication(run: Run) {
           return published;
         } catch (error) {
           if (error instanceof Error && 'code' in error && (error.code==='ZA001' || error.code==='ZA003' || error.code==='ZA005')
-            && denials.has(error.message as Reason)) throw new IntakeRejection(error.message as Reason,error.code==='ZA001'?'VALIDATION':error.code==='ZA005'?'FORBIDDEN':'CONFLICT');
+            && denials.has(error.message as Reason)) {
+            // Resource authority can change after publish-prepare; keep the final
+            // SQL rejection indistinguishable from an absent candidate.
+            let code: C['IntakeFailure']['code'] = 'CONFLICT';
+            if (error.code==='ZA001') code = 'VALIDATION';
+            else if (error.code==='ZA005') code = error.message==='SCOPE_DENIED' ? 'NOT_FOUND' : 'FORBIDDEN';
+            throw new IntakeRejection(error.message as Reason,code);
+          }
           throw error;
         }
       },receipt);
