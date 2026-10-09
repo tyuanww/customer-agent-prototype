@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionView } from '@shared/content-intake-permissions';
+import { formatIntakeTime } from './intake-time';
 export function IntakePermissions({ active }: { active: boolean }) {
   const [view,setView]=useState<IntakePermissionView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [person,setPerson]=useState(''),[actions,setActions]=useState<IntakePermissionView['actions']>([]);
@@ -49,15 +50,15 @@ export function IntakePermissions({ active }: { active: boolean }) {
           <button disabled={!person || !actions.length || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
             onClick={()=>void apply({action:'preview',person,actions,startsAt:new Date(starts).toISOString(),expiresAt:new Date(expires).toISOString(),reason})}>预览权限</button>
         </fieldset>:<section aria-label="权限预览"><h2>预览 · 尚未保存</h2><p>{view.preview.person} · {view.preview.scope}</p>
-          <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{view.preview.startsAt} 至 {view.preview.expiresAt}</p><p>{view.preview.reason}</p>
-          <button className="dash-action-primary" disabled={disabled} onClick={()=>void apply({action:'save'})}>确认保存权限</button>
-          <button disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</button></section>}
+          <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatIntakeTime(view.preview.startsAt)} 至 {formatIntakeTime(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>
+          <div className="intake-toolbar"><button className="dash-action-primary" disabled={disabled} onClick={()=>void apply({action:'save'})}>确认保存权限</button>
+          <button disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</button></div></section>}
         <section aria-label="已有业务权限"><h2>当前可管理的业务权限</h2><p>当前姓名不可用时，请依据授权记录编号、范围和原授权原因核对后撤销；不会猜测人员。</p>
           {!view.grants.length && <p>此范围暂无可管理业务权限。</p>}
-          {view.grants.map(g=><article className="intake-card" key={g.selection}><h3>{g.person} · {labels[g.action]}</h3><p>授权记录 {g.reference}</p><p>原授权原因：{g.reason}</p><p>{g.scope} · {g.startsAt} 至 {g.expiresAt} · {g.revoked?'已撤销':'授权记录（实际使用仍核验当前资格）'}</p>
-            <button disabled={disabled || !g.canRevoke || !!view.preview} onClick={()=>{setRevoke(g.selection);setRevokeReason('');}}>撤销该权限</button>
+          {view.grants.map(g=><article className="intake-card" key={g.selection}><h3>{g.person} · {labels[g.action]}</h3><p>授权记录 {g.reference}</p><p>原授权原因：{g.reason}</p><p>{g.scope} · {formatIntakeTime(g.startsAt)} 至 {formatIntakeTime(g.expiresAt)} · {g.revoked?'已撤销':'授权记录（实际使用仍核验当前资格）'}</p>
+            <button className="intake-danger" disabled={disabled || !g.canRevoke || !!view.preview} onClick={()=>{setRevoke(g.selection);setRevokeReason('');}}>撤销该权限</button>
             {revoke===g.selection && <fieldset disabled={disabled}><legend>核对撤销</legend><label>撤销原因<textarea aria-label="撤销原因" maxLength={512} value={revokeReason} onChange={e=>setRevokeReason(e.target.value)}/></label>
-              <button disabled={!revokeReason.trim()} onClick={()=>void apply({action:'revoke',selection:revoke,reason:revokeReason})}>确认撤销</button><button onClick={()=>setRevoke('')}>取消</button></fieldset>}
+              <div className="intake-toolbar"><button className="intake-danger" disabled={!revokeReason.trim()} onClick={()=>void apply({action:'revoke',selection:revoke,reason:revokeReason})}>确认撤销</button><button onClick={()=>setRevoke('')}>取消</button></div></fieldset>}
           </article>)}
         </section>
       </>}

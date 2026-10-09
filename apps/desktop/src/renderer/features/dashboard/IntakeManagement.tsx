@@ -1,9 +1,10 @@
 import { IntakePermissions } from './IntakePermissions';
 import type { components } from '@customer-agent/contracts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
 import { IntakeRollback } from './IntakeRollback';
 import { IntakeUpload } from './IntakeUpload';
+import { formatIntakeTime } from './intake-time';
 import './intake-management.css';
 const states: Record<string, string> = { 'awaiting-evidence': '等待补证', ready: '候选就绪', publishing: '发布中', published: '已发布', cancelled: '已取消', invalidated: '已失效',
   confirmed: '来源已确认', creating: '审批创建结果待确认', pending: '等待组织审批', approved: '组织审批已通过', rejected: '组织审批未通过', revoked: '组织审批已撤回', unavailable: '审批服务暂不可用', unknown: '操作结果待确认', failed: '操作失败', not_frozen: '待冻结抽样', revision_required: '需要修订后重新检查', initial_required: '等待初检', expansion_required: '等待扩检', passed: '质量检查通过', blocked: '质量检查未通过' };
@@ -33,7 +34,7 @@ function EntryDetails({ entry }: { entry: components['schemas']['IntakeEntry'] }
     <dt>操作</dt><dd>{entry.operation === 'disable' ? '停用' : '新增或更新'}</dd>
     <dt>分类</dt><dd>{entry.category || '未填写'}</dd>
     <dt>适用说明</dt><dd>{entry.applicabilityNote || '未填写'}</dd>
-    <dt>有效时间</dt><dd>{entry.effectiveFrom} 至 {entry.effectiveTo ?? '长期'}</dd>
+    <dt>有效时间</dt><dd>{formatIntakeTime(entry.effectiveFrom)} 至 {entry.effectiveTo ? formatIntakeTime(entry.effectiveTo) : '长期'}</dd>
     <dt>问题表达</dt><dd>{entry.questions.map(q => `${q.text}（${q.active ? '启用' : '停用'} · ${q.id} / ${q.version}）`).join('；') || '无'}</dd>
     <dt>商品 / 场景引用</dt><dd>{[...entry.productRefs, ...entry.scenarioRefs].map(r => `${r.id} / ${r.displayVersion}`).join('；') || '无'}</dd>
     <dt>内部说明</dt><dd>{entry.internalNote || '无'}</dd><dt>风险提示</dt><dd>{entry.riskNote || '无'}</dd>
@@ -64,7 +65,8 @@ function CheckRow({ sample, disabled, save, onDirty }: { sample: QualityPage['sa
       </fieldset>}
   </article>;
 }
-function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeManagementView; disabled: boolean;
+function CandidateWorkflow({ view, disabled, apply, onDirty, sectionId, children }: { view: IntakeManagementView; disabled: boolean;
+  sectionId: string; children: ReactNode;
   apply: (command: IntakeManagementCommand) => void; onDirty: (id: string, dirty: boolean) => void }) {
   const [versionKind, setVersionKind] = useState<'integer' | 'opaque'>('opaque');
   const [versionValue, setVersionValue] = useState(''), [reason, setReason] = useState('');
@@ -88,7 +90,7 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
     if (result?.action === 'publish' && result.state === 'published') { setTitle(''); setSummary(''); }
   }, [result?.operationId, result?.action, result?.state]);
   return <section aria-label="来源确认与发布">
-    <h2>来源确认</h2><p>已记录 {candidate.sourceEvidenceVersion} 次来源确认。请核对原资料版本与当前候选材料。</p>
+    <h2 id={`${sectionId}-source`} tabIndex={-1}>2. 确认来源</h2><p>已记录 {candidate.sourceEvidenceVersion} 次来源确认。请核对原资料版本与当前候选材料。</p>
     {view.canConfirmSource ? <fieldset disabled={disabled || view.hasDraft || publishDirty || !mutable || !view.material}>
       <legend>确认本次导出对应的来源版本</legend>
       {!view.material && <p>请先查看材料，核对本次上传内容。</p>}
@@ -97,26 +99,49 @@ function CandidateWorkflow({ view, disabled, apply, onDirty }: { view: IntakeMan
       <label>来源版本<input aria-label="来源版本" value={versionValue} onChange={e => setVersionValue(e.target.value)} /></label>
       <label>来源确认说明<textarea aria-label="来源确认说明" value={reason} onChange={e => setReason(e.target.value)} /></label>
       <p>版本最多 128 字；说明最多 512 字。递增整数须为 0 或不带前导零的正整数。</p>
-      <button disabled={!sourceValid} onClick={() => apply({ action: 'confirm-source', versionKind, versionValue, reason })}>确认来源版本</button>
+      <button className="dash-action-primary" disabled={!sourceValid} onClick={() => apply({ action: 'confirm-source', versionKind, versionValue, reason })}>确认来源版本</button>
     </fieldset> : <p>当前没有此来源的确认权限。</p>}
     {legacy && <section aria-label="历史审批记录"><h2>历史审批记录</h2>
       <p>这是旧审批流程的候选。首次确认直发须显式修订或重新导入，不能直接转换；已发布历史保留原审核记录。</p>
       <button disabled={disabled || !candidate.approvalEvidenceVersion} onClick={() => apply({ action: 'read-review' })}>读取历史审批</button>
       {view.review && <div role="status"><p>{stateLabel(view.review.state, view.review)}{view.review.instanceCode ? ` · 审批编号 ${view.review.instanceCode}` : ''}</p>
-        <p>历史核验：{view.review.checkedAt ?? '尚未核验'} · 有效至：{view.review.validUntil ?? '尚无有效核验'}。此处只读，不延长有效期。</p></div>}
+        <p>历史核验：{view.review.checkedAt ? formatIntakeTime(view.review.checkedAt) : '尚未核验'} · 有效至：{view.review.validUntil ? formatIntakeTime(view.review.validUntil) : '尚无有效核验'}。此处只读，不延长有效期。</p></div>}
     </section>}
-    <h2>发布</h2><p>来源与质量检查满足要求后，由具备发布权限的人员确认发布。点击发布将弹窗再次确认。</p>
+    {children}
+    <h2 id={`${sectionId}-publish`} tabIndex={-1}>4. 确认发布</h2><p>来源与质量检查满足要求后，由具备发布权限的人员确认发布。点击发布将弹窗再次确认。</p>
     {view.canPublish ? <fieldset disabled={disabled || view.hasDraft || sourceDirty || !view.material || legacy || candidate.state !== 'ready'}>
       <legend>本次发布说明</legend>
       <label>发布标题<input aria-label="发布标题" value={title} onChange={e => setTitle(e.target.value)} /></label>
       <label>发布摘要<textarea aria-label="发布摘要" value={summary} onChange={e => setSummary(e.target.value)} /></label>
       <p>标题最多 256 字；摘要最多 2048 字。</p>
-      <button disabled={!title.trim() || !summary.trim() || [...title].length > 256 || [...summary].length > 2048}
+      <button className="dash-action-primary" disabled={!title.trim() || !summary.trim() || [...title].length > 256 || [...summary].length > 2048}
         onClick={() => apply({ action: 'publish', title, summary })}>发布当前候选</button>
     </fieldset> : <p>当前没有此来源的发布权限。</p>}
     {candidate.publishedReleaseId && <p role="status">当前候选已发布：{candidate.publishedReleaseId}。坐席重新查询后可读取新版本。</p>}
     {result && <p role="status">本次操作结果：{result.action === 'publish' && ['pending', 'unknown'].includes(result.state) ? '发布结果待确认' : stateLabel(result.state, view.review)}{result.releaseId ? ` · ${result.releaseId}` : ''}。这是操作记录；当前候选状态可单独刷新。</p>}
   </section>;
+}
+/** Navigation advice only. Main/API continue to own every operation's eligibility. */
+function currentStep(view: IntakeManagementView, dirtyIds: Set<string>): { title: string; detail: string; target: string } {
+  if (view.pending) return { title: '确认上次操作结果', detail: '先取得原操作的结果，再继续处理当前资料。', target: 'recovery' };
+  const candidate = view.selected!;
+  if (!['awaiting-evidence', 'ready'].includes(candidate.state)) return { title: stateLabel(candidate.state), detail: '请查看当前候选状态与操作记录。', target: 'candidate' };
+  if (candidate.publicationPolicy === 'approval-v1') return { title: '先修订或重新导入旧候选', detail: '旧审批记录继续保留；直接发布需要新的候选及检查。', target: 'candidate' };
+  if (dirtyIds.has('workflow-source')) return { title: '完成来源确认', detail: '请提交当前填写的来源版本和确认说明，或清空这些输入。', target: 'source' };
+  if (dirtyIds.has('workflow-publish')) return { title: '完成发布说明', detail: '请核对当前标题和摘要。点击发布后，还需在弹窗中再次确认。', target: 'publish' };
+  if (dirtyIds.size || view.hasDraft) return { title: '完成本轮质量检查', detail: '先保存各条判断，再提交本轮检查。已暂存的判断还没有完成提交。', target: 'quality' };
+  if (!view.material) return { title: '1. 核对材料', detail: '先查看当前候选的内容和差异，再确认它对应的来源版本。', target: 'material' };
+  if (!candidate.sourceEvidenceVersion) return { title: '2. 确认来源', detail: view.canConfirmSource ? '填写本次导出的来源版本，并说明核对结果。' : '需要有此来源确认权限的人员完成核对。', target: 'source' };
+  if (candidate.state === 'ready') return { title: '4. 确认发布', detail: view.canPublish ? '填写发布标题和摘要；点击发布后，弹窗会要求再次确认。' : '当前候选就绪，需要有此来源发布权限的人员操作。', target: 'publish' };
+  if (view.receipt && !view.quality) return { title: '读取最新检查状态', detail: '已收到本次操作回执。请重新读取初检或扩检，核对当前结果。', target: 'quality' };
+  const state = view.quality?.status.state;
+  if (state === 'blocked' || state === 'revision_required') return { title: '修订后重新检查', detail: '本次质量检查未通过，请修订资料后重新上传和检查。', target: 'quality' };
+  if (state === 'passed' || candidate.readinessReasons.some(reason => !['SOURCE_CONFIRMATION_REQUIRED', 'QUALITY_NOT_PASSED'].includes(reason))) {
+    return { title: '核对候选状态', detail: '请刷新候选状态，并处理下方提示的待核验事项。', target: 'candidate' };
+  }
+  return { title: '3. 完成质量检查', detail: !view.canReview ? '需要有此来源检查权限的人员完成本轮检查。'
+    : state === 'expansion_required' ? '读取扩检，逐条保存人工判断，再提交本轮检查。'
+      : '读取初检并确定抽样范围，逐条保存人工判断，再提交本轮检查。', target: 'quality' };
 }
 export function IntakeManagement() {
   const [page,setPage]=useState<'materials'|'permissions'>('materials');
@@ -130,6 +155,7 @@ export function IntakeManagement() {
   </>;
 }
 function IntakeMaterials() {
+  const sectionId = useId();
   const [view, setView] = useState<IntakeManagementView | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
   const generation = useRef(0), pending = useRef<number | null>(null);
@@ -215,17 +241,26 @@ function IntakeMaterials() {
   const qualityDirty = [...dirtyIds].some(id => id !== 'workflow-source' && id !== 'workflow-publish');
   const workflowDirty = dirtyIds.has('workflow-source') || dirtyIds.has('workflow-publish');
   const editable = quality?.status.state === (quality?.phase === 'initial' ? 'initial_required' : 'expansion_required');
+  const step = view?.authorized && view.selected && !view.rollback.pending && !view.rollback.impact && !dirtyIds.has('rollback-input')
+    ? currentStep(view, dirtyIds) : null;
   return <section className="intake-management" aria-label="FAQ 资料管理">
     <header><div><h1>资料管理</h1><p>上传 FAQ、核对来源与质量，确认后发布</p></div><span>{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</span></header>
     {error && <div><p role="alert">{error}</p><button disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</button></div>}
+    {step && <section className="intake-notice intake-current-step" aria-label="当前步骤">
+      <div><h2>{step.title}</h2><p>{step.detail}</p><small>核对材料 → 确认来源 → 质量检查 → 确认发布</small></div>
+      <button onClick={() => {
+        const target = document.getElementById(`${sectionId}-${step.target}`);
+        target?.focus(); target?.scrollIntoView({ block: 'start' });
+      }}>前往当前步骤</button>
+    </section>}
     {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy} stopping={stopping}
       blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
     {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <button disabled={busy || stopping}
       onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</button>}
-    {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2>操作结果待确认</h2>
+    {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2 id={`${sectionId}-recovery`} tabIndex={-1}>操作结果待确认</h2>
       {view.pending.action === 'cancel' && <p>取消结果尚未确认。取得最终回执前，不能认定候选已经取消。</p>}
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
-      <div>{view.pending.recovery === 'receipt' && <button disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</button>}
+      <div className="intake-toolbar">{view.pending.recovery === 'receipt' && <button disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</button>}
         {view.pending.retryAllowed !== false && <button disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</button>}
         {view.pending.retryAllowed === false && <p>旧流程操作不能转成确认直发，请查询原回执或读取历史状态。</p>}</div></section>}
     {view?.signedIn && (view.rollback.available || view.rollback.pending) && <IntakeRollback view={view} busy={busy || stopping}
@@ -244,7 +279,7 @@ function IntakeMaterials() {
           <strong>{row.candidate.sourceId}</strong><span>{states[row.candidate.state]} · 版本 {row.candidate.key.version}</span><small>{row.candidate.key.candidateId}</small>
         </button>)}</div></section>
       {dirty && <p role="status">当前有尚未提交的输入。请完成对应操作，或关闭当前候选并明确放弃。</p>}
-      {view.selected && <section aria-label="当前候选"><h2>当前候选 · {view.selected.sourceId} · 版本 {view.selected.key.version}</h2>
+      {view.selected && <section aria-label="当前候选"><h2 id={`${sectionId}-candidate`} tabIndex={-1}>当前候选 · {view.selected.sourceId} · 版本 {view.selected.key.version}</h2>
         <p>{states[view.selected.state]} · {['awaiting-evidence','ready'].includes(view.selected.state)
           ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
         {(view.canRevise || view.canCancel) && <div className="intake-toolbar">
@@ -255,26 +290,31 @@ function IntakeMaterials() {
             if (window.confirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。')) void apply({ action: 'cancel-candidate' });
           }}>取消当前候选</button>}
         </div>}
-        <div className="intake-toolbar"><button disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新候选状态</button>
-          <button disabled={disabled} onClick={() => void apply({ action: 'material', next: false })}>查看材料</button>
-          <button disabled={disabled || !view.material?.nextCursor} onClick={() => void apply({ action: 'material', next: true })}>下一页材料</button>
-          {view.canReview && <><button disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'initial' })}>读取初检</button>
-            <button disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'expanded' })}>读取扩检</button></>}</div>
+        <button disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新候选状态</button>
+        <h2 id={`${sectionId}-material`} tabIndex={-1}>1. 核对材料</h2>
+        <div className="intake-toolbar"><button disabled={disabled} onClick={() => void apply({ action: 'material', next: false })}>查看材料</button>
+          <button disabled={disabled || !view.material?.nextCursor} onClick={() => void apply({ action: 'material', next: true })}>下一页材料</button></div>
         {view.material && <section aria-label="当前页材料与差异">
           <p>来源版本：{view.material.materialHeader.sourceClaim.versionValue ?? '尚未确认'} · 风险等级：{riskLabels[view.material.materialHeader.risk.level]}</p>
           {view.material.entries.map(entry => <article className="intake-card" key={entry.businessEntryId}><h3>{entry.title}</h3><p className="intake-answer">{entry.answerText}</p><EntryDetails entry={entry} /></article>)}
           <h3>当前页差异</h3>{view.material.differences.map(d => <p key={d.businessEntryId}>{d.businessEntryId} · {({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[d.change]} · {d.previousVersion ?? '无前版'} → {d.nextVersion}</p>)}
         </section>}
-        {quality && <section aria-label="人工质量检查"><h2>{states[quality.status.state] ?? quality.status.state}</h2><p>本轮 {quality.total} 条 · 已填写 {quality.checked} 条</p>
-          {!quality.status.frozen && <button disabled={disabled || workflowDirty} onClick={() => void apply({ action: 'freeze' })}>冻结本次抽样</button>}
+        <CandidateWorkflow key={view.selected.key.digest} view={view} disabled={disabled || qualityDirty} apply={c => void apply(c)} onDirty={onDirty} sectionId={sectionId}>
+          <section aria-label="人工质量检查"><h2 id={`${sectionId}-quality`} tabIndex={-1}>3. 质量检查</h2>
+          <p>{view.selected.publicationPolicy === 'approval-v1' ? '旧候选保留原审批记录；如需直接发布，请先修订或重新导入。' : '检查用于核对资料质量。通过后可直接确认发布，无需另行审批。'}</p>
+          {view.canReview ? <div className="intake-toolbar"><button disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'initial' })}>读取初检</button>
+            <button disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'expanded' })}>读取扩检</button></div> : <p>当前没有此来源的检查权限。</p>}
+        {quality && <><h3>{states[quality.status.state] ?? quality.status.state}</h3><p>本轮 {quality.total} 条 · 已填写 {quality.checked} 条</p>
+          {!quality.status.frozen && <><p>冻结抽样会固定本轮要检查的条目，不会发布资料。</p><button className="dash-action-primary" disabled={disabled || workflowDirty} onClick={() => void apply({ action: 'freeze' })}>冻结本次抽样</button></>}
           <div className="intake-toolbar"><button disabled={disabled || dirty || quality.offset === 0} onClick={() => void apply({ action: 'quality-page', offset: Math.max(0, quality.offset - 20) })}>上一页检查</button>
             <button disabled={disabled || dirty || quality.offset + 20 >= quality.total} onClick={() => void apply({ action: 'quality-page', offset: quality.offset + 20 })}>下一页检查</button></div>
           {quality.samples.map(sample => <CheckRow key={`${view.selected!.key.digest}-${quality.phase}-${quality.offset}-${sample.scriptId}`} sample={sample}
             disabled={disabled || workflowDirty || !editable} onDirty={onDirty} save={c => void apply(c)} />)}
-          <button disabled={disabled || dirty || quality.checked !== quality.total || !editable}
+          <button className="dash-action-primary" disabled={disabled || dirty || quality.checked !== quality.total || !editable}
             onClick={() => void apply({ action: 'submit' })}>提交本轮人工检查</button>
-        </section>}
-        <CandidateWorkflow key={view.selected.key.digest} view={view} disabled={disabled || qualityDirty} apply={c => void apply(c)} onDirty={onDirty} />
+        </>}
+          </section>
+        </CandidateWorkflow>
         {view.receipt && <p role="status">操作回执：{states[view.receipt.state] ?? view.receipt.state}。这是本次操作记录，请重新读取检查状态。</p>}
       </section>}
     </>}

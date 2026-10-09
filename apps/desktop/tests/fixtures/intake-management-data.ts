@@ -60,7 +60,10 @@ export function intakeManagementData(count = 2) {
       const existing = receipts.get(req.operationId); if (existing) return existing;
       status.state = action === 'quality-freeze' ? 'initial_required' : 'passed';
       status.frozen = { principalId: 'reviewer', factsVersion: 1, recordedAt: '2026-01-01T00:00:00Z' };
-      if (action === 'quality-check') { for (const sample of samples) sample.check = req.checks.find(c => c.scriptId === sample.scriptId)!; }
+      if (action === 'quality-check') {
+        for (const sample of samples) sample.check = req.checks.find(c => c.scriptId === sample.scriptId)!;
+        status.rounds = [{ phase: req.phase, reviewer: status.frozen, checkedCount: req.checks.length, defectCount: req.checks.filter(check => check.defect).length }];
+      }
       const receipt: C['IntakeQualityReceipt'] = { key, operationId: req.operationId, action, state: status.state, phase: action === 'quality-freeze' ? null : req.phase };
       receipts.set(req.operationId, receipt); sync(); return receipt;
     }

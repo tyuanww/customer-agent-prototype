@@ -1,0 +1,143 @@
+{
+  "schema": "intake-ui-closeout/v1",
+  "date": "2026-10-09",
+  "base": "7660a295841f9d2d840b2c6c529d3004d2a3efc6",
+  "version": "0.3.26",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "platform": "darwin-arm64",
+    "timezone": "Asia/Shanghai",
+    "dependencyInstall": false
+  },
+  "inputs": "inputs.json",
+  "inputsVerified": 434,
+  "commands": [
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/component/intake-management.test.tsx tests/component/intake-upload.test.tsx tests/component/intake-permissions.test.tsx tests/component/intake-library.test.tsx tests/component/intake-dashboard-shell.test.tsx tests/component/intake-rollback.test.tsx tests/unit/content-intake-management.test.ts tests/unit/content-intake-upload.test.ts",
+      "exitCode": 0,
+      "log": "component.log",
+      "sha256": "3a8105afb89fcfbad35aa29d3f413e3df7da5f7136a351e53182196553282577",
+      "passed": 126
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/component/intake-management.test.tsx",
+      "exitCode": 0,
+      "log": "rollback-regression.log",
+      "sha256": "6dc102c4af34881574be1ecf41af6d8e4e0282f7dfd0fa0e35a486c74752b91f",
+      "passed": 14
+    },
+    {
+      "command": "pnpm exec eslint apps/desktop/src/renderer/DashboardApp.tsx apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx apps/desktop/src/renderer/features/dashboard/IntakePermissions.tsx apps/desktop/src/renderer/features/dashboard/IntakeLibrary.tsx apps/desktop/src/renderer/features/dashboard/intake-time.ts apps/desktop/tests/component/intake-management.test.tsx apps/desktop/tests/component/intake-permissions.test.tsx apps/desktop/tests/component/intake-library.test.tsx apps/desktop/tests/fixtures/intake-management-data.ts",
+      "exitCode": 0,
+      "log": "lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop typecheck",
+      "exitCode": 0,
+      "log": "typecheck.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop build",
+      "exitCode": 0,
+      "log": "build.log",
+      "sha256": "2ac291d71e8824b58059cbdd71ecc54718dab90ae1a3a7acbb09be9d0298f5f0"
+    },
+    {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-workspace-real-stack.spec.ts",
+      "exitCode": 0,
+      "log": "electron.log",
+      "sha256": "c836445b5b5f9a3680ef380e56f973494d77fcbaafda31e2882d8fafe38c70b2",
+      "passed": 5
+    },
+    {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/intake-ui-compact-temporary.spec.ts",
+      "exitCode": 0,
+      "log": "electron-csv-compact.log",
+      "sha256": "e527bcdb1e323ec9843dabe2757754818c02bc2e9fde6e216e149e435f984b5a",
+      "passed": 1
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "log": "docs.log",
+      "sha256": "6c6912d0a574a6e9e836c38b1e8cb0ef60ca2cf34d2e67f44a75be5e20cd5053"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "log": "workspace.log",
+      "sha256": "b70622763191567c9fad07b0ab14f5ba83ef0f1aeaf0599df26a29dc8d6bead3"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "log": "diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "earlierFailure": {
+    "log": "component-before-fixture.log",
+    "exitCode": 1,
+    "passed": 40,
+    "failed": 1,
+    "sha256": "204ae80132ed97004976eac4f8e186ac01d14b5f6410ab8ffd025e901084fb3b",
+    "reason": "Expanded test read passed quality status; preexisting synthetic fixture had no rounds. Corrected fixture, not production validator."
+  },
+  "findings": {
+    "D1": "fixed",
+    "D2": "fixed",
+    "D3": "fixed",
+    "D4": "fixed",
+    "D5": "fixed",
+    "independentReview": "one Medium rollback guidance issue fixed and rechecked; no remaining actionable issue"
+  },
+  "browser": {
+    "viewports": [
+      [
+        1180,
+        760
+      ],
+      [
+        980,
+        680
+      ]
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "errors": [],
+    "minimumPanel": {
+      "clientWidth": 732,
+      "scrollWidth": 732
+    },
+    "boundary": "actual renderer + synthetic Main/HTTP bridge; no native-dialog/PG claim"
+  },
+  "externalReview": "INCOMPLETE",
+  "deviceAcceptance": "PARTIAL",
+  "packagedAcceptanceForNewUI": "NOT_RUN",
+  "realDataActivated": false,
+  "budget": {
+    "totalMiB": 38.8,
+    "limitMiB": 45,
+    "sourceMiB": 16.7,
+    "sourceLimitMiB": 20,
+    "contractMiB": 12.8,
+    "contractLimitMiB": 15,
+    "evidenceMiB": 9.2,
+    "evidenceLimitMiB": 10
+  },
+  "reportValidation": {
+    "htmlParsed": true,
+    "embeddedImages": 9,
+    "externalDependencies": 0,
+    "allBase64AndImageSignaturesValid": true,
+    "browserFileOpen": "NOT_VERIFIED: Aside local file access unavailable; no browser settings changed",
+    "sha256": "e9c11d264e532ba10e3c0e5b5ffafa0ae73f0bd43b79b5c119064241c6f406ab"
+  },
+  "logArchive": "logs.json"
+}

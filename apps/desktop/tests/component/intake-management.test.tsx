@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { IntakeManagement } from '../../src/renderer/features/dashboard/IntakeManagement';
@@ -191,4 +191,87 @@ it.each(['revise', 'cancel-candidate'] as const)('requires explicit confirmation
       expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled();
     }
   } finally { confirm.mockRestore(); f.main.dispose(); }
+});
+
+it('guides the existing material, source, quality and publish flow without issuing commands on navigation', async () => {
+  const f = setup(); render(<IntakeManagement />);
+  try {
+    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    const guide = () => within(screen.getByRole('region', { name: '当前步骤' }));
+    expect(guide().getByRole('heading', { name: '1. 核对材料' })).toBeInTheDocument();
+    const target = within(screen.getByRole('region', { name: '当前候选' })).getByRole('heading', { name: '1. 核对材料' });
+    const scroll = vi.fn(); Object.defineProperty(target, 'scrollIntoView', { value: scroll });
+    const calls = f.command.mock.calls.length;
+    await f.user.click(guide().getByRole('button', { name: '前往当前步骤' }));
+    expect(target).toHaveFocus(); expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    expect(f.command).toHaveBeenCalledTimes(calls);
+    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    expect(guide().getByRole('heading', { name: '2. 确认来源' })).toBeInTheDocument();
+    await f.user.type(screen.getByRole('textbox', { name: '来源版本' }), 'export-1');
+    await f.user.type(screen.getByRole('textbox', { name: '来源确认说明' }), '已核对合成来源');
+    expect(guide().getByRole('heading', { name: '完成来源确认' })).toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: '确认来源版本' }));
+    await waitFor(() => expect(guide().getByRole('heading', { name: '3. 完成质量检查' })).toBeInTheDocument());
+    await f.user.click(screen.getByRole('button', { name: '读取初检' }));
+    await f.user.click(screen.getByRole('button', { name: '冻结本次抽样' }));
+    await f.user.click(screen.getByRole('button', { name: '读取初检' }));
+    await f.user.selectOptions(screen.getByRole('combobox', { name: '检查结论 合成洁面 1' }), 'pass');
+    await f.user.click(screen.getByRole('button', { name: '保存本条判断' }));
+    expect(guide().getByRole('heading', { name: '完成本轮质量检查' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled();
+    await f.user.click(screen.getByRole('button', { name: '提交本轮人工检查' }));
+    expect(guide().getByRole('heading', { name: '读取最新检查状态' })).toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: '读取初检' }));
+    expect(guide().getByRole('heading', { name: '核对候选状态' })).toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: '刷新候选状态' }));
+    expect(guide().getByRole('heading', { name: '4. 确认发布' })).toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
+
+it('directs an unknown publication to its original recovery and removes the guide on access invalidation', async () => {
+  const f = setup(); render(<IntakeManagement />);
+  try {
+    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    const pendingView = { ...f.main.view(), pending: { action: 'publish' as const, operationId: 'synthetic-unknown', recovery: 'receipt' as const } };
+    window.dashboardIntake!.current = async () => ({ ok: true, view: pendingView });
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    const guide = within(screen.getByRole('region', { name: '当前步骤' }));
+    expect(guide.getByRole('heading', { name: '确认上次操作结果' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled();
+    const target = screen.getByRole('heading', { name: '操作结果待确认' });
+    Object.defineProperty(target, 'scrollIntoView', { value: vi.fn() });
+    const calls = f.command.mock.calls.length;
+    await f.user.click(guide.getByRole('button', { name: '前往当前步骤' }));
+    expect(target).toHaveFocus(); expect(f.command).toHaveBeenCalledTimes(calls);
+    window.dashboardIntake!.current = async () => ({ ok: false, code: 'UNAUTHORIZED', message: '未登录', view: null });
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.queryByRole('region', { name: '当前步骤' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
+
+it('leaves rollback input, an active plan and unknown recovery with the rollback panel instead of candidate guidance', async () => {
+  const f = setup(); render(<IntakeManagement />);
+  try {
+    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    const view = f.main.view(); view.rollback.available = true;
+    window.dashboardIntake!.current = async () => ({ ok: true, view: structuredClone(view) });
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.getByRole('region', { name: '当前步骤' })).toBeInTheDocument();
+    const input = screen.getByRole('combobox', { name: '当前发布版本' });
+    await f.user.type(input, 'rel_2');
+    expect(screen.queryByRole('region', { name: '当前步骤' })).not.toBeInTheDocument();
+    await f.user.clear(input);
+    expect(screen.getByRole('region', { name: '当前步骤' })).toBeInTheDocument();
+    view.rollback.impact = { baseReleaseId: 'rel_2', targetReleaseId: 'rel_1', scopes: [], requiresCorrectiveCandidate: false };
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.queryByRole('region', { name: '当前步骤' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '关闭回退计划' })).toBeInTheDocument();
+    view.rollback.impact = null; // Unknown recovery must also work after material was withdrawn.
+    view.rollback.pending = { action: 'rollback', recovery: 'receipt' };
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.queryByRole('region', { name: '当前步骤' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查询原回退回执' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '发布当前候选' })).toBeDisabled();
+  } finally { f.main.dispose(); }
 });
