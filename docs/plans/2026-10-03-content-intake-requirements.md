@@ -793,6 +793,8 @@ D `953a555` → `b1531fc` 已在[Menokin 整理说明](../reference-intake-menok
 
 **整分支有界复核后的失败确定性补齐（2026-10-09，本地实施）：** 新发现容量预留/持久化的 `COMMIT` 响应丢失被上传接口误报为确定回滚，组织登记/事实写入的 `ROLLBACK` 响应丢失也被误报为确定回滚。两条合成 PG15 红测先复现后修复：容量未知经 HTTP 返回 `503/COMMIT_UNKNOWN`，组织两入口返回 `DEPENDENCY_UNAVAILABLE/unknown`，连接丢弃，不据失败码假定确定回滚；容量预留阶段尚无上传回执，原 operationId 不能定位临时 reservation，不能声称自动恢复。正常上传幂等与组织登记刷新另有 2/2 PG15 回归。桌面 CSV/XLSX 共用文件错误提示已修正。根 lint/typecheck/test/build 及分组 workspace:check 通过，见[定向证据](../../evidence/qa/intake-legacy-acl-runtime/review-failure-certainty-2026-10-09.md)。这不是生产断线实测或完整 `/review` 通过；回退部分失权按整单策略拒绝保持 403、全失权保持 404，含准备后撤权的合成 HTTP/PG15 2/2 通过；治理仓另记合同解释，不更改已冻结机器合同。`externalCompleteReview` 保持 INCOMPLETE，真实身份/资料、标准尺寸真人系统框与 Windows 条件不变。
 
+**当前 Mac 标准尺寸安装态补证（2026-10-09，本地实施）：** 当前显示器逻辑 1470×956、Electron 工作区 1470×829，原版 CSV 完整场景在开发态和本轮新打的 0.3.26 DMG 解包副本上各 1/1 通过，原测试的 1180×760 及 980×680 尺寸断言均未放宽。同一解包副本的权限、纠正回退、同名店铺及四域工作台另有 7/7，通过真实回环 HTTP/受限 PG15 与 Electron；新包安装态共两批 8/8。旧包已保留，新 DMG 与解包 app.asar 摘要相符，见[标准尺寸记录](../../evidence/qa/intake-standard-mac-package-20261009/README.md)。文件/确认原生框仍由自动化控制响应，不能称真人系统框、办公 Windows 或真实资料验收；完整 `/review` 不因此关闭。
+
 ### 已定位的原始候选
 
 本机已找到五份 XLSX；均属于既有忽略目录，`git ls-files -- faq` 为空。结构核查由仓外工作目录中的独立只读脚本完成，只输出结构与聚合，没有将文件送入产品导入模块、外部模型或数据库。
