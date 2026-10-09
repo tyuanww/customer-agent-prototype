@@ -16,6 +16,26 @@ it('keeps IDs and original batch in Main; preview unsaved, unknown retry exact, 
   const current=await main.command({action:'refresh'});await expect(main.command(f.command(view.people[0]!.selection))).rejects.toThrow();expect(current.grants[0]!.canRevoke).toBe(true);
  }finally{main.dispose();}
 });
+it('keeps an uncertain grant operation when a later qualification rejection cannot read its receipt',async()=>{
+ const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session),original=f.session.request;
+ try{
+  const initial=await main.command({action:'refresh'});await main.command(f.command(initial.people[0]!.selection));
+  f.setUnknown();await expect(main.command({action:'save'})).rejects.toMatchObject({code:'UNAVAILABLE'});
+  expect(main.view().pending).toBe(true);expect(f.grants).toHaveLength(1);
+  const originalBody=f.requests.find(r=>r.path==='/v1/intake/grants')!.body;
+  f.session.request=async(epoch,path,options)=>{
+   if(path==='/v1/intake/grants' && options.body)throw new ProductHttpError('FORBIDDEN');
+   return original(epoch,path,options);
+  };
+  await expect(main.command({action:'retry'})).rejects.toMatchObject({code:'FORBIDDEN'});
+  expect(main.view().pending).toBe(true);
+  expect(main.view().notice).toContain('当前资格已拒绝重试');
+  f.session.request=original;
+  await main.command({action:'retry'});
+  expect(main.view().pending).toBe(false);expect(f.grants).toHaveLength(1);
+  expect(f.requests.filter(r=>r.path==='/v1/intake/grants').at(-1)!.body).toEqual(originalBody);
+ }finally{main.dispose();}
+});
 it('revokes an identifiable grant record after its current name disappears without exposing hidden identity',async()=>{
  const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session);
  try{const initial=await main.command({action:'refresh'});await main.command(f.command(initial.people[0]!.selection));await main.command({action:'save'});
