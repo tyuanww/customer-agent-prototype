@@ -299,7 +299,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       }};
       const before=Number((await admin.query('SELECT count(*) FROM content_intake.object_reservations')).rows[0].count);
       await expect(createIntakeCapacity(uncertain,store,()=>undefined).persist('user-enabler','source-a','input',
-        (async function*(){yield Buffer.from('synthetic');})(),'csv',10)).rejects.toThrow('synthetic lost capacity commit');
+        (async function*(){yield Buffer.from('synthetic');})(),'csv',10)).rejects.toMatchObject({
+        reason: 'COMMIT_UNKNOWN', code: 'OVERLOADED', cause: { message: 'synthetic lost capacity commit' },
+      });
       expect(injected).toBe(true);
       expect(Number((await admin.query('SELECT count(*) FROM content_intake.object_reservations')).rows[0].count)).toBe(before+1);
     }
@@ -353,6 +355,32 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await expect(cap.persist('user-enabler','source-a','input',(async function*(){yield Buffer.from('too large');})(),'csv',1)).rejects.toThrow('CONTENT_UPLOAD_TOO_LARGE');
     expect((await admin.query("SELECT count(*) FROM content_intake.object_reservations WHERE state IN ('reserved','persisted','releasing')")).rows[0].count).toBe('0');
   });
+
+  it('management HTTP reports an unknown upload outcome when the capacity COMMIT response is lost', async () => {
+    let lost = false;
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect(); let persisting = false;
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql.includes("SET state='persisted'")) persisting = true;
+          if (sql === 'COMMIT' && persisting && !lost) { lost = true; throw new Error('synthetic lost capacity COMMIT'); }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, key); return typeof member === 'function' ? member.bind(target) : member;
+      } }) as PoolClient;
+    } };
+    const host = await managementHost(store, uncertain);
+    try {
+      const response = await host.upload(await httpWorkbook(), 'capacity-commit-unknown');
+      expect(lost).toBe(true);
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ error: { details: { reason: 'COMMIT_UNKNOWN' } } });
+      expect((await admin.query("SELECT state FROM content_intake.object_reservations WHERE purpose='input'")).rows.map(row => row.state)).toEqual(['persisted']);
+      expect((await admin.query("SELECT count(*) FROM content_intake.objects WHERE purpose='input'")).rows[0].count).toBe('0');
+      expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:upload' AND request_key='capacity-commit-unknown'")).rows[0].count).toBe('0');
+    } finally { await host.app.close(); }
+  }, 40_000);
 
   it('capacity: report quota refusal terminates failed and cancelled jobs even with one pool connection', async () => {
     const one = new Pool({...pool.options,max:1,connectionTimeoutMillis:2000});
@@ -2268,6 +2296,29 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const req:C['IntakeRollback']={operationId:'rollback-submit',rollbackPlanId:p.rollbackPlanId,baseReleaseId:pair.base,targetReleaseId:pair.target,impactDigest:p.impactDigest,confirmed:true};
     return {...pair,p,req};
   }
+  async function rollbackAfterPrepareRevocation(grantId:string, request:C['IntakeRollback'], expectedVersion:number) {
+    let prepared=false, revoked=false;
+    const interleaved:IntakePool={async connect(){const client=await pool.connect();return new Proxy(client,{get(target,key){
+      if(key==='query')return async(sql:string,args?:unknown[])=>{
+        if(sql.includes('FROM content_intake.rollback_plans p WHERE rollback_plan_id'))prepared=true;
+        const result=await target.query(sql,args);
+        if(sql==='COMMIT'&&prepared&&!revoked){
+          revoked=true;
+          value(await service.changeGrant(actor('director'),grantId,{operationId:`revoke-${request.operationId}`,
+            expectedVersion,change:'revoke',reason:'合成准备后撤权',stewardPrincipalId:null}));
+        }
+        return result;
+      };
+      const member:unknown=Reflect.get(target,key);return typeof member==='function'?member.bind(target):member;
+    }}) as PoolClient;}};
+    const host=await managementHost(store,interleaved);
+    try {
+      const result=await host.app.inject({method:'POST',url:'/v1/intake/rollback',headers:{...host.headers,'content-type':'application/json'},
+        payload:JSON.stringify(request)});
+      expect(revoked).toBe(true);
+      return result;
+    } finally {await host.app.close();}
+  }
   it('rollback: lost COMMIT recovers the original permanent receipt without observing the provider again',async()=>{
     const {req}=await readyRollback();let lost=false;
     const uncertain:IntakePool={async connect(){const client=await pool.connect();let writing=false;return new Proxy(client,{get(target,key){
@@ -2302,11 +2353,46 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query("UPDATE public.content_current SET current_release_id='rel_composite' WHERE id=1");await admin.query('COMMIT');
     const full=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:'rel_composite',targetReleaseId:target}));
     expect(full.scopes.map(s=>s.sourceId)).toEqual(['source-a','source-b']);expect(full.requiresCorrectiveCandidate).toBe(false);
-    value(await service.changeGrant(actor('director'),'business-enabler-rollback-b',{operationId:'partial-rb',expectedVersion:1,change:'revoke',reason:'合成部分权限',stewardPrincipalId:null}));
+    const request=(operationId:string,rollbackPlanId:string,impactDigest:string):C['IntakeRollback']=>({
+      operationId,rollbackPlanId,baseReleaseId:'rel_composite',targetReleaseId:target,impactDigest,confirmed:true});
+    const raced=await rollbackAfterPrepareRevocation('business-enabler-rollback-b',request('partial-race',full.rollbackPlanId,full.impactDigest),1);
+    expect(raced.statusCode,raced.body).toBe(403);
+    expect(raced.json()).toMatchObject({error:{code:'FORBIDDEN',details:{reason:'SCOPE_DENIED'}}});
+    expect(raced.body).not.toContain('source-b');
     const partial=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:'rel_composite',targetReleaseId:target}));
     expect(partial.scopes.map(s=>s.sourceId)).toEqual(['source-a']);expect(partial.requiresCorrectiveCandidate).toBe(true);
     expect(await service.rollback(actor('enabler'),{operationId:'partial-rollback',rollbackPlanId:partial.rollbackPlanId,baseReleaseId:'rel_composite',targetReleaseId:target,impactDigest:partial.impactDigest,confirmed:true})).toMatchObject({ok:false,reason:'SCOPE_DENIED'});
+    const host=await managementHost();
+    try {
+      const post=(operationId:string)=>host.app.inject({method:'POST',url:'/v1/intake/rollback',headers:{...host.headers,'content-type':'application/json'},
+        payload:JSON.stringify(request(operationId,partial.rollbackPlanId,partial.impactDigest))});
+      const partlyDenied=await post('partial-http');
+      expect(partlyDenied.statusCode,partlyDenied.body).toBe(403);
+      expect(partlyDenied.json()).toMatchObject({error:{code:'FORBIDDEN',details:{reason:'SCOPE_DENIED'}}});
+      expect(partlyDenied.body).not.toContain('source-b');
+      value(await service.changeGrant(actor('director'),'business-enabler-rollback',{operationId:'full-revoke-a',expectedVersion:1,
+        change:'revoke',reason:'合成全部撤权',stewardPrincipalId:null}));
+      const fullyDenied=await post('full-http');
+      expect(fullyDenied.statusCode,fullyDenied.body).toBe(404);
+      expect(fullyDenied.json()).toMatchObject({error:{code:'NOT_FOUND',details:{reason:'SCOPE_DENIED'}}});
+      expect((await admin.query("SELECT count(*) FROM content_intake.publications WHERE action='rollback'")).rows[0].count).toBe('0');
+      expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:rollback'")).rows[0].count).toBe('0');
+      expect((await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0].current_release_id).toBe('rel_composite');
+    } finally {await host.app.close();}
     expect((await admin.query('SELECT source_id FROM content_intake.rollback_scopes WHERE rollback_plan_id=$1 ORDER BY source_id',[partial.rollbackPlanId])).rows).toEqual([{source_id:'source-a'},{source_id:'source-b'}]);
+  });
+
+  it('rollback: full grant loss after prepare is a resource-level 404 without a publication',async()=>{
+    const {base,target}=await rollbackPair();
+    const p=value(await service.rollbackPreview(actor('enabler'),{baseReleaseId:base,targetReleaseId:target}));
+    const result=await rollbackAfterPrepareRevocation('business-enabler-rollback',{
+      operationId:'full-race-http',rollbackPlanId:p.rollbackPlanId,baseReleaseId:base,targetReleaseId:target,
+      impactDigest:p.impactDigest,confirmed:true},1);
+    expect(result.statusCode,result.body).toBe(404);
+    expect(result.json()).toMatchObject({error:{code:'NOT_FOUND',details:{reason:'SCOPE_DENIED'}}});
+    expect((await admin.query("SELECT count(*) FROM content_intake.publications WHERE action='rollback'")).rows[0].count).toBe('0');
+    expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:rollback'")).rows[0].count).toBe('0');
+    expect((await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0].current_release_id).toBe(base);
   });
 
   it('rollback: preview cannot retain a plan after its consumed grant expires before COMMIT',async()=>{

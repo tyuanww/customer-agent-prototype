@@ -93,7 +93,8 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
       } catch (error) {
         broken = committing;
         if (!committing) try { await client.query('ROLLBACK'); } catch { broken = true; }
-        return { ok: false as const, reason: error instanceof OrganizationFactsRejected ? error.reason : 'DEPENDENCY_UNAVAILABLE', commit: committing ? 'unknown' : 'rolled_back' };
+        if (broken) return { ok: false as const, reason: 'DEPENDENCY_UNAVAILABLE' as const, commit: 'unknown' as const };
+        return { ok: false as const, reason: error instanceof OrganizationFactsRejected ? error.reason : 'DEPENDENCY_UNAVAILABLE', commit: 'rolled_back' as const };
       } finally { client.release(broken); }
     },
     async observe(principalId: string, signal?: AbortSignal): Promise<RegisteredObservation> {

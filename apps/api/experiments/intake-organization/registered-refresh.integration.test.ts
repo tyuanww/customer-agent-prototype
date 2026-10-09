@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createRegisteredOrganizationRefresh } from '../../src/content-intake/organization/registered-refresh.js';
+import { createOrganizationFactsWriter } from '../../src/content-intake/organization/facts-writer.js';
 import { createOrganizationHttpSessionOwner, createOrganizationHttpTransport } from './http-transport.js';
 import { startSyntheticContactDouble } from './synthetic-contact-double.js';
 import { seedIntakeSyntheticHost } from '../../tests/support/intake-synthetic-seed.js';
@@ -190,6 +191,20 @@ describe.skipIf(!enabled)('registered organization input through the existing at
     // The established agent binding's open ID cannot also name a second principal.
     expect(await refresh.register({ ...input, principalId: 'reviewer', openId: contact.user.open_id })).toMatchObject({ ok: false, commit: 'rolled_back', reason: 'DEPENDENCY_UNAVAILABLE' });
     expect((await admin.query("SELECT count(*) FROM intake_organization.bindings WHERE principal_id='reviewer'")).rows[0].count).toBe('0');
+  });
+
+  it('does not certify a rollback when its response is lost during registration or fact writing', async () => {
+    const uncertain = intercepted(async sql => { if (sql === 'ROLLBACK') throw new Error('synthetic lost rollback response'); });
+    const registration = createRegisteredOrganizationRefresh(uncertain, scope, transport);
+    expect(await registration.register({ principalId: 'agent', openId: 'synthetic-other', expectedBindingVersion: 1,
+      validUntil: new Date(Date.now() + 3_600_000).toISOString() })).toMatchObject({
+      ok: false, reason: 'DEPENDENCY_UNAVAILABLE', commit: 'unknown',
+    });
+    const request = await refresh.observe('agent');
+    expect(await createOrganizationFactsWriter(uncertain, scope)({ ...request.snapshot, expectedFactsVersion: 2 })).toMatchObject({
+      ok: false, reason: 'DEPENDENCY_UNAVAILABLE', commit: 'unknown',
+    });
+    expect(await state()).toMatchObject({ current_facts_version: '1', binding_version: '1', observations: '0' });
   });
 
   it('rolls an expired registration insert back at its final database-clock checkpoint', async () => {

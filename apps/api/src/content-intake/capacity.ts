@@ -6,6 +6,12 @@ export const INTAKE_TEMPORARY_BYTES = 1024 * 1024 * 1024;
 type Query = Pick<PoolClient, 'query'>;
 type Purpose = 'input' | 'report' | 'review-package';
 
+/** Admission can commit before the caller receives its result. Keep that
+ * uncertainty distinct from a rejected upload; no upload receipt exists yet. */
+export class IntakeCapacityCommitUnknown extends IntakeRejection {
+  constructor(readonly cause: unknown) { super('COMMIT_UNKNOWN', 'OVERLOADED'); }
+}
+
 /** Private admission owner. Every file is charged before writing, then adopted in
  * its business transaction. It never guesses whether an interrupted command
  * committed. No lease expiry authorizes historical deletion. Disk I/O stays
@@ -28,7 +34,14 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
       broken = true;
       // A lost COMMIT response may have durably charged capacity. Do not issue
       // rollback or classify it as uncommitted; discard the connection instead.
-      if (!committing) { try { await client.query('ROLLBACK'); } catch { /* Keep all charges on uncertain outcomes. */ } }
+      let rollbackFailed = false;
+      let rollbackError: unknown;
+      if (!committing) {
+        try { await client.query('ROLLBACK'); }
+        catch (failure) { rollbackFailed = true; rollbackError = failure; }
+      }
+      if (committing || rollbackFailed) throw new IntakeCapacityCommitUnknown(rollbackFailed
+        ? new AggregateError([error, rollbackError], 'capacity rollback failed') : error);
       throw error;
     } finally { client.release(broken); }
   }

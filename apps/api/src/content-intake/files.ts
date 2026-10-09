@@ -1,4 +1,4 @@
-import type { IntakeCapacity } from './capacity.js';
+import { IntakeCapacityCommitUnknown, type IntakeCapacity } from './capacity.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import { ContractValidationError, parseContractSchema, type components } from '@customer-agent/contracts';
@@ -34,7 +34,8 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
         : /^CONTENT_(UPLOAD|OBJECT_TYPE)/.test(message) ? new IntakeRejection(
           message.includes('TOO_LARGE') ? 'FILE_LIMIT' : 'FILE_INVALID', 'VALIDATION')
           : new IntakeRejection('FILE_INVALID', 'INTERNAL_ERROR');
-    return { ok: false, code: rejection.code, reason: rejection.reason, diagnosticId, commit: 'rolled_back' };
+    return { ok: false, code: rejection.code, reason: rejection.reason, diagnosticId,
+      commit: error instanceof IntakeCapacityCommitUnknown ? 'unknown' : 'rolled_back' };
   }
   const busy = () => failed(new IntakeRejection('QUOTA_EXCEEDED', 'OVERLOADED'));
   async function allowedSource(client: IntakeTransaction, who: Principal, sourceId: string) {
