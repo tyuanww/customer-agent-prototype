@@ -632,6 +632,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(listPreviews(job.candidateId!, sources)).toHaveLength(1);
       const removed = await fetch(`${host.origin}/v1/intake/sop/candidates/${job.candidateId}/versions/${job.candidateVersion}/rows/${encodeURIComponent('sop:过敏流程SOP:2')}`, { method: 'DELETE', headers: host.headers });
       expect(removed.status, await removed.clone().text()).toBe(204);
+      expect(listPreviews(job.candidateId!, sources)).toEqual([]);
       const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
       const candidate = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
       const cancelled = await fetch(`${url}/cancel`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },

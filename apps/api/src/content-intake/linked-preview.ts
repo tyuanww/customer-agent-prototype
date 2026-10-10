@@ -4,6 +4,7 @@ export type LinkedPreview = Readonly<{
   objectId: string;
   sha256: string;
   sourceId: string;
+  rowId: string;
   mime: 'image/png' | 'image/jpeg' | 'image/gif';
   bytes: Buffer;
 }>;
@@ -17,6 +18,19 @@ export function stagePreviews(key: string, items: readonly LinkedPreview[]): voi
 export function adoptPreviews(fromKey: string, toKey: string): void {
   const items = byKey.get(fromKey);
   if (items) byKey.set(toKey, items);
+}
+
+/** Drop images that belong only to one unused row. Shared arrays stay for the other rows. */
+export function discardPreviewRow(key: string, rowId: string): void {
+  const items = byKey.get(key);
+  if (!items) return;
+  const kept = items.filter(item => item.rowId !== rowId);
+  if (kept.length === items.length) return;
+  if (kept.length === 0) {
+    for (const [stored, value] of byKey) if (value === items) byKey.delete(stored);
+    return;
+  }
+  items.splice(0, items.length, ...kept);
 }
 
 /** Drop an unused upload's images, including the earlier object-id copy of the same list. */
@@ -34,7 +48,7 @@ export function openPreview(key: string, objectId: string, sourceIds: ReadonlySe
   return listPreviews(key, sourceIds).find(item => item.objectId === objectId) ?? null;
 }
 
-export function previewFromBytes(bytes: Buffer, mime: LinkedPreview['mime'], sourceId: string): LinkedPreview {
+export function previewFromBytes(bytes: Buffer, mime: LinkedPreview['mime'], sourceId: string, rowId: string): LinkedPreview {
   const sha256 = createHash('sha256').update(bytes).digest('hex');
-  return { objectId: `med_${sha256}`, sha256, sourceId, mime, bytes };
+  return { objectId: `med_${sha256}`, sha256, sourceId, rowId, mime, bytes };
 }
