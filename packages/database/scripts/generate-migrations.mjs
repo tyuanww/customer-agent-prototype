@@ -779,7 +779,15 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     ranges: [],
     sourceBody: sopDomainBody,
   }, successorSnapshot) : null;
-  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : []), ...(sopDomainMigration ? [sopDomainMigration] : [])]);
+  const sopStageBody = readFileSync(path.join(projectRoot, 'packages/database/seeds/menokin-sop-stage.sql'), 'utf8').trim();
+  const sopStageMigration = successorSnapshot ? renderUpgradeMigration({
+    position: 39,
+    id: '0039_menokin_sop_stage_media',
+    version: 'Stage SOP image metadata without storing bytes',
+    ranges: [],
+    sourceBody: sopStageBody,
+  }, successorSnapshot) : null;
+  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : []), ...(sopDomainMigration ? [sopDomainMigration] : []), ...(sopStageMigration ? [sopStageMigration] : [])]);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -803,6 +811,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (sopMigration) outputs.set(`packages/database/migrations/${sopMigration.file}`, sopMigration.sql);
   if (registrationMigration) outputs.set(`packages/database/migrations/${registrationMigration.file}`, registrationMigration.sql);
   if (sopDomainMigration) outputs.set(`packages/database/migrations/${sopDomainMigration.file}`, sopDomainMigration.sql);
+  if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });
