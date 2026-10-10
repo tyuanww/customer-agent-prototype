@@ -14,6 +14,7 @@ import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createSyntheticSopWorkbook, createTemplate } from '@customer-agent/content-intake';
 import { ContentIntakeUsage } from '../../desktop/src/main/content-intake-usage.js';
+import { listPreviews } from '../src/content-intake/linked-preview.js';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -617,6 +618,29 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await reader.close(); await host.app.close(); }
   }, 40_000);
 
+  it('cancelling an unused SOP upload drops its images', async () => {
+    const { bytes: workbook } = await createSyntheticSopWorkbook();
+    const host = await managementHost();
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook, 'sop-unused-upload')).json());
+      const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = await host.receive(object.objectId, 'sop-unused-receive', null, baseReleaseId);
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state, JSON.stringify(job.issues)).toBe('validated');
+      const sources = new Set(['source-a']);
+      expect(listPreviews(job.candidateId!, sources)).toHaveLength(1);
+      const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
+      const candidate = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
+      const cancelled = await fetch(`${url}/cancel`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ operationId: 'sop-unused-cancel', key: candidate.key }) });
+      expect(cancelled.status, await cancelled.clone().text()).toBe(200);
+      expect(parseContractSchema('IntakeReceipt', await cancelled.json()).state).toBe('cancelled');
+      expect(listPreviews(job.candidateId!, sources)).toEqual([]);
+      expect(listPreviews(object.objectId, sources)).toEqual([]);
+    } finally { await host.app.close(); }
+  }, 40_000);
+
   it('second synthetic seat copies published text only and previews the uploaded image inside the system', async () => {
     const { bytes: workbook, png } = await createSyntheticSopWorkbook();
     await publicationBase();
@@ -703,6 +727,12 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       const seen = await catalog.preview(handles.items[0]!.objectId);
       expect(seen.mime).toBe('image/png');
       expect(seen.bytes.equals(png)).toBe(true);
+      const kept = await fetch(`${url}/cancel`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ operationId: 'sop-image-cancel-published', key: c.key }) });
+      expect(kept.status).toBe(409);
+      const still = await fetch(`${origin}/v1/intake/preview?entitlementId=${entitlement.entitlementId}&objectId=${handles.items[0]!.objectId}`, { headers });
+      expect(still.status, await still.clone().text()).toBe(200);
+      expect(Buffer.from((await still.json() as { bytesBase64: string }).bytesBase64, 'base64').equals(png)).toBe(true);
       await grantQuerySources(['source-b']);
       const otherShop = await seat('agent', 'sop-other-shop');
       const otherHeaders = { authorization: `Bearer ${otherShop.token}` };

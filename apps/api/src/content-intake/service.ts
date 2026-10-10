@@ -3,7 +3,7 @@ import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
-import { adoptPreviews, previewFromBytes, stagePreviews } from './linked-preview.js';
+import { adoptPreviews, discardPreviews, previewFromBytes, stagePreviews } from './linked-preview.js';
 import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
@@ -241,7 +241,9 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     async cancel(actor: AuthenticatedUser, raw: unknown) {
       const result = await run(actor, 'cancel', json(raw), operation(raw),
         (client, who) => cancelCandidate(client, who, parseContractSchema('IntakeCancel', raw)), historicalCandidate);
-      return result.ok ? { ok: true as const, value: cancellationReceipt(operation(raw)!, result.value) } : result;
+      if (!result.ok) return result;
+      discardPreviews(result.value.key.candidateId);
+      return { ok: true as const, value: cancellationReceipt(operation(raw)!, result.value) };
     },
     async parse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {
       if (parseActive) return { ok: false, code: 'OVERLOADED', reason: 'QUOTA_EXCEEDED', commit: 'rolled_back', diagnosticId: `intake_${randomUUID()}` };
