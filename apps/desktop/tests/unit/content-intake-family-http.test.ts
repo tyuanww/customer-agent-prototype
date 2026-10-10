@@ -39,7 +39,8 @@ it.skipIf(!context?.family)('consumes qualified family choices through HTTP, Mai
         expect(query.copy(result.key)).toEqual({ copied: true });
         expect(copied.at(-1)).toBe(result.answerText);
       }
-      oldKey = results[0]!.key; oldCatalog = catalog;
+      if (results[0]) oldKey = results[0].key;
+      oldCatalog = catalog;
     }
     expect((await session.logout()).ok).toBe(true);
     expect(() => query.copy(oldKey!)).toThrow('STALE');

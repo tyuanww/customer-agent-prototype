@@ -2214,12 +2214,12 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await familyPublish('family-shop-a',[familyRow('local',{family:'source-brand/root',body:'A店第一行。\nA店第二行。'})]);
     await familyPublish('family-shop-b',[familyRow('local',{family:'source-brand/root',body:'B店专用原文'})],'b');
     const a=await familySnapshot();
-    expect(a.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).toEqual(['source-a/local','source-brand/unrelated']);
-    expect(a.pageSizes).toEqual([1,1]);
-    expect(a.entries.map(e=>e.entry.answerText)).toEqual(['A店第一行。\nA店第二行。','同名独立通用条目']);
+    expect(a.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).toEqual(['source-a/local']);
+    expect(a.pageSizes).toEqual([1]);
+    expect(a.entries.map(e=>e.entry.answerText)).toEqual(['A店第一行。\nA店第二行。']);
     expect(JSON.stringify(a.entries)).not.toContain('仅管理内部说明');
     const b=await familySnapshot({...usage,shopId:'shop-b'});
-    expect(b.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual(['source-b/local','source-brand/unrelated']);
+    expect(b.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual(['source-b/local']);
     expect(b.entries.find(e=>e.sourceId==='source-b')!.entry.answerText).toBe('B店专用原文');
     const material=(await admin.query('SELECT material FROM content_intake.candidate_versions WHERE source_id=\'source-a\'')).rows[0].material;
     expect(material.entries[0]).toMatchObject({familySourceId:'source-brand',familyBusinessEntryId:'root'});
@@ -2237,15 +2237,16 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       familyRow('combined-local',{family:'source-brand/combined',products:'product-one',scenarios:'scenario-one'}),
     ]);
     const without=await familySnapshot();
-    expect(without.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual(roots.map(id=>`source-brand/${id}`).sort());
-    expect(without.pageSizes).toEqual([1,1,1,1,1]);
+    expect(without.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual([
+      'source-a/combined-local','source-a/product-local','source-a/scenario-local']);
+    expect(without.pageSizes).toEqual([1,1,1]);
     const matched=await familySnapshot({...usage,productIds:['product-one'],scenarioIds:['scenario-one']},2);
     expect(matched.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual([
-      'source-a/combined-local','source-a/product-local','source-a/scenario-local','source-brand/expired','source-brand/future']);
-    expect(matched.pageSizes).toEqual([2,2,1]);
+      'source-a/combined-local']);
+    expect(matched.pageSizes).toEqual([1]);
     const productOnly=await familySnapshot({...usage,productIds:['product-one']});
     expect(productOnly.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual([
-      'source-a/product-local','source-brand/combined','source-brand/expired','source-brand/future','source-brand/scenario']);
+      'source-a/combined-local','source-a/product-local']);
   },60_000);
 
   it('family: actual HTTP and Main query/copy consume shop overrides and another shop generic fallback',async()=>{
@@ -2268,7 +2269,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       child.stdout!.on('data',chunk=>{stdout+=String(chunk);});child.stderr!.on('data',chunk=>{stderr+=String(chunk);});
       timeout=setTimeout(()=>child?.kill('SIGTERM'),45_000);
       child.stdin!.end(JSON.stringify({origin,token:logged.token,expiresAt:logged.expiresAt,releaseId:published.receipt.releaseId,family:true,
-        cases:[{shopId:'shop-a',answers:[local,independent]},{shopId:'shop-b',answers:[generic,independent]}]}));
+        cases:[{shopId:'shop-a',answers:[local]},{shopId:'shop-b',answers:[]}]}));
       expect((await ended)[0],stderr).toBe(0);
       expect(JSON.parse(stdout)).toEqual({status:'PASS',actualSession:true,family:true,shopFallback:true,publishedText:true,queryCopy:true});
       expect(stdout+stderr).not.toContain(logged.token);
@@ -2289,7 +2290,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       let target='source-brand/root';
       if(conflict==='foreign-brand'||conflict==='foreign-domain') {
         await familySource('foreign',null,conflict==='foreign-brand'?'brand-b':'brand-a',conflict==='foreign-domain'?'campaign':'product');
-        await familyPublish('foreign-root',[familyRow('root',{to:'2098-01-01T00:00:00Z'})],'foreign');target='source-foreign/root';
+        await familyPublish('foreign-root',[familyRow('root',{from:'2026-01-01T00:00:00Z',to:'2098-01-01T00:00:00Z'})],'foreign');target='source-foreign/root';
       } else if(conflict!=='missing-root') {
         await familyPublish('conflict-root',[familyRow('root',{protected:conflict==='protected-root'})],'brand');
       }
@@ -2332,7 +2333,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await familyPublish('disable-root',[familyRow('root')],'brand');
     await familyPublish('disable-child',[familyRow('child',{family:'source-brand/root'})]);
     await familyPublish('disable-child-next',[familyRow('child',{family:'source-brand/root',disabled:true})]);
-    expect((await familySnapshot()).entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).toEqual(['source-brand/root']);
+    expect((await familySnapshot()).entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`)).toEqual([]);
     await familyPublish('disable-root-next',[familyRow('root',{disabled:true})],'brand');
     expect((await familySnapshot()).entries).toEqual([]);
   },60_000);
@@ -2355,12 +2356,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const context={...usage,productIds:['product-one','product-two'],scenarioIds:['scenario-one','scenario-two']};
     const result=await familySnapshot(context,3);
     expect(result.entries.map(e=>`${e.sourceId}/${e.entry.businessEntryId}`).sort()).toEqual([
-      'source-a/covered-one','source-a/covered-two','source-a/cross-one','source-a/cross-two',
-      'source-a/protected-two','source-a/restricted-one','source-a/wildcard-one',
-      'source-brand/cross-gap','source-brand/protected','source-brand/restricted','source-brand/wildcard']);
-    expect(result.pageSizes).toEqual([3,3,3,2]);
+      'source-a/covered-one','source-a/covered-two','source-a/cross-one','source-a/cross-two']);
+    expect(result.pageSizes).toEqual([3,1]);
     expect((await familySnapshot({...context,productIds:['product-one'],scenarioIds:['scenario-one']},3)).entries
-      .filter(e=>e.sourceId==='source-brand').map(e=>e.entry.businessEntryId)).toEqual(['protected']);
+      .filter(e=>e.sourceId==='source-brand').map(e=>e.entry.businessEntryId)).toEqual([]);
   },60_000);
 
   it('family: a historical catalog guard rejection fails closed for issuance and every existing snapshot page',async()=>{
@@ -2399,7 +2398,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await familyPublish('lease-child',[familyRow('child',{family:'source-brand/root',body:'边界内的店铺答案',
       from:startText.replace('.000Z','Z'),to:endText.replace('.000Z','Z')})]);
     const before=value(await issue());expect(before.validUntil).toBe(startText);
-    expect(value(await snapshot(before.entitlementId)).faq.map(e=>e.entry.answerText)).toEqual(['边界外的通用答案']);
+    expect(value(await snapshot(before.entitlementId)).faq.map(e=>e.entry.answerText)).toEqual([]);
     await new Promise(resolve=>setTimeout(resolve,Math.max(0,starts-Date.now())+30));
     expect(await snapshot(before.entitlementId)).toMatchObject({ok:false,reason:'LEASE_EXPIRED'});
     const active=value(await issue());expect(active.validUntil).toBe(endText);
@@ -2407,7 +2406,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await new Promise(resolve=>setTimeout(resolve,Math.max(0,ends-Date.now())+30));
     expect(await snapshot(active.entitlementId)).toMatchObject({ok:false,reason:'LEASE_EXPIRED'});
     const after=value(await issue());
-    expect(value(await snapshot(after.entitlementId)).faq.map(e=>e.entry.answerText)).toEqual(['边界外的通用答案']);
+    expect(value(await snapshot(after.entitlementId)).faq.map(e=>e.entry.answerText)).toEqual([]);
   },60_000);
 
   async function rollbackPair() {

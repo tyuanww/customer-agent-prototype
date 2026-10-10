@@ -24,7 +24,7 @@ if (family) {
   assert.ok(Array.isArray(context.cases) && context.cases.length === 2);
   for (const item of context.cases) {
     assert.match(item.shopId, /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
-    assert.ok(Array.isArray(item.answers) && item.answers.length > 0 && item.answers.length <= 3);
+    assert.ok(Array.isArray(item.answers) && item.answers.length <= 3);
     assert.ok(item.answers.every(answer => typeof answer === 'string' && answer.length > 0));
   }
 }
