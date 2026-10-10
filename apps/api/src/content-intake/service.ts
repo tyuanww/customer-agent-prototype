@@ -3,7 +3,7 @@ import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
-import { adoptPreviews, discardPreviews, previewFromBytes, stagePreviews } from './linked-preview.js';
+import { adoptPreviews, discardPreviewRow, discardPreviews, previewFromBytes, stagePreviews } from './linked-preview.js';
 import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
@@ -157,7 +157,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       const sop = await tryParseSopAsFaq(bytes, prepared.value.source.scope);
       if (sop) {
         parsed = sop.parsed;
-        stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId)));
+        stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId)));
       } else {
         parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
       }
@@ -258,6 +258,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
           if (message.includes('SOP_ROW_IN_USE')) throw new IntakeRejection('ALREADY_PUBLISHED');
           throw error;
         }
+        discardPreviewRow(candidateId, rowId);
       }, () => undefined);
     },
     async parse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {
