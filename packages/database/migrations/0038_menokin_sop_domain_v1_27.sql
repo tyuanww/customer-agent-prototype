@@ -76,6 +76,9 @@ BEGIN
   SELECT coalesce(array_agg(media_object_id), ARRAY[]::content_intake.identifier[]) INTO v_media
   FROM content_intake.sop_candidate_media
   WHERE candidate_id = p_candidate_id AND candidate_version = p_version AND row_id = p_row_id;
+  IF coalesce(cardinality(v_media), 0) = 0 THEN
+    RAISE EXCEPTION 'SOP_ROW_NOT_FOUND';
+  END IF;
   DELETE FROM content_intake.sop_candidate_media
   WHERE candidate_id = p_candidate_id AND candidate_version = p_version AND row_id = p_row_id;
   UPDATE content_intake.sop_media_objects o

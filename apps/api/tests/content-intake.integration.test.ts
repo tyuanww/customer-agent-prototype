@@ -14,7 +14,7 @@ import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createSyntheticSopWorkbook, createTemplate } from '@customer-agent/content-intake';
 import { ContentIntakeUsage } from '../../desktop/src/main/content-intake-usage.js';
-import { listPreviews } from '../src/content-intake/linked-preview.js';
+import { listPreviews, mediaObjectId } from '../src/content-intake/linked-preview.js';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -179,8 +179,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       form.set('file', new Blob([new Uint8Array(bytes)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), '../../synthetic.xlsx');
       return fetch(`${origin}/v1/intake/sources/${sourceId}/objects`, { method: 'POST', headers, body: form });
     }
-    async function receive(objectId: string, operationId = 'http-receive', prior: C['IntakeCandidateKey'] | null = null, baseReleaseId: string | null = null) {
-      return app.inject({ method: 'POST', url: '/v1/intake/sources/source-a/candidates', headers,
+    async function receive(objectId: string, operationId = 'http-receive', prior: C['IntakeCandidateKey'] | null = null, baseReleaseId: string | null = null, sourceId = 'source-a') {
+      return app.inject({ method: 'POST', url: `/v1/intake/sources/${sourceId}/candidates`, headers,
         payload: { operationId, objectId, sourceVersion: 1, baseReleaseId,
           contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['other'], confirmed: true }, expectedPriorKey: prior } });
     }
@@ -618,20 +618,40 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await reader.close(); await host.app.close(); }
   }, 40_000);
 
+  async function registerSopSource() {
+    await admin.query('BEGIN');
+    try {
+      await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ('source-sop','scope-a',1,'v2-preview')");
+      await admin.query("INSERT INTO content_intake.source_mappings VALUES ('source-sop',1,'faq-p1.1','intake-p1.1','sop-not-imported',repeat('a',64))");
+      await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+        to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-sop','source_id','source-sop'))).*
+        FROM content_intake.grants g WHERE source_id='source-a' AND kind='business'`);
+      await admin.query('COMMIT');
+    } catch (error) {
+      await admin.query('ROLLBACK');
+      throw error;
+    }
+  }
   it('cancelling an unused SOP upload drops its images', async () => {
     const { bytes: workbook } = await createSyntheticSopWorkbook();
+    await registerSopSource();
     const host = await managementHost();
     try {
-      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook, 'sop-unused-upload')).json());
+      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook, 'sop-unused-upload', 'source-sop')).json());
       const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
-      const received = await host.receive(object.objectId, 'sop-unused-receive', null, baseReleaseId);
+      const received = await host.receive(object.objectId, 'sop-unused-receive', null, baseReleaseId, 'source-sop');
       expect(received.statusCode, received.body).toBe(202);
       const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
       expect(job.state, JSON.stringify(job.issues)).toBe('validated');
-      const sources = new Set(['source-a']);
+      const sources = new Set(['source-sop']);
       expect(listPreviews(job.candidateId!, sources)).toHaveLength(1);
       const stagedMedia = (await admin.query<{ media_object_id: string; state: string }>(`SELECT o.media_object_id, o.state FROM content_intake.sop_candidate_media cm JOIN content_intake.sop_media_objects o USING (media_object_id) WHERE cm.candidate_id=$1 AND cm.row_id=$2`, [job.candidateId, 'sop:过敏流程SOP:2'])).rows;
       expect(stagedMedia).toEqual([{ media_object_id: stagedMedia[0]?.media_object_id, state: 'staged' }]);
+      const stranger = await seat('agent');
+      const denied = await fetch(`${host.origin}/v1/intake/sop/candidates/${job.candidateId}/versions/${job.candidateVersion}/rows/${encodeURIComponent('sop:过敏流程SOP:2')}`, { method: 'DELETE', headers: { authorization: `Bearer ${stranger.token}` } });
+      expect(denied.status, await denied.clone().text()).toBe(404);
+      const missingRow = await fetch(`${host.origin}/v1/intake/sop/candidates/${job.candidateId}/versions/${job.candidateVersion}/rows/${encodeURIComponent('sop:过敏流程SOP:9')}`, { method: 'DELETE', headers: host.headers });
+      expect(missingRow.status, await missingRow.clone().text()).toBe(404);
       const removed = await fetch(`${host.origin}/v1/intake/sop/candidates/${job.candidateId}/versions/${job.candidateVersion}/rows/${encodeURIComponent('sop:过敏流程SOP:2')}`, { method: 'DELETE', headers: host.headers });
       expect(removed.status, await removed.clone().text()).toBe(204);
       expect(listPreviews(job.candidateId!, sources)).toEqual([]);
@@ -651,14 +671,15 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
   it('second synthetic seat copies published text only and previews the uploaded image inside the system', async () => {
     const { bytes: workbook, png } = await createSyntheticSopWorkbook();
     await publicationBase();
+    await registerSopSource();
     const host = await managementHost();
     const reader = Fastify();
     await reader.register(contentIntakeUsageRoutes, { auth: auth!, usage: service });
     const origin = await reader.listen({ host: '127.0.0.1', port: 0 });
     try {
-      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook, 'sop-image-upload')).json());
+      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook, 'sop-image-upload', 'source-sop')).json());
       const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
-      const received = await host.receive(object.objectId, 'sop-image-receive', null, baseReleaseId);
+      const received = await host.receive(object.objectId, 'sop-image-receive', null, baseReleaseId, 'source-sop');
       expect(received.statusCode, received.body).toBe(202);
       const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
       expect(job.state, JSON.stringify(job.issues)).toBe('validated');
@@ -693,7 +714,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(handles.url).toBeUndefined();
       expect(handles.bytesBase64).toBeUndefined();
       expect(handles.items).toHaveLength(1);
-      expect(handles.items[0]!.objectId).toBe(`med_${createHash('sha256').update(png).digest('hex')}`);
+      expect(handles.items[0]!.objectId).toBe(mediaObjectId('source-sop', png));
+      expect(handles.items[0]!.sha256).toBe(createHash('sha256').update(png).digest('hex'));
       const missing = await fetch(`${origin}/v1/intake/preview?entitlementId=${entitlement.entitlementId}&objectId=med_${'ab'.repeat(32)}`, { headers });
       expect(missing.status).toBe(404);
       const preview = await fetch(`${origin}/v1/intake/preview?entitlementId=${entitlement.entitlementId}&objectId=${handles.items[0]!.objectId}`, { headers });

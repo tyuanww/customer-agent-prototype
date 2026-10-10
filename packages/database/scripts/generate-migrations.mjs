@@ -757,6 +757,9 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     version: 'schema.v1.25 legacy CHECK execution closure', ranges: [], sourceBody: sources.legacyAcl.trimEnd() }, snapshot);
   const successor = findSopSuccessor(projectRoot);
   const sopMigration = successor ? renderSopMigration(successor) : null;
+  // 0037-0039 are Menokin deltas carried on the ingested OpenAPI 1.23 / schema 1.26
+  // successor. schema.v1.27 is the approved overlay and is not a separate ingested
+  // contract set, so these migrations keep that successor sha instead of inventing one.
   const successorSnapshot = successor ? {
     contract_set_id: successor.manifest.contract_set_id,
     source_git_sha: successor.manifest.source_git_sha,

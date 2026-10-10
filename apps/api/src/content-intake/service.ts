@@ -3,7 +3,7 @@ import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
-import { adoptPreviews, discardPreviewRow, discardPreviews, previewFromBytes, stagePreviews } from './linked-preview.js';
+import { adoptPreviews, discardPreviewRow, discardPreviews, mediaObjectId, previewFromBytes, stagePreviews } from './linked-preview.js';
 import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
@@ -14,6 +14,7 @@ import { authorize, changeGrant, createGrants, previewGrants, source } from './a
 import { cancelCandidate, cancellationReceipt, historicalCandidate, freezeParsed, getJob, readCandidate, receive } from './candidate.js';
 import { digest } from './material.js';
 import { sourceInputFormat } from './input-format.js';
+import { sourceUsesSopWorkbook } from './sop-source.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
 import { createIntakeRollback } from './rollback.js';
@@ -155,11 +156,14 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       const bytes = await store.readPayload(prepared.value.job.object_id);
       if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) throw new Error('OBJECT_CHANGED');
       const sourceId = prepared.value.source.scope.sourceId;
-      const sop = await tryParseSopAsFaq(bytes, prepared.value.source.scope);
+      const sopSource = sourceUsesSopWorkbook(prepared.value.source);
+      const sop = sopSource ? await tryParseSopAsFaq(bytes, prepared.value.source.scope) : null;
       if (sop) {
         parsed = sop.parsed;
         sopPreviews = sop.previews;
-        stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId)));
+        stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId, {
+          productRefIds: item.productRefIds, scenarioRefIds: item.scenarioRefIds, familySourceId: item.familySourceId,
+        })));
       } else {
         parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
       }
@@ -174,7 +178,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       for (const item of sopPreviews) {
         await client.query(
           'SELECT content_intake.stage_sop_candidate_media($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-          [candidate.key.candidateId, candidate.key.version, src.scope.sourceId, who.id, `med_${digest(item.bytes)}`, digest(item.bytes), item.bytes.length, item.mime, item.sheet, item.row, item.column, item.ordinal],
+          [candidate.key.candidateId, candidate.key.version, src.scope.sourceId, who.id, mediaObjectId(src.scope.sourceId, item.bytes), digest(item.bytes), item.bytes.length, item.mime, item.sheet, item.row, item.column, item.ordinal],
         );
       }
       return candidate;
@@ -255,10 +259,16 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       return { ok: true as const, value: cancellationReceipt(operation(raw)!, result.value) };
     },
     async deleteUnusedSopRow(actor: AuthenticatedUser, candidateId: string, candidateVersion: number, rowId: string) {
-      return run(actor, 'delete-unused-sop-row', { candidateId, candidateVersion, rowId }, null, async (client) => {
+      const result = await run(actor, 'delete-unused-sop-row', { candidateId, candidateVersion, rowId }, null, async (client, who) => {
         parseContractSchema('IntakeId', candidateId);
         if (!Number.isInteger(candidateVersion) || candidateVersion < 1) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         if (!/^sop:[^:]{1,128}:[1-9][0-9]{0,3}$/.test(rowId)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        const found = await client.query<{ source_id: string }>(
+          'SELECT source_id FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2',
+          [candidateId, candidateVersion]);
+        const sourceId = found.rows[0]?.source_id;
+        if (!sourceId) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+        await authorize(client, who, 'candidate-cancel', await source(client, sourceId));
         try {
           await client.query('SELECT content_intake.delete_unused_sop_row($1,$2,$3)', [candidateId, candidateVersion, rowId]);
         } catch (error) {
@@ -267,8 +277,14 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
           if (message.includes('SOP_ROW_IN_USE')) throw new IntakeRejection('ALREADY_PUBLISHED');
           throw error;
         }
-        discardPreviewRow(candidateId, rowId);
-      }, () => undefined);
+        return { candidateId, rowId };
+      }, (value: unknown) => {
+        const removed = value as { candidateId: string; rowId: string };
+        return removed;
+      });
+      if (!result.ok) return result;
+      discardPreviewRow(result.value.candidateId, result.value.rowId);
+      return { ok: true as const, value: undefined };
     },
     async parse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {
       if (parseActive) return { ok: false, code: 'OVERLOADED', reason: 'QUOTA_EXCEEDED', commit: 'rolled_back', diagnosticId: `intake_${randomUUID()}` };

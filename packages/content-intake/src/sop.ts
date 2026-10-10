@@ -124,8 +124,10 @@ export async function createSyntheticSopWorkbook(): Promise<{ bytes: Buffer; png
   return { bytes: Buffer.from(await book.xlsx.writeBuffer()), png: SYNTHETIC_PNG };
 }
 
+const refIds = (value: string): string[] => value ? value.split(',').map(part => part.trim()).filter(Boolean) : [];
+
 /** Map a six-sheet SOP workbook onto the existing FAQ row shape and keep image bytes. */
-export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ parsed: import('./policy.js').ParseResult; previews: readonly { bytes: Buffer; mime: `image/${'jpeg' | 'png' | 'gif'}`; rowId: string; sheet: string; row: number; column: number; ordinal: number }[] } | null> {
+export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ parsed: import('./policy.js').ParseResult; previews: readonly { bytes: Buffer; mime: `image/${'jpeg' | 'png' | 'gif'}`; rowId: string; sheet: string; row: number; column: number; ordinal: number; productRefIds: readonly string[]; scenarioRefIds: readonly string[]; familySourceId: string }[] } | null> {
   const book = new ExcelJS.Workbook();
   try { await book.xlsx.load(bytes as unknown as ExcelJS.Buffer); } catch { return null; }
   if (!SOP_SHEET_NAMES.every(name => book.getWorksheet(name))) return null;
@@ -136,17 +138,34 @@ export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId
   if (!sop.ok) {
     return { parsed: { ok: false, policyVersion: P.version, rows: [], questions: [], issues: sop.issues, excluded: [], expandedBytes: 0, mediaCount: sop.attachments.length }, previews: [] };
   }
-  const rows = sop.rows.map((row, index) => {
+  const shaped = sop.rows.map((row, index) => {
     const id = `sop${index + 1}`;
-    return { id, title: row.sheet, body: row.text, state: '启用' as const, values: [id, row.sheet, row.text, '', '', '分类', '', '启用', '', '', '', '', '', '', 'false'] };
+    const values = [id, row.sheet, row.text, '', '', '分类', '', '启用', '', '', '', '', '', '', 'false'];
+    const family = values[10] ?? '';
+    return {
+      faq: { id, title: row.sheet, body: row.text, state: '启用' as const, values },
+      rowId: `sop:${row.sheet}:${row.row}`,
+      productRefIds: refIds(values[3] ?? ''),
+      scenarioRefIds: refIds(values[4] ?? ''),
+      familySourceId: family.includes('/') ? family.split('/')[0] ?? '' : '',
+    };
   });
+  const rows = shaped.map(item => item.faq);
+  const applicability = new Map(shaped.map(item => [item.rowId, item]));
   return {
     parsed: { ok: rows.length > 0, policyVersion: P.version, rows, questions: [], issues: rows.length ? [] : [{ code: 'EMPTY_DATA', sheet: SOP_SHEET_NAMES[0], row: 2, column: 'A', fix: '补一行文字答案' }], excluded: [], expandedBytes: 0, mediaCount: sop.attachments.length },
-    previews: sop.attachments.map((item, index) => ({
-      bytes: Buffer.from(item.base64, 'base64'), mime: item.mime, rowId: `sop:${item.sheet}:${item.row}`,
-      sheet: item.sheet, row: item.row, column: item.column,
-      ordinal: sop.attachments.slice(0, index).filter(other => other.sheet === item.sheet && other.row === item.row).length + 1,
-    })),
+    previews: sop.attachments.map((item, index) => {
+      const rowId = `sop:${item.sheet}:${item.row}`;
+      const refs = applicability.get(rowId);
+      return {
+        bytes: Buffer.from(item.base64, 'base64'), mime: item.mime, rowId,
+        sheet: item.sheet, row: item.row, column: item.column,
+        ordinal: sop.attachments.slice(0, index).filter(other => other.sheet === item.sheet && other.row === item.row).length + 1,
+        productRefIds: refs?.productRefIds ?? [],
+        scenarioRefIds: refs?.scenarioRefIds ?? [],
+        familySourceId: refs?.familySourceId ?? '',
+      };
+    }),
   };
 }
 
