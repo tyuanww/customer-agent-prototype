@@ -42,6 +42,8 @@ export type ExecutableMigrationCatalogue = Readonly<{
     priorReviewedUpgrades: readonly Readonly<MigrationProvenance & {
       migrationCount: number;
     }>[];
+    /** The last migration may belong to this additive contract. The catalogue identity stays the consumed contract. */
+    additiveSuccessor?: MigrationProvenance | null;
   }>;
   migrations: readonly ExecutableDatabaseMigration[];
 }>;

@@ -142,10 +142,15 @@ const REQUIRED_POLICY_KEYS = Object.freeze([
 // No table grants, runtime roles or existing function bodies change.
 // 0035 adds exactly eight helper EXECUTEs to the NOLOGIN function owner.
 // Objects, function bodies/security attributes and triggers remain unchanged.
+// 0036 adds three SOP media tables. Their owner manifest is separate from the
+// consumed 0035 prefix, which the legacy CHECK step still verifies.
 const EXPECTED_ACL_MANIFEST_ENTRIES = 550;
 const EXPECTED_ACL_MANIFEST_SHA256 = '7890fde2f2bf59f2a941aa020864951091a8eef73e8010d869e14054fcefa38d';
 const EXPECTED_OBJECT_MANIFEST_ENTRIES = 3090;
 const EXPECTED_OBJECT_MANIFEST_SHA256 = 'c31a0c03694ec13c86ba15eb596c6b47c5164335712d839bc53cc0fb40e0de03';
+const EXPECTED_SUCCESSOR_TABLES = 100;
+const EXPECTED_SUCCESSOR_OBJECT_MANIFEST_ENTRIES = 3211;
+const EXPECTED_SUCCESSOR_OBJECT_MANIFEST_SHA256 = '9e6411f6aa5cd2abce8768b17e97c85de2e0e3324a8ab0741c7c5c481b6cae62';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 255;
 const EXPECTED_FUNCTION_SECURITY_SHA256 = '51ec728928940da3bbd28767d8727727518574d124c24330e64eb5189a38d26b';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
@@ -180,6 +185,11 @@ async function verifyCatalogueState(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
   expectedAcl: Readonly<{ entries: number; sha256: string }>,
+  expectedInventory: Readonly<{ tables: number; objectEntries: number; objectSha256: string }> = {
+    tables: 97,
+    objectEntries: EXPECTED_OBJECT_MANIFEST_ENTRIES,
+    objectSha256: EXPECTED_OBJECT_MANIFEST_SHA256,
+  },
 ): Promise<DatabaseVerificationReport> {
   const migrationStatus = await inspectMigrationCatalogue(client, catalogue);
   if (migrationStatus.state !== 'COMPLETE') {
@@ -792,7 +802,7 @@ async function verifyCatalogueState(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== 97 || inventory.views !== 7 || inventory.functions !== 255 || !inventory.pgcrypto || !inventory.pg_trgm) {
+  if (!inventory || inventory.tables !== expectedInventory.tables || inventory.views !== 7 || inventory.functions !== 255 || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push('object or extension inventory');
   }
   if (!roles || roles.total !== 17 || roles.safe !== 17 || roles.memberships !== 0) {
@@ -803,8 +813,8 @@ async function verifyCatalogueState(
   }
   if (
     !objects
-    || objects.entries !== EXPECTED_OBJECT_MANIFEST_ENTRIES
-    || sha256(objects.manifest) !== EXPECTED_OBJECT_MANIFEST_SHA256
+    || objects.entries !== expectedInventory.objectEntries
+    || sha256(objects.manifest) !== expectedInventory.objectSha256
   ) {
     failures.push(`exact database object/owner manifest [${objects?.entries ?? 'missing'}:${objects ? sha256(objects.manifest) : 'missing'}]`);
   }
@@ -903,6 +913,22 @@ export function verifyLegacyCheckPredecessor(client: DatabaseQueryClient): Promi
 
 export function verifyMigrationCatalogue(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
   return verifyCatalogueState(client, generatedMigrationCatalogue, {
+    entries: EXPECTED_ACL_MANIFEST_ENTRIES, sha256: EXPECTED_ACL_MANIFEST_SHA256,
+  }, {
+    tables: EXPECTED_SUCCESSOR_TABLES,
+    objectEntries: EXPECTED_SUCCESSOR_OBJECT_MANIFEST_ENTRIES,
+    objectSha256: EXPECTED_SUCCESSOR_OBJECT_MANIFEST_SHA256,
+  });
+}
+
+/** Check the ledger through an already-applied prefix. The additive successor is not applied yet. */
+export function verifyMigrationPrefix(client: DatabaseQueryClient, migrationCount: number): Promise<DatabaseVerificationReport> {
+  const catalogue = {
+    ...generatedMigrationCatalogue,
+    migrations: generatedMigrationCatalogue.migrations.slice(0, migrationCount),
+    compatibility: { ...generatedMigrationCatalogue.compatibility, additiveSuccessor: null },
+  };
+  return verifyCatalogueState(client, catalogue, {
     entries: EXPECTED_ACL_MANIFEST_ENTRIES, sha256: EXPECTED_ACL_MANIFEST_SHA256,
   });
 }

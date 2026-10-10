@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { applyDatabaseMigrations } from '../src/runner.js';
 import { Pg15Harness } from '../src/testkit/index.js';
 
 const registrationSql = readFileSync(path.join(
@@ -20,14 +21,7 @@ describe.skipIf(!enabled)('Menokin source registration', () => {
     const database = harness.createDatabase('menokin_sources');
     const client = await harness.connect(database.config);
     try {
-      // Source tables exist by 0034. 0035 rechecks a catalogue that 0036 no longer matches.
-      const migrationDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
-      const files = readdirSync(migrationDir).filter(name => /^\d{4}_.+\.sql$/.test(name) && name < '0035_').sort();
-      for (const file of files) {
-        await client.query('BEGIN');
-        await client.query(readFileSync(path.join(migrationDir, file), 'utf8'));
-        await client.query('COMMIT');
-      }
+      await applyDatabaseMigrations(client);
       await client.query(registrationSql);
       await client.query(registrationSql);
       const rows = (await client.query<{

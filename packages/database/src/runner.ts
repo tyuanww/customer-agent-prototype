@@ -4,7 +4,7 @@ import { withExclusiveDatabaseClient } from './client.js';
 import { databaseDiagnostic, DatabaseMigrationError } from './errors.js';
 import { generatedMigrationCatalogue } from './generated/migrations.generated.js';
 import { inspectMigrationCatalogue } from './planner.js';
-import { verifyLegacyCheckPredecessor, verifyMigrationCatalogue } from './verifier.js';
+import { verifyLegacyCheckPredecessor, verifyMigrationCatalogue, verifyMigrationPrefix } from './verifier.js';
 import type {
   ApplyMigrationsResult,
   AppliedMigrationResult,
@@ -213,7 +213,7 @@ export async function applyMigrationCatalogue(
           // predecessor instead of mistaking rendering differences for drift.
           if (verifierSearchPath === undefined) throw new DatabaseMigrationError('MIGRATION_VERIFY_FAILED', 'Missing predecessor search path');
           await client.query("SELECT set_config('search_path', $1, true)", [verifierSearchPath]);
-          await verifyMigrationCatalogue(client);
+          await verifyMigrationPrefix(client, migration.position);
         }
       } catch (error) {
         await rollback(client, migration.id, error);
