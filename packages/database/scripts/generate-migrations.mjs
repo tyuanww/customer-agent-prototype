@@ -771,7 +771,15 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     ranges: [],
     sourceBody: registrationBody,
   }, successorSnapshot) : null;
-  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : [])]);
+  const sopDomainBody = readFileSync(path.join(projectRoot, 'packages/database/seeds/menokin-sop-v1-27.sql'), 'utf8').trim();
+  const sopDomainMigration = successorSnapshot ? renderUpgradeMigration({
+    position: 38,
+    id: '0038_menokin_sop_domain_v1_27',
+    version: 'Approved schema.v1.27 sop domain and unused-row delete',
+    ranges: [],
+    sourceBody: sopDomainBody,
+  }, successorSnapshot) : null;
+  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : []), ...(sopDomainMigration ? [sopDomainMigration] : [])]);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -794,6 +802,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   outputs.set(`packages/database/migrations/${legacyAcl.file}`, legacyAcl.sql);
   if (sopMigration) outputs.set(`packages/database/migrations/${sopMigration.file}`, sopMigration.sql);
   if (registrationMigration) outputs.set(`packages/database/migrations/${registrationMigration.file}`, registrationMigration.sql);
+  if (sopDomainMigration) outputs.set(`packages/database/migrations/${sopDomainMigration.file}`, sopDomainMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });
