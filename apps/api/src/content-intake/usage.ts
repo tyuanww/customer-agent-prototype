@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { canonical, digest, SNAPSHOT_VOCABULARY_LIMIT, snapshotVocabularyKeys } from './material.js';
-import { listPreviews, openPreview } from './linked-preview.js';
+import { listPreviews, previewApplies } from './linked-preview.js';
 import { clock, createIntakeTransactions, lockProductSession, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
@@ -122,12 +122,13 @@ const entries = `WITH materials AS MATERIALIZED (
   SELECT l.source_id,l.business_entry_id,e FROM expanded c JOIN content_intake.release_lineage l
     ON l.release_id=$1 AND l.source_id=c.source_id AND l.candidate_id=c.candidate_id
     AND l.candidate_version=c.version AND l.business_entry_id=c.e->>'businessEntryId'`;
-const applies = `e->>'operation'='upsert'
+export const contentEntryAppliesSql = `e->>'operation'='upsert'
   AND (cardinality($4::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'productRefs') ref WHERE ref->>'id'=ANY($4::text[])))
   AND (cardinality($5::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'scenarioRefs') ref WHERE ref->>'id'=ANY($5::text[])))
   AND NOT (coalesce(e->>'familySourceId','')='' AND jsonb_array_length(e->'productRefs')=0 AND jsonb_array_length(e->'scenarioRefs')=0
     AND EXISTS (SELECT 1 FROM content_intake.sources src JOIN content_intake.scopes sc USING (scope_id)
-      WHERE src.source_id=source_id AND sc.shop_id IS NULL))`;
+      WHERE src.source_id=entries.source_id AND sc.shop_id IS NULL))`;
+const applies = contentEntryAppliesSql;
 
 async function contentDeadline(client: IntakeTransaction, release: string, scopes: ScopeRow[], ctx: IntakeUsageContext, now: number): Promise<number> {
   const { rows } = await client.query<{ until: Date | null }>(`WITH entries AS (${entries}) SELECT
@@ -335,9 +336,10 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         client.validUntil(until);
         await contentDeadline(client,lease.release_id,scopes,ctx,lease.issued_at.getTime());
         const sourceIds=new Set(scopes.map(scope=>scope.source_id));
-        const linked = listPreviews(lease.release_id, sourceIds).map(({ objectId, sha256 }) => ({ objectId, sha256 }));
-        if (query.objectId === undefined) return { items: linked };
-        const item = openPreview(lease.release_id, query.objectId, sourceIds);
+        const linked = listPreviews(lease.release_id, sourceIds).filter(item => previewApplies(item, ctx, scopes.some(scope =>
+          scope.source_id === item.sourceId && scope.scope.shopId === null)));
+        if (query.objectId === undefined) return { items: linked.map(({ objectId, sha256 }) => ({ objectId, sha256 })) };
+        const item = linked.find(candidate => candidate.objectId === query.objectId);
         if (!item) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
         return { mime: item.mime, sha256: item.sha256, bytesBase64: item.bytes.toString('base64') };
       }, value => {

@@ -7,6 +7,9 @@ export type LinkedPreview = Readonly<{
   rowId: string;
   mime: 'image/png' | 'image/jpeg' | 'image/gif';
   bytes: Buffer;
+  productRefIds: readonly string[];
+  scenarioRefIds: readonly string[];
+  familySourceId: string;
 }>;
 
 const byKey = new Map<string, LinkedPreview[]>();
@@ -48,7 +51,37 @@ export function openPreview(key: string, objectId: string, sourceIds: ReadonlySe
   return listPreviews(key, sourceIds).find(item => item.objectId === objectId) ?? null;
 }
 
-export function previewFromBytes(bytes: Buffer, mime: LinkedPreview['mime'], sourceId: string, rowId: string): LinkedPreview {
-  const sha256 = createHash('sha256').update(bytes).digest('hex');
-  return { objectId: `med_${sha256}`, sha256, sourceId, rowId, mime, bytes };
+/** Same bytes on another source get another id. The content hash stays `sha256`. */
+export function mediaObjectId(sourceId: string, bytes: Buffer): string {
+  return `med_${createHash('sha256').update(sourceId).update('\0').update(bytes).digest('hex')}`;
+}
+
+export function previewApplies(
+  item: Pick<LinkedPreview, 'productRefIds' | 'scenarioRefIds' | 'familySourceId'>,
+  filter: { productIds: readonly string[]; scenarioIds: readonly string[] },
+  brandScoped: boolean,
+): boolean {
+  if (filter.productIds.length > 0 && !item.productRefIds.some(id => filter.productIds.includes(id))) return false;
+  if (filter.scenarioIds.length > 0 && !item.scenarioRefIds.some(id => filter.scenarioIds.includes(id))) return false;
+  return !(brandScoped && item.familySourceId === '' && item.productRefIds.length === 0 && item.scenarioRefIds.length === 0);
+}
+
+export function previewFromBytes(
+  bytes: Buffer,
+  mime: LinkedPreview['mime'],
+  sourceId: string,
+  rowId: string,
+  applicability: { productRefIds?: readonly string[]; scenarioRefIds?: readonly string[]; familySourceId?: string } = {},
+): LinkedPreview {
+  return {
+    objectId: mediaObjectId(sourceId, bytes),
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    sourceId,
+    rowId,
+    mime,
+    bytes,
+    productRefIds: applicability.productRefIds ?? [],
+    scenarioRefIds: applicability.scenarioRefIds ?? [],
+    familySourceId: applicability.familySourceId ?? '',
+  };
 }

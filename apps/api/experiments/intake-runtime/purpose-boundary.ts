@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { ContractValidationError, parseContractSchema } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../../src/auth-service.js';
 import { canonical, digest } from '../../src/content-intake/material.js';
+import { contentEntryAppliesSql } from '../../src/content-intake/usage.js';
 import { authorize, source } from '../../src/content-intake/authority.js';
 import {
   clock, IntakeRejection, principal, requireFresh,
@@ -242,9 +243,7 @@ export function createPurposePrivilegeProbe(pool: IntakePool, report: (diagnosti
           await releaseDeadline(client, release, who.tenantId));
         const content = await client.query<{ until: Date | null }>(`WITH entries AS (${entries}) SELECT
           min(CASE WHEN (e->>'effectiveFrom')::timestamptz>$3 THEN (e->>'effectiveFrom')::timestamptz
-            ELSE (e->>'effectiveTo')::timestamptz END) FILTER (WHERE e->>'operation'='upsert'
-            AND (cardinality($4::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'productRefs') ref WHERE ref->>'id'=ANY($4::text[])))
-            AND (cardinality($5::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'scenarioRefs') ref WHERE ref->>'id'=ANY($5::text[])))
+            ELSE (e->>'effectiveTo')::timestamptz END) FILTER (WHERE ${contentEntryAppliesSql}
             AND ((e->>'effectiveTo') IS NULL OR (e->>'effectiveTo')::timestamptz>$3)) AS until FROM entries`,
         [release, scopes.map(row => row.source_id), new Date(issued), usage.productIds, usage.scenarioIds]);
         until = Math.min(until, content.rows[0]?.until?.getTime() ?? Infinity);
