@@ -91,7 +91,12 @@
         "source_schema_sha256": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
         "migration_count": 34
       }
-    ]
+    ],
+    "additive_successor": {
+      "contract_set_id": "cs-ai-c11-openapi-1.23.0-schema-1.26-c08bfcadf94d",
+      "source_git_sha": "c08bfcadf94d274d5b871c6f122848919340c769",
+      "source_schema_sha256": "1c0a4e508ea0aab97d40abff4829ea5a0ce65882ad6a044187fc231872bbe39c"
+    }
   },
   "migrations": [
     {

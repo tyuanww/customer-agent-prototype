@@ -126,10 +126,18 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     const expectedProvenance = prior !== null && index < prior.migrationCount
       ? prior
       : reviewedUpgrades.find(({ migrationCount }) => index < migrationCount) ?? catalogue;
+    const successor = catalogue.compatibility.additiveSuccessor ?? null;
+    const declaredSuccessor = successor !== null
+      && index === catalogue.migrations.length - 1
+      && migration.contractSetId === successor.contractSetId
+      && migration.sourceGitSha === successor.sourceGitSha
+      && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
+      && successor.contractSetId !== catalogue.contractSetId;
     if (
-      migration.contractSetId !== expectedProvenance.contractSetId
+      !declaredSuccessor
+      && (migration.contractSetId !== expectedProvenance.contractSetId
       || migration.sourceGitSha !== expectedProvenance.sourceGitSha
-      || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256
+      || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256)
     ) {
       catalogueError(`Migration catalogue provenance changes outside the declared baseline boundary at ${migration.id}`);
     }

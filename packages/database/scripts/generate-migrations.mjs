@@ -440,6 +440,16 @@ function renderIntakeOverlay(projectRoot, snapshot, position, id) {
     source_schema_sha256: snapshot.manifest.database.sha256, sql });
 }
 
+function additiveSuccessorLiteral(manifest) {
+  const successor = manifest.compatibility?.additive_successor;
+  if (!successor) return 'null';
+  return `Object.freeze(${JSON.stringify({
+    contractSetId: successor.contract_set_id,
+    sourceGitSha: successor.source_git_sha,
+    sourceSchemaSha256: successor.source_schema_sha256,
+  })})`;
+}
+
 function renderCatalogue(manifest, migrations, compatibleUpgrades) {
   const migrationEntries = migrations.map((migration) => `  Object.freeze({
     position: ${migration.position},
@@ -452,7 +462,7 @@ function renderCatalogue(manifest, migrations, compatibleUpgrades) {
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}) }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}), additiveSuccessor: ${additiveSuccessorLiteral(manifest)} }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
 function buildDirectMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
@@ -758,6 +768,11 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
         contract_set_id: p.contractSetId, source_git_sha: p.sourceGitSha,
         source_schema_sha256: p.sourceSchemaSha256, migration_count: p.migrationCount,
       }))),
+      additive_successor: sopMigration ? Object.freeze({
+        contract_set_id: successor.manifest.contract_set_id,
+        source_git_sha: successor.manifest.source_git_sha,
+        source_schema_sha256: successor.manifest.database.sha256,
+      }) : null,
     }),
     migrations: Object.freeze(migrations.map(({ sql: _sql, ...migration }) => migration)),
   });
