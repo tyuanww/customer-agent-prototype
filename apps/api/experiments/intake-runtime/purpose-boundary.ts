@@ -243,8 +243,8 @@ export function createPurposePrivilegeProbe(pool: IntakePool, report: (diagnosti
         const content = await client.query<{ until: Date | null }>(`WITH entries AS (${entries}) SELECT
           min(CASE WHEN (e->>'effectiveFrom')::timestamptz>$3 THEN (e->>'effectiveFrom')::timestamptz
             ELSE (e->>'effectiveTo')::timestamptz END) FILTER (WHERE e->>'operation'='upsert'
-            AND (jsonb_array_length(e->'productRefs')=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'productRefs') ref WHERE ref->>'id'=ANY($4::text[])))
-            AND (jsonb_array_length(e->'scenarioRefs')=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'scenarioRefs') ref WHERE ref->>'id'=ANY($5::text[])))
+            AND (cardinality($4::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'productRefs') ref WHERE ref->>'id'=ANY($4::text[])))
+            AND (cardinality($5::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'scenarioRefs') ref WHERE ref->>'id'=ANY($5::text[])))
             AND ((e->>'effectiveTo') IS NULL OR (e->>'effectiveTo')::timestamptz>$3)) AS until FROM entries`,
         [release, scopes.map(row => row.source_id), new Date(issued), usage.productIds, usage.scenarioIds]);
         until = Math.min(until, content.rows[0]?.until?.getTime() ?? Infinity);

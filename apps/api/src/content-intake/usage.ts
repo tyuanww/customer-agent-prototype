@@ -123,8 +123,11 @@ const entries = `WITH materials AS MATERIALIZED (
     ON l.release_id=$1 AND l.source_id=c.source_id AND l.candidate_id=c.candidate_id
     AND l.candidate_version=c.version AND l.business_entry_id=c.e->>'businessEntryId'`;
 const applies = `e->>'operation'='upsert'
-  AND (jsonb_array_length(e->'productRefs')=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'productRefs') ref WHERE ref->>'id'=ANY($4::text[])))
-  AND (jsonb_array_length(e->'scenarioRefs')=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'scenarioRefs') ref WHERE ref->>'id'=ANY($5::text[])))`;
+  AND (cardinality($4::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'productRefs') ref WHERE ref->>'id'=ANY($4::text[])))
+  AND (cardinality($5::text[])=0 OR EXISTS (SELECT 1 FROM jsonb_array_elements(e->'scenarioRefs') ref WHERE ref->>'id'=ANY($5::text[])))
+  AND NOT (coalesce(e->>'familySourceId','')='' AND jsonb_array_length(e->'productRefs')=0 AND jsonb_array_length(e->'scenarioRefs')=0
+    AND EXISTS (SELECT 1 FROM content_intake.sources src JOIN content_intake.scopes sc USING (scope_id)
+      WHERE src.source_id=source_id AND sc.shop_id IS NULL))`;
 
 async function contentDeadline(client: IntakeTransaction, release: string, scopes: ScopeRow[], ctx: IntakeUsageContext, now: number): Promise<number> {
   const { rows } = await client.query<{ until: Date | null }>(`WITH entries AS (${entries}) SELECT
@@ -237,11 +240,11 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
             AND ((e->>'effectiveTo') IS NULL OR (e->>'effectiveTo')::timestamptz>$3)),
           contexts AS MATERIALIZED (SELECT *,
             CASE WHEN jsonb_array_length(e->'productRefs')=0
-              THEN int4multirange(int4range(0,greatest(cardinality($4::text[]),1)))
+              THEN CASE WHEN cardinality($4::text[])=0 THEN int4multirange(int4range(0,1)) ELSE int4multirange() END
               ELSE (SELECT range_agg(int4range(p.slot,p.slot+1)) FROM products p
                 WHERE p.id=ANY(ARRAY(SELECT ref->>'id' FROM jsonb_array_elements(e->'productRefs') ref))) END product_mask,
             CASE WHEN jsonb_array_length(e->'scenarioRefs')=0
-              THEN int4multirange(int4range(0,greatest(cardinality($5::text[]),1)))
+              THEN CASE WHEN cardinality($5::text[])=0 THEN int4multirange(int4range(0,1)) ELSE int4multirange() END
               ELSE (SELECT range_agg(int4range(s.slot,s.slot+1)) FROM scenarios s
                 WHERE s.id=ANY(ARRAY(SELECT ref->>'id' FROM jsonb_array_elements(e->'scenarioRefs') ref))) END scenario_mask
             FROM eligible),
