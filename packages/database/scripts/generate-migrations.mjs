@@ -757,7 +757,21 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     version: 'schema.v1.25 legacy CHECK execution closure', ranges: [], sourceBody: sources.legacyAcl.trimEnd() }, snapshot);
   const successor = findSopSuccessor(projectRoot);
   const sopMigration = successor ? renderSopMigration(successor) : null;
-  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : [])]);
+  const successorSnapshot = successor ? {
+    contract_set_id: successor.manifest.contract_set_id,
+    source_git_sha: successor.manifest.source_git_sha,
+    manifest: successor.manifest,
+  } : null;
+  const registrationBody = readFileSync(path.join(projectRoot, 'packages/database/seeds/menokin-source-registration.sql'), 'utf8')
+    .split('\n').filter(line => line !== 'BEGIN;' && line !== 'COMMIT;').join('\n').trim();
+  const registrationMigration = successorSnapshot ? renderUpgradeMigration({
+    position: 37,
+    id: '0037_menokin_source_registration',
+    version: 'Menokin text source registration; no workbook import',
+    ranges: [],
+    sourceBody: registrationBody,
+  }, successorSnapshot) : null;
+  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : [])]);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -779,6 +793,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const outputs = new Map(prior.outputs);
   outputs.set(`packages/database/migrations/${legacyAcl.file}`, legacyAcl.sql);
   if (sopMigration) outputs.set(`packages/database/migrations/${sopMigration.file}`, sopMigration.sql);
+  if (registrationMigration) outputs.set(`packages/database/migrations/${registrationMigration.file}`, registrationMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });
