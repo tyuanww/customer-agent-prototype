@@ -50,6 +50,7 @@ export function createFaqTableValidator(context: RuleContext, issue: AddIssue) {
         const value = values[index]!;
         if (value && !validTime(value)) issue('INVALID_TIME', location.sheet, location.row, location.column(index), '填写真实日历日期与带时区的 ISO 时间');
       }
+      if (context.domain === 'campaign' && !values[8]) issue('EFFECTIVE_REQUIRED', location.sheet, location.row, location.column(8), '活动必须填写生效时间');
       if (context.domain === 'campaign' && !values[9]) issue('EXPIRY_REQUIRED', location.sheet, location.row, location.column(9), '活动必须填写失效时间');
       if (values[8] && values[9] && Date.parse(values[8]) >= Date.parse(values[9])) issue('INVALID_WINDOW', location.sheet, location.row, location.column(9), '失效时间须晚于生效时间');
       if (!parseFamilyReference(values[10]!, context)) issue('INVALID_FAMILY', location.sheet, location.row, location.column(10), '仅店铺来源可填写其他来源的 sourceId/businessEntryId；两段须为合法非示例稳定编号，留空取消关联');

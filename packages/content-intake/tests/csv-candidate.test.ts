@@ -99,7 +99,9 @@ describe('frozen standard CSV parser', () => {
   });
   it('requires a real activity expiry and a forward time window', () => {
     const selected = { ...context, domain: 'campaign' as const }, row = faq();
-    expect(codes(createCsvTemplate(selected, [{ faq: row }]), selected)).toContain('EXPIRY_REQUIRED');
+    expect(codes(createCsvTemplate(selected, [{ faq: row }]), selected)).toEqual(expect.arrayContaining(['EFFECTIVE_REQUIRED', 'EXPIRY_REQUIRED']));
+    row[9] = '2099-01-01T00:00:00Z';
+    expect(codes(createCsvTemplate(selected, [{ faq: row }]), selected)).toContain('EFFECTIVE_REQUIRED');
     row[8] = '2028-02-29T12:00:00+08:00'; row[9] = '2028-03-01T00:00:00Z';
     expect(parseCsv(createCsvTemplate(selected, [{ faq: row }]), selected).ok).toBe(true);
     row[9] = row[8]; expect(codes(createCsvTemplate(selected, [{ faq: row }]), selected)).toContain('INVALID_WINDOW');
