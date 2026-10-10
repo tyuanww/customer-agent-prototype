@@ -630,6 +630,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(job.state, JSON.stringify(job.issues)).toBe('validated');
       const sources = new Set(['source-a']);
       expect(listPreviews(job.candidateId!, sources)).toHaveLength(1);
+      const removed = await fetch(`${host.origin}/v1/intake/sop/candidates/${job.candidateId}/versions/${job.candidateVersion}/rows/${encodeURIComponent('sop:过敏流程SOP:2')}`, { method: 'DELETE', headers: host.headers });
+      expect(removed.status, await removed.clone().text()).toBe(204);
       const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
       const candidate = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
       const cancelled = await fetch(`${url}/cancel`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },
@@ -727,6 +729,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       const seen = await catalog.preview(handles.items[0]!.objectId);
       expect(seen.mime).toBe('image/png');
       expect(seen.bytes.equals(png)).toBe(true);
+      const keptRow = await fetch(`${host.origin}/v1/intake/sop/candidates/${c.key.candidateId}/versions/${c.key.version}/rows/${encodeURIComponent('sop:过敏流程SOP:2')}`, { method: 'DELETE', headers: host.headers });
+      expect(keptRow.status).toBe(409);
       const kept = await fetch(`${url}/cancel`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },
         body: JSON.stringify({ operationId: 'sop-image-cancel-published', key: c.key }) });
       expect(kept.status).toBe(409);
