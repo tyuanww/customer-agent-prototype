@@ -19,6 +19,13 @@ export function adoptPreviews(fromKey: string, toKey: string): void {
   if (items) byKey.set(toKey, items);
 }
 
+/** Drop an unused upload's images, including the earlier object-id copy of the same list. */
+export function discardPreviews(key: string): void {
+  const items = byKey.get(key);
+  if (!items) return;
+  for (const [stored, value] of byKey) if (value === items) byKey.delete(stored);
+}
+
 export function listPreviews(key: string, sourceIds: ReadonlySet<string>): readonly LinkedPreview[] {
   return (byKey.get(key) ?? []).filter(item => sourceIds.has(item.sourceId));
 }
