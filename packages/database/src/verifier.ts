@@ -149,10 +149,12 @@ const EXPECTED_ACL_MANIFEST_SHA256 = '7890fde2f2bf59f2a941aa020864951091a8eef73e
 const EXPECTED_OBJECT_MANIFEST_ENTRIES = 3090;
 const EXPECTED_OBJECT_MANIFEST_SHA256 = 'c31a0c03694ec13c86ba15eb596c6b47c5164335712d839bc53cc0fb40e0de03';
 const EXPECTED_SUCCESSOR_TABLES = 100;
-const EXPECTED_SUCCESSOR_OBJECT_MANIFEST_ENTRIES = 3211;
-const EXPECTED_SUCCESSOR_OBJECT_MANIFEST_SHA256 = '9e6411f6aa5cd2abce8768b17e97c85de2e0e3324a8ab0741c7c5c481b6cae62';
+const EXPECTED_V127_OBJECT_MANIFEST_ENTRIES = 3212;
+const EXPECTED_V127_OBJECT_MANIFEST_SHA256 = '434dd231200d7ca4d21496a23b3600f42a5190b95ef4877c110f51bc6510bf15';
 const EXPECTED_FUNCTION_SECURITY_ENTRIES = 255;
 const EXPECTED_FUNCTION_SECURITY_SHA256 = '51ec728928940da3bbd28767d8727727518574d124c24330e64eb5189a38d26b';
+const EXPECTED_V127_FUNCTION_SECURITY_ENTRIES = 256;
+const EXPECTED_V127_FUNCTION_SECURITY_SHA256 = '497eda387ae80b9bac1e69104e1f7162e84dd59042f783222024aaf46c3bd59d';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
 
@@ -185,10 +187,13 @@ async function verifyCatalogueState(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
   expectedAcl: Readonly<{ entries: number; sha256: string }>,
-  expectedInventory: Readonly<{ tables: number; objectEntries: number; objectSha256: string }> = {
+  expectedInventory: Readonly<{ tables: number; functions: number; objectEntries: number; objectSha256: string; functionEntries: number; functionSha256: string }> = {
     tables: 97,
+    functions: 255,
     objectEntries: EXPECTED_OBJECT_MANIFEST_ENTRIES,
     objectSha256: EXPECTED_OBJECT_MANIFEST_SHA256,
+    functionEntries: EXPECTED_FUNCTION_SECURITY_ENTRIES,
+    functionSha256: EXPECTED_FUNCTION_SECURITY_SHA256,
   },
 ): Promise<DatabaseVerificationReport> {
   const migrationStatus = await inspectMigrationCatalogue(client, catalogue);
@@ -802,8 +807,8 @@ async function verifyCatalogueState(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
-  if (!inventory || inventory.tables !== expectedInventory.tables || inventory.views !== 7 || inventory.functions !== 255 || !inventory.pgcrypto || !inventory.pg_trgm) {
-    failures.push('object or extension inventory');
+  if (!inventory || inventory.tables !== expectedInventory.tables || inventory.views !== 7 || inventory.functions !== expectedInventory.functions || !inventory.pgcrypto || !inventory.pg_trgm) {
+    failures.push(`object or extension inventory [${inventory?.tables ?? 'missing'}/${inventory?.views ?? 'missing'}/${inventory?.functions ?? 'missing'}]`);
   }
   if (!roles || roles.total !== 17 || roles.safe !== 17 || roles.memberships !== 0) {
     failures.push('capability role safety');
@@ -820,8 +825,8 @@ async function verifyCatalogueState(
   }
   if (
     !functionSecurity
-    || functionSecurity.entries !== EXPECTED_FUNCTION_SECURITY_ENTRIES
-    || sha256(functionSecurity.manifest) !== EXPECTED_FUNCTION_SECURITY_SHA256
+    || functionSecurity.entries !== expectedInventory.functionEntries
+    || sha256(functionSecurity.manifest) !== expectedInventory.functionSha256
   ) {
     failures.push(`exact function definition/owner/security manifest [${functionSecurity?.entries ?? 'missing'}:${functionSecurity ? sha256(functionSecurity.manifest) : 'missing'}]`);
   }
@@ -916,8 +921,11 @@ export function verifyMigrationCatalogue(client: DatabaseQueryClient): Promise<D
     entries: EXPECTED_ACL_MANIFEST_ENTRIES, sha256: EXPECTED_ACL_MANIFEST_SHA256,
   }, {
     tables: EXPECTED_SUCCESSOR_TABLES,
-    objectEntries: EXPECTED_SUCCESSOR_OBJECT_MANIFEST_ENTRIES,
-    objectSha256: EXPECTED_SUCCESSOR_OBJECT_MANIFEST_SHA256,
+    functions: 256,
+    objectEntries: EXPECTED_V127_OBJECT_MANIFEST_ENTRIES,
+    objectSha256: EXPECTED_V127_OBJECT_MANIFEST_SHA256,
+    functionEntries: EXPECTED_V127_FUNCTION_SECURITY_ENTRIES,
+    functionSha256: EXPECTED_V127_FUNCTION_SECURITY_SHA256,
   });
 }
 
