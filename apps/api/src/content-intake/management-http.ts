@@ -111,6 +111,12 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
     return reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .header('content-disposition', 'attachment; filename="intake-issues.xlsx"').send(result.value);
   });
+  app.delete('/v1/intake/sop/candidates/:candidateId/versions/:version/rows/:rowId', { exposeHeadRoute: false }, async (request, reply) => {
+    if (!noQuery(request)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    const result = await service.deleteUnusedSopRow(actor(request), params(request).candidateId!, version(request), params(request).rowId!);
+    if (!result.ok) return intakeFailure(reply, result.code, result.reason, result.diagnosticId);
+    return reply.code(204).send();
+  });
   app.get('/v1/intake/candidates/:candidateId/versions/:version', { exposeHeadRoute: false }, async (request, reply) => {
     if (!noQuery(request)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
     return sendIntake(reply, await service.candidate(actor(request), params(request).candidateId!, version(request)), 'IntakeCandidate');

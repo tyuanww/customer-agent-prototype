@@ -245,6 +245,21 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       discardPreviews(result.value.key.candidateId);
       return { ok: true as const, value: cancellationReceipt(operation(raw)!, result.value) };
     },
+    async deleteUnusedSopRow(actor: AuthenticatedUser, candidateId: string, candidateVersion: number, rowId: string) {
+      return run(actor, 'delete-unused-sop-row', { candidateId, candidateVersion, rowId }, null, async (client) => {
+        parseContractSchema('IntakeId', candidateId);
+        if (!Number.isInteger(candidateVersion) || candidateVersion < 1) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        if (!/^sop:[^:]{1,128}:[1-9][0-9]{0,3}$/.test(rowId)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        try {
+          await client.query('SELECT content_intake.delete_unused_sop_row($1,$2,$3)', [candidateId, candidateVersion, rowId]);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '';
+          if (message.includes('SOP_ROW_NOT_FOUND')) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+          if (message.includes('SOP_ROW_IN_USE')) throw new IntakeRejection('ALREADY_PUBLISHED');
+          throw error;
+        }
+      }, () => undefined);
+    },
     async parse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {
       if (parseActive) return { ok: false, code: 'OVERLOADED', reason: 'QUOTA_EXCEEDED', commit: 'rolled_back', diagnosticId: `intake_${randomUUID()}` };
       parseActive = true;
