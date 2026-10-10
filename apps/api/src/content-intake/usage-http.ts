@@ -10,13 +10,19 @@ import { intakeFailure, intakeHttpBoundary, intakePageQuery, sendIntake } from '
  */
 export const contentIntakeUsageRoutes: FastifyPluginAsync<{
   auth: ProductAuthService;
-  usage: Pick<ReturnType<typeof createContentIntakeService>, 'issueEntitlement' | 'snapshot' | 'authorizations' | 'sources' | 'vocabulary' | 'shopDirectory'>;
+  usage: Pick<ReturnType<typeof createContentIntakeService>, 'issueEntitlement' | 'snapshot' | 'preview' | 'authorizations' | 'sources' | 'vocabulary' | 'shopDirectory'>;
   report?: (diagnosticId: string, error: unknown) => void;
 }> = async (app, { auth, usage, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
   app.get('/v1/intake/sources/:sourceId/vocabulary', { exposeHeadRoute: false }, async (request, reply) => {
     const { sourceId } = request.params as { sourceId: string };
     return sendIntake(reply, await usage.vocabulary(actor(request), sourceId, intakePageQuery(request)), 'IntakeVocabularyList');
+  });
+  app.get('/v1/intake/preview', { exposeHeadRoute: false }, async (request, reply) => {
+    const result = await usage.preview(actor(request), request.query);
+    if (!result.ok) return intakeFailure(reply, result.code, result.reason);
+    reply.header('cache-control', 'private, no-store');
+    return reply.send(result.value);
   });
   app.post('/v1/intake/entitlements', { bodyLimit: 65_536 }, async (request, reply) => {
     if (Object.keys(request.query as object).length) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');

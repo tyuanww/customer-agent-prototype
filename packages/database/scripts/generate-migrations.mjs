@@ -372,6 +372,41 @@ function loadFrozenProductOverlay(projectRoot, descriptor) {
   return migration;
 }
 
+function findSopSuccessor(projectRoot) {
+  const upstream = path.join(projectRoot, 'contracts/upstream/customer-agent');
+  if (!existsSync(upstream)) return null;
+  const found = readdirSync(upstream).flatMap((name) => {
+    const manifestPath = path.join(upstream, name, 'contract-set.json');
+    if (!existsSync(manifestPath)) return [];
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    return manifest.schema === 'customer-agent-contract-set/v5' ? [{ dir: path.join(upstream, name), manifest }] : [];
+  });
+  if (found.length > 1) throw new Error('More than one SOP successor contract set is present');
+  return found[0] ?? null;
+}
+
+function renderSopMigration(successor) {
+  const database = readFileSync(path.join(successor.dir, successor.manifest.database.file), 'utf8');
+  if (sha256(database) !== successor.manifest.database.sha256) throw new Error('SOP successor schema drifted');
+  const start = database.indexOf('-- BEGIN SOP MEDIA CONTRACT');
+  const end = database.indexOf('-- END SOP MEDIA CONTRACT');
+  if (start < 0 || end < start) throw new Error('SOP successor increment is missing');
+  const sourceBody = database.slice(start, end).trimEnd().split('\n').filter(line => line !== 'BEGIN;' && line !== 'COMMIT;').join('\n');
+  if (/CREATE ROLE|\bGRANT\b/i.test(sourceBody)) throw new Error('SOP successor increment grants or creates a role');
+  if (!sourceBody.includes('OWNER TO intake_runtime_fn_owner')) throw new Error('SOP successor tables lack the existing owner');
+  return renderUpgradeMigration({
+    position: 36,
+    id: '0036_intake_sop_v1_26',
+    version: 'schema.v1.26 SOP additive successor',
+    ranges: [],
+    sourceBody,
+  }, {
+    contract_set_id: successor.manifest.contract_set_id,
+    source_git_sha: successor.manifest.source_git_sha,
+    manifest: successor.manifest,
+  });
+}
+
 function renderUpgradeMigration(descriptor, snapshot) {
   const { position, id, version, ranges, sourceBody } = descriptor;
   const sql = [
@@ -710,7 +745,9 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   // reinstall historical ACL or give the LOGIN roles an extra capability.
   const legacyAcl = renderUpgradeMigration({ position: 35, id: '0035_intake_legacy_check_acl_v1_25',
     version: 'schema.v1.25 legacy CHECK execution closure', ranges: [], sourceBody: sources.legacyAcl.trimEnd() }, snapshot);
-  const migrations = Object.freeze([...prior.migrations, legacyAcl]);
+  const successor = findSopSuccessor(projectRoot);
+  const sopMigration = successor ? renderSopMigration(successor) : null;
+  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : [])]);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -726,6 +763,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   });
   const outputs = new Map(prior.outputs);
   outputs.set(`packages/database/migrations/${legacyAcl.file}`, legacyAcl.sql);
+  if (sopMigration) outputs.set(`packages/database/migrations/${sopMigration.file}`, sopMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });

@@ -20,6 +20,7 @@ export interface IntakeCatalog {
   /** Main-only handle: read/copy always recheck this exact qualification. No token in the projection. */
   read(): { releaseId: string; contextGeneration: number; validUntil: string; faq: Row[]; scopes: C['IntakeEntitlement']['scopes']; vocabulary: C['IntakeVocabulary'][] } | null;
   copy(key: string): { copied: true };
+  preview(objectId: string): Promise<{ mime: string; bytes: Buffer }>;
 }
 const MAX_PAGES = 500;
 const MAX_BYTES = 32 * 1024 * 1024;
@@ -116,7 +117,7 @@ export class ContentIntakeUsage {
         return !expired && active();
       };
       const vocabulary = new Map<string,C['IntakeVocabulary']>();
-      const faq: Row[] = [], keys = new Set<string>(), cursors = new Set<string>();
+      const faq: Row[] = [], keys = new Set<string>(), cursors = new Set<string>(), mediaIds = new Set<string>();
       const sourceIds = new Set(entitlement.scopes.map(s => s.sourceId));
       let cursor: string | null = null, bytes = 0;
       for (let page = 0; ; page++) {
@@ -132,7 +133,8 @@ export class ContentIntakeUsage {
         if (bytes > MAX_BYTES) throw new IntakeUsageError('LIMIT');
         const snapshot = parseContractSchema('IntakeSnapshot', response.value);
         if (snapshot.entitlementId !== entitlement.entitlementId || snapshot.releaseId !== entitlement.releaseId
-          || snapshot.contextGeneration !== generation || snapshot.sopNodes.length || snapshot.sopEdges.length || snapshot.media.length) {
+          || snapshot.contextGeneration !== generation || snapshot.sopNodes.length || snapshot.sopEdges.length
+          || snapshot.media.some(item => !/^med_[0-9a-f]{64}$/.test(item.objectId) || !/^[0-9a-f]{64}$/.test(item.sha256))) {
           throw new IntakeUsageError('FORBIDDEN');
         }
         const pageVocabulary = new Map(snapshot.vocabulary.map(term => [JSON.stringify([term.id,term.displayVersion]),term]));
@@ -148,6 +150,7 @@ export class ContentIntakeUsage {
           if (!sourceIds.has(row.sourceId) || keys.has(identity)) throw new IntakeUsageError('FORBIDDEN');
           keys.add(identity); faq.push({ ...row, key: randomUUID() });
         }
+        for (const item of snapshot.media) mediaIds.add(item.objectId);
         if (snapshot.nextCursor === null) break;
         if (!snapshot.faq.length || cursors.has(snapshot.nextCursor)) throw new IntakeUsageError('FORBIDDEN');
         cursors.add(snapshot.nextCursor); cursor = snapshot.nextCursor;
@@ -163,6 +166,18 @@ export class ContentIntakeUsage {
           if (!row) throw new IntakeUsageError('VALIDATION');
           try { this.writeClipboard(row.entry.answerText); } catch { throw new IntakeUsageError('CLIPBOARD_FAILED'); }
           return { copied: true };
+        },
+        preview: async objectId => {
+          if (!live()) throw new IntakeUsageError('STALE');
+          // The active snapshot contract cannot list media. When it does, only those ids are local.
+          if (!/^med_[0-9a-f]{64}$/.test(objectId) || (mediaIds.size > 0 && !mediaIds.has(objectId))) throw new IntakeUsageError('FORBIDDEN');
+          const response = await this.session.request(epoch, `/v1/intake/preview?entitlementId=${entitlement.entitlementId}&objectId=${objectId}`, { signal: controller.signal });
+          if (!live()) throw new IntakeUsageError('STALE');
+          const value = response.value as { mime?: unknown; sha256?: unknown; bytesBase64?: unknown; url?: unknown };
+          if (typeof value.mime !== 'string' || typeof value.sha256 !== 'string' || typeof value.bytesBase64 !== 'string' || 'url' in value) throw new IntakeUsageError('FORBIDDEN');
+          const bytes = Buffer.from(value.bytesBase64, 'base64');
+          if (bytes.toString('base64') !== value.bytesBase64) throw new IntakeUsageError('FORBIDDEN');
+          return { mime: value.mime, bytes };
         },
       };
       this.catalog = catalog;

@@ -12,7 +12,8 @@ import { Pool, type Client, type PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
-import { createTemplate } from '@customer-agent/content-intake';
+import { createSyntheticSopWorkbook, createTemplate } from '@customer-agent/content-intake';
+import { ContentIntakeUsage } from '../../desktop/src/main/content-intake-usage.js';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -613,6 +614,112 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(JSON.stringify(snapshot)).not.toContain('合成内部说明');
       console.log(JSON.stringify({ probe: 'workflow-http-second-seat', source: 'uploaded-synthetic-xlsx', releaseId: receipt.releaseId,
         faqRows: snapshot.faq.length, multilinePreserved: true, qualityTransport: 'Main-ProductSession-HTTP', publicationPolicy: 'direct-v1' }));
+    } finally { await reader.close(); await host.app.close(); }
+  }, 40_000);
+
+  it('second synthetic seat copies published text only and previews the uploaded image inside the system', async () => {
+    const { bytes: workbook, png } = await createSyntheticSopWorkbook();
+    await publicationBase();
+    const host = await managementHost();
+    const reader = Fastify();
+    await reader.register(contentIntakeUsageRoutes, { auth: auth!, usage: service });
+    const origin = await reader.listen({ host: '127.0.0.1', port: 0 });
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook, 'sop-image-upload')).json());
+      const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = await host.receive(object.objectId, 'sop-image-receive', null, baseReleaseId);
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state, JSON.stringify(job.issues)).toBe('validated');
+      const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
+      const c = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
+      const source: C['IntakeSourceConfirmation'] = { operationId: 'sop-image-source', key: c.key, expectedEvidenceVersion: 0,
+        confirmedVersionKind: 'opaque', confirmedVersionValue: 'synthetic-export-one', acquisition: 'controlled-synthetic-export',
+        objectSha256: object.sha256, reason: '合成人工来源确认' };
+      expect((await fetch(`${url}/source-confirmation`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' }, body: JSON.stringify(source) })).status).toBe(200);
+      await httpQuality(host, c);
+      const publish: C['IntakePublish'] = { operationId: 'sop-image-publish', key: c.key, baseReleaseId, sourceEvidenceVersion: 1, confirmed: true, title: '合成 SOP 发布', summary: '带图片' };
+      const published = await fetch(`${url}/publish`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' }, body: JSON.stringify(publish) });
+      expect(published.status, await published.clone().text()).toBe(202);
+      const receipt = parseContractSchema('IntakeReceipt', await published.json());
+      const secondSeat = await seat('agent', 'sop-image');
+      const headers = { authorization: `Bearer ${secondSeat.token}` };
+      const entitlementResponse = await fetch(`${origin}/v1/intake/entitlements`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ ...usage, releaseId: receipt.releaseId }) });
+      expect(entitlementResponse.status).toBe(200);
+      const entitlement = parseContractSchema('IntakeEntitlement', await entitlementResponse.json());
+      const response = await fetch(`${origin}/v1/intake/snapshot?entitlementId=${entitlement.entitlementId}`, { headers });
+      expect(response.status, await response.clone().text()).toBe(200);
+      const snapshot = parseContractSchema('IntakeSnapshot', await response.json());
+      const copied = snapshot.faq.map(row => row.entry.answerText).join('\n');
+      expect(copied).toContain('合成文字');
+      expect(snapshot.sopNodes).toEqual([]);
+      expect(snapshot.sopEdges).toEqual([]);
+      const listed = await fetch(`${origin}/v1/intake/preview?entitlementId=${entitlement.entitlementId}`, { headers });
+      expect(listed.status, await listed.clone().text()).toBe(200);
+      expect(listed.headers.get('cache-control')).toContain('no-store');
+      const handles = await listed.json() as { items: { objectId: string; sha256: string }[]; url?: string; bytesBase64?: string };
+      expect(handles.url).toBeUndefined();
+      expect(handles.bytesBase64).toBeUndefined();
+      expect(handles.items).toHaveLength(1);
+      expect(handles.items[0]!.objectId).toBe(`med_${createHash('sha256').update(png).digest('hex')}`);
+      const missing = await fetch(`${origin}/v1/intake/preview?entitlementId=${entitlement.entitlementId}&objectId=med_${'ab'.repeat(32)}`, { headers });
+      expect(missing.status).toBe(404);
+      const preview = await fetch(`${origin}/v1/intake/preview?entitlementId=${entitlement.entitlementId}&objectId=${handles.items[0]!.objectId}`, { headers });
+      expect(preview.status, await preview.clone().text()).toBe(200);
+      expect(preview.headers.get('cache-control')).toContain('no-store');
+      const body = await preview.json() as { mime: string; sha256: string; bytesBase64: string; url?: string };
+      expect(body.url).toBeUndefined();
+      expect(body.mime).toBe('image/png');
+      expect(body.sha256).toBe(handles.items[0]!.sha256);
+      expect(Buffer.from(body.bytesBase64, 'base64').equals(png)).toBe(true);
+      expect(copied).not.toContain(body.bytesBase64);
+      expect(JSON.stringify(snapshot)).not.toContain(body.bytesBase64);
+      const clipboard: string[] = [];
+      const seatClient = new ContentIntakeUsage({
+        view: () => ({ signedIn: true, sessionEpoch: 1 }),
+        subscribe: () => () => undefined,
+        request: async (_epoch, path, options) => {
+          const init: RequestInit = {
+            method: options.body === undefined ? 'GET' : 'POST',
+            headers: { ...headers, ...(options.body === undefined ? {} : { 'content-type': 'application/json' }) },
+            signal: options.signal,
+          };
+          if (options.body !== undefined) init.body = JSON.stringify(options.body);
+          const result = await fetch(`${origin}${path}`, init);
+          const value = await result.json() as { error?: { code?: string; details?: { reason?: string } } };
+          if (!result.ok) throw { code: value.error?.code, reason: value.error?.details?.reason };
+          return { value };
+        },
+      }, text => { clipboard.push(text); });
+      seatClient.select({ shopId: 'shop-a', productIds: [], scenarioIds: [] });
+      const catalog = await seatClient.refresh();
+      const projected = catalog.read();
+      expect(projected?.faq.some(row => row.entry.answerText.includes('合成文字'))).toBe(true);
+      const key = projected!.faq.find(row => row.entry.answerText.includes('合成文字'))!.key;
+      expect(catalog.copy(key)).toEqual({ copied: true });
+      expect(clipboard.at(-1)).toContain('合成文字');
+      expect(clipboard.at(-1)).not.toContain(png.toString('base64'));
+      const seen = await catalog.preview(handles.items[0]!.objectId);
+      expect(seen.mime).toBe('image/png');
+      expect(seen.bytes.equals(png)).toBe(true);
+      await grantQuerySources(['source-b']);
+      const otherShop = await seat('agent', 'sop-other-shop');
+      const otherHeaders = { authorization: `Bearer ${otherShop.token}` };
+      const otherEntitlementResponse = await fetch(`${origin}/v1/intake/entitlements`, { method: 'POST', headers: { ...otherHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ shopId: 'shop-b', contextGeneration: 1, productIds: [], scenarioIds: [], releaseId: receipt.releaseId }) });
+      expect(otherEntitlementResponse.status, await otherEntitlementResponse.clone().text()).toBe(200);
+      const otherEntitlement = parseContractSchema('IntakeEntitlement', await otherEntitlementResponse.json());
+      const otherSnapshot = await fetch(`${origin}/v1/intake/snapshot?entitlementId=${otherEntitlement.entitlementId}`, { headers: otherHeaders });
+      expect(otherSnapshot.status, await otherSnapshot.clone().text()).toBe(200);
+      const otherPage = parseContractSchema('IntakeSnapshot', await otherSnapshot.json());
+      expect(otherPage.faq.some(row => row.sourceId === 'source-a')).toBe(false);
+      const otherList = await fetch(`${origin}/v1/intake/preview?entitlementId=${otherEntitlement.entitlementId}`, { headers: otherHeaders });
+      expect(otherList.status, await otherList.clone().text()).toBe(200);
+      expect((await otherList.json() as { items: unknown[] }).items).toEqual([]);
+      const denied = await fetch(`${origin}/v1/intake/preview?entitlementId=${otherEntitlement.entitlementId}&objectId=${handles.items[0]!.objectId}`, { headers: otherHeaders });
+      expect(denied.status).toBe(404);
+      seatClient.dispose();
     } finally { await reader.close(); await host.app.close(); }
   }, 40_000);
 
@@ -2561,7 +2668,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         return reply.code(204).send();
       });
       await server.register(contentIntakeUsageRoutes,{auth:auth!,usage:{
-        authorizations:service.authorizations,sources:service.sources,vocabulary:service.vocabulary,shopDirectory:service.shopDirectory,
+        authorizations:service.authorizations,sources:service.sources,vocabulary:service.vocabulary,shopDirectory:service.shopDirectory,preview:service.preview,
         issueEntitlement:async(current,body)=>{
           if(expireNext) {
             await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
