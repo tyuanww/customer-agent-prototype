@@ -649,6 +649,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.23.0-schema-1.26-c08bfcadf94d",
       "source_git_sha": "c08bfcadf94d274d5b871c6f122848919340c769",
       "source_schema_sha256": "1c0a4e508ea0aab97d40abff4829ea5a0ce65882ad6a044187fc231872bbe39c"
+    },
+    {
+      "position": 37,
+      "id": "0037_menokin_source_registration",
+      "file": "0037_menokin_source_registration.sql",
+      "source_ranges": [],
+      "sha256": "93fc05c58af3001deb9fa4ce3645b6e3b2a784b220fec9db599fec2becfd8608",
+      "bytes": 2607,
+      "contract_set_id": "cs-ai-c11-openapi-1.23.0-schema-1.26-c08bfcadf94d",
+      "source_git_sha": "c08bfcadf94d274d5b871c6f122848919340c769",
+      "source_schema_sha256": "1c0a4e508ea0aab97d40abff4829ea5a0ce65882ad6a044187fc231872bbe39c"
     }
   ]
 }

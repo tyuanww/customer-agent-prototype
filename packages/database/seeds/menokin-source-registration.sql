@@ -1,4 +1,5 @@
--- Menokin source names only. This is not a migration and does not import workbooks.
+-- Menokin source names only. Migration 0037 applies these statements.
+-- Re-running them does not import workbooks.
 -- The format guard only accepts the frozen FAQ or CSV tuple. This uses the FAQ
 -- tuple with mapping version not-imported. structure_digest is SHA-256 of the
 -- UTF-8 marker menokin-source-not-imported, not a hash of any desktop workbook.

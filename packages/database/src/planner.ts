@@ -101,6 +101,7 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
   }
 
   const ids = new Set<string>();
+  let successorSuffix = false;
   for (const [index, migration] of catalogue.migrations.entries()) {
     if (
       migration.position !== index + 1
@@ -127,14 +128,15 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       ? prior
       : reviewedUpgrades.find(({ migrationCount }) => index < migrationCount) ?? catalogue;
     const successor = catalogue.compatibility.additiveSuccessor ?? null;
-    const declaredSuccessor = successor !== null
-      && index === catalogue.migrations.length - 1
+    const matchesSuccessor = successor !== null
       && migration.contractSetId === successor.contractSetId
       && migration.sourceGitSha === successor.sourceGitSha
       && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
       && successor.contractSetId !== catalogue.contractSetId;
+    if (matchesSuccessor) successorSuffix = true;
+    else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
-      !declaredSuccessor
+      !matchesSuccessor
       && (migration.contractSetId !== expectedProvenance.contractSetId
       || migration.sourceGitSha !== expectedProvenance.sourceGitSha
       || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256)
