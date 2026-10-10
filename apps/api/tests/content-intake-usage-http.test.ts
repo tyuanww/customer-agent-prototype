@@ -24,7 +24,8 @@ async function host(result: IntakeResult<C['IntakeEntitlement']> = { ok: true, v
   const sources = vi.fn(async (): Promise<IntakeResult<C['IntakeSourceList']>> => ({ ok: true, value: { items: [], nextCursor: null } }));
   const report = vi.fn();
   const app = Fastify({ logger: false, exposeHeadRoutes: false }); apps.push(app);
-  await app.register(contentIntakeUsageRoutes, { auth, usage: { shopDirectory: async () => ({ok:true,value:{items:[],nextCursor:null,validUntil:new Date(Date.now()+60000).toISOString()}}), issueEntitlement, snapshot, authorizations, sources, vocabulary: async () => ({ ok: true, value: { items: [], nextCursor: null } }) }, report });
+  const preview = vi.fn(async (): Promise<IntakeResult<{ items: [] }>> => ({ ok: false, code: 'NOT_FOUND', reason: 'SCOPE_DENIED', commit: 'rolled_back', diagnosticId: 'synthetic-diagnostic' }));
+  await app.register(contentIntakeUsageRoutes, { auth, usage: { shopDirectory: async () => ({ok:true,value:{items:[],nextCursor:null,validUntil:new Date(Date.now()+60000).toISOString()}}), issueEntitlement, snapshot, preview, authorizations, sources, vocabulary: async () => ({ ok: true, value: { items: [], nextCursor: null } }) }, report });
   return { app, auth, issueEntitlement, snapshot, authorizations, sources, report };
 }
 const headers = { authorization: 'Bearer synthetic-token' };

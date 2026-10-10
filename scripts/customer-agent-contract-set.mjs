@@ -25,6 +25,7 @@ const CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v1';
 const RUNTIME_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v2';
 const CSV_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v3';
 const LEGACY_CHECK_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v4';
+const SOP_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v5';
 const CONSUMPTION_SCHEMA = 'customer-agent-contract-consumption/v1';
 const SOURCE_REPOSITORY = 'ai-赋能立项';
 const UPSTREAM_ROOT = 'contracts/upstream/customer-agent';
@@ -156,6 +157,7 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
+  const sopProfile = rawManifest?.schema === SOP_CONTRACT_SET_SCHEMA;
   const legacyCheckProfile = rawManifest?.schema === LEGACY_CHECK_CONTRACT_SET_SCHEMA;
   const csvProfile = legacyCheckProfile || rawManifest?.schema === CSV_CONTRACT_SET_SCHEMA;
   const runtimeProfile = csvProfile || rawManifest?.schema === RUNTIME_CONTRACT_SET_SCHEMA;
@@ -174,7 +176,7 @@ function validateManifest(rawManifest) {
     ],
     'contract-set manifest',
   );
-  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile) {
+  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile) {
     throw new Error(`Unsupported contract-set schema: ${String(rawManifest.schema)}`);
   }
   if (rawManifest.source_repository !== SOURCE_REPOSITORY) {
@@ -206,6 +208,7 @@ function validateManifest(rawManifest) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
   // Version and both paths form one reviewed pair; mixed generations fail closed.
+  const sopPair = openapi.version === '1.23.0' && database.version === 'schema.v1.26';
   const legacyCheckPair = openapi.version === '1.22.0' && database.version === 'schema.v1.25';
   const csvPair = openapi.version === '1.22.0' && database.version === 'schema.v1.24';
   const runtimePair = openapi.version === '1.21.0' && database.version === 'schema.v1.23';
@@ -219,10 +222,13 @@ function validateManifest(rawManifest) {
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
+  if (sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
-  if (runtimePair || csvPair || legacyCheckPair) {
+  if (sopPair) {
+    openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.23.yaml`;
+    databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.26.sql`;
+  } else if (runtimePair || csvPair || legacyCheckPair) {
     openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v${csvProfile ? '1.22' : '1.21'}.yaml`;
     databasePath = `${OWNER_SOURCE_ROOT}/schema.v${legacyCheckPair ? '1.25' : csvPair ? '1.24' : '1.23'}.sql`;
     const members = legacyCheckPair ? LEGACY_CHECK_MEMBERS : csvPair ? CSV_MEMBERS : RUNTIME_MEMBERS;
@@ -435,6 +441,17 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
  * Historical v1-v3 source SHAs remain valid after newer approvals exist. */
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
+  if (manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
+    const approval = source('business-docs/01-客服Agent项目/90-评审/2026-10-10_SOP合同冻结批准.md');
+    if (!approval.includes('FROZEN · NOT EXPORTED · NOT INTAKE · SYNTHETIC DEVELOPMENT ONLY')) {
+      throw new Error('SOP successor approval must stay frozen and not exported as the main contract set');
+    }
+    const hashes = approval.match(/[0-9a-f]{64}/g) ?? [];
+    if (!hashes.includes(manifest.openapi.sha256) || !hashes.includes(manifest.database.sha256)) {
+      throw new Error('SOP successor approval hashes mismatch');
+    }
+    return;
+  }
   const legacyCheck = manifest.schema === LEGACY_CHECK_CONTRACT_SET_SCHEMA;
   const csv = legacyCheck || manifest.schema === CSV_CONTRACT_SET_SCHEMA;
   for (const [enabled, approvalPath, label] of [
@@ -759,8 +776,18 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       if (!manifestsMatch(existing.manifest, source.manifest)) {
         throw new Error('Existing contract-set manifest differs from the verified source');
       }
-      if (!current || current.contract_set_id !== source.manifest.contract_set_id) {
+      if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && (!current || current.contract_set_id !== source.manifest.contract_set_id)) {
         writeJsonAtomically(lockPath, consumptionLock(existing));
+      }
+      if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
+        const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });
+        return Object.freeze({
+          status: 'REUSED',
+          contract_set_id: existing.manifest.contract_set_id,
+          preserved_lock: kept.contract_set_id,
+          path: destination,
+          generateMigrations: true,
+        });
       }
       const verified = verifyIngestedContractSet({
         projectRoot: resolvedRoot,
@@ -786,7 +813,7 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       }
       const nextLock = consumptionLock(staged);
       renameSync(stagingDirectory, destination);
-      writeJsonAtomically(lockPath, nextLock);
+      if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA) writeJsonAtomically(lockPath, nextLock);
     } catch (error) {
       if (existsSync(stagingDirectory)) {
         rmSync(stagingDirectory, { recursive: true, force: true });
@@ -794,6 +821,17 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       throw error;
     }
 
+    if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
+      const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });
+      const successor = verifyContractSetDirectory(destination);
+      return Object.freeze({
+        status: 'CREATED',
+        contract_set_id: successor.manifest.contract_set_id,
+        preserved_lock: kept.contract_set_id,
+        path: destination,
+        generateMigrations: true,
+      });
+    }
     const verified = verifyIngestedContractSet({
       projectRoot: resolvedRoot,
       expectedContractSetId: source.manifest.contract_set_id,
@@ -802,6 +840,17 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   } finally {
     releaseIntakeLock();
   }
+}
+
+function ingestContractSetAndGenerate(options) {
+  const result = ingestContractSet(options);
+  if (result.generateMigrations) {
+    execFileSync(process.execPath, [path.join(options.projectRoot ?? defaultProjectRoot(), 'packages/database/scripts/generate-migrations.mjs')], {
+      cwd: options.projectRoot ?? defaultProjectRoot(),
+      stdio: 'inherit',
+    });
+  }
+  return result;
 }
 
 function defaultProjectRoot() {
@@ -830,7 +879,7 @@ export function parseCliArguments(argv) {
 function runCli() {
   const { command, options } = parseCliArguments(process.argv.slice(2));
   const result = command === 'ingest'
-    ? ingestContractSet({
+    ? ingestContractSetAndGenerate({
         projectRoot: options['project-root'],
         sourceDirectory: options.source,
         sourceRepositoryRoot: options['source-repository-root'],

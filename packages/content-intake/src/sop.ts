@@ -109,6 +109,43 @@ function imageBuffer(image: ExcelJS.Image): Buffer | undefined {
   return undefined;
 }
 
+const SYNTHETIC_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=', 'base64');
+
+/** One synthetic six-sheet workbook with text and a same-row PNG. Not a real customer file. */
+export async function createSyntheticSopWorkbook(): Promise<{ bytes: Buffer; png: Buffer }> {
+  const book = new ExcelJS.Workbook();
+  for (const [index, name] of SOP_SHEET_NAMES.entries()) {
+    const sheet = book.addWorksheet(name);
+    sheet.addRow(['答案']);
+    if (index < 3) sheet.getCell('A2').value = `${name}合成文字`;
+  }
+  const imageId = book.addImage({ buffer: SYNTHETIC_PNG as unknown as ExcelJS.Buffer, extension: 'png' });
+  book.getWorksheet(SOP_SHEET_NAMES[0])!.addImage(imageId, { tl: { col: 1, row: 1 }, ext: { width: 8, height: 8 } });
+  return { bytes: Buffer.from(await book.xlsx.writeBuffer()), png: SYNTHETIC_PNG };
+}
+
+/** Map a six-sheet SOP workbook onto the existing FAQ row shape and keep image bytes. */
+export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ parsed: import('./policy.js').ParseResult; previews: readonly { bytes: Buffer; mime: `image/${'jpeg' | 'png' | 'gif'}` }[] } | null> {
+  const book = new ExcelJS.Workbook();
+  try { await book.xlsx.load(bytes as unknown as ExcelJS.Buffer); } catch { return null; }
+  if (!SOP_SHEET_NAMES.every(name => book.getWorksheet(name))) return null;
+  const sop = await parseSopWorkbook(bytes, {
+    sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? scope.brandId,
+    scopeKind: scope.shopId === null ? 'brand' : 'shop', selectedSheets: SOP_SHEET_NAMES,
+  });
+  if (!sop.ok) {
+    return { parsed: { ok: false, policyVersion: P.version, rows: [], questions: [], issues: sop.issues, excluded: [], expandedBytes: 0, mediaCount: sop.attachments.length }, previews: [] };
+  }
+  const rows = sop.rows.map((row, index) => {
+    const id = `sop${index + 1}`;
+    return { id, title: row.sheet, body: row.text, state: '启用' as const, values: [id, row.sheet, row.text, '', '', '分类', '', '启用', '', '', '', '', '', '', 'false'] };
+  });
+  return {
+    parsed: { ok: rows.length > 0, policyVersion: P.version, rows, questions: [], issues: rows.length ? [] : [{ code: 'EMPTY_DATA', sheet: SOP_SHEET_NAMES[0], row: 2, column: 'A', fix: '补一行文字答案' }], excluded: [], expandedBytes: 0, mediaCount: sop.attachments.length },
+    previews: sop.attachments.map(item => ({ bytes: Buffer.from(item.base64, 'base64'), mime: item.mime })),
+  };
+}
+
 /** Parse a six-sheet SOP workbook using row text plus same-row image attachments. */
 export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext): Promise<SopParseResult> {
   const rawSha256 = createHash('sha256').update(bytes).digest('hex');

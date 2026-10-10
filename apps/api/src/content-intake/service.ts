@@ -3,7 +3,8 @@ import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
-import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, type ParseResult } from '@customer-agent/content-intake';
+import { adoptPreviews, previewFromBytes, stagePreviews } from './linked-preview.js';
+import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import type { ContentObjectStore, PersistedContentObject } from '../content-object-store.js';
@@ -147,11 +148,19 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       return prepared;
     }
     if ('candidate' in prepared.value) return { ok: true, value: prepared.value.candidate };
+    const previewKey = prepared.value.job.object_id;
     let parsed: ParseResult;
     try {
       const bytes = await store.readPayload(prepared.value.job.object_id);
       if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) throw new Error('OBJECT_CHANGED');
-      parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
+      const sourceId = prepared.value.source.scope.sourceId;
+      const sop = await tryParseSopAsFaq(bytes, prepared.value.source.scope);
+      if (sop) {
+        parsed = sop.parsed;
+        stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId)));
+      } else {
+        parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
+      }
     } catch {
       parsed = { ...failedParse('OBJECT_UNAVAILABLE', prepared.value.source.ruleVersion === CSV_POLICY_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version),
         issues: [{ code: 'OBJECT_UNAVAILABLE', sheet: '', row: 0, column: '', fix: '对象不可读取或指纹变化，请重新上传' }] };
@@ -174,6 +183,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
         return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
       }
     }
+    if (frozen.ok) adoptPreviews(previewKey, frozen.value.key.candidateId);
     return frozen;
   }
 

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { canonical, digest, SNAPSHOT_VOCABULARY_LIMIT, snapshotVocabularyKeys } from './material.js';
+import { listPreviews, openPreview } from './linked-preview.js';
 import { clock, createIntakeTransactions, lockProductSession, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
@@ -300,9 +301,62 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         // Cursor is only a bounded keyset position, not authority. Rechecked
         // entitlement/scopes/selection always determine the accessible rows.
         return { releaseId:lease.release_id,entitlementId:req.entitlementId,contextGeneration:ctx.contextGeneration,faq,
+          // The consumed IntakeSnapshot contract keeps media, sopNodes and sopEdges at maxItems 0.
+          // Related images are read through preview(), which returns bytes for this release only.
           sopNodes:[],sopEdges:[],media:[],vocabulary:vocabulary.rows.map(v=>v.value),
           nextCursor:result.rows.length>rows.length && last ? Buffer.from(JSON.stringify([hash,last.source_id,last.business_entry_id])).toString('base64url') : null };
       },v=>parseContractSchema('IntakeSnapshot',v));
+    },
+    preview(actor: AuthenticatedUser, raw: unknown) {
+      return run(actor,'preview',null,null,async (client,who) => {
+        const query = raw as { entitlementId?: unknown; objectId?: unknown };
+        const entitlementId = parseContractSchema('IntakeId', query.entitlementId);
+        if (query.objectId !== undefined && (typeof query.objectId !== 'string' || !/^med_[0-9a-f]{64}$/.test(query.objectId))) {
+          throw new IntakeRejection('FILE_INVALID','VALIDATION');
+        }
+        const hash = digest(entitlementId), {hash:sessionTokenHash}=await lockProductSession(client,actor);
+        const leases=await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash,c.product_ids,c.scenario_ids
+          FROM content_intake.entitlements e JOIN public.snapshot_offline_leases l USING(lease_token_hash)
+          JOIN content_intake.entitlement_contexts c USING(entitlement_hash)
+          WHERE e.entitlement_hash=$1 AND e.principal_id=$2 AND e.user_id=$3 AND c.session_token_hash=$4`,[hash,who.id,who.userId,sessionTokenHash]);
+        const lease=leases.rows[0];
+        if (!lease) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+        const ctx: IntakeUsageContext={sessionTokenHash,shopId:lease.shop_id,contextGeneration:Number(lease.context_generation),
+          productIds:lease.product_ids,scenarioIds:lease.scenario_ids};
+        if (Number(lease.principal_generation)!==who.generation) throw new IntakeRejection('PERMISSION_CHANGED','FORBIDDEN');
+        if (Math.min(lease.valid_until.getTime(),lease.expires_at.getTime())<=await clock(client)) throw new IntakeRejection('LEASE_EXPIRED','FORBIDDEN');
+        const scopes=await scopesFor(client,who,ctx.shopId,hash);
+        if (lease.client_id!==binding(ctx,scopes)) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+        await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
+        const until=Math.min(lease.valid_until.getTime(),lease.expires_at.getTime(),await releaseDeadline(client,lease.release_id,who.tenantId));
+        client.validUntil(until);
+        await contentDeadline(client,lease.release_id,scopes,ctx,lease.issued_at.getTime());
+        const sourceIds=new Set(scopes.map(scope=>scope.source_id));
+        const linked = listPreviews(lease.release_id, sourceIds).map(({ objectId, sha256 }) => ({ objectId, sha256 }));
+        if (query.objectId === undefined) return { items: linked };
+        const item = openPreview(lease.release_id, query.objectId, sourceIds);
+        if (!item) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+        return { mime: item.mime, sha256: item.sha256, bytesBase64: item.bytes.toString('base64') };
+      }, value => {
+        const preview = value as { mime?: unknown; sha256?: unknown; bytesBase64?: unknown; url?: unknown; items?: unknown };
+        if ('url' in preview) throw new IntakeRejection('FILE_INVALID','VALIDATION');
+        if (Array.isArray(preview.items)) {
+          if ('bytesBase64' in preview || 'mime' in preview) throw new IntakeRejection('FILE_INVALID','VALIDATION');
+          return { items: preview.items.map(item => {
+            if (!item || typeof item !== 'object') throw new IntakeRejection('FILE_INVALID','VALIDATION');
+            const row = item as { objectId?: unknown; sha256?: unknown; url?: unknown };
+            if (typeof row.objectId !== 'string' || !/^med_[0-9a-f]{64}$/.test(row.objectId)
+              || typeof row.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(row.sha256) || 'url' in row) {
+              throw new IntakeRejection('FILE_INVALID','VALIDATION');
+            }
+            return { objectId: row.objectId, sha256: row.sha256 };
+          }) };
+        }
+        if (typeof preview.mime !== 'string' || typeof preview.sha256 !== 'string' || typeof preview.bytesBase64 !== 'string') {
+          throw new IntakeRejection('FILE_INVALID','VALIDATION');
+        }
+        return { mime: preview.mime, sha256: preview.sha256, bytesBase64: preview.bytesBase64 };
+      });
     },
   };
 }

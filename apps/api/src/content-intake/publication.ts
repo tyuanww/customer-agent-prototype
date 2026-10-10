@@ -4,6 +4,7 @@ import type { CanonicalJsonValue } from '../idempotency.js';
 import { candidateContext, cancellationReceipt } from './candidate.js';
 import { assertSnapshotPageable } from './material.js';
 import { createIntakeTransactions, intakeReplay, IntakeRejection, type IntakeResult, type Reason } from './transaction.js';
+import { adoptPreviews } from './linked-preview.js';
 
 type C = components['schemas'];
 type Run = ReturnType<typeof createIntakeTransactions>;
@@ -53,6 +54,7 @@ export function createIntakePublication(run: Run) {
             JOIN content_intake.approval_facts f USING(review_request_id,facts_version)
             WHERE l.release_id=$1`, [published.releaseId]);
           if (inherited.rows[0]?.until) client.validUntil(inherited.rows[0].until.getTime());
+          if (published.releaseId) adoptPreviews(req.key.candidateId, published.releaseId);
           return published;
         } catch (error) {
           if (error instanceof Error && 'code' in error && (error.code==='ZA001' || error.code==='ZA003' || error.code==='ZA005')
