@@ -37,7 +37,7 @@ export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
 type SyntheticFileOptions = { missingAnswer?: boolean; answerSuffix?: string; domain?: IntakeSyntheticDomain; missingExpiry?: boolean };
 function syntheticRows({ missingAnswer = false, answerSuffix = '', domain = 'product', missingExpiry = false }: SyntheticFileOptions) {
   return INTAKE_SYNTHETIC_FAQ.map((faq, i) => [`faq-${i}`, faq.title, missingAnswer && i === 1 ? '' : faq.answer + answerSuffix,
-    '', '', '合成分类', '', '启用', '', domain === 'campaign' && !missingExpiry ? '2099-01-01T00:00:00Z' : '', '', '合成内部说明', '', '', 'false']);
+    '', '', '合成分类', '', '启用', domain === 'campaign' ? '2026-01-01T00:00:00Z' : '', domain === 'campaign' && !missingExpiry ? '2099-01-01T00:00:00Z' : '', '', '合成内部说明', '', '', 'false']);
 }
 /** Original bytes for native file-picker journeys; all text is synthetic. */
 export function createIntakeSyntheticWorkbook(options: SyntheticFileOptions = {}) {
