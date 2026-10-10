@@ -630,9 +630,13 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(job.state, JSON.stringify(job.issues)).toBe('validated');
       const sources = new Set(['source-a']);
       expect(listPreviews(job.candidateId!, sources)).toHaveLength(1);
+      const stagedMedia = (await admin.query<{ media_object_id: string; state: string }>(`SELECT o.media_object_id, o.state FROM content_intake.sop_candidate_media cm JOIN content_intake.sop_media_objects o USING (media_object_id) WHERE cm.candidate_id=$1 AND cm.row_id=$2`, [job.candidateId, 'sop:过敏流程SOP:2'])).rows;
+      expect(stagedMedia).toEqual([{ media_object_id: stagedMedia[0]?.media_object_id, state: 'staged' }]);
       const removed = await fetch(`${host.origin}/v1/intake/sop/candidates/${job.candidateId}/versions/${job.candidateVersion}/rows/${encodeURIComponent('sop:过敏流程SOP:2')}`, { method: 'DELETE', headers: host.headers });
       expect(removed.status, await removed.clone().text()).toBe(204);
       expect(listPreviews(job.candidateId!, sources)).toEqual([]);
+      expect((await admin.query('SELECT count(*)::int AS count FROM content_intake.sop_candidate_media WHERE candidate_id=$1', [job.candidateId])).rows).toEqual([{ count: 0 }]);
+      expect((await admin.query('SELECT state FROM content_intake.sop_media_objects WHERE media_object_id=$1', [stagedMedia[0]!.media_object_id])).rows).toEqual([{ state: 'discarded' }]);
       const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
       const candidate = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
       const cancelled = await fetch(`${url}/cancel`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },

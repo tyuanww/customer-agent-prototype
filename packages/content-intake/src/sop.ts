@@ -125,7 +125,7 @@ export async function createSyntheticSopWorkbook(): Promise<{ bytes: Buffer; png
 }
 
 /** Map a six-sheet SOP workbook onto the existing FAQ row shape and keep image bytes. */
-export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ parsed: import('./policy.js').ParseResult; previews: readonly { bytes: Buffer; mime: `image/${'jpeg' | 'png' | 'gif'}`; rowId: string }[] } | null> {
+export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ parsed: import('./policy.js').ParseResult; previews: readonly { bytes: Buffer; mime: `image/${'jpeg' | 'png' | 'gif'}`; rowId: string; sheet: string; row: number; column: number; ordinal: number }[] } | null> {
   const book = new ExcelJS.Workbook();
   try { await book.xlsx.load(bytes as unknown as ExcelJS.Buffer); } catch { return null; }
   if (!SOP_SHEET_NAMES.every(name => book.getWorksheet(name))) return null;
@@ -142,7 +142,11 @@ export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId
   });
   return {
     parsed: { ok: rows.length > 0, policyVersion: P.version, rows, questions: [], issues: rows.length ? [] : [{ code: 'EMPTY_DATA', sheet: SOP_SHEET_NAMES[0], row: 2, column: 'A', fix: '补一行文字答案' }], excluded: [], expandedBytes: 0, mediaCount: sop.attachments.length },
-    previews: sop.attachments.map(item => ({ bytes: Buffer.from(item.base64, 'base64'), mime: item.mime, rowId: `sop:${item.sheet}:${item.row}` })),
+    previews: sop.attachments.map((item, index) => ({
+      bytes: Buffer.from(item.base64, 'base64'), mime: item.mime, rowId: `sop:${item.sheet}:${item.row}`,
+      sheet: item.sheet, row: item.row, column: item.column,
+      ordinal: sop.attachments.slice(0, index).filter(other => other.sheet === item.sheet && other.row === item.row).length + 1,
+    })),
   };
 }
 

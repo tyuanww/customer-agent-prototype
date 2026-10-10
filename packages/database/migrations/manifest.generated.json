@@ -671,6 +671,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.23.0-schema-1.26-c08bfcadf94d",
       "source_git_sha": "c08bfcadf94d274d5b871c6f122848919340c769",
       "source_schema_sha256": "1c0a4e508ea0aab97d40abff4829ea5a0ce65882ad6a044187fc231872bbe39c"
+    },
+    {
+      "position": 39,
+      "id": "0039_menokin_sop_stage_media",
+      "file": "0039_menokin_sop_stage_media.sql",
+      "source_ranges": [],
+      "sha256": "637fdbb4f96457361f17e6262eb69c4ae645f5b6745b08353474caad2696aba8",
+      "bytes": 2719,
+      "contract_set_id": "cs-ai-c11-openapi-1.23.0-schema-1.26-c08bfcadf94d",
+      "source_git_sha": "c08bfcadf94d274d5b871c6f122848919340c769",
+      "source_schema_sha256": "1c0a4e508ea0aab97d40abff4829ea5a0ce65882ad6a044187fc231872bbe39c"
     }
   ]
 }

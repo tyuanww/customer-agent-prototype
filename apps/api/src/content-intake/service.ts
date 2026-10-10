@@ -150,6 +150,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     if ('candidate' in prepared.value) return { ok: true, value: prepared.value.candidate };
     const previewKey = prepared.value.job.object_id;
     let parsed: ParseResult;
+    let sopPreviews: Awaited<ReturnType<typeof tryParseSopAsFaq>> extends infer Value ? Value extends { previews: infer Previews } ? Previews : never : never = [];
     try {
       const bytes = await store.readPayload(prepared.value.job.object_id);
       if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) throw new Error('OBJECT_CHANGED');
@@ -157,6 +158,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       const sop = await tryParseSopAsFaq(bytes, prepared.value.source.scope);
       if (sop) {
         parsed = sop.parsed;
+        sopPreviews = sop.previews;
         stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId)));
       } else {
         parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
@@ -168,7 +170,14 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     const frozen = parsed.ok ? await run(actor, 'freeze', null, null, async (client, who) => {
       const { job: j, src } = await getJob(client, who, id);
       if (j.state === 'validated') return readCandidate(client, who, j.result_candidate_id!, Number(j.result_candidate_version), 'import');
-      return freezeParsed(client, who, j, src, parsed);
+      const candidate = await freezeParsed(client, who, j, src, parsed);
+      for (const item of sopPreviews) {
+        await client.query(
+          'SELECT content_intake.stage_sop_candidate_media($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+          [candidate.key.candidateId, candidate.key.version, src.scope.sourceId, who.id, `med_${digest(item.bytes)}`, digest(item.bytes), item.bytes.length, item.mime, item.sheet, item.row, item.column, item.ordinal],
+        );
+      }
+      return candidate;
     }, candidate) : { ok: false as const, code: 'VALIDATION' as const, reason: 'FILE_INVALID' as const,
       commit: 'rolled_back' as const, diagnosticId: `intake_${randomUUID()}` };
     if (!frozen.ok && frozen.commit !== 'unknown') {
