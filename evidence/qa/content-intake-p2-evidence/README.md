@@ -54,3 +54,7 @@ Pre-Landing Review: **0 unresolved issues（0 critical / 0 informational）**；
 下一切片沿冻结合同§2/§5将 ready 候选接到既有发布底座：受控 staging 与质量证据、60秒单次票据、同事务 release/current/公告/catalog/lineage/publication/永久回执。旧函数在 `0020_coach_publish_v1_19.sql`；既有质量计划/population hash/抽样缺陷门、owner acceptance、治理摘要和四域来源继续有效。新路径只替换旧双组织声明，不伪造两位审核人，不直接插release作为运行实现。
 
 必须覆盖发布/撤权、发布/取消、同base竞争、响应未知原键恢复，以及缺行继承、显式停用和全部来源谱系；旧整域写按实际影响集合共锁并继承未触及catalog，否则拒绝。原子发布、旧写隔离和使用资格完成后再连接另一坐席按店查询；这些实现尚未完成，不能由当前 ready 或合同安装推断通过。应用新schema ACL保持封闭，未push/PR/merge/deploy、未启用active。收尾再次 fetch origin/main 遇网络超时；本轮沿用启动时取得的 `8ab309f` 目标基线，审查对象为 `46c39ab` 后差异，不声称收尾已同步到远端最新。
+
+## 2026-10-11 命令展示补充
+
+原始 `evidence.json` 的 001、003、004、006、007 五条 `command` 展示串省略了 `-t` 参数引号，不能直接复制到 shell 执行。可复制命令与原始参数数组见 [replay-commands.json](replay-commands.json)，从同一证据的 `learning` 参数数组还原，并验证 shell 分词往返相同；`|` 保留在单个筛选参数内，不作为管道。原日志、状态、输入摘要和证据 JSON 字节均未改写。本轮仅修正文档消费方式，没有重跑这些历史测试；重放仍须恢复记录绑定的输入、Node 24/PG15 环境与专项开关，不能将旧通过迁移为当前 HEAD 的验收结论。
