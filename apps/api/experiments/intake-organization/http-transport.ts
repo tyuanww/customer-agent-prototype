@@ -47,7 +47,7 @@ export class OrganizationTransportError extends Error {
   }
 }
 
-/** Injected app-identity credential; cached only in memory until expiry, never fetched or persisted here. */
+/** Injected app-identity credential; cached in memory until expiry or rejection, never fetched or persisted here. */
 export type OrganizationAppToken = { token: string; expiresAtMs: number };
 export type OrganizationTokenSupplier = {
   current(signal: AbortSignal): Promise<OrganizationAppToken>;
@@ -283,7 +283,7 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
   async function credential(combined: AbortSignal, caller: AbortSignal, timeout: AbortSignal): Promise<OrganizationHttpCredential> {
     if (options.session) return options.session.current(combined);
     const at = clockReading(now);
-    if (cached && cached.expiresAtMs > at) return { token: cached.token };
+    if (cached && cached.expiresAtMs > at) return cached;
     let issued: OrganizationAppToken;
     try {
       issued = await new Promise<OrganizationAppToken>((resolve, reject) => {
@@ -307,7 +307,7 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
     if (timeout.aborted) throw new OrganizationTransportError('TIMED_OUT');
     const token = usableToken(issued, clockReading(now));
     cached = { token, expiresAtMs: issued.expiresAtMs };
-    return { token };
+    return cached;
   }
 
   async function once(path: string, query: URLSearchParams, caller: AbortSignal, kind: 'user' | 'jobs'): Promise<string> {
@@ -337,6 +337,9 @@ export function createOrganizationHttpTransport(options: OrganizationHttpTranspo
       if (response.status === 429) { await discard(response); throw new OrganizationTransportError('RATE_LIMITED'); }
       if (response.status === 401 || response.status === 403) {
         options.session?.invalidate(lease);
+        // Only retire the rejected issuance; an older response cannot evict a
+        // newer credential, even if the supplier reused the same token text.
+        if (cached === lease) cached = undefined;
         await discard(response); throw new OrganizationTransportError('AUTH_REJECTED');
       }
       if (response.status !== 200) { await discard(response); throw new OrganizationTransportError('HTTP_STATUS'); }
