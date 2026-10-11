@@ -13,9 +13,10 @@ const registrationSql = readFileSync(path.join(
 const enabled = process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1';
 
 describe.skipIf(!enabled)('Menokin source registration', () => {
-  const harness = new Pg15Harness();
-  beforeAll(() => harness.start(), 120_000);
-  afterAll(() => harness.stop());
+  let harness: Pg15Harness;
+  // A skipped integration suite must not discover PostgreSQL or allocate a cluster.
+  beforeAll(() => { harness = new Pg15Harness(); harness.start(); }, 120_000);
+  afterAll(() => harness?.stop());
 
   it('registers the four text sources and the sop source without grants', async () => {
     const database = harness.createDatabase('menokin_sources');
