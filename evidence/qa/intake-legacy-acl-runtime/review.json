@@ -1002,8 +1002,17 @@
       "files": 67,
       "purpose": "SOP image loop and formal successor intake",
       "manifest": "product-staging-manifest.json",
-      "commitCreated": false,
-      "pushPerformed": false
+      "commitCreated": true,
+      "pushPerformed": false,
+      "mainCommit": "0ea25dd62c4738e6019b8d461f50b75d370013ae",
+      "relatedCommits": [
+        "f82b211b1b192a95779879edb2acf81bc70b9c47",
+        "917266efa5566b64a4167781a1b5e997a1d908ca",
+        "e10f094d2a5c9fe24113a36194852ddea9abf68e"
+      ],
+      "pushAuthorized": true,
+      "draftPrAuthorized": true,
+      "note": "Snapshot before authorized branch push; remote outcome belongs to PR and external delivery receipt. Complete review remains INCOMPLETE."
     }
   }
 }
