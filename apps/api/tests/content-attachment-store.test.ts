@@ -70,9 +70,11 @@ it('retains and reports an unowned lock instead of silently removing it', async 
 });
 it('excludes a second process and leaves a killed writer lock busy while committed bytes remain readable', async () => {
   const s = store(), expected = descriptor(); await s.persistAttachment(expected, png);
+  // Keep the child event loop alive until SIGKILL; an unresolved top-level
+  // promise alone lets Node exit 13 before the parent exercises reclamation.
   const script = `import {createContentObjectStore} from ${JSON.stringify(new URL('../src/content-object-store.ts', import.meta.url).href)};
     const s=createContentObjectStore(process.argv[1]);
-    await s.withObjectLock(process.argv[2],async()=>{process.stdout.write('LOCKED\\n');await new Promise(()=>{});});`;
+    await s.withObjectLock(process.argv[2],async()=>{process.stdout.write('LOCKED\\n');await new Promise(()=>{setInterval(()=>{},1000);});});`;
   const child = spawn(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script, s.rootDirectory, expected.objectId], { stdio: ['ignore', 'pipe', 'pipe'] });
   const output: Buffer[] = []; child.stderr.on('data', chunk => output.push(chunk));
   try {
