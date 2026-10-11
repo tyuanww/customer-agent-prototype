@@ -17,10 +17,10 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
     try {
       const value = await (shopId ? api.selectShop({ shopId }) : api.access());
       if (request !== sequence.current) return;
-      if (value.ok) { setContext(value); resetRef.current(); }
+      if (value.ok) setContext(value);
       else setError(value.message);
     } catch { if (request === sequence.current) setError('店铺读取失败，请重试。'); }
-    finally { if (request === sequence.current) setBusy(false); }
+    finally { if (request === sequence.current) { resetRef.current(); setBusy(false); } }
   }, [enabled, signedIn]);
   const selectConditions = useCallback(async (selection: IntakeQuerySelection) => {
     const api = window.customerAgent?.intakeQuery;
@@ -32,11 +32,11 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
     try {
       const value = await api.selectConditions(selection);
       if (request !== sequence.current) return;
-      if (value.ok) { setContext(value); resetRef.current(); }
+      if (value.ok) setContext(value);
       else { setContext(emptyIntakeQueryContext()); setError(value.message); }
     } catch {
       if (request === sequence.current) { setContext(emptyIntakeQueryContext()); setError('筛选条件更新失败，请刷新店铺。'); }
-    } finally { if (request === sequence.current) setBusy(false); }
+    } finally { if (request === sequence.current) { resetRef.current(); setBusy(false); } }
   }, [enabled, signedIn]);
   useEffect(() => {
     if (!context.validUntil) return;

@@ -22,6 +22,7 @@ type QueryCapsuleProps = {
   invalidMessage: string;
   sessionNotice: SessionNotice | null;
   searching: boolean;
+  scopePending?: boolean;
   signedIn: boolean;
   inputIdle: boolean;
   onCancelScheduledResultFocus: () => void;
@@ -48,6 +49,7 @@ export function QueryCapsule({
   invalidMessage,
   sessionNotice,
   searching,
+  scopePending = false,
   signedIn,
   inputIdle,
   onCancelScheduledResultFocus,
@@ -177,8 +179,9 @@ export function QueryCapsule({
             className="search-btn"
             data-testid="search-button"
             onClick={onSearch}
-            disabled={searching}
-            aria-busy={searching}
+            disabled={searching || scopePending}
+            aria-busy={searching || scopePending}
+            title={scopePending ? '正在更新查询范围，请稍后查询。' : undefined}
           >
             {searching ? (
               <span className="searching-label" data-testid="searching-indicator">
@@ -190,7 +193,7 @@ export function QueryCapsule({
                 检索中
               </span>
             ) : (
-              '查询'
+              scopePending ? '更新中' : '查询'
             )}
           </button>
         </div>
