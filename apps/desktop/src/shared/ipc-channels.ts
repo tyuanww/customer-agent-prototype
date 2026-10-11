@@ -29,6 +29,7 @@ export const IPC_CHANNELS = {
   PRODUCT_RETRIEVAL_PREFERENCE_SET: 'product:retrieval-preference-set',
   COPY_TEXT: 'clipboard:copy-text',
   GET_WINDOW_CONTEXT: 'overlay:get-window-context',
+  QUERY_SUBSCRIBED: 'overlay:query-subscribed',
   OPEN_SEARCH: 'overlay:open-search',
   OPEN_DASHBOARD: 'dashboard:open',
   DASHBOARD_WORDING_LIST: 'dashboard:wording-list',

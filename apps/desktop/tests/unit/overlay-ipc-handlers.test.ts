@@ -94,6 +94,7 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
   const openDashboard = vi.fn<() => Promise<OpenDashboardResult>>().mockResolvedValue({ ok: true });
   const moveBy = vi.fn().mockReturnValue(null);
   const commitFoxDragSettle = vi.fn();
+  const querySubscribed = vi.fn();
   const controller = {
     accelerator: 'CommandOrControl+Shift+Space',
     phase: 'RESULTS',
@@ -108,6 +109,7 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     openDashboard,
     moveBy,
     commitFoxDragSettle,
+    querySubscribed,
   } as unknown as OverlayController;
 
   return {
@@ -120,6 +122,7 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     openDashboard,
     moveBy,
     commitFoxDragSettle,
+    querySubscribed,
   };
 }
 
@@ -141,6 +144,17 @@ describe('overlay query layout IPC handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     electronMocks.handlers.clear();
+  });
+
+  it('accepts subscription readiness only from the trusted Query main frame', () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const receive = capturedHandler(IPC_CHANNELS.QUERY_SUBSCRIBED);
+    for (const event of [fixture.fox.event, fixture.dashboard.event,
+      createSender(99, 'query').event, createSender(7, 'query', { subframe: true }).event]) receive(event);
+    expect(fixture.querySubscribed).not.toHaveBeenCalled();
+    receive(fixture.query.event);
+    expect(fixture.querySubscribed).toHaveBeenCalledOnce();
   });
 
   it('returns the trusted renderer context with the runtime platform', () => {

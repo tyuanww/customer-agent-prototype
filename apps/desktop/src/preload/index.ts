@@ -46,6 +46,7 @@ import {
 } from '../shared/query-layout';
 
 const overlayListeners = new Set<(command: OverlayCommand) => void>();
+let subscriptionReported = false;
 
 ipcRenderer.on(IPC_CHANNELS.OVERLAY_COMMAND, (_event, payload: unknown) => {
   if (!isOverlayCommand(payload)) {
@@ -314,6 +315,14 @@ const api: CustomerAgentApi = {
   },
   onOverlayCommand(handler) {
     overlayListeners.add(handler);
+    // Report once per document, after the receiver exists. Main owns recovery
+    // if QueryEntry's profile handshake outlived the initial open command.
+    if (!subscriptionReported) {
+      subscriptionReported = true;
+      void ipcRenderer.invoke(IPC_CHANNELS.QUERY_SUBSCRIBED).catch(() => {
+        console.error('Query subscription handshake failed');
+      });
+    }
     return () => {
       overlayListeners.delete(handler);
     };

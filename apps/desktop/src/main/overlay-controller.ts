@@ -332,6 +332,14 @@ export class OverlayController {
     this.applyEvent({ type: 'OPEN' });
   }
 
+  querySubscribed(): void {
+    // A profile lookup can delay Query's first subscription past native open.
+    // Re-arm from Main's current intent; a late receiver must not undo dismiss.
+    if (!this.isInactive() && isOpenPhase(this.phase)) {
+      this.applyEvent({ type: 'OPEN' });
+    }
+  }
+
   dismiss(restorePreviousApp = false): void {
     if (this.isInactive()) {
       return;
