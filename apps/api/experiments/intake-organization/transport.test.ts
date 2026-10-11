@@ -166,6 +166,54 @@ describe('loopback organization transport', () => {
     expect(contact.requests).toHaveLength(1);
   });
 
+  it.each([401, 403])('invalidates a rejected supplier credential after HTTP %s without retrying the request', async status => {
+    const supplier = tokens();
+    const client = transport(supplier);
+    const signal = new AbortController().signal;
+    contact.mode = { kind: 'status', status, body: '{}' };
+    await expect(client.user('synthetic-open-agent', signal)).rejects.toMatchObject({ code: 'AUTH_REJECTED' });
+    expect(contact.requests).toHaveLength(1);
+    contact.mode = { kind: 'status', status: 200, body: '{}' };
+    await client.user('synthetic-open-agent', signal);
+    expect(supplier.issued).toHaveLength(2);
+    expect(contact.requests.map(request => request.authorization)).toEqual([
+      'Bearer synthetic-app-token-1', 'Bearer synthetic-app-token-2',
+    ]);
+  });
+
+  it('does not let a delayed rejection invalidate a newer issuance with the same token text', async () => {
+    let nowMs = started;
+    let supplierCalls = 0;
+    let rejectOld: (() => void) | undefined;
+    const server = createServer((request, response) => {
+      if (request.url?.includes('/old?')) rejectOld = () => { response.writeHead(401); response.end('{}'); };
+      else { response.writeHead(200); response.end('{}'); }
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const client = createOrganizationHttpTransport({
+        origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requestTimeoutMs: 2_000,
+        now: () => nowMs, tokenSupplier: { async current() {
+          supplierCalls++;
+          return { token: 'synthetic-reissued-token', expiresAtMs: nowMs + 1_000 };
+        } },
+      });
+      const signal = new AbortController().signal;
+      const old = client.user('old', signal);
+      const rejection = expect(old).rejects.toMatchObject({ code: 'AUTH_REJECTED' });
+      await waitFor(() => Boolean(rejectOld));
+      nowMs += 1_001;
+      await client.user('fresh', signal);
+      rejectOld!();
+      await rejection;
+      await client.user('fresh', signal);
+      expect(supplierCalls).toBe(2);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  });
+
   it('times out a hung response and ignores a body that arrives after cancellation', async () => {
     contact.mode = { kind: 'hang' };
     const timed = transport(tokens(), 40).user('synthetic-open-agent', new AbortController().signal);
