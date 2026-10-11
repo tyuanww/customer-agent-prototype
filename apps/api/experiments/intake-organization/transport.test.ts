@@ -217,11 +217,11 @@ describe('loopback organization transport', () => {
   it.each([false, true])('times out and ignores a late body after cancellation; timeout before HTTP=%s', async (beforeHttp) => {
     contact.mode = { kind: 'hang' };
     const supplier = tokens();
-    const timed = transport(beforeHttp ? { async current() {
+    const timed = transport(beforeHttp ? { async current(signal) {
       // Force the deadline to win before HTTP; the cancellation below must not
       // assume that this first request was observed by the server.
       await new Promise(resolve => setTimeout(resolve, 80));
-      return supplier.current();
+      return supplier.current(signal);
     } } : supplier, 40).user('synthetic-open-agent', new AbortController().signal);
     await expect(timed).rejects.toMatchObject({ code: 'TIMED_OUT' });
     contact.release('{"code":0,"msg":"secret-message","data":{}}');
