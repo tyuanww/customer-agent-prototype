@@ -79,6 +79,13 @@ export function registerOverlayIpc(getController: () => OverlayController | null
     };
   });
 
+  ipcMain.handle(IPC_CHANNELS.QUERY_SUBSCRIBED, (event): void => {
+    const controller = guard(event);
+    if (!controller || controller.overlayRoleOf(event.sender) !== 'query' ||
+        !isTrustedMainFrameSender(event, controller.trustedContents(), controller.rendererDevServerUrl)) return;
+    controller.querySubscribed();
+  });
+
   ipcMain.handle(IPC_CHANNELS.OPEN_SEARCH, (event, visualTransform: unknown): void => {
     const controller = guard(event);
     if (!controller) {
