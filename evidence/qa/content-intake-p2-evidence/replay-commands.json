@@ -1,0 +1,88 @@
+{
+  "scope": "Formatting correction only; historical records unchanged; commands were not rerun. Restore the recorded input and environment before replay; this is not current-HEAD validation.",
+  "evidenceFile": "evidence.json",
+  "evidenceSha256": "08568f3c57448f0cd1e2eceb9a0eb8c95ae51bdcc7e471bde9110cd65d75eaaa",
+  "reconstructedFrom": "evidence.json learning observationArgv/nextArgv",
+  "commands": [
+    {
+      "capture": "001",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "round-trips|keeps revoked"
+      ],
+      "shellCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'round-trips|keeps revoked'",
+      "originalCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t round-trips|keeps revoked"
+    },
+    {
+      "capture": "003",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "sub-millisecond|uncommitted grant"
+      ],
+      "shellCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'sub-millisecond|uncommitted grant'",
+      "originalCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t sub-millisecond|uncommitted grant"
+    },
+    {
+      "capture": "004",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "sub-millisecond|uncommitted grant"
+      ],
+      "shellCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'sub-millisecond|uncommitted grant'",
+      "originalCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t sub-millisecond|uncommitted grant"
+    },
+    {
+      "capture": "006",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "sub-millisecond|uncommitted grant"
+      ],
+      "shellCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'sub-millisecond|uncommitted grant'",
+      "originalCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t sub-millisecond|uncommitted grant"
+    },
+    {
+      "capture": "007",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "round-trips|keeps revoked"
+      ],
+      "shellCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'round-trips|keeps revoked'",
+      "originalCommand": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t round-trips|keeps revoked"
+    }
+  ]
+}
