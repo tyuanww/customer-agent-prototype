@@ -292,6 +292,8 @@ CodeGraph 已就绪：仓根有 `.codegraph/`，本机 CLI 与 MCP 服务均可�
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 
+Query 的模式确认可晚于原生窗口展开。overlay preload 在首次 `onOverlayCommand` 注册之后发出窄 `overlay:query-subscribed` 握手；Main 仅接受可信 Query 主帧，按当前开关意图重新建立交接，不在 preload 排队历史命令，不让迟到订阅撤销已完成的关闭。
+
 Fox presence 的纯姿态解析、deadline 计算与数值几何保留在 `apps/desktop/src/shared/fox-presence.ts`；依赖 DOM、`setTimeout` 与 `Date.now` 的运行时所有权集中在 `apps/desktop/src/renderer/lib/fox-presence-runtime.ts`。Main 与 preload 不得导入后者。
 
 叶子模块的输入、输出、协议边界和对应测试见 [抽取叶子模块合同](reference-extracted-module-contracts.md)。该页是维护参考，不把这些 helper 提升成跨窗口公共 API。
