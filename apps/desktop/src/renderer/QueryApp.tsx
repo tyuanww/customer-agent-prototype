@@ -1085,9 +1085,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     if (intake) {
       if (!(productState?.ok && productState.signedIn)) return;
       const api = window.customerAgent?.intakeQuery;
+      if (!api) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); return; }
       const text = (inputRef.current?.value ?? query).trim();
-      if (!api || !text || [...text].length > 500 || !intakeShops.shopId || intakeShops.busy) {
-        setErrorMessage(!intakeShops.shopId ? '请先选择有权限的店铺。' : '请输入最多 500 字的客户问题。'); reportPhase('ERROR'); return;
+      const blocked = intakeShops.busy ? '正在更新查询范围，请稍后查询。'
+        : !intakeShops.shopId ? '请先选择有权限的店铺。'
+          : !text || [...text].length > 500 ? '请输入最多 500 字的客户问题。' : null;
+      if (blocked) {
+        setErrorMessage(blocked); reportPhase('ERROR'); return;
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       const generation = ++searchGenerationRef.current;
@@ -1809,6 +1813,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           invalidMessage={invalidMessage}
           sessionNotice={sessionNotice}
           searching={searching}
+          scopePending={intake && intakeShops.busy}
           signedIn={Boolean(productState?.ok && productState.signedIn)}
           inputIdle={parked || closing}
           onCancelScheduledResultFocus={cancelScheduledResultFocus}
