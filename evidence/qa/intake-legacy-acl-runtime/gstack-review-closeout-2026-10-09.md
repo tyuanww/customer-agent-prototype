@@ -1,5 +1,6 @@
 # `/review` 定向收口记录（2026-10-09）
 
+> 证据交付边界（2026-10-12 校正）：下文 `.gstack/` 文件只在原本机工作树保留，未随 Git 交付，远端审阅者不能据此直接复核原始执行。本文保留历史观察及其限制；这些本机路径不是仓内可点击证据，也不证明当前版本通过。
 **结论：INCOMPLETE。** 本轮修复了审查中确认的两条桌面恢复/显示问题，当前增量复核没有已确认待修问题；这不等于整条分支的 gstack `/review` 已完成，也不授权真实运行。
 
 ## 输入与范围
@@ -20,10 +21,10 @@
 | 门禁 | 本轮实际结果 | 证据或限制 |
 | --- | --- | --- |
 | gstack 技能启动与 scope | `gstack-skill-start --skill review --model claude` 退出 0；`gstack-diff-scope origin/main` 退出 0 | 启动不等于审查完成；九名审查者均为本宿主 Codex 代理，结论限于所读路径 |
-| Step 4.7 smoke | 两条真实合成 API/临时 PG15 管理 HTTP，用 `gstack-qa-evidence capture` 记录；成功上传/重放/解析/分页 1 passed，以及匿名/越店/错误输入拒绝 1 passed，均退出 0 | [功能报告](../../../.gstack/qa-reports/review-c72e020-20261009-gstack/functional/report.md)与[物化证据](../../../.gstack/qa-reports/review-c72e020-20261009-gstack/functional/evidence.json)；API 路径及 fixture 在其后桌面改动中未变 |
-| 当前恢复探针 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-permissions.test.ts -t 'keeps the original grant request when stopping after a possible commit precedes a forbidden retry'`：修前退出 1，修后经 `gstack-qa-evidence capture --timeout-ms 120000` 退出 0，1 passed | [checkpoint 003](../../../.gstack/qa-reports/review-c72e020-20261009-gstack/functional/exploration-003.json)。该捕获发生在首次 evidence.json 物化之后，工具拒绝第二次物化（退出 2），所以不把 003 写成该 JSON 中的第三项 |
+| Step 4.7 smoke | 两条真实合成 API/临时 PG15 管理 HTTP，用 `gstack-qa-evidence capture` 记录；成功上传/重放/解析/分页 1 passed，以及匿名/越店/错误输入拒绝 1 passed，均退出 0 | 功能报告（本机历史文件 `.gstack/qa-reports/review-c72e020-20261009-gstack/functional/report.md`）与物化证据（本机历史文件 `.gstack/qa-reports/review-c72e020-20261009-gstack/functional/evidence.json`）；API 路径及 fixture 在其后桌面改动中未变 |
+| 当前恢复探针 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-permissions.test.ts -t 'keeps the original grant request when stopping after a possible commit precedes a forbidden retry'`：修前退出 1，修后经 `gstack-qa-evidence capture --timeout-ms 120000` 退出 0，1 passed | checkpoint 003（本机历史文件 `.gstack/qa-reports/review-c72e020-20261009-gstack/functional/exploration-003.json`）。该捕获发生在首次 evidence.json 物化之后，工具拒绝第二次物化（退出 2），所以不把 003 写成该 JSON 中的第三项 |
 | 定向回归 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-permissions.test.ts tests/component/intake-rollback.test.tsx tests/unit/content-intake-upload.test.ts`：退出 0，55/55 | 当前桌面恢复、回退显示和上传单测 |
-| 根检查 | `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm workspace:check` 全部退出 0 | [test-final.log](../../../.gstack/qa-reports/review-c72e020-20261009-gstack/test-final.log)、[build-final.log](../../../.gstack/qa-reports/review-c72e020-20261009-gstack/build-final.log)；API 567 passed/362 skipped，桌面 1461 passed/7 skipped；当前分组预算总量 39.5/45、合同 12.8/15、证据 9.86/10、源输入 16.8/20 MiB。旧 32 MiB 失败不改写 |
+| 根检查 | `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm workspace:check` 全部退出 0 | test-final.log（本机历史文件 `.gstack/qa-reports/review-c72e020-20261009-gstack/test-final.log`）、build-final.log（本机历史文件 `.gstack/qa-reports/review-c72e020-20261009-gstack/build-final.log`）；API 567 passed/362 skipped，桌面 1461 passed/7 skipped；当前分组预算总量 39.5/45、合同 12.8/15、证据 9.86/10、源输入 16.8/20 MiB。旧 32 MiB 失败不改写 |
 | 提交门禁 | 两次代码提交各自显式 `git add` 指定文件、`git diff --cached --check` 退出 0、暂存 diff 经 `gstack-redact --repo-visibility public` 扫描退出 0，无发现；作者 `tyuanww` | 只本地提交，不推送/建 PR/合并/部署 |
 
 ## 尚未满足的完整 `/review` 条件

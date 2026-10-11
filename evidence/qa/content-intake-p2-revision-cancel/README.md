@@ -1,5 +1,6 @@
 # P2 候选修订与服务端取消合成验收
 
+> 证据交付边界（2026-10-12 校正）：下文 `.gstack/` 文件只在原本机工作树保留，未随 Git 交付，远端审阅者不能据此直接复核原始执行。本文保留历史观察及其限制；这些本机路径不是仓内可点击证据，也不证明当前版本通过。
 基线：`fcda90ca7137478c3653fd4cf73add337ba9af1f` 后本轮差异。环境为 macOS 26.5.2 arm64、Node 24.19.0、pnpm 11.19.0、PostgreSQL 15.18。全部工作簿、人员、来源及审批均为合成输入；OpenAPI 1.19.0 / schema.v1.21 无变更。
 
 ## 实际行为与边界
@@ -33,7 +34,7 @@
 | Electron → 实际 HTTP → PG15 → 坐席 | 最终 1 项通过（19.3 秒）；错误报告实际落盘回读、坏修订保旧、好修订换版、重新审批/质量检查、v2 发布、另一候选取消、普通坐席查询并复制修订原文 |
 | 深浅色及最小窗口 | 1180×760 和 980×680 几何断言，无整体或面板横向溢出；原生 select/checkbox 保留可见性 |
 
-首轮 Electron capture 001 失败，日志保留，截图目录改存 `native001-failed`。修后 capture 002 通过；capture 003 按原命令完成复验，截图输出到 `native001`。随后原生复审发现离线清理缺陷，修复后在 `final-revalidation/001` 对新构建再次完整通过；最终截图来自 `final-revalidation/native`。父目录和最终复验的 QA 工具 verdict 都为 pass，不把首轮失败记成成功。探索学习记录：[checkpoint 002](../../../.gstack/qa-reports/content-intake-revision-cancel-20261007/exploration-002.json)、[checkpoint 003](../../../.gstack/qa-reports/content-intake-revision-cancel-20261007/exploration-003.json)。全部测试拥有的 PG 与 Electron 临时目录由 finally 清理并断言移除。
+首轮 Electron capture 001 失败，日志保留，截图目录改存 `native001-failed`。修后 capture 002 通过；capture 003 按原命令完成复验，截图输出到 `native001`。随后原生复审发现离线清理缺陷，修复后在 `final-revalidation/001` 对新构建再次完整通过；最终截图来自 `final-revalidation/native`。父目录和最终复验的 QA 工具 verdict 都为 pass，不把首轮失败记成成功。探索学习记录：checkpoint 002（本机历史文件 `.gstack/qa-reports/content-intake-revision-cancel-20261007/exploration-002.json`）、checkpoint 003（本机历史文件 `.gstack/qa-reports/content-intake-revision-cancel-20261007/exploration-003.json`）。全部测试拥有的 PG 与 Electron 临时目录由 finally 清理并断言移除。
 
 截图：[工作台深色](dashboard-intake-dark.png)、[修订材料](dashboard-revision-v2.png)、[取消终态](dashboard-cancelled.png)、[坐席已发布修订稿](query-published-faq.png)。
 

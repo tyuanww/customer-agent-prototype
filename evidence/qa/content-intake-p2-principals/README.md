@@ -1,5 +1,6 @@
 # P2 已确认参与人目录验收
 
+> 证据交付边界（2026-10-12 校正）：下文 `.gstack/` 文件只在原本机工作树保留，未随 Git 交付，远端审阅者不能据此直接复核原始执行。本文保留历史观察及其限制；这些本机路径不是仓内可点击证据，也不证明当前版本通过。
 日期：2026-10-07。集成分支 `codex/content-intake-p2`；前序 `ef700cb`。仅本地合成开发，未扩大正式运行、真实员工目录、飞书或外部 Git 授权。具体文件/日志哈希见 [verification.json](verification.json)。本目录独立于既有审批发布验收，不覆盖历史证据。
 
 ## 本轮结果与所有权
@@ -55,9 +56,9 @@
 
 原始证据位于本工作树 ignored `.gstack/qa-reports/content-intake-principals-20261007/`；命令、stdout、stderr、截止及完成回执均保留。以下检查点由证据工具在后续探针执行前生成：
 
-- [checkpoint002](../../../.gstack/qa-reports/content-intake-principals-20261007/exploration-002.json)：用trace定位目录成功测试的数据库客户端警告。
-- [checkpoint003](../../../.gstack/qa-reports/content-intake-principals-20261007/exploration-003.json)：检查共享身份投影及宿主标签接线对发布和退出清理的影响。
-- [checkpoint004](../../../.gstack/qa-reports/content-intake-principals-20261007/exploration-004.json)：修后重跑目录必需矩阵，确认警告消失且断言保留。
+- checkpoint002（本机历史文件 `.gstack/qa-reports/content-intake-principals-20261007/exploration-002.json`）：用trace定位目录成功测试的数据库客户端警告。
+- checkpoint003（本机历史文件 `.gstack/qa-reports/content-intake-principals-20261007/exploration-003.json`）：检查共享身份投影及宿主标签接线对发布和退出清理的影响。
+- checkpoint004（本机历史文件 `.gstack/qa-reports/content-intake-principals-20261007/exploration-004.json`）：修后重跑目录必需矩阵，确认警告消失且断言保留。
 
 ### 限制与下一步
 

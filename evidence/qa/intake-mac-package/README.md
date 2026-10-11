@@ -1,5 +1,6 @@
 # Mac FAQ 安装副本验收（2026-10-08）
 
+> 证据交付边界（2026-10-12 校正）：下文 `.gstack/` 文件只在原本机工作树保留，未随 Git 交付，远端审阅者不能据此直接复核原始执行。本文保留历史观察及其限制；这些本机路径不是仓内可点击证据，也不证明当前版本通过。
 产品运行基线 `b091c9e8de1149cd69d102e80243b884697a237c`，分支 `codex/intake-organization`，版本 **0.3.26**。本轮只给既有 E2E 增加可选打包执行入口并更新文档，没有修改运行源码、角色规则、合同或生产装配。用户授权本地实施/验证/commit；没有 push、PR、合并、部署或真实数据接入。
 
 ## 实际结果
@@ -35,8 +36,8 @@ Node24.19.0、pnpm11.19.0、PG15.18、Electron43.4.0，当前 Mac arm64。Univer
 
 [打包态复现命令](../../../docs/how-to-verify-desktop.md#faq-mac-安装副本合成验收)。精确 argv、环境、起止时间、原始日志SHA和产物SHA在 `checks.json`。临时原生探针使用本轮目录中的 `native.config.ts` / `native-dialog.spec.ts`，需要 CUA 在真实文件框选择探针刚生成的合成文件，然后取消/确认；不得把用户原表作为选择对象。该脚本仅本机证据，不是新增产品流程。
 
-- [checkpoint 002](../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-002.json) — 构建后消费真实 DMG。
-- [checkpoint 003](../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-003.json) — 安装副本完整场景首轮。
-- [checkpoint 004](../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-004.json) — 对齐物理路径后重跑。
-- [checkpoint 005](../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-005.json) — 真实原生框，首次输入来源不明。
-- [checkpoint 006](../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-006.json) — 最新 AX 与时序绑定后的实机取消/确认。
+- checkpoint 002（本机历史文件 `.gstack/qa-reports/intake-mac-package-20261008/exploration-002.json`） — 构建后消费真实 DMG。
+- checkpoint 003（本机历史文件 `.gstack/qa-reports/intake-mac-package-20261008/exploration-003.json`） — 安装副本完整场景首轮。
+- checkpoint 004（本机历史文件 `.gstack/qa-reports/intake-mac-package-20261008/exploration-004.json`） — 对齐物理路径后重跑。
+- checkpoint 005（本机历史文件 `.gstack/qa-reports/intake-mac-package-20261008/exploration-005.json`） — 真实原生框，首次输入来源不明。
+- checkpoint 006（本机历史文件 `.gstack/qa-reports/intake-mac-package-20261008/exploration-006.json`） — 最新 AX 与时序绑定后的实机取消/确认。
