@@ -15,7 +15,7 @@
     "help:dev": "node scripts/dev-help.mjs",
     "dev:api": "pnpm --filter @customer-agent/api dev",
     "dev:intake:synthetic": "pnpm build:services && node scripts/intake-synthetic/run.ts",
-    "test:intake:synthetic": "pnpm build:services && CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts",
+    "test:intake:synthetic": "pnpm build:services && CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts && CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --experimental-transform-types --test scripts/intake-synthetic/sop-consumer.test.ts",
     "test:intake:desktop": "pnpm build && CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-shop-directory-real-stack.spec.ts tests/e2e/content-intake-workspace-real-stack.spec.ts",
     "lint": "eslint .",
     "typecheck": "pnpm --filter @customer-agent/contracts typecheck && pnpm --filter @customer-agent/retrieval-core typecheck && pnpm --filter @customer-agent/content-intake typecheck && pnpm --filter @customer-agent/database typecheck && pnpm --filter @customer-agent/api typecheck && pnpm --filter @customer-agent/desktop typecheck",
@@ -77,14 +77,15 @@
     "content:retention": "node scripts/content-retention.ts",
     "identity:accounts:init": "node scripts/synthetic-stack/identity-accounts-init.ts",
     "verify:plan": "node scripts/verification-policy.mjs plan",
-    "test:workflow": "node --test scripts/verification-policy.test.mjs scripts/synthetic-stack/stack.test.ts scripts/dev-help.test.mjs scripts/update-download-page.test.mjs scripts/ops/health-check.test.mjs",
+    "test:workflow": "node --test scripts/verification-policy.test.mjs scripts/repair-contract-intake.test.mjs scripts/synthetic-stack/stack.test.ts scripts/dev-help.test.mjs scripts/update-download-page.test.mjs scripts/ops/health-check.test.mjs",
     "download-page:update": "node scripts/update-download-page.mjs",
     "download-page:check": "node scripts/update-download-page.mjs --check",
     "test:g1a:e0:ci": "node scripts/run-g1a-synthetic.mjs",
     "test:search-decision:proof": "pnpm --filter @customer-agent/api test:search-decision:proof",
     "test:g1a:comparison:package": "pnpm --filter @customer-agent/api test:g1a:comparison:package",
     "test:content-intake:p1": "pnpm --filter @customer-agent/content-intake test && pnpm --filter @customer-agent/api exec vitest run tests/content-intake-p1.test.ts",
-    "content:intake:probe": "pnpm --filter @customer-agent/content-intake probe"
+    "content:intake:probe": "pnpm --filter @customer-agent/content-intake probe",
+    "test:repair-intake": "node --test scripts/repair-contract-intake.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

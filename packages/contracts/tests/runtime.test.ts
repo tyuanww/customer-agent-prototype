@@ -46,18 +46,18 @@ describe('generated customer-agent runtime contracts', () => {
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
-      contract_set_id: 'cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780',
-      source_git_sha: 'db6ba13d4780a3abb1558e8673e016f7bfb5604e',
-      openapi_sha256: '3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94',
-      database_sha256: '0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998',
+      contract_set_id: 'cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed',
+      source_git_sha: '379b793811edf48bd64f512f5733790b9fdeeb0d',
+      openapi_sha256: '9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5',
+      database_sha256: 'c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
     });
     const runtimeDefinitions = (OPENAPI_RUNTIME_SCHEMA_DOCUMENT as {
       $defs: Record<string, unknown>;
     }).$defs;
-    expect(contractSchemaNames).toHaveLength(236);
-    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(236);
+    expect(contractSchemaNames).toHaveLength(246);
+    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(246);
     expect(Object.keys(runtimeDefinitions)).toEqual([...contractSchemaNames]);
     expect(runtimeDefinitions).toMatchObject({
       FileImportRequest: {

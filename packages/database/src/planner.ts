@@ -133,10 +133,17 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       && migration.sourceGitSha === successor.sourceGitSha
       && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
       && successor.contractSetId !== catalogue.contractSetId;
-    if (matchesSuccessor) successorSuffix = true;
+    const repair = catalogue.compatibility.repairSuccessor;
+    const matchesRepair = repair != null && index === 39 && catalogue.migrations.length === 40
+      && migration.id === '0040_intake_repair_successor_v1_28'
+      && migration.contractSetId === repair.contractSetId && migration.sourceGitSha === repair.sourceGitSha
+      && migration.sourceSchemaSha256 === repair.sourceSchemaSha256
+      && migration.sha256 === repair.migrationSha256;
+    if (matchesRepair && !successorSuffix) catalogueError('Repair requires the preceding additive successor');
+    if (matchesSuccessor || matchesRepair) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
-      !matchesSuccessor
+      !matchesSuccessor && !matchesRepair
       && (migration.contractSetId !== expectedProvenance.contractSetId
       || migration.sourceGitSha !== expectedProvenance.sourceGitSha
       || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256)

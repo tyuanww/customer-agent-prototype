@@ -520,50 +520,6 @@ Windows原生前置检查发现现有Node22.20.0 / pnpm12.9.1且互操作处于�
 - **合同差集：** 商品/场景无需新合同/迁移；店铺显示名没有冻结字段，交接文档给出最小候选与验收，未修改冻结快照或虚构显示名。该依赖不阻塞合成选择器。
 - **验证：** 现有使用资格的商品/场景/时间/分页测试，加真实 PG 词表读取与游标失效、Main 选择及取消、renderer 与 Electron 信任边界/键盘/几何验证。最终命令与审查结果见[本组证据](../../evidence/qa/content-intake-p2-query-filters/README.md)；未验证项不借用其他版本的 Windows 结果。
 
-## 1. 已确认的目标
-
-用户已确认本期完成“资料导入、维护、发布、坐席查询形成完整流程”。完成必须以坐席使用到正确的已发布内容为依据，不能止于后台上传成功。
-
-用户已确认分工：
-
-| 角色 | 本期目标权限 | 范围边界 |
-| --- | --- | --- |
-| 客服总监、客服经理 | 配置权限，上传Excel、检查资料、确认后发布，查询复制 | 只在已登记负责范围内；不通过人工审批 |
-| 客服主管、客服组长 | 上传Excel、检查资料、确认后发布，查询复制 | 不因上传发布取得配置他人权限的能力 |
-| 普通客服 | 查询已发布内容、人工选择并复制 | 不上传、不发布、不配置权限 |
-
-本表按2026-10-08最新补充更新，当前角色与运行差异以§0.52为准；岗位映射仍复用独立内容域身份/授权规则，不把四岗都映射为登录owner。历史话术师/委派规则不自动作为本期新增名单。
-
-用户最新确认的主要使用路径是：**四类管理岗位在飞书维护原表 → 导出标准Excel → 上传桌面应用 → 资料检查与差异预览 → 点击发布并弹窗确认 → 客服查阅复制。** 首期以这个手工文件闭环设计，业务从一开始就在飞书维护。直接读取飞书 / 自动同步保留为后续增强，不成为本期文件上传的前置条件。
-
-用户已明确澄清：普通坐席只查阅资料，话术师和管理人员负责上传与发布。因此首期不新增普通坐席的资料提交入口。飞书原表只读 / 编辑权限和桌面上传 / 审批 / 发布权限分别管理，不因某一侧登录成功自动授予另一侧权限；本轮只记录要求，不修改现有文档共享设置。
-
-本轮目标是既有客服辅助产品的内容闭环。AI 自由生成回答、自动发送和自动学习不纳入本期；查询仍返回已发布原文，复制只表示“已复制”。
-
-## 2. 工单与代码证据
-
-| 工单现象 / 实现事实 | 已核实的情况 | 对开发的影响 |
-| --- | --- | --- |
-| 找不到 FAQ / 话术导入入口 | 内容管理的导入区域默认折叠；尚不能据此确定客户现场是入口发现问题还是角色问题 | 入口及可操作范围应清晰；权限不足要给出原因和处理人 |
-| SOP 文件大小限制 | SOP 入口目前收 CSV，限额 256 KiB；内容管理 CSV / XLSX 限额 10 MiB | 两个入口的格式和限额不同；需要按实际来源设计一致、可解释的校验 |
-| “未连接飞书 / Wiki” | XLSX 解析失败路径包含该文案；本地解析失败不证明飞书授权失败 | 本地文件错误、连接未配置、文档不可读分别反馈 |
-| XLSX 支持不足 | 自有解析器只取第一张工作表，业务表头及合并区域需要另行处理 | 使用成熟解析器，支持选表、表头定位和字段映射 |
-| CSV 内换行 | SOP CSV 解析先拆行，不能正确处理带引号的多行单元格 | 使用成熟 CSV 解析器，保留正文换行 |
-| 话术师发布 | 当前发布接口和桌面闸门均是 owner-only | 用户的新要求必须同步进入合同、服务端授权和桌面能力展示 |
-| SOP 从后台到坐席 | 工作台管理树已有接口；独立流程窗 `loadTree()` 仍返回 `ALLERGY_SOP_TREE`，投影固定 `demo: true` | SOP 发布版本与坐席流程的正式接线是本次闭环的重要缺口 |
-| 发布替换范围 | 当前一次发布以绑定域为单位整库替换，其余域继承 | 导入少量内容不能悄悄覆盖整个库；发布前应明确影响范围和删除变化 |
-
-客户当时的账号角色、安装版本、具体上传文件仍未取得，以上源码事实不能冒充现场复现结论。
-
-证据入口：
-
-- [内容管理](../../apps/desktop/src/renderer/features/dashboard/ContentModule.tsx)、[本地解析与发布](../../apps/desktop/src/main/dashboard-content.ts)、[XLSX 解析](../../apps/desktop/src/main/xlsx-first-sheet.ts)。
-- [SOP 限额与接口类型](../../apps/desktop/src/shared/dashboard-ops-loop.ts)、[SOP CSV 解析](../../apps/api/src/ops-loop-csv.ts)。
-- [SOP 流程窗控制器](../../apps/desktop/src/main/sop-window-controller.ts)、[SOP 窗口投影](../../apps/desktop/src/shared/sop-window.ts)。
-- [现行内容发布合同](../reference-content-publish.md)、[飞书导入待办](../../TODOS.md)。
-
-## 3. 数据源盘点
-
 ### 0.46 第二组：容量与并发收尾（2026-10-08）
 
 授权沿用用户“开始下一组”：本轮完成 E9 对象容量和 E18 并发验证的独立合成切片，审查、维修后本地 commit；不含 push、PR、真实数据或历史清理批准。基于第一组 `1e5cca6` 建立独立 `codex/content-intake-capacity`；获取远端 main 超时，不能声称已同步最新远端。
@@ -794,6 +750,101 @@ D `953a555` → `b1531fc` 已在[Menokin 整理说明](../reference-intake-menok
 **整分支有界复核后的失败确定性补齐（2026-10-09，本地实施）：** 新发现容量预留/持久化的 `COMMIT` 响应丢失被上传接口误报为确定回滚，组织登记/事实写入的 `ROLLBACK` 响应丢失也被误报为确定回滚。两条合成 PG15 红测先复现后修复：容量未知经 HTTP 返回 `503/COMMIT_UNKNOWN`，组织两入口返回 `DEPENDENCY_UNAVAILABLE/unknown`，连接丢弃，不据失败码假定确定回滚；容量预留阶段尚无上传回执，原 operationId 不能定位临时 reservation，不能声称自动恢复。正常上传幂等与组织登记刷新另有 2/2 PG15 回归。桌面 CSV/XLSX 共用文件错误提示已修正。根 lint/typecheck/test/build 及分组 workspace:check 通过，见[定向证据](../../evidence/qa/intake-legacy-acl-runtime/review-failure-certainty-2026-10-09.md)。这不是生产断线实测或完整 `/review` 通过；回退部分失权按整单策略拒绝保持 403、全失权保持 404，含准备后撤权的合成 HTTP/PG15 2/2 通过；治理仓另记合同解释，不更改已冻结机器合同。`externalCompleteReview` 保持 INCOMPLETE，真实身份/资料、标准尺寸真人系统框与 Windows 条件不变。
 
 **当前 Mac 标准尺寸安装态补证（2026-10-09，本地实施）：** 当前显示器逻辑 1470×956、Electron 工作区 1470×829，原版 CSV 完整场景在开发态和本轮新打的 0.3.26 DMG 解包副本上各 1/1 通过，原测试的 1180×760 及 980×680 尺寸断言均未放宽。同一解包副本的权限、纠正回退、同名店铺及四域工作台另有 7/7，通过真实回环 HTTP/受限 PG15 与 Electron；新包安装态共两批 8/8。旧包已保留，新 DMG 与解包 app.asar 摘要相符，见[标准尺寸记录](../../evidence/qa/intake-standard-mac-package-20261009/README.md)。文件/确认原生框仍由自动化控制响应，不能称真人系统框、办公 Windows 或真实资料验收；完整 `/review` 不因此关闭。
+
+### 0.54 SOP 合成候选治理合同准备（2026-10-10）
+
+**2026-10-12 本地交付收敛：** 当前工作树按功能整理为SOP/后继合同主候选67文件、身份保护4文件、查询状态5文件及历史证据整理2文件；主候选已显式暂存，其余原样保留，不执行混合提交。当前代码与上一轮通过检查的输入摘要相同，复用根检查和正式PG91用例证据；本机有限增量对抗复核无新增可行动问题；生成信息／预算外部小包已有效返回NO_FINDINGS（CLI报告claude-opus-5[1M]），测试正文外部逐行覆盖和完整门禁不由此推断。下一退出点是本地提交这些明确分组，再在获得push/PR授权后推开发分支并建草稿PR；不把真人数据、设备上线或未授权Mermaid快照塞入本地代码提交的退出条件。完整review仍按其精确门禁记录，不能因暂存或推分支而写成PASS。产品本地跟踪引用与HEAD同为292221d，治理本地领先跟踪引用1笔379b793；未联网刷新、未push。
+
+**2026-10-12 精确后继已正式版本化接收：** 用户批准治理38文件提交及源码19／冻结合同16／证据10 MiB分组（总45不变）。治理提交 `379b793811edf48bd64f512f5733790b9fdeeb0d` 严格匹配批准清单，实际暂存差异的public扫描52条命中均按原文核对为示例编号／整数界限误报，原exit2保留。正式导出并接收 `cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed`：OpenAPI1.24.0/schema1.28/0040，八件包、独立repair锁及生成合同已落产品工作树，0001–0039与主锁保持原字节，状态VERIFIED_NOT_ACTIVATED。接收后发现生成记录混用旧合同ID／来源SHA，已统一由同一后继快照生成并补精确断言。正式40段在隔离PG15通过前序漂移拒绝、安装后漂移整笔回滚、未知提交恢复和零重复迁移；SOP四组测试改为直接消费正式0040，91个不同用例通过（首轮61通过/2测试子进程导入错误，修复后2通过/43跳过；另28通过，未改写首轮记录）。实际workspace检查43.4/45MiB，合同15.7/16、证据9.97/10、源码17.7/19。接收后根lint/typecheck/test/build、workspace:check、docs:check全部通过；失败首轮与修复复跑日志分别保留。治理48步release按未变输入复用。旧图片增量COMPLETE_WITH_FINDINGS保持固定范围；本次新增量仍须补生成信息修复和正式接收测试变更的有限审查及完整gstack门禁合成，完整/review、externalCompleteReview保持INCOMPLETE。证据见仓外 `客服Agent-SOP图片闭环-20261011/versioned-handoff-v1/`。产品0.3.26，产品未暂存／未提交；未push、部署或接真实数据，SOP实验装配尚未成为生产HTTP/Main入口。
+
+
+**2026-10-11 SOP 图片完整交付候选已实现，审查完成、待正式交付：** `/plan-eng-review` 已完成；同图跨行、沿原容量账本持久附件、同事务发布/回退/旧发布继承投影、清空 Map 后授权读取均已有候选实现。固定 input-v3 实际 PG/HTTP 组合65项通过（另18项因专用开关未设跳过），随后行删除18/18单独补跑通过，共83项；治理组合静态6项、安装PG5项、带历史数据升级PG7项通过。新增验证覆盖先按可见行过滤再同图去重、未来/过期行不贡献图片、真实文件读取期间授权/租约到期不返回字节、旧发布候选继承两行同图及缺行映射整单回滚、用途×MIME/大小CHECK与旧stage真实执行。不同job同图冗余文件回收后重放、乱序等价/重复位置拒绝、五代500条图片关系与501拒绝已实际通过；规模使用共享小型合成PNG，不宣称500张最大附件或RSS压力验收。合法继承规模曾触发5秒SQL超时，隔离复现后仅改候选继承文字校验为按唯一版本展开JSON，保留完整条目及来源/基线/行映射校验，不抬超时；v2红证据与v3回归保留。本机发现的预约/登记import截止亦已有真实PG红绿及独立复核。根lint/test/typecheck/build既有通过证据按未变输入复用，后续变化另以专项验证绑定。正式能力未激活，实验reader仍需显式注入；崩溃残锁保守报忙。随后按原计划补充“持久文件丢失／停用行”的实际拒绝断言，相关5项PG/HTTP、lint与API typecheck通过；只变测试，旧83项未整套重跑。本次最终增量`/review`已回收本机与原生对抗，已核范围无新增确证行为缺陷；三个外审小包各540秒超时、无结论，已终止，未重送原整包；另一次约39KB存储子范围诊断审查180秒仍超时，未计通过。review-v1成功smoke通过、失败路径在到期后按计划检查通过，历史inconclusive保留。随后六文件实际增量的review-v2已完成本机／原生复核，成功与整单回滚两条smoke均在新的5分钟时限内通过，工具verdict=pass；不重置旧调用。随后改为完整职责切片、流式进度及240秒硬时限，预览、文件存储、容量、可信冻结、行登记/删除/投影与使用侧已陆续取得有效外审；没有把先前超时改成通过。真实PG核实后，固定released预约必须新建job、历史候选引用图片保留及行位置歧义拒绝均按既定合同处理，不新增业务。外审确证共享容量persisted登记明确回滚后漏清理，本轮已修，红1项失败、绿2项通过/173跳过（含两个阶段未知提交保留）、SOP容量PG11/11及根lint/typecheck/test/build全部退出0；修复增量外审无新增可行动问题。随后两类确证问题已修复：validated 恢复只清理本 job 未采用冗余预约；可信冻结和查询预览均在锁外读文件，最终短事务重验权限、截止与资产身份。实际 PG 暂存45项、交付/容量/删除46项通过（91个不同用例；定向子集不重复计数），治理安装/升级PG12项通过；预览锁竞争红2项失败、绿4项通过含撤权/授权与租约到期，均保留。根lint/typecheck/test/build均退出0，修复B4M/C4M外审有终态且无新增可行动发现；模型为CLI报告的claude-opus-5-5[1M]，未独立认证后台身份。2026-10-12已回收生成器D1M和PG证据D2M外审并逐项核对：自动提交安装不属于既定caller-owned事务入口；当前business七项/usage一项EXECUTE与清单一致，依赖完整性仍由前序闭包证明，维护建议保留。E1候选自洽不足以绑定当前提案已复现并修复：字节不同但清单自洽副本修前7项通过、修后在PG启动前拒绝，当前候选安装/升级12项通过且零跳过；新增四行测试绑定随后由E1M外审回收，无新增可行动问题。review-v3两条有界smoke通过（未知提交恢复清理、锁外读图期间撤权拒绝），原生对抗已回收，未发现新可行动行为缺陷。D3M在185秒内十次API重试后返回429“额度已用完”、exit1，无结论；不再重复调用或误记超时通过。该时点剩余的交付测试与E1增量现已由E1M/D5M/D6M补齐；旧整分支限制保留。SQL及生成器变更后，下文旧47步release仅覆盖旧快照；当前候选release于2026-10-11 16:17:00 UTC退出0，47步骤全部exit0、609输入无漂移；日志SHA-256为9abeeaa3ed6ad08efa782af103a3e089841db3e0d825bad0dded70cf61f2b8cc，详见仓外stage-repair-v1/governance-release-final-verification.json；独立PG仍单列，不由release代替。详见仓外external-slices-v1/current-findings.json、stage-repair-v1/D报告核对.md与review-v3/functional-report.md，旧图片增量INCOMPLETE原始回执保留；最终状态由本段末的当前核对取代，未改写旧审查原件。治理release首轮发现新增升级PG测试漏登记独立命令，已补命令与路由断言，定向4项及新入口实际PG7项通过；完整release复验已于2026-10-11 14:20:49 UTC退出0，47步骤均exit0，36个受测输入哈希未漂移；日志SHA-256为b9281956c06c37daa5e6d58b80e296e9ef14275c366e4601b31ade4276d276b3。2026-10-12最终回收：服务恢复探针exit0；E1M输入绑定修复、D5M发布/继承测试、D6M读取/撤权测试均取得有效外部结论，无新增可行动缺陷，当前模型按CLI记录为claude-opus-5[1M]，不冒充后台独立认证。D4M的240秒持续分析超时与D3M历史429原件保留；本轮不再重试。容量/输入绑定原生补审也完成。最终按旧固定快照44份未变文件与39份增量的实际审查、两条当前smoke、根四项、独立PG及47步release核对，本轮图片增量审查完成；整分支汇总为`COMPLETE_WITH_FINDINGS`，不是clean/PASS。此前已确认的10组、21条原编号仍留在已消费/冻结字节，候选验证不能代替正式修复交付。旧OCR原件、累计DDL/OpenAPI阅读与动态实验限制保留，不以路径覆盖率替代结论。当前精确证据见仓外review-v3/final-closeout.md与gate-overlay-final.json。详细记录为仓外`review-v2/核对与交接.md`；方案外审的发送前配置拒绝也不计外部通过。证据位于仓外《客服Agent-SOP图片闭环-20261011》；未暂存/提交、未冻结/export/intake、未接真实数据或新增设备验收，版本0.3.26。
+
+**2026-10-11 当前审查执行已完成，仍有正式交付问题：** 跨继承基线下迟到删除取错图片的原主张已被真实 PG 反驳；可信登记 SQL/parser、预览 owner/trusted-receipt 及后续 service/cancel 修复均已有有效外审。此次实际修复两项：未知冻结已提交后重试缺图片；取消已提交但旧解析／重试晚返回时复活图片。原句柄与完整候选键恢复、取消版本屏障分别由 service 与预览 owner 拥有，旧取消不清新版。最终三次执行合计90项通过，另两条管理HTTP探针通过；相关lint/typecheck/build通过，红灯与错环境变量导致的18项跳过及后续补跑均保留。完整 `/review` 与 `externalCompleteReview` 当前为 `COMPLETE_WITH_FINDINGS`（审查执行完成、不是PASS/clean）。旧账本仍有10个结构问题组（原21条，3 Medium/7 Low）待正式版本交付或后续修复，不把候选验证当作已消费版本修复；历史超时、旧CSV审查状态和覆盖限制不追改。下一步转入SOP同图跨行、发布／回退继承和持久图片的完整交付，再按精确候选办理版本治理。版本0.3.26，未暂存、未提交、未冻结/export/intake。详见[集中修复记录](../../evidence/qa/intake-legacy-acl-runtime/focused-fixes-2026-10-11.md)。
+
+**2026-10-11 可信 SOP 登记与有限外审回收：** token/query/export 三个小包已取得实际模型用量报告为 `claude-opus-5[1m]` 的有效外部结论，输入摘要一致；query 等待失败残留和导出失败恢复问题已修，修后两包均 `NO_FINDINGS`，不是继续沿用上轮180秒超时。可信 SOP 实验从 adopted 对象的真实字节解析，经 business 窄函数同事务写候选、完整行映射、媒体和 job；`freshRowIds` 区分新解析与精确继承，提交前暂存／提交后投影消除晚返回覆盖剩余图片。24项 producer 与18项删除 PG15 合计42/42，组合安装5/5。用户确认的新内容版本复用已删图片、保留删除记录、同版本不恢复已实现为候选：版本列优先/无列hash，不可变删除事件保留历史；新50项PG矩阵49通过及1项错误预期校正后定向通过，原失败保留。随后外审确认两处预览顺序P2，已用真实PG复现并修复：同版本旧回执只能缩小图片集合；明确回滚只恢复本次仍持有的输入槽。最终受影响矩阵70/70通过。媒体生命周期小包已有有效外审，可信解析登记包600秒超时无结论，预览修后外审又确认回滚链owner缺口，已改为每次暂存独立提交/回滚句柄，最终75项及原service两项PG通过、根四项检查通过；另一条跨继承基线取图主张仍待业务复现，修后外审尚未覆盖新句柄。跨行同图片关系键仍未闭合，不能据此冻结；正式 HTTP/Main、持久图片字节和生产装配仍未接入。建议 OpenAPI 1.24.0/schema 1.28/0040 及 Mermaid 安全快照保持候选，未批准冻结、export/intake 或发布。完整 `/review` 与 `externalCompleteReview` 继续 `INCOMPLETE`，旧 OCR 原件缺失与历史模型来源限制保持原记录；各轮验证和余项见[集中修复记录](../../evidence/qa/intake-legacy-acl-runtime/focused-fixes-2026-10-11.md)。未暂存、未提交，版本0.3.26不变。
+
+**2026-10-11 集中修复与审查进度：** 旧报告 287 条主张已全部按原 ID 核实，未核 0；这不表示所有主张都是缺陷，也不表示缺陷全部修复。此次完成 7 项已确认问题：查询等待提示与禁用、组织实验令牌拒绝失效、SOP 导出强制冻结校验、两处过时文档状态、计划章节归位和五条历史命令的安全引用。定向检查为组织 36/36、Query 97/97、治理导出 10/10；根 lint/typecheck/test/build、docs:check、分组预算均通过。代码修复前的预期失败与修后结果分别保留。完整 `/review` 和 `externalCompleteReview` 仍为 `INCOMPLETE`，原因已收窄为当前全分支必需门禁、独立增量复审及冻结资产/后继合同的剩余处理，不再重复核对已完成的旧主张。此前各段仅描述当时证据；最新范围与限制见[集中修复记录](../../evidence/qa/intake-legacy-acl-runtime/focused-fixes-2026-10-11.md)。本轮未暂存、未提交，未执行正式 export/intake 或真实接入。
+
+**当前增量审查（2026-10-11）：** 删除权限/SQL、回执版本、解析预览、测试合同按职责分块复核完成。晚解析COMMIT响应使已删图片复活已真实复现；修复在预览所有者保留空态版本屏障，并用服务端冻结材料中的准确输入对象恢复剩余图片，避免第一版修复误丢未删图。两种真实PG交错随后实际发布均通过，完整受影响矩阵18/18，预览及相邻发布16/16。测试逐库重建但共享进程缓存造成的rel_2串扰已修在fixture清理，保留全部红绿记录。本轮本机增量收口不等于整分支通过；旧原始主张的最终ID处置表、跨块语义和当前输入的完整门禁尚未齐，非Grok外部structured模型路由未验证。当前宿主使用Codex native，不再等待旧Claude-native门。真实数据/Windows及合同冻结/export/intake另属接入，不作为现在不能review的理由。见仓外《客服Agent-当前增量分块审查-20261011》；完整/review与externalCompleteReview仍INCOMPLETE，没有新增业务TODO或正式接入。
+
+**2026-10-11 单行删除后继：** 治理 `sop-row-deletion-candidate` 用显式行到业务键映射、新候选版本及受限函数修正旧媒体删除语义；产品实验消费者位于 `apps/api/experiments/sop-row-deletion`，不注册生产 HTTP。16 项 PG15 合成验证通过，定向审核发现的旧删除回执误改新版预览已修复并回归；原版本正文/摘要不改，新版移除目标文字/媒体、来源确认与质量重新执行；最后一行取消候选；已发布及历史使用行、越权/失效/跨租户拒绝；共享媒体保留，未知提交按原 operationId 恢复。解析阶段的管理池造数不能冒充正式用途权限验证，正式 producer 同事务绑定与继承行映射、新 POST/Main 仍列为版本化交接条件。治理生成器绑定冻结 OpenAPI 1.23/schema 1.27 字节，但尚未分配后继版本/迁移号，未冻结/export/intake。完整审查 INCOMPLETE 不变。
+
+**2026-10-11 后续三项推进：** SOP 跨应用组合由仓级 `scripts/intake-synthetic/sop-consumer.test.ts` 拥有，通过测试专用宿主调用实际 HTTP/PG15，再消费真实 Main `ContentIntakeUsage`；API 测试仅保留服务端断言，不新增架构白名单。合成验收入口新增 Node 24 类型转换参数以加载 Main TypeScript，不改生产构建。实际上传→质量检查→确认发布→第二坐席复制文字及图片预览通过，剪贴板为内存回调，不冒充原生系统验收。
+
+发布模块已将图片 alias 登记移到事务成功结果之后，已提交原操作重放和永久回执查询使用同一投影；回滚、未知提交、非 published 回执不提前投影。10 项事务替身测试通过；实际 HTTP/PG15 定向 4 passed / 162 skipped 覆盖 SOP HTTP、提交响应丢失后查回执与原操作重放、最终检查异常回滚。PG 故障由连接代理注入，不声称真实断网或进程崩溃。独立增量复核未发现待修问题。
+
+本轮根 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 均退出 0；API 587 passed / 378 skipped，桌面 1471 passed / 7 skipped，架构 19/19、workflow 81/81。`pnpm test:intake:synthetic` 10/10；分组预算 40.9/45 MiB（冻结合同14.0/15、审计证据9.90/10、源码等17.0/20）通过。历史根检查因测试越界失败的记录保留如下，不改写为当时通过。
+
+治理仓新增可复现的 `publication-compatibility-candidate` 草稿：恢复前序 owner 承接/租户不变量、保留批准的 SQL coach 范围和当前 HTTP owner-only；同一 OpenAPI 后继草稿消除 `push_method` nullable 重叠。未分配正式版本或迁移号，未冻结/export/intake，产品冻结文件与消费锁不变。候选专项5/5、治理机器合同及文档检查均退出0。另在隔离PG15实际安装并回滚候选，核对属主/ACL/安全属性不变、非法角色拒绝和前序正文漂移拒绝；这项安装冒烟不代替有资料的owner/coach业务矩阵。随后同一候选补齐30项业务PG检查、既有发布HTTP/worker套件13项，均实际通过：承接锚点/版本/完整scope、撤销/到期/来源停用、跨tenant拒绝、single/dual、SQL coach合法/越域/敏感内容及承接组合、围栏/继承/锁序、并发幂等和COMMIT回执丢失恢复。新增夹具从暂存发布边界造数据，不声称owner承接入口的上传/审批签发全链路已验证。两条额外审查探针分别反驳ALL FUNCTIONS自动授权未来函数、确认intake_business调用SOP单行删除得到42501；后者保持未修，不扩大授权或手改0038。正式版本化交接条件已准备，仍待后继版本与完整依赖/ACL闭包、冻结/export/intake批准；真实装配关闭。证据在仓外《客服Agent-合同业务PG验收-20261011》，不把静态SQL解析当作数据库执行。另补核两条旧报告：CSV installation 的1.24前序为显式依赖；主体授权用 principalId、永久回执读写用 userId，并无原报告猜测的错配。没有批量关闭其余未核主张。
+
+本轮不暂存、不提交，不接真实身份/正文/存储、生产 runner 或 Windows。完整 `/review` 与 `externalCompleteReview` 仍 `INCOMPLETE`；仓外总报告为《客服Agent-审查分块收口-20261011/本轮三项完成.md》。
+
+**2026-10-11 前序增量状态（保留当时检查结果）：** `292221d` 已有 0036–0039；SOP 后继沿 `cs-ai-c11-openapi-1.23.0-schema-1.26-c08bfcadf94d` 追加，主消费锁仍是 1.22/1.25，schema 1.27 是批准 overlay，不伪造新的已消费合同集。本轮仅将数据库生成器的旧 35 段测试预期与现有产物对齐，保留前 35 段精确字节保护，并锁定四个新增 ID、SQL 哈希及来源。25 项生成器测试、定向 lint、database typecheck 通过。根 `pnpm test` 已越过原失败点：database 42 通过/27 跳过，API 577 通过/376 跳过，desktop 1471 通过/7 跳过；随后架构检查发现 `apps/api/tests/content-intake.integration.test.ts:16` 直接依赖桌面模块而退出 1，不能称整套通过。被阻断的 workflow 单独补跑退出 0。上轮未变输入的 lint/typecheck/build/分组预算证据继续按范围复用。
+
+身份绑定候选的两项缺陷已按用户明确批准修复并用隔离 PG15 8 项验证，仍未接线、不绑定真人、不写授权。补审按完整行为链推进：79 份旧外审完成响应只证明提交范围连续；相同字节的 Mermaid 重建、旧日志精确引用和 PG15 digest 重载已分别补证，不据此宣布完整安全审查。冻结旧发布函数的 owner 验收/租户门与 OpenAPI 权限声明需在所属治理仓按后继版本处理，禁止改写冻结 SQL、已有迁移或消费锁。 补审同时确认指标响应 push_method 的 nullable oneOf 在当前生成校验器中拒绝合法 null（合成探针已复现，但无已实现指标流 HTTP 故障证据）；发布提交前的图片预览 alias 回滚清理仍是局部状态一致性待修项，读取继续受真实 release/资格门约束。目录属主身份列 UPDATE 保留纵深加固建议，未证实当前登录角色可利用的接管路径。完整 `/review` 与 `externalCompleteReview` 仍为 `INCOMPLETE`；本轮日志、指纹和逐项复核报告存于仓外《客服Agent-审查分块收口-20261011》，未覆盖旧证据、不新增业务 TODO，也不放行真实资料、生产 runner 或 Windows 人工验收。
+
+用户已确认下一阶段顺序：先准备 SOP 合成候选的治理合同，随后再接生产 runner。治理仓已提交两层仍为草稿的候选材料：格式合同 `codex/content-intake-p2-contracts@de5ab06`，媒体运行边界增量 `@4603dc6`。格式候选材料包括：
+
+- `business-docs/01-客服Agent项目/30-开发-进行中/20-P2 SOP工作簿媒体合同候选.md`
+- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/protocol.json`
+- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/verification.md`
+
+媒体运行边界候选包括：
+
+- `business-docs/01-客服Agent项目/30-开发-进行中/21-P2 SOP媒体运行边界合同候选.md`
+- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/openapi.delta.json`
+- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/storage.delta.sql`
+- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/boundary-verification.md`
+
+候选机器合同为 `sop-xlsx-v1`，仍是 `DRAFT · NOT FROZEN · NOT EXPORTED · NOT INTAKE`，并明确 `productionConsumerReady=false`、`syntheticOnly=true`。候选已经固化本期已确认的六个工作表、按行保留文字和换行、同一行多图片附件、图片无文字时拒绝、显式版本列优先且否则取文件 SHA-256、同来源同版本幂等，以及外部超链接只保留标签而不跟随读取。既有 ops-loop 的 SOP CSV 合同和 FAQ/售前/售后/活动的 CSV/XLSX 合同没有改变。
+
+治理候选的 `npm --prefix sites run test:docs:fast`、候选 JSON/SQL 静态检查、`npm --prefix sites run test:intake-sop-media-boundary`（4/4）和 `npm --prefix sites run test:release` 均有成功证据；边界检查器已在治理仓提交 `68d90c2` 并纳入 release 质量计划，冻结前评审门已在 `47fc45c` 固化六项待治理确认和最小证据包；工作表枚举一致性在 `985bc5e` 修正并由最新 release 重新验证；候选输入哈希、检查命令和未覆盖门禁已在 `checks.json`（证据计数修正提交 `1d9961e`，其 `sourceCommit` 仍指向最新测试提交）固定；三张表的来源、候选和发布媒体外键结构由 PostgreSQL AST 检查（提交 `877d676`）固定；证据账本的 `sourceCommit` 已在 `8694ed4` 与最新测试提交对齐。最新 release 退出 0、依赖审计报告 0 vulnerabilities，但 Redocly 的历史非阻断 warning 保留。候选尚未接入生成器，因此不能把该基线通过写成 SOP 合同冻结或产品消费证据。暂存差异检查和 `gstack-redact` 也通过。产品解析器的合成测试和证据沿用本节前文，不因治理候选同步而重跑。下一道准确门禁是按评审门批准 HTTP、对象/附件生命周期、来源绑定、发布/回退与存储边界，之后按治理仓正规路径冻结、导出并 intake；只有完成这些步骤，才可接生产 runner，再做上传→检查→确认发布→第二坐席查询/预览的合成闭环。真实飞书、真实资料、生产配置、Windows 和完整 `/review` 仍未完成；`externalCompleteReview` 继续保持 `INCOMPLETE`。本节是状态同步，不新增业务范围或 TODO。
+
+
+## 1. 已确认的目标
+
+用户已确认本期完成“资料导入、维护、发布、坐席查询形成完整流程”。完成必须以坐席使用到正确的已发布内容为依据，不能止于后台上传成功。
+
+用户已确认分工：
+
+| 角色 | 本期目标权限 | 范围边界 |
+| --- | --- | --- |
+| 客服总监、客服经理 | 配置权限，上传Excel、检查资料、确认后发布，查询复制 | 只在已登记负责范围内；不通过人工审批 |
+| 客服主管、客服组长 | 上传Excel、检查资料、确认后发布，查询复制 | 不因上传发布取得配置他人权限的能力 |
+| 普通客服 | 查询已发布内容、人工选择并复制 | 不上传、不发布、不配置权限 |
+
+本表按2026-10-08最新补充更新，当前角色与运行差异以§0.52为准；岗位映射仍复用独立内容域身份/授权规则，不把四岗都映射为登录owner。历史话术师/委派规则不自动作为本期新增名单。
+
+用户最新确认的主要使用路径是：**四类管理岗位在飞书维护原表 → 导出标准Excel → 上传桌面应用 → 资料检查与差异预览 → 点击发布并弹窗确认 → 客服查阅复制。** 首期以这个手工文件闭环设计，业务从一开始就在飞书维护。直接读取飞书 / 自动同步保留为后续增强，不成为本期文件上传的前置条件。
+
+用户已明确澄清：普通坐席只查阅资料，话术师和管理人员负责上传与发布。因此首期不新增普通坐席的资料提交入口。飞书原表只读 / 编辑权限和桌面上传 / 审批 / 发布权限分别管理，不因某一侧登录成功自动授予另一侧权限；本轮只记录要求，不修改现有文档共享设置。
+
+本轮目标是既有客服辅助产品的内容闭环。AI 自由生成回答、自动发送和自动学习不纳入本期；查询仍返回已发布原文，复制只表示“已复制”。
+
+## 2. 工单与代码证据
+
+| 工单现象 / 实现事实 | 已核实的情况 | 对开发的影响 |
+| --- | --- | --- |
+| 找不到 FAQ / 话术导入入口 | 内容管理的导入区域默认折叠；尚不能据此确定客户现场是入口发现问题还是角色问题 | 入口及可操作范围应清晰；权限不足要给出原因和处理人 |
+| SOP 文件大小限制 | SOP 入口目前收 CSV，限额 256 KiB；内容管理 CSV / XLSX 限额 10 MiB | 两个入口的格式和限额不同；需要按实际来源设计一致、可解释的校验 |
+| “未连接飞书 / Wiki” | XLSX 解析失败路径包含该文案；本地解析失败不证明飞书授权失败 | 本地文件错误、连接未配置、文档不可读分别反馈 |
+| XLSX 支持不足 | 自有解析器只取第一张工作表，业务表头及合并区域需要另行处理 | 使用成熟解析器，支持选表、表头定位和字段映射 |
+| CSV 内换行 | SOP CSV 解析先拆行，不能正确处理带引号的多行单元格 | 使用成熟 CSV 解析器，保留正文换行 |
+| 话术师发布 | 当前发布接口和桌面闸门均是 owner-only | 用户的新要求必须同步进入合同、服务端授权和桌面能力展示 |
+| SOP 从后台到坐席 | 工作台管理树已有接口；独立流程窗 `loadTree()` 仍返回 `ALLERGY_SOP_TREE`，投影固定 `demo: true` | SOP 发布版本与坐席流程的正式接线是本次闭环的重要缺口 |
+| 发布替换范围 | 当前一次发布以绑定域为单位整库替换，其余域继承 | 导入少量内容不能悄悄覆盖整个库；发布前应明确影响范围和删除变化 |
+
+客户当时的账号角色、安装版本、具体上传文件仍未取得，以上源码事实不能冒充现场复现结论。
+
+证据入口：
+
+- [内容管理](../../apps/desktop/src/renderer/features/dashboard/ContentModule.tsx)、[本地解析与发布](../../apps/desktop/src/main/dashboard-content.ts)、[XLSX 解析](../../apps/desktop/src/main/xlsx-first-sheet.ts)。
+- [SOP 限额与接口类型](../../apps/desktop/src/shared/dashboard-ops-loop.ts)、[SOP CSV 解析](../../apps/api/src/ops-loop-csv.ts)。
+- [SOP 流程窗控制器](../../apps/desktop/src/main/sop-window-controller.ts)、[SOP 窗口投影](../../apps/desktop/src/shared/sop-window.ts)。
+- [现行内容发布合同](../reference-content-publish.md)、[飞书导入待办](../../TODOS.md)。
+
+## 3. 数据源盘点
 
 ### 已定位的原始候选
 
@@ -1246,26 +1297,6 @@ G01–G24 继续按原层级执行，其中所有“完整缺行自动下架”�
 下一位实现者 Hour 1 先读权限/来源/候选合同和当前 owner-only 差异，Hour 2–3 做纯模板/稳定 ID/显式停用，Hour 4–5 处理飞书身份和审批失败/幂等/事务边界，Hour 6+ 验证跨会话与切店、报告实物和打包进程。时间标签表示推进顺序，不表示 6 小时做完。新增组织与原生审批适配使 P1/P2 的工程预估调整为人类团队 8–13 工作日 / AI 辅助 4–7 工作日，P3 5–10 / 3–5 日，P4 2–4 / 1–3 日，排除租户授权、业务清洗和实机排期；需 spike 后校准。
 
 当前缺口是技术/现场证据：B1 最新版及负责人、B4 租户字段/可见范围；原生审批定义的人工节点/附件保真；撤销传播实测；正式合同差集与 intake。B2/B3/B5 的业务选择已关闭，不再询问。真实能力/数据/上线仍按各自批准，先用合成样本开发验证。
-
-### 0.54 SOP 合成候选治理合同准备（2026-10-10）
-
-用户已确认下一阶段顺序：先准备 SOP 合成候选的治理合同，随后再接生产 runner。治理仓已提交两层仍为草稿的候选材料：格式合同 `codex/content-intake-p2-contracts@de5ab06`，媒体运行边界增量 `@4603dc6`。格式候选材料包括：
-
-- `business-docs/01-客服Agent项目/30-开发-进行中/20-P2 SOP工作簿媒体合同候选.md`
-- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/protocol.json`
-- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/verification.md`
-
-媒体运行边界候选包括：
-
-- `business-docs/01-客服Agent项目/30-开发-进行中/21-P2 SOP媒体运行边界合同候选.md`
-- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/openapi.delta.json`
-- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/storage.delta.sql`
-- `business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-candidate/boundary-verification.md`
-
-候选机器合同为 `sop-xlsx-v1`，仍是 `DRAFT · NOT FROZEN · NOT EXPORTED · NOT INTAKE`，并明确 `productionConsumerReady=false`、`syntheticOnly=true`。候选已经固化本期已确认的六个工作表、按行保留文字和换行、同一行多图片附件、图片无文字时拒绝、显式版本列优先且否则取文件 SHA-256、同来源同版本幂等，以及外部超链接只保留标签而不跟随读取。既有 ops-loop 的 SOP CSV 合同和 FAQ/售前/售后/活动的 CSV/XLSX 合同没有改变。
-
-治理候选的 `npm --prefix sites run test:docs:fast`、候选 JSON/SQL 静态检查、`npm --prefix sites run test:intake-sop-media-boundary`（4/4）和 `npm --prefix sites run test:release` 均有成功证据；边界检查器已在治理仓提交 `68d90c2` 并纳入 release 质量计划，冻结前评审门已在 `47fc45c` 固化六项待治理确认和最小证据包；工作表枚举一致性在 `985bc5e` 修正并由最新 release 重新验证；候选输入哈希、检查命令和未覆盖门禁已在 `checks.json`（证据计数修正提交 `1d9961e`，其 `sourceCommit` 仍指向最新测试提交）固定；三张表的来源、候选和发布媒体外键结构由 PostgreSQL AST 检查（提交 `877d676`）固定；证据账本的 `sourceCommit` 已在 `8694ed4` 与最新测试提交对齐。最新 release 退出 0、依赖审计报告 0 vulnerabilities，但 Redocly 的历史非阻断 warning 保留。候选尚未接入生成器，因此不能把该基线通过写成 SOP 合同冻结或产品消费证据。暂存差异检查和 `gstack-redact` 也通过。产品解析器的合成测试和证据沿用本节前文，不因治理候选同步而重跑。下一道准确门禁是按评审门批准 HTTP、对象/附件生命周期、来源绑定、发布/回退与存储边界，之后按治理仓正规路径冻结、导出并 intake；只有完成这些步骤，才可接生产 runner，再做上传→检查→确认发布→第二坐席查询/预览的合成闭环。真实飞书、真实资料、生产配置、Windows 和完整 `/review` 仍未完成；`externalCompleteReview` 继续保持 `INCOMPLETE`。本节是状态同步，不新增业务范围或 TODO。
-
 
 <!-- autoplan-accepted:ceo -->
 - 保持 U01–U03 的五模块与角色/流程边界；按 §11 的唯一所有者实现，优先复用身份、发布、回退与检索现有主链，禁止模块形成第二个正式发布指针。

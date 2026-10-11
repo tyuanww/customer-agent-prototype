@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.22.0:components";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.24.0:components";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -211,12 +211,22 @@ export const COMPONENT_SCHEMA_NAMES = [
   "SnapshotResponse",
   "SoftwareRelease",
   "SoftwareReleaseList",
+  "SopCandidateMaterial",
+  "SopCandidateRow",
   "SopCatalogResponse",
   "SopImportAccepted",
   "SopImportRequest",
+  "SopMediaObject",
   "SopNode",
   "SopNodeDelete",
   "SopNodePatch",
+  "SopPreview",
+  "SopPublishCommand",
+  "SopPublishReceipt",
+  "SopRollbackCommand",
+  "SopRollbackReceipt",
+  "SopUploadReceipt",
+  "SopWorkbookUpload",
   "SourceBindingHash",
   "SourceContractReason",
   "TelemetryStatus",
@@ -243,7 +253,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.22.0:components",
+  "$id": "urn:customer-agent:openapi:1.24.0:components",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -10860,14 +10870,7 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "maximum": 3
         },
         "push_method": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/PushMethod"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/$defs/PushMethod"
         },
         "release_id": {
           "type": "string",
@@ -13201,6 +13204,108 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "SopCandidateMaterial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "version",
+        "sheets",
+        "contentHash"
+      ],
+      "properties": {
+        "candidateId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "sheets": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "rows"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "过敏流程SOP",
+                  "少错破SOP",
+                  "品质售后SOP",
+                  "税收相关规则",
+                  "品牌对接资源汇总",
+                  "长痘痘SOP"
+                ]
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/SopCandidateRow"
+                }
+              }
+            }
+          }
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "SopCandidateRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rowId",
+        "sheetName",
+        "rowNumber",
+        "answer",
+        "media"
+      ],
+      "properties": {
+        "rowId": {
+          "type": "string",
+          "pattern": "^sop:[^:]{1,128}:[1-9][0-9]{0,3}$"
+        },
+        "sheetName": {
+          "type": "string",
+          "enum": [
+            "过敏流程SOP",
+            "少错破SOP",
+            "品质售后SOP",
+            "税收相关规则",
+            "品牌对接资源汇总",
+            "长痘痘SOP"
+          ]
+        },
+        "rowNumber": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "media": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/SopMediaObject"
+          }
+        }
+      }
+    },
     "SopCatalogResponse": {
       "type": "object",
       "additionalProperties": false,
@@ -13255,6 +13360,67 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "file": {
           "type": "string",
           "format": "binary"
+        }
+      }
+    },
+    "SopMediaObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mediaObjectId",
+        "sheetName",
+        "rowNumber",
+        "ordinal",
+        "sha256",
+        "mime",
+        "bytes"
+      ],
+      "properties": {
+        "mediaObjectId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "sheetName": {
+          "type": "string",
+          "enum": [
+            "过敏流程SOP",
+            "少错破SOP",
+            "品质售后SOP",
+            "税收相关规则",
+            "品牌对接资源汇总",
+            "长痘痘SOP"
+          ]
+        },
+        "rowNumber": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "mime": {
+          "type": "string",
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5242880
+        },
+        "preview": {
+          "$ref": "#/$defs/SopPreview"
         }
       }
     },
@@ -13345,6 +13511,149 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         },
         "sort_key": {
           "type": "integer"
+        }
+      }
+    },
+    "SopPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "previewToken",
+        "expiresAt"
+      ],
+      "properties": {
+        "previewToken": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        }
+      }
+    },
+    "SopPublishCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "contentHash",
+        "confirm"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "confirm": {
+          "const": true
+        }
+      }
+    },
+    "SopPublishReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "contentHash",
+        "state"
+      ],
+      "properties": {
+        "releaseId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "state": {
+          "const": "published"
+        }
+      }
+    },
+    "SopRollbackCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rollbackPlanId",
+        "operationId",
+        "confirm"
+      ],
+      "properties": {
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "confirm": {
+          "const": true
+        }
+      }
+    },
+    "SopRollbackReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "state"
+      ],
+      "properties": {
+        "releaseId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "state": {
+          "const": "rolled_back"
+        }
+      }
+    },
+    "SopUploadReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "candidateId",
+        "version",
+        "state"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "staged",
+            "idempotent"
+          ]
+        }
+      }
+    },
+    "SopWorkbookUpload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "format": "binary"
         }
       }
     },

@@ -142,5 +142,868 @@
     "modeOrder": "Reused final-targeted/mode-order.json. Input bytes of files.ts, transaction.ts, authority.ts, and management-http.ts matched the 1c5d5e1 record; 1c5d5e1..18ff7cf diff for those files plus 0021, 0022, and 0030 was empty. Not rerun.",
     "roleRules": "record_policy_history does not call lock_content. intake_usage, intake_business, intake_worker, and intake_org_writer have no INSERT, UPDATE, DELETE, or TRUNCATE on role_rules. There is no formal rule-write API. This is not a vulnerability of the current login roles. Formal activation condition: a future rule maintainer must take the same content lock and pass an interleaving acceptance. 0030 was not modified and no rule-maintenance feature was added.",
     "completeReview": "INCOMPLETE"
+  },
+  "currentIncrementReview20261011": {
+    "status": "LOCAL_BOUNDED_REVIEW_COMPLETE",
+    "productHead": "292221d080006a86a3b5a4a950b055cef2e94eaa",
+    "governanceHead": "6239ff740f3c1c1d204f93f1a3bc0b99f1293243",
+    "includesUncommittedInputs": true,
+    "evidenceLocation": "Local-only: Desktop/客服Agent-当前增量分块审查-20261011 (input-manifest.json, final-state.json, 核对与交接.md)",
+    "scope": [
+      "SOP row-deletion SQL/permissions",
+      "version and permanent receipt recovery",
+      "parser row mapping and preview projection",
+      "tests and candidate-contract consistency"
+    ],
+    "findings": [
+      {
+        "id": "R-P1",
+        "status": "fixed-and-rechecked",
+        "summary": "Late parse projection resurrected deleted images; empty-state version barrier and receipt-bound exact input projection now preserve the confirmed row set, including surviving images."
+      },
+      {
+        "id": "PG-FIXTURE-CACHE",
+        "status": "fixed-and-rechecked",
+        "summary": "Fresh databases reuse rel_2 but module cache persists; fixture teardown releases only its database-owned aliases."
+      }
+    ],
+    "verification": {
+      "pgRowDeletion": 18,
+      "previewAndPublicationUnit": 16,
+      "notWholeBranchAcceptance": true
+    },
+    "wholeBranchReview": "INCOMPLETE",
+    "externalCompleteReview": "INCOMPLETE",
+    "productionReadiness": "NOT_READY",
+    "remainingReviewCategories": [
+      "Reconcile remaining original report claim IDs against subsequent accepted/rejected/fixed evidence; do not reuse stale open counts.",
+      "Complete scoped semantic and mandatory probe closure for the whole branch; current increment is only a bounded slice.",
+      "Outside structured review model route is unverified; CLI existence or provider name is not proof of approved model identity."
+    ],
+    "hostRuleCorrection": "Current Codex review uses Codex in-host native; omits Review Army permits specialists:{} without claiming that coverage. Historical Claude-native gate is not imposed on this host.",
+    "futureAcceptanceIsSeparate": [
+      "successor versioning/freeze/export/intake",
+      "production parser/ACL/HTTP/Main/media persistence",
+      "real identities/data and device acceptance"
+    ],
+    "historicalRecordsPreserved": true
+  },
+  "latestReviewProgress20261011": {
+    "status": "BOUNDED_FIXES_VERIFIED_UNCOMMITTED",
+    "version": "0.3.26",
+    "productHead": "292221d080006a86a3b5a4a950b055cef2e94eaa",
+    "governanceHead": "6239ff740f3c1c1d204f93f1a3bc0b99f1293243",
+    "oldClaims": {
+      "total": 287,
+      "reconciled": 287,
+      "unreconciled": 0,
+      "notEquivalentToFixed": true,
+      "ledgerSha256": "0bf69b182e1d4a14448e69ccab4839c546c0cbabdef3f955fd59d8627d395812"
+    },
+    "findings": [
+      {
+        "id": "product-pack-07:12",
+        "previousStatus": "CONFIRMED_LOW_FEEDBACK",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "resolution": "筛选更新期间禁用查询，Enter 显示等待原因且不调用搜索；条件确认后保留问题并可查询。"
+      },
+      {
+        "id": "product-pack-07:21",
+        "previousStatus": "CONFIRMED_LOW_EXPERIMENT",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "resolution": "HTTP 401/403 后仅清除该次签发对象，下一次请求重新取令牌；不自动重试，迟到拒绝不清除同文本的新签发。"
+      },
+      {
+        "id": "governance-pack-01:29",
+        "previousStatus": "CONFIRMED_LOW",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "resolution": "SOP build/writer 入口强制校验同一提交的冻结批准、双哈希及 profile；缺批准、状态错误、已提交漂移或脏批准均在输出前拒绝。测试仅写临时目录并清理。"
+      },
+      {
+        "id": "governance-pack-01:23",
+        "previousStatus": "CONFIRMED_LOW_DOCUMENTATION_STATUS",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "resolution": "归档 README 当前候选改为 2026-10-06，保留 10-05 历史及全部冻结文件。"
+      },
+      {
+        "id": "governance-pack-02:7",
+        "previousStatus": "CONFIRMED_LOW_DOCUMENTATION_STATUS",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "resolution": "工具 README 去掉历史 P2 的错误“未冻结”现状标签，版本状态回归批准记录。"
+      },
+      {
+        "id": "product-file-10:15",
+        "previousStatus": "CONFIRMED_LOW_DOCUMENTATION_NAVIGATION",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "resolution": "§0.46–0.54 移入 §0 导航；移动前后原文逐行多重集合相同，Review record 不挪。"
+      },
+      {
+        "id": "product-pack-10:9",
+        "previousStatus": "CONFIRMED_LOW_EVIDENCE_COMMAND",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "resolution": "从历史 learning 参数数组还原五条安全 shell 命令，单独补充消费说明；原 evidence.json 与日志不动，没有重跑旧测试。"
+      }
+    ],
+    "completeReview": "INCOMPLETE",
+    "externalCompleteReview": "INCOMPLETE",
+    "scope": "Seven bounded accepted findings only; no whole-branch or outside-review completion. Existing dirty inputs preserved.",
+    "notRun": [
+      "governance test:release",
+      "new PG15 integration",
+      "Electron or packaged Mac acceptance",
+      "Windows or real-data acceptance",
+      "whole-branch mandatory review probes",
+      "new external structured model review"
+    ],
+    "evidenceDocument": "focused-fixes-2026-10-11.md",
+    "evidenceLocation": "Local-only: Desktop/客服Agent-集中修复-20261011",
+    "historicalRootFieldsScope": "Earlier root status, remainingActionableCodeFindings and limits describe their original bounded review; not current whole-branch acceptance.",
+    "remainingReviewConditions": [
+      "Current whole-branch checklist, native adversarial and required smoke/plan probes must have actual passing evidence; prior bounded passes are not full closure.",
+      "New fix delta has not had a fresh independent external review; verify the actual model route before any bounded external run.",
+      "Frozen archive dependency findings and successor-contract gaps remain separately recorded; do not overwrite frozen assets or treat experimental candidates as delivered."
+    ],
+    "supersededBy": "successorProgress20261011 (the original notRun and findings above describe the prior bounded-fix run, not the current gate inventory)"
+  },
+  "successorProgress20261011": {
+    "completeReview": "INCOMPLETE",
+    "externalCompleteReview": "INCOMPLETE",
+    "evidenceConsolidation": {
+      "status": "completed",
+      "reportDirectory": "/Users/hutou/Desktop/客服Agent-后继修复交付-20261011",
+      "report": "gate-evidence.json",
+      "sha256": "5f3a62c0d4f991498ad6badf15f0124c54ff461676a277d6d89a68505725985a",
+      "baselineInputsMatched": 52,
+      "receiptOutputsMatched": 33,
+      "logsMatched": 37,
+      "historicalOcrOriginalsMissing": 7
+    },
+    "boundedExternal": {
+      "status": "unavailable",
+      "scopes": [
+        "token",
+        "query",
+        "export"
+      ],
+      "attemptsThisRound": 3,
+      "timeoutSecondsEach": 180,
+      "returnedConclusions": 0,
+      "modelUsage": null,
+      "retryStopped": true,
+      "routeAcceptedByUser": "CLI-reported claude-opus-5[1m]; not proof of underlying provider",
+      "results": "/Users/hutou/Desktop/客服Agent-后继修复交付-20261011/external-results.json"
+    },
+    "newCandidates": {
+      "archive": "DRAFT_NOT_FROZEN_NOT_PUBLISHED",
+      "contract": "DRAFT_NOT_FROZEN_NOT_EXPORTED_NOT_INTAKE",
+      "proposedVersionsOnly": {
+        "openapi": "1.24.0",
+        "schema": "1.28",
+        "migration": "0040"
+      },
+      "productionConsumerReady": false,
+      "archiveTreeSha256": "bfa15083b59cd16bfc62d22c7cb7376b48a8b94de21f8bcea663fa3191a0bbd4",
+      "contractManifestSha256": "ad87567c8bb9ff4e27957ae1a2d490c35e09440e4ca11c3c073a2acceea73959"
+    },
+    "remainingIndependentFindings": [
+      "product-pack-19:49 non-adopted push_method combination Low",
+      "governance-pack-03:19/04:19/04:29 archive style/theme Low"
+    ],
+    "notImplied": [
+      "all findings fixed",
+      "complete review pass",
+      "historical OCR originals reconstructed",
+      "formal contract consumed",
+      "production activation"
+    ],
+    "details": "focused-fixes-2026-10-11.md",
+    "newIncrementReview": {
+      "primary": "completed within candidate generators, install tests and release wiring",
+      "native": "completed; N-SOURCE-1 fixed and independently rechecked; final test wiring appendix reviewed without new actionable findings",
+      "candidateHttpAndFile": "pass bounded actual-artifact consumption",
+      "governanceRelease": {
+        "status": "pass",
+        "exitCode": 0,
+        "stepCount": 47,
+        "logSha256": "89959f714bfdbf1594cfb8f2874725a465640adead4a85b92daaeef65be20e89",
+        "firstRunExitCode": 1,
+        "firstRunFailures": "cwd-dependent test input and unregistered isolated PG script; fixed; original failure log retained",
+        "scope": "governance repository release plus separate exact-candidate HTTP/file consumption; no freeze/export/intake"
+      },
+      "nativeReportSha256": "fbecc92257d53095d33e1d1fa868e26c9a570fa5165a4d0347e48f843d07676b"
+    }
+  },
+  "trustedSopProgress20261011": {
+    "completeReview": "INCOMPLETE",
+    "externalCompleteReview": "INCOMPLETE",
+    "reportDirectory": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011",
+    "boundedExternal": {
+      "status": "completed_for_token_query_export",
+      "actualReportedModel": "claude-opus-5[1m]",
+      "providerIndependentlyVerified": false,
+      "results": [
+        {
+          "scope": "token",
+          "validation": {
+            "completed": true,
+            "gate": "pass"
+          },
+          "report": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/token-external.json",
+          "sha256": "9e274e7b4f20173962832ad8f6d815dbd406b806658221b794c62e71047de8c4",
+          "inputManifest": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/token-external-input.json",
+          "inputMismatches": 0
+        },
+        {
+          "scope": "query-final",
+          "validation": {
+            "completed": true,
+            "gate": "pass"
+          },
+          "report": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/query-final-external.json",
+          "sha256": "34e6f4253cab1940f378f378623f090294b1ff11a5d59d321fff47891137fce3",
+          "inputManifest": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/query-final-external-input.json",
+          "inputMismatches": 0
+        },
+        {
+          "scope": "export-final",
+          "validation": {
+            "completed": true,
+            "gate": "pass"
+          },
+          "report": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/export-final-external.json",
+          "sha256": "ae113ffbc7f6a0237806203e12e94540e3d278f04d9091f376a5758efbc00494",
+          "inputManifest": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/export-final-external-input.json",
+          "inputMismatches": 0
+        }
+      ],
+      "supersedes": "Prior three 180-second unavailable attempts, only within their bounded scopes; not the historical 79 packages or full branch."
+    },
+    "newStageExternal": {
+      "status": "unavailable",
+      "attempts": 1,
+      "timeoutMs": 600000,
+      "result": "empty response, no modelUsage",
+      "report": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/sop-stage-external.json",
+      "inputManifest": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/sop-stage-external-input.json",
+      "retryStopped": true,
+      "inputDrift": "sop.ts fixture variant changed during review; no external conclusion to reuse"
+    },
+    "newStageNative": {
+      "report": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/native-review.json",
+      "reportSha256": "690347e7b469181023e2ee1a91d56a40ab153207dc19e554f86ca4ed27b2e791",
+      "fixed": [
+        "fresh rows changing images distinguishable from inherited rows",
+        "pre-COMMIT input preview staging preserves surviving images after an early deletion"
+      ],
+      "scope": "bounded new candidate, not whole branch; fixtures changed after source review"
+    },
+    "validation": {
+      "consumerPG15": "42/42 (24 producer +18 delete)",
+      "consumerEvidence": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/consumer-evidence.json",
+      "consumerLogSha256": "e047536c3ae0612b709bd3a0abf826929432050f81ef39d71dca4e50dacc8482",
+      "combinedInstallPG15": "5/5",
+      "rootLint": 0,
+      "rootTypecheck": 0,
+      "rootTestFirstExit": 1,
+      "rootTestFirstFailure": "Prior canonical runs hit three unmodified search-decision 5-second timeouts; serial targeted rerun and remaining chain passed; final canonical pnpm test after heavy PG release finished exits 0. Earlier failures retained.",
+      "rootBuild": 0,
+      "governanceRelease": {
+        "exitCode": 0,
+        "steps": 47,
+        "mainTests": 336,
+        "logSha256": "7e62af6e50b9e1ee24e29280a6d86331505998875df66f5d1dd6646da452f41c",
+        "scope": "pre-lifecycle main suite; later frozen-contract steps completed while lifecycle source was being edited, not final lifecycle release evidence"
+      },
+      "rootTestRecoveryEvidence": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/lifecycle-product-completion-checks.json",
+      "governanceReleaseFinal": {
+        "name": "lifecycle-governance-release",
+        "command": [
+          "npm",
+          "--prefix",
+          "sites",
+          "run",
+          "test:release"
+        ],
+        "cwd": "/Users/hutou/Desktop/ai-content-intake-p2-contracts",
+        "exitCode": 0,
+        "startedAt": "2026-10-11T10:38:25.015156+00:00",
+        "endedAt": "2026-10-11T10:57:49.326409+00:00",
+        "log": "lifecycle-governance-release.log",
+        "sha256": "4b52e768e58b0b34170eb8ee64c1c4203aeda925bba24cc27c9ce987458027d3",
+        "candidateInputs": "lifecycle-governance-inputs.json;17/17 unchanged after execution"
+      },
+      "previewRootChecks": [
+        {
+          "name": "preview-root-lint",
+          "command": [
+            "pnpm",
+            "lint"
+          ],
+          "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+          "exitCode": 0,
+          "startedAt": "2026-10-11T10:57:53.901481+00:00",
+          "endedAt": "2026-10-11T10:58:00.321080+00:00",
+          "log": "preview-root-lint.log",
+          "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+        },
+        {
+          "name": "preview-root-typecheck",
+          "command": [
+            "pnpm",
+            "typecheck"
+          ],
+          "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+          "exitCode": 0,
+          "startedAt": "2026-10-11T10:58:00.321741+00:00",
+          "endedAt": "2026-10-11T10:58:12.293430+00:00",
+          "log": "preview-root-typecheck.log",
+          "sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b"
+        },
+        {
+          "name": "preview-root-build",
+          "command": [
+            "pnpm",
+            "build"
+          ],
+          "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+          "exitCode": 0,
+          "startedAt": "2026-10-11T10:58:12.293882+00:00",
+          "endedAt": "2026-10-11T10:58:22.000893+00:00",
+          "log": "preview-root-build.log",
+          "sha256": "908335f58ec05f77cd220958b71d51658754c99b578cd11bde0acb2385c06103"
+        }
+      ],
+      "rootTestFinal": {
+        "name": "preview-root-test",
+        "command": [
+          "pnpm",
+          "test"
+        ],
+        "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+        "exitCode": 0,
+        "startedAt": "2026-10-11T10:59:04.101150+00:00",
+        "endedAt": "2026-10-11T11:01:36.062616+00:00",
+        "log": "preview-root-test.log",
+        "sha256": "b0730142ea85acc43a267b3dfb1c39456c0f718b16ee7fa5bb752290ad6ea921"
+      },
+      "handleFinalRootChecks": [
+        {
+          "name": "handle-root-lint",
+          "command": [
+            "pnpm",
+            "lint"
+          ],
+          "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+          "exitCode": 0,
+          "startedAt": "2026-10-11T11:13:52.878280+00:00",
+          "endedAt": "2026-10-11T11:13:58.394150+00:00",
+          "log": "handle-root-lint.log",
+          "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+        },
+        {
+          "name": "handle-root-typecheck",
+          "command": [
+            "pnpm",
+            "typecheck"
+          ],
+          "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+          "exitCode": 0,
+          "startedAt": "2026-10-11T11:13:58.394689+00:00",
+          "endedAt": "2026-10-11T11:14:08.560917+00:00",
+          "log": "handle-root-typecheck.log",
+          "sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b"
+        },
+        {
+          "name": "handle-root-build",
+          "command": [
+            "pnpm",
+            "build"
+          ],
+          "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+          "exitCode": 0,
+          "startedAt": "2026-10-11T11:14:08.561514+00:00",
+          "endedAt": "2026-10-11T11:14:16.825341+00:00",
+          "log": "handle-root-build.log",
+          "sha256": "8719e005bd9d53f9c7755896726c35540ce925d6ca5f55c8bebaa660a1fca8db"
+        },
+        {
+          "name": "handle-root-test",
+          "command": [
+            "pnpm",
+            "test"
+          ],
+          "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+          "exitCode": 0,
+          "startedAt": "2026-10-11T11:14:16.825771+00:00",
+          "endedAt": "2026-10-11T11:16:17.410432+00:00",
+          "log": "handle-root-test.log",
+          "sha256": "e82c8cf948c03aed1bd26f6db0d8011b8d9bd26d512c0e435af7e165ae24a487"
+        }
+      ]
+    },
+    "candidate": {
+      "state": "DRAFT_NOT_FROZEN_NOT_EXPORTED_NOT_INTAKE",
+      "proposedOnly": {
+        "openapi": "1.24.0",
+        "schema": "1.28",
+        "migration": "0040"
+      },
+      "productionConsumerReady": false,
+      "contractManifestSha256": "7ef6ab5b4c6e34d22d591f6e43b9f771f9cd538fa808acc22e0f912dde7770b5",
+      "sourceSha256": "981dd0e1887a757b51b8469a87ee4668f5dc0b2b3a0ac47c108bb9767cdc8f20",
+      "generatedSqlSha256": "6f48f5cebcbd5a318e4de559f96047b6a5bc402da723506ca44a82f8621f3c63",
+      "previousManifestSha256": "20146bbf9d54ac0f2672ff25f101e50a136fea17e142ad32d4564452560d385b"
+    },
+    "freezeBlockers": [
+      "same-image cross-row keys and old stage/release/rollback inheritance closure remain unresolved",
+      "exact candidate version/freeze/export/receipt/intake approval still required"
+    ],
+    "productionConditions": [
+      "trusted service/parser admission; SQL validates metadata not XLSX derivation",
+      "durable media byte fetcher; current inherited cache miss fails closed",
+      "formal HTTP/Main and real runtime assembly remain disabled"
+    ],
+    "archive": {
+      "state": "DRAFT_NOT_FROZEN_NOT_PUBLISHED",
+      "treeSha256": "bfa15083b59cd16bfc62d22c7cb7376b48a8b94de21f8bcea663fa3191a0bbd4",
+      "artifactHashesRechecked": 30
+    },
+    "notImplied": [
+      "full review pass",
+      "all confirmed findings repaired",
+      "whole source review freshness from a bounded package",
+      "real data or production activation"
+    ],
+    "lifecycleDecision": {
+      "source": "current user reply",
+      "decision": "New declared/parser-hash content version may explicitly reuse deleted unpublished media while immutable deletion history remains; same content-version replay never restores deleted rows",
+      "status": "implemented_and_native_reviewed_with_49_plus_1_business_validation"
+    },
+    "lifecycleValidation": {
+      "evidence": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/lifecycle-evidence.json",
+      "sha256": "cc77b685ff173d395adbc5165a907e14459a184f5a7c824c6cce320edfd9ba73",
+      "matrix": {
+        "cases": 50,
+        "firstPass": 49,
+        "firstFail": 1,
+        "exitCode": 1,
+        "failure": "wrong expected error code in one new top-level unknown-key assertion; corrected",
+        "targetedRerunPass": 1,
+        "targetedRerunSkipped": 31,
+        "targetedExitCode": 0
+      },
+      "parser": "6/6",
+      "static": "9/9",
+      "combinedInstallPG15": "5/5",
+      "nativeReport": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/native-lifecycle-review.json",
+      "nativeUnresolvedActionable": 0
+    },
+    "newStageSplitExternal": {
+      "status": "returned_partial",
+      "timeoutMsEach": 600000,
+      "attemptsEach": 1,
+      "mediaLifecycle": "valid NO_FINDINGS for supplied SQL/parser excerpts; pre-preview-fix stage excerpt is historical, not current freshness",
+      "parserRegistration": "unavailable/timeout, empty response; no conclusion; retries stopped",
+      "previewOrder": "initial two P2 repaired; final rereview returned new nested-rollback finding and generation-selection claim, not NO_FINDINGS"
+    },
+    "previewFollowup": {
+      "evidence": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/preview-followup-evidence.json",
+      "sha256": "ac6f084febdba5fa70c2ff7d22a25036e153a0e546d6ad142a000404216f4848",
+      "red": "2 failed /32 skipped, real PG15",
+      "targetedGreen": "4 passed /38 skipped",
+      "affectedMatrix": "70/70 passed:34 trusted stage PG15 +18 deletion PG15 +8 preview +10 publication preview",
+      "nativeReport": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/native-preview-feedback.json",
+      "sqlChanged": false,
+      "externalFinal": {
+        "status": "completed_with_findings",
+        "report": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/sop-preview-final-external.json",
+        "actualReportedModel": "claude-opus-5[1m]",
+        "claims": [
+          "P2-1 nested rollback owner counterexample confirmed and fixed with exact stage handles; native reviewed, final75+service2 pass; fixed delta has no new external conclusion",
+          "P2-2 mutable input with different inherited bases remains INVESTIGATE; no real PG business closure yet"
+        ],
+        "notClean": true
+      }
+    },
+    "previewRollbackChain": {
+      "evidence": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/preview-rollback-chain-evidence.json",
+      "sha256": "60268863becd48c19119997f494f916ed4a8600da87bd8ea3d63623a4b12f4b1",
+      "nativeReview": "/Users/hutou/Desktop/客服Agent-SOP可信登记-20261011/native-preview-final-handle-review.json",
+      "affectedTests": "75/75 (34 trusted PG +18 deletion PG +13 owner +10 publication)",
+      "legacyServicePG": "2 passed /164 skipped",
+      "scope": "exact stage handle owns commit/rollback; no SQL changes",
+      "externalReviewAfterFix": "not-run",
+      "remainingClaim": "cross-base generation selection INVESTIGATE"
+    },
+    "remainingReview": [],
+    "crossBaseCloseout20261011": {
+      "reportDirectory": "/Users/hutou/Desktop/客服Agent-SOP跨基线审查-20261011",
+      "crossBaseClaim": "REFUTED_CURRENT_TRUSTED_PATH",
+      "behaviorChanged": false,
+      "externalRegistration": {
+        "sql": "completed: three claims refuted by existing constraints and transaction guards",
+        "parser": "completed: row reordering fail-closed remains disclosed compatibility limit; validated replay divergence refuted",
+        "reportedModel": "claude-opus-5[1m]",
+        "inputMismatches": 0,
+        "validation": "external-final-validation.json"
+      },
+      "previewHandle": {
+        "status": "unavailable",
+        "reason": "timeout",
+        "timeoutMs": 600000,
+        "attemptsThisRound": 1,
+        "retryStopped": true,
+        "report": "preview-handle-external.json",
+        "inputManifest": "preview-handle-external-input.json"
+      },
+      "historical79": {
+        "disposition": "accepted as valid original-baseline outside reports, reported DeepSeek; CLI unrecognized_model is warning, not execution failure",
+        "evidence": "historical-result-classification.json",
+        "resubmitted": false
+      },
+      "native": "native-delta-review.md; native-registration-sql-claims.md; native-registration-parser-claims.md",
+      "notImplied": [
+        "arbitrary workbook row-reordering compatibility",
+        "durable pictures or production readiness",
+        "whole review PASS"
+      ],
+      "supersedesCurrentClaims": [
+        "previewRollbackChain.remainingClaim INVESTIGATE",
+        "newStageSplitExternal.parserRegistration unavailable",
+        "previewRollbackChain.externalReviewAfterFix not-run"
+      ],
+      "completeReview": "INCOMPLETE",
+      "externalCompleteReview": "INCOMPLETE",
+      "validation": {
+        "receipt": "/Users/hutou/Desktop/客服Agent-SOP跨基线审查-20261011/combined-evidence.json",
+        "sha256": "e73b34191949b3f91624cca19475cf626b6cfc1b8356e8ca7dd8f783f6d701e5",
+        "actualPG": "3 passed / 34 skipped",
+        "lint": 0,
+        "apiTypecheck": 0,
+        "testSha256": "ff5b22273b4187197f03d9ffe11e47aaf8d23acdce1da0961a8dec0417303d43",
+        "reused75": "unchanged behavior only; not claimed as a fresh 78-test execution"
+      }
+    },
+    "currentStatusOwnedBy": "previewHandleCloseout20261011; other nested INCOMPLETE values are preserved historical attempts"
+  },
+  "previewHandleCloseout20261011": {
+    "completeReview": "COMPLETE_WITH_FINDINGS",
+    "externalCompleteReview": "COMPLETE_WITH_FINDINGS",
+    "reportDirectory": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011",
+    "baseline": {
+      "product": "292221d080006a86a3b5a4a950b055cef2e94eaa",
+      "governance": "6239ff740f3c1c1d204f93f1a3bc0b99f1293243",
+      "includesUncommitted": true
+    },
+    "crossBaseClaim": "REFUTED_CURRENT_TRUSTED_PATH (prior exact evidence reused)",
+    "originalPreviewPackages": {
+      "owner": "completed NO_FINDINGS",
+      "trustedReceipt": "completed NO_FINDINGS; cropped barrier line resolved by complete owner source",
+      "service": "confirmed P2; repaired unknown-commit exact-handle recovery",
+      "serviceFinal": "completed NO_FINDINGS for source283eb0; later real cancellation race independently confirmed, so not whole-path clean"
+    },
+    "fixedThisRound": [
+      {
+        "id": "service-unknown-commit-preview-recovery",
+        "status": "FIXED_WORKTREE_VERIFIED",
+        "originalRed": "1 failed /166 skipped",
+        "originalFinal": "8 passed /164 skipped",
+        "bound": "same surviving service instance, full candidateId/version/digest; not persistent restart recovery"
+      },
+      {
+        "id": "cancel-late-parse-projection",
+        "status": "FIXED_WORKTREE_VERIFIED_AND_REVIEWED",
+        "red": "2 failed /172 skipped; real freeze and parse-start COMMIT followed by true cancel before ACK returns",
+        "behavior": "owner retains cancellation version barrier, older cancel cannot delete newer projection; returned candidate state still reflects its read snapshot"
+      }
+    ],
+    "finalValidation": {
+      "receipt": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/service-cancel-evidence.json",
+      "sha256": "cc7e977d9ee589e9fa7719630da982f0965b61e46ad9b95d9b4e01b062b88231",
+      "executedPassing": 90,
+      "separateInvocations": 3,
+      "notSingleRun": true,
+      "initialDeletionSkipped": 18,
+      "correctedDeletionPassed": 18,
+      "lint": 0,
+      "apiTypecheck": 0,
+      "apiBuild": 0,
+      "sourceHashes": {
+        "apps/api/src/content-intake/linked-preview.ts": "7ce32abf8fec0518a51da84c3ec30b5b3d87ee97b10d7170bbb445f8323bd584",
+        "apps/api/src/content-intake/service.ts": "90a98bcbd79206647714d93cb260beda229a41ea4c6a63eea31982bb96ace205",
+        "apps/api/tests/sop-row-deletion-preview.test.ts": "353c704e56319110b29e97dc89b9c7a7eadd850fb86a8e423e19b437dde9bc2a",
+        "apps/api/tests/content-intake.integration.test.ts": "c012232fefa1bcc5ae16e795194d5ee125b5a7ad8a31eb376dd4cb64572666f0",
+        "apps/api/experiments/sop-row-deletion/trusted-stage.ts": "cbf3948fb1faf5a392732bd6986fc4e669c21d02ce643aff05cd6594d080318e",
+        "apps/api/tests/sop-trusted-stage.integration.test.ts": "ff5b22273b4187197f03d9ffe11e47aaf8d23acdce1da0961a8dec0417303d43",
+        "apps/api/tests/sop-row-deletion-candidate.integration.test.ts": "94fa25f2e328482d0976eab56c2942b03025e3d5661b655d1b02dc92668e21d5",
+        "apps/api/tests/intake-publication-preview.test.ts": "0564658ff7440ed7845bfab52a053fb6d0869cb63b783d53640f845874fb4c39"
+      }
+    },
+    "remainingReview": [],
+    "unresolvedConfirmed": {
+      "structuralGroups": 10,
+      "originalIds": 21,
+      "report": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/unresolved-confirmed.json",
+      "sha256": "84221e072805cbea84e3028c54c7862656011d1addf3fcab49ca388569a44a91",
+      "groups": [
+        {
+          "id": "archive-prototype-pollution",
+          "severity": "Low",
+          "originalIds": [
+            "mermaid-01-07:13"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "archive-exception-dom-cleanup",
+          "severity": "Low",
+          "originalIds": [
+            "mermaid-01-07:16"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "old-publication-owner-acceptance-tenant-closure",
+          "severity": "Medium",
+          "originalIds": [
+            "governance-file-03:20",
+            "governance-file-06:11",
+            "product-file-03:5",
+            "product-file-08:11"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "owner-coach-contract-contradiction",
+          "severity": "Medium",
+          "originalIds": [
+            "governance-pack-10:9",
+            "governance-pack-11:5",
+            "governance-pack-14:11",
+            "product-pack-17:5",
+            "product-pack-19:9",
+            "product-pack-20:7",
+            "product-pack-21:9",
+            "product-pack-24:14"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "metrics-nullable-oneof",
+          "severity": "Medium",
+          "originalIds": [
+            "product-pack-24:7"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "sop-delete-execute-acl",
+          "severity": "Low",
+          "originalIds": [
+            "product-pack-03-01:18"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "sop-delete-text-row-semantics",
+          "severity": "Low",
+          "originalIds": [
+            "product-pack-03-01:22"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "archive-css-undefined-vars",
+          "severity": "Low",
+          "originalIds": [
+            "governance-pack-03:19",
+            "governance-pack-04:19"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "archive-brand-noop",
+          "severity": "Low",
+          "originalIds": [
+            "governance-pack-04:29"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        },
+        {
+          "id": "nonadopted-push-method-combinations",
+          "severity": "Low",
+          "originalIds": [
+            "product-pack-19:49"
+          ],
+          "status": "CONFIRMED_UNRESOLVED_IN_ADOPTED_OR_FROZEN_BYTES"
+        }
+      ]
+    },
+    "historicalRecords": "Prior incomplete/timeout/failure records remain historical. This overlay owns current progress, not a retrospective PASS.",
+    "formalDelivery": "DRAFT_NOT_FROZEN_NOT_EXPORTED_NOT_INTAKE; productionConsumerReady=false",
+    "notImplied": [
+      "all confirmed defects fixed",
+      "whole review clean",
+      "same-image cross-row delivery",
+      "durable image storage",
+      "real-data or device acceptance"
+    ],
+    "completed": true,
+    "status": "issues_found",
+    "specialists": {},
+    "qualityMeaning": "review execution complete; 10 confirmed unresolved structural groups remain; not clean/PASS or ship authorization",
+    "evidenceOverlay": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/gate-overlay.json",
+    "finalOutside": {
+      "report": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/cancel-final-external.json",
+      "sha256": "99f98d58c5adad8df56da7df14270ca279b22fc82830dbd857b4e1fbb4ee171f",
+      "input": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/cancel-final-external-input.json",
+      "validator": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/cancel-final-external-validation.json",
+      "completed": true,
+      "gate": "pass",
+      "verdict": "clean",
+      "reportedModel": "claude-opus-5[1m]",
+      "providerIndependentlyVerified": false
+    },
+    "nativeFinal": {
+      "report": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/native-cancel-final.json",
+      "sha256": "207b9b7f3d52a3314d9490a6260824f7ff0174e992fd22ff07ba688de7d9f466",
+      "completed": true
+    },
+    "reuseProof": "/Users/hutou/Desktop/客服Agent-预览句柄分块外审-20261011/reuse-after-cancel.json",
+    "sourceScope": "Final owner/service cancellation delta plus exact prior source and historical branch evidence; main review binds final dirty working tree."
+  },
+  "completeReview": "INCOMPLETE",
+  "currentReviewStatus": "versioned_handoff_increment_pending",
+  "historicalRootFields": "status/baseline/method/scope/fixed/remainingActionableCodeFindings retain the original recorded baseline. previewHandleCloseout20261011 preserves the completed fixed-snapshot review and ten unresolved adopted/frozen groups. Current completeReview/externalCompleteReview/currentReviewStatus are owned by versionedHandoffIncrement20261012; no old report is rewritten as failed or passed.",
+  "imageDeliveryIncrement20261012": {
+    "completeReview": "COMPLETE_WITH_FINDINGS",
+    "externalCompleteReview": "COMPLETE_WITH_FINDINGS",
+    "completed": true,
+    "productHead": "292221d080006a86a3b5a4a950b055cef2e94eaa",
+    "governanceHead": "6239ff740f3c1c1d204f93f1a3bc0b99f1293243",
+    "includesUncommitted": true,
+    "reportDirectory": "/Users/hutou/Desktop/客服Agent-SOP图片闭环-20261011",
+    "sourceSnapshot": {
+      "path": "verification-state-v7.json",
+      "sha256": "12010243419d0d732a7976fda8b16b4349700f85a427b575702c83e823eab65e",
+      "scope": "Final behavior and tests before this documentation-only overlay; not a self-hash"
+    },
+    "priorGoalSteps": {
+      "crossBase": "REFUTED_CURRENT_TRUSTED_PATH; current stage-full.log repeats exact regression successfully",
+      "registrationAndHandles": "Original goal steps1/2 closed at previewHandleCloseout20261011; new durable-media changes have separate required review"
+    },
+    "currentFixes": [
+      "validated job recovers its own redundant unadopted payloads for guarded cleanup",
+      "stage and preview perform file reads outside content lock and recheck authority/assets before return",
+      "governance PG upgrade input binds to current successor manifest, not just adjacent self-consistent manifest"
+    ],
+    "validation": {
+      "stagePG": "45 passed; includes cross-base and row-shift regression",
+      "relatedPG": "46 passed (delivery17/capacity11/row-deletion18)",
+      "rootChecks": "stage-repair-v1/root-checks.json; lint/typecheck/test/build exit0; their PG skips are not PG proof",
+      "governancePG": "stage-repair-v1/binding-current.json; 12 passed/0 fail/0 skip",
+      "smoke": "review-v3/functional-report.md; two selected PG/HTTP probes passed within one300-second budget",
+      "native": "review-v3/native-adversarial.md plus native-capacity-binding.md; exact scope and test-summary limitations preserved",
+      "release": {
+        "receipt": "/Users/hutou/Desktop/客服Agent-SOP图片闭环-20261011/stage-repair-v1/governance-release-final.json",
+        "verification": "/Users/hutou/Desktop/客服Agent-SOP图片闭环-20261011/stage-repair-v1/governance-release-final-verification.json",
+        "exitCode": 0,
+        "steps": 47,
+        "inputFiles": 609,
+        "changedInputs": 0,
+        "logSha256": "9abeeaa3ed6ad08efa782af103a3e089841db3e0d825bad0dded70cf61f2b8cc",
+        "finishedAt": "2026-10-11T16:17:00.826738+00:00",
+        "independentPGIncluded": false
+      }
+    },
+    "external": {
+      "completed": [
+        "B4M stage repair",
+        "C4M preview repair",
+        "D1M generator review with main triage",
+        "D2M evidence review with E1 repaired afterwards",
+        "E1M four-line local input binding",
+        "D5M publication/legacy/shared-media test scenarios",
+        "D6M read/rollback/authorization test scenarios"
+      ],
+      "evidence": "external-slices-v1/coverage.json, current-findings.json; exact input checks in stage-repair-v1/review-input-checks.json",
+      "remaining": [],
+      "backendIndependentlyVerified": false,
+      "retryStopped": true,
+      "reportedModels": [
+        "claude-opus-5-5[1M] (earlier slices)",
+        "claude-opus-5[1M] (restored route E1M/D5M/D6M)"
+      ],
+      "recoveryEvidence": "external-diagnostic-v1/restored-connectivity-20261012.receipt.json",
+      "historicalFailures": "D3M API429 and D4M timeout retained; no successful verdict inferred from either"
+    },
+    "candidateState": "DRAFT_NOT_FROZEN_NOT_EXPORTED_NOT_INTAKE",
+    "productionConsumerReady": false,
+    "unchangedHistoricalLimits": [
+      "Old whole-branch OCR/source/DDL/OpenAPI evidence limitations preserved",
+      "Ten confirmed groups in adopted/frozen bytes require their respective successor delivery; candidate fixes are not formally adopted fixes",
+      "No real-data, production HTTP, new Mac package or Windows acceptance"
+    ],
+    "notImplied": [
+      "clean/PASS",
+      "all historical defects repaired or delivered",
+      "formal version/freeze approval",
+      "new device or real-data acceptance"
+    ],
+    "converged": true,
+    "currentIncrementUnresolvedBehaviorDefects": 0,
+    "inheritedUnresolvedStructuralGroups": 10,
+    "inheritedOriginalIds": 21,
+    "finalGateEvidence": "/Users/hutou/Desktop/客服Agent-SOP图片闭环-20261011/review-v3/gate-overlay-final.json"
+  },
+  "currentReviewOwner": "versionedHandoffIncrement20261012",
+  "versionedHandoffIncrement20261012": {
+    "completeReview": "INCOMPLETE",
+    "externalCompleteReview": "INCOMPLETE",
+    "completed": false,
+    "priorReview": "imageDeliveryIncrement20261012 remains COMPLETE_WITH_FINDINGS on its exact old input",
+    "scope": "v6 export/intake/generator and 0040 runner verification",
+    "approvedVersions": {
+      "openapi": "1.24.0",
+      "schema": "1.28",
+      "migration": "0040",
+      "profile": "content-intake-repair-successor-v1"
+    },
+    "candidateState": "VERIFIED_NOT_ACTIVATED",
+    "formalSourceCommitAuthorized": true,
+    "productionConsumerReady": false,
+    "evidenceDirectory": "/Users/hutou/Desktop/客服Agent-SOP图片闭环-20261011/versioned-handoff-v1",
+    "isolatedRoundtrip": "Passed export/intake/generation and real PG15 predecessor drift, rollback, COMMIT_UNKNOWN/replay, physical verifier",
+    "remaining": [
+      "final current-input gstack gate synthesis; reconcile prior findings with exact delivered version; full formal-SOP test external coverage not claimed"
+    ],
+    "validation": {
+      "root": "post-intake-checks.json: actual formal input lint/typecheck/test/build/workspace/docs exit0; first failed attempts retained separately",
+      "governance": "governance-release-summary.json:48 steps all exit0",
+      "intakeRegression": "review-regression-red.log:2 failed; review-regression-green.log:6 passed",
+      "pgRoundtrip": "roundtrip-fixed.log:isolated exact artifact export/intake/40 migration runner/recovery PASS; not formal source intake",
+      "formalPg": "formal-runner-pg.log PASS against actual source379b793; post-intake SOP91 distinct tests:61 initial PASS plus2 fixed targeted PASS plus28 PASS; initial failures retained",
+      "workspace": "post-intake-workspace.log exit0:43.4/45MiB; groups19/16/10 approved"
+    },
+    "external": {
+      "modelReported": "claude-opus-5[1M]",
+      "initial": "review-A/B returned findings; dispositions in 外审处置.md",
+      "fix": "review-fix-small.result.json:30.28s exit0 NO_FINDINGS for two binding fixes",
+      "timeoutRetained": "review-fix.result.json:240s timeout no conclusion",
+      "boundedIncrementComplete": false,
+      "notWholeBranchPass": true,
+      "previousBoundedIncrementComplete": true,
+      "newUnreviewedDelta": "formal SOP test bodies and whole-current-input gate synthesis remain outside the bounded external source package",
+      "deliveryDeltaReview": "delivery-delta-review-summary.json: generator identity and budget slice completed NO_FINDINGS; native generated artifact checks also passed; fixtures summary-only"
+    },
+    "sourceGitSha": "379b793811edf48bd64f512f5733790b9fdeeb0d",
+    "formalContractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed",
+    "staging": {
+      "files": 67,
+      "purpose": "SOP image loop and formal successor intake",
+      "manifest": "product-staging-manifest.json",
+      "commitCreated": false,
+      "pushPerformed": false
+    }
   }
 }

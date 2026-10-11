@@ -72,7 +72,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
 | `apps/api/` | 命名 profile、公开/私有配置分离、Fastify 生命周期、runtime/admin 双 pool、mock/Feishu 登录 provider（配置边界见 API 运行配置）、service readiness、策略读写、受控搜索与事件事务边界、合成 CSV/XLSX 持久接收、冻结 iteration-task 列表/开始/关闭、OpenAPI 1.14.0 ops-loop HTTP（不准、SOP、话术草稿、检索账、软件目录） | 桌面 fixture、renderer、migration owner、未获准的真实组织/审批输入、真实业务数据、桌面 adapter、worker 解析或外部 bind |
 | `apps/api/tests/support/g1a-e0/` | 测试专用仓外输入校验、一次性 PG15 装载、同一 SearchBackend 评测、聚合报告与清理 | HTTP route、事件写入、桌面依赖、长期数据库、真实内容或正式构建产物 |
-| `apps/api/tests/support/intake-synthetic-*.ts` / `scripts/intake-synthetic/` | 全新临时 PG15、合成 FAQ、实际身份／资料 HTTP 模块及直发状态统计；前台 CLI 与独立桌面 profile 的生命周期边界 | 业务配置、已有数据库、真实身份／飞书、正式 factory／ACL、审批 provider 或自动续期 |
+| `apps/api/tests/support/intake-synthetic-*.ts` | 全新临时 PG15、合成 FAQ/SOP 来源、实际身份／资料 HTTP 模块及直发状态统计；只提供受控合成宿主与清理 | 桌面 adapter、业务配置、已有数据库、真实身份／飞书、正式 factory／ACL、审批 provider 或自动续期 |
+| `scripts/intake-synthetic/` | 跨应用合成验收与前台 CLI；SOP 测试组合上述 HTTP 宿主及真实 Main `ContentIntakeUsage`，验证第二坐席复制文字、系统图片预览及资源清理，归入 `pnpm test:intake:synthetic` | API 反向导入桌面、生产运行装配、真实数据；内存剪贴板回调不替代 OS／Electron 人工验收 |
 | `apps/api/src/search-decision.ts`、`search-relations.ts` | 产品搜索判定、内部诊断，以及有界正文关系/否定/论元语义；实验复用同一规则 | 人工来源注解、实验 fixture、HTTP 诊断字段或绕过来源门禁 |
 | `apps/api/experiments/search-decision/` | 合成搜索判定实验与验收工具：固定产品源码哈希 + 仅重定位 import 的诊断副本、合成夹具、需求判定和事实/行为/失败门禁 | 产品 `src` 行为、SearchBackend、真实来源、runtime 依赖、正式构建产物 |
 | 根 `scripts/` | 合同快照接收、workspace 卫生门、架构依赖门（`pnpm check:architecture`）、W6 正式服务候选产物组装与隔离后验 | Electron 运行时、UI、真实凭证或部署动作 |
@@ -80,7 +81,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
 | `packages/retrieval-core/` | 纯 TypeScript 检索算法：BM25、RRF、余弦相似度、分数门槛和字符分词；通过显式输入隐藏算法细节，不拥有产品字段、HTTP、Electron、数据库或 UI 策略 | `apps/*` 依赖、产品字段权重、合成/真实数据读取、运行时 I/O |
 | `packages/content-intake/` | 标准 FAQ 的 XLSX / CSV 解析、预算前检、错误/模板实物及可取消子进程；`faq-rules.ts` 独占格式无关业务校验，`csv.ts` 拥有原字节 CSV 格式边界；同一 runner 按服务端来源上下文选择解析器，P2 API 消费正式编译产物 | 不拥有授权/审批/正式候选、renderer IPC、真实来源或自行发布；experiments/csv 只保存合成原字节夹具 |
-| `apps/api/src/content-intake/` | 产品会话主体到组织／岗位／业务授权交集；原子授权、接收／解析、服务端 direct-v1 材料冻结、修订／取消与来源确认；候选质量计划及逐条人工检查复用封闭 DB 存储；publication 拥有确认意图、精确原操作恢复与内部 SQL 原子发布；rollback 拥有上一版完整影响预检、全部影响范围复核及新发布回执；evidence 保留来源确认与只读旧审批历史，四个审批写口拒绝 MODE_CONFLICT；usage 统一拥有会话／店铺／选择绑定、来源材料一致性、混合政策谱系、最早截止、逐页重验和坐席投影；discovery 投影来源资格及绑定会话／完整权限版本的分页 | 仅隔离 PG 合成消费者，无生产 HTTP factory／新 ACL；不安装新审批 provider，不制造审批通过，不创建第二 current，不隐式 bootstrap／认领旧同域内容 |
+| `apps/api/src/content-intake/` | 产品会话主体到组织／岗位／业务授权交集；原子授权、接收／解析、服务端 direct-v1 材料冻结、修订／取消与来源确认；候选质量计划及逐条人工检查复用封闭 DB 存储；publication 拥有确认意图、精确原操作恢复与内部 SQL 原子发布；仅在事务确认成功或已提交回执恢复后登记图片预览，回滚和未知提交不提前投影；rollback 拥有上一版完整影响预检、全部影响范围复核及新发布回执；evidence 保留来源确认与只读旧审批历史，四个审批写口拒绝 MODE_CONFLICT；usage 统一拥有会话／店铺／选择绑定、来源材料一致性、混合政策谱系、最早截止、逐页重验和坐席投影；discovery 投影来源资格及绑定会话／完整权限版本的分页 | 仅隔离 PG 合成消费者，无生产 HTTP factory／新 ACL；不安装新审批 provider，不制造审批通过，不创建第二 current，不隐式 bootstrap／认领旧同域内容 |
 | `apps/api/src/content-intake/usage-http.ts` | 六条发现/词表/店铺目录/资格/快照 HTTP 路由的认证、查询解码、正式错误与响应校验；保留认证私有引用，复用既有 usage 事务 | 仅隔离合成宿主显式注册；不导入桌面，不注册生产工厂，不授予新应用 ACL |
 | `apps/api/src/content-intake/grants-http.ts` / `authority.ts` / `discovery.ts` grants | 冻结授权合同的列表、只读预览、创建与撤销/接管 HTTP；预览与创建共用批次校验，列表在 SQL 扫描前按当前可管理范围收窄，最终仍复核母授权；管理插件借出同一个 requireProductSession service | 仅合成宿主注册；不建立第二权限规则、不创建 root allocation；游标不携带无权范围的扫描行，预览没有持久写或回执 |
 | `apps/api/src/content-intake/management-http.ts` / `files.ts` | 管理端上传、接收与有界串行解析；服务端摘要、永久回执、容量门、会话锁、材料分页与 Excel 错误报告；来源确认、只读旧审批、确认发布／取消／回退及主体+action+operationId 回执查询；共享 http-boundary.ts 拥有认证引用、错误封口及分页解码，候选地址与正文键必须一致 | 仅隔离合成宿主显式注册；新审批请求／刷新返回 MODE_CONFLICT；不接受客户端角色、材料摘要／正文行或审批结论；质量 HTTP 保留摘要／样本／提交／回执；上传消费管理上下文及参与人目录；回退仅支持上一版，越范围须新纠正候选 |
@@ -274,7 +275,7 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 | CodeGraph 索引 | `.codegraph/` | 本地工具状态，不进业务提交 |
 | 用户参考 ZIP | `clawd-on-desk-0.15.0.zip` | 只读、忽略、不得复制资源进仓 |
 
-`pnpm workspace:check` 对所有保留输入实行三个独立 allocated-byte 预算：源码/测试/文档/资产/迁移/生成源码与配置 20 MiB、冻结合同 `contracts/upstream/` 15 MiB、冻结证据 `evidence/` 10 MiB，总量 45 MiB；任一分组或总量超限均失败。依赖、各已知包构建输出和精确派生图标单独统计，不误算成源码增长，也不借此排除未知文件或冻结历史。分组共享 inode 计数以避免重复统计硬链接，实际字节构成与批准依据见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。它还验证根 workspace 门面不声明版本，并要求 `.gstack/package-json-path` 唯一指向 `apps/desktop/package.json`，避免发布版本与安装包版本分叉。清理器是精确 allowlist，遇到未知路径或符号链接会停止。
+`pnpm workspace:check` 对所有保留输入实行三个独立 allocated-byte 预算：源码/测试/文档/资产/迁移/生成源码与配置 19 MiB、冻结合同 `contracts/upstream/` 16 MiB、冻结证据 `evidence/` 10 MiB，总量 45 MiB；任一分组或总量超限均失败。依赖、各已知包构建输出和精确派生图标单独统计，不误算成源码增长，也不借此排除未知文件或冻结历史。分组共享 inode 计数以避免重复统计硬链接，实际字节构成与批准依据见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。它还验证根 workspace 门面不声明版本，并要求 `.gstack/package-json-path` 唯一指向 `apps/desktop/package.json`，避免发布版本与安装包版本分叉。清理器是精确 allowlist，遇到未知路径或符号链接会停止。
 
 ## 7. 当前架构评价
 
@@ -349,6 +350,8 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 `content-intake/transaction.ts` 是唯一内容事务 owner，直接调用冻结 `intake_runtime.lock_product_session`；ZA003/SESSION_UNAVAILABLE 映射为未授权。各业务 owner 可注册事务内最终不变量检查，但不得自行 COMMIT；最终事实/最早截止仍由事务 owner 复核。
 
+SOP 单行删除合同已随批准的 schema1.28/0040 版本化接收，应用消费者仍留显式合成实验：`packages/content-intake/src/sop.ts` 唯一产生 `rowBindings`；治理候选拥有持久行映射与新版本删除 SQL；`apps/api/experiments/sop-row-deletion/consumer.ts` 只在显式合成测试装配中复用事务、资格、回执和提交后预览变更。`linked-preview.ts` 拥有预览数组别名与候选版本，解析成功登记版本、删除回执按版本及剩余行集合投影，空态也保留版本屏障，晚解析和旧回执不得改新版本。实验私有回执还绑定冻结材料的输入对象，删除只从该对象暂存字节生成独立候选预览，保留未删除图片且不修改既有发布别名。`trusted-stage.ts` 是同一实验的可信解析入口：从已采用对象读真实字节并校验摘要，复用唯一 SOP parser/material 构造，经已接收后继窄函数在同事务写候选、词项、job、完整行和媒体。新解析行显式列入 `freshRowIds`；继承只接受精确发布谱系与完整行／媒体映射；本轮持久候选逐张验证系统附件，不再因缓存为空拒绝继承。缺文件或错误摘要仍明确拒绝。图片字节读取在内容锁外完成，最终事务重新核对同一份行／媒体快照与资格；validated 恢复只取该 job 自己未采用的预约描述符，经已有带锁释放能力清理冗余副本，未知提交继续保留。预览在 COMMIT 前暂存输入、确认成功后采用，明确回滚只清本次暂存，未知提交保留。旧冻结 DELETE/204 未改；正式 HTTP/Main 与运行装配未接线，不从实验导入生产；持久字节读取仅在本轮候选实验显式装配。删除后重用由同一候选维护不可变删除事件：parser透传声明版本优先/无列hash的内容版本，新job不算新版本；旧版删除屏障不因新版本恢复当前媒体状态而消失。本轮后继候选将候选／发布媒体关系键补入 row_id，发布谱系的语句级触发器同事务写完整图片关系，图片原物理对象继续去重。正式0040已完成容量、并发和相关合成回归；HTTP/Main接线、生产装配及当前增量审查仍须各自完成，不由合同接收替代。
+
 `content-intake/runtime-pool.ts` 唯一拥有四用途连接的显式 SET ROLE/assert_purpose、借出失败销毁及关停；连接配置由调用者显式提供，不创建角色或读取环境凭据。业务/usage 分别创建原 service，worker 只服务既有失败收尾和报告容量。组织 `organization/{facts-writer,feishu-observer,registered-refresh}.ts` 隐藏可信绑定、观察及写入/恢复，在受限组织连接内消费冻结 schema/mapping；HTTP transport 仍留实验目录，无生产飞书接线。
 
 `shop-directory.ts` 借用原内容事务及真实 ProductSession，会话锁后 prepare 有界目录，最终 finish 和 deadline 通过才返回。Main `content-intake-access.ts` 完整消费分页并要求名称 shopId 集合与已授权 shops 相等，名称失败保留编号与可见提示；Query 只投影显示名，同名附 ID，不改变授权或新建 IPC。
@@ -359,3 +362,11 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 
 `packages/content-intake/src/csv.ts` 隐藏UTF-8/CSV语法、固定23列、来源逐记录绑定与预算；`faq-rules.ts` 单一拥有FAQ/问法业务约束，runner在隔离子进程按受信模板选择CSV/XLSX并核对返回policy。`apps/api/src/content-intake/input-format.ts` 单一拥有登记template/rule/mapping/structure到MIME、context和逻辑selectedSheets的映射，由files/service/material消费。Main只拥有原生有界读、原字节及未知请求重放；renderer不提供路径、MIME或解析结果。CSV采用运行依赖csv-parse7.0.3，不新增服务或生产注册。实验目录仅保留合成模板与历史说明；实际验证见[CSV接入](../evidence/qa/intake-csv-runtime/README.md)。
+
+SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件与独占文件锁，`experiments/sop-row-deletion/media-lifecycle.ts` 拥有同任务稳定预约、持锁重核、写入登记及失败清理，治理候选窄函数复用原 objects/object_reservations 容量账本。文件锁不随 DB 断连释放；所有附件写入及通用回收共用它，锁作用域结束前等待真实 I/O 完成。未知提交、锁竞争及崩溃残锁保守保留计费，不做自动 TTL 清理。`persistent-media.ts` 只读取绑定会话／租约的行级图片元数据及单张已授权文件；`usage.ts` 继续唯一拥有会话、当前权限、租约、适用性与最终截止核验，先过滤行再对可见图片去重。图片读取分为授权选取、锁外读文件、返回前重新选取三步，第二个短事务核对同一图片及最早授权截止，避免持有全局内容锁等待磁盘。内部 payload ID 不进 HTTP，列表不携带字节，文件坏损不能回退内存缓存。生产 factory 不注入这个实验 reader；旧调用默认内存 reader。
+
+预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
+
+### 精确修复后继的版本接收（2026-10-12）
+
+治理 `export_customer_agent_repair_successor.mjs` 拥有批准记录、六件不可变冻结字节及 v6 八件导出包；累计 schema 只作参考，实际安装消费 upgrade。产品 `customer-agent-contract-set.mjs` 验证同一 Git 来源的批准/全部成员、39段前序及独立 `repair-contract-set.lock.json`，原主锁不变。合同生成器选择已验证 repair 快照；数据库生成器先重建并逐件比较原39段，再追加0040。runner 在0040事务内做前后物理校验及回执记账，COMMIT_UNKNOWN保留待恢复语义。治理来源提交379b793已正式导出，产品已接收独立repair锁与0040，生成合同的内容、ID、来源SHA及摘要统一取同一后继快照。接收状态VERIFIED_NOT_ACTIVATED；正式 HTTP/Main 和持久图片生产装配仍未开放。

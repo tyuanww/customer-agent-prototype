@@ -1,0 +1,59 @@
+{
+  "schema": "customer-agent-contract-set/v6",
+  "contract_set_id": "cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "379b793811edf48bd64f512f5733790b9fdeeb0d",
+  "architecture_version": "1.16",
+  "implementation_version": "1.22",
+  "openapi": {
+    "version": "1.24.0",
+    "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/openapi.v1.yaml",
+    "file": "openapi.v1.yaml",
+    "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+    "bytes": 795585
+  },
+  "database": {
+    "version": "schema.v1.28",
+    "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/schema-v1.28.sql",
+    "file": "schema-v1.28.sql",
+    "sha256": "c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69",
+    "bytes": 834890
+  },
+  "repair": {
+    "upgrade": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/upgrade.v1.sql",
+      "file": "upgrade.v1.sql",
+      "sha256": "a0e2e9d04a44bc78a2ab77b14ebf35f3bca4e2b9427d328405bd9ca141795b8f",
+      "bytes": 115028
+    },
+    "installation": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/installation.v1.json",
+      "file": "installation.v1.json",
+      "sha256": "adac07c832853c64ac273762138ebdb3b998259607e13a4345eafdb5bd3abe9f",
+      "bytes": 5119
+    },
+    "predecessor": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/predecessor-lock.v1.json",
+      "file": "predecessor-lock.v1.json",
+      "sha256": "0e33365085437efa1c2bf899ca87c7cef68147848edc8a3f9e42d6d3b2c8caf2",
+      "bytes": 9128
+    },
+    "provenance": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/provenance.v1.json",
+      "file": "provenance.v1.json",
+      "sha256": "08f1e5149ab5f4a4fbcd9e7ad062428adcedb4b96d1c4bb2e9e2976d4a2f27f2",
+      "bytes": 2969
+    },
+    "approval": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/90-评审/2026-10-12_后继合同批准.json",
+      "file": "approval.v1.json",
+      "sha256": "d26d746361ccd8b545499f66d7cf3a920a768eaf94470cba15a76722b9c61da3",
+      "bytes": 1357
+    }
+  }
+}

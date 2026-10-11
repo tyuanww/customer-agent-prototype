@@ -1,3 +1,4 @@
+import { publicationCandidateSql } from './support/publication-candidate.js';
 import { createHash as sha } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,6 +19,7 @@ import { parseApiRuntimeConfig } from '../src/runtime-config.js';
 import { createServiceRepository } from '../src/service-repository.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
+const candidateSql = publicationCandidateSql();
 const HMAC = Object.freeze({
   currentVersion: 'hmac-idempotency-v1',
   keys: Object.freeze({ 'hmac-idempotency-v1': 'synthetic-t4-idempotency-material-0001' }),
@@ -57,6 +59,11 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     admin = await harness.connect(db.config);
     competitor = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
+    if (candidateSql) {
+      await admin.query('BEGIN');
+      try { await admin.query(candidateSql); await admin.query('COMMIT'); }
+      catch (error) { await admin.query('ROLLBACK'); throw error; }
+    }
     await admin.query(`
       CREATE ROLE t4_runtime LOGIN; GRANT app_runtime TO t4_runtime;
       CREATE ROLE t4_admin LOGIN; GRANT app_content_admin TO t4_admin;
