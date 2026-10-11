@@ -1,5 +1,6 @@
 # P2 合同交接验收 · 2026-10-06
 
+> 证据交付边界（2026-10-12 校正）：下文 `.gstack/` 文件只在原本机工作树保留，未随 Git 交付，远端审阅者不能据此直接复核原始执行。本文保留历史观察及其限制；这些本机路径不是仓内可点击证据，也不证明当前版本通过。
 本次完成治理合同的产品接收、类型/validator 生成和追加迁移，未实现完整 FAQ 运行流程。依据与下一步见[需求计划 §0.5](../../../docs/plans/2026-10-03-content-intake-requirements.md#05-本地提交与产品合同交接2026-10-05-授权2026-10-06-接续)及[P2 交接](../../../docs/reference-content-intake-p2-contract-handoff.md)。
 
 ## 候选与输入
@@ -49,7 +50,7 @@
 
 ### Exploratory QA and Verification Results
 
-功能面为 CLI/生成物/隔离数据库，无视觉评分。5 分钟 smoke 中完成有效合同接收、混版本/来源拒绝、字段名/字面量转换检查；新增 DOMAIN 修复属于必要复核，使用独立 120 秒命令上限。安全数据与实际观察由 `gstack-qa-evidence` 落盘，检查点依次为本地 [002](../../../.gstack/content-intake-p2-handoff/review-qa/exploration-002.json)、[003](../../../.gstack/content-intake-p2-handoff/review-qa/exploration-003.json)、[004](../../../.gstack/content-intake-p2-handoff/review-qa/exploration-004.json)。
+功能面为 CLI/生成物/隔离数据库，无视觉评分。5 分钟 smoke 中完成有效合同接收、混版本/来源拒绝、字段名/字面量转换检查；新增 DOMAIN 修复属于必要复核，使用独立 120 秒命令上限。安全数据与实际观察由 `gstack-qa-evidence` 落盘，检查点依次为本地 002（本机历史文件 `.gstack/content-intake-p2-handoff/review-qa/exploration-002.json`）、003（本机历史文件 `.gstack/content-intake-p2-handoff/review-qa/exploration-003.json`）、004（本机历史文件 `.gstack/content-intake-p2-handoff/review-qa/exploration-004.json`）。
 
 检查前后核对非文档输入；未变化的合同、解析和 API 实库证据复用。DOMAIN 源码变化后已重跑仓库四项及 PG 必要回归。最终仅校正 PG 测试设置和说明文档，PG17重新通过；未重复不受其影响的全仓检查。临时 PG 实例已停止；持久保留本地审查/测试日志供审阅。
 
