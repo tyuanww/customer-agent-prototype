@@ -37,3 +37,21 @@ CI测试外审报P2：块体beforeAll未return启动Promise。**反驳**：`pack
 ## 证据与限制
 
 原始外审响应、逐项核对、SQL与两个实验脚本/日志保存在仓外 `客服Agent-SOP图片闭环-20261011/ci-delta-review-20261012/`；机器回执 `review-receipt.json` 记录输入和证据摘要。目录未随Git交付；本报告不把本机路径当成远端可访问证据。没有新增真实数据、生产激活、部署、最终Mac安装包或办公Windows人工验收。治理原有9项修改保持原样。
+
+## 后继候选补齐（2026-10-12）
+
+本段承接上述诊断，不改写其当时状态。治理仓新增 `build_customer_agent_readiness_successor.mjs` 与 `readiness-successor-candidate`：沿用 OpenAPI 1.24.0 原字节，拟 schema 1.29／0041／`content-intake-readiness-successor-v1`。生成器固定1.28前序和40段迁移回执锁，参考schema保留前序原字节，仅追加五函数PUBLIC撤权、三种既有内部角色的纯格式谓词EXECUTE及版本标记。未改产品迁移、业务源码、正式合同锁或API探针。
+
+新增生成器5项通过；真实隔离PG15父测试及11子项共12项通过，验证前序缺失/篡改、角色异常、整笔回滚、函数正文及安全属性不变、权限/版本门和三类ACL漂移。当前1.28解释器仍拒绝1.29，未把未来版本当作已接收；同一严格SQL使用拟1.29版本参数返回完整关闭的策略标记。
+
+仓外隔离副本在真实40段迁移之后安装相同升级SQL；受限账号HTTP/PG15套件9项通过：四域CSV发布及另一客服读取、XLSX上传解析、幂等、worker错误报告/修正重传和越权/格式拒绝。测试沿用非超级用户用途池，未替换数据库返回值或业务函数。首次命令因临时路径规范化问题未收集测试；改为副本规范工作目录后9项通过，原失败日志保留。此证据不是正式迁移或最终CI。
+
+命令、输入摘要、安装SQL、补丁及日志保存在仓外 `readiness-successor-20261012`。新候选仍DRAFT，未经冻结/export/intake，完整审查保持INCOMPLETE；需精确候选批准后沿正式版本交接，不能修改历史0001–0040或用新版本注释单独放行当前消费者。
+
+接收体积预检：当前workspace为43.3/45 MiB、合同组15.7/16 MiB，检查通过；完整候选再复制会令合同组约17.3 MiB。候选已补固定前序+差量的组合说明及字节还原测试，五件候选4KiB块投影不足64KiB。该方案仍需正式export/intake消费者实现与最终预算验收；没有修改预算或历史文件，不把预测当作安装结果。
+
+## 就绪后继正式接收（2026-10-12）
+
+用户批准固定前序＋差量的精确候选：OpenAPI 1.24.0、schema 1.29、迁移 0041、profile `content-intake-readiness-successor-v1`。治理仓已提交 `75e1889efee91322dab1dfa28aadc53fd718682b`，`test:release` 与 export check 均退出 0；导出目录为 `cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9`，状态 `EXPORTED_NOT_INTAKE`。
+
+产品由同一导出包完成 intake：合同锁记录治理源 SHA，0041、生成 manifest/provenance 与固定前序组合已落工作树，状态 `VERIFIED_NOT_ACTIVATED`，`ddev_authorized=false`、`runtime_activated=false`。PG15 迁移和运行时测试 75/75 通过，产品 intake 定向测试 11/11 通过；先前 DRAFT 候选的 5/12/9 项记录保留为历史候选证据，不改写为正式交接结果。此次接收仍未接生产 runner、HTTP、真实飞书或客户资料，也未完成 Windows／办公设备人工验收。

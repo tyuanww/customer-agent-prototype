@@ -1,0 +1,48 @@
+{
+  "schema": "readiness-successor-review-candidate/v1",
+  "status": "DRAFT",
+  "proposedVersions": {
+    "openapi": "1.24.0",
+    "schema": "1.29",
+    "migration": "0041",
+    "exportProfile": "content-intake-readiness-successor-v1"
+  },
+  "formalVersionAssigned": false,
+  "freezeApproved": false,
+  "exportApproved": false,
+  "intakeApproved": false,
+  "productionConsumerReady": false,
+  "runtimeActivated": false,
+  "syntheticOnly": true,
+  "inputs": {
+    "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/schema-v1.28.sql": "c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69",
+    "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1/openapi.v1.yaml": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+    "business-docs/01-客服Agent项目/30-开发-进行中/readiness-successor-candidate/predecessor-lock.json": "c9b85e65a83925c2520394b562f26f8e07a6d2e7f1d5b91b62e8a07dd4d41c0d"
+  },
+  "artifacts": {
+    "openapi.candidate.yaml": {
+      "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "bytes": 795585
+    },
+    "schema.candidate.sql": {
+      "sha256": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771",
+      "bytes": 840498
+    },
+    "upgrade.candidate.sql": {
+      "sha256": "848bf0222dcbd02f406611979d4221fa3d5add8c4941df775356b901435ece2d",
+      "bytes": 5534
+    },
+    "assembly.candidate.json": {
+      "sha256": "5b76a4712bbf40f047104323e142a835742ae27f2af5ee94695b4244fec77bb2",
+      "bytes": 1731
+    },
+    "installation.candidate.json": {
+      "sha256": "ebe48223f3ea16598668ef892339bfd2b5dd1c920c196083f711627b5ca47c0b",
+      "bytes": 1521
+    }
+  },
+  "remainingApprovals": [
+    "Approve exact proposed version/profile and artifact hashes before freeze/export/intake.",
+    "Run release gate and formal installer verification on the approved artifacts. Candidate tests do not activate production."
+  ]
+}

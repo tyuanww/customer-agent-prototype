@@ -157,6 +157,14 @@ const EXPECTED_V127_FUNCTION_SECURITY_ENTRIES = 257;
 const EXPECTED_V127_FUNCTION_SECURITY_SHA256 = 'f077ee5d6f3bfb460f7fa2dbf6c503d03723a242404e6b8031a3b7f5b56b1d6b';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
+const READINESS_FORMAT_FUNCTIONS = Object.freeze([
+  'content_intake.candidate_format_guard()',
+  'content_intake.input_format_matches(text,text,text,text,text)',
+  'content_intake.input_object_format_guard()',
+  'content_intake.parse_format_guard()',
+  'content_intake.source_format_guard()',
+]);
+const READINESS_PREDICATE_ROLES = Object.freeze(['intake_business', 'intake_worker', 'intake_runtime_fn_owner']);
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -195,6 +203,7 @@ async function verifyCatalogueState(
     functionEntries: EXPECTED_FUNCTION_SECURITY_ENTRIES,
     functionSha256: EXPECTED_FUNCTION_SECURITY_SHA256,
   },
+  schemaCommentFragments: readonly string[] = REQUIRED_SCHEMA_COMMENT_FRAGMENTS,
 ): Promise<DatabaseVerificationReport> {
   const migrationStatus = await inspectMigrationCatalogue(client, catalogue);
   if (migrationStatus.state !== 'COMPLETE') {
@@ -837,7 +846,7 @@ async function verifyCatalogueState(
   ) {
     failures.push(`exact trigger table/function/event/enabled/definition manifest [${trigger?.entries ?? 'missing'}:${trigger ? sha256(trigger.manifest) : 'missing'}]`);
   }
-  if (REQUIRED_SCHEMA_COMMENT_FRAGMENTS.some((fragment) => !schemaComment.includes(fragment))) {
+  if (schemaCommentFragments.some((fragment) => !schemaComment.includes(fragment))) {
     failures.push('schema evidence-boundary comment');
   }
   if (
@@ -919,16 +928,24 @@ export function verifyLegacyCheckPredecessor(client: DatabaseQueryClient): Promi
 const V127_INVENTORY = Object.freeze({ tables: EXPECTED_SUCCESSOR_TABLES, functions: 257,
   objectEntries: EXPECTED_V127_OBJECT_MANIFEST_ENTRIES, objectSha256: EXPECTED_V127_OBJECT_MANIFEST_SHA256,
   functionEntries: EXPECTED_V127_FUNCTION_SECURITY_ENTRIES, functionSha256: EXPECTED_V127_FUNCTION_SECURITY_SHA256 });
+const READINESS_INVENTORY = Object.freeze({ tables: 104, functions: 270,
+  objectEntries: 3319, objectSha256: '527586edd3e6ce1bc42018fef37429f64f9e5e9c1281eef4a6624f141d5b8e65',
+  functionEntries: 270, functionSha256: '78cd2e22d8eee25b1f75da542b79f2a6e9da0c4ff77bdf4deaa51354c6dd562e',
+  triggerEntries: 112, triggerSha256: '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a' });
 
 /** Physical checks and receipt verification share the 0040 transaction. These
  * fingerprints come from the exact approved upgrade on isolated PG15, not the
  * cumulative schema, which is not an executable bootstrap. */
 export function verifyRepairSuccessor(client: DatabaseQueryClient, catalogue: ExecutableMigrationCatalogue): Promise<DatabaseVerificationReport> {
-  if (catalogue.migrations.length !== 40
-    || catalogue.compatibility.repairSuccessor?.sourceSchemaSha256 !== 'c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69') {
+  const repairCatalogue = catalogue.migrations.length === 41
+    ? { ...catalogue, migrations: catalogue.migrations.slice(0, 40),
+      compatibility: { ...catalogue.compatibility, readinessSuccessor: null } }
+    : catalogue;
+  if (repairCatalogue.migrations.length !== 40
+    || repairCatalogue.compatibility.repairSuccessor?.sourceSchemaSha256 !== 'c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69') {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved repair successor required');
   }
-  return verifyCatalogueState(client, catalogue, {
+  return verifyCatalogueState(client, repairCatalogue, {
     entries: 573, sha256: '73ef57b18fc9ae2a5b5f99f50b7dd35bf5dd70829c6d97d2355ec65a86debd6e',
   }, { tables: 104, functions: 270,
     objectEntries: 3319, objectSha256: '527586edd3e6ce1bc42018fef37429f64f9e5e9c1281eef4a6624f141d5b8e65',
@@ -946,7 +963,66 @@ export function verifyRepairPredecessor(client: DatabaseQueryClient, catalogue: 
   }, V127_INVENTORY);
 }
 
+/**
+ * 0041 is a deliberately narrow ACL/marker delta over the fully verified 0040
+ * state. The runner verifies that full predecessor before applying the SQL;
+ * this post-check proves the delta did not widen application authority or
+ * leave any of the five invoker predicates executable by PUBLIC.
+ */
+export async function verifyReadinessSuccessor(
+  client: DatabaseQueryClient,
+  catalogue: ExecutableMigrationCatalogue,
+): Promise<DatabaseVerificationReport> {
+  if (catalogue.migrations.length !== 41
+    || catalogue.migrations[40]?.id !== '0041_intake_readiness_v1_29'
+    || catalogue.compatibility.readinessSuccessor?.sourceSchemaSha256 !== '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771') {
+    throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved readiness successor required');
+  }
+  const base = await verifyCatalogueState(client, catalogue, {
+    entries: 571, sha256: '04f03f0b0245f97c6b5948a57d3535c258e099dcde1b9a3378521bff4ba4e00c',
+  }, READINESS_INVENTORY, ['schema.v1.29', 'runtime activation and production NOT_CERTIFIED']);
+  const marker = await verifyQuery<{ schema_comment: string | null }>(client,
+    `SELECT pg_catalog.obj_description('public'::pg_catalog.regnamespace, 'pg_namespace') AS schema_comment`);
+  const publicExec = await verifyQuery<{ signature: string; public_exec: boolean }>(client, `
+    SELECT p.oid::regprocedure::text AS signature,
+      EXISTS (
+        SELECT 1 FROM pg_catalog.aclexplode(coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))) a
+        WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'
+      ) AS public_exec
+    FROM pg_catalog.pg_proc p
+    WHERE p.oid = ANY($1::regprocedure[])
+    ORDER BY 1`, [READINESS_FORMAT_FUNCTIONS]);
+  const predicateExec = await verifyQuery<{ role_name: string; allowed: boolean; grantable: boolean }>(client, `
+    SELECT r.rolname AS role_name,
+      pg_catalog.has_function_privilege(r.rolname, $1, 'EXECUTE') AS allowed,
+      EXISTS (
+        SELECT 1 FROM pg_catalog.pg_proc p
+        CROSS JOIN LATERAL pg_catalog.aclexplode(coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))) a
+        WHERE p.oid = $2::regprocedure AND a.grantee = r.oid AND a.privilege_type = 'EXECUTE' AND a.is_grantable
+      ) AS grantable
+    FROM pg_catalog.pg_roles r
+    WHERE r.rolname = ANY($3::text[])
+    ORDER BY 1`, [READINESS_FORMAT_FUNCTIONS[1], READINESS_FORMAT_FUNCTIONS[1], READINESS_PREDICATE_ROLES]);
+  const failures: string[] = [];
+  if (marker.rows[0]?.schema_comment !== 'CS-AI-C11 schema.v1.29; content-intake readiness successor; runtime activation and production NOT_CERTIFIED') {
+    failures.push('schema version marker');
+  }
+  if (publicExec.rows.length !== READINESS_FORMAT_FUNCTIONS.length || publicExec.rows.some(row => row.public_exec)) {
+    failures.push('PUBLIC EXECUTE removed from all readiness predicates');
+  }
+  const expected = new Set(READINESS_PREDICATE_ROLES);
+  if (predicateExec.rows.length !== expected.size
+    || predicateExec.rows.some(row => !expected.has(row.role_name) || !row.allowed || row.grantable)) {
+    failures.push('predicate EXECUTE role boundary');
+  }
+  if (failures.length > 0) {
+    throw new DatabaseMigrationError('MIGRATION_VERIFY_FAILED', `Readiness successor verification failed: ${failures.join(', ')}`);
+  }
+  return Object.freeze({ ...base, migrationCount: 41 });
+}
+
 export function verifyMigrationCatalogue(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
+  if (generatedMigrationCatalogue.compatibility.readinessSuccessor) return verifyReadinessSuccessor(client, generatedMigrationCatalogue);
   if (generatedMigrationCatalogue.compatibility.repairSuccessor) return verifyRepairSuccessor(client, generatedMigrationCatalogue);
   return verifyCatalogueState(client, generatedMigrationCatalogue, {
     entries: EXPECTED_ACL_MANIFEST_ENTRIES, sha256: EXPECTED_ACL_MANIFEST_SHA256,

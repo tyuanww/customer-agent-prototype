@@ -134,16 +134,24 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
       && successor.contractSetId !== catalogue.contractSetId;
     const repair = catalogue.compatibility.repairSuccessor;
-    const matchesRepair = repair != null && index === 39 && catalogue.migrations.length === 40
+    const matchesRepair = repair != null && index === 39 && [40, 41].includes(catalogue.migrations.length)
       && migration.id === '0040_intake_repair_successor_v1_28'
       && migration.contractSetId === repair.contractSetId && migration.sourceGitSha === repair.sourceGitSha
       && migration.sourceSchemaSha256 === repair.sourceSchemaSha256
       && migration.sha256 === repair.migrationSha256;
+    const readiness = catalogue.compatibility.readinessSuccessor;
+    const matchesReadiness = readiness != null && index === 40 && catalogue.migrations.length === 41
+      && migration.id === '0041_intake_readiness_v1_29'
+      && migration.contractSetId === readiness.contractSetId && migration.sourceGitSha === readiness.sourceGitSha
+      && migration.sourceSchemaSha256 === readiness.sourceSchemaSha256 && migration.sha256 === readiness.migrationSha256
+      && repair != null && catalogue.migrations[39]?.id === '0040_intake_repair_successor_v1_28'
+      && catalogue.migrations[39]?.sha256 === repair.migrationSha256;
+    if (matchesReadiness && !successorSuffix) catalogueError('Readiness requires the preceding repair successor');
     if (matchesRepair && !successorSuffix) catalogueError('Repair requires the preceding additive successor');
-    if (matchesSuccessor || matchesRepair) successorSuffix = true;
+    if (matchesSuccessor || matchesRepair || matchesReadiness) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
-      !matchesSuccessor && !matchesRepair
+      !matchesSuccessor && !matchesRepair && !matchesReadiness
       && (migration.contractSetId !== expectedProvenance.contractSetId
       || migration.sourceGitSha !== expectedProvenance.sourceGitSha
       || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256)

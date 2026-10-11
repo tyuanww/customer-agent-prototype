@@ -27,3 +27,13 @@ export function renderRepairMigration(snapshot) {
   return renderUpgradeMigration({ position: 40, id: '0040_intake_repair_successor_v1_28',
     version: 'Approved schema.v1.28 repair successor', ranges: [], sourceBody: source.trimEnd() }, snapshot);
 }
+
+/** The approved compact successor retains its own exact upgrade provenance. */
+export function renderReadinessMigration(snapshot) {
+  const source = snapshot.readiness_sources?.upgrade;
+  if (typeof source !== 'string' || sha256(source) !== snapshot.manifest.readiness.upgrade.sha256) {
+    throw new Error('Readiness upgrade bytes differ from approved descriptor');
+  }
+  return renderUpgradeMigration({ position: 41, id: '0041_intake_readiness_v1_29',
+    version: 'Approved schema.v1.29 readiness successor', ranges: [], sourceBody: source.trimEnd() }, snapshot);
+}

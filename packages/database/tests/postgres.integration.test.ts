@@ -20,6 +20,7 @@ const SOP_REPAIR_SUFFIX = [
   '0038_menokin_sop_domain_v1_27',
   '0039_menokin_sop_stage_media',
   '0040_intake_repair_successor_v1_28',
+  '0041_intake_readiness_v1_29',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -510,7 +511,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(40);
+      expect(fresh.pending).toHaveLength(41);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -522,12 +523,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 40,
+        migrationCount: 41,
         inventory: { tables: 104, views: 7, functions: 270 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 31-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 32-migration current suffix',
         },
       });
 
@@ -674,7 +675,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 40,
+        migrationCount: 41,
       });
     } finally {
       await client.end();
@@ -889,7 +890,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect((await client.query("SELECT to_regclass('public.owner_acceptance_records') AS relation")).rows[0].relation).toBeNull();
       await client.query('DROP ROLE app_owner_acceptance_registrar');
       await applyDatabaseMigrations(client);
-      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(40);
+      expect((await verifyDatabaseMigrations(client)).migrationCount).toBe(41);
       await expectSqlState(client, 'SELECT * FROM owner_acceptance_records', '42501', undefined, 'app_runtime');
       await expectSqlState(client, "SELECT register_owner_acceptance('synthetic','{}','bad','bad')", '42501', undefined, 'app_runtime');
       await expectVerificationFailureAfterMutation(client, 'ALTER ROLE app_owner_acceptance_registrar LOGIN');
@@ -930,7 +931,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 40,
+        migrationCount: 41,
       });
     } finally {
       await client.end();
@@ -1087,12 +1088,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         applyDatabaseMigrations(firstClient),
         applyDatabaseMigrations(secondClient),
       ]);
-      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 40]);
+      expect(results.map(({ applied }) => applied.length).sort((left, right) => left - right)).toEqual([0, 41]);
       expect(results.every(({ after }) => after.state === 'COMPLETE')).toBe(true);
       const ledger = await firstClient.query<CountRow>(`
         SELECT count(*)::int AS count FROM customer_agent_meta.schema_migrations
       `);
-      expect(ledger.rows[0]?.count).toBe(40);
+      expect(ledger.rows[0]?.count).toBe(41);
     } finally {
       await firstClient.end();
       secondClient.release();
