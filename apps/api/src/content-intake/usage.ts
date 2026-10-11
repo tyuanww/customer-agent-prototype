@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { canonical, digest, SNAPSHOT_VOCABULARY_LIMIT, snapshotVocabularyKeys } from './material.js';
-import { listPreviews, previewApplies } from './linked-preview.js';
+import { listPreviews, previewApplies, type LinkedPreview } from './linked-preview.js';
 import { clock, createIntakeTransactions, lockProductSession, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
@@ -11,6 +11,27 @@ type C = components['schemas'];
 type IntakeUsageContext = {
   sessionTokenHash: string; shopId: string; contextGeneration: number;
   productIds: string[]; scenarioIds: string[];
+};
+/** Internal trusted reader: list metadata only; open exactly one authorized row.
+ * The opaque storage value belongs to the adapter and never crosses the wire. */
+export type IntakePreviewItem = Omit<LinkedPreview, 'bytes'> & {
+  sizeBytes: number; storage: unknown; operation?: string;
+  effectiveFrom?: string | null; effectiveTo?: string | null;
+};
+export type IntakePreviewReader = {
+  list(client: IntakeTransaction, context: { principalId: string; entitlementHash: string;
+    sessionTokenHash: string; releaseId: string; sourceIds: ReadonlySet<string> }): Promise<readonly IntakePreviewItem[]>;
+  read(item: IntakePreviewItem): Promise<Buffer>;
+};
+const memoryPreviewReader: IntakePreviewReader = {
+  async list(_client, context) {
+    return listPreviews(context.releaseId, context.sourceIds).map(item => ({ ...item,
+      sizeBytes: item.bytes.length, storage: item.bytes }));
+  },
+  async read(item) {
+    if (!Buffer.isBuffer(item.storage)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+    return item.storage;
+  },
 };
 type ScopeRow = { source_id: string; scope: C['IntakeSourceScope']; generation: string; mode_version: string; mode: string; until: Date | null };
 type Lease = { entitlement_hash: string; release_id: string; shop_id: string; context_generation: string;
@@ -165,10 +186,78 @@ function cursor(raw: string | undefined, hash: string): [string,string] {
   } catch { throw new IntakeRejection('FILE_INVALID','VALIDATION'); }
 }
 
+function decodePreview(value: unknown) {
+  const preview = value as { mime?: unknown; sha256?: unknown; bytesBase64?: unknown; url?: unknown; items?: unknown };
+  if ('url' in preview) throw new IntakeRejection('FILE_INVALID','VALIDATION');
+  if (Array.isArray(preview.items)) {
+    if ('bytesBase64' in preview || 'mime' in preview) throw new IntakeRejection('FILE_INVALID','VALIDATION');
+    return { items: preview.items.map(item => {
+      if (!item || typeof item !== 'object') throw new IntakeRejection('FILE_INVALID','VALIDATION');
+      const row = item as { objectId?: unknown; sha256?: unknown; url?: unknown };
+      if (typeof row.objectId !== 'string' || !/^med_[0-9a-f]{64}$/.test(row.objectId)
+        || typeof row.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(row.sha256) || 'url' in row) {
+        throw new IntakeRejection('FILE_INVALID','VALIDATION');
+      }
+      return { objectId: row.objectId, sha256: row.sha256 };
+    }) };
+  }
+  if (typeof preview.mime !== 'string' || typeof preview.sha256 !== 'string' || typeof preview.bytesBase64 !== 'string') {
+    throw new IntakeRejection('FILE_INVALID','VALIDATION');
+  }
+  return { mime: preview.mime, sha256: preview.sha256, bytesBase64: preview.bytesBase64 };
+}
+
 /** The single usage owner hides deadlines, immutable pagination and white-list
  * projection. It shares the transaction/lease owners; there is no second current,
  * permission cache, remote approval call, legacy read adapter or runtime ACL. */
-export function createIntakeUsage(run: ReturnType<typeof createIntakeTransactions>) {
+export function createIntakeUsage(run: ReturnType<typeof createIntakeTransactions>, previewReader: IntakePreviewReader = memoryPreviewReader) {
+  async function selectPreview(client: IntakeTransaction, who: Principal, actor: AuthenticatedUser, raw: unknown) {
+    const query = raw as { entitlementId?: unknown; objectId?: unknown };
+    const entitlementId = parseContractSchema('IntakeId', query.entitlementId);
+    if (query.objectId !== undefined && (typeof query.objectId !== 'string' || !/^med_[0-9a-f]{64}$/.test(query.objectId))) {
+      throw new IntakeRejection('FILE_INVALID','VALIDATION');
+    }
+    const hash = digest(entitlementId), {hash:sessionTokenHash,validUntil:sessionUntil}=await lockProductSession(client,actor);
+    const leases=await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash,c.product_ids,c.scenario_ids
+      FROM content_intake.entitlements e JOIN public.snapshot_offline_leases l USING(lease_token_hash)
+      JOIN content_intake.entitlement_contexts c USING(entitlement_hash)
+      WHERE e.entitlement_hash=$1 AND e.principal_id=$2 AND e.user_id=$3 AND c.session_token_hash=$4`,[hash,who.id,who.userId,sessionTokenHash]);
+    const lease=leases.rows[0];
+    if (!lease) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+    const ctx: IntakeUsageContext={sessionTokenHash,shopId:lease.shop_id,contextGeneration:Number(lease.context_generation),
+      productIds:lease.product_ids,scenarioIds:lease.scenario_ids};
+    if (Number(lease.principal_generation)!==who.generation) throw new IntakeRejection('PERMISSION_CHANGED','FORBIDDEN');
+    if (Math.min(lease.valid_until.getTime(),lease.expires_at.getTime())<=await clock(client)) throw new IntakeRejection('LEASE_EXPIRED','FORBIDDEN');
+    const scopes=await scopesFor(client,who,ctx.shopId,hash);
+    if (lease.client_id!==binding(ctx,scopes)) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
+    const until=Math.min(lease.valid_until.getTime(),lease.expires_at.getTime(),sessionUntil,who.validUntil,
+      ...scopes.map(scope => scope.until!.getTime()),await releaseDeadline(client,lease.release_id,who.tenantId),
+      await contentDeadline(client,lease.release_id,scopes,ctx,lease.issued_at.getTime()));
+    client.validUntil(until);
+    const sourceIds=new Set(scopes.map(scope=>scope.source_id));
+    const at = lease.issued_at.getTime();
+    const visible = (await previewReader.list(client, { principalId: who.id, entitlementHash: hash,
+      sessionTokenHash, releaseId: lease.release_id, sourceIds })).filter(item => sourceIds.has(item.sourceId)
+        && (item.operation === undefined || item.operation === 'upsert')
+        && (item.effectiveFrom == null || Date.parse(item.effectiveFrom) <= at)
+        && (item.effectiveTo == null || Date.parse(item.effectiveTo) > at)
+        && previewApplies(item, ctx, scopes.some(scope => scope.source_id === item.sourceId && scope.scope.shopId === null)));
+    // Applicability belongs to a row. Deduplicate shared bytes only after all
+    // row filters; an invisible first row must not hide another visible row.
+    const linked = new Map<string, IntakePreviewItem>();
+    for (const item of visible) {
+      const previous = linked.get(item.objectId);
+      if (previous && (previous.sha256 !== item.sha256 || previous.mime !== item.mime || previous.sizeBytes !== item.sizeBytes)) {
+        throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+      }
+      linked.set(item.objectId, item);
+    }
+    if (query.objectId === undefined) return { kind: 'list' as const, value: decodePreview({ items: [...linked.values()].map(({ objectId, sha256 }) => ({ objectId, sha256 })) }) };
+    const item = linked.get(query.objectId);
+    if (!item) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+    return { kind: 'item' as const, item, validUntil: until };
+  }
   return {
     issueEntitlement(actor: AuthenticatedUser, raw: unknown) {
       return run(actor,'entitlement',null,null,async (client,who) => {
@@ -311,57 +400,33 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
           nextCursor:result.rows.length>rows.length && last ? Buffer.from(JSON.stringify([hash,last.source_id,last.business_entry_id])).toString('base64url') : null };
       },v=>parseContractSchema('IntakeSnapshot',v));
     },
-    preview(actor: AuthenticatedUser, raw: unknown) {
+    async preview(actor: AuthenticatedUser, raw: unknown) {
+      const selected = await run(actor,'preview',null,null,
+        (client,who) => selectPreview(client,who,actor,raw), value => value as Awaited<ReturnType<typeof selectPreview>>);
+      if (!selected.ok) return selected;
+      if (selected.value.kind === 'list') return { ok: true as const, value: selected.value.value };
+      const original = selected.value;
+      // No database transaction or global content lock is held during file I/O.
+      // Keep errors for the final transaction owner to normalize consistently.
+      let read: { ok: true; bytes: Buffer } | { ok: false; error: unknown };
+      try { read = { ok: true, bytes: await previewReader.read(original.item) }; }
+      catch (error) { read = { ok: false, error }; }
       return run(actor,'preview',null,null,async (client,who) => {
-        const query = raw as { entitlementId?: unknown; objectId?: unknown };
-        const entitlementId = parseContractSchema('IntakeId', query.entitlementId);
-        if (query.objectId !== undefined && (typeof query.objectId !== 'string' || !/^med_[0-9a-f]{64}$/.test(query.objectId))) {
+        if (await clock(client) >= original.validUntil) throw new IntakeRejection('PERMISSION_CHANGED','FORBIDDEN');
+        client.validUntil(original.validUntil);
+        const current = await selectPreview(client,who,actor,raw);
+        if (current.kind !== 'item' || current.item.objectId !== original.item.objectId
+          || current.item.sourceId !== original.item.sourceId || current.item.sha256 !== original.item.sha256
+          || current.item.mime !== original.item.mime || current.item.sizeBytes !== original.item.sizeBytes) {
+          throw new IntakeRejection('MATERIAL_CHANGED');
+        }
+        if (!read.ok) throw read.error;
+        const { bytes } = read, { item } = current;
+        if (bytes.length !== item.sizeBytes || bytes.length > 5 * 1024 * 1024 || digest(bytes) !== item.sha256) {
           throw new IntakeRejection('FILE_INVALID','VALIDATION');
         }
-        const hash = digest(entitlementId), {hash:sessionTokenHash}=await lockProductSession(client,actor);
-        const leases=await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash,c.product_ids,c.scenario_ids
-          FROM content_intake.entitlements e JOIN public.snapshot_offline_leases l USING(lease_token_hash)
-          JOIN content_intake.entitlement_contexts c USING(entitlement_hash)
-          WHERE e.entitlement_hash=$1 AND e.principal_id=$2 AND e.user_id=$3 AND c.session_token_hash=$4`,[hash,who.id,who.userId,sessionTokenHash]);
-        const lease=leases.rows[0];
-        if (!lease) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
-        const ctx: IntakeUsageContext={sessionTokenHash,shopId:lease.shop_id,contextGeneration:Number(lease.context_generation),
-          productIds:lease.product_ids,scenarioIds:lease.scenario_ids};
-        if (Number(lease.principal_generation)!==who.generation) throw new IntakeRejection('PERMISSION_CHANGED','FORBIDDEN');
-        if (Math.min(lease.valid_until.getTime(),lease.expires_at.getTime())<=await clock(client)) throw new IntakeRejection('LEASE_EXPIRED','FORBIDDEN');
-        const scopes=await scopesFor(client,who,ctx.shopId,hash);
-        if (lease.client_id!==binding(ctx,scopes)) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
-        await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
-        const until=Math.min(lease.valid_until.getTime(),lease.expires_at.getTime(),await releaseDeadline(client,lease.release_id,who.tenantId));
-        client.validUntil(until);
-        await contentDeadline(client,lease.release_id,scopes,ctx,lease.issued_at.getTime());
-        const sourceIds=new Set(scopes.map(scope=>scope.source_id));
-        const linked = listPreviews(lease.release_id, sourceIds).filter(item => previewApplies(item, ctx, scopes.some(scope =>
-          scope.source_id === item.sourceId && scope.scope.shopId === null)));
-        if (query.objectId === undefined) return { items: linked.map(({ objectId, sha256 }) => ({ objectId, sha256 })) };
-        const item = linked.find(candidate => candidate.objectId === query.objectId);
-        if (!item) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
-        return { mime: item.mime, sha256: item.sha256, bytesBase64: item.bytes.toString('base64') };
-      }, value => {
-        const preview = value as { mime?: unknown; sha256?: unknown; bytesBase64?: unknown; url?: unknown; items?: unknown };
-        if ('url' in preview) throw new IntakeRejection('FILE_INVALID','VALIDATION');
-        if (Array.isArray(preview.items)) {
-          if ('bytesBase64' in preview || 'mime' in preview) throw new IntakeRejection('FILE_INVALID','VALIDATION');
-          return { items: preview.items.map(item => {
-            if (!item || typeof item !== 'object') throw new IntakeRejection('FILE_INVALID','VALIDATION');
-            const row = item as { objectId?: unknown; sha256?: unknown; url?: unknown };
-            if (typeof row.objectId !== 'string' || !/^med_[0-9a-f]{64}$/.test(row.objectId)
-              || typeof row.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(row.sha256) || 'url' in row) {
-              throw new IntakeRejection('FILE_INVALID','VALIDATION');
-            }
-            return { objectId: row.objectId, sha256: row.sha256 };
-          }) };
-        }
-        if (typeof preview.mime !== 'string' || typeof preview.sha256 !== 'string' || typeof preview.bytesBase64 !== 'string') {
-          throw new IntakeRejection('FILE_INVALID','VALIDATION');
-        }
-        return { mime: preview.mime, sha256: preview.sha256, bytesBase64: preview.bytesBase64 };
-      });
+        return { mime: item.mime, sha256: item.sha256, bytesBase64: bytes.toString('base64') };
+      }, decodePreview);
     },
   };
 }

@@ -11,6 +11,15 @@ type Run = ReturnType<typeof createIntakeTransactions>;
 const receipt = (value: unknown) => parseContractSchema('IntakeReceipt',value);
 const json = (value: unknown) => value as CanonicalJsonValue;
 
+/** A decoded receipt is projected only after its transaction confirms success.
+ * The same path repairs an unknown publication once its durable receipt is read;
+ * the cache does not confer read authority or reconstruct missing image bytes. */
+function projectPublishedPreviews(value: C['IntakeOperationReceipt']): void {
+  if (value.action === 'publish' && value.state === 'published' && value.releaseId) {
+    adoptPreviews(value.key.candidateId, value.releaseId);
+  }
+}
+
 /** The private DB publisher reports only existing typed rejection reasons. Other
  * SQL failures retain the transaction owner's diagnostics and certainty handling. */
 const denials = new Set<Reason>(['FILE_LIMIT','MATERIAL_CHANGED','ALREADY_PUBLISHED','SCOPE_DENIED','MODE_CONFLICT','BASE_CHANGED',
@@ -38,8 +47,11 @@ export function createIntakePublication(run: Run) {
       },v => v as { req: C['IntakePublish']; prior: C['IntakeReceipt'] | null });
       if (!prepared.ok) return prepared;
       const { req,prior } = prepared.value;
-      if (prior) return { ok:true,value:prior };
-      return run(actor,'publish',json(req),req.operationId,async (client,who) => {
+      if (prior) {
+        projectPublishedPreviews(prior);
+        return { ok:true,value:prior };
+      }
+      const result = await run(actor,'publish',json(req),req.operationId,async (client,who) => {
         try {
           const result = await client.query<{ value: { receipt: unknown; validUntil: string } }>(
             'SELECT content_intake.publish_candidate($1,$2::jsonb,$3::jsonb) AS value',
@@ -54,7 +66,6 @@ export function createIntakePublication(run: Run) {
             JOIN content_intake.approval_facts f USING(review_request_id,facts_version)
             WHERE l.release_id=$1`, [published.releaseId]);
           if (inherited.rows[0]?.until) client.validUntil(inherited.rows[0].until.getTime());
-          if (published.releaseId) adoptPreviews(req.key.candidateId, published.releaseId);
           return published;
         } catch (error) {
           if (error instanceof Error && 'code' in error && (error.code==='ZA001' || error.code==='ZA003' || error.code==='ZA005')
@@ -69,9 +80,11 @@ export function createIntakePublication(run: Run) {
           throw error;
         }
       },receipt);
+      if (result.ok) projectPublishedPreviews(result.value);
+      return result;
     },
-    operationReceipt(actor: AuthenticatedUser, operationId: unknown, action: unknown) {
-      return run(actor,'operation-receipt',null,null,async (client,who) => {
+    async operationReceipt(actor: AuthenticatedUser, operationId: unknown, action: unknown) {
+      const result = await run(actor,'operation-receipt',null,null,async (client,who) => {
         const op = parseContractSchema('IntakeId',operationId);
         if (action !== 'publish' && action !== 'cancel' && action !== 'rollback') throw new IntakeRejection('FILE_INVALID','VALIDATION');
         const saved = await client.query<{ response: unknown }>(`SELECT response FROM backend_review.receipts
@@ -82,6 +95,8 @@ export function createIntakePublication(run: Run) {
         if (result.operationId !== op || result.action !== action) throw new IntakeRejection('COMMIT_UNKNOWN');
         return result;
       },value => parseContractSchema('IntakeOperationReceipt',value));
+      if (result.ok) projectPublishedPreviews(result.value);
+      return result;
     },
   };
 }

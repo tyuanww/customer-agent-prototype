@@ -18,6 +18,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderRepairMigration } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
@@ -26,6 +27,11 @@ const RUNTIME_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v2';
 const CSV_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v3';
 const LEGACY_CHECK_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v4';
 const SOP_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v5';
+const REPAIR_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v6';
+const REPAIR_LOCK = 'repair-contract-set.lock.json';
+const REPAIR_SOURCE = 'business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1';
+const REPAIR_APPROVAL = 'business-docs/01-客服Agent项目/90-评审/2026-10-12_后继合同批准.json';
+const REPAIR_MEMBERS = Object.freeze({ upgrade: 'upgrade.v1.sql', installation: 'installation.v1.json', predecessor: 'predecessor-lock.v1.json', provenance: 'provenance.v1.json', approval: 'approval.v1.json' });
 const CONSUMPTION_SCHEMA = 'customer-agent-contract-consumption/v1';
 const SOURCE_REPOSITORY = 'ai-赋能立项';
 const UPSTREAM_ROOT = 'contracts/upstream/customer-agent';
@@ -157,6 +163,7 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
+  const repairProfile = rawManifest?.schema === REPAIR_CONTRACT_SET_SCHEMA;
   const sopProfile = rawManifest?.schema === SOP_CONTRACT_SET_SCHEMA;
   const legacyCheckProfile = rawManifest?.schema === LEGACY_CHECK_CONTRACT_SET_SCHEMA;
   const csvProfile = legacyCheckProfile || rawManifest?.schema === CSV_CONTRACT_SET_SCHEMA;
@@ -173,10 +180,11 @@ function validateManifest(rawManifest) {
       'openapi',
       'database',
       ...(runtimeProfile ? ['runtime'] : []),
+      ...(repairProfile ? ['repair'] : []),
     ],
     'contract-set manifest',
   );
-  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile) {
+  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile && !repairProfile) {
     throw new Error(`Unsupported contract-set schema: ${String(rawManifest.schema)}`);
   }
   if (rawManifest.source_repository !== SOURCE_REPOSITORY) {
@@ -208,6 +216,7 @@ function validateManifest(rawManifest) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
   // Version and both paths form one reviewed pair; mixed generations fail closed.
+  const repairPair = openapi.version === '1.24.0' && database.version === 'schema.v1.28';
   const sopPair = openapi.version === '1.23.0' && database.version === 'schema.v1.26';
   const legacyCheckPair = openapi.version === '1.22.0' && database.version === 'schema.v1.25';
   const csvPair = openapi.version === '1.22.0' && database.version === 'schema.v1.24';
@@ -222,10 +231,19 @@ function validateManifest(rawManifest) {
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
+  if (repairPair !== repairProfile || sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!repairPair && !sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
-  if (sopPair) {
+  if (repairPair) {
+    openapiPath = `${REPAIR_SOURCE}/openapi.v1.yaml`;
+    databasePath = `${REPAIR_SOURCE}/schema-v1.28.sql`;
+    assertExactKeys(rawManifest.repair, Object.keys(REPAIR_MEMBERS), 'repair artifacts');
+    for (const [key, file] of Object.entries(REPAIR_MEMBERS)) {
+      const descriptor = validateDescriptor(rawManifest.repair[key], `repair.${key}`);
+      const source = key === 'approval' ? REPAIR_APPROVAL : `${REPAIR_SOURCE}/${file}`;
+      if (descriptor.version !== '1' || descriptor.file !== file || descriptor.source_path !== source) throw new Error(`Repair descriptor mismatch: ${key}`);
+    }
+  } else if (sopPair) {
     openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.23.yaml`;
     databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.26.sql`;
   } else if (runtimePair || csvPair || legacyCheckPair) {
@@ -276,7 +294,8 @@ function expectedMembers(manifest) {
 
 function contractDescriptors(manifest) {
   return [['OpenAPI', manifest.openapi], ['Database', manifest.database],
-    ...Object.entries(manifest.runtime ?? {}).map(([key, descriptor]) => [`runtime.${key}`, descriptor])];
+    ...Object.entries(manifest.runtime ?? {}).map(([key, descriptor]) => [`runtime.${key}`, descriptor]),
+    ...Object.entries(manifest.repair ?? {}).map(([key, descriptor]) => [`repair.${key}`, descriptor])];
 }
 
 /** Verify the installation plan's references as well as the outer file hashes.
@@ -421,6 +440,7 @@ export function verifyContractSetDirectory(directory) {
   }
   for (const [label, descriptor] of contractDescriptors(manifest)) assertMember(resolvedDirectory, descriptor, label);
   verifyRuntimeReferences(resolvedDirectory, manifest);
+  if (manifest.repair) verifyRepairReferences(resolvedDirectory, manifest);
   return Object.freeze({ directory: resolvedDirectory, manifest });
 }
 
@@ -441,6 +461,15 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
  * Historical v1-v3 source SHAs remain valid after newer approvals exist. */
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
+  if (manifest.schema === REPAIR_CONTRACT_SET_SCHEMA) {
+    // Every package member, including the structured approval, was already
+    // checked against this exact Git commit by verifySourceRepository.
+    const approval = JSON.parse(source(REPAIR_APPROVAL));
+    verifyRepairApproval(approval, manifest);
+    return;
+  }
+  const repairHistory = String(runGit(repositoryRoot, ['log', '--full-history', '-1', '--format=%H', manifest.source_git_sha, '--', REPAIR_APPROVAL], 'utf8')).trim();
+  if (repairHistory) throw new Error('Approved repair successor cannot be downgraded to a previous profile');
   if (manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
     const approval = source('business-docs/01-客服Agent项目/90-评审/2026-10-10_SOP合同冻结批准.md');
     if (!approval.includes('FROZEN · NOT EXPORTED · NOT INTAKE · SYNTHETIC DEVELOPMENT ONLY')) {
@@ -588,6 +617,119 @@ function acquireIntakeLock(projectRoot, upstreamRoot) {
   return () => rmdirSync(lockDirectory);
 }
 
+const REPAIR_ARTIFACT_KEYS = Object.freeze({
+  'openapi.candidate.json': 'openapi', 'schema.candidate.sql': 'database',
+  'upgrade.candidate.sql': 'upgrade', 'installation.candidate.json': 'installation',
+  'predecessor-lock.json': 'predecessor', 'manifest.json': 'provenance',
+});
+const REPAIR_VERSIONS = Object.freeze({ openapi: '1.24.0', schema: '1.28', migration: '0040', exportProfile: 'content-intake-repair-successor-v1' });
+
+function verifyRepairApproval(approval, manifest) {
+  if (approval.schema !== 'customer-agent-repair-successor-approval/v1' || approval.status !== 'APPROVED'
+    || !isDeepStrictEqual(approval.versions, REPAIR_VERSIONS)
+    || ['freezeApproved', 'exportApproved', 'intakeApproved', 'syntheticOnly'].some(k => approval[k] !== true)
+    || ['runtimeActivated', 'productionConsumerReady'].some(k => approval[k] !== false)) {
+    throw new Error('Repair successor requires exact version approval without runtime activation');
+  }
+  assertExactKeys(approval.artifacts, Object.keys(REPAIR_ARTIFACT_KEYS), 'approved repair artifacts');
+  for (const [name, key] of Object.entries(REPAIR_ARTIFACT_KEYS)) {
+    const descriptor = manifest[key] ?? manifest.repair[key];
+    if (approval.artifacts[name] !== descriptor.sha256) throw new Error(`Repair approval hash mismatch: ${name}`);
+  }
+}
+
+function verifyRepairReferences(directory, manifest) {
+  const read = key => readJson(path.join(directory, manifest.repair[key].file), `Repair ${key}`);
+  verifyRepairApproval(read('approval'), manifest);
+  const provenance = read('provenance');
+  const installation = read('installation');
+  const predecessor = read('predecessor');
+  if (!isDeepStrictEqual(provenance.proposedVersions, REPAIR_VERSIONS)
+    || !isDeepStrictEqual(installation.proposal, REPAIR_VERSIONS)
+    || installation.predecessor?.migrationCount !== 39 || installation.predecessor?.newDatabaseBootstrap !== false
+    || installation.owner !== 'intake_runtime_fn_owner') throw new Error('Repair installation boundary mismatch');
+  for (const name of ['openapi.candidate.json', 'schema.candidate.sql', 'upgrade.candidate.sql', 'installation.candidate.json']) {
+    const key = REPAIR_ARTIFACT_KEYS[name]; const descriptor = manifest[key] ?? manifest.repair[key];
+    if (provenance.artifacts?.[name]?.sha256 !== descriptor.sha256 || provenance.artifacts[name].bytes !== descriptor.bytes) {
+      throw new Error(`Repair provenance mismatch: ${name}`);
+    }
+  }
+  requireString(predecessor.manifestSha256, HASH_PATTERN, 'predecessor manifest hash');
+  if (!Array.isArray(predecessor.migrations) || predecessor.migrations.length !== 39) throw new Error('Repair requires exactly 39 predecessors');
+  const names = new Set();
+  predecessor.migrations.forEach((m, i) => {
+    if (m.position !== i + 1 || !/^\d{4}_[a-z0-9_]+$/.test(m.id) || m.file !== `${m.id}.sql`
+      || names.has(m.file) || !Number.isSafeInteger(m.bytes) || m.bytes < 1) throw new Error('Invalid repair predecessor entry');
+    names.add(m.file); requireString(m.sha256, HASH_PATTERN, 'predecessor hash');
+  });
+}
+
+// This is an upgrade over the exact installed generator closure, never a bootstrap.
+function verifyRepairPredecessor(projectRoot, directory) {
+  verifyIngestedContractSet({ projectRoot });
+  const predecessor = readJson(path.join(directory, REPAIR_MEMBERS.predecessor), 'Repair predecessor');
+  const migrationRoot = path.join(projectRoot, 'packages/database/migrations');
+  const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
+  assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
+  const actual = readJson(manifestPath, 'Migration manifest');
+  if (![39, 40].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (actual.migrations.length === 39 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Repair predecessor manifest drift');
+  if (actual.migrations.length === 40) {
+    const lockPath = path.join(projectRoot, UPSTREAM_ROOT, REPAIR_LOCK);
+    assertPathInsideRoot(projectRoot, lockPath); assertRegularFile(lockPath, 'Repair lock');
+    const lock = validateConsumptionLock(readJson(lockPath, 'Repair lock'));
+    const manifest = readJson(path.join(directory, MANIFEST_FILE), 'Repair manifest');
+    if (lock.contract_set_id !== manifest.contract_set_id
+      || actual.migrations[39].id !== '0040_intake_repair_successor_v1_28'
+      || actual.compatibility?.repair_successor?.contract_set_id !== lock.contract_set_id) throw new Error('Unrecognized repair successor');
+    const expected = renderRepairMigration({ contract_set_id: manifest.contract_set_id, source_git_sha: manifest.source_git_sha,
+      manifest, repair_sources: { upgrade: readFileSync(path.join(directory, manifest.repair.upgrade.file), 'utf8') } });
+    for (const key of ['position', 'id', 'file', 'sha256', 'bytes', 'contract_set_id', 'source_git_sha', 'source_schema_sha256']) {
+      if (actual.migrations[39][key] !== expected[key]) throw new Error(`Repair migration metadata drift: ${key}`);
+    }
+    const file = path.join(migrationRoot, expected.file);
+    assertPathInsideRoot(projectRoot, file); assertRegularFile(file, 'Repair migration');
+    if (readFileSync(file, 'utf8') !== expected.sql) throw new Error('Repair migration bytes differ from approved upgrade');
+
+  }
+  for (const expected of predecessor.migrations) {
+    const found = actual.migrations[expected.position - 1];
+    for (const key of ['position', 'id', 'file', 'sha256', 'bytes']) {
+      if (found[key] !== expected[key]) throw new Error(`Repair predecessor metadata drift: ${expected.file}`);
+    }
+    const file = path.join(migrationRoot, expected.file);
+    assertPathInsideRoot(projectRoot, file); assertRegularFile(file, 'Predecessor migration');
+    if (sha256(file) !== expected.sha256 || lstatSync(file).size !== expected.bytes) throw new Error(`Repair predecessor bytes drift: ${expected.file}`);
+  }
+}
+
+function repairMetadata(snapshot) {
+  const { contract_set_id, source_git_sha, path: directory, lock_path } = snapshot;
+  return { contract_set_id, source_git_sha, path: directory, lock_path, intake_status: INTAKE_STATUS, ddev_authorized: false, runtime_activated: false };
+}
+
+// Called while the shared intake lock is held, so both generations remain coherent.
+function verifyRepairIngested(projectRoot) {
+  const lockPath = path.join(projectRoot, UPSTREAM_ROOT, REPAIR_LOCK);
+  if (!existsSync(lockPath)) return null;
+  assertPathInsideRoot(projectRoot, lockPath); assertRegularFile(lockPath, 'Repair lock');
+  const lock = validateConsumptionLock(readJson(lockPath, 'Repair lock'));
+  const directory = path.join(projectRoot, UPSTREAM_ROOT, lock.contract_set_id);
+  assertPathInsideRoot(projectRoot, directory);
+  const verified = verifyContractSetDirectory(directory);
+  if (verified.manifest.schema !== REPAIR_CONTRACT_SET_SCHEMA) throw new Error('Repair lock requires v6 bundle');
+  assertLockMatchesContractSet(lock, verified);
+  verifyRepairPredecessor(projectRoot, directory);
+  const manifest = verified.manifest;
+  return Object.freeze({ ...repairMetadata({ ...lock, path: directory, lock_path: lockPath }),
+    lock: Object.freeze(lock), manifest: Object.freeze(manifest),
+    openapi_source: readFileSync(path.join(directory, manifest.openapi.file), 'utf8'),
+    database_source: readFileSync(path.join(directory, manifest.database.file), 'utf8'),
+    repair_sources: Object.freeze(Object.fromEntries(Object.entries(manifest.repair)
+      .map(([key, descriptor]) => [key, readFileSync(path.join(directory, descriptor.file), 'utf8')]))),
+  });
+}
+
 function consumptionLock(verifiedContractSet) {
   const { directory, manifest } = verifiedContractSet;
   return {
@@ -724,7 +866,9 @@ export async function withVerifiedContractSetSnapshot(
     assertRegularFile(openapiPath, 'OpenAPI contract');
     assertRegularFile(databasePath, 'Database contract');
 
+    const repair = verifyRepairIngested(resolvedRoot);
     const snapshot = Object.freeze({
+      ...(repair ? { repair } : {}),
       ...verified,
       lock: Object.freeze({ ...lock }),
       manifest: Object.freeze({
@@ -758,7 +902,8 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   const resolvedRoot = assertProjectRoot(projectRoot ?? defaultProjectRoot());
   const upstreamRoot = path.join(resolvedRoot, UPSTREAM_ROOT);
   const destination = path.join(upstreamRoot, source.manifest.contract_set_id);
-  const lockPath = path.join(upstreamRoot, LOCK_FILE);
+  const isRepair = source.manifest.schema === REPAIR_CONTRACT_SET_SCHEMA;
+  const lockPath = path.join(upstreamRoot, isRepair ? REPAIR_LOCK : LOCK_FILE);
   assertPathInsideRoot(resolvedRoot, upstreamRoot);
   assertPathInsideRoot(resolvedRoot, destination);
   assertPathInsideRoot(resolvedRoot, lockPath);
@@ -767,7 +912,13 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   const releaseIntakeLock = acquireIntakeLock(resolvedRoot, upstreamRoot);
 
   try {
-    const current = existsSync(lockPath)
+    const repairLockPath = path.join(upstreamRoot, REPAIR_LOCK);
+    if (existsSync(repairLockPath)) {
+      const existingRepair = verifyRepairIngested(resolvedRoot);
+      if (!isRepair || existingRepair.contract_set_id !== source.manifest.contract_set_id) throw new Error('Refuse repair lock downgrade or replacement');
+    }
+    if (isRepair) verifyRepairPredecessor(resolvedRoot, source.directory);
+    const current = existsSync(path.join(upstreamRoot, LOCK_FILE))
       ? verifyIngestedContractSet({ projectRoot: resolvedRoot })
       : null;
 
@@ -779,6 +930,7 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && (!current || current.contract_set_id !== source.manifest.contract_set_id)) {
         writeJsonAtomically(lockPath, consumptionLock(existing));
       }
+      if (isRepair) return Object.freeze({ ...repairMetadata(verifyRepairIngested(resolvedRoot)), status: 'REUSED', generateMigrations: true, generateContracts: true });
       if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
         const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });
         return Object.freeze({
@@ -821,6 +973,7 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       throw error;
     }
 
+    if (isRepair) return Object.freeze({ ...repairMetadata(verifyRepairIngested(resolvedRoot)), status: 'CREATED', generateMigrations: true, generateContracts: true });
     if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
       const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });
       const successor = verifyContractSetDirectory(destination);
@@ -848,6 +1001,11 @@ function ingestContractSetAndGenerate(options) {
     execFileSync(process.execPath, [path.join(options.projectRoot ?? defaultProjectRoot(), 'packages/database/scripts/generate-migrations.mjs')], {
       cwd: options.projectRoot ?? defaultProjectRoot(),
       stdio: 'inherit',
+    });
+  }
+  if (result.generateContracts) {
+    execFileSync(process.execPath, [path.join(options.projectRoot ?? defaultProjectRoot(), 'packages/contracts/scripts/generate-contracts.mjs')], {
+      cwd: options.projectRoot ?? defaultProjectRoot(), stdio: 'inherit',
     });
   }
   return result;

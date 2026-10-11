@@ -12,10 +12,11 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration } from './migration-artifact.mjs';
 import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
-const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
+
 const EXPECTED_DATABASE_SHA256 = 'c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce';
 const BASELINE = Object.freeze({
   contractSetId: 'cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c',
@@ -407,22 +408,6 @@ function renderSopMigration(successor) {
   });
 }
 
-function renderUpgradeMigration(descriptor, snapshot) {
-  const { position, id, version, ranges, sourceBody } = descriptor;
-  const sql = [
-    `-- ${GENERATED_HEADER}`,
-    `-- ${id}; source ${version}${ranges.length ? ` lines ${ranges.map((r) => `${r.start_line}-${r.end_line}`).join(', ')}` : ''}`,
-    `-- contract_set_id=${snapshot.contract_set_id}`,
-    `-- source_git_sha=${snapshot.source_git_sha}`,
-    `-- source_schema_sha256=${snapshot.manifest.database.sha256}`,
-    'SET LOCAL search_path = public, pg_catalog, pg_temp;', '', sourceBody, '',
-  ].join('\n');
-  return Object.freeze({ position, id, file: `${id}.sql`, source_ranges: ranges,
-    sha256: sha256(sql), bytes: Buffer.byteLength(sql),
-    contract_set_id: snapshot.contract_set_id, source_git_sha: snapshot.source_git_sha,
-    source_schema_sha256: snapshot.manifest.database.sha256, sql });
-}
-
 // New product overlays are appended after the frozen contract increments. Their
 // provenance stays tied to this intake; old overlay headers are never restamped.
 function renderIntakeOverlay(projectRoot, snapshot, position, id) {
@@ -462,7 +447,7 @@ function renderCatalogue(manifest, migrations, compatibleUpgrades) {
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}), additiveSuccessor: ${additiveSuccessorLiteral(manifest)} }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}), additiveSuccessor: ${additiveSuccessorLiteral(manifest)}${manifest.compatibility.repair_successor ? `, repairSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.repair_successor.contract_set_id, sourceGitSha: manifest.compatibility.repair_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.repair_successor.source_schema_sha256, migrationSha256: manifest.compatibility.repair_successor.migration_sha256 })})` : ''} }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
 function buildDirectMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
@@ -790,7 +775,17 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     ranges: [],
     sourceBody: sopStageBody,
   }, successorSnapshot) : null;
-  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : []), ...(sopDomainMigration ? [sopDomainMigration] : []), ...(sopStageMigration ? [sopStageMigration] : [])]);
+  const repair = snapshot.repair;
+  const repairMigration = repair ? renderRepairMigration(repair) : null;
+  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : []), ...(sopDomainMigration ? [sopDomainMigration] : []), ...(sopStageMigration ? [sopStageMigration] : []), ...(repairMigration ? [repairMigration] : [])]);
+  if (repair) {
+    const expected = JSON.parse(repair.repair_sources.predecessor).migrations;
+    if (expected.length !== 39 || migrations.length !== 40) throw new Error('Repair generator requires the complete predecessor closure');
+    if (expected.some((m, i) => m.position !== i + 1)) throw new Error('Repair predecessor positions must be 1 through 39');
+    for (const m of expected) for (const key of ['position', 'id', 'file', 'sha256', 'bytes']) {
+      if (migrations[m.position - 1][key] !== m[key]) throw new Error(`Generated repair predecessor drift: ${m.file}`);
+    }
+  }
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -801,6 +796,9 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
         contract_set_id: p.contractSetId, source_git_sha: p.sourceGitSha,
         source_schema_sha256: p.sourceSchemaSha256, migration_count: p.migrationCount,
       }))),
+      ...(repair ? { repair_successor: Object.freeze({ contract_set_id: repair.contract_set_id,
+        source_git_sha: repair.source_git_sha, source_schema_sha256: repair.manifest.database.sha256,
+        upgrade_sha256: repair.manifest.repair.upgrade.sha256, migration_sha256: repairMigration.sha256 }) } : {}),
       additive_successor: sopMigration ? Object.freeze({
         contract_set_id: successor.manifest.contract_set_id,
         source_git_sha: successor.manifest.source_git_sha,
@@ -814,6 +812,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (sopMigration) outputs.set(`packages/database/migrations/${sopMigration.file}`, sopMigration.sql);
   if (registrationMigration) outputs.set(`packages/database/migrations/${registrationMigration.file}`, registrationMigration.sql);
   if (sopDomainMigration) outputs.set(`packages/database/migrations/${sopDomainMigration.file}`, sopDomainMigration.sql);
+  if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));

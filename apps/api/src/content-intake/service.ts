@@ -3,7 +3,7 @@ import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
-import { adoptPreviews, discardPreviewRow, discardPreviews, mediaObjectId, previewFromBytes, stagePreviews } from './linked-preview.js';
+import { adoptPreviews, cancelPreviewsAtVersion, discardPreviewRow, mediaObjectId, previewFromBytes, stagePreviews } from './linked-preview.js';
 import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
@@ -121,8 +121,13 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     return stored !== undefined;
   }
 
+  // Only an uncertain freeze retains its exact parser generation. A later,
+  // authorized read of the same durable job result confirms this handle, never
+  // whichever stage currently occupies the shared object-id preview slot.
+  const uncertainPreviews = new Map<string, { key: C['IntakeCandidateKey']; stage: ReturnType<typeof stagePreviews> }>();
   let parseActive = false;
   async function executeParse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {
+    const pending = uncertainPreviews.get(id);
     // Reserve once, then release all database locks before object I/O and parsing.
     const prepared = await run(actor, 'parse-start', null, null, async (client, who) => {
       const { job: j, src } = await getJob(client, who, parseContractSchema('IntakeId', id));
@@ -148,8 +153,25 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       }
       return prepared;
     }
-    if ('candidate' in prepared.value) return { ok: true, value: prepared.value.candidate };
+    if ('candidate' in prepared.value) {
+      const recovered = prepared.value.candidate;
+      if (pending) {
+        if (pending.key.candidateId === recovered.key.candidateId && pending.key.version === recovered.key.version
+          && pending.key.digest === recovered.key.digest && recovered.state !== 'cancelled') {
+          pending.stage.commit(recovered.key.candidateId, recovered.key.version);
+        } else pending.stage.rollback();
+        if (uncertainPreviews.get(id) === pending) uncertainPreviews.delete(id);
+      }
+      return { ok: true, value: recovered };
+    }
+    // A locked read still in reading/parsing proves the earlier uncertain freeze
+    // did not leave a durable result. Retire only the record this call observed.
+    if (pending) {
+      pending.stage.rollback();
+      if (uncertainPreviews.get(id) === pending) uncertainPreviews.delete(id);
+    }
     const previewKey = prepared.value.job.object_id;
+    let previewStage: ReturnType<typeof stagePreviews> | undefined;
     let parsed: ParseResult;
     let sopPreviews: Awaited<ReturnType<typeof tryParseSopAsFaq>> extends infer Value ? Value extends { previews: infer Previews } ? Previews : never : never = [];
     try {
@@ -161,7 +183,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       if (sop) {
         parsed = sop.parsed;
         sopPreviews = sop.previews;
-        stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId, {
+        previewStage = stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId, {
           productRefIds: item.productRefIds, scenarioRefIds: item.scenarioRefIds, familySourceId: item.familySourceId,
         })));
       } else {
@@ -171,9 +193,13 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       parsed = { ...failedParse('OBJECT_UNAVAILABLE', prepared.value.source.ruleVersion === CSV_POLICY_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version),
         issues: [{ code: 'OBJECT_UNAVAILABLE', sheet: '', row: 0, column: '', fix: '对象不可读取或指纹变化，请重新上传' }] };
     }
+    let frozenKey: C['IntakeCandidateKey'] | undefined;
     const frozen = parsed.ok ? await run(actor, 'freeze', null, null, async (client, who) => {
       const { job: j, src } = await getJob(client, who, id);
-      if (j.state === 'validated') return readCandidate(client, who, j.result_candidate_id!, Number(j.result_candidate_version), 'import');
+      if (j.state === 'validated') {
+        const existing = await readCandidate(client, who, j.result_candidate_id!, Number(j.result_candidate_version), 'import');
+        frozenKey = existing.key; return existing;
+      }
       const candidate = await freezeParsed(client, who, j, src, parsed);
       for (const item of sopPreviews) {
         await client.query(
@@ -181,9 +207,17 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
           [candidate.key.candidateId, candidate.key.version, src.scope.sourceId, who.id, mediaObjectId(src.scope.sourceId, item.bytes), digest(item.bytes), item.bytes.length, item.mime, item.sheet, item.row, item.column, item.ordinal],
         );
       }
+      frozenKey = candidate.key;
       return candidate;
     }, candidate) : { ok: false as const, code: 'VALIDATION' as const, reason: 'FILE_INVALID' as const,
       commit: 'rolled_back' as const, diagnosticId: `intake_${randomUUID()}` };
+    if (!frozen.ok && frozen.commit === 'unknown' && previewStage && frozenKey) {
+      uncertainPreviews.set(id, { key: frozenKey, stage: previewStage });
+    }
+    if (!frozen.ok && frozen.commit === 'rolled_back') {
+      previewStage?.rollback();
+      if (uncertainPreviews.get(id)?.stage === previewStage) uncertainPreviews.delete(id);
+    }
     if (!frozen.ok && frozen.commit !== 'unknown') {
       const failure = parsed.ok ? { ...parsed, ok: false, rows: [], questions: [],
         issues: [{ code: frozen.reason, sheet: '', row: 0, column: '', fix: '刷新权限、来源和候选后重新接收文件' }] } : parsed;
@@ -196,7 +230,11 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
         return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
       }
     }
-    if (frozen.ok) adoptPreviews(previewKey, frozen.value.key.candidateId);
+    if (frozen.ok) {
+      if (previewStage) previewStage.commit(frozen.value.key.candidateId, frozen.value.key.version);
+      else adoptPreviews(previewKey, frozen.value.key.candidateId, frozen.value.key.version);
+      if (uncertainPreviews.get(id)?.stage === previewStage) uncertainPreviews.delete(id);
+    }
     return frozen;
   }
 
@@ -255,7 +293,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       const result = await run(actor, 'cancel', json(raw), operation(raw),
         (client, who) => cancelCandidate(client, who, parseContractSchema('IntakeCancel', raw)), historicalCandidate);
       if (!result.ok) return result;
-      discardPreviews(result.value.key.candidateId);
+      cancelPreviewsAtVersion(result.value.key.candidateId, result.value.key.version);
       return { ok: true as const, value: cancellationReceipt(operation(raw)!, result.value) };
     },
     async deleteUnusedSopRow(actor: AuthenticatedUser, candidateId: string, candidateVersion: number, rowId: string) {

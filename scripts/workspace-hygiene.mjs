@@ -39,9 +39,9 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // borrow unused space from another group, even with a larger aggregate override.
 export const WORKSPACE_REMAINDER_BUDGET_BYTES = 45 * 1024 * 1024;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
-  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 15 * 1024 * 1024 }),
+  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 16 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10 * 1024 * 1024 }),
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 20 * 1024 * 1024 }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 19 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([

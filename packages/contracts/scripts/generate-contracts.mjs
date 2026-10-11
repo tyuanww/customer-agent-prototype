@@ -197,7 +197,8 @@ function artifactDescriptor(relativePath, content) {
 }
 
 async function buildGeneratedArtifactsFromSnapshot(snapshot) {
-  const { lock, manifest, openapi_source: source } = snapshot;
+  const effectiveSnapshot = snapshot.repair ?? snapshot;
+  const { lock, manifest, openapi_source: source } = effectiveSnapshot;
   const openapiDescriptor = requireRecord(manifest.openapi, 'OpenAPI descriptor');
   const databaseDescriptor = requireRecord(manifest.database, 'Database descriptor');
   const openapiDocument = parse(source, { maxAliasCount: 0 });
@@ -248,15 +249,15 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
   };
   const provenanceValue = {
     schema: CODEGEN_SCHEMA,
-    contract_set_id: snapshot.contract_set_id,
+    contract_set_id: effectiveSnapshot.contract_set_id,
     source_repository: lock.source_repository,
-    source_git_sha: snapshot.source_git_sha,
+    source_git_sha: effectiveSnapshot.source_git_sha,
     manifest_sha256: lock.manifest_sha256,
     openapi_version: contractVersion,
     openapi_sha256: lock.openapi_sha256,
     database_version: databaseDescriptor.version,
     database_sha256: lock.database_sha256,
-    intake_status: snapshot.intake_status,
+    intake_status: effectiveSnapshot.intake_status,
     runtime_activated: false,
     runtime_schema_dialect: RUNTIME_SCHEMA_DIALECT,
     component_schema_count: schemaNames.length,
@@ -279,7 +280,7 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
   }, null, 2)}\n`;
 
   return Object.freeze({
-    contract_set_id: snapshot.contract_set_id,
+    contract_set_id: effectiveSnapshot.contract_set_id,
     runtime_activated: false,
     schema_count: schemaNames.length,
     files: new Map([

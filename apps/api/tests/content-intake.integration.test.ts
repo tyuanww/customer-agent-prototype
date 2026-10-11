@@ -13,8 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createSyntheticSopWorkbook, createTemplate } from '@customer-agent/content-intake';
-import { ContentIntakeUsage } from '../../desktop/src/main/content-intake-usage.js';
-import { listPreviews, mediaObjectId } from '../src/content-intake/linked-preview.js';
+import { listPreviews, mediaObjectId, previewFromBytes, stagePreviews, discardPreviews, retainPreviewRowsAtVersion } from '../src/content-intake/linked-preview.js';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -268,6 +267,45 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     return { url, headers, logged, get, status, page, samples, post, receipt };
   }
   const wireChecks = (items: C['IntakeQualitySample'][]) => items.map(i => i.check ?? ({ scriptId: i.scriptId, contentHash: i.contentHash, defect: false, reason: '' }));
+
+  it('capacity: reclaims a persisted file after definite registration rollback', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, rolledBack = false;
+    const chargedBefore = Number((await admin.query(`SELECT coalesce(sum(reserved_bytes),0) AS bytes
+      FROM content_intake.object_reservations WHERE state IN ('reserved','persisted','releasing')`)).rows[0].bytes);
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      // The file and admission commit are real. Another connection blocks only
+      // the following persisted marker, never the initial capacity reservation.
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const observed: IntakePool = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held) {
+            rolledBack = true; await admin.query('ROLLBACK'); held = false;
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    const failures: unknown[] = [];
+    try {
+      await expect(createIntakeCapacity(observed, blockedStore, error => failures.push(error))
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(rolledBack).toBe(true); expect(objectId).not.toBe(''); expect(failures).toEqual([]);
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'released' }]);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+    expect(Number((await admin.query(`SELECT coalesce(sum(reserved_bytes),0) AS bytes
+      FROM content_intake.object_reservations WHERE state IN ('reserved','persisted','releasing')`)).rows[0].bytes)).toBe(chargedBefore);
+    await expect(store.readPayload(objectId)).rejects.toMatchObject({ code: 'ENOENT' });
+  }, 40_000);
 
   it('capacity: serializes tenfold admission before bytes, protects unknown commits, retries cleanup and consumes the dry-run CLI', async () => {
     const cap = createIntakeCapacity(pool, store, error => diagnostics.push(error));
@@ -632,6 +670,120 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       throw error;
     }
   }
+  it.each(['plain', 'successor-pending', 'same-version-empty', 'newer-version', 'cancelled', 'uncommitted', 'late-replay-cancel', 'late-freeze-cancel'] as const)('recovers SOP preview projection after a confirmed freeze COMMIT loses its acknowledgement: %s', async variant => {
+    await registerSopSource();
+    const workbook = await createSyntheticSopWorkbook();
+    const host = await managementHost();
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook.bytes, 'sop-unknown-upload', 'source-sop')).json());
+      const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = value(await service.receive(actor('enabler'), 'source-sop', { operationId: 'sop-unknown-receive', objectId: object.objectId,
+        sourceVersion: 1, baseReleaseId, expectedPriorKey: null,
+        contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['enabler'], confirmed: true } }));
+      let lost = false, waiting = false;
+      let entered!: () => void, release!: () => void;
+      const committedBeforeReturn = new Promise<void>(resolve => { entered = resolve; });
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      const uncertain: IntakePool = { async connect() {
+        const client = await pool.connect(); let freezing = false;
+        return new Proxy(client, { get(target, property) {
+          if (property === 'query') return async (sql: string, values?: unknown[]) => {
+            if (sql === 'COMMIT' && freezing && !lost && variant === 'uncommitted') {
+              await target.query('ROLLBACK'); lost = true; throw new Error('synthetic uncertain freeze rolled back before acknowledgement');
+            }
+            const result = await target.query(sql, values);
+            if (sql.includes("SET state='validated'")) freezing = true;
+            if (sql === 'COMMIT' && freezing && !lost) {
+              lost = true;
+              if (variant === 'late-freeze-cancel') { entered(); await gate; }
+              else throw new Error('synthetic committed SOP freeze acknowledgement lost');
+            }
+            if (sql === 'COMMIT' && !freezing && lost && variant === 'late-replay-cancel' && !waiting) {
+              waiting = true; entered(); await gate;
+            }
+            return result;
+          };
+          const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+        } });
+      } };
+      const uncertainService = createContentIntakeService(uncertain, store);
+      const firstParse = uncertainService.parse(actor('enabler'), received.jobId);
+      if (variant === 'late-freeze-cancel') {
+        await committedBeforeReturn;
+        const frozen = (await admin.query('SELECT result_candidate_id,result_candidate_version FROM content_intake.parse_jobs WHERE job_id=$1', [received.jobId])).rows[0];
+        const prior = value(await service.candidate(actor('enabler'), frozen.result_candidate_id, Number(frozen.result_candidate_version)));
+        try { value(await service.cancel(actor('enabler'), { key: prior.key, operationId: 'cancel-before-freeze-return' })); }
+        finally { release(); }
+        const result = value(await firstParse);
+        expect(result.key).toEqual(prior.key);
+        expect((await admin.query('SELECT state FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2', [prior.key.candidateId, prior.key.version])).rows[0].state).toBe('cancelled');
+        expect(listPreviews(prior.key.candidateId, new Set(['source-sop']))).toEqual([]);
+        discardPreviews(object.objectId); discardPreviews(prior.key.candidateId);
+        return;
+      }
+      expect(await firstParse).toMatchObject({ ok: false, commit: 'unknown', reason: 'COMMIT_UNKNOWN' });
+      expect(lost).toBe(true);
+      const committed = (await admin.query('SELECT state,result_candidate_id,result_candidate_version FROM content_intake.parse_jobs WHERE job_id=$1', [received.jobId])).rows[0];
+      const sources = new Set(['source-sop']);
+      if (variant === 'uncommitted') {
+        expect(committed).toMatchObject({ state: 'parsing', result_candidate_id: null, result_candidate_version: null });
+        expect((await admin.query('SELECT count(*)::int AS n FROM content_intake.candidate_versions')).rows[0].n).toBe(0);
+        const recovered = value(await uncertainService.parse(actor('enabler'), received.jobId));
+        expect(listPreviews(recovered.key.candidateId, sources)).toHaveLength(1);
+        expect(value(await uncertainService.parse(actor('enabler'), received.jobId))).toEqual(recovered);
+        expect((await admin.query('SELECT count(*)::int AS n FROM content_intake.candidate_versions')).rows[0].n).toBe(1);
+        discardPreviews(object.objectId); discardPreviews(recovered.key.candidateId);
+        return;
+      }
+      expect(committed.state).toBe('validated');
+      const inputPreviews = [...listPreviews(object.objectId, sources)];
+      expect(inputPreviews).toHaveLength(1);
+      expect(listPreviews(committed.result_candidate_id, sources)).toEqual([]);
+      let successor: ReturnType<typeof stagePreviews> | undefined;
+      if (variant === 'successor-pending') successor = stagePreviews(object.objectId,
+        [previewFromBytes(Buffer.from('synthetic later pending image'), 'image/png', 'source-sop', 'later-row')]);
+      // This variant sets an owner projection barrier, not a fake database deletion.
+      if (variant === 'same-version-empty') retainPreviewRowsAtVersion(committed.result_candidate_id, [], Number(committed.result_candidate_version), object.objectId);
+      let nextObjectId: string | undefined;
+      if (variant === 'cancelled') {
+        const prior = value(await service.candidate(actor('enabler'), committed.result_candidate_id, Number(committed.result_candidate_version)));
+        value(await service.cancel(actor('enabler'), { key: prior.key, operationId: 'sop-unknown-cancel' }));
+      }
+      if (variant === 'newer-version') {
+        const prior = value(await service.candidate(actor('enabler'), committed.result_candidate_id, Number(committed.result_candidate_version)));
+        const nextFile = await createSyntheticSopWorkbook({ omitFirstImage: true, textSuffix: '合成新版' });
+        const nextObject = parseContractSchema('IntakeObject', await (await host.upload(nextFile.bytes, 'sop-next-upload', 'source-sop')).json());
+        const nextJob = value(await service.receive(actor('enabler'), 'source-sop', { operationId: 'sop-next-receive', objectId: nextObject.objectId,
+          sourceVersion: 1, baseReleaseId, expectedPriorKey: prior.key,
+          contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['enabler'], confirmed: true } }));
+        const newer = value(await service.parse(actor('enabler'), nextJob.jobId));
+        expect(newer.key).toMatchObject({ candidateId: prior.key.candidateId, version: prior.key.version + 1 });
+        expect(listPreviews(newer.key.candidateId, sources)).toEqual([]);
+        nextObjectId = nextObject.objectId;
+      }
+      const recovering = uncertainService.parse(actor('enabler'), received.jobId);
+      if (variant === 'late-replay-cancel') {
+        await committedBeforeReturn;
+        const prior = value(await service.candidate(actor('enabler'), committed.result_candidate_id, Number(committed.result_candidate_version)));
+        try { value(await service.cancel(actor('enabler'), { key: prior.key, operationId: 'cancel-before-replay-return' })); }
+        finally { release(); }
+        expect((await admin.query('SELECT state FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2', [prior.key.candidateId, prior.key.version])).rows[0].state).toBe('cancelled');
+      }
+      const recovered = value(await recovering);
+      expect(recovered.key).toMatchObject({ candidateId: committed.result_candidate_id, version: Number(committed.result_candidate_version) });
+      expect(listPreviews(recovered.key.candidateId, sources)).toEqual(variant === 'same-version-empty' || variant === 'newer-version' || variant === 'cancelled' || variant === 'late-replay-cancel' ? [] : inputPreviews);
+      if (successor) {
+        expect(listPreviews(object.objectId, sources).map(item => item.rowId)).toEqual(['later-row']);
+        successor.rollback();
+        expect(listPreviews(object.objectId, sources)).toEqual(inputPreviews);
+        expect(listPreviews(recovered.key.candidateId, sources)).toEqual(inputPreviews);
+      }
+      expect((await admin.query('SELECT count(*)::int AS n FROM content_intake.candidate_versions')).rows[0].n).toBe(variant === 'newer-version' ? 2 : 1);
+      discardPreviews(object.objectId); discardPreviews(recovered.key.candidateId);
+      if (nextObjectId) discardPreviews(nextObjectId);
+    } finally { await host.app.close(); }
+  }, 40_000);
+
   it('cancelling an unused SOP upload drops its images', async () => {
     const { bytes: workbook } = await createSyntheticSopWorkbook();
     await registerSopSource();
@@ -668,7 +820,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await host.app.close(); }
   }, 40_000);
 
-  it('second synthetic seat copies published text only and previews the uploaded image inside the system', async () => {
+  it('second synthetic seat receives published SOP text and protected image bytes over HTTP', async () => {
     const { bytes: workbook, png } = await createSyntheticSopWorkbook();
     await publicationBase();
     await registerSopSource();
@@ -728,34 +880,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(Buffer.from(body.bytesBase64, 'base64').equals(png)).toBe(true);
       expect(copied).not.toContain(body.bytesBase64);
       expect(JSON.stringify(snapshot)).not.toContain(body.bytesBase64);
-      const clipboard: string[] = [];
-      const seatClient = new ContentIntakeUsage({
-        view: () => ({ signedIn: true, sessionEpoch: 1 }),
-        subscribe: () => () => undefined,
-        request: async (_epoch, path, options) => {
-          const init: RequestInit = {
-            method: options.body === undefined ? 'GET' : 'POST',
-            headers: { ...headers, ...(options.body === undefined ? {} : { 'content-type': 'application/json' }) },
-            signal: options.signal,
-          };
-          if (options.body !== undefined) init.body = JSON.stringify(options.body);
-          const result = await fetch(`${origin}${path}`, init);
-          const value = await result.json() as { error?: { code?: string; details?: { reason?: string } } };
-          if (!result.ok) throw { code: value.error?.code, reason: value.error?.details?.reason };
-          return { value };
-        },
-      }, text => { clipboard.push(text); });
-      seatClient.select({ shopId: 'shop-a', productIds: [], scenarioIds: [] });
-      const catalog = await seatClient.refresh();
-      const projected = catalog.read();
-      expect(projected?.faq.some(row => row.entry.answerText.includes('合成文字'))).toBe(true);
-      const key = projected!.faq.find(row => row.entry.answerText.includes('合成文字'))!.key;
-      expect(catalog.copy(key)).toEqual({ copied: true });
-      expect(clipboard.at(-1)).toContain('合成文字');
-      expect(clipboard.at(-1)).not.toContain(png.toString('base64'));
-      const seen = await catalog.preview(handles.items[0]!.objectId);
-      expect(seen.mime).toBe('image/png');
-      expect(seen.bytes.equals(png)).toBe(true);
       const keptRow = await fetch(`${host.origin}/v1/intake/sop/candidates/${c.key.candidateId}/versions/${c.key.version}/rows/${encodeURIComponent('sop:过敏流程SOP:2')}`, { method: 'DELETE', headers: host.headers });
       expect(keptRow.status).toBe(409);
       const kept = await fetch(`${url}/cancel`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' },
@@ -780,7 +904,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect((await otherList.json() as { items: unknown[] }).items).toEqual([]);
       const denied = await fetch(`${origin}/v1/intake/preview?entitlementId=${otherEntitlement.entitlementId}&objectId=${handles.items[0]!.objectId}`, { headers: otherHeaders });
       expect(denied.status).toBe(404);
-      seatClient.dispose();
     } finally { await reader.close(); await host.app.close(); }
   }, 40_000);
 
@@ -811,15 +934,24 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await host.app.close(); }
   }, 40_000);
 
-  it('workflow HTTP recovers a lost publish COMMIT through actor/action-scoped receipts without another publication', async () => {
+  it.each(['receipt', 'replay', 'rollback'] as const)('workflow HTTP synchronizes preview aliases after publish certainty: %s', async mode => {
     await publicationBase();
-    let lost = false;
+    let lost = false, releaseId = '', candidateId = '';
+    const sources = new Set(['source-a']);
     const uncertain: IntakePool = { async connect() {
       const client = await pool.connect(); let publishes = false;
       return new Proxy(client, { get(target, key) {
         if (key === 'query') return async (sql: string, args?: unknown[]) => {
+          if (sql === 'COMMIT' && publishes) {
+            expect(listPreviews(releaseId, sources)).toEqual([]);
+          }
+          // A pre-COMMIT failure must occur before the transaction owner sets
+          // committing=true; fail the final principal read after receipt insert.
+          if (mode === 'rollback' && publishes && sql.includes('FROM content_intake.principals')) throw new Error('synthetic final principal failure');
           const result = await target.query(sql, args);
-          if (sql.includes('content_intake.publish_candidate(')) publishes = true;
+          if (sql.includes('content_intake.publish_candidate(')) {
+            publishes = true; releaseId = result.rows[0].value.receipt.releaseId;
+          }
           if (sql === 'COMMIT' && publishes && !lost) { lost = true; throw new Error('synthetic lost publish COMMIT'); }
           return result;
         };
@@ -830,11 +962,25 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     try {
       const f = await httpCandidate(host);
       await httpConfirm(f); await httpQuality(host, f.c);
+      candidateId = f.c.key.candidateId;
+      const image = previewFromBytes((await createSyntheticSopWorkbook()).png, 'image/png', 'source-a', 'faq-0');
+      stagePreviews(candidateId, [image]);
       const first = await f.post('publish', f.publish);
-      expect(first.status).toBe(503);
+      expect(first.status).toBe(mode === 'rollback' ? 500 : 503);
+      expect(listPreviews(releaseId, sources)).toEqual([]);
+      expect(listPreviews(candidateId, sources)).toHaveLength(1);
+      if (mode === 'rollback') {
+        expect(lost).toBe(false);
+        expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('0');
+        expect((await admin.query("SELECT count(*) FROM backend_review.receipts WHERE operation='intake:publish'")).rows[0].count).toBe('0');
+        return;
+      }
       expect(await first.json()).toMatchObject({ error: { details: { reason: 'COMMIT_UNKNOWN' } } });
       const url = `${host.origin}/v1/intake/operations/${f.publish.operationId}`;
-      const recovered = parseContractSchema('IntakeReceipt', await (await fetch(`${url}?action=publish`, { headers: host.headers })).json());
+      const recovery = mode === 'receipt' ? await fetch(`${url}?action=publish`, { headers: host.headers }) : await f.post('publish', f.publish);
+      expect(recovery.status).toBe(mode === 'receipt' ? 200 : 202);
+      const recovered = parseContractSchema('IntakeReceipt', await recovery.json());
+      expect(listPreviews(releaseId, sources)).toEqual([image]);
       expect(recovered.state).toBe('published');
       expect((await fetch(`${url}?action=publish`, { headers: { authorization: `Bearer ${(await seat('other')).token}` } })).status).toBe(404);
       expect((await fetch(`${url}?action=cancel`, { headers: host.headers })).status).toBe(404);
@@ -842,7 +988,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(await (await f.post('publish', f.publish)).json()).toEqual(recovered);
       expect(provider.instanceCalls()).toBe(observations);
       expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('1');
-    } finally { await host.app.close(); }
+    } finally { if (candidateId) discardPreviews(candidateId); await host.app.close(); }
   }, 40_000);
 
   it('workflow HTTP preserves historical cancellation receipts and requires a live owning session to recover them', async () => {

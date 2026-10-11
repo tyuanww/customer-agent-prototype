@@ -11,7 +11,7 @@ export const INTAKE_SYNTHETIC_IDENTITIES = [
 
 /** Explicit throwaway bootstrap. These synthetic identities and the empty
  * intake catalog are never adopted by a production factory or an existing DB. */
-export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product', inputFormat: 'xlsx' | 'csv' = 'xlsx') {
+export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product', inputFormat: 'xlsx' | 'csv' = 'xlsx', includeSopSource = false) {
   await admin.query('BEGIN');
   try {
     for (const [id, role] of INTAKE_SYNTHETIC_IDENTITIES) {
@@ -37,6 +37,14 @@ export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' |
           VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成业务授权','director',$4)`,
         [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
       }
+    }
+    // Test-only sibling source: exercise the same SOP opt-in as the API suite.
+    if (includeSopSource) {
+      await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ('source-sop','scope-a',1,'v2-preview')");
+      await admin.query("INSERT INTO content_intake.source_mappings VALUES ('source-sop',1,'faq-p1.1','intake-p1.1','sop-not-imported',repeat('a',64))");
+      await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+        to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-sop','source_id','source-sop'))).*
+        FROM content_intake.grants g WHERE source_id='source-a' AND kind='business'`);
     }
     const domains = ['aftersale', 'campaign', 'presale', 'product'];
     const sourceHash = createHash('sha256').update(domains.map(d => `${d}:srcv_pub_${d}`).join('|')).digest('hex');

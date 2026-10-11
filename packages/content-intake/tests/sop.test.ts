@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
-import { parseSopWorkbook, SOP_POLICY_VERSION, SOP_SHEET_NAMES, type SopParseContext } from '@customer-agent/content-intake';
+import { createSyntheticSopWorkbook, parseSopWorkbook, tryParseSopAsFaq, SOP_POLICY_VERSION, SOP_SHEET_NAMES, type SopParseContext } from '@customer-agent/content-intake';
 
 const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=';
 const context: SopParseContext = {
@@ -31,7 +31,7 @@ describe('candidate SOP workbook parser', () => {
     const result = await parseSopWorkbook(await fixture(), context);
     expect(result.ok).toBe(true);
     expect(result.policyVersion).toBe(SOP_POLICY_VERSION);
-    expect(result.version).toBe(result.rawSha256);
+    expect(result.version).toBe(result.rawSha256); expect(result.versionKind).toBe('sha256');
     expect(result.rows.find((row) => row.sheet === SOP_SHEET_NAMES[0] && row.row === 2)).toMatchObject({
       text: '同一行的合成答案\n保留列顺序\n保留单元格换行\n外部说明标签',
       attachmentIds: [`sop:${SOP_SHEET_NAMES[0]}:2:1`, `sop:${SOP_SHEET_NAMES[0]}:2:2`],
@@ -43,7 +43,15 @@ describe('candidate SOP workbook parser', () => {
   it('uses an explicit version cell when a sheet exposes the exact version header', async () => {
     const result = await parseSopWorkbook(await fixture({ version: 'sop-version-synthetic-1' }), context);
     expect(result.ok).toBe(true);
-    expect(result.version).toBe('sop-version-synthetic-1');
+    expect(result.version).toBe('sop-version-synthetic-1'); expect(result.versionKind).toBe('declared');
+  });
+
+  it.each([false,true])('preserves the sole parser version through the FAQ adapter: declared=%s', async declared => {
+    const bytes = await fixture(declared ? { version: 'sop-adapter-version' } : {});
+    const result = await tryParseSopAsFaq(bytes, { sourceId: context.sourceId, brandId: context.brandId, shopId: context.scope });
+    expect(result?.parsed.ok).toBe(true);
+    const parsed = await parseSopWorkbook(bytes, context);
+    expect(result?.contentVersion).toEqual({ kind: declared ? 'declared' : 'sha256', value: parsed.version });
   });
 
   it('rejects an image-only row and returns no usable partial data', async () => {
@@ -59,4 +67,16 @@ describe('candidate SOP workbook parser', () => {
     expect(result.ok).toBe(false);
     expect(result.issues).toContainEqual(expect.objectContaining({ code: 'UNKNOWN_SHEET', sheet: '未登记页' }));
   });
+});
+
+it('builds bounded synthetic media windows with stable row identities across smaller successors', async () => {
+  const first = await createSyntheticSopWorkbook({ omitFirstImage: true, tailRows: 501, tailImageStart: 401, tailImageCount: 100 });
+  const next = await createSyntheticSopWorkbook({ omitFirstImage: true, tailRows: 401, tailImageStart: 301, tailImageCount: 100 });
+  const scope = { sourceId: context.sourceId, brandId: context.brandId, shopId: context.scope };
+  const a = (await tryParseSopAsFaq(first.bytes, scope))!, b = (await tryParseSopAsFaq(next.bytes, scope))!;
+  expect(a.parsed.ok).toBe(true); expect(b.parsed.ok).toBe(true);
+  expect(a.previews).toHaveLength(100); expect(b.previews).toHaveLength(100);
+  expect(b.rowBindings).toEqual(a.rowBindings.slice(0, b.rowBindings.length));
+  expect(a.previews[0]?.row).toBe(403); expect(b.previews.at(-1)?.row).toBe(402);
+  await expect(createSyntheticSopWorkbook({ tailRows: 502 })).rejects.toThrow('SYNTHETIC_TAIL_ROWS');
 });

@@ -99,14 +99,21 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
         }
         throw error;
       }
-      // A lost response here retains the file and its charge. Do not hand an
-      // uncertain persisted object to a business transaction or release it.
-      await transaction(async client => {
-        const changed = await client.query(`UPDATE content_intake.object_reservations
-          SET state='persisted',actual_bytes=$2,sha256=$3,updated_at=clock_timestamp()
-          WHERE object_id=$1 AND state='reserved' AND reserved_bytes >= $2`, [object.objectId, object.sizeBytes, object.sha256]);
-        if (changed.rowCount !== 1) throw new IntakeRejection('COMMIT_UNKNOWN');
-      });
+      try {
+        await transaction(async client => {
+          const changed = await client.query(`UPDATE content_intake.object_reservations
+            SET state='persisted',actual_bytes=$2,sha256=$3,updated_at=clock_timestamp()
+            WHERE object_id=$1 AND state='reserved' AND reserved_bytes >= $2`, [object.objectId, object.sizeBytes, object.sha256]);
+          if (changed.rowCount !== 1) throw new IntakeRejection('COMMIT_UNKNOWN');
+        });
+      } catch (error) {
+        // Only a definite rollback permits cleanup. A lost COMMIT or failed
+        // ROLLBACK retains the file and its charge for uncertain-result recovery.
+        if (!(error instanceof IntakeCapacityCommitUnknown)) {
+          try { await discard(object.objectId); } catch (cleanup) { report(cleanup); }
+        }
+        throw error;
+      }
       return object;
     },
     /** Call after inserting the object, under the business transaction's content

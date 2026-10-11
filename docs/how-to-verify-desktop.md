@@ -268,7 +268,7 @@ pnpm clean:preview
 
 `workspace:size` 按磁盘分配量拆分 `release/`、各 workspace 包的 `node_modules/` 与已知构建输出、精确派生图标、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
 
-`workspace:check` 按已批准的三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **20 MiB**，`contracts/upstream/` 冻结合同为 **15 MiB**，`evidence/` 冻结证据为 **10 MiB**，默认合计上限 **45 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。统计采用 allocated bytes（磁盘分配块，按 inode 去重），不是安装包大小或文件逻辑字节。`node_modules`、精确已知构建输出/派生图标、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单列；未知输出、canonical 资产、构建配置和已提交 generated source 不会被宽泛排除。分组依据及 2026-10-09 批准记录见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。`--remainder-budget-mib=N` 只改变总量上限，不能绕过分组门禁；分组政策变更须根据真实构成另行审阅，不能删除冻结历史或仅靠临时参数使默认门禁显绿。
+`workspace:check` 按已批准的三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **19 MiB**，`contracts/upstream/` 冻结合同为 **16 MiB**，`evidence/` 冻结证据为 **10 MiB**，默认合计上限 **45 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。统计采用 allocated bytes（磁盘分配块，按 inode 去重），不是安装包大小或文件逻辑字节。`node_modules`、精确已知构建输出/派生图标、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单列；未知输出、canonical 资产、构建配置和已提交 generated source 不会被宽泛排除。分组在2026-10-12为接收获批后继合同调整为19/16/10（总45不变，见TODOS当前交接）；历史分组依据及2026-10-09批准记录见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。`--remainder-budget-mib=N` 只改变总量上限，不能绕过分组门禁；分组政策变更须根据真实构成另行审阅，不能删除冻结历史或仅靠临时参数使默认门禁显绿。
 
 | 命令 | 行为 | 恢复方式 |
 | --- | --- | --- |
@@ -528,3 +528,13 @@ pnpm test:db:integration
 ```
 
 回退只允许当前目录的上一已发布版本，仍须全部实际变化范围的当前资格、来源/内容有效性和基线校验；权限不足走正常纠正候选。新直发无需人工审批，但保留人工质量检查与确认。未知直发只能查询回执或重试原已确认输入，不能换计划；旧协议未知发布/回退只能查原回执，不能重编码为确认直发。混合目录中的旧审批内容仍按其历史政策验证，审批或来源失效不得借直发恢复。上述均为合成证据，不代表真实飞书、Windows GUI、生产装配或正式运行 ACL 已放行。
+
+### SOP 后继合同接收后的合成回归
+
+先运行 `pnpm build` 生成当前合同与数据库运行产物，再在仓库根执行：
+
+```sh
+CUSTOMER_AGENT_API_PG15_INTEGRATION=1 apps/api/node_modules/.bin/vitest run --root apps/api tests/sop-trusted-stage.integration.test.ts tests/sop-row-deletion-candidate.integration.test.ts tests/sop-media-capacity.integration.test.ts tests/sop-media-delivery.integration.test.ts
+```
+
+这四组直接安装产品已接收的40段迁移，并核验物理状态；不再读取仓外候选SQL或依赖候选目录环境变量。全部资料、身份、PG集群和存储均为测试自建。实验reader仍显式注入，测试通过不代表生产HTTP/Main装配已开放。

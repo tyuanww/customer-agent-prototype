@@ -187,7 +187,7 @@ async function verifyCatalogueState(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
   expectedAcl: Readonly<{ entries: number; sha256: string }>,
-  expectedInventory: Readonly<{ tables: number; functions: number; objectEntries: number; objectSha256: string; functionEntries: number; functionSha256: string }> = {
+  expectedInventory: Readonly<{ tables: number; functions: number; objectEntries: number; objectSha256: string; functionEntries: number; functionSha256: string; triggerEntries?: number; triggerSha256?: string }> = {
     tables: 97,
     functions: 255,
     objectEntries: EXPECTED_OBJECT_MANIFEST_ENTRIES,
@@ -832,8 +832,8 @@ async function verifyCatalogueState(
   }
   if (
     !trigger
-    || trigger.entries !== EXPECTED_TRIGGER_MANIFEST_ENTRIES
-    || sha256(trigger.manifest) !== EXPECTED_TRIGGER_MANIFEST_SHA256
+    || trigger.entries !== (expectedInventory.triggerEntries ?? EXPECTED_TRIGGER_MANIFEST_ENTRIES)
+    || sha256(trigger.manifest) !== (expectedInventory.triggerSha256 ?? EXPECTED_TRIGGER_MANIFEST_SHA256)
   ) {
     failures.push(`exact trigger table/function/event/enabled/definition manifest [${trigger?.entries ?? 'missing'}:${trigger ? sha256(trigger.manifest) : 'missing'}]`);
   }
@@ -916,17 +916,41 @@ export function verifyLegacyCheckPredecessor(client: DatabaseQueryClient): Promi
   });
 }
 
+const V127_INVENTORY = Object.freeze({ tables: EXPECTED_SUCCESSOR_TABLES, functions: 257,
+  objectEntries: EXPECTED_V127_OBJECT_MANIFEST_ENTRIES, objectSha256: EXPECTED_V127_OBJECT_MANIFEST_SHA256,
+  functionEntries: EXPECTED_V127_FUNCTION_SECURITY_ENTRIES, functionSha256: EXPECTED_V127_FUNCTION_SECURITY_SHA256 });
+
+/** Physical checks and receipt verification share the 0040 transaction. These
+ * fingerprints come from the exact approved upgrade on isolated PG15, not the
+ * cumulative schema, which is not an executable bootstrap. */
+export function verifyRepairSuccessor(client: DatabaseQueryClient, catalogue: ExecutableMigrationCatalogue): Promise<DatabaseVerificationReport> {
+  if (catalogue.migrations.length !== 40
+    || catalogue.compatibility.repairSuccessor?.sourceSchemaSha256 !== 'c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69') {
+    throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved repair successor required');
+  }
+  return verifyCatalogueState(client, catalogue, {
+    entries: 573, sha256: '73ef57b18fc9ae2a5b5f99f50b7dd35bf5dd70829c6d97d2355ec65a86debd6e',
+  }, { tables: 104, functions: 270,
+    objectEntries: 3319, objectSha256: '527586edd3e6ce1bc42018fef37429f64f9e5e9c1281eef4a6624f141d5b8e65',
+    functionEntries: 270, functionSha256: '78cd2e22d8eee25b1f75da542b79f2a6e9da0c4ff77bdf4deaa51354c6dd562e',
+    triggerEntries: 112, triggerSha256: '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a',
+  });
+}
+
+export function verifyRepairPredecessor(client: DatabaseQueryClient, catalogue: ExecutableMigrationCatalogue): Promise<DatabaseVerificationReport> {
+  const predecessor = { ...catalogue, migrations: catalogue.migrations.slice(0, 39),
+    compatibility: { ...catalogue.compatibility, repairSuccessor: null } };
+  if (predecessor.migrations.length !== 39) throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Repair predecessor requires 39 migrations');
+  return verifyCatalogueState(client, predecessor, {
+    entries: EXPECTED_ACL_MANIFEST_ENTRIES, sha256: EXPECTED_ACL_MANIFEST_SHA256,
+  }, V127_INVENTORY);
+}
+
 export function verifyMigrationCatalogue(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
+  if (generatedMigrationCatalogue.compatibility.repairSuccessor) return verifyRepairSuccessor(client, generatedMigrationCatalogue);
   return verifyCatalogueState(client, generatedMigrationCatalogue, {
     entries: EXPECTED_ACL_MANIFEST_ENTRIES, sha256: EXPECTED_ACL_MANIFEST_SHA256,
-  }, {
-    tables: EXPECTED_SUCCESSOR_TABLES,
-    functions: 257,
-    objectEntries: EXPECTED_V127_OBJECT_MANIFEST_ENTRIES,
-    objectSha256: EXPECTED_V127_OBJECT_MANIFEST_SHA256,
-    functionEntries: EXPECTED_V127_FUNCTION_SECURITY_ENTRIES,
-    functionSha256: EXPECTED_V127_FUNCTION_SECURITY_SHA256,
-  });
+  }, V127_INVENTORY);
 }
 
 /** Check the ledger through an already-applied prefix. The additive successor is not applied yet. */

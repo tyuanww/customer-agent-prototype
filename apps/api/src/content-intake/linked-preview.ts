@@ -13,14 +13,92 @@ export type LinkedPreview = Readonly<{
 }>;
 
 const byKey = new Map<string, LinkedPreview[]>();
+const candidateVersions = new Map<string, number>();
 
-export function stagePreviews(key: string, items: readonly LinkedPreview[]): void {
-  if (items.length) byKey.set(key, [...items]);
+type PreviewStage = { previous: LinkedPreview[] | undefined; state: 'pending' | 'rolled-back' | 'settled' };
+const stagedHistory = new WeakMap<LinkedPreview[], PreviewStage>();
+
+function projectPreviews(items: LinkedPreview[] | undefined, toKey: string, candidateVersion?: number): void {
+  if (candidateVersion !== undefined && (candidateVersions.get(toKey) ?? -1) >= candidateVersion) return;
+  if (items) byKey.set(toKey, items);
+  if (candidateVersion !== undefined) {
+    if (!items) byKey.delete(toKey);
+    candidateVersions.set(toKey, candidateVersion);
+  }
 }
 
-export function adoptPreviews(fromKey: string, toKey: string): void {
-  const items = byKey.get(fromKey);
-  if (items) byKey.set(toKey, items);
+/** Own one immutable input generation. Confirm only this transaction's snapshot;
+ * rollback skips rejected predecessors without changing later stages or aliases.
+ * Unknown commit outcomes leave the handle unsettled for recovery. */
+export function stagePreviews(key: string, items: readonly LinkedPreview[]): {
+  rollback(): void;
+  commit(toKey: string, candidateVersion?: number): void;
+} {
+  const staged = [...items];
+  const stage: PreviewStage = { previous: byKey.get(key), state: 'pending' };
+  stagedHistory.set(staged, stage);
+  byKey.set(key, staged);
+  return {
+    rollback() {
+      if (stage.state !== 'pending') return;
+      stage.state = 'rolled-back';
+      if (byKey.get(key) !== staged) return;
+      let previous = stage.previous;
+      while (previous) {
+        const ancestor = stagedHistory.get(previous);
+        if (ancestor?.state !== 'rolled-back') break;
+        previous = ancestor.previous;
+      }
+      if (previous) byKey.set(key, previous);
+      else byKey.delete(key);
+    },
+    commit(toKey, candidateVersion) {
+      if (stage.state === 'rolled-back') return;
+      // Settle this handle, even if a newer projection wins the version barrier.
+      // Never settle whichever transaction happens to occupy the input slot now.
+      stage.state = 'settled'; stage.previous = undefined;
+      projectPreviews(staged, toKey, candidateVersion);
+    },
+  };
+}
+
+/** Alias an already-owned preview. This does not settle any pending stage. */
+export function adoptPreviews(fromKey: string, toKey: string, candidateVersion?: number): void {
+  projectPreviews(byKey.get(fromKey), toKey, candidateVersion);
+}
+
+/** A deletion receipt contains the remaining row set for its revision. Replaying
+ * an older result cannot edit a newer parse. Projecting the whole remaining set
+ * also repairs earlier unknown deletions when a later revision commits first. */
+export function retainPreviewRowsAtVersion(key: string, rowIds: readonly string[], version: number, inputObjectId?: string): void {
+  const current = candidateVersions.get(key);
+  if (current !== undefined && current > version) return;
+  // Freeze stages immutable input bytes before COMMIT. A confirmed deletion may
+  // therefore recover its surviving images before parse has adopted the candidate.
+  // Never borrow another candidate generation's bytes based only on row labels.
+  // Last-row cancellation retains its version. A same-version older receipt
+  // may only shrink the current projection, never restore rows from input.
+  const items = byKey.get(current === version ? key : inputObjectId ?? key);
+  if (items) {
+    const keep = new Set(rowIds);
+    const kept = items.filter(item => keep.has(item.rowId));
+    if (kept.length) byKey.set(key, kept);
+    else byKey.delete(key);
+  } else if (inputObjectId !== undefined) {
+    byKey.delete(key);
+  }
+  // Keep the barrier even with no cached bytes. Absence of an image must not let
+  // an older in-flight parse resurrect it; only a newer parse can supply bytes.
+  candidateVersions.set(key, version);
+}
+
+/** Cancel one candidate revision while retaining a version tombstone. Late
+ * parses cannot revive it, and an older cancellation cannot erase a newer
+ * projection. Only aliases of this exact array are removed. */
+export function cancelPreviewsAtVersion(key: string, version: number): void {
+  if ((candidateVersions.get(key) ?? -1) > version) return;
+  discardPreviews(key);
+  candidateVersions.set(key, version);
 }
 
 /** Drop images that belong only to one unused row. Shared arrays stay for the other rows. */
@@ -30,7 +108,7 @@ export function discardPreviewRow(key: string, rowId: string): void {
   const kept = items.filter(item => item.rowId !== rowId);
   if (kept.length === items.length) return;
   if (kept.length === 0) {
-    for (const [stored, value] of byKey) if (value === items) byKey.delete(stored);
+    for (const [stored, value] of byKey) if (value === items) { byKey.delete(stored); candidateVersions.delete(stored); }
     return;
   }
   items.splice(0, items.length, ...kept);
@@ -40,7 +118,7 @@ export function discardPreviewRow(key: string, rowId: string): void {
 export function discardPreviews(key: string): void {
   const items = byKey.get(key);
   if (!items) return;
-  for (const [stored, value] of byKey) if (value === items) byKey.delete(stored);
+  for (const [stored, value] of byKey) if (value === items) { byKey.delete(stored); candidateVersions.delete(stored); }
 }
 
 export function listPreviews(key: string, sourceIds: ReadonlySet<string>): readonly LinkedPreview[] {
