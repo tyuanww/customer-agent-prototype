@@ -18,7 +18,8 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderRepairMigration } from '../packages/database/scripts/migration-artifact.mjs';
+import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL, READINESS_MEMBERS, verifyReadinessReferences, composeReadiness } from './readiness-contract.mjs';
+import { renderReadinessMigration, renderRepairMigration } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
@@ -163,6 +164,7 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
+  const readinessProfile = rawManifest?.schema === READINESS_SCHEMA;
   const repairProfile = rawManifest?.schema === REPAIR_CONTRACT_SET_SCHEMA;
   const sopProfile = rawManifest?.schema === SOP_CONTRACT_SET_SCHEMA;
   const legacyCheckProfile = rawManifest?.schema === LEGACY_CHECK_CONTRACT_SET_SCHEMA;
@@ -181,10 +183,11 @@ function validateManifest(rawManifest) {
       'database',
       ...(runtimeProfile ? ['runtime'] : []),
       ...(repairProfile ? ['repair'] : []),
+      ...(readinessProfile ? ['readiness'] : []),
     ],
     'contract-set manifest',
   );
-  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile && !repairProfile) {
+  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile && !repairProfile && !readinessProfile) {
     throw new Error(`Unsupported contract-set schema: ${String(rawManifest.schema)}`);
   }
   if (rawManifest.source_repository !== SOURCE_REPOSITORY) {
@@ -216,6 +219,7 @@ function validateManifest(rawManifest) {
     throw new Error('Database descriptor does not match contract_set_id');
   }
   // Version and both paths form one reviewed pair; mixed generations fail closed.
+  const readinessPair = openapi.version === '1.24.0' && database.version === 'schema.v1.29';
   const repairPair = openapi.version === '1.24.0' && database.version === 'schema.v1.28';
   const sopPair = openapi.version === '1.23.0' && database.version === 'schema.v1.26';
   const legacyCheckPair = openapi.version === '1.22.0' && database.version === 'schema.v1.25';
@@ -231,10 +235,19 @@ function validateManifest(rawManifest) {
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (repairPair !== repairProfile || sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!repairPair && !sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
+  if (readinessPair !== readinessProfile || repairPair !== repairProfile || sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!readinessPair && !repairPair && !sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
-  if (repairPair) {
+  if (readinessPair) {
+    openapiPath = `${READINESS_SOURCE}/openapi.v1.yaml`;
+    databasePath = `${READINESS_SOURCE}/schema-v1.29.sql`;
+    assertExactKeys(rawManifest.readiness, Object.keys(READINESS_MEMBERS), 'readiness artifacts');
+    for (const [key,file] of Object.entries(READINESS_MEMBERS)) {
+      const descriptor = validateDescriptor(rawManifest.readiness[key], `readiness.${key}`);
+      const source = key === 'approval' ? READINESS_APPROVAL : `${READINESS_SOURCE}/${file}`;
+      if (descriptor.version !== '1' || descriptor.file !== file || descriptor.source_path !== source) throw new Error(`Readiness descriptor mismatch: ${key}`);
+    }
+  } else if (repairPair) {
     openapiPath = `${REPAIR_SOURCE}/openapi.v1.yaml`;
     databasePath = `${REPAIR_SOURCE}/schema-v1.28.sql`;
     assertExactKeys(rawManifest.repair, Object.keys(REPAIR_MEMBERS), 'repair artifacts');
@@ -289,13 +302,18 @@ function validateManifest(rawManifest) {
 }
 
 function expectedMembers(manifest) {
-  return [MANIFEST_FILE, ...contractDescriptors(manifest).map(([, descriptor]) => descriptor.file)].sort();
+  return [MANIFEST_FILE, ...physicalDescriptors(manifest).map(([, descriptor]) => descriptor.file)].sort();
+}
+
+function physicalDescriptors(manifest) {
+  return manifest.readiness ? Object.entries(manifest.readiness) : contractDescriptors(manifest);
 }
 
 function contractDescriptors(manifest) {
   return [['OpenAPI', manifest.openapi], ['Database', manifest.database],
     ...Object.entries(manifest.runtime ?? {}).map(([key, descriptor]) => [`runtime.${key}`, descriptor]),
-    ...Object.entries(manifest.repair ?? {}).map(([key, descriptor]) => [`repair.${key}`, descriptor])];
+    ...Object.entries(manifest.repair ?? {}).map(([key, descriptor]) => [`repair.${key}`, descriptor]),
+    ...Object.entries(manifest.readiness ?? {}).map(([key, descriptor]) => [`readiness.${key}`, descriptor])];
 }
 
 /** Verify the installation plan's references as well as the outer file hashes.
@@ -438,8 +456,9 @@ export function verifyContractSetDirectory(directory) {
   ) {
     throw new Error(`Contract-set members mismatch: ${actualMembers.join(', ')}`);
   }
-  for (const [label, descriptor] of contractDescriptors(manifest)) assertMember(resolvedDirectory, descriptor, label);
+  for (const [label, descriptor] of physicalDescriptors(manifest)) assertMember(resolvedDirectory, descriptor, label);
   verifyRuntimeReferences(resolvedDirectory, manifest);
+  if (manifest.readiness) verifyReadinessReferences(resolvedDirectory, manifest);
   if (manifest.repair) verifyRepairReferences(resolvedDirectory, manifest);
   return Object.freeze({ directory: resolvedDirectory, manifest });
 }
@@ -461,6 +480,9 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
  * Historical v1-v3 source SHAs remain valid after newer approvals exist. */
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
+  if (manifest.schema === READINESS_SCHEMA) return; // Full references and approval are verified against this exact Git SHA.
+  const readinessHistory = String(runGit(repositoryRoot, ['log', '--full-history', '-1', '--format=%H', manifest.source_git_sha, '--', READINESS_APPROVAL], 'utf8')).trim();
+  if (readinessHistory) throw new Error('Approved readiness successor cannot be downgraded');
   if (manifest.schema === REPAIR_CONTRACT_SET_SCHEMA) {
     // Every package member, including the structured approval, was already
     // checked against this exact Git commit by verifySourceRepository.
@@ -672,9 +694,10 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![39, 40].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
   if (actual.migrations.length === 39 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Repair predecessor manifest drift');
-  if (actual.migrations.length === 40) {
+  if (actual.migrations.length === 41 && !existsSync(path.join(projectRoot, UPSTREAM_ROOT, READINESS_LOCK))) throw new Error('Readiness lock required for 41 migrations');
+  if (actual.migrations.length >= 40) {
     const lockPath = path.join(projectRoot, UPSTREAM_ROOT, REPAIR_LOCK);
     assertPathInsideRoot(projectRoot, lockPath); assertRegularFile(lockPath, 'Repair lock');
     const lock = validateConsumptionLock(readJson(lockPath, 'Repair lock'));
@@ -728,6 +751,51 @@ function verifyRepairIngested(projectRoot) {
     repair_sources: Object.freeze(Object.fromEntries(Object.entries(manifest.repair)
       .map(([key, descriptor]) => [key, readFileSync(path.join(directory, descriptor.file), 'utf8')]))),
   });
+}
+
+function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
+  const sources = verifyReadinessReferences(directory, manifest);
+  const composed = composeReadiness(manifest, sources, repair);
+  const predecessor = JSON.parse(sources.predecessor);
+  const migrationRoot = path.join(projectRoot, 'packages/database/migrations');
+  const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
+  assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
+  const actual = readJson(manifestPath, 'Migration manifest');
+  if (![40,41].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (actual.migrations.length === 40 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Readiness predecessor manifest drift');
+  for (const expected of predecessor.migrations) {
+    const found = actual.migrations[expected.position - 1];
+    for (const key of ['position','id','file','sha256','bytes']) if (found[key] !== expected[key]) throw new Error(`Readiness predecessor metadata drift: ${expected.file}`);
+    const file=path.join(migrationRoot,expected.file);
+    assertPathInsideRoot(projectRoot,file); assertRegularFile(file,'Readiness predecessor migration');
+    if (sha256(file)!==expected.sha256 || lstatSync(file).size!==expected.bytes) throw new Error(`Readiness predecessor bytes drift: ${expected.file}`);
+  }
+  if (actual.migrations.length === 41) {
+    const lockPath=path.join(projectRoot,UPSTREAM_ROOT,READINESS_LOCK);
+    assertPathInsideRoot(projectRoot,lockPath); assertRegularFile(lockPath,'Readiness lock');
+    const lock=validateConsumptionLock(readJson(lockPath,'Readiness lock'));
+    if (lock.contract_set_id!==manifest.contract_set_id || actual.compatibility?.readiness_successor?.contract_set_id!==lock.contract_set_id) throw new Error('Unrecognized readiness successor');
+    const expected=renderReadinessMigration({contract_set_id:manifest.contract_set_id,source_git_sha:manifest.source_git_sha,manifest,readiness_sources:sources});
+    for(const key of ['position','id','file','sha256','bytes','contract_set_id','source_git_sha','source_schema_sha256']) if(actual.migrations[40][key]!==expected[key]) throw new Error(`Readiness migration metadata drift: ${key}`);
+    const file=path.join(migrationRoot,expected.file); assertPathInsideRoot(projectRoot,file); assertRegularFile(file,'Readiness migration');
+    if(readFileSync(file,'utf8')!==expected.sql) throw new Error('Readiness migration bytes drift');
+  }
+  return {readiness_sources:sources,...composed};
+}
+
+// The existing shared intake lock protects the predecessor, compact package and
+// consumption lock throughout reconstruction and generated-output consumption.
+function verifyReadinessIngested(projectRoot, repair) {
+  const lockPath=path.join(projectRoot,UPSTREAM_ROOT,READINESS_LOCK);
+  if(!existsSync(lockPath)) return null;
+  assertPathInsideRoot(projectRoot,lockPath); assertRegularFile(lockPath,'Readiness lock');
+  const lock=validateConsumptionLock(readJson(lockPath,'Readiness lock'));
+  const directory=path.join(projectRoot,UPSTREAM_ROOT,lock.contract_set_id); assertPathInsideRoot(projectRoot,directory);
+  const verified=verifyContractSetDirectory(directory);
+  if(verified.manifest.schema!==READINESS_SCHEMA) throw new Error('Readiness lock requires v7 bundle');
+  assertLockMatchesContractSet(lock,verified);
+  const sources=verifyReadinessPredecessor(projectRoot,directory,verified.manifest,repair);
+  return Object.freeze({...repairMetadata({...lock,path:directory,lock_path:lockPath}),lock:Object.freeze(lock),manifest:Object.freeze(verified.manifest),...sources});
 }
 
 function consumptionLock(verifiedContractSet) {
@@ -867,8 +935,10 @@ export async function withVerifiedContractSetSnapshot(
     assertRegularFile(databasePath, 'Database contract');
 
     const repair = verifyRepairIngested(resolvedRoot);
+    const readiness = verifyReadinessIngested(resolvedRoot, repair);
     const snapshot = Object.freeze({
       ...(repair ? { repair } : {}),
+      ...(readiness ? { readiness } : {}),
       ...verified,
       lock: Object.freeze({ ...lock }),
       manifest: Object.freeze({
@@ -902,8 +972,9 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   const resolvedRoot = assertProjectRoot(projectRoot ?? defaultProjectRoot());
   const upstreamRoot = path.join(resolvedRoot, UPSTREAM_ROOT);
   const destination = path.join(upstreamRoot, source.manifest.contract_set_id);
+  const isReadiness = source.manifest.schema === READINESS_SCHEMA;
   const isRepair = source.manifest.schema === REPAIR_CONTRACT_SET_SCHEMA;
-  const lockPath = path.join(upstreamRoot, isRepair ? REPAIR_LOCK : LOCK_FILE);
+  const lockPath = path.join(upstreamRoot, isReadiness ? READINESS_LOCK : isRepair ? REPAIR_LOCK : LOCK_FILE);
   assertPathInsideRoot(resolvedRoot, upstreamRoot);
   assertPathInsideRoot(resolvedRoot, destination);
   assertPathInsideRoot(resolvedRoot, lockPath);
@@ -912,11 +983,17 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   const releaseIntakeLock = acquireIntakeLock(resolvedRoot, upstreamRoot);
 
   try {
+    const readinessLockPath = path.join(upstreamRoot, READINESS_LOCK);
+    if (existsSync(readinessLockPath)) {
+      const existing = verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot));
+      if (!isReadiness || existing.contract_set_id !== source.manifest.contract_set_id) throw new Error('Refuse readiness lock downgrade or replacement');
+    }
     const repairLockPath = path.join(upstreamRoot, REPAIR_LOCK);
     if (existsSync(repairLockPath)) {
       const existingRepair = verifyRepairIngested(resolvedRoot);
-      if (!isRepair || existingRepair.contract_set_id !== source.manifest.contract_set_id) throw new Error('Refuse repair lock downgrade or replacement');
+      if (!isReadiness && (!isRepair || existingRepair.contract_set_id !== source.manifest.contract_set_id)) throw new Error('Refuse repair lock downgrade or replacement');
     }
+    if (isReadiness) verifyReadinessPredecessor(resolvedRoot, source.directory, source.manifest, verifyRepairIngested(resolvedRoot));
     if (isRepair) verifyRepairPredecessor(resolvedRoot, source.directory);
     const current = existsSync(path.join(upstreamRoot, LOCK_FILE))
       ? verifyIngestedContractSet({ projectRoot: resolvedRoot })
@@ -930,6 +1007,7 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && (!current || current.contract_set_id !== source.manifest.contract_set_id)) {
         writeJsonAtomically(lockPath, consumptionLock(existing));
       }
+      if (isReadiness) return Object.freeze({ ...repairMetadata(verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot))), status: 'REUSED', generateMigrations: true, generateContracts: true });
       if (isRepair) return Object.freeze({ ...repairMetadata(verifyRepairIngested(resolvedRoot)), status: 'REUSED', generateMigrations: true, generateContracts: true });
       if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
         const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });
@@ -973,6 +1051,7 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       throw error;
     }
 
+    if (isReadiness) return Object.freeze({ ...repairMetadata(verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot))), status: 'CREATED', generateMigrations: true, generateContracts: true });
     if (isRepair) return Object.freeze({ ...repairMetadata(verifyRepairIngested(resolvedRoot)), status: 'CREATED', generateMigrations: true, generateContracts: true });
     if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
       const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });

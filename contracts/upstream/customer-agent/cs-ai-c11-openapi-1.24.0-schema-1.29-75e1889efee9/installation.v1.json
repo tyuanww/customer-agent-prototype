@@ -1,0 +1,43 @@
+{
+  "schema": "readiness-successor-installation/v1",
+  "status": "DRAFT",
+  "approved": false,
+  "proposal": {
+    "openapi": "1.24.0",
+    "schema": "1.29",
+    "migration": "0041",
+    "exportProfile": "content-intake-readiness-successor-v1"
+  },
+  "predecessor": {
+    "contractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed",
+    "migrationCount": 40,
+    "newDatabaseBootstrap": false
+  },
+  "order": [
+    "BEGIN with existing migration-runner lock",
+    "verify exact predecessor receipts and role boundary",
+    "upgrade.candidate.sql",
+    "verify strict runtime ACL using proposed schema provenance and record migration receipt",
+    "COMMIT"
+  ],
+  "failure": "Failure before COMMIT rolls back ACL, marker and receipt together. Unknown COMMIT requires receipt recovery, not blind reapply.",
+  "aclDelta": {
+    "revokePublicExecute": [
+      "content_intake.candidate_format_guard()",
+      "content_intake.input_format_matches(text,text,text,text,text)",
+      "content_intake.input_object_format_guard()",
+      "content_intake.parse_format_guard()",
+      "content_intake.source_format_guard()"
+    ],
+    "grantPredicateExecute": [
+      "intake_business",
+      "intake_worker",
+      "intake_runtime_fn_owner"
+    ],
+    "applicationTableGrants": [],
+    "newRoles": [],
+    "newFunctionBodies": []
+  },
+  "versionMarker": "CS-AI-C11 schema.v1.29;",
+  "compatibility": "HTTP/OpenAPI bytes and business semantics unchanged. app_runtime receives no new privileges. No production activation."
+}

@@ -22,6 +22,7 @@ async function fixture(t) {
   for(const rel of ['contracts/upstream/customer-agent','packages/database/migrations','packages/database/seeds','packages/database/overlays','packages/database/src/generated']) {
     mkdirSync(path.dirname(path.join(product,rel)),{recursive:true});cpSync(path.join(root,rel),path.join(product,rel),{recursive:true});
   }
+  rmSync(path.join(product,'contracts/upstream/customer-agent/readiness-contract-set.lock.json'),{force:true});
   rmSync(path.join(product,'contracts/upstream/customer-agent/repair-contract-set.lock.json'),{force:true});
   await generateDatabaseMigrations({projectRoot:product});
   // All payload is invented; only the exact immutable predecessor comes from the repository.

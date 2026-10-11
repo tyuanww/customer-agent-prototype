@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration } from './migration-artifact.mjs';
+import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration } from './migration-artifact.mjs';
 import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
@@ -447,7 +447,7 @@ function renderCatalogue(manifest, migrations, compatibleUpgrades) {
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}), additiveSuccessor: ${additiveSuccessorLiteral(manifest)}${manifest.compatibility.repair_successor ? `, repairSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.repair_successor.contract_set_id, sourceGitSha: manifest.compatibility.repair_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.repair_successor.source_schema_sha256, migrationSha256: manifest.compatibility.repair_successor.migration_sha256 })})` : ''} }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}), additiveSuccessor: ${additiveSuccessorLiteral(manifest)}${manifest.compatibility.repair_successor ? `, repairSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.repair_successor.contract_set_id, sourceGitSha: manifest.compatibility.repair_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.repair_successor.source_schema_sha256, migrationSha256: manifest.compatibility.repair_successor.migration_sha256 })})` : ''}${manifest.compatibility.readiness_successor ? `, readinessSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.readiness_successor.contract_set_id, sourceGitSha: manifest.compatibility.readiness_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.readiness_successor.source_schema_sha256, migrationSha256: manifest.compatibility.readiness_successor.migration_sha256 })})` : ''} }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
 function buildDirectMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
@@ -777,13 +777,22 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   }, successorSnapshot) : null;
   const repair = snapshot.repair;
   const repairMigration = repair ? renderRepairMigration(repair) : null;
-  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : []), ...(sopDomainMigration ? [sopDomainMigration] : []), ...(sopStageMigration ? [sopStageMigration] : []), ...(repairMigration ? [repairMigration] : [])]);
+  const readiness = snapshot.readiness;
+  const readinessMigration = readiness ? renderReadinessMigration(readiness) : null;
+  const migrations = Object.freeze([...prior.migrations, legacyAcl, ...(sopMigration ? [sopMigration] : []), ...(registrationMigration ? [registrationMigration] : []), ...(sopDomainMigration ? [sopDomainMigration] : []), ...(sopStageMigration ? [sopStageMigration] : []), ...(repairMigration ? [repairMigration] : []), ...(readinessMigration ? [readinessMigration] : [])]);
   if (repair) {
     const expected = JSON.parse(repair.repair_sources.predecessor).migrations;
-    if (expected.length !== 39 || migrations.length !== 40) throw new Error('Repair generator requires the complete predecessor closure');
+    if (expected.length !== 39 || migrations.length !== (readiness ? 41 : 40)) throw new Error('Repair generator requires the complete predecessor closure');
     if (expected.some((m, i) => m.position !== i + 1)) throw new Error('Repair predecessor positions must be 1 through 39');
     for (const m of expected) for (const key of ['position', 'id', 'file', 'sha256', 'bytes']) {
       if (migrations[m.position - 1][key] !== m[key]) throw new Error(`Generated repair predecessor drift: ${m.file}`);
+    }
+  }
+  if (readiness) {
+    const expected = JSON.parse(readiness.readiness_sources.predecessor).migrations;
+    if (!repair || expected.length !== 40 || migrations.length !== 41 || expected.some((m,i)=>m.position!==i+1)) throw new Error('Readiness generator requires exact forty-migration predecessor');
+    for (const m of expected) for (const key of ['position','id','file','sha256','bytes']) {
+      if (migrations[m.position-1][key] !== m[key]) throw new Error(`Generated readiness predecessor drift: ${m.file}`);
     }
   }
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
@@ -799,6 +808,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
       ...(repair ? { repair_successor: Object.freeze({ contract_set_id: repair.contract_set_id,
         source_git_sha: repair.source_git_sha, source_schema_sha256: repair.manifest.database.sha256,
         upgrade_sha256: repair.manifest.repair.upgrade.sha256, migration_sha256: repairMigration.sha256 }) } : {}),
+      ...(readiness ? { readiness_successor: Object.freeze({ contract_set_id: readiness.contract_set_id, source_git_sha: readiness.source_git_sha, source_schema_sha256: readiness.manifest.database.sha256, migration_sha256: readinessMigration.sha256 }) } : {}),
       additive_successor: sopMigration ? Object.freeze({
         contract_set_id: successor.manifest.contract_set_id,
         source_git_sha: successor.manifest.source_git_sha,
@@ -812,6 +822,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (sopMigration) outputs.set(`packages/database/migrations/${sopMigration.file}`, sopMigration.sql);
   if (registrationMigration) outputs.set(`packages/database/migrations/${registrationMigration.file}`, registrationMigration.sql);
   if (sopDomainMigration) outputs.set(`packages/database/migrations/${sopDomainMigration.file}`, sopDomainMigration.sql);
+  if (readinessMigration) outputs.set(`packages/database/migrations/${readinessMigration.file}`, readinessMigration.sql);
   if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);

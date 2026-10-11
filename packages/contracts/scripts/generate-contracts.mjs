@@ -197,7 +197,7 @@ function artifactDescriptor(relativePath, content) {
 }
 
 async function buildGeneratedArtifactsFromSnapshot(snapshot) {
-  const effectiveSnapshot = snapshot.repair ?? snapshot;
+  const effectiveSnapshot = snapshot.readiness ?? snapshot.repair ?? snapshot;
   const { lock, manifest, openapi_source: source } = effectiveSnapshot;
   const openapiDescriptor = requireRecord(manifest.openapi, 'OpenAPI descriptor');
   const databaseDescriptor = requireRecord(manifest.database, 'Database descriptor');

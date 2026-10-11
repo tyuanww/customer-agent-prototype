@@ -73,7 +73,7 @@ describe('database migration planner', () => {
     const prior = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;
     expect(prior.migrationCount).toBe(34);
     const prefix = deriveMigrationStatus(generatedMigrationCatalogue.migrations.slice(0,34).map((_,index)=>ledgerRow(index)),generatedMigrationCatalogue);
-    expect(prefix.pending.map(m=>m.id)).toEqual(['0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28']);
+    expect(prefix.pending.map(m=>m.id)).toEqual(['0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29']);
     for (const change of [{ sourceSchemaSha256: 'f'.repeat(64) }, { contractSetId: generatedMigrationCatalogue.contractSetId }, { migrationCount: generatedMigrationCatalogue.migrations.length + 1 }]) {
       const invalid = { ...generatedMigrationCatalogue, compatibility: { ...generatedMigrationCatalogue.compatibility,
         priorReviewedUpgrades: [...generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1), { ...prior, ...change }] } };
@@ -191,7 +191,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(40);
+    expect(status.pending).toHaveLength(41);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });
