@@ -214,18 +214,26 @@ describe('loopback organization transport', () => {
     }
   });
 
-  it('times out a hung response and ignores a body that arrives after cancellation', async () => {
+  it.each([false, true])('times out and ignores a late body after cancellation; timeout before HTTP=%s', async (beforeHttp) => {
     contact.mode = { kind: 'hang' };
-    const timed = transport(tokens(), 40).user('synthetic-open-agent', new AbortController().signal);
+    const supplier = tokens();
+    const timed = transport(beforeHttp ? { async current() {
+      // Force the deadline to win before HTTP; the cancellation below must not
+      // assume that this first request was observed by the server.
+      await new Promise(resolve => setTimeout(resolve, 80));
+      return supplier.current();
+    } } : supplier, 40).user('synthetic-open-agent', new AbortController().signal);
     await expect(timed).rejects.toMatchObject({ code: 'TIMED_OUT' });
     contact.release('{"code":0,"msg":"secret-message","data":{}}');
     await expect(timed).rejects.toThrow('TIMED_OUT');
     contact.mode = { kind: 'hang' };
     const controller = new AbortController();
+    const priorRequestCount = contact.requests.length;
     const cancelled = transport().user('synthetic-open-agent', controller.signal);
-    await waitFor(() => contact.requests.length > 1);
+    const rejected = expect(cancelled).rejects.toMatchObject({ code: 'CANCELLED' });
+    await waitFor(() => contact.requests.length > priorRequestCount);
     controller.abort();
-    await expect(cancelled).rejects.toMatchObject({ code: 'CANCELLED' });
+    await rejected;
     contact.release('{"msg":"secret-message"}');
     await expect(cancelled).rejects.toThrow('CANCELLED');
   });
