@@ -80,7 +80,6 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
   try{render(<DashboardApp/>);await user.click(await screen.findByRole('button',{name:'权限配置'}));
     await screen.findByRole('option',{name:'合成坐席'});await user.selectOptions(screen.getByRole('combobox',{name:'人员'}),owner.view().people[0]!.selection);
-    await user.click(screen.getByRole('checkbox',{name:'查询复制'}));
     fireEvent.change(screen.getByLabelText('生效时间'),{target:{value:'2026-10-08T18:00'}});fireEvent.change(screen.getByLabelText('失效时间'),{target:{value:'2026-10-09T18:00'}});
     await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成导航保留');await user.click(screen.getByRole('button',{name:'预览权限'}));await screen.findByText('预览 · 尚未保存');
     await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-content'));
