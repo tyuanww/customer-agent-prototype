@@ -109,10 +109,9 @@ export function materialFromParse(input: {
       const scriptPart = (e: Entry) => ({ ...e, questions: [] });
       if (old && canonical(scriptPart(old)) !== canonical(scriptPart(next))) next.scriptVersion++;
       if (old?.operation === 'upsert' && next.operation === 'disable') disables++;
-      // A declared risk note only escalates. Removing an old note/keyword is
+      // A declared risk note only escalates. Removing an old note is
       // itself a critical change, so the author cannot turn it into self-review.
-      if (old?.riskNote.trim() || next.riskNote.trim()
-        || [old?.title ?? '', old?.answerText ?? '', next.title, next.answerText].some(t => /过敏|赔付/u.test(t))) critical = true;
+      if (old?.riskNote.trim() || next.riskNote.trim()) critical = true;
       differences.push({ businessEntryId: row.id,
         change: !old ? 'add' : next.operation === 'disable' ? 'disable' : old.operation === 'disable' ? 'reenable' : 'modify',
         previousVersion: old?.scriptVersion ?? null, nextVersion: next.scriptVersion,

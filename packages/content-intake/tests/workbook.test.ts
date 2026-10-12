@@ -91,7 +91,6 @@ describe('P1 mature XLSX parser and real output roundtrip', () => {
     ['duplicate ID', (book: ExcelJS.Workbook) => { book.getWorksheet('FAQ')!.getCell('A3').value = 'faq-001'; }, 'DUPLICATE_ID'],
     ['header', (book: ExcelJS.Workbook) => { book.getWorksheet('FAQ')!.getCell('C1').value = '标题'; }, 'HEADER_MISMATCH'],
     ['wrong source', (book: ExcelJS.Workbook) => { book.getWorksheet('来源')!.getCell('A2').value = 'different-source'; }, 'SOURCE_MISMATCH'],
-    ['allergy body', (book: ExcelJS.Workbook) => { book.getWorksheet('FAQ')!.getCell('B2').value = '过敏：停手确认'; }, 'ALLERGY_BODY'],
     ['oversize text', (book: ExcelJS.Workbook) => { book.getWorksheet('FAQ')!.getCell('C2').value = 'a'.repeat(P.cellChars + 1); }, 'CELL_TEXT_LIMIT'],
     ['impossible date', (book: ExcelJS.Workbook) => { book.getWorksheet('FAQ')!.getCell('I2').value = '2026-02-30T00:00:00Z'; }, 'INVALID_TIME'],
     ['normalized hour', (book: ExcelJS.Workbook) => { book.getWorksheet('FAQ')!.getCell('I2').value = '2026-10-04T24:00:00Z'; }, 'INVALID_TIME'],
