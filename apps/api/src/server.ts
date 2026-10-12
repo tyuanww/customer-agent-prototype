@@ -3,6 +3,8 @@ import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
 import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
+import { createIntakePurposePool } from './content-intake/runtime-pool.js';
+import { createApiRuntimeDiagnostic, reportApiRuntimeDiagnostic } from './runtime-diagnostics.js';
 import { createContentImportService } from './content-import-service.js';
 import { createContentReviewService } from './content-review-service.js';
 import { createContentReleaseServiceForPool } from './content-release-service.js';
@@ -31,6 +33,31 @@ import {
   sharedRuntimePool,
   type ServiceRepository,
 } from './service-repository.js';
+
+function intakeRoutes(
+  auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined,
+  objectStoreDir: string | undefined,
+) {
+  const business = process.env.INTAKE_BUSINESS_DATABASE_URL;
+  const usage = process.env.INTAKE_USAGE_DATABASE_URL;
+  const worker = process.env.INTAKE_WORKER_DATABASE_URL;
+  if (!business && !usage && !worker) return undefined;
+  if (auth?.kind !== 'product' || objectStoreDir === undefined || !business || !usage || !worker) {
+    throw new Error('Intake HTTP pools are incomplete');
+  }
+  const report = (error: unknown): void => {
+    try { reportApiRuntimeDiagnostic(createApiRuntimeDiagnostic('DATABASE_IDLE_CLIENT_FAILED', error)); } catch { /* observational */ }
+  };
+  const pool = (connectionString: string, purpose: 'business' | 'usage' | 'worker') => createIntakePurposePool(
+    { connectionString, max: 2, connectionTimeoutMillis: 2_000 }, purpose, report,
+  );
+  return {
+    business: pool(business, 'business'),
+    usage: pool(usage, 'usage'),
+    worker: pool(worker, 'worker'),
+    store: createContentObjectStore(objectStoreDir),
+  };
+}
 
 export type StartedApi = Readonly<{
   address: string;
@@ -107,6 +134,7 @@ export async function startApi(
         const notice = runtimePool === undefined ? undefined : {
           service: createNoticeServiceForPool(runtimePool, false),
         };
+        const intake = intakeRoutes(auth, bootstrap.objectStoreDir);
         const app = createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac,
@@ -126,7 +154,8 @@ export async function startApi(
           { repository, idempotencyHmac: bootstrap.idempotencyHmac },
           contentImport, contentReview, contentRelease, announce, iterationTasks, opsLoop,
           { logHash: bootstrap.logHash },
-          notice);
+          notice,
+          intake);
         const environment = options.environment ?? process.env;
         const reviewPort = reviewLoginPort(environment, config.port);
         if (config.profile === 'formal-dev' && auth?.kind === 'product' && reviewPort !== undefined) {
