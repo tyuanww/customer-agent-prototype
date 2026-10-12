@@ -23,6 +23,9 @@
 .intake-management textarea { flex: 1; min-height: 80px; resize: vertical; }
 .intake-management input:not([type=checkbox]) { flex: 1; }
 .intake-management fieldset { min-width: 0; border: 0; padding: 12px 0 0; margin: 0; }
+.intake-seat-create { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+.intake-seat-create > legend, .intake-seat-create > button { grid-column: 1 / -1; justify-self: start; }
+@media (max-width: 760px) { .intake-seat-create { grid-template-columns: 1fr; } }
 .intake-management legend { font-weight: 600; }
 .intake-management details { margin: 12px 0; }
 .intake-management summary { color: var(--dash-purple-strong); }

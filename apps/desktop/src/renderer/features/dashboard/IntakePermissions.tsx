@@ -69,7 +69,7 @@ function SeatAccounts({ disabled }: { disabled: boolean }) {
   }, []);
   return <section>
     {problem && <p role="alert">{problem}</p>}
-    <fieldset disabled={blocked}><legend>新建外包坐席</legend>
+    <fieldset className="intake-seat-create" disabled={blocked}><legend>新建外包坐席</legend>
       <label>姓名<input aria-label="姓名" value={name} onChange={event => setName(event.target.value)} /></label>
       <label>登录名<input aria-label="登录名" value={username} onChange={event => setUsername(event.target.value)} /></label>
       <label>密码<input aria-label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} /></label>
