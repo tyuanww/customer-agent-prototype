@@ -45,6 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { catalogReferences } from '../../apps/desktop/src/shared/synthetic-catalog.ts';
 import { SYNTHETIC_SCRIPT_IDS } from './content.ts';
 import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
+import { bindMenokinTestIdentities } from './menokin-test-binding.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   PREFERRED_PORTS, PROFILE_FILE, STACK_ROOT, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
@@ -429,6 +430,7 @@ async function runStart(foreground: boolean): Promise<void> {
     for (const step of await bootstrapDatabase(database)) log(step);
     const feishu = loadFeishuStackConfig();
     if (feishu) log(await seedFeishuBindings(database, feishu.bindings));
+    if (profile.databaseName !== 'customer_agent_formal') log(await bindMenokinTestIdentities(database, profile.databaseName));
   } finally { await database.end(); }
 
   log(await ensureLoginRoles(cluster, profile.databaseName));
