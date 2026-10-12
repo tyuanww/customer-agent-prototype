@@ -112,3 +112,12 @@ describe('desktop menu model', () => {
     ]);
   });
 });
+
+it('omits unavailable Dashboard actions from every native menu while preserving Query and edit roles', () => {
+  const menus = [createTrayMenuModel(false), createOverlayContextMenuModel(null, false),
+    ...createApplicationMenuModel('darwin', false).flatMap(s => s.type === 'agent' ? [s.items] : [])];
+  for (const entries of menus) {
+    expect(entries.some(e => e.type === 'action' && e.id === 'open-search')).toBe(true);
+    expect(entries.some(e => e.type === 'action' && e.id === 'open-dashboard')).toBe(false);
+  }
+});

@@ -1,0 +1,22 @@
+✔ foreground CLI consumes fixed commands and cleans its host while retaining separately owned Electron profile (1747.094125ms)
+✔ piped stdin EOF drains status and identity commands before shutdown (1932.161375ms)
+✔ startup SIGTERM cleans the already started private PostgreSQL without announcing readiness (1741.006167ms)
+✔ startup SIGINT cleans the already started private PostgreSQL without announcing readiness (2090.246167ms)
+{"status":"PASS","profile":"existing","domain":"product","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated existing/product HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1721.929125ms)
+{"status":"PASS","profile":"purpose-runtime","domain":"product","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-runtime/product HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1685.544458ms)
+{"status":"PASS","profile":"purpose-runtime","domain":"campaign","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-runtime/campaign HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1772.515042ms)
+{"status":"PASS","profile":"purpose-runtime","domain":"presale","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-runtime/presale HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1908.111292ms)
+{"status":"PASS","profile":"purpose-runtime","domain":"aftersale","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-runtime/aftersale HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1344.231292ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8674.842834

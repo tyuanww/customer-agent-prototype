@@ -1,0 +1,12 @@
+{
+  "schema": "customer-agent-contract-consumption/v1",
+  "contract_set_id": "cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "379b793811edf48bd64f512f5733790b9fdeeb0d",
+  "manifest_sha256": "aed4ff59e10d2d33bd6c9c6d9c666e80e7b8c6e6b904f95415ce6230555a9f38",
+  "openapi_sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+  "database_sha256": "c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69",
+  "intake_status": "VERIFIED_NOT_ACTIVATED",
+  "ddev_authorized": false,
+  "runtime_activated": false
+}

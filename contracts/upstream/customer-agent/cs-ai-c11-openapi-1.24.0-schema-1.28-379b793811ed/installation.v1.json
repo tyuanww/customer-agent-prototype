@@ -1,0 +1,98 @@
+{
+  "schema": "repair-successor-installation-proposal/v1",
+  "status": "DRAFT",
+  "approved": false,
+  "proposal": {
+    "openapi": "1.24.0",
+    "schema": "1.28",
+    "migration": "0040",
+    "exportProfile": "content-intake-repair-successor-v1"
+  },
+  "predecessor": {
+    "productHead": "292221d080006a86a3b5a4a950b055cef2e94eaa",
+    "migrationCount": 39,
+    "newDatabaseBootstrap": false,
+    "note": "Install the existing verified 0001–0039 closure first. The cumulative reference schema is not a standalone bootstrap: runtime companion SQL and original role ownership remain prerequisites."
+  },
+  "order": [
+    "BEGIN",
+    "verify predecessor migration receipts/checksums 0001–0039 and role/ACL closure",
+    "upgrade.candidate.sql",
+    "assert resulting security/ACL; record approved migration receipt only after future intake",
+    "COMMIT"
+  ],
+  "failure": "Any precondition or installation error rolls back the whole transaction. Unknown COMMIT requires receipt recovery, never blind reapply.",
+  "owner": "intake_runtime_fn_owner",
+  "aclDelta": {
+    "grantExecuteToBusiness": [
+      "content_intake.freeze_sop_parsed_candidate(text,text,jsonb,jsonb,jsonb)",
+      "content_intake.revise_unused_sop_row(text,text,bigint,text,text)",
+      "content_intake.read_sop_inherited_assets(text,text)",
+      "content_intake.reserve_sop_media_payload(text,text,text,text,bigint,text)",
+      "content_intake.complete_sop_media_payload(text,text,text,text)",
+      "content_intake.begin_sop_media_release(text,text,text,text)",
+      "content_intake.complete_sop_media_release(text,text,text,text)"
+    ],
+    "grantExecuteToUsage": [
+      "content_intake.read_sop_release_assets(text,text,text)"
+    ],
+    "revokeFromBusiness": [
+      "content_intake.delete_unused_sop_row(content_intake.identifier,content_intake.version,text)",
+      "content_intake.register_sop_candidate_rows(text,text,bigint,jsonb)",
+      "content_intake.stage_sop_candidate_assets(text,text,bigint,jsonb,jsonb)"
+    ],
+    "grantToFunctionOwner": {
+      "content_intake.candidate_vocabulary": [
+        "SELECT",
+        "INSERT"
+      ],
+      "content_intake.objects": [
+        "SELECT",
+        "INSERT"
+      ],
+      "content_intake.object_reservations": [
+        "SELECT",
+        "INSERT",
+        "UPDATE"
+      ],
+      "content_intake.entitlement_scopes": [
+        "SELECT"
+      ],
+      "content_intake.parse_jobs": [
+        "SELECT",
+        "UPDATE(state,finished_at,result_candidate_id,result_candidate_version)"
+      ],
+      "content_intake.release_catalogs": [
+        "SELECT"
+      ],
+      "content_intake.vocabulary": [
+        "SELECT"
+      ],
+      "content_intake.vocabulary_displays": [
+        "SELECT"
+      ]
+    },
+    "applicationTableGrants": [],
+    "publicGrants": [],
+    "changesExistingPublisherOwnerAcl": false
+  },
+  "requiredFunctions": [
+    "backend_review.lock_content()",
+    "content_intake.authorization_deadline(text,text,text,text,timestamp with time zone)",
+    "public.jsonb_jcs(jsonb)",
+    "content_intake.guard_legacy_write(text,text)",
+    "content_intake.inherit_legacy_catalog(text,text)"
+  ],
+  "consumerBoundary": {
+    "rowBinding": "Trusted parser supplies validated material, exact rowBindings for ALL entries and digest-bound media envelope to freeze_sop_parsed_candidate; it atomically freezes the job and candidate, vocabulary, rows and media. read_sop_inherited_assets returns authorized exact predecessor provenance. Row/media helpers are owner-internal.",
+    "command": "Existing transaction/receipt owner maps request to revise_unused_sop_row, enforces path/key identity and returns IntakeCandidate. Never expose actor body or database result directly.",
+    "preview": "On unknown commit retain operationId and preview; durable response and rowIds apply only to their candidate version. Read immutable release-media bindings only after the existing session/lease/source authorization, filter each row before deduplication, then verify one private payload. Missing or corrupted bytes fail closed; no cache fallback.",
+    "payload": "Same job/media reservation returns the same private object. sop-media shares the existing tenant quota; immutable files and database adoption are separate recoverable steps. Filesystem object locks cover writes and reclaim independently of database connectivity; crashed locks remain busy and charged, with no automatic TTL reclaim.",
+    "publication": "One statement-level release_lineage trigger projects exact row media in the same publish/rollback/inheritance transaction. Shared images retain distinct row bindings; missing provenance or payload rejects the entire publication. Existing frozen migrations remain unchanged.",
+    "blocked": [
+      "production parser must adopt the bounded freeze function after versioned intake; no broad business table write grant",
+      "inherited material must carry reliable complete row mapping and explicitly inherited media; unbound history fails closed",
+      "new POST is not wired in production; old media-only DELETE cannot stand in for text deletion"
+    ]
+  }
+}

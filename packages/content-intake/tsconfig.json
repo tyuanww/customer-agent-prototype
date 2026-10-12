@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["ES2022"], "module": "NodeNext", "moduleResolution": "NodeNext",
+    "strict": true, "noEmit": true, "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true, "isolatedModules": true, "esModuleInterop": true, "types": ["node"],
+    "paths": {
+      "@customer-agent/content-intake": ["./src/workbook.ts"],
+      "@customer-agent/content-intake/runner": ["./src/runner.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "experiments/**/*.ts"]
+}

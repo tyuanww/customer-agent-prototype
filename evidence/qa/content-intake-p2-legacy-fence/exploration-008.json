@@ -1,0 +1,20 @@
+{
+  "observationCapture": "007",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/source-bypass.mjs"
+  ],
+  "observed": "",
+  "hypothesis": "Confirm the second synthetic setup constraint failure; source_version_id must use the existing srcv_ format.",
+  "nextCapture": "008",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/source-bypass.mjs"
+  ]
+}

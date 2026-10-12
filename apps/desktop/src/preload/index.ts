@@ -15,6 +15,7 @@ import {
 } from '../shared/product-notice';
 import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { contextBridge, ipcRenderer } from 'electron';
+import { intakeQuery } from './content-intake-query';
 import {
   IPC_CHANNELS,
   isOpenDashboardResult,
@@ -45,6 +46,7 @@ import {
 } from '../shared/query-layout';
 
 const overlayListeners = new Set<(command: OverlayCommand) => void>();
+let subscriptionReported = false;
 
 ipcRenderer.on(IPC_CHANNELS.OVERLAY_COMMAND, (_event, payload: unknown) => {
   if (!isOverlayCommand(payload)) {
@@ -143,6 +145,7 @@ function parseSopWindowOpenResult(value: unknown):
   return null;
 }
 const api: CustomerAgentApi = {
+  intakeQuery,
   productSearch: {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
     copyAdopt: request => queryInvoke(IPC_CHANNELS.PRODUCT_COPY_ADOPT, request) as Promise<ProductCopyResult>,
@@ -312,6 +315,14 @@ const api: CustomerAgentApi = {
   },
   onOverlayCommand(handler) {
     overlayListeners.add(handler);
+    // Report once per document, after the receiver exists. Main owns recovery
+    // if QueryEntry's profile handshake outlived the initial open command.
+    if (!subscriptionReported) {
+      subscriptionReported = true;
+      void ipcRenderer.invoke(IPC_CHANNELS.QUERY_SUBSCRIBED).catch(() => {
+        console.error('Query subscription handshake failed');
+      });
+    }
     return () => {
       overlayListeners.delete(handler);
     };

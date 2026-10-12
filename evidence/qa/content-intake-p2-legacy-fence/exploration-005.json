@@ -1,0 +1,28 @@
+{
+  "observationCapture": "004",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-release.integration.test.ts",
+    "-t",
+    "inherits the catalog|inheritance cannot complete"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-release.integration.test.ts (9 tests | 7 skipped) 1939ms\n   ✓ content publish and rollback > inherits the catalog on a disjoint-domain legacy publish and refuses legacy rollback through it  1032ms\n   ✓ content publish and rollback > rolls back the old release, pointer, announcement and catalog when inheritance cannot complete  906ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 7 skipped (9)\n   Start at  10:34:37\n   Duration  2.44s (transform 201ms, setup 0ms, collect 355ms, tests 1.94s, environment 0ms, prepare 31ms)\n\n",
+  "hypothesis": "Native review found the earlier source snapshot mutation reachable from owner upload. An active product source must reject that mutation before any revision or hash changes.",
+  "nextCapture": "005",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "node",
+    ".gstack/content-intake-p2-publication/source-bypass.mjs"
+  ]
+}

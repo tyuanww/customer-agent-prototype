@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype
+
+ ✓ packages/database/tests/planner.test.ts (12 tests) 24ms
+ ✓ packages/database/tests/generator.test.ts (22 tests) 414ms
+ ✓ packages/database/tests/verifier-runtime.integration.test.ts (23 tests) 1598ms
+
+ Test Files  3 passed (3)
+      Tests  57 passed (57)
+   Start at  23:31:29
+   Duration  2.01s (transform 295ms, setup 0ms, collect 464ms, tests 2.04s, environment 0ms, prepare 140ms)
+

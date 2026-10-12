@@ -1,0 +1,256 @@
+{
+  "baseline": "c0db575001d5b4d74a19f43b16e1206d90f3f43b",
+  "branch": "codex/content-intake-p2",
+  "recordedAt": "2026-10-06T16:47:25.303278+00:00",
+  "runtime": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "host": "macOS",
+    "fixture": "isolated synthetic PG15 and loopback HTTP"
+  },
+  "sourceInputs": {
+    "apps/api/src/auth-service.ts": "bab918fef86eb5598e31ba6dbced67a2d2ab60cdc5b3a80d054a3beeb2d30c89",
+    "apps/api/src/content-intake/authority.ts": "930980f7f3f6226f0505ed9b3f752684a4e75831b869156bde149a078ead51f6",
+    "apps/api/src/content-intake/discovery.ts": "fa1c6cf145f26a50852ae5f1a0b4c8be05a5a100680f1140703bea8f0018d9c7",
+    "apps/api/src/content-intake/service.ts": "cd44d2f1609256232cbfa19434238eabe74940431e267cedcefbf0c057562da5",
+    "apps/api/src/content-intake/transaction.ts": "302b39f584e06554ed0ccb8ea388dfe6a60e7e890612898de8b0880c7638078e",
+    "apps/api/src/content-intake/usage-http.ts": "0e1416536804b6824803f0983db72b69ee29a7d25ec235a015c2c24beabf797b",
+    "apps/api/src/content-intake/usage.ts": "574aa37ab84395b162f3433e4ffe7e61b195595a6a97da2792f67c97bcdd3c9c",
+    "apps/api/src/product-auth-service.ts": "a835aa796e6570e0ecba0a14e88b3bf8fef23b525f8bff92bf86850038d80689",
+    "apps/api/tests/content-intake-usage-http.test.ts": "1999ace483b3474128690b9fb2fcdd72bf330bb50a3d636898543f4575cc422b",
+    "apps/api/tests/content-intake.integration.test.ts": "232a844f4288798d20774d50bc405f748172bd10862ed21c12c5d23a07866b44",
+    "apps/desktop/src/main/content-intake-access.ts": "aaff28fe21d3d7e69f858e7e2aeb473c47a26dfcbebdb1bdc9223fafe6145c22",
+    "apps/desktop/src/main/content-intake-usage.ts": "d0b790995fa4b58c11c2e5ef7a9c86a1a8fa53eca974285a258b53e386500091",
+    "apps/desktop/src/main/product-http.ts": "d77adaa621bddce39470ddbdaec1e1a9ca7f2dd46135fe2cce3308436e89ed03",
+    "apps/desktop/src/main/product-session.ts": "e3d5ba02f219e01065616d3bfe5b1d857e6ea584dc3500b05144ee06e33d7e60",
+    "apps/desktop/tests/unit/content-intake-access.test.ts": "a096a6140a658615dc4de5d18d021e568ff7465201de4ad8c2f5c005fd253991",
+    "apps/desktop/tests/unit/content-intake-usage-http.test.ts": "e98aed46ccdf43febef0450de353c1b51024cb40a85cd1d1693d25856472bb40",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "24b4d68d72b55db78bfe6fb0451e6476f4067c066b9c4a1fae04bffd3867a630",
+    "package.json": "89c15dd870721678541cbf45904f391f6425c972bfe82438c6f32b54fad21b5f",
+    "packages/database/migrations/0026_intake_discovery_index.sql": "c96e289e3ae19d600913b80796f3051eb7c19c5f544e1b8b9e17d5f5f1cd911f",
+    "packages/database/migrations/manifest.generated.json": "2a92d41b4a865f46ba6e0df55d0d522ec9b1021968aaf78ed081cc0ebaf3246b",
+    "packages/database/overlays/0026_intake_discovery_index.sql": "1a2c16f41947e8596cb29285591d85481b0e5e1371e587534581bc8b0bef1922",
+    "packages/database/scripts/generate-migrations.mjs": "32d417497a483d1f144d77a0e2730bbf4b314a215686f23f407434e0e5ec7249",
+    "packages/database/src/generated/migrations.generated.ts": "3e7f07a7eebf92a5e85909d51625e5aaee939376926bc00f03f972bb745b779d",
+    "packages/database/src/verifier.ts": "0c4435d391358dc113a99f8e12fdced8aee60290a6b956cf5fe07718de77df26",
+    "packages/database/tests/generator.test.ts": "8c3701a4456dcbcd36faac0cc72431717ac4f59b81671133d53698d6ecf046c6",
+    "packages/database/tests/planner.test.ts": "5f3a55e5818cb34daf2f99f759091319db3aa90a847d5ac98dbdab89ec90ed8b",
+    "packages/database/tests/postgres.integration.test.ts": "0c6eaba77f9c3427ba35d2e75b6fcc427ca364f0fa1ac3104eed42516b6294c5",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78",
+    "scripts/probe-intake-usage-consumer.mjs": "a128a7aefdfe0742c2f879bed40258a0147281fc96970e1fabeb55385136b93f"
+  },
+  "commands": [
+    {
+      "command": "pnpm lint",
+      "status": "PASS",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-discovery/lint-cycle2.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-discovery/typecheck-cycle2.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "status": "PASS",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-discovery/test-cycle2.log",
+      "sha256": "e96c87550d039c74f0af68a193f94548929fe2e1739abff60d24f0acca12ca7f"
+    },
+    {
+      "command": "pnpm build",
+      "status": "PASS",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-discovery/build-cycle2.log",
+      "sha256": "d5887d8bddecc7a5f0e51efb22a54e7142accbf0e2075483b3bf6f274153d46c"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "status": "PASS",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-discovery/architecture-cycle2.log",
+      "sha256": "a9fec5c207a746d1bb6657f132adad5bf4635b407ca895f27d0af09864691841"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "status": "PASS",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-discovery/workspace-cycle2.log",
+      "sha256": "ce8f0ca08ba08c3a8ca580293e1bdd7a3e9577b06a03f1c91ae1eef85ffc76a9"
+    },
+    {
+      "command": "pnpm docs:check",
+      "status": "PASS",
+      "exitCode": 0,
+      "log": ".gstack/content-intake-discovery/docs-cycle2.log",
+      "sha256": "43cf83a80adc08a58bdd859648fe4bd0356c337405b82b86fae603d8ea61be44"
+    }
+  ],
+  "testCounts": {
+    "default": {
+      "passed": 1815,
+      "skipped": 199
+    },
+    "pgContentIntake": {
+      "passed": 102,
+      "skipped": 0
+    },
+    "pgDatabase": {
+      "passed": 23,
+      "skipped": 0
+    },
+    "mainDiscoveryTargeted": {
+      "passed": 12,
+      "skipped": 0
+    },
+    "countsAreSeparateRunsNotSummed": true
+  },
+  "capacity": {
+    "sources": 5000,
+    "httpPages": 150,
+    "actualMainElapsedMs": 25315,
+    "targetedPriorRunMs": 25451,
+    "qualifiedBeforeFactsExpiry": true,
+    "priorIndexOnlyFullRunMs": 25243
+  },
+  "immutablePriorMigrations": [
+    {
+      "path": "packages/database/migrations/0001_extensions.sql",
+      "sha256": "4876b7ef62bb033b4b7b487e06e88a525b9cb8b3e32e82e6516124b7fc8eca62"
+    },
+    {
+      "path": "packages/database/migrations/0002_identity_and_content.sql",
+      "sha256": "62322728f1621c75b2cc0f66ac20e65710a916c714caa84761a93108b71e1b64"
+    },
+    {
+      "path": "packages/database/migrations/0003_events_and_metrics.sql",
+      "sha256": "c109b3c7ec79c73cb6e3748808aca9296ed1c96e5d8fc91ab0046c80fd2b50d4"
+    },
+    {
+      "path": "packages/database/migrations/0004_import_release_announce.sql",
+      "sha256": "ff68d5969e28a9d4d7eed963906f2fc3783f4c34b5ec1fa347ea87c3bc0b2f6a"
+    },
+    {
+      "path": "packages/database/migrations/0005_idempotency_rate_limit_outbox.sql",
+      "sha256": "715db39163e2a99d10a88126a4bded14c75f4fb4ba1ec97dcba573265babdf02"
+    },
+    {
+      "path": "packages/database/migrations/0006_definer_functions_and_triggers.sql",
+      "sha256": "f5b369165b5e5f0e21801f8fd8eb2c4589ee26ca0761327811f4ed5c5903d4ca"
+    },
+    {
+      "path": "packages/database/migrations/0007_search_bigram.sql",
+      "sha256": "7cf632ec4123b9031893646b0b67348cf5a89dd3fe89ec544dccecb576513189"
+    },
+    {
+      "path": "packages/database/migrations/0008_runtime_acl.sql",
+      "sha256": "f883a929a8742e0f71a498e70de410124e8c25fd2fdee6a492047201475990f2"
+    },
+    {
+      "path": "packages/database/migrations/0009_phase1_policy_seed.sql",
+      "sha256": "a6ae5649347ad56f78cede6f8c34a69ebe4ceff6ea91be92da2d261999088e7e"
+    },
+    {
+      "path": "packages/database/migrations/0010_search_projection_v1_13.sql",
+      "sha256": "026497120b6ad6d7d885de47d54335bb8891d8b45e2da010cc85eae6ea7b6818"
+    },
+    {
+      "path": "packages/database/migrations/0011_search_no_hit_context_v1_14.sql",
+      "sha256": "8f5337b69b1a10fb85013694699e683c99e14399fa3471bd970eb89ac8591a0f"
+    },
+    {
+      "path": "packages/database/migrations/0012_owner_acceptance_v1_15.sql",
+      "sha256": "3bc06f81ed596049e0539a679e066b7a6c2d1814314c3d2ba9fd4d65f469be18"
+    },
+    {
+      "path": "packages/database/migrations/0013_backend_identity_content_v1_16.sql",
+      "sha256": "8794d2e32117d8949a7ccd8c38ac91d04852b406be7e30825ff8fb364925eee2"
+    },
+    {
+      "path": "packages/database/migrations/0014_release_deferred_guard_v1_17.sql",
+      "sha256": "ee7615d9ca7b05b01f66646393fbf26f1757a882b027a3fd6be415872a269339"
+    },
+    {
+      "path": "packages/database/migrations/0015_ops_loop_v1_18.sql",
+      "sha256": "e7ac1d9c5f487336b63ed4a8abeb66031dbcd3189286fbd2d07b97407685613b"
+    },
+    {
+      "path": "packages/database/migrations/0016_office_owner_publish.sql",
+      "sha256": "d574ebd891e3a7db771e6f6a5fb7a85f6e6d3614c7880f2dea4b4bb642d6b447"
+    },
+    {
+      "path": "packages/database/migrations/0017_rollback_previous_target.sql",
+      "sha256": "eb3ccbf3f04c4005393fc757b8f1e03d55a5078837b2b8eb9dbac72d83116788"
+    },
+    {
+      "path": "packages/database/migrations/0018_owner_read_views.sql",
+      "sha256": "c89d76992850aa562a3d24618bccb39a941a8bc88136342505a9edea5440acba"
+    },
+    {
+      "path": "packages/database/migrations/0019_candidate_client_snapshot.sql",
+      "sha256": "e4720feabd0a9b92d8d5cc22fcb6dcce75cf6e8136c0b2d9365d0d7c1cf18cd7"
+    },
+    {
+      "path": "packages/database/migrations/0020_coach_publish_v1_19.sql",
+      "sha256": "fd261530461c20aca90c5468997a695d67921fe53ff74b39de2c0a5f6b80d678"
+    },
+    {
+      "path": "packages/database/migrations/0021_content_intake_v1_20.sql",
+      "sha256": "7c19bf3f97fecb5af61c92131c0ce2a5f5f42822d2e104bb4202d96e292c73db"
+    },
+    {
+      "path": "packages/database/migrations/0022_intake_legacy_fence.sql",
+      "sha256": "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03"
+    },
+    {
+      "path": "packages/database/migrations/0023_intake_quality.sql",
+      "sha256": "c3b37131c28b76b2453e24d5f432e70329c478a7f90d34c95598518124e50136"
+    },
+    {
+      "path": "packages/database/migrations/0024_intake_publication.sql",
+      "sha256": "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2"
+    },
+    {
+      "path": "packages/database/migrations/0025_intake_usage_v1_21.sql",
+      "sha256": "f270f787323a65baf3727337dcc34c1ff3f7a0bac0baf79a1894a7f7ae9591f4"
+    }
+  ],
+  "review": {
+    "route": "open-code-review-delegate host review + gstack /review native adversarial",
+    "externalModelInvoked": false,
+    "nativeFixtureCoverage": "summary-only; parent inspected full tests",
+    "fixCycles": 2,
+    "receiptStorage": "local gstack review-log; final zero-edit pass follows this evidence freeze"
+  },
+  "limits": [
+    "No production factory/ACL/activation or real data.",
+    "No IPC/renderer/native Mac/Windows GUI acceptance; WSL not rerun.",
+    "No atomic multi-HTTP snapshot; selection hints are revalidated by usage qualification.",
+    "Shop display names are absent from the frozen contract."
+  ],
+  "verificationHistory": [
+    "Pre-repair default and PG runs passed but do not certify the index repair.",
+    "First index rerun exposed two stale migration-count assertions (23→24 and 24→25); corrected to catalogue length minus applied prefix, then final default and PG runs passed.",
+    "Initial QA materialize used a wrong relative annotation path and returned an error without a report; retry with annotations.json succeeded.",
+    "Second native review reproduced a five-second timeout for 5000 overlapping valid business grants. Moving the business predicate outside the aggregate preserved authority and passed the new service regression plus all 102 final PG/material tests; default lint/typecheck/test/build also rerun after the SQL/test change."
+  ],
+  "overlap": {
+    "additionalGrants": 5000,
+    "targetedRunMs": 28,
+    "fullMatrixRunMs": 19,
+    "queryAllowed": true,
+    "publishDenied": true,
+    "noAllocationOrDelegation": true
+  },
+  "evidenceReuse": {
+    "finalPgMatrix": "functional-recheck.json, capture 006",
+    "unchangedDatabase": "functional-evidence.json, capture 003",
+    "unchangedMainTargeted": "functional-evidence.json, capture 005",
+    "historyOnly": "functional-evidence.json, captures 001/002/004; 004 superseded after overlapping-grant SQL repair"
+  }
+}

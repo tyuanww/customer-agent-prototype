@@ -1,0 +1,207 @@
+{
+  "schema": "content-intake-p1-review-attempts/1",
+  "external": [
+    {
+      "attempt": "adversarial",
+      "transportStatus": "completed",
+      "validation": "completed",
+      "result": "## 审查结论\n\nP1 合成模型与 Excel 探针整体是 **fail-closed**：子进程取消/超时等 `close` 才释放槽位、预算前置、空表不清库、过敏正文、grant/allocation 分离、审批实例绑定，均成立。生产服务与 owner-only 未动，不把未接线的 P2 当缺陷。下列是 **当前实验代码里可触发的控制绕过 / 静默错误数据 / 双解析器缺口**，测试（24+22、磁盘 roundtrip、500/5000×10、取消/超时）未覆盖。\n\n## 发现\n\n**1. FIXABLE [P2] `apps/api/experiments/content-intake-p1/permissions.ts:48`**  \n`covers()` 对 `shop === null` 按注释做成「品牌通用、不是所有店」；同函数 `outer.source === null` 却匹配 **任意** `inner.source`。  \n**可观察：** `source: null` 的 grant 能 `authorize(..., { source: '任意来源' })` 成功。与差集「source 是范围维、shop null 非通配」不一致，合成模型会把单来源权扩成全来源。\n\n**2. FIXABLE [P2] `packages/content-intake/src/archive.ts:64`**  \n外部关系只在 `TargetMode === 'External'`（大小写精确）时拒绝；`ContentType` 则 `toLowerCase()`。无 `TargetMode`、或 `external`/`EXTERNAL`，即使 `Target` 是 `https://` / `http://` / `file://` 也会放行。  \n**可观察：** 预检声称 `EXTERNAL_RESOURCE`，特制 rels 仍 `inspectArchive` 成功；随后 ExcelJS 加载同一字节。网络探针不是 OS 沙箱，这条是 **XML 门自己的旁路**，不是未做的 P2 出站隔离。\n\n**3. FIXABLE [P2] `apps/api/experiments/content-intake-p1/approval.ts`（`assessRisk` / `freezeCandidate`）**  \n风险只看调用方提供的 `differences`，不核对 `entries`。漏掉停用、过敏/赔付、`critical` 条目时，`risk === 'routine'`，摘要仍对「不完整差集」哈希。  \n**可观察：** `verifyApproval` 对 routine 允许贡献人自审；关键材料可走自审通道。这是模型自称拥有的风险判定被静默降级，不是缺 PG。\n\n**4. FIXABLE [P2] `apps/api/experiments/content-intake-p1/approval.ts`（`issueTicket` / `canCommit`）**  \n`attachEvidence(..., sourceConfirmed)` 把来源确认做成 ready 条件，但 `issueTicket` / `canCommit` 写死 `sourceConfirmed: true`，票据也不含确认代际。  \n**可观察：** 无独立 source-confirm 证据仍能发 60s 票据且 `canCommit` 为 ok。与差集「来源确认独立证据」相反。\n\n**5. INVESTIGATE [P2] `packages/content-intake/src/workbook.ts`（`inspectArchive` 后 `book.xlsx.load`）**  \n预算门是 yauzl；对象模型是 ExcelJS/JSZip（锁里还有 unzipper/fstream）。两套 ZIP 对 UTF-8 名、重复项、绝对路径、extra field 的解释可以不一致。  \n**可观察：** 预检通过的包，ExcelJS 可能看到预检未计数的条目（宏/外部部件/超大表），或预检当安全、加载抛成 `INVALID_XLSX`。现有 22 个 Excel 用例未做 parser-confusion 夹具。不把「未做 OS RSS」算进来。\n\n**6. FIXABLE [P3] `packages/content-intake/src/workbook.ts`（`INVALID_TIME` 的 `Date.parse`）**  \n正则只验形状，`Date.parse('2026-02-31T00:00:00Z')` 会溢出成 3 月且 `Number.isFinite` 为真。  \n**可观察：** `ok: true` 的行带着日历上不存在的时间；`INVALID_WINDOW` 用的是溢出后的瞬间。静默脏数据，不是丢行。\n\n**7. FIXABLE [P3] `packages/content-intake/src/runner.ts:48-51`**  \n子进程 stdout 只验 `ok`、两个数组、`policyVersion`、`maxRssKiB`、`networkAttempts === 0`。不验 `questions`、`ok === (issues.length===0)`、失败时 `rows` 必须空。  \n**可观察：** 若 ExcelJS/子进程被异常输出，父进程会把 `ok: true` 加非空 `issues` 或失败仍带 rows 当成合法 `ProcessResult`。生命周期（BUSY/取消等 close）本身是对的。\n\n未计入：空 `env`、JS 网络打桩、`--max-old-space-size`≠RSS、utilityProcess/IPC/DB、1.15.0 owner-only、岗位矩阵其余角色——均已标明推迟或非本轮生产缺陷。\n\nRecommendation: 在合同 intake 前先修 source 匹配、TargetMode/URL 预检、风险差集自洽、票据上来源确认，并补 ZIP 双解析与 `TargetMode` 夹具，because 这些是 P1 已声称的权限/审批/预检不变量，现有 46 个用例和 5000 行探针都不会红。  \nScore: 7/10\n\nReview complete",
+      "error": null,
+      "usage": {
+        "input_tokens": 47091,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 512,
+        "output_tokens": 33590,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "",
+        "iterations": [],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5": {
+          "inputTokens": 47091,
+          "outputTokens": 33590,
+          "cacheReadInputTokens": 512,
+          "cacheCreationInputTokens": 0,
+          "webSearchRequests": 0,
+          "costUSD": 1.075461,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 0,
+          "canonicalModel": "claude-opus-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      }
+    },
+    {
+      "attempt": "structured",
+      "transportStatus": "unavailable",
+      "validation": "timeout",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "usage": null,
+      "modelUsage": null
+    },
+    {
+      "attempt": "adversarial-r2",
+      "transportStatus": "unavailable",
+      "validation": "timeout",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "usage": null,
+      "modelUsage": null
+    },
+    {
+      "attempt": "structured-r2",
+      "transportStatus": "unavailable",
+      "validation": "timeout",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "usage": null,
+      "modelUsage": null
+    },
+    {
+      "attempt": "adversarial-r3",
+      "transportStatus": "completed",
+      "validation": "completion-marker-invalid",
+      "result": "## Findings\n\n**FIXABLE [P1] `packages/content-intake/src/archive.ts:147`**  \n`xml?.write(decoder.end()).close()`：`xml` 为 `undefined` 时可选链得到 `undefined`，随后 `.close()` 抛 `TypeError`，被 `fail()` 收成 `INVALID_ZIP_XML`。  \n路径：`/\\.(xml|rels)$/` 不匹配且非目录的成员（`xl/media/*`、`.vml` 等）。`createTemplate` 无媒体时测不过这条；一带二进制媒体/图片部件，预检在 `MEDIA_LIMIT` 之前失败。媒体个数/字节预算形同未接通。\n\n**FIXABLE [P2] `packages/content-intake/src/approval.ts:32`**  \n`c.after.disabled && !c.before?.disabled`：`before === null` 时 `!undefined` 为真，**新建**停用条目计入停用数。同一候选两条新停用 → `risk=critical`，贡献人自审被 `verifyApproval`/`reviewerCurrent` 拒绝。与「缺行继承、显式停用已发布条目」不一致。\n\n**FIXABLE [P2] `apps/api/experiments/content-intake-p1/approval.ts:32`（`assessRisk` 正则）**  \n`` `${before.title}${before.body}${after.title}${after.body}` `` 无分隔符。`before.body` 尾「过」+ `after.title` 头「敏」（或「赔」「付」跨字段）会误升 `critical`，同样挡住自审。\n\n**FIXABLE [P2] `packages/content-intake/src/policy.ts` + `runner.ts` spawn `--max-old-space-size=192`**  \n合法组合 `rows=5000` × 15 列 × `cellChars=32767` 远超 `outputBytes`（50MB）和 192MB 堆。整表纯文本可通过 ZIP 前检，随后子进程 OOM/`OUTPUT_LIMIT`，调用方看到 `PROCESS_FAILURE`/`OUTPUT_LIMIT` 而非单元格预算码。\n\n**INVESTIGATE [P2] `packages/content-intake/src/archive.ts:60-66`**  \n只拒绝 **central** `extraFields` 的 `0x7075`，未扫 local extra（offset+28 长度、name 之后）。与注释「禁止 Unicode path alias、yauzl/JSZip 必须同成员」不一致。若仅 local 带 0x7075，可能绕过 `ZIP_NAME_MISMATCH`，两解析器按不同文件名索引。\n\n未把 PG 事务、真实飞书 adapter、utilityProcess、OS RSS/出站、完整材料 schema、P2 FAQ 写成已实现能力。\n\nScore: 6/10  \nReview complete  \nRecommendation: 先修非 XML 成员 `.close()` 再跑带媒体的探针；同时改 `assessRisk` 只统计「已发布→停用」并给字段加分隔，避免误升他审。",
+      "error": null,
+      "usage": {
+        "input_tokens": 33767,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 512,
+        "output_tokens": 34379,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "",
+        "iterations": [],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5": {
+          "inputTokens": 33767,
+          "outputTokens": 34379,
+          "cacheReadInputTokens": 512,
+          "cacheCreationInputTokens": 0,
+          "webSearchRequests": 0,
+          "costUSD": 1.028566,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 0,
+          "canonicalModel": "claude-opus-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      }
+    },
+    {
+      "attempt": "structured-r3",
+      "transportStatus": "completed",
+      "validation": "completed-reported-gate-fail",
+      "result": "## P1 阻断\n\n**FIXABLE [P1] `packages/content-intake/src/archive.ts`（`xml?.write(decoder.end()).close()`）**  \n可选链只罩住 `write`，`.close()` 仍会在 `xml === undefined` 时解引用。`xl/media/*`、`.vml`、其它非 `.xml/.rels` 成员走完流式预算后必抛 `TypeError`，被 `fail()` 收成 `INVALID_ZIP_XML`，`parseWorkbook` 再变成 `INVALID_XLSX`。\n\n可观察失败：带 `xl/media/` 的 xlsx（排除页图片也一样）无法完成 `inspectArchive`，`mediaCount`/`MEDIA_LIMIT`/`UNRESOLVED_MEDIA` 路径不可达；设计要计数并整批阻断的媒体文件，实际整文件判损坏。目录项提前 `return`，纯 XML 模板可幸免，所以现有无二进制媒体样例仍可通过。\n\n## P2\n\n**FIXABLE [P2] `packages/content-intake/src/workbook.ts`（`getWorksheet(name)`）+ `archive.ts`（`sheets.set`）**  \n`workbook.xml` 允许重复表名：Map 后写覆盖，ExcelJS 只返回第一张。可观察失败：两张 `FAQ`/`来源`，第一张合法、第二张多行或媒体时 `ok: true`，多出行不进 `rows`/`issues`。\n\n**INVESTIGATE [P2] `archive.ts`（local extra `0x7075`）**  \n已拒 CD extra `0x7075` 并比对 local 文件名字段，但未读 local extra 的 Info-ZIP Unicode Path。若 JSZip/ExcelJS 用 local extra 名、yauzl 用 CD ASCII 名，可出现“检的是 A、加载的是 B”。需用一枚只在 local extra 带 `0x7075` 的夹具证实。\n\n**FIXABLE [P2] `apps/api/experiments/content-intake-p1/approval.ts`（`canCommit`）**  \n`issueTicket` 把窗口压到 `TICKET_MAX_AGE_MS`（60s），`canCommit` 只信 `ticket.expiresAt`，不核对 `expiresAt <= issuedAt + 60s`，也不重算。可观察失败：调用方改长 `expiresAt` 后，在证据/授权仍有效时可把一次票用到约 5 分钟（`APPROVAL_MAX_AGE_MS`）。同进程只走 `issueTicket` 时测不出来。\n\n## 未记为缺陷\n\n空 env、`--max-old-space-size`、Node 网络桩、无 PG/飞书/utilityProcess/OS RSS，均与 P1 范围声明一致，不升格为 P1。权限交集、关键变更他审、缺行继承、整批无部分行、取消等 `close` 再放槽，在已给代码里是闭合的。\n\nScore: 6/10  \nReview complete  \nRecommendation: 先改成 `xml?.write(decoder.end()); xml?.close();` 并加带 `xl/media` 的夹具，因为当前媒体前检路径对任何非 XML 成员都是死的。",
+      "error": null,
+      "usage": {
+        "input_tokens": 33784,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 512,
+        "output_tokens": 27967,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "",
+        "iterations": [],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "modelUsage": {
+        "claude-opus-5": {
+          "inputTokens": 33784,
+          "outputTokens": 27967,
+          "cacheReadInputTokens": 512,
+          "cacheCreationInputTokens": 0,
+          "webSearchRequests": 0,
+          "costUSD": 0.8683510000000001,
+          "contextWindow": 1000000,
+          "maxOutputTokens": 64000,
+          "thinkingTokens": 0,
+          "canonicalModel": "claude-opus-5",
+          "provider": "firstParty",
+          "costBasis": "list"
+        }
+      }
+    }
+  ],
+  "native": [
+    {
+      "cycle": 1,
+      "completed": true,
+      "findings": [
+        "reviewer expiry",
+        "column bounds",
+        "selected background/drawings",
+        "scope stewardship"
+      ]
+    },
+    {
+      "cycle": 2,
+      "completed": true,
+      "findings": [
+        "rich-text aggregate",
+        "grant start containment",
+        "stdout enum types"
+      ]
+    },
+    {
+      "cycle": 3,
+      "completed": true,
+      "findings": [
+        "strict approval response strings"
+      ],
+      "priorNativeFindingsReplayedClosed": 7
+    }
+  ],
+  "nativeTestsCoverage": "Test and fixture bodies summary-only per review skill; parent ran full actual tests.",
+  "finalCompleteReviewAfterRepairs": false
+}

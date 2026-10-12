@@ -1,0 +1,37 @@
+[
+  {
+    "command": [
+      "hdiutil",
+      "attach",
+      "-readonly",
+      "-nobrowse",
+      "-plist",
+      "-mountpoint",
+      "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/mount",
+      "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/release/local-unsigned/客服话术浮窗 Demo-0.3.26-mac-universal-UNSIGNED.dmg"
+    ],
+    "exitCode": 0,
+    "stdout": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>system-entities</key>\n\t<array>\n\t\t<dict>\n\t\t\t<key>content-hint</key>\n\t\t\t<string>Apple_HFS</string>\n\t\t\t<key>dev-entry</key>\n\t\t\t<string>/dev/disk4s1</string>\n\t\t\t<key>mount-point</key>\n\t\t\t<string>/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/mount</string>\n\t\t\t<key>potentially-mountable</key>\n\t\t\t<true/>\n\t\t\t<key>unmapped-content-hint</key>\n\t\t\t<string>48465300-0000-11AA-AA11-00306543ECAC</string>\n\t\t\t<key>volume-kind</key>\n\t\t\t<string>hfs</string>\n\t\t</dict>\n\t\t<dict>\n\t\t\t<key>content-hint</key>\n\t\t\t<string>GUID_partition_scheme</string>\n\t\t\t<key>dev-entry</key>\n\t\t\t<string>/dev/disk4</string>\n\t\t\t<key>potentially-mountable</key>\n\t\t\t<false/>\n\t\t\t<key>unmapped-content-hint</key>\n\t\t\t<string>GUID_partition_scheme</string>\n\t\t</dict>\n\t</array>\n</dict>\n</plist>\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "ditto",
+      "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/mount/客服话术浮窗 Demo.app",
+      "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app"
+    ],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "hdiutil",
+      "detach",
+      "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/mount"
+    ],
+    "exitCode": 0,
+    "stdout": "\"disk4\" ejected.\n",
+    "stderr": ""
+  }
+]

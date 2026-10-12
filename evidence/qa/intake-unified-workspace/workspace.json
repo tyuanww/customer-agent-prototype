@@ -1,0 +1,9 @@
+{
+  "command": [
+    "pnpm",
+    "workspace:check"
+  ],
+  "startedAt": "2026-10-08T11:54:15.957887+00:00",
+  "endedAt": "2026-10-08T11:54:16.974409+00:00",
+  "exitCode": 1
+}

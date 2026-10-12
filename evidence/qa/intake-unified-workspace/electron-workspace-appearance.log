@@ -1,0 +1,15 @@
+
+Running 4 tests using 1 worker
+
+(node:95815) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"status":"PASS","domain":"product","flow":"restricted-publication-to-unified-workspace","screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-08T11-51-32-511Z","oldAdapters":false}
+  ✓  1 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified product publication without old adapters or Query selection coupling (5.4s)
+{"status":"PASS","domain":"campaign","flow":"restricted-publication-to-unified-workspace","screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-08T11-51-37-161Z","oldAdapters":false}
+  ✓  2 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified campaign publication without old adapters or Query selection coupling (4.1s)
+{"status":"PASS","domain":"presale","flow":"restricted-publication-to-unified-workspace","screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-08T11-51-41-244Z","oldAdapters":false}
+  ✓  3 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified presale publication without old adapters or Query selection coupling (4.0s)
+{"status":"PASS","domain":"aftersale","flow":"restricted-publication-to-unified-workspace","screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-08T11-51-45-282Z","oldAdapters":false}
+  ✓  4 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified aftersale publication without old adapters or Query selection coupling (4.1s)
+
+  4 passed (17.9s)

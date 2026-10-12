@@ -1,0 +1,15 @@
+$ node scripts/check-documentation.mjs
+evidence/qa/content-intake-p2-handoff/README.md: missing ../../../.gstack/content-intake-p2-handoff/review-qa/exploration-002.json
+evidence/qa/content-intake-p2-handoff/README.md: missing ../../../.gstack/content-intake-p2-handoff/review-qa/exploration-003.json
+evidence/qa/content-intake-p2-handoff/README.md: missing ../../../.gstack/content-intake-p2-handoff/review-qa/exploration-004.json
+evidence/qa/content-intake-p2-principals/README.md: missing ../../../.gstack/qa-reports/content-intake-principals-20261007/exploration-002.json
+evidence/qa/content-intake-p2-principals/README.md: missing ../../../.gstack/qa-reports/content-intake-principals-20261007/exploration-003.json
+evidence/qa/content-intake-p2-principals/README.md: missing ../../../.gstack/qa-reports/content-intake-principals-20261007/exploration-004.json
+evidence/qa/content-intake-p2-revision-cancel/README.md: missing ../../../.gstack/qa-reports/content-intake-revision-cancel-20261007/exploration-002.json
+evidence/qa/content-intake-p2-revision-cancel/README.md: missing ../../../.gstack/qa-reports/content-intake-revision-cancel-20261007/exploration-003.json
+evidence/qa/intake-mac-package/README.md: missing ../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-002.json
+evidence/qa/intake-mac-package/README.md: missing ../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-003.json
+evidence/qa/intake-mac-package/README.md: missing ../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-004.json
+evidence/qa/intake-mac-package/README.md: missing ../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-005.json
+evidence/qa/intake-mac-package/README.md: missing ../../../.gstack/qa-reports/intake-mac-package-20261008/exploration-006.json
+[ELIFECYCLE] Command failed with exit code 1.

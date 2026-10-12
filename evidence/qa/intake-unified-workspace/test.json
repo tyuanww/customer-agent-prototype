@@ -1,0 +1,10 @@
+{
+  "command": [
+    "pnpm",
+    "test"
+  ],
+  "environment": {},
+  "startedAt": "2026-10-08T11:47:09.862744+00:00",
+  "endedAt": "2026-10-08T11:48:47.511699+00:00",
+  "exitCode": 0
+}

@@ -45,6 +45,7 @@ const UNREADABLE_PROFILE_ERROR =
 export type PackagedProductProfile = Readonly<{
   apiOrigin: string;
   identityOrigin: string;
+  contentIntake?: 'faq-v2';
 }>;
 
 /**
@@ -146,6 +147,9 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, kind: 'invalid' };
   const record = parsed as Record<string, unknown>;
+  if ('contentIntake' in record && (record.contentIntake !== 'faq-v2' || record.mode !== MODE)) {
+    return { ok: false, kind: 'invalid' };
+  }
   if (record.mode === OFFLINE_MODE) {
     const keys = Object.keys(record);
     if (keys.length !== 1 || keys[0] !== 'mode') return { ok: false, kind: 'invalid' };
@@ -165,7 +169,8 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
     return { ok: false, kind: 'invalid' };
   }
-  return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin }) };
+  return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin,
+    ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) }) };
 }
 
 /** Read and validate the packaged synthetic profile. Missing or invalid files fail closed. Explicit offline mode returns undefined (S0), it is not a missing file. */
@@ -255,11 +260,16 @@ export function resolveProductProfile(
 export function developmentProductProfile(environment: NodeJS.ProcessEnv): PackagedProductProfile | undefined {
   const apiOrigin = environment.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
   const identityOrigin = environment.CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN;
+  const contentIntake = environment.CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE;
+  if (contentIntake !== undefined && (contentIntake !== 'faq-v2' || !loopbackOrigin(apiOrigin) || !loopbackOrigin(identityOrigin))) {
+    throw new Error('FAQ intake requires explicit loopback synthetic origins');
+  }
   if (apiOrigin === undefined && identityOrigin === undefined) return undefined;
   const api = productOrigin(apiOrigin);
   const identity = productOrigin(identityOrigin);
   if (api === undefined || identity === undefined || api === identity) {
     throw new Error('Synthetic desktop requires both exact loopback or https origins in development');
   }
-  return Object.freeze({ apiOrigin: api, identityOrigin: identity });
+  return Object.freeze({ apiOrigin: api, identityOrigin: identity,
+    ...(contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) });
 }

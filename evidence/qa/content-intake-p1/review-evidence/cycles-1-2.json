@@ -1,0 +1,195 @@
+{
+  "revision": "8ab309fcd9c494b7343ed88bacb253205d36575f",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype",
+  "limits": [
+    "The initial 300000ms exploration deadline was not reset; later bounded captures are directed reproductions/regressions for concrete code-review findings.",
+    "All material is synthetic; no browser, tenant, DB, real workbooks or employee data.",
+    "Tests of process behaviour measure Node, not Electron or an OS memory/network sandbox.",
+    "Captures 001-006 describe earlier inputs; current regressions and exact replays are captures 007-010. Later source changes invalidate only affected evidence; final approval-shape repair will receive a separate bounded regression record."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/content-intake exec vitest run tests/workbook.test.ts",
+      "contract": "Initial parser/process suite",
+      "expected": "22 baseline cases pass",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (22 tests) 1852ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  622ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  455ms\n\n Test Files  1 passed (1)\n      Tests  22 passed (22)\n   Start at  20:04:04\n   Duration  2.36s (transform 63ms, setup 0ms, collect 281ms, tests 1.85s, environment 0ms, prepare 44ms)\n\n"
+    },
+    {
+      "command": "node .gstack/p1-review/edge-repro.mjs",
+      "contract": "Invalid calendar dates and duplicate cells must be blocked",
+      "expected": "ok false",
+      "classification": "superseded",
+      "observed": "{\"case\":\"impossible-date\",\"ok\":true,\"issues\":[]}\n{\"case\":\"example-question-id\",\"ok\":false,\"issues\":[{\"code\":\"INVALID_QUESTION\",\"sheet\":\"相似问法\",\"row\":2,\"column\":\"A\",\"fix\":\"核对条目引用、稳定问法编号、问法及状态\"}]}\n{\"case\":\"duplicate-cell\",\"ok\":true,\"issues\":[]}\n"
+    },
+    {
+      "command": "node .gstack/p1-review/edge-repro.mjs",
+      "contract": "Calendar/duplicate-cell/EXAMPLE question identifiers must be blocked",
+      "expected": "all three cases reject",
+      "classification": "superseded",
+      "observed": "{\"case\":\"impossible-date\",\"ok\":true,\"issues\":[]}\n{\"case\":\"example-question-id\",\"ok\":true,\"issues\":[]}\n{\"case\":\"duplicate-cell\",\"ok\":true,\"issues\":[]}\n"
+    },
+    {
+      "command": "pnpm test:content-intake:p1",
+      "contract": "First repair and adjacent contracts",
+      "expected": "62 cases pass",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (34 tests) 2028ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  633ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  485ms\n\n Test Files  1 passed (1)\n      Tests  34 passed (34)\n   Start at  20:20:56\n   Duration  2.40s (transform 63ms, setup 0ms, collect 204ms, tests 2.03s, environment 0ms, prepare 37ms)\n\n\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-p1.test.ts (28 tests) 5ms\n\n Test Files  1 passed (1)\n      Tests  28 passed (28)\n   Start at  20:20:59\n   Duration  189ms (transform 35ms, setup 0ms, collect 38ms, tests 5ms, environment 0ms, prepare 38ms)\n\n"
+    },
+    {
+      "command": "pnpm test:content-intake:p1",
+      "contract": "ZIP member consistency and all first-cycle repairs",
+      "expected": "64 cases pass",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (36 tests) 1829ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  584ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  429ms\n\n Test Files  1 passed (1)\n      Tests  36 passed (36)\n   Start at  20:23:09\n   Duration  2.09s (transform 32ms, setup 0ms, collect 111ms, tests 1.83s, environment 0ms, prepare 36ms)\n\n\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-p1.test.ts (28 tests) 6ms\n\n Test Files  1 passed (1)\n      Tests  28 passed (28)\n   Start at  20:23:11\n   Duration  173ms (transform 34ms, setup 0ms, collect 36ms, tests 6ms, environment 0ms, prepare 34ms)\n\n"
+    },
+    {
+      "command": "node .gstack/p1-review/edge-repro-r2.mjs",
+      "contract": "Whole-cell text budget, grant interval containment, strict state enums",
+      "expected": "all three cases reject",
+      "classification": "superseded",
+      "observed": "{\"case\":\"rich-fragments-total-33000\",\"ok\":true,\"issues\":[]}\n{\"case\":\"array-state\",\"accepted\":true}\n{\"case\":\"retroactive-grant\",\"decision\":{\"ok\":true}}\n"
+    },
+    {
+      "command": "pnpm test:content-intake:p1",
+      "contract": "All P1 repaired contracts including exact rich-text budget and adjacent paths",
+      "expected": "67 cases pass",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (39 tests) 1853ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  578ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  450ms\n\n Test Files  1 passed (1)\n      Tests  39 passed (39)\n   Start at  20:34:45\n   Duration  2.21s (transform 81ms, setup 0ms, collect 204ms, tests 1.85s, environment 0ms, prepare 42ms)\n\n\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-p1.test.ts (28 tests) 5ms\n\n Test Files  1 passed (1)\n      Tests  28 passed (28)\n   Start at  20:34:47\n   Duration  179ms (transform 35ms, setup 0ms, collect 37ms, tests 5ms, environment 0ms, prepare 36ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/content-intake exec vitest run tests/workbook.test.ts",
+      "contract": "Standalone parser/process entrypoint after repair",
+      "expected": "39 cases pass",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (39 tests) 1840ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  587ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  431ms\n\n Test Files  1 passed (1)\n      Tests  39 passed (39)\n   Start at  20:39:23\n   Duration  2.09s (transform 31ms, setup 0ms, collect 110ms, tests 1.84s, environment 0ms, prepare 34ms)\n\n"
+    },
+    {
+      "command": "node .gstack/p1-review/edge-repro.mjs",
+      "contract": "Exact first-cycle faulty inputs after repair",
+      "expected": "All three inputs rejected",
+      "classification": "pass",
+      "observed": "{\"case\":\"impossible-date\",\"ok\":false,\"issues\":[{\"code\":\"INVALID_TIME\",\"sheet\":\"FAQ\",\"row\":2,\"column\":\"I\",\"fix\":\"填写真实日历日期与带时区的 ISO 时间\"}]}\n{\"case\":\"example-question-id\",\"ok\":false,\"issues\":[{\"code\":\"INVALID_QUESTION\",\"sheet\":\"相似问法\",\"row\":2,\"column\":\"A\",\"fix\":\"核对条目引用、合法非示例问法编号、问法及状态\"}]}\n{\"case\":\"duplicate-cell\",\"ok\":false,\"issues\":[{\"code\":\"AMBIGUOUS_COORDINATE\",\"sheet\":\"\",\"row\":0,\"column\":\"\",\"fix\":\"检查文件或重新导出标准模板后重试\"}]}\n"
+    },
+    {
+      "command": "node .gstack/p1-review/edge-repro-r2.mjs",
+      "contract": "Exact second-cycle faulty inputs after repair",
+      "expected": "Rich text, array state and retroactive grant rejected",
+      "classification": "pass",
+      "observed": "{\"case\":\"rich-fragments-total-33000\",\"ok\":false,\"issues\":[{\"code\":\"CELL_TEXT_LIMIT\",\"sheet\":\"\",\"row\":0,\"column\":\"\",\"fix\":\"检查文件或重新导出标准模板后重试\"}]}\n{\"case\":\"array-state\",\"accepted\":false}\n{\"case\":\"retroactive-grant\",\"decision\":{\"ok\":false,\"reason\":\"GRANT_AUTHORITY_DENIED\"}}\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/content-intake",
+        "exec",
+        "vitest",
+        "run",
+        "tests/workbook.test.ts"
+      ],
+      "hypothesis": "Happy-path artifact tests passed, but source review shows date normalization, question-ID, and duplicate-cell validators may accept ambiguous input; reproduce each using the same synthetic template.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "node",
+        ".gstack/p1-review/edge-repro.mjs"
+      ]
+    },
+    {
+      "observationCapture": "003",
+      "observationArgv": [
+        "node",
+        ".gstack/p1-review/edge-repro.mjs"
+      ],
+      "hypothesis": "Permanent regressions now cover impossible dates, duplicate cells, invalid IDs, background/unsupported drawings, column budgets and process output; authority tests cover exact takeover, reviewer expiry and source-confirmation binding. All must pass together after repair.",
+      "nextCapture": "004",
+      "nextArgv": [
+        "pnpm",
+        "test:content-intake:p1"
+      ]
+    },
+    {
+      "observationCapture": "005",
+      "observationArgv": [
+        "pnpm",
+        "test:content-intake:p1"
+      ],
+      "hypothesis": "Second native review reproduced rich-text aggregate overflow, grant start predating its allocation, and coerced stdout enums; independently replay all three before repair.",
+      "nextCapture": "006",
+      "nextArgv": [
+        "node",
+        ".gstack/p1-review/edge-repro-r2.mjs"
+      ]
+    },
+    {
+      "observationCapture": "006",
+      "observationArgv": [
+        "node",
+        ".gstack/p1-review/edge-repro-r2.mjs"
+      ],
+      "hypothesis": "Complete cell/shared-string accumulation including CDATA, strict state enums and both endpoints of grant validity now reject each reproduced defect; exact-budget rich text must remain accepted.",
+      "nextCapture": "007",
+      "nextArgv": [
+        "pnpm",
+        "test:content-intake:p1"
+      ]
+    },
+    {
+      "observationCapture": "007",
+      "observationArgv": [
+        "pnpm",
+        "test:content-intake:p1"
+      ],
+      "hypothesis": "The combined 67-case suite passes; rerun the original standalone parser entrypoint on the final source so its earlier result is not reused across input changes.",
+      "nextCapture": "008",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/content-intake",
+        "exec",
+        "vitest",
+        "run",
+        "tests/workbook.test.ts"
+      ]
+    },
+    {
+      "observationCapture": "008",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/content-intake",
+        "exec",
+        "vitest",
+        "run",
+        "tests/workbook.test.ts"
+      ],
+      "hypothesis": "The final standalone suite passes; replay the original calendar, EXAMPLE question ID and duplicate-cell inputs to prove the concrete earlier failures now reject.",
+      "nextCapture": "009",
+      "nextArgv": [
+        "node",
+        ".gstack/p1-review/edge-repro.mjs"
+      ]
+    },
+    {
+      "observationCapture": "009",
+      "observationArgv": [
+        "node",
+        ".gstack/p1-review/edge-repro.mjs"
+      ],
+      "hypothesis": "All first-round exact inputs reject; replay the second-round rich-text total, array state and retroactive grant examples on the current source.",
+      "nextCapture": "010",
+      "nextArgv": [
+        "node",
+        ".gstack/p1-review/edge-repro-r2.mjs"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

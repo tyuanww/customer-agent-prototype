@@ -1,0 +1,5 @@
+$ node scripts/workspace-hygiene.mjs check
+Workspace source budget: FAIL (remainder 37.0 MiB / 32.0 MiB)
+workspace-remainder exceeds budget by 5.03 MiB
+Workspace root policy: PASS
+[ELIFECYCLE] Command failed with exit code 1.

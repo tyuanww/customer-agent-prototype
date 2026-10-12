@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-08",
+  "version": "0.3.26",
+  "productBase": "ddd1b4e5a269c63e04f2f5e91bb9f5c09dc93b5f",
+  "integratedCodeHead": "971c9e8e88608dd4022b379867cfe5e1502f94c2",
+  "environment": {
+    "os": "macOS arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "dependencyInstall": false
+  },
+  "inputs": "inputs.json",
+  "checks": [
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "rawLog": ".gstack/runtime-completion/build.log",
+      "rawLogSha256": "0252a01628f03bea3ab6d13d1c71f455f021bad1bca74cbf66a8a8c081d5a15f",
+      "tail": "build-tail.txt",
+      "tailSha256": "367d7c4ee93754dabdfa6ec7043bc96a902c466b0c2a36eb9b6065c44383eae4"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "rawLog": ".gstack/runtime-completion/lint.log",
+      "rawLogSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "tail": "lint-tail.txt",
+      "tailSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "rawLog": ".gstack/runtime-completion/typecheck.log",
+      "rawLogSha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+      "tail": "typecheck-tail.txt",
+      "tailSha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "rawLog": ".gstack/runtime-completion/test.log",
+      "rawLogSha256": "490a4232e9a577dbb5ce330017565d5cde54f87b2fdf80368843c987080c936d",
+      "tail": "test-tail.txt",
+      "tailSha256": "5f4068b143272f6b9d3ac548337884b1462dd2cd2c7795b3ef3b507bcde79ddc"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/api exec vitest run experiments/intake-organization/registered-refresh.integration.test.ts tests/intake-runtime-consumers.integration.test.ts tests/intake-runtime-consumer-pool.test.ts",
+      "exitCode": 0,
+      "rawLog": ".gstack/runtime-completion/integrated-pg.log",
+      "rawLogSha256": "de4e1ab02b4f7d46d3cf969b6d83250431594787c95bb9870940534ba66764ec",
+      "tail": "integrated-pg-tail.txt",
+      "tailSha256": "d9800d50d77657307507ad7af595d4246cab6b4c784fdbde346d85f2ba726b9e"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "rawLog": ".gstack/runtime-completion/docs.log",
+      "rawLogSha256": "c03875e76452793da0de396cb152c0d79cf03617fb5b8024f921654c73296cd1",
+      "tail": "docs-tail.txt",
+      "tailSha256": "c03875e76452793da0de396cb152c0d79cf03617fb5b8024f921654c73296cd1"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 1,
+      "rawLog": ".gstack/runtime-completion/workspace.log",
+      "rawLogSha256": "1e8a15ed31192d15dd082c962445d8f06f4f98e3125609be23ddd8d1a9530974",
+      "tail": "workspace-tail.txt",
+      "tailSha256": "1e8a15ed31192d15dd082c962445d8f06f4f98e3125609be23ddd8d1a9530974"
+    }
+  ],
+  "integratedNewCases": "23/23 PASS (20 PG + 3 unit)",
+  "reusedLocalCases": "A 52 unit/HTTP + 24 PG; B 13 new + deadline supplement + 8 default-path PG. Exact source/log hashes verified; B first cwd failure retained.",
+  "ordinaryTestLimit": "API 308 / desktop 7 skipped; no PG/GUI success inferred",
+  "review": "Scoped implementation review and fixes; old role15/15 reused; full external /review INCOMPLETE",
+  "buildBoundary": "Only service optional terminalPool and capacity COMMIT certainty changed in API src. Experiments excluded from dist. HTTP/factory/transaction/authority/contracts/migrations/desktop/lockfile unchanged.",
+  "governance": {
+    "status": "DRAFT_NOT_FROZEN_NOT_EXPORTED_NOT_INTAKE",
+    "base": "45f5c0d9b7a1b1cf20f6fd0dd302dd6ac45d86f7",
+    "candidateCommit": "734bbc208dae9e51d29a9c568d41eb75f1cd455c",
+    "integrationHead": "e833f9a7946b72f16600c0dd1c47d57ae642cc76",
+    "evidence": "/Users/hutou/Desktop/ai-content-intake-p2-contracts/business-docs/01-客服Agent项目/30-开发-进行中/content-intake-shop-directory-candidate/lifecycle-checks.json",
+    "evidenceSha256": "b6f0f15dada9b55c5fbbfcab0d8c3a2860faff450024e0d2cd2ccec41bd7568b",
+    "pgPassed": 208,
+    "contractPassed": 5,
+    "releaseSteps": 41,
+    "releaseExitCode": 0,
+    "releaseCoverage": "STABLE_FINAL_INPUTS: final consumer missing-name mapping fix included; previous pre-fix run retained separately",
+    "releaseLogSha256": "8c566495fe446d49e71c9f2fd588e8405c4f645a497cd85ef24e82e2a2c1485d",
+    "verifiedInputs": 14,
+    "verifiedLogs": 13,
+    "logsPreservedAt": "/Users/hutou/Desktop/ai-content-intake-p2-contracts/output/content-intake-shop-directory-contract/lifecycle",
+    "treeEquality": "git diff candidateCommit integrationHead is empty",
+    "frozenContractHashesUnchanged": true
+  },
+  "workspaceBudget": "FAIL: 32.8 MiB / 32 MiB; approximately 845 KiB over. Root policy PASS. No evidence deletion or threshold change.",
+  "unchangedEvidence": "Frozen product contracts/codegen/32 migrations and package lock match previous recovery inputs; no mechanical rerun of historical contract/role review checks. Build/test include their existing generation checks."
+}

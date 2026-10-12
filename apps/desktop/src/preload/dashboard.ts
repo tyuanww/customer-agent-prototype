@@ -1,3 +1,6 @@
+import type { IntakeCatalogApi, IntakeCatalogCommand } from '../shared/content-intake-catalog';
+import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
+import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import { contextBridge, ipcRenderer } from 'electron';
 
 // Keep these literals aligned with IPC_CHANNELS. Do not import shared modules:
@@ -425,3 +428,34 @@ contextBridge.exposeInMainWorld('dashboardIteration', {
     }
   },
 });
+
+// Deliberately no runtime shared import: keep this sandbox preload self-contained.
+// Main validates exact command payloads before any state or native side effect.
+contextBridge.exposeInMainWorld('dashboardIntake', {
+  mode: () => ipcRenderer.invoke('dashboard:intake-mode'),
+  current: () => ipcRenderer.invoke('dashboard:intake-current'),
+  command: (command: IntakeManagementCommand) => ipcRenderer.invoke('dashboard:intake-command', command),
+  onInvalidated: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on('dashboard:intake-invalidated', handler);
+    return () => { ipcRenderer.removeListener('dashboard:intake-invalidated', handler); };
+  },
+} satisfies IntakeManagementApi);
+
+contextBridge.exposeInMainWorld('dashboardPermissions', {
+  current: () => ipcRenderer.invoke('dashboard:permissions-current'),
+  command: (command: IntakePermissionCommand) => ipcRenderer.invoke('dashboard:permissions-command', command),
+  onInvalidated: (listener: () => void) => {
+    const handler = () => listener(); ipcRenderer.on('dashboard:permissions-invalidated', handler);
+    return () => { ipcRenderer.removeListener('dashboard:permissions-invalidated', handler); };
+  },
+} satisfies IntakePermissionApi);
+
+contextBridge.exposeInMainWorld('dashboardIntakeCatalog', {
+  current: () => ipcRenderer.invoke('dashboard:intake-catalog-current'),
+  command: (command: IntakeCatalogCommand) => ipcRenderer.invoke('dashboard:intake-catalog-command', command),
+  onInvalidated: (listener: () => void) => {
+    const handler = () => listener(); ipcRenderer.on('dashboard:intake-catalog-invalidated', handler);
+    return () => { ipcRenderer.removeListener('dashboard:intake-catalog-invalidated', handler); };
+  },
+} satisfies IntakeCatalogApi);

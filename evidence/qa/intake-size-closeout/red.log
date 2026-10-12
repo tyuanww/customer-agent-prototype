@@ -1,0 +1,153 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-size-closeout/customer-agent-prototype/apps/desktop
+
+ ❯ tests/unit/workspace-hygiene.test.ts (41 tests | 12 failed | 29 skipped) 119ms
+   ↓ workspace hygiene > fails closed for unknown CLI flags instead of overriding an apply command
+   ↓ workspace hygiene > reports generated packages and dependencies separately from the small workspace remainder
+   ↓ workspace hygiene > keeps the source budget independent from generated packages and dependencies
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: packages/contracts/dist/index.js 14ms
+     → expected 198688 to be 71712 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: packages/content-intake/dist/workbook.js 10ms
+     → expected 198784 to be 71808 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: packages/retrieval-core/dist/index.js 10ms
+     → expected 198784 to be 71808 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: packages/contracts/node_modules/tool/runtime.js 9ms
+     → expected 198784 to be 71808 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: packages/content-intake/node_modules/tool/runtime.js 11ms
+     → expected 198880 to be 71904 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: packages/retrieval-core/node_modules/tool/runtime.js 9ms
+     → expected 198880 to be 71904 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: apps/desktop/build/icon.png 9ms
+     → expected 194464 to be 67488 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: apps/desktop/build/icon.ico 10ms
+     → expected 194464 to be 67488 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: apps/desktop/build/icon.icns 10ms
+     → expected 194464 to be 67488 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: build/icon.png 9ms
+     → expected 194464 to be 67488 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: build/icon.ico 10ms
+     → expected 194464 to be 67488 // Object.is equality
+   × workspace hygiene > keeps growing rebuildable output out of the source budget: build/icon.icns 8ms
+     → expected 194464 to be 67488 // Object.is equality
+   ↓ workspace hygiene > continues to count protected inputs and unknown outputs: contracts/upstream/customer-agent/frozen/schema.sql
+   ↓ workspace hygiene > continues to count protected inputs and unknown outputs: packages/database/migrations/0001_frozen.sql
+   ↓ workspace hygiene > continues to count protected inputs and unknown outputs: packages/contracts/src/generated/openapi.generated.ts
+   ↓ workspace hygiene > continues to count protected inputs and unknown outputs: evidence/qa/frozen.log
+   ↓ workspace hygiene > continues to count protected inputs and unknown outputs: apps/desktop/build/entitlements.mac.plist
+   ↓ workspace hygiene > continues to count protected inputs and unknown outputs: apps/desktop/build/unrecognized.bin
+   ↓ workspace hygiene > pins the root toolchain and declares the staged monorepo targets
+   ↓ workspace hygiene > rejects a runtime outside Node 24 even when package metadata is correct
+   ↓ workspace hygiene > requires the private workspace package manifests with no toolchain overrides
+   ↓ workspace hygiene > pins product version ownership to the desktop release manifest
+   ↓ workspace hygiene > rejects workspace patterns that can cancel or broaden the pinned package set
+   ↓ workspace hygiene > rejects duplicate workspace package declarations
+   ↓ workspace hygiene > rejects a required workspace target hidden behind a symlinked ancestor
+   ↓ workspace hygiene > rejects an additional workspace member that escapes through a symlink
+   ↓ workspace hygiene > rejects a workspace member whose package manifest is a symlink
+   ↓ workspace hygiene > rejects dangling workspace roots and member manifests as unsafe symlinks
+   ↓ workspace hygiene > fails closed when a root tool version or required workspace target drifts
+   ↓ workspace hygiene > fails when checked-in workspace remainder exceeds the explicit budget
+   ↓ workspace hygiene > rejects invalid or negative source budgets instead of silently passing
+   ↓ workspace hygiene > keeps cleanup as a dry run unless apply is explicit
+   ↓ workspace hygiene > removes only allowlisted generated outputs and preserves dependencies and protected content
+   ↓ workspace hygiene > removes dependencies only in the explicit deep scope
+   ↓ workspace hygiene > fails closed for unknown roots, non-allowlisted paths, and symlink targets
+   ↓ workspace hygiene > rejects symlinked cleanup ancestors before deleting protected content
+   ↓ workspace hygiene > rejects a workspace whose root package manifest is a symlink
+   ↓ workspace hygiene > validates the full plan before removing an earlier target
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: packages/contracts/dist/index.js
+AssertionError: expected 198688 to be 71712 // Object.is equality
+
+- Expected
++ Received
+
+- 71712
++ 198688
+
+ ❯ tests/unit/workspace-hygiene.test.ts:175:34
+    173| 
+    174|     expect(after.totalBytes).toBeGreaterThan(before.totalBytes);
+    175|     expect(after.remainderBytes).toBe(before.remainderBytes);
+       |                                  ^
+    176|     expect(after.pass).toBe(true);
+    177|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: packages/content-intake/dist/workbook.js
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: packages/retrieval-core/dist/index.js
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: packages/contracts/node_modules/tool/runtime.js
+AssertionError: expected 198784 to be 71808 // Object.is equality
+
+- Expected
++ Received
+
+- 71808
++ 198784
+
+ ❯ tests/unit/workspace-hygiene.test.ts:175:34
+    173| 
+    174|     expect(after.totalBytes).toBeGreaterThan(before.totalBytes);
+    175|     expect(after.remainderBytes).toBe(before.remainderBytes);
+       |                                  ^
+    176|     expect(after.pass).toBe(true);
+    177|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: packages/content-intake/node_modules/tool/runtime.js
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: packages/retrieval-core/node_modules/tool/runtime.js
+AssertionError: expected 198880 to be 71904 // Object.is equality
+
+- Expected
++ Received
+
+- 71904
++ 198880
+
+ ❯ tests/unit/workspace-hygiene.test.ts:175:34
+    173| 
+    174|     expect(after.totalBytes).toBeGreaterThan(before.totalBytes);
+    175|     expect(after.remainderBytes).toBe(before.remainderBytes);
+       |                                  ^
+    176|     expect(after.pass).toBe(true);
+    177|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: apps/desktop/build/icon.png
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: apps/desktop/build/icon.ico
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: apps/desktop/build/icon.icns
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: build/icon.png
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: build/icon.ico
+ FAIL  tests/unit/workspace-hygiene.test.ts > workspace hygiene > keeps growing rebuildable output out of the source budget: build/icon.icns
+AssertionError: expected 194464 to be 67488 // Object.is equality
+
+- Expected
++ Received
+
+- 67488
++ 194464
+
+ ❯ tests/unit/workspace-hygiene.test.ts:175:34
+    173| 
+    174|     expect(after.totalBytes).toBeGreaterThan(before.totalBytes);
+    175|     expect(after.remainderBytes).toBe(before.remainderBytes);
+       |                                  ^
+    176|     expect(after.pass).toBe(true);
+    177|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  12 failed | 29 skipped (41)
+   Start at  02:21:59
+   Duration  587ms (transform 34ms, setup 111ms, collect 28ms, tests 119ms, environment 212ms, prepare 34ms)
+
+undefined
+/Users/hutou/.codex/worktrees/intake-size-closeout/customer-agent-prototype/apps/desktop:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/unit/workspace-hygiene.test.ts -t 'growing rebuildable'

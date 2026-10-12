@@ -1,0 +1,150 @@
+{
+  "base_commit": "46fb2bb71d4dcd3ff96779ccfb235bbccdf7c372",
+  "version": "0.3.26",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "os": "macOS",
+    "data": "synthetic only; disposable PostgreSQL15"
+  },
+  "checks": [
+    {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "exit_code": 0,
+      "started_at": 1791436986.3208508,
+      "seconds": 4.93,
+      "log": ".gstack/intake-publication-confirmation/lint.log",
+      "log_sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "archived_log_key": "lint.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "started_at": 1791436991.2555299,
+      "seconds": 11.0,
+      "log": ".gstack/intake-publication-confirmation/typecheck.log",
+      "log_sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+      "archived_log_key": "typecheck.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "test"
+      ],
+      "exit_code": 0,
+      "started_at": 1791437002.254698,
+      "seconds": 108.15,
+      "log": ".gstack/intake-publication-confirmation/test.log",
+      "log_sha256": "2b0b05a85ca12daee2447492f6588275ae6c8676857799e3a0a6d1bcaad2e47a",
+      "archived_log_key": "test.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "exit_code": 0,
+      "started_at": 1791437110.403338,
+      "seconds": 9.51,
+      "log": ".gstack/intake-publication-confirmation/build.log",
+      "log_sha256": "98ceb3f2b5d906e2d6716811a304ca32dcd96b739c65913449487227efba50f1",
+      "archived_log_key": "build.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-management.spec.ts"
+      ],
+      "exit_code": 0,
+      "started_at": 1791437119.9117062,
+      "seconds": 10.23,
+      "log": ".gstack/intake-publication-confirmation/electron.log",
+      "log_sha256": "0e636ada1b0a3404111257f45a70ffb8b4015d046f02dd8bf1ec1680391e4027",
+      "archived_log_key": "electron.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "vitest",
+        "run",
+        "tests/unit/content-intake-management.test.ts",
+        "tests/unit/content-intake-native-files.test.ts",
+        "tests/unit/content-intake-management-ipc.test.ts",
+        "tests/component/intake-management.test.tsx"
+      ],
+      "exit_code": 0,
+      "result": "4 files / 55 tests passed",
+      "log": ".gstack/intake-publication-confirmation/targeted.log",
+      "log_sha256": "f448d398a82fec3e1f552b29e6af601553fa1403cc60aed8a1b79862038c318a",
+      "archived_log_key": "targeted.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-real-stack.spec.ts"
+      ],
+      "environment": {
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E": "1"
+      },
+      "exit_code": 0,
+      "result": "1 actual Electron/HTTP/PG15 synthetic workflow passed",
+      "log": ".gstack/intake-publication-confirmation/real-stack.log",
+      "log_sha256": "1eb34f0b46bf81c6ca09797e47543b081463b6751a13a8ebc55d56410ddb5c28",
+      "archived_log_key": "real-stack.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "exit_code": 0,
+      "log": ".gstack/intake-publication-confirmation/final-lint.log",
+      "log_sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "archived_log_key": "final-lint.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "log": ".gstack/intake-publication-confirmation/final-typecheck.log",
+      "log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "archived_log_key": "final-typecheck.log"
+    }
+  ],
+  "review": {
+    "core": "no unresolved actionable findings",
+    "native": "scoped confirmation review completed; no actionable findings",
+    "outside": "not repeated; prior bounded attempt timed out",
+    "overall": "INCOMPLETE outside coverage; no all-reviewers-pass claim"
+  },
+  "reuse": "Full workspace checks passed for the unchanged production code. Added real-stack E2E dialog response then reran that workflow; subsequent TypeScript-only overload assertion has no runtime effect. Final lint/desktop typecheck passed. Documentation and workspace checks passed.",
+  "not_verified": [
+    "Real OS button interaction and Windows dialog behavior",
+    "New direct-publication contract runtime / removal of server approval gates",
+    "Real Feishu data or production ACL/factory",
+    "Remote CI, deployment"
+  ]
+}

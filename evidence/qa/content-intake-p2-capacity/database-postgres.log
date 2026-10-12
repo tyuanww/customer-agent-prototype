@@ -1,0 +1,43 @@
+$ vitest run tests/postgres.integration.test.ts
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/packages/database
+
+ ✓ tests/postgres.integration.test.ts (33 tests) 43648ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the unchanged 27-row prefix and keeps family policy private  989ms
+   ✓ PostgreSQL 15 immutable migration gate > checks explicit roots and all three applicability dimensions on the complete catalog  1187ms
+   ✓ PostgreSQL 15 immutable migration gate > validates 5000 entries with grouped expansion under a bounded PG budget  1783ms
+   ✓ PostgreSQL 15 immutable migration gate > keeps fifty usage-page guard checks on 5000 unassociated rows within five seconds  1787ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint products under five seconds  1769ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint scenarios under five seconds  1993ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint half-open-time under five seconds  2596ms
+   ✓ PostgreSQL 15 immutable migration gate > matches a fixed-seed pairwise applicability oracle across wildcard and interval-chain catalogs  3226ms
+   ✓ PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op  1514ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'usage' ledger with the rollback and family overlays  1082ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'quality' ledger with the rollback and family overlays  989ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.12 ledger prefix through the immutable v1.13/v1.14 suffix  1138ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.16 with the deferred guard and ops-loop migrations and rejects privilege drift  1401ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the shipped nineteen-migration prefix and keeps P2 storage sealed  1468ms
+   ✓ PostgreSQL 15 immutable migration gate > appends discovery and rollback to the exact 25-row ledger and detects index drift  1345ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints  1483ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed  1199ms
+   ✓ PostgreSQL 15 immutable migration gate > appends sealed quality storage without rewriting the 22-row ledger or opening application access  1324ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=false  1014ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=true  1004ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.17 with only the ops-loop migration  1027ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact v1.15 ledger with only the backend migration  1052ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.14 with only the atomic owner suffix and denies registrar/runtime privilege drift  1287ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.13 ledger prefix with only the immutable v1.14 suffix  974ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls back an interrupted synthetic backfill and safely retries the same migration id  760ms
+   ✓ PostgreSQL 15 immutable migration gate > keeps DDL and its immutable ledger row atomic when the ledger insert fails  851ms
+   ✓ PostgreSQL 15 immutable migration gate > reconciles an unknown COMMIT acknowledgement from the immutable ledger on a new session  1156ms
+   ✓ PostgreSQL 15 immutable migration gate > serializes two independent fresh clients and applies the catalogue exactly once  1055ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects concurrent control-plane operations on the same client session  1125ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects ACL, function-security, trigger-mode, and policy-key drift by exact manifest  1628ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a table  901ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a enum  790ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a schema  752ms
+
+ Test Files  1 passed (1)
+      Tests  33 passed (33)
+   Start at  10:46:15
+   Duration  44.05s (transform 168ms, setup 0ms, collect 216ms, tests 43.65s, environment 0ms, prepare 53ms)

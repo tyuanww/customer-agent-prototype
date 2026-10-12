@@ -1,0 +1,44 @@
+
+Running 1 test using 1 worker
+
+(node:69596) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"status":"OWNED_RESOURCES","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-9SogDU","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-NtwHHr"}
+{"status":"FAILED","rendererErrors":[],"screenshots":"/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/e2e"}
+{"status":"OWNED_RESOURCES_REMOVED","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-9SogDU","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-NtwHHr"}
+  ✘  1 tests/e2e/content-intake-real-stack.spec.ts:11:1 › native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG (17.7s)
+
+
+  1) tests/e2e/content-intake-real-stack.spec.ts:11:1 › native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Array [
+        1180,
+    -   760,
+    +   680,
+      ]
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      153 |     async function resizeDashboard(width: number, height: number) {
+      154 |       await nativeDashboard.evaluate((win, size) => win.setSize(size.width, size.height), { width, height });
+    > 155 |       await expect.poll(() => nativeDashboard.evaluate(win => win.getSize())).toEqual([width, height]);
+          |                                                                               ^
+      156 |       // Windows native borders occupy part of the outer size. Compare the
+      157 |       // renderer to Electron's content width while retaining the outer-size gate.
+      158 |       const contentWidth = await nativeDashboard.evaluate(win => win.getContentSize()[0]);
+        at resizeDashboard (/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-real-stack.spec.ts:155:79)
+        at /Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-real-stack.spec.ts:163:5
+
+    Error Context: test-results/content-intake-real-stack--73ec2-ry-seat-through-real-API-PG/error-context.md
+
+  1 failed
+    tests/e2e/content-intake-real-stack.spec.ts:11:1 › native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG 
+undefined
+/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/apps/desktop:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test tests/e2e/content-intake-real-stack.spec.ts

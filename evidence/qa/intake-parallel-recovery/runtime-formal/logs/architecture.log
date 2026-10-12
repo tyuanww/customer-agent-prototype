@@ -1,0 +1,2 @@
+$ node scripts/architecture-boundary-check.mjs
+Architecture boundary PASS: 387 files, 0 violations.

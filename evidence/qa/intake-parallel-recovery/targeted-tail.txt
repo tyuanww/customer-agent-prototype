@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-runtime-assembly.test.ts (7 tests) 7ms
+ ✓ tests/intake-scope-runtime.integration.test.ts (4 tests) 2036ms
+ ✓ tests/intake-runtime-assembly.integration.test.ts (8 tests) 2259ms
+ ✓ experiments/intake-organization/transport.test.ts (24 tests) 2781ms
+   ✓ loopback organization transport > refuses the 51st user call in one second and the 1001st call in one minute  2177ms
+ ✓ experiments/intake-organization/transport-consumer.integration.test.ts (4 tests) 6697ms
+   ✓ HTTP organization transport through the restricted writer and real usage > refreshes from the local HTTP double and does not extend the existing usage deadline  2098ms
+   ✓ HTTP organization transport through the restricted writer and real usage > invalidates old usage after a job change, a department change, and deactivation  1794ms
+   ✓ HTTP organization transport through the restricted writer and real usage > recovers an unknown commit only from the original snapshot, not from a later observation  1449ms
+   ✓ HTTP organization transport through the restricted writer and real usage > keeps the previous facts and expiry when a later HTTP page fails  1355ms
+
+ Test Files  5 passed (5)
+      Tests  47 passed (47)
+   Start at  16:47:10
+   Duration  8.19s (transform 1.16s, setup 0ms, collect 4.89s, tests 13.78s, environment 0ms, prepare 506ms)

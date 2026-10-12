@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-release-acceptance/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-runtime-consumer-pool.test.ts (3 tests) 3ms
+ ✓ tests/intake-runtime-candidate.integration.test.ts (1 test) 1381ms
+   ✓ candidate install pins actual overlay ledger and LOGIN capability guards block cross-purpose and forged cancellation outcomes  1380ms
+
+ Test Files  2 passed (2)
+      Tests  4 passed (4)
+   Start at  18:27:09
+   Duration  2.07s (transform 297ms, setup 0ms, collect 727ms, tests 1.38s, environment 0ms, prepare 94ms)

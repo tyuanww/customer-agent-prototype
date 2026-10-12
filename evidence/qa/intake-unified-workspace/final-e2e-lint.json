@@ -1,0 +1,13 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "eslint",
+    "tests/e2e/content-intake-workspace-real-stack.spec.ts"
+  ],
+  "startedAt": "2026-10-08T11:54:15.957900+00:00",
+  "endedAt": "2026-10-08T11:54:16.878383+00:00",
+  "exitCode": 0
+}

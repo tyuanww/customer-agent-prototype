@@ -1,0 +1,17 @@
+{
+  "apps/api/src/content-intake/shop-directory.ts": "813317a93953cf0ad913c042e87ac51487addc245b936b126019416b0ee0b0e3",
+  "apps/api/src/content-intake/service.ts": "5da8018affbf47cb25d2d40863c04dbd03345e19a2e9f3a751e389f6e9193c2f",
+  "apps/api/src/content-intake/usage-http.ts": "89f7422ca2b5cbfbd2b8af95e6bd3f1ec9f2598e162c626a5e293b96507c1765",
+  "apps/api/src/content-intake/http-boundary.ts": "c50907eaeb222b28481a55297f063ddf2514d6bf53fdba1792bc228b5ae2d50c",
+  "apps/api/tests/intake-shop-directory.integration.test.ts": "1c1c98cd85899d8195a12db59741d174edc847d0aeb1cf5b38f9f05040f73050",
+  "apps/api/tests/support/intake-synthetic-directory.ts": "039b0192657671f6cd5ffbdf6bd6ef056974f4c12268017af450b3c11fd64f69",
+  "apps/api/tests/content-intake-usage-http.test.ts": "106461bf2f65cb2321fafd03a97b605c677b7265526d028115367aae0e2cbc74",
+  "apps/desktop/src/main/content-intake-access.ts": "73b3f067aed0ed1addd60b7bcfcf3a7393ea3f6b46e1600f60fec5ba49b415a0",
+  "apps/desktop/src/main/content-intake-query.ts": "c78fb06b98f38747f3437711daa8ac7812da23e525307f6731f3f340f9ddeb56",
+  "apps/desktop/src/shared/content-intake-query.ts": "77ab3ecc785f3c3f8e3d3bf35154225f224c5f4bd0ad942d944fb2d36c6b6a0e",
+  "apps/desktop/src/renderer/features/search/use-intake-shops.ts": "9956689e9412e2eb1af97551884a05b5f779d8fafbc7bcbadf4826bbff68d4b8",
+  "apps/desktop/src/renderer/features/search/IntakeQueryFilters.tsx": "5d15cad1176a977e81ed3d8755d623d1515b3a038b703bf455ce4265ea6f2357",
+  "apps/desktop/tests/unit/content-intake-access.test.ts": "d29416ac621bd1a1b100e927f24cc675876bea8b39dee3dc5d683e9c15531f73",
+  "apps/desktop/tests/component/intake-shop-directory.test.tsx": "323661eccf112d1df0d38114ee408e12f3754ba196ee541564c894aa7d8365b3",
+  "apps/desktop/tests/e2e/content-intake-shop-directory-real-stack.spec.ts": "266c94465dfb425cffb588c44e187b2be023e2da893f8fe25394d59d9419039a"
+}

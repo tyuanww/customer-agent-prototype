@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ✓ tests/postgres.integration.test.ts (38 tests | 35 skipped) 2711ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the atomic runtime installation to the exact thirty-two-row ledger  999ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for role-conflict  852ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for missing-implementation  860ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 35 skipped (38)
+   Start at  18:58:54
+   Duration  3.20s (transform 205ms, setup 0ms, collect 248ms, tests 2.71s, environment 0ms, prepare 56ms)
+

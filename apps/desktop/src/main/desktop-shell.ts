@@ -76,8 +76,8 @@ function toMenuTemplate(
   });
 }
 
-function installApplicationMenu(actions: DesktopActions): void {
-  const template = createApplicationMenuModel(process.platform).map(
+function installApplicationMenu(actions: DesktopActions, dashboardEnabled: boolean): void {
+  const template = createApplicationMenuModel(process.platform, dashboardEnabled).map(
     (section): MenuItemConstructorOptions => {
       if (section.type === 'role') {
         return { role: section.role };
@@ -118,7 +118,7 @@ function bindOverlayContextMenus(
   for (const win of controller.getWindows()) {
     const handler = (_event: Electron.Event, params: ContextMenuParams): void => {
       const menu = Menu.buildFromTemplate(
-        toMenuTemplate(createOverlayContextMenuModel(contextEditCapabilities(params)), actions),
+        toMenuTemplate(createOverlayContextMenuModel(contextEditCapabilities(params), controller.dashboardEnabled), actions),
       );
       const releaseBlurGuard = controller.beginNativeContextMenu(win);
       try {
@@ -148,7 +148,7 @@ function bindOverlayContextMenus(
   };
 }
 
-function createTray(actions: DesktopActions): Tray | null {
+function createTray(actions: DesktopActions, dashboardEnabled: boolean): Tray | null {
   const iconCandidates = trayIconCandidates({
     isPackaged: app.isPackaged,
     appPath: app.getAppPath(),
@@ -176,7 +176,7 @@ function createTray(actions: DesktopActions): Tray | null {
       trayIcon.setTemplateImage(true);
     }
     const tray = new Tray(trayIcon);
-    const menu = Menu.buildFromTemplate(toMenuTemplate(createTrayMenuModel(), actions));
+    const menu = Menu.buildFromTemplate(toMenuTemplate(createTrayMenuModel(dashboardEnabled), actions));
     tray.setToolTip('客服 Agent Demo');
 
     if (process.platform === 'linux') {
@@ -201,9 +201,9 @@ function createTray(actions: DesktopActions): Tray | null {
 
 export function installDesktopShell(options: DesktopShellOptions): DesktopShell {
   const actions = createActions(options);
-  installApplicationMenu(actions);
+  installApplicationMenu(actions, options.controller.dashboardEnabled);
   const unbindContextMenus = bindOverlayContextMenus(options.controller, actions);
-  const tray = createTray(actions);
+  const tray = createTray(actions, options.controller.dashboardEnabled);
   let destroyed = false;
 
   return {

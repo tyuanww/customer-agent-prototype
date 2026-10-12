@@ -1,0 +1,120 @@
+{
+  "total_files": 18,
+  "reviewed_files": 18,
+  "skipped_files": 0,
+  "coverage_rate": 1.0,
+  "files": [
+    {
+      "path": "apps/api/src/content-intake/material.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/src/content-intake/publication.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/checks.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/evidence.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/exploration-002.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/inputs.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/ocr-coverage.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/review.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/README.md",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/charter.md",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff or machine-output validation; default exclusions included."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage/wsl.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "Host full source/diff and validation against completed WSL logs, cleanup output and source hashes."
+    }
+  ],
+  "baseCommit": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+  "reviewedHead": "2dfae0362864dc0c88b69354a7ef985178db2398",
+  "ocrReviewableFiles": 11,
+  "defaultExcludedFilesReviewed": 7
+}

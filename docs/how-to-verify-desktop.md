@@ -266,14 +266,14 @@ pnpm workspace:check
 pnpm clean:preview
 ```
 
-`workspace:size` 按磁盘分配量拆分 `release/`、根与桌面包 `node_modules/`、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
+`workspace:size` 按磁盘分配量拆分 `release/`、各 workspace 包的 `node_modules/` 与已知构建输出、精确派生图标、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
 
-`workspace:check` 只检查源码、测试、文档和已纳入项目的资产等 workspace remainder，默认上限为 32 MiB；`node_modules`、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单独统计，不会把可重建或本地工具内容误报为代码膨胀。若有一次性大资产确实需要纳入，可临时使用 `--remainder-budget-mib=N`，并在评审记录原因，不要永久抬高默认门槛。
+`workspace:check` 按已批准的三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **18.5 MiB**，`contracts/upstream/` 冻结合同为 **16 MiB**，`evidence/` 冻结证据为 **10.5 MiB**，默认合计上限 **45 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。统计采用 allocated bytes（磁盘分配块，按 inode 去重），不是安装包大小或文件逻辑字节。`node_modules`、精确已知构建输出/派生图标、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单列；未知输出、canonical 资产、构建配置和已提交 generated source 不会被宽泛排除。分组在2026-10-12为接收获批后继合同先调整为19/16/10，随后根据同一提交的Linux磁盘分配块差异，经用户明确批准调整为18.5/16/10.5（总45不变，见TODOS当前交接）；历史分组依据及2026-10-09批准记录见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。`--remainder-budget-mib=N` 只改变总量上限，不能绕过分组门禁；分组政策变更须根据真实构成另行审阅，不能删除冻结历史或仅靠临时参数使默认门禁显绿。
 
 | 命令 | 行为 | 恢复方式 |
 | --- | --- | --- |
 | `pnpm clean:preview` | 默认 dry-run；列出本地未签名包、`apps/desktop/out/`、派生 `apps/desktop/build/icon.*`、测试报告、gstack QA 报告与 Vite 缓存 | 无改动 |
-| `pnpm workspace:check` | 检查不可再生源码区是否超过 32 MiB 预算 | 删除或迁移新增大文件后重跑 |
+| `pnpm workspace:check` | 检查三个保留输入分组的 18.5/16/10.5 MiB 上限及总量 45 MiB 上限 | 按输出定位增长归属；纠正误计或评审必要增量后重跑，不自动删除冻结输入 |
 | `pnpm clean:generated` | 只删除上面的精确 allowlist | `pnpm build`、相应 `package:*` / 测试命令重新生成 |
 | `pnpm clean:deep:preview` | 预览 generated + `node_modules` | 无改动 |
 | `pnpm clean:deep` | 在 generated 之外删除根、API、database 与桌面包依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm electron:install` |
@@ -441,3 +441,100 @@ node scripts/synthetic-stack/anomaly-check.ts
 | 回退后桌面 `ProductSearch.copy` 对旧候选返回 `STALE`（`announce.allows()`） | 裸 `POST /v1/events/adoption` 拒绝旧 release；Mac 人工复制手感 |
 
 人工注入命令：`stack.ts anomaly status|session-revoke|source-suspend <id>`。`source-suspend` 的 id 是 argv[4]。暂停后不得靠 `start` 重新播种恢复。
+
+## FAQ P2 Query 接线
+
+入口及实际能力限制见[资料导入开发说明](how-to-develop-content-intake.md#p2-桌面-query-合成入口)。定向验证：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-query.test.ts tests/unit/content-intake-query-ipc.test.ts tests/unit/content-intake-usage.test.ts tests/unit/product-runtime-config.test.ts tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx
+pnpm --filter @customer-agent/desktop build
+pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-query.spec.ts
+```
+
+前者验证 Main 资格、取消、超限与 renderer 告知/迟到结果；后者使用真实 Electron Main/preload、登录窗口和系统剪贴板，HTTP 为自有合成 wire。新 profile 的 Windows GUI、安装包和真实飞书未因此获得证据。
+
+
+## FAQ 原生上传与报告
+
+只使用 FAQ loopback 合成 profile；按以下入口验证上传生命周期与实际消费者：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-upload.test.ts tests/unit/content-intake-native-files.test.ts tests/unit/content-intake-management.test.ts tests/unit/content-intake-management-ipc.test.ts tests/unit/product-http.test.ts tests/component/intake-management.test.tsx tests/component/intake-upload.test.tsx
+node packages/content-intake/scripts/probe-issue-report.mjs
+pnpm test:intake:desktop
+```
+
+上述默认使用 XLSX。CSV 的完整真实合成栈单独指定格式，不能用 XLSX 结果替代：
+
+```sh
+pnpm build
+CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts
+```
+
+CSV 用例保留 BOM、逗号、引号及多行正文原字节，回读 `CSV!H3` 的 Excel 报告，再修订、确认发布并由另一普通客服复制相同正文。当前 Mac 开发构建的两格式结果见[CSV 接入证据](../evidence/qa/intake-csv-runtime/README.md)。
+
+原生文件选择、报告保存与发布二次确认由 Main 拥有。单元测试覆盖有界文件/报告、停止等待、迟到响应、取消不提交、会话失效与原操作恢复；[实际 Electron 上传测试](../apps/desktop/tests/e2e/content-intake-real-stack.spec.ts)从选择工作簿、阻断报告落盘回读、整批更正与修订，贯穿来源确认、人工质量检查、原生取消/确认直发，再换另一普通客服查询并通过系统剪贴板复制。新候选为 `direct-v1`，没有 review HTTP 请求；测试读取实际数据库，验证审批绑定和审批事实均为0，发布由直发政策记录。原生文件选择和确认响应使用受控替身，文件、HTTP、PostgreSQL 15、Main/preload 与系统剪贴板实际执行；不计作真人点击 macOS 原生对话框、Windows GUI 或真实飞书验收。报告预算 probe 只证明其记录的合成规模，不能将实测最大样例冒充所有可能 XLSX 的数学上界。跨边界改动仍须运行根 lint/typecheck/test/build。
+
+另一个 [Electron 管理 wire 测试](../apps/desktop/tests/e2e/content-intake-management.spec.ts)使用自有合成 HTTP 替身，验证未知质量回执恢复、原生确认取消/提交与 sandbox 边界；它不替代上述真实 HTTP/PG 发布产物被另一客服消费的证据。
+
+
+## FAQ Mac 安装副本合成验收
+
+先按[打包约束](reference-packaging-and-signing.md)运行 `pnpm package:mac:local`，从实际 DMG/ZIP 解包到专用目录，核对副本与构建 app.asar 摘要，不覆盖已安装应用。既有完整场景可显式选择该副本：
+
+```sh
+CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 \
+CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 \
+CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE='/绝对路径/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo' \
+pnpm --filter @customer-agent/desktop exec playwright test \
+  tests/e2e/content-intake-real-stack.spec.ts \
+  tests/e2e/content-intake-permissions-real-stack.spec.ts \
+  tests/e2e/content-intake-workspace-real-stack.spec.ts \
+  tests/e2e/content-intake-rollback-real-stack.spec.ts \
+  tests/e2e/content-intake-shop-directory-real-stack.spec.ts
+```
+
+五个测试文件共八个场景（上传、权限、四域、回退、店铺）共用 [安装/开发测试启动入口](../apps/desktop/tests/support/intake-electron.ts)。它为自有 userData 以 `0600` 和禁止覆盖方式写 `synthetic-stack.json`，用打包态文件 profile 接到一次性回环 HTTP/PG15，故意把开发环境地址置为不可用，并校验版本、`isPackaged`、实际 executable 与 userData；每个安装场景保存身份及原生显示器几何。没有指定 executable 时沿用既有开发态场景；显式指定空值、相对路径或无效文件则拒绝，不能悄悄改测开发构建。初始化失败由入口关闭自有 Electron，成功后仍由原测试清理应用、PG 和临时目录。解析器属于 API 子进程，不宣称在桌面包内。文件/确认框仍用受控响应；真人 OS 验收、Windows、签名/公证及真实资料另验。
+
+本轮另有 CUA 操作真实文件选择与取消/确认系统框的窄探针，最终取消零写入、确认一条发布；这是工具操作的实机证据，不是非开发维护者的人工作业验收。产物、命令、首次路径别名断言失败和不明输入记录见[Mac 包证据](../evidence/qa/intake-mac-package/README.md)。CSV 已在本次重新生成的 0.3.26 本地未签名包中完成独立副本实际闭环，见[CSV 安装副本证据](../evidence/qa/intake-csv-runtime/README.md)。运行上面的副本命令时再显式设置 `CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`；不指定时仍为 XLSX。新 CSV 包的文件/确认框使用受控响应，不继承旧包的 CUA 或人工作业结论。 后续 UI 修正版包已按上述统一入口通过权限、四域、店铺和回退7项，CSV紧凑高度场景另1项通过；[证据](../evidence/qa/intake-ui-mac-package-20261009/README.md)保留标准尺寸未通过和设备PARTIAL。`CUSTOMER_AGENT_INTAKE_INPUT_FORMAT=csv`只控制主上传用例，不把其他场景的XLSX准备改成CSV。
+
+
+当前显示环境已能容纳 1180×760：本地提交 `332119e` 重新生成的 0.3.26 DMG 解包副本，以未改动的原版标准尺寸 CSV 测试 1/1 和其余四文件 7/7 完成[Mac 标准尺寸安装态合成补证](../evidence/qa/intake-standard-mac-package-20261009/README.md)。此前 960×600 环境下的失败记录仍保留；新结果只证明自动化合成场景，原生框响应仍由测试控制。
+
+## FAQ 统一工作台
+
+`pnpm test:intake:desktop` 包含原上传/回退/权限配置/店铺目录，以及[四域工作台测试](../apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts)。实际受限 HTTP/PG15 先发布资料，Electron 的话术库按产品/活动/售前/售后归类读取同一产物；系统同步展示相同发布版本，撤权后刷新清空正文。Dashboard 刷新不能破坏 Query 的既有合法复制资格，禁止走旧公告/内容/话术/SOP适配器。原上传和权限测试还验证跨导航保留未提交输入及预览。完整截图保存在 ignored `.gstack/intake-workspace/`；光暗和最小窗口证据不替代办公 Windows 与人工系统窗验收。
+
+目录只表示当前店铺、商品、场景条件下可读内容。无条件维度只读通用内容，不能据此声称全库同步。定向边界测试：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-catalog.test.ts tests/unit/content-intake-catalog-ipc.test.ts tests/component/intake-library.test.tsx tests/component/intake-dashboard-shell.test.tsx
+```
+
+本次证据、命令、跳过项及已知预算失败见[统一工作台记录](../evidence/qa/intake-unified-workspace/README.md)。
+
+
+## FAQ 纠正回退
+
+`pnpm test:intake:desktop` 同时运行原生上传闭环和[纠正回退测试](../apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts)。回退用例先经实际上传、来源确认和人工质量检查直发两版，再从工作台预览上一版全部影响，由 Main 原生二次确认：取消时发布数不变，确认后创建新 release；另一普通客服查询、比对并复制历史原文。测试检查未发起任何 review HTTP 请求、数据库审批绑定和审批事实均为0；光暗截图在 `.gstack/intake-synthetic/rollback-*`，等待主题过渡完成且核对无页面横向溢出。原生对话框仍用受控响应，不声称真人 OS 点击或跨平台 GUI 验收。
+
+定向验证：
+
+```sh
+pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-rollback.test.ts tests/component/intake-rollback.test.tsx tests/unit/content-intake-management.test.ts
+pnpm --filter @customer-agent/api test:intake:transactions
+pnpm test:db:integration
+```
+
+回退只允许当前目录的上一已发布版本，仍须全部实际变化范围的当前资格、来源/内容有效性和基线校验；权限不足走正常纠正候选。新直发无需人工审批，但保留人工质量检查与确认。未知直发只能查询回执或重试原已确认输入，不能换计划；旧协议未知发布/回退只能查原回执，不能重编码为确认直发。混合目录中的旧审批内容仍按其历史政策验证，审批或来源失效不得借直发恢复。上述均为合成证据，不代表真实飞书、Windows GUI、生产装配或正式运行 ACL 已放行。
+
+### SOP 后继合同接收后的合成回归
+
+先运行 `pnpm build` 生成当前合同与数据库运行产物，再在仓库根执行：
+
+```sh
+CUSTOMER_AGENT_API_PG15_INTEGRATION=1 apps/api/node_modules/.bin/vitest run --root apps/api tests/sop-trusted-stage.integration.test.ts tests/sop-row-deletion-candidate.integration.test.ts tests/sop-media-capacity.integration.test.ts tests/sop-media-delivery.integration.test.ts
+```
+
+这四组直接安装产品已接收的40段迁移，并核验物理状态；不再读取仓外候选SQL或依赖候选目录环境变量。全部资料、身份、PG集群和存储均为测试自建。实验reader仍显式注入，测试通过不代表生产HTTP/Main装配已开放。

@@ -1,0 +1,8 @@
+{
+  "path": "packages/content-intake/experiments/csv/synthetic-template.csv",
+  "workingEqualsGitIndex": true,
+  "sha256": "9ef1019dfc84124f1aa1f6b1bbdb63ea9c08089d668aff6e1d2cb76a87f2e2bd",
+  "bytes": 1062,
+  "gitBlob": "1d4d4e460250d6d65e342fad3722c9d8fedd8086",
+  "consumerEvidence": "parser-final.log and test.log consumed these exact bytes; no fixture rewrite after tests"
+}

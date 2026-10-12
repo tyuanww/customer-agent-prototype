@@ -1,0 +1,13 @@
+{
+  "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78",
+  "package.json": "0938118eec06a03f3cfc375d02b88215d8dfb525a9e6eb14774c1feca637fdf1",
+  "apps/desktop/package.json": "0ad47d29854d228b36907a481de044ca0b759000dc5c0aae6c26ec0d79a201e4",
+  "apps/desktop/src/main/content-intake-management-ipc.ts": "72ec6bcac92b043ef0aa4b826f3f49c674ff169cc64319d6f76eb8bbf2fbc650",
+  "apps/desktop/src/main/content-intake-management.ts": "b25a121bf3ba466de1ed3f136b9afe8d398210bddebd06c299da6d70d35603fe",
+  "apps/desktop/src/main/content-intake-native-files.ts": "a9d01aa036a684f152183600899c60c8dcf813e0906773e5ea8421c9587479f4",
+  "apps/desktop/tests/component/intake-management.test.tsx": "c86980721adc88fd093791d9ce309a9d8571cbb61cf3191524a049d1a43b0582",
+  "apps/desktop/tests/e2e/content-intake-management.spec.ts": "4e0ca5d15488a22a238ad444f8ce7c4e924912e44b87b7a5e582228f498e6b1c",
+  "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "d3b2db4b651b2e58191de370246de0664deb12c57772d2c19791d4fe4ce571ca",
+  "apps/desktop/tests/unit/content-intake-management.test.ts": "9c4c4444932e92419c1973e5851418d2b4d2c6e36644b44e70d8660dc1f3a83e",
+  "apps/desktop/tests/unit/content-intake-native-files.test.ts": "7a51d6b2f5e586bae94fbcb77e659b1b6ba72566899d5fa1bf8911a1595e283b"
+}

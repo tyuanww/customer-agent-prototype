@@ -1,0 +1,30 @@
+{
+  "revision": "b5d26ec496862eb477ba639e7b37a4c0bdb3015c",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Capture 001 predates precise server expiry normalization; capture 002 revalidates affected behavior.",
+    "No native Electron/renderer, real data, production HTTP/ACL or Windows evidence."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-usage.test.ts",
+      "contract": "Main 本地资格期限与分页隔离",
+      "expected": "14 cases pass",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-usage.test.ts (14 tests) 223ms\n\n Test Files  1 passed (1)\n      Tests  14 passed (14)\n   Start at  21:52:37\n   Duration  464ms (transform 60ms, setup 55ms, collect 96ms, tests 223ms, environment 0ms, prepare 24ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-usage.test.ts",
+      "contract": "独立资格到期（本地及 API LEASE_EXPIRED）、真正权限/会话失效、原文复制",
+      "expected": "18 cases pass",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-usage.test.ts (18 tests) 284ms\n\n Test Files  1 passed (1)\n      Tests  18 passed (18)\n   Start at  22:05:17\n   Duration  750ms (transform 101ms, setup 148ms, collect 160ms, tests 284ms, environment 0ms, prepare 40ms)\n\n"
+    }
+  ],
+  "learning": [],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

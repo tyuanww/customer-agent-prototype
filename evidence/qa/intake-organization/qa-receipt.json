@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "id": "001",
+  "cwd": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "test:intake:organization"
+  ],
+  "deadline": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-organization/deadline.json",
+  "timing": [
+    {
+      "guard": "qa-deadline",
+      "event": "started",
+      "version": 1,
+      "startedAt": "2026-10-08T03:24:11.375Z",
+      "deadlineAt": "2026-10-08T03:29:11.375Z",
+      "budgetMs": 300000,
+      "observedAt": "2026-10-08T03:24:17.465Z",
+      "remainingMs": 293910,
+      "expired": false
+    },
+    {
+      "guard": "qa-deadline",
+      "event": "finished",
+      "observedAt": "2026-10-08T03:24:28.816Z",
+      "deadlineAt": "2026-10-08T03:29:11.375Z",
+      "timedOut": false,
+      "exitCode": 0
+    }
+  ],
+  "startedAt": "2026-10-08T03:24:17.461Z",
+  "completedAt": "2026-10-08T03:24:28.820Z",
+  "exitCode": 0,
+  "signal": null,
+  "status": "complete",
+  "observation": {
+    "sha256": "766b6e9459c867caf67a84288169e2900f29e4ecf0565b8980481925ed30ad22",
+    "bytes": 1746
+  },
+  "publicOutput": true,
+  "stdout": {
+    "sha256": "ecd74d34f4547cefd15dc096397e037ff347de58de41a46bceb12a1b849a5962",
+    "bytes": 1725
+  },
+  "stderr": {
+    "sha256": "9a174d64f1dc5a6ec8a3b04ee04ea715e76ee3cdaba7f4c064f5b97a84b38c85",
+    "bytes": 351
+  }
+}

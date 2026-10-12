@@ -1,0 +1,14 @@
+{
+  "observationCapture": "003",
+  "observationArgv": [
+    "node",
+    ".gstack/p1-review/edge-repro.mjs"
+  ],
+  "observed": "{\"case\":\"impossible-date\",\"ok\":true,\"issues\":[]}\n{\"case\":\"example-question-id\",\"ok\":true,\"issues\":[]}\n{\"case\":\"duplicate-cell\",\"ok\":true,\"issues\":[]}\n",
+  "hypothesis": "Permanent regressions now cover impossible dates, duplicate cells, invalid IDs, background/unsupported drawings, column budgets and process output; authority tests cover exact takeover, reviewer expiry and source-confirmation binding. All must pass together after repair.",
+  "nextCapture": "004",
+  "nextArgv": [
+    "pnpm",
+    "test:content-intake:p1"
+  ]
+}

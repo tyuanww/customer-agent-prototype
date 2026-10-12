@@ -1,0 +1,28 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "publishes native"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (64 tests | 63 skipped) 1148ms\n   ✓ P2 sealed synthetic authority and durable candidates > publishes native material atomically without invented legacy fields, and recovers its permanent receipt  1148ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 63 skipped (64)\n   Start at  16:14:02\n   Duration  1.58s (transform 160ms, setup 0ms, collect 303ms, tests 1.15s, environment 0ms, prepare 40ms)\n\n",
+  "hypothesis": "The durable publication and receipt replay succeeded, so now check whether late failures roll back every effect and whether cancellation, revocation and a lost COMMIT response preserve one publication.",
+  "nextCapture": "002",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "late announcement|lost publication|publication is observing|cancellation waits"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "observationCapture": "005",
+  "observationArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "workflow HTTP approval package cleanup"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (117 tests | 114 skipped) 3253ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP approval package cleanup keeps only the concurrently adopted package  1206ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP approval package cleanup reclaims after verification before registration  1024ms\n   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP approval package cleanup reclaims after logout before registration  1023ms\n\n Test Files  1 passed (1)\n      Tests  3 passed | 114 skipped (117)\n   Start at  05:44:28\n   Duration  3.79s (transform 199ms, setup 0ms, collect 394ms, tests 3.25s, environment 0ms, prepare 38ms)\n\n",
+  "hypothesis": "The bounded 006 replay was interrupted by the single smoke deadline; this required post-repair replay uses the same full HTTP command with a finite timeout and preserves that incomplete attempt.",
+  "nextCapture": "007",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "workflow HTTP"
+  ]
+}

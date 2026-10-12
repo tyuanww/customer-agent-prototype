@@ -1,0 +1,11 @@
+$ eslint .
+
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api/tests/intake-runtime-consumers.integration.test.ts
+  14:10  error  'IntakeRejection' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop/src/shared/content-intake-query.ts
+  62:136  error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+
+✖ 2 problems (2 errors, 0 warnings)
+
+[ELIFECYCLE] Command failed with exit code 1.

@@ -1,0 +1,103 @@
+{
+  "scope": {
+    "base": "e18ff820988fe7bf8bb9222def70809a300f0260",
+    "branch": "codex/intake-organization",
+    "description": "Offline session-lock SQL candidate, 8 synthetic PG15 tests and native-input/permission handoff; no production source/migration/contract changes."
+  },
+  "findings": [],
+  "core": {
+    "status": "no_actionable_findings",
+    "coverage": "Full SQL and integration test, relevant identity migration and transaction consumer, final documentation; critical SQL/locking/trust and informational consistency passes."
+  },
+  "native_adversarial": {
+    "status": "completed",
+    "reviewer": "in-host subagent runtime_boundary_review",
+    "findings": [],
+    "coverage": "SQL, adjacent identity/transaction source, docs and evidence README/inputs; test summary only; no independent test rerun, SDK lookup or hash recalculation."
+  },
+  "outside": {
+    "status": "not_retried",
+    "reason": "Preserve previous two 180-second timeouts; do not rerun merely to erase INCOMPLETE. No new external review conclusion.",
+    "previous": "../intake-organization/review.json"
+  },
+  "review_verdict": "INCOMPLETE: core/native have no actionable findings; full outside coverage remains missing. Not an all-reviewers pass.",
+  "verification": [
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/intake-runtime-boundary.integration.test.ts",
+      "status": "pass",
+      "result": "8/8 actual PG15 integration tests",
+      "output": "postgres-final.log"
+    },
+    {
+      "command": "pnpm lint",
+      "status": "pass",
+      "output": "lint.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "pass",
+      "output": "typecheck.log"
+    },
+    {
+      "command": "pnpm test",
+      "status": "pass",
+      "output": "workspace-tests.log"
+    },
+    {
+      "command": "pnpm build",
+      "status": "pass",
+      "output": "build.log"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "status": "pass",
+      "output": "workspace-check.log"
+    },
+    {
+      "command": "pnpm docs:check",
+      "status": "pass",
+      "output": "docs-check-final.log",
+      "limits": "Initial missing review.json link resolved; failure log retained."
+    },
+    {
+      "command": "pnpm workspace:check (after staging)",
+      "status": "pass",
+      "output": "workspace-check-staged.log"
+    },
+    {
+      "command": "git diff --cached --check -- . :(exclude)evidence/qa/intake-runtime-boundary/*.log",
+      "status": "pass",
+      "limits": "Unmodified raw Vitest output ends with a blank line in three PG logs; the full whitespace check reports exactly those three EOF warnings. Raw bytes are preserved and fingerprinted."
+    },
+    {
+      "command": "Verify input SHA-256, production/contract/migration diff, version and API dist exclusion",
+      "status": "pass",
+      "result": "Input hashes match; production sources and frozen contracts/migrations unchanged; version 0.3.26; no experiment in dist."
+    }
+  ],
+  "earlier_probes": [
+    {
+      "result": "4/4 boundary reproduction",
+      "output": "postgres.log"
+    },
+    {
+      "result": "7/7 initial candidate checks; superseded by final 8-case input",
+      "output": "postgres-candidate.log"
+    },
+    {
+      "command": "pnpm docs:check",
+      "status": "failed",
+      "reason": "README linked review.json before this evidence record existed.",
+      "output": "docs-check.log"
+    }
+  ],
+  "build_boundary": "API src, contract/migration bytes and desktop version unchanged. API tsconfig excludes experiments. Built dist contains no intake-runtime/session-lock artifact.",
+  "not_verified": [
+    "Real Feishu organization/approval field semantics, identity provenance and network transport",
+    "Formal identity-function contract and versioned intake",
+    "Production runtime factory and full least-privilege usage/management/worker lanes; existing lockProductSession is not switched to the candidate",
+    "Tenant data isolation and actual environment/real data",
+    "GUI/Windows/remote CI: unchanged desktop and no push/PR"
+  ],
+  "test_limits": "Ordinary pnpm test retains environment-gated skips; these 8 PG cases were explicitly enabled separately. Prior organization and FAQ full-flow evidence remains bound to its prior unchanged implementation."
+}

@@ -1,0 +1,28 @@
+{
+  "schema": "customer-agent-readiness-successor-approval/v1",
+  "status": "APPROVED",
+  "decisionDate": "2026-10-12",
+  "versions": {
+    "openapi": "1.24.0",
+    "schema": "1.29",
+    "migration": "0041",
+    "exportProfile": "content-intake-readiness-successor-v1"
+  },
+  "freezeApproved": true,
+  "exportApproved": true,
+  "intakeApproved": true,
+  "syntheticOnly": true,
+  "runtimeActivated": false,
+  "productionConsumerReady": false,
+  "approvalBasis": "User explicitly approved the exact candidate manifest and fixed-predecessor plus delta composition in this task.",
+  "approvedCandidateManifestSha256": "60c0a22e31d6ed1f6d08f1e1305266a4a634da5d1fb5a95f3e1a21c4cd0e2a71",
+  "artifacts": {
+    "openapi.candidate.yaml": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+    "schema.candidate.sql": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771",
+    "upgrade.candidate.sql": "848bf0222dcbd02f406611979d4221fa3d5add8c4941df775356b901435ece2d",
+    "assembly.candidate.json": "5b76a4712bbf40f047104323e142a835742ae27f2af5ee94695b4244fec77bb2",
+    "installation.candidate.json": "ebe48223f3ea16598668ef892339bfd2b5dd1c920c196083f711627b5ca47c0b",
+    "predecessor-lock.json": "c9b85e65a83925c2520394b562f26f8e07a6d2e7f1d5b91b62e8a07dd4d41c0d",
+    "manifest.json": "60c0a22e31d6ed1f6d08f1e1305266a4a634da5d1fb5a95f3e1a21c4cd0e2a71"
+  }
+}

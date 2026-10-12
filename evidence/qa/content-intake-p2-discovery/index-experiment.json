@@ -1,0 +1,53 @@
+[
+  {
+    "sources": 102,
+    "rows": 102,
+    "ms": 4,
+    "status": "PASS",
+    "lowerBoundBytes": 91905
+  },
+  {
+    "sources": 1000,
+    "rows": 1000,
+    "ms": 179,
+    "status": "PASS",
+    "lowerBoundBytes": 901003
+  },
+  {
+    "sources": 5000,
+    "rows": 5000,
+    "ms": 3901,
+    "status": "PASS",
+    "lowerBoundBytes": 4505003,
+    "repeatMs": 3859,
+    "repeatRows": 5000,
+    "indexes": [
+      {
+        "indexSql": "CREATE INDEX review_source_first ON content_intake.grants(recipient_id,scope_id,source_id,action,expires_at) WHERE revoked_at IS NULL",
+        "timings": [
+          {
+            "ms": 121,
+            "rows": 5000
+          },
+          {
+            "ms": 123,
+            "rows": 5000
+          }
+        ]
+      },
+      {
+        "indexSql": "CREATE INDEX review_action_first ON content_intake.grants(recipient_id,scope_id,action,source_id,expires_at) WHERE revoked_at IS NULL",
+        "timings": [
+          {
+            "ms": 1398,
+            "rows": 5000
+          },
+          {
+            "ms": 1395,
+            "rows": 5000
+          }
+        ]
+      }
+    ]
+  }
+]

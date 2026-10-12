@@ -1,0 +1,177 @@
+{
+  "date": "2026-10-08",
+  "environment": {
+    "os": "Darwin arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18"
+  },
+  "input_manifest": "inputs.json",
+  "synthetic_only": true,
+  "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
+  "checks": [
+    {
+      "id": "governance-release",
+      "command": "npm --prefix sites run test:release",
+      "status": "PASS",
+      "details": "38 steps; 281 unit tests plus release/browser checks",
+      "log": "intake-direct-freeze-release.log"
+    },
+    {
+      "id": "governance-export-gate",
+      "command": "node --test sites/tests/content-intake-direct-contract.test.mjs",
+      "status": "PASS",
+      "details": "7/7",
+      "log": "intake-direct-freeze-only.log"
+    },
+    {
+      "id": "product-root",
+      "command": "pnpm test",
+      "status": "PASS",
+      "details": "Root unit/package/workflow suites; PG/host environmental skips preserved",
+      "log": "intake-direct-root-test.log"
+    },
+    {
+      "id": "api-pg-initial",
+      "command": "pnpm --filter @customer-agent/api test:intake:transactions",
+      "status": "FAIL_FIXED",
+      "details": "165/168; three past-effectiveTo fixtures failed in SQL, fixed in 0032",
+      "log": "intake-api-direct-full.log"
+    },
+    {
+      "id": "api-pg-affected",
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'inapplicable time|nonoverlapping half-open-time|filters product/scenario/time|direct publication|legacy history|legacy rollback history'",
+      "status": "PASS",
+      "details": "11/11 selected; 141 skipped by filter; includes all three earlier failures and new deadline case",
+      "log": "intake-api-direct-time-regression.log"
+    },
+    {
+      "id": "api-content-final-deadline",
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'keeps a currently live content deadline'",
+      "status": "PASS",
+      "details": "1/1 selected after strengthened assertion proving SQL writes completed; final commit rolls back",
+      "log": "intake-api-direct-content-deadline.log"
+    },
+    {
+      "id": "api-legacy-receipts",
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'absent policy in durable'",
+      "status": "PASS",
+      "details": "1 selected; publish/rollback/cancel/source history unchanged; zero provider I/O",
+      "log": "intake-api-direct-old-receipts.log"
+    },
+    {
+      "id": "database-final",
+      "command": "pnpm --filter @customer-agent/database test:integration",
+      "status": "PASS",
+      "details": "35/35 with final migration32 and verifier",
+      "log": "intake-direct-db-final.log"
+    },
+    {
+      "id": "cli-http-pg",
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts",
+      "status": "PASS",
+      "details": "5/5 actual HTTP/PG and CLI cleanup",
+      "log": "intake-direct-cli-final.log"
+    },
+    {
+      "id": "desktop-targeted",
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/component/intake-management.test.tsx tests/component/intake-upload.test.tsx tests/component/intake-rollback.test.tsx tests/component/intake-dashboard-shell.test.tsx tests/unit/content-intake-management.test.ts tests/unit/content-intake-upload.test.ts tests/unit/content-intake-rollback.test.ts tests/unit/content-intake-native-files.test.ts tests/unit/content-intake-management-ipc.test.ts",
+      "status": "PASS",
+      "details": "124/124",
+      "log": "direct-desktop-final-tests.log"
+    },
+    {
+      "id": "electron-wire",
+      "command": "pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-management.spec.ts",
+      "status": "PASS",
+      "details": "1/1 actual sandbox Electron with HTTP double",
+      "log": "direct-desktop-wire-e2e.log"
+    },
+    {
+      "id": "electron-http-pg-final",
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts",
+      "status": "PASS",
+      "details": "2/2 final SQL, controlled native dialogs, zero approval rows, actual clipboard",
+      "log": "direct-desktop-real-final.log"
+    },
+    {
+      "id": "lint",
+      "command": "pnpm lint",
+      "status": "PASS",
+      "details": "final runtime plus targeted lint after test assertions/two message strings",
+      "log": "intake-direct-lint-final.log"
+    },
+    {
+      "id": "typecheck",
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "details": "all packages",
+      "log": "intake-direct-typecheck-final.log"
+    },
+    {
+      "id": "build",
+      "command": "pnpm build",
+      "status": "PASS",
+      "details": "final runtime; desktop rebuilt after only message wording change",
+      "log": "intake-direct-build-final.log"
+    },
+    {
+      "id": "desktop-final-build",
+      "command": "pnpm --filter @customer-agent/desktop build",
+      "status": "PASS",
+      "details": "final message strings",
+      "log": "intake-direct-desktop-build-final.log"
+    },
+    {
+      "id": "ipc-message-check",
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-management-ipc.test.ts",
+      "status": "PASS",
+      "details": "1/1; no interface/control-flow changes since E2E",
+      "log": "intake-direct-ipc-final.log"
+    },
+    {
+      "id": "docs",
+      "command": "pnpm docs:check",
+      "status": "PASS",
+      "details": "214 Markdown files; local references/workflow ownership",
+      "log": "intake-direct-docs-final.log"
+    },
+    {
+      "id": "workspace",
+      "command": "pnpm workspace:check",
+      "status": "FAIL",
+      "details": "root policy PASS; source remainder exceeds 32 MiB after approved immutable snapshot intake; no threshold change or historical cleanup",
+      "log": "intake-direct-workspace-final.log"
+    },
+    {
+      "id": "contracts",
+      "command": "pnpm contracts:verify",
+      "status": "PASS",
+      "details": "exact frozen snapshot; VERIFIED_NOT_ACTIVATED",
+      "log": "intake-direct-verify-final.log"
+    },
+    {
+      "id": "codegen",
+      "command": "pnpm contracts:codegen:check",
+      "status": "PASS",
+      "details": "generated bytes match",
+      "log": "intake-direct-codegen-check-final.log"
+    },
+    {
+      "id": "migrations",
+      "command": "pnpm db:migrations:check",
+      "status": "PASS",
+      "details": "32 generated files; first30 unchanged",
+      "log": "intake-direct-migrations-final.log"
+    }
+  ],
+  "reuse": "Root unit evidence reused across final SQL fix and two display strings; affected real PG, 35 DB, 2 Electron flows rerun. Final test-only deadline assertion/wording got focused validation. API 169 current cases are covered by initial plus targeted runs, not claimed as one final full run.",
+  "full_review": "INCOMPLETE",
+  "unverified": [
+    "production factory/ACL/activation",
+    "real organization refresh/transport",
+    "real scope/adoption/name/retention inputs",
+    "human macOS and Windows device checks"
+  ],
+  "git_authorization": "local commits only; no push/PR/merge/deploy"
+}

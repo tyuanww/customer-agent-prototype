@@ -1,0 +1,50 @@
+{
+  "baseCommit": "1e5cca667657aad48bf7e2bd88a2493883256e94",
+  "branch": "codex/content-intake-capacity",
+  "sha256": {
+    "apps/api/src/content-intake/capacity.ts": "13c5235a0f9d2ffb097582003e171e8e97d6e6002c11c430c93be26196ab407f",
+    "apps/api/src/content-intake/evidence.ts": "ccb3424ed06dde74d1ff4e688589081d3fc4966c9d69bb0e2cf87665191b3dfc",
+    "apps/api/src/content-intake/files.ts": "21118f59c94d4c60bcf8fd10e6fc8c56e0218f7c49e2a2e1bdc61df37d6e451a",
+    "apps/api/src/content-intake/rollback.ts": "eb74dabe32cfa5070c60c00685f26bc7007f542dc2ced9f753f7e7d1594e8b7e",
+    "apps/api/src/content-intake/service.ts": "85cfbfbe6325c3eb3e94305941fc921d547bfa7c33848926ceac68789183f98c",
+    "apps/api/src/content-object-store.ts": "d03a2e2c3b31acf6cb0f75e05b946ba535eb7917bd2982015e35bc3d2c2f8ab0",
+    "apps/api/tests/content-intake.integration.test.ts": "5b9bc24d5b427ffe9aeee52a310911187be8d4754b06c4dc28370168e859fc38",
+    "apps/api/tests/content-object-store.test.ts": "47eb91cafa8ef2d8370d77d12410dbe7e266a9d100773060e38763a0a597afa5",
+    "packages/database/README.md": "80492467ef084205b2ac6d3e12101a12e07888dc9389ac8a4070234c2b607f86",
+    "packages/database/migrations/0029_intake_capacity.sql": "9d56a3ea4b56d5ec1ccbef5bc331c12f5f788da725a2d09030f2ccbe9e2f00ab",
+    "packages/database/migrations/manifest.generated.json": "899365ff9379cb6ea292f88260483a7181ada011566dd88f66608fdcb5fff3b1",
+    "packages/database/overlays/0029_intake_capacity.sql": "b95700247661d36f2e1cdfa29002c8e44947df320d96b9bdb1dc735504523aa8",
+    "packages/database/scripts/generate-migrations.mjs": "70bcf72638f920befc9271b611c14b76d9d7d997a4bd22e2bbdc5b008a2ea8f1",
+    "packages/database/src/generated/migrations.generated.ts": "e6de637d2f7b5cdb6d310e57968d1b0214686ff15fefd4792f5cd808e1c55513",
+    "packages/database/src/verifier.ts": "ac1c0b5efbf6555d6cd6982ebd9a68f1f77acf8e581a312bebc8166719ec2a2e",
+    "packages/database/tests/generator.test.ts": "e8ee8ec9f6a17c8bb65d0fad0ed5156a6163304ad951d09ef587a33dc490038b",
+    "packages/database/tests/planner.test.ts": "82f380608417ffa88fd1767c0a9d8e4578adbc8a1cfc7b22c6866471ecacb20c",
+    "packages/database/tests/postgres.integration.test.ts": "b94a1183a5ae0cd9ababc58ada2fa53dffd4e9ac89dfb3e086ff593d2ac363f2",
+    "scripts/content-retention.ts": "6d2c8da14e0684047b3562e14dee6cefeb8059b10f6e066c4c21fe0815a31e68"
+  },
+  "immutableMigrationPrefix": {
+    "count": 28,
+    "unchanged": true
+  },
+  "verification": {
+    "apiPostgres": {
+      "passed": 180,
+      "extraAdoptionRacePassed": 1
+    },
+    "databasePostgres": {
+      "passed": 33,
+      "extraPrefixUpgradePassed": 1
+    },
+    "fullWorkspace": "pnpm build + pnpm test:built",
+    "lint": "pnpm lint",
+    "typecheck": "pnpm typecheck"
+  },
+  "limits": [
+    "No production activation or real data",
+    "No historical retention TTL approved",
+    "Dry-run checks database accounting, not a complete disk orphan scan",
+    "10/100 history baseline is synthetic, not production forecast",
+    "Human approval waiting time unmeasured",
+    "External reviews timed out"
+  ]
+}

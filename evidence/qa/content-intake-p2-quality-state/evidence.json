@@ -1,0 +1,59 @@
+{
+  "revision": "0566cf2fd514872d9cbab19259496d0eec3d92a2",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Functional-only; no UI, Feishu, production ACL or runtime activation.",
+    "Q initially rejected the Chinese hypothesis before any child execution; an English causal sentence was accepted.",
+    "2 captures, 3 selected integration tests; full regressions are separate."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'freezes quality before'",
+      "contract": "Frozen plan and individual check persistence",
+      "expected": "The service returns passed, another service reads the identical frozen plan, checks are immutable and no approval/ticket/release is created.",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (45 tests | 44 skipped) 1046ms\n   ✓ P2 sealed synthetic authority and durable candidates > freezes quality before individual checks, survives service recreation and creates no approval or release  1046ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 44 skipped (45)\n   Start at  15:21:31\n   Duration  1.48s (transform 150ms, setup 0ms, collect 296ms, tests 1.05s, environment 0ms, prepare 31ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'rejects omitted|all 5000 critical checks'",
+      "contract": "Exact samples and maximum critical batch",
+      "expected": "Invalid samples produce no writes and all 5000 critical checks persist within the unchanged budget.",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (45 tests | 43 skipped) 3950ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects omitted, invented, duplicate, changed-content and caller-supplied quality conclusions atomically  1057ms\n   ✓ P2 sealed synthetic authority and durable candidates > records all 5000 critical checks within the unchanged transaction budget  2892ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 43 skipped (45)\n   Start at  15:22:34\n   Duration  4.38s (transform 144ms, setup 0ms, collect 286ms, tests 3.95s, environment 0ms, prepare 34ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "freezes quality before"
+      ],
+      "hypothesis": "The persisted success path passed, so now verify invalid samples leave no writes and the corrected 5000-row limit still respects the unchanged transaction budget.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "rejects omitted|all 5000 critical checks"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

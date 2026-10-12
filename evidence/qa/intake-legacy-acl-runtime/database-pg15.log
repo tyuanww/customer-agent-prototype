@@ -1,0 +1,102 @@
+$ pnpm --filter @customer-agent/database test:integration
+$ CUSTOMER_AGENT_DB_PG15_INTEGRATION=1 vitest run tests/postgres.integration.test.ts tests/verifier-runtime.integration.test.ts
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ✓ tests/verifier-runtime.integration.test.ts (26 tests) 1842ms
+ ❯ tests/postgres.integration.test.ts (49 tests | 1 failed) 46457ms
+   ✓ PostgreSQL 15 immutable migration gate > appends only eight helper grants to the exact thirty-four-row ledger and preserves role attributes  1067ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor owner LOGIN before granting any legacy helper capability  1135ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor owner member before granting any legacy helper capability  902ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor ACL leakage before granting any legacy helper capability  933ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor ACL missing before granting any legacy helper capability  853ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor helper missing before granting any legacy helper capability  849ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor function changed before granting any legacy helper capability  856ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor CSV guard missing before granting any legacy helper capability  851ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls newly granted helpers and ledger back if the same transaction fails the final verifier  865ms
+   ✓ PostgreSQL 15 immutable migration gate > appends CSV to the exact thirty-three-row ledger without changing historical SQL or role attributes  907ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls CSV constraints and ledger back together when a later format function conflicts  843ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the atomic runtime installation to the exact thirty-two-row ledger  866ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for role-conflict  808ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for missing-implementation  990ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact thirty-row ledger with only direct storage and runtime overlays  918ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact 28-row prefix with only the private capacity ledger and no application access  919ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the unchanged 27-row prefix and keeps family policy private  947ms
+   ✓ PostgreSQL 15 immutable migration gate > checks explicit roots and all three applicability dimensions on the complete catalog  1016ms
+   ✓ PostgreSQL 15 immutable migration gate > validates 5000 entries with grouped expansion under a bounded PG budget  1545ms
+   ✓ PostgreSQL 15 immutable migration gate > keeps fifty usage-page guard checks on 5000 unassociated rows within five seconds  1532ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint products under five seconds  1040ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint scenarios under five seconds  1033ms
+   ✓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint half-open-time under five seconds  1015ms
+   ✓ PostgreSQL 15 immutable migration gate > matches a fixed-seed pairwise applicability oracle across wildcard and interval-chain catalogs  1059ms
+   × PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op 913ms
+     → expected { status: 'PASS', …(6) } to match object { status: 'PASS', …(5) }
+(12 matching properties omitted from actual)
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'usage' ledger with the rollback and family overlays  892ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'quality' ledger with the rollback and family overlays  893ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.12 ledger prefix through the immutable v1.13/v1.14 suffix  914ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.16 with the deferred guard and ops-loop migrations and rejects privilege drift  952ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the shipped nineteen-migration prefix and keeps P2 storage sealed  1126ms
+   ✓ PostgreSQL 15 immutable migration gate > appends discovery and rollback to the exact 25-row ledger and detects index drift  918ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints  1030ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed  1208ms
+   ✓ PostgreSQL 15 immutable migration gate > appends sealed quality storage without rewriting the 22-row ledger or opening application access  1001ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=false  918ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=true  967ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.17 with only the ops-loop migration  908ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact v1.15 ledger with only the backend migration  932ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades v1.14 with only the atomic owner suffix and denies registrar/runtime privilege drift  1066ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.13 ledger prefix with only the immutable v1.14 suffix  900ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls back an interrupted synthetic backfill and safely retries the same migration id  650ms
+   ✓ PostgreSQL 15 immutable migration gate > keeps DDL and its immutable ledger row atomic when the ledger insert fails  654ms
+   ✓ PostgreSQL 15 immutable migration gate > reconciles an unknown COMMIT acknowledgement from the immutable ledger on a new session  887ms
+   ✓ PostgreSQL 15 immutable migration gate > serializes two independent fresh clients and applies the catalogue exactly once  955ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects concurrent control-plane operations on the same client session  895ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects ACL, function-security, trigger-mode, and policy-key drift by exact manifest  1190ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a table  639ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a enum  652ms
+   ✓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a schema  645ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/postgres.integration.test.ts > PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op
+AssertionError: expected { status: 'PASS', …(6) } to match object { status: 'PASS', …(5) }
+(12 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -3,11 +3,11 @@
+      "memberships": 0,
+      "safe": 17,
+      "total": 17,
+    },
+    "compatibility": {
+-     "priorUpgrade": "SUPPORTED · immutable 9-migration baseline → 25-migration current suffix",
++     "priorUpgrade": "SUPPORTED · immutable 9-migration baseline → 26-migration current suffix",
+    },
+    "inventory": {
+      "functions": 255,
+      "tables": 97,
+      "views": 7,
+
+ ❯ tests/postgres.integration.test.ts:512:22
+    510| 
+    511|       const report = await verifyDatabaseMigrations(client);
+    512|       expect(report).toMatchObject({
+       |                      ^
+    513|         status: 'PASS',
+    514|         migrationCount: 35,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 74 passed (75)
+   Start at  01:01:05
+   Duration  46.92s (transform 250ms, setup 0ms, collect 508ms, tests 48.30s, environment 0ms, prepare 112ms)
+
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @customer-agent/database@ test:integration: `CUSTOMER_AGENT_DB_PG15_INTEGRATION=1 vitest run tests/postgres.integration.test.ts tests/verifier-runtime.integration.test.ts`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.

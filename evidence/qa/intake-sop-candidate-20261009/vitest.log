@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/content-intake
+
+ ✓ tests/sop.test.ts (4 tests) 123ms
+ ✓ tests/csv-candidate.test.ts (41 tests) 745ms
+ ✓ tests/workbook.test.ts (56 tests) 2937ms
+   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  686ms
+   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  546ms
+
+ Test Files  3 passed (3)
+      Tests  101 passed (101)
+   Start at  00:00:19
+   Duration  3.47s (transform 202ms, setup 0ms, collect 806ms, tests 3.81s, environment 0ms, prepare 179ms)

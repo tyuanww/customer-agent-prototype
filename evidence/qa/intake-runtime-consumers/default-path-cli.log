@@ -1,0 +1,16 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-assembly/customer-agent-prototype/apps/api
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > capacity: serializes tenfold admission before bytes, protects unknown commits, retries cleanup and consumes the dry-run CLI
+{"probe":"capacity-admission","contenders":10,"adoptable":1,"elapsedMs":34.534458000000086}
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > capacity: serializes tenfold admission before bytes, protects unknown commits, retries cleanup and consumes the dry-run CLI
+{"probe":"capacity-admission","contenders":100,"adoptable":1,"elapsedMs":117.51933400000007}
+
+ ✓ tests/content-intake.integration.test.ts (152 tests | 151 skipped) 1208ms
+   ✓ P2 sealed synthetic authority and durable candidates > capacity: serializes tenfold admission before bytes, protects unknown commits, retries cleanup and consumes the dry-run CLI  1207ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 151 skipped (152)
+   Start at  17:15:57
+   Duration  1.82s (transform 241ms, setup 0ms, collect 447ms, tests 1.21s, environment 0ms, prepare 39ms)

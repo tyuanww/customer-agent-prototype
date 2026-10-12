@@ -1,0 +1,15 @@
+{
+  "base_commit": "0e6aea9e3b10b170f95e1e6114e2ec8d5fdf9872",
+  "branch": "codex/intake-org-runtime-candidate",
+  "version": "0.3.26",
+  "unchanged_reused_from_native_observer": {
+    "apps/api/experiments/intake-organization/feishu-observer.ts": "ad2ceece87d5d6aa29898cffab101ee0e416f333e36693f0bfc8435007bb0d62",
+    "apps/api/experiments/intake-organization/facts-writer.ts": "ade4fec8a5c79d75716149fc09c3d38d836ab3513818f09db829a4aa583f0ca8"
+  },
+  "new_sources_sha256": {
+    "apps/api/experiments/intake-organization/http-transport.ts": "c37a9f4e9963964c36ee9c1f907cf804391b6fe9251be62d4349167aaef026cc",
+    "apps/api/experiments/intake-organization/synthetic-contact-double.ts": "e77afd0489dd390f5e0089ac87f3b64de14d6e1a3f95aaea510158fcde12fb97",
+    "apps/api/experiments/intake-organization/transport.test.ts": "a74d27e0a0ffea43a199d9412bc3b20db07a15921162caae50c163343381dcb7",
+    "apps/api/experiments/intake-organization/transport-consumer.integration.test.ts": "e84062bb1ef4811b6893d89162f2c20b5f2d66a27220dd11a21871930caa5169"
+  }
+}

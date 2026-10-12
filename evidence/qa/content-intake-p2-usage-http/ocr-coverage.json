@@ -1,0 +1,127 @@
+{
+  "schema": "ocr-delegate-coverage/v1",
+  "base_commit": "90a72c57695b7d353622aa1cee9b476ddd060560",
+  "total_files": 19,
+  "reviewed_files": 19,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "ocr_eligible": 11,
+  "supplementary": 8,
+  "outside_model": "unavailable; not invoked",
+  "files": [
+    {
+      "path": "apps/desktop/src/main/content-intake-usage.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "apps/desktop/src/main/product-http.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "apps/desktop/src/main/product-session.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "scripts/probe-intake-usage-consumer.mjs",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "apps/api/src/content-intake/usage-http.ts",
+      "status": "added",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-http/exploration-002.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-http/exploration-003.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-http/functional-evidence.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-http/ocr-coverage.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-http/qa-final/exploration-002.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-http/verification.json",
+      "status": "added",
+      "review": "reviewed",
+      "method": "OCR rules + host full source review"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    },
+    {
+      "path": "apps/desktop/tests/unit/product-http.test.ts",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    },
+    {
+      "path": "apps/api/tests/content-intake-usage-http.test.ts",
+      "status": "added",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-usage-http.test.ts",
+      "status": "added",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-http/README.md",
+      "status": "added",
+      "review": "reviewed",
+      "method": "host supplementary review (test/doc/evidence)"
+    }
+  ]
+}

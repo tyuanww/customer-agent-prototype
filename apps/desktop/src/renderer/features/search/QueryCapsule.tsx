@@ -11,6 +11,8 @@ import {
 
 type QueryCapsuleProps = {
   productControl?: React.ReactNode;
+  scopeControl?: React.ReactNode;
+  intake?: boolean;
   foxVisualState: QueryFoxVisualState;
   foxDrag: ReturnType<typeof useWindowDrag>;
   deepThinkingDescription: string;
@@ -20,6 +22,7 @@ type QueryCapsuleProps = {
   invalidMessage: string;
   sessionNotice: SessionNotice | null;
   searching: boolean;
+  scopePending?: boolean;
   signedIn: boolean;
   inputIdle: boolean;
   onCancelScheduledResultFocus: () => void;
@@ -35,6 +38,8 @@ type QueryCapsuleProps = {
 
 export function QueryCapsule({
   productControl,
+  scopeControl,
+  intake = false,
   foxVisualState,
   foxDrag,
   deepThinkingDescription,
@@ -44,6 +49,7 @@ export function QueryCapsule({
   invalidMessage,
   sessionNotice,
   searching,
+  scopePending = false,
   signedIn,
   inputIdle,
   onCancelScheduledResultFocus,
@@ -103,9 +109,9 @@ export function QueryCapsule({
                 }}
                 onKeyDown={onKeyDown}
               />
-            <span id="deep-thinking-description" className="sr-only">
+            {!intake ? <span id="deep-thinking-description" className="sr-only">
               {deepThinkingDescription}
-            </span>
+            </span> : null}
             <div className="capsule-meta">
               {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired')) ? (
               <p
@@ -130,7 +136,7 @@ export function QueryCapsule({
               ) : null}
               <div className="capsule-tools">
                 {productControl}
-                <button
+                {!intake ? <button
                   type="button"
                   className="dashboard-entry"
                   data-testid="open-dashboard"
@@ -148,8 +154,8 @@ export function QueryCapsule({
                     <path d="M3 7.25h14M7.25 7.5v9" />
                     <path d="M10 10.25h4.5M10 13.25h3" />
                   </svg>
-                </button>
-                <div className="capsule-tools-end">
+                </button> : null}
+                {intake ? scopeControl : <div className="capsule-tools-end">
                   <span className="smart-retrieval-label" aria-hidden="true">智能检索</span>
                   <button
                     type="button"
@@ -164,7 +170,7 @@ export function QueryCapsule({
                   >
                     <span className="smart-toggle-thumb" aria-hidden="true" />
                   </button>
-                </div>
+                </div>}
               </div>
             </div>
           </div>
@@ -173,8 +179,9 @@ export function QueryCapsule({
             className="search-btn"
             data-testid="search-button"
             onClick={onSearch}
-            disabled={searching}
-            aria-busy={searching}
+            disabled={searching || scopePending}
+            aria-busy={searching || scopePending}
+            title={scopePending ? '正在更新查询范围，请稍后查询。' : undefined}
           >
             {searching ? (
               <span className="searching-label" data-testid="searching-indicator">
@@ -186,7 +193,7 @@ export function QueryCapsule({
                 检索中
               </span>
             ) : (
-              '查询'
+              scopePending ? '更新中' : '查询'
             )}
           </button>
         </div>

@@ -1,0 +1,57 @@
+{
+  "scope": "increment after 789ce58; code/fixtures immutable during all readers; final evidence metadata reviewed separately",
+  "native": {
+    "skill": "adversarial-review",
+    "timestamp": "2026-10-06T06:37:22.790128+00:00",
+    "status": "clean",
+    "source": "in-host",
+    "host": "codex",
+    "phase": "adversarial",
+    "tier": "always",
+    "gate": "informational",
+    "commit": "789ce58",
+    "completed": true,
+    "converged": true,
+    "issues_found": 0,
+    "findings": [],
+    "scope": "quality preview increment; unchanged historical source hash verified; fixtures summary-only, parent ran tests",
+    "conclusion": "NO_FINDINGS",
+    "fixtureMode": "summary-only",
+    "independentTestRun": false,
+    "historicalHashReuse": {
+      "approval": "23/26 unchanged",
+      "legacyFence": "32/34 unchanged"
+    },
+    "recommendation": "accept this scoped increment because the preview preserves authorization and material identity without creating quality approval or publication authority"
+  },
+  "outside": {
+    "adversarial": {
+      "status": "unavailable",
+      "provider": "claude-code",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "exit_code": null
+    },
+    "structured": {
+      "status": "unavailable",
+      "provider": "claude-code",
+      "result": "",
+      "error": {
+        "code": "timeout",
+        "message": "Claude Code timed out after 540000ms."
+      },
+      "exit_code": null
+    }
+  },
+  "remainingConfirmedDefects": 0,
+  "outsideCoverage": "missing; neither timeout is a completed review",
+  "remoteBase": {
+    "branch": "origin/main",
+    "mergeBase": "8ab309fcd9c494b7343ed88bacb253205d36575f",
+    "refresh": "git fetch failed: Empty reply from server",
+    "pr": "no PR for current branch"
+  }
+}

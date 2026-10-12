@@ -12,3 +12,16 @@
 # 将来如增加 Windows 原生命令脚本，检出时使用 CRLF。
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# CSV 原件摘要夹具保留引号内外的原始换行字节。
+packages/content-intake/experiments/csv/synthetic-template.csv -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+
+# 本轮原始工具输出按摘要留证；保留系统表格尾空格和测试报告末空行。
+evidence/qa/intake-csv-runtime/*.log -text -whitespace
+
+# 旧目录 ACL 回归的原始日志保留实际输出字节，供 SHA-256 复核。
+evidence/qa/intake-legacy-acl-runtime/*.log -text -whitespace
+
+# Raw size-investigation logs preserve failed and successful probe bytes.
+evidence/qa/intake-size-closeout/*.log -text -whitespace
+evidence/qa/intake-size-closeout/*.patch -whitespace

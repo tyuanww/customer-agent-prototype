@@ -1,0 +1,429 @@
+{
+  "revision": "28436477945e3e5bb6dd1d7956187e05eb7181b0",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Only owned temporary PostgreSQL15 clusters and synthetic fixture API consumers. Node24.19.0,pnpm11.19.0,PG15.18; no real data,transport,production ACL,UI or OS evidence.",
+    "Optional smoke deadline2026-10-06T02:32:49.379Z..02:37:49.379Z,300s/12probe budget; stopped after10. Captures011–014 are required defect/plan revalidation after repairs; deadline was not reset.",
+    "Historical001–002 wrong local probe import path;005–006 source_ref fixture format;007–008 source_version_id fixture format. All setup failures preserved and superseded by identical-argv corrected probes011/012, not counted as successful original attempts.",
+    "Historical009–010 twice reproduced product defect: active source SHA changed and revision persisted. SQL boundary repaired; identical app_runtime replay011 refuses with no changes.",
+    "Historical003/004 were partial pre-repair PASS; final012/013 repeat on current code. No current probe left open. Inputs bound in tracked inputs.json; full checks in checks.json."
+  ],
+  "evidence": [
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/inspect.mjs",
+      "contract": "Migration22 consumed by verifier; private helpers inaccessible to application roles; no content release side effect",
+      "expected": "PASS: migrationCount22,214functions,three42501denials,releaseCount0",
+      "classification": "superseded",
+      "observed": ""
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/inspect.mjs",
+      "contract": "Migration22 consumed by verifier; private helpers inaccessible to application roles; no content release side effect",
+      "expected": "PASS: migrationCount22,214functions,three42501denials,releaseCount0",
+      "classification": "superseded",
+      "observed": ""
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/inspect.mjs",
+      "contract": "Migration22 consumed by verifier; private helpers inaccessible to application roles; no content release side effect",
+      "expected": "PASS: migrationCount22,214functions,three42501denials,releaseCount0",
+      "classification": "superseded",
+      "observed": {
+        "status": "PASS",
+        "installed": [
+          "0001_extensions",
+          "0002_identity_and_content",
+          "0003_events_and_metrics",
+          "0004_import_release_announce",
+          "0005_idempotency_rate_limit_outbox",
+          "0006_definer_functions_and_triggers",
+          "0007_search_bigram",
+          "0008_runtime_acl",
+          "0009_phase1_policy_seed",
+          "0010_search_projection_v1_13",
+          "0011_search_no_hit_context_v1_14",
+          "0012_owner_acceptance_v1_15",
+          "0013_backend_identity_content_v1_16",
+          "0014_release_deferred_guard_v1_17",
+          "0015_ops_loop_v1_18",
+          "0016_office_owner_publish",
+          "0017_rollback_previous_target",
+          "0018_owner_read_views",
+          "0019_candidate_client_snapshot",
+          "0020_coach_publish_v1_19",
+          "0021_content_intake_v1_20",
+          "0022_intake_legacy_fence"
+        ],
+        "verification": {
+          "status": "PASS",
+          "migrationCount": 22,
+          "inventory": {
+            "tables": 81,
+            "views": 7,
+            "functions": 211,
+            "pgcrypto": "1.3",
+            "pgTrgm": "1.6"
+          },
+          "capabilityRoles": {
+            "total": 10,
+            "safe": 10,
+            "memberships": 0
+          },
+          "acl": {
+            "runtimeReleaseItemsRead": false,
+            "runtimeBackingViewRead": false,
+            "runtimeControlledSearchExecute": true,
+            "publicLedgerSchemaUsage": false,
+            "publicLedgerRead": false
+          },
+          "phase1PolicyHardOff": true,
+          "compatibility": {
+            "current": "N",
+            "priorSignedBaseline": {
+              "contractSetId": "cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c",
+              "sourceGitSha": "1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38",
+              "sourceSchemaSha256": "47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801",
+              "migrationCount": 9
+            },
+            "priorUpgrade": "SUPPORTED · immutable 9-migration baseline → 13-migration current suffix"
+          }
+        },
+        "deniedHelpers": [
+          "app_content_admin",
+          "app_runtime",
+          "app_backend_review"
+        ],
+        "releaseCount": 0
+      }
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-release.integration.test.ts -t 'inherits the catalog|inheritance cannot complete'",
+      "contract": "Actual legacy consumer inherits full catalog; inherited-catalog failure rolls whole publication back",
+      "expected": "2 API tests pass",
+      "classification": "superseded",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-release.integration.test.ts (9 tests | 7 skipped) 1939ms\n   ✓ content publish and rollback > inherits the catalog on a disjoint-domain legacy publish and refuses legacy rollback through it  1032ms\n   ✓ content publish and rollback > rolls back the old release, pointer, announcement and catalog when inheritance cannot complete  906ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 7 skipped (9)\n   Start at  10:34:37\n   Duration  2.44s (transform 201ms, setup 0ms, collect 355ms, tests 1.94s, environment 0ms, prepare 31ms)\n\n"
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/source-bypass.mjs",
+      "contract": "app_runtime must not advance snapshots in an active domain",
+      "expected": "ZA003,original SHA unchanged,zero revision rows",
+      "classification": "superseded",
+      "observed": ""
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/source-bypass.mjs",
+      "contract": "app_runtime must not advance snapshots in an active domain",
+      "expected": "ZA003,original SHA unchanged,zero revision rows",
+      "classification": "superseded",
+      "observed": ""
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/source-bypass.mjs",
+      "contract": "app_runtime must not advance snapshots in an active domain",
+      "expected": "ZA003,original SHA unchanged,zero revision rows",
+      "classification": "superseded",
+      "observed": ""
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/source-bypass.mjs",
+      "contract": "app_runtime must not advance snapshots in an active domain",
+      "expected": "ZA003,original SHA unchanged,zero revision rows",
+      "classification": "superseded",
+      "observed": ""
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/source-bypass.mjs",
+      "contract": "app_runtime must not advance snapshots in an active domain",
+      "expected": "ZA003,original SHA unchanged,zero revision rows",
+      "classification": "superseded",
+      "observed": {
+        "rejection": null,
+        "actual": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "revisions": 1,
+        "hashes": [
+          {
+            "proname": "advance_source_snapshots",
+            "sha256": "dd7f9f859ade82e0b746adc151996415bb0effc481fa8175ba39398ab15a6096"
+          },
+          {
+            "proname": "restore_source_snapshots",
+            "sha256": "cf09f5d33725bbf344725d11993c4a2b98c58cadc286a82d38b35ff9493a4755"
+          }
+        ]
+      }
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/source-bypass.mjs",
+      "contract": "app_runtime must not advance snapshots in an active domain",
+      "expected": "ZA003,original SHA unchanged,zero revision rows",
+      "classification": "superseded",
+      "observed": {
+        "rejection": null,
+        "actual": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "revisions": 1,
+        "hashes": [
+          {
+            "proname": "advance_source_snapshots",
+            "sha256": "dd7f9f859ade82e0b746adc151996415bb0effc481fa8175ba39398ab15a6096"
+          },
+          {
+            "proname": "restore_source_snapshots",
+            "sha256": "cf09f5d33725bbf344725d11993c4a2b98c58cadc286a82d38b35ff9493a4755"
+          }
+        ]
+      }
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/source-bypass.mjs",
+      "contract": "app_runtime must not advance snapshots in an active domain",
+      "expected": "ZA003,original SHA unchanged,zero revision rows",
+      "classification": "pass",
+      "observed": {
+        "rejection": "ZA003",
+        "actual": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "revisions": 0,
+        "hashes": [
+          {
+            "proname": "advance_source_snapshots",
+            "sha256": "5a7423426c85eb7cdd1c697d0f037b0775f52761fef2ce07da2bd7bc42ac2df7"
+          },
+          {
+            "proname": "restore_source_snapshots",
+            "sha256": "b03a5e8bb19db8a50ddc7148bd835b8d8c830b4c66ec61778f67464764f56b6e"
+          }
+        ]
+      }
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .gstack/content-intake-p2-publication/inspect.mjs",
+      "contract": "Migration22 consumed by verifier; private helpers inaccessible to application roles; no content release side effect",
+      "expected": "PASS: migrationCount22,214functions,three42501denials,releaseCount0",
+      "classification": "pass",
+      "observed": {
+        "status": "PASS",
+        "installed": [
+          "0001_extensions",
+          "0002_identity_and_content",
+          "0003_events_and_metrics",
+          "0004_import_release_announce",
+          "0005_idempotency_rate_limit_outbox",
+          "0006_definer_functions_and_triggers",
+          "0007_search_bigram",
+          "0008_runtime_acl",
+          "0009_phase1_policy_seed",
+          "0010_search_projection_v1_13",
+          "0011_search_no_hit_context_v1_14",
+          "0012_owner_acceptance_v1_15",
+          "0013_backend_identity_content_v1_16",
+          "0014_release_deferred_guard_v1_17",
+          "0015_ops_loop_v1_18",
+          "0016_office_owner_publish",
+          "0017_rollback_previous_target",
+          "0018_owner_read_views",
+          "0019_candidate_client_snapshot",
+          "0020_coach_publish_v1_19",
+          "0021_content_intake_v1_20",
+          "0022_intake_legacy_fence"
+        ],
+        "verification": {
+          "status": "PASS",
+          "migrationCount": 22,
+          "inventory": {
+            "tables": 81,
+            "views": 7,
+            "functions": 214,
+            "pgcrypto": "1.3",
+            "pgTrgm": "1.6"
+          },
+          "capabilityRoles": {
+            "total": 10,
+            "safe": 10,
+            "memberships": 0
+          },
+          "acl": {
+            "runtimeReleaseItemsRead": false,
+            "runtimeBackingViewRead": false,
+            "runtimeControlledSearchExecute": true,
+            "publicLedgerSchemaUsage": false,
+            "publicLedgerRead": false
+          },
+          "phase1PolicyHardOff": true,
+          "compatibility": {
+            "current": "N",
+            "priorSignedBaseline": {
+              "contractSetId": "cs-ai-c11-openapi-1.11.0-schema-1.12-1d62e2c85c3c",
+              "sourceGitSha": "1d62e2c85c3c77dbb7a2fecc1d24a2002cb0ed38",
+              "sourceSchemaSha256": "47b667958e522a28df1c04d7c79a56c930bfe0ac04598321824b55744ac4a801",
+              "migrationCount": 9
+            },
+            "priorUpgrade": "SUPPORTED · immutable 9-migration baseline → 13-migration current suffix"
+          }
+        },
+        "deniedHelpers": [
+          "app_content_admin",
+          "app_runtime",
+          "app_backend_review"
+        ],
+        "releaseCount": 0
+      }
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-release.integration.test.ts -t 'inherits the catalog|inheritance cannot complete'",
+      "contract": "Actual legacy consumer inherits full catalog; inherited-catalog failure rolls whole publication back",
+      "expected": "2 API tests pass",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-release.integration.test.ts (13 tests | 11 skipped) 1921ms\n   ✓ content publish and rollback > inherits the catalog on a disjoint-domain legacy publish and refuses legacy rollback through it  987ms\n   ✓ content publish and rollback > rolls back the old release, pointer, announcement and catalog when inheritance cannot complete  933ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 11 skipped (13)\n   Start at  10:56:13\n   Duration  2.37s (transform 185ms, setup 0ms, collect 311ms, tests 1.92s, environment 0ms, prepare 35ms)\n\n"
+    },
+    {
+      "command": "env PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-release.integration.test.ts tests/content-intake.integration.test.ts tests/content-intake-material.test.ts tests/content-import.integration.test.ts tests/content-worker.integration.test.ts",
+      "contract": "Final combined source/import/worker/approval/release regressions including concurrent cancellation/upload",
+      "expected": "68 tests pass across5files",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-material.test.ts (5 tests) 212ms\n ✓ tests/content-worker.integration.test.ts (5 tests) 6036ms\n   ✓ content worker and restricted review > stages a 501-row import without dual-review parking  1683ms\n   ✓ content worker and restricted review > stages a claimed import without dual-review waits  1049ms\n   ✓ content worker and restricted review > cancels a staged import  1094ms\n   ✓ content worker and restricted review > leaves the dual-review queue empty after org-reviewed staging  1138ms\n   ✓ content worker and restricted review > fences heartbeat on a mismatched lease_version  1072ms\n ✓ tests/content-release.integration.test.ts (13 tests) 14129ms\n   ✓ content publish and rollback > fences the entire bound domain set, including a source absent from the uploaded rows  1270ms\n   ✓ content publish and rollback > inherits the catalog on a disjoint-domain legacy publish and refuses legacy rollback through it  1188ms\n   ✓ content publish and rollback > does not inherit a revoked catalog or leave a partial release on refusal  1162ms\n   ✓ content publish and rollback > observes activation committed while the legacy publisher waits for the shared first lock  1164ms\n   ✓ content publish and rollback > holds the shared lock through publication so a queued mode CAS observes the new base  1127ms\n   ✓ content publish and rollback > rolls back the old release, pointer, announcement and catalog when inheritance cannot complete  1097ms\n   ✓ content publish and rollback > refuses active-domain upload before it can commit source hashes or snapshot revisions  947ms\n   ✓ content publish and rollback > keeps cancellation able to restore by refusing activation while a legacy snapshot is pending  1021ms\n   ✓ content publish and rollback > serializes the earlier snapshot mutation and mode admission: mode-first  963ms\n   ✓ content publish and rollback > serializes the earlier snapshot mutation and mode admission: snapshot-first  1006ms\n   ✓ content publish and rollback > publishes a staged batch, rejects non-owners, replays, and refuses current/missing rollback  1001ms\n   ✓ content publish and rollback > reimports identical content and rolls back to a new release sequence  1154ms\n   ✓ content publish and rollback > reports a stable-identity collision as a reason, not as an in-flight draft  1027ms\n ✓ tests/content-import.integration.test.ts (14 tests) 14748ms\n   ✓ persistent content import receive > returns 202 only after durable persist and enqueue commit, then serves status and cancel  1244ms\n   ✓ persistent content import receive > refuses a cancel sweep with nothing in flight instead of reporting a phantom success  1029ms\n   ✓ persistent content import receive > still cancels a real in-flight batch through the sentinel and audits it once  1014ms\n   ✓ persistent content import receive > rolls the idempotency claim back with the empty sweep instead of leasing the key  1027ms\n   ✓ persistent content import receive > keeps the sweep honest when a different actor enqueues while this actor sweeps  1110ms\n   ✓ persistent content import receive > serializes actor cancellation and upload on the same first lock without taking the admission lock early  1115ms\n   ✓ persistent content import receive > waits on the enqueue lock so a concurrent enqueue cannot slip past the sweep  1418ms\n   ✓ persistent content import receive > refuses the sweep for an actor with nothing in flight without touching another actor batch  988ms\n   ✓ persistent content import receive > refuses the cancel sweep for an agent instead of reporting an empty sweep  874ms\n   ✓ persistent content import receive > accepts a declared XLSX payload after persist and digest verification  928ms\n   ✓ persistent content import receive > rejects oversized, truncated, unauthenticated, agent, and Feishu JSON uploads without creating a batch  1002ms\n   ✓ persistent content import receive > audits ineligible and mismatched sources after rolling back enqueue  1095ms\n   ✓ persistent content import receive > reclaims the object after a known database enqueue failure  896ms\n   ✓ persistent content import receive > replays the same idempotency key and rejects a different body  1007ms\n ✓ tests/content-intake.integration.test.ts (31 tests) 34256ms\n   ✓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant  1156ms\n   ✓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation  1089ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes  1002ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys  1104ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit  1259ms\n   ✓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants  1040ms\n   ✓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer  968ms\n   ✓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager  1051ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report  1322ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving  1359ms\n   ✓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate  1134ms\n   ✓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock  920ms\n   ✓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result  1114ms\n   ✓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot  1050ms\n   ✓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations  1094ms\n   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1025ms\n   ✓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility  1032ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed  1013ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence  1021ms\n   ✓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart  1014ms\n   ✓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O  1001ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready  1029ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  1006ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable  1001ms\n   ✓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation  1186ms\n   ✓ P2 sealed synthetic authority and durable candidates > inherits exact candidate and approval lineage and propagates later revocation to both releases  1064ms\n   ✓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider  1125ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire  1350ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled  1343ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires  1339ms\n   ✓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit  1041ms\n\n Test Files  5 passed (5)\n      Tests  68 passed (68)\n   Start at  10:56:36\n   Duration  34.69s (transform 380ms, setup 0ms, collect 1.63s, tests 69.38s, environment 0ms, prepare 186ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "003",
+      "observationArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "node",
+        ".gstack/content-intake-p2-publication/inspect.mjs"
+      ],
+      "hypothesis": "Installation and sealed helper access pass. Exercise the real API producer and database consumer for disjoint catalog inheritance and a forced post-write failure.",
+      "nextCapture": "004",
+      "nextArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-release.integration.test.ts",
+        "-t",
+        "inherits the catalog|inheritance cannot complete"
+      ]
+    },
+    {
+      "observationCapture": "004",
+      "observationArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-release.integration.test.ts",
+        "-t",
+        "inherits the catalog|inheritance cannot complete"
+      ],
+      "hypothesis": "Native review found the earlier source snapshot mutation reachable from owner upload. An active product source must reject that mutation before any revision or hash changes.",
+      "nextCapture": "005",
+      "nextArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "node",
+        ".gstack/content-intake-p2-publication/source-bypass.mjs"
+      ]
+    },
+    {
+      "observationCapture": "011",
+      "observationArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "node",
+        ".gstack/content-intake-p2-publication/source-bypass.mjs"
+      ],
+      "hypothesis": "Snapshot refusal now passes; revalidate the final migration manifest and application denial after the cancellation lock-order repair changed installed function bodies.",
+      "nextCapture": "012",
+      "nextArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "node",
+        ".gstack/content-intake-p2-publication/inspect.mjs"
+      ]
+    },
+    {
+      "observationCapture": "012",
+      "observationArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "node",
+        ".gstack/content-intake-p2-publication/inspect.mjs"
+      ],
+      "hypothesis": "Final installed ACL and bodies verify; rerun the original real-consumer inheritance and fault-rollback checks on the repaired migration before accepting current evidence.",
+      "nextCapture": "013",
+      "nextArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-release.integration.test.ts",
+        "-t",
+        "inherits the catalog|inheritance cannot complete"
+      ]
+    },
+    {
+      "observationCapture": "013",
+      "observationArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-release.integration.test.ts",
+        "-t",
+        "inherits the catalog|inheritance cannot complete"
+      ],
+      "hypothesis": "The repaired catalog consumer and rollback pass; validate the final combined import/cancellation, source and evidence regression suites after their test type correction, including real concurrent HTTP cancellation and upload.",
+      "nextCapture": "014",
+      "nextArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-release.integration.test.ts",
+        "tests/content-intake.integration.test.ts",
+        "tests/content-intake-material.test.ts",
+        "tests/content-import.integration.test.ts",
+        "tests/content-worker.integration.test.ts"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

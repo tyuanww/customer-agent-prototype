@@ -1,0 +1,73 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/content-import-multipart.test.ts (11 tests) 17ms
+ ✓ tests/intake-transaction-runtime.test.ts (7 tests) 4ms
+ ❯ tests/content-intake-material.test.ts (18 tests | 1 failed) 411ms
+   ✓ formal candidate material from independently parsed workbook > binds CSV format, original-byte object and independent questions without changing FAQ material rules 109ms
+   ✓ formal candidate material from independently parsed workbook > binds every material field to the sampling tuple without pretending it is a governance hash 36ms
+   ✓ formal candidate material from independently parsed workbook > namespaces IDs by source, keeps missing entries and binds explicit disables outside the old population 23ms
+   ✓ formal candidate material from independently parsed workbook > uses the existing 500/501 sampling boundary and makes a critical candidate entirely mandatory 47ms
+   ✓ formal candidate material from independently parsed workbook > preserves omitted entries and questions, with separate answer/question version allocation 23ms
+   ✓ formal candidate material from independently parsed workbook > computes critical risk from before/after plus the same-source rolling count 30ms
+   ✓ formal candidate material from independently parsed workbook > treats an explicit risk note as an escalation and cannot downgrade by clearing it 15ms
+   × formal candidate material from independently parsed workbook > rejects unknown vocabulary and cross-entry question identity 9ms
+     → expected [Function] to throw error including 'SOURCE_MISMATCH' but got 'SOURCE_FORMAT_MISMATCH'
+   ✓ formal candidate material from independently parsed workbook > binds a family as a pair, versions association changes and clears only explicitly uploaded associations 42ms
+   ✓ formal candidate material from independently parsed workbook > rechecks malformed family root/ even when a parsed DTO claims success 13ms
+   ✓ formal candidate material from independently parsed workbook > rechecks malformed family /entry even when a parsed DTO claims success 7ms
+   ✓ formal candidate material from independently parsed workbook > rechecks malformed family root/entry/extra even when a parsed DTO claims success 6ms
+   ✓ formal candidate material from independently parsed workbook > rechecks malformed family EXAMPLE_root/entry even when a parsed DTO claims success 6ms
+   ✓ formal candidate material from independently parsed workbook > rechecks malformed family root/EXAMPLE_entry even when a parsed DTO claims success 6ms
+   ✓ formal candidate material from independently parsed workbook > rechecks malformed family source/entry even when a parsed DTO claims success 7ms
+   ✓ formal candidate material from independently parsed workbook > uses the registered source to reject brand and self-source associations 7ms
+   ✓ formal candidate material from independently parsed workbook > allows a shop ID literally named brand without granting brand-only authority 16ms
+   ✓ formal candidate material from independently parsed workbook > produces canonical bytes accepted by the formal schema and rejects invalid Unicode 7ms
+ ✓ tests/intake-csv-http.integration.test.ts (8 tests) 10654ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes product original CSV bytes and another agent reads the same text  1496ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes campaign original CSV bytes and another agent reads the same text  1216ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes presale original CSV bytes and another agent reads the same text  1207ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > publishes aftersale original CSV bytes and another agent reads the same text  1176ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > rejects missing-answer as a whole batch and exports a real readable XLSX report  1278ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > rejects invalid-utf8 as a whole batch and exports a real readable XLSX report  1207ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > rejects missing-expiry as a whole batch and exports a real readable XLSX report  1238ms
+   ✓ native CSV through restricted HTTP/PG15 producers and consumers > enforces registered format and existing actor/scope grants before CSV admission  1835ms
+ ✓ tests/intake-runtime-consumers.integration.test.ts (13 tests) 15240ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rolls back receiving an old XLSX object against a newly registered CSV source version  1106ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > does not reinterpret a queued historical XLSX object after the source selects CSV  1014ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > evicts a terminated idle connection and admits a new one through the purpose guard  987ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor  1349ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > publishes a confirmed corrective rollback through the actual service  1406ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > grants through the actual allocator and invalidates saved usage after revocation  1178ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > recovers an actually committed publication after a lost COMMIT response  1139ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT  1531ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uses the worker pool for actual parser failure and report capacity without business writes  1088ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response  1018ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical revoked approval unavailable to reads and rollback  1280ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical expired approval unavailable to reads and rollback  1275ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected  870ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/content-intake-material.test.ts > formal candidate material from independently parsed workbook > rejects unknown vocabulary and cross-entry question identity
+AssertionError: expected [Function] to throw error including 'SOURCE_MISMATCH' but got 'SOURCE_FORMAT_MISMATCH'
+
+Expected: "SOURCE_MISMATCH"
+Received: "SOURCE_FORMAT_MISMATCH"
+
+ ❯ tests/content-intake-material.test.ts:124:49
+    122|     const vocabularyRow = row(); vocabularyRow[3] = 'missing-product';
+    123|     const vocabulary = await input([vocabularyRow]);
+    124|     expect(() => materialFromParse(vocabulary)).toThrow('SOURCE_MISMAT…
+       |                                                 ^
+    125|     const first = materialFromParse({ ...await input(), parsed: { ...(…
+    126|       questions: [{ entryId: 'entry-a', id: 'q1', text: '合成问法', state:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 56 passed (57)
+   Start at  23:45:58
+   Duration  15.82s (transform 491ms, setup 0ms, collect 1.46s, tests 26.33s, environment 0ms, prepare 256ms)
+

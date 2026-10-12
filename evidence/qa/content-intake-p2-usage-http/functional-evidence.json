@@ -1,0 +1,60 @@
+{
+  "revision": "90a72c57695b7d353622aa1cee9b476ddd060560",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Isolated synthetic PG and loopback host only; production registration and ACL remain sealed.",
+    "No renderer/preload/native clipboard or Windows/WSL run in this slice.",
+    "Outside model unavailable; native reviewer has summary-only fixtures."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake-usage-http.test.ts",
+      "contract": "正式错误合同、诊断回调抛错、认证/参数/正文边界",
+      "expected": "15 cases pass, including sink exception",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-usage-http.test.ts (15 tests) 61ms\n\n Test Files  1 passed (1)\n      Tests  15 passed (15)\n   Start at  23:25:56\n   Duration  397ms (transform 100ms, setup 0ms, collect 189ms, tests 61ms, environment 0ms, prepare 35ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'Main consumes actual synthetic HTTP'",
+      "contract": "修后实际 PG 发布产物由真实桌面客户端消费",
+      "expected": "1 integration case passes, 86 filtered; published 101 FAQ across two pages; cancel/expiry/revocation",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (87 tests | 86 skipped) 3786ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  3786ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 86 skipped (87)\n   Start at  23:25:57\n   Duration  4.36s (transform 186ms, setup 0ms, collect 419ms, tests 3.79s, environment 0ms, prepare 29ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake-usage-http.test.ts"
+      ],
+      "hypothesis": "All 15 strict-ingress/error/sink cases pass on final source; confirm the same repaired adapter still delivers actual published PG material through the real desktop session and cleans up.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "Main consumes actual synthetic HTTP"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

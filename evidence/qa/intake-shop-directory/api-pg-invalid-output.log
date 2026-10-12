@@ -1,0 +1,17 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/content-intake-usage-http.test.ts (18 tests) 88ms
+ ✓ tests/intake-shop-directory.integration.test.ts (6 tests) 6207ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > returns only names for visible shop IDs, denies forged selectors, and exposes no private envelope  1082ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > rejects an entire missing-name set and invalidates pagination on rename and revocation  1041ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > rejects the whole malformed prepared page as unavailable: missing-field  986ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > rejects the whole malformed prepared page as unavailable: oversize-name  902ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > does not expose a page after an unknown COMMIT and allows a fresh read retry  888ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > fails closed on unavailable key and rejects a prepared page that expires before the final guard  1307ms
+
+ Test Files  2 passed (2)
+      Tests  24 passed (24)
+   Start at  19:09:46
+   Duration  6.97s (transform 313ms, setup 0ms, collect 853ms, tests 6.29s, environment 0ms, prepare 115ms)
+

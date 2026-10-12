@@ -1,0 +1,54 @@
+{
+  "schema": "repair-successor-review-candidate/v1",
+  "status": "DRAFT",
+  "formalVersionAssigned": false,
+  "proposedVersions": {
+    "openapi": "1.24.0",
+    "schema": "1.28",
+    "migration": "0040",
+    "exportProfile": "content-intake-repair-successor-v1"
+  },
+  "freezeApproved": false,
+  "exportApproved": false,
+  "intakeApproved": false,
+  "productionConsumerReady": false,
+  "runtimeActivated": false,
+  "syntheticOnly": true,
+  "inputs": {
+    "business-docs/01-客服Agent项目/30-开发-进行中/owner-acceptance.publish.v1.sql": "e2d92ff440e333b066a638accf6ca0942de21415832b92a24dc172a123174edd",
+    "business-docs/01-客服Agent项目/30-开发-进行中/coach-publish-candidate/storage.delta.sql": "2bb50cabc8b7ce0fd77c25c0800c35c17b4bfaa3419f7a140d70719ac2ba5847",
+    "business-docs/01-客服Agent项目/30-开发-进行中/openapi.v1.23.yaml": "82443864e4459af4a9575b304ccecfcbb2cbb4e3c1f08cff13bd512616fe54b0",
+    "business-docs/01-客服Agent项目/30-开发-进行中/schema.v1.26.sql": "1c0a4e508ea0aab97d40abff4829ea5a0ce65882ad6a044187fc231872bbe39c",
+    "business-docs/01-客服Agent项目/30-开发-进行中/schema.v1.27.sql": "ad80e456ff1dd26017e893dd211e84ff6a7e9032bb029811d49ac3df36b9aa85",
+    "business-docs/01-客服Agent项目/30-开发-进行中/sop-row-deletion-candidate/storage.source.sql": "9036ac67bd0bcf7d66c5b09e6c10142fb092af94e761b4238e845c039f40250d",
+    "business-docs/01-客服Agent项目/30-开发-进行中/repair-successor-candidate/predecessor-lock.json": "0e33365085437efa1c2bf899ca87c7cef68147848edc8a3f9e42d6d3b2c8caf2"
+  },
+  "exactReuse": {
+    "publisherSql": "268b0ecc1b25d7c9d55c737e2e60040d1abef923f88c83dd68f0a4bc4f8df813",
+    "reuseScope": "Only unchanged publisher body. Row revision now writes immutable deletion history; all SOP lifecycle functions, ACL and combined installation require fresh evidence."
+  },
+  "newSopCandidateSql": "dfa8dc104c6c0a4654d33c3e0bd21dc50d9580cbdb6baf41f2dcf2837a2d0f45",
+  "artifacts": {
+    "openapi.candidate.json": {
+      "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "bytes": 795585
+    },
+    "schema.candidate.sql": {
+      "sha256": "c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69",
+      "bytes": 834890
+    },
+    "upgrade.candidate.sql": {
+      "sha256": "a0e2e9d04a44bc78a2ab77b14ebf35f3bca4e2b9427d328405bd9ca141795b8f",
+      "bytes": 115028
+    },
+    "installation.candidate.json": {
+      "sha256": "adac07c832853c64ac273762138ebdb3b998259607e13a4345eafdb5bd3abe9f",
+      "bytes": 5119
+    }
+  },
+  "remainingApprovals": [
+    "Confirm proposed versions, migration and profile; hashes in this manifest are review objects, NOT approval.",
+    "Review exact final artifacts and installation closure, then run release gate on frozen input and record explicit freeze.",
+    "Separate export approval/profile, export receipt and product versioned intake; no direct copy to migrations."
+  ]
+}

@@ -1,0 +1,687 @@
+{
+  "schema_v1_25": {
+    "status": "executed",
+    "acl": [
+      {
+        "signature": "backend_review.lock_content()",
+        "usage_execute": true,
+        "public_execute": false
+      },
+      {
+        "signature": "content_intake.manage_shop_directory_steward(p_session_hash text, p_target text, p_expected_version bigint, p_target_facts bigint, p_valid_until timestamp with time zone, p_reason text, p_operation text)",
+        "usage_execute": false,
+        "public_execute": false
+      },
+      {
+        "signature": "content_intake.read_shop_directory(p_principal text, p_session_hash text, p_at timestamp with time zone, p_cursor text, p_limit integer, p_cursor_signing_key text, p_outer_deadline timestamp with time zone)",
+        "usage_execute": false,
+        "public_execute": false
+      }
+    ],
+    "dynamic": {
+      "asUsage": [
+        {
+          "label": "lock_content",
+          "who": "rev_usage after SET ROLE intake_usage",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "setRole": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          },
+          "privilege": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "allowed": true
+              }
+            ]
+          },
+          "executed": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "lock_content": ""
+              }
+            ]
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "manage_shop_directory_steward",
+          "who": "rev_usage after SET ROLE intake_usage",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "setRole": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          },
+          "privilege": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "allowed": false
+              }
+            ]
+          },
+          "executed": {
+            "ok": false,
+            "sqlstate": "42501",
+            "message": "permission denied for function manage_shop_directory_steward"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "read_shop_directory",
+          "who": "rev_usage after SET ROLE intake_usage",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "setRole": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          },
+          "privilege": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "allowed": false
+              }
+            ]
+          },
+          "executed": {
+            "ok": false,
+            "sqlstate": "42501",
+            "message": "permission denied for function read_shop_directory"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        }
+      ],
+      "asOwner": [
+        {
+          "label": "lock_content",
+          "who": "cluster owner gate_owner, same session pg_temp bait; resolution only",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "executed": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "lock_content": ""
+              }
+            ]
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "manage_shop_directory_steward",
+          "who": "cluster owner gate_owner, same session pg_temp bait; resolution only",
+          "planted": [
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"pg_advisory_xact_lock\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"current_setting\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"hashtext\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"clock_timestamp\" already exists with same argument types"
+            }
+          ],
+          "executed": {
+            "ok": false,
+            "sqlstate": "P0001",
+            "message": "SHOP_DIRECTORY_SESSION"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "read_shop_directory",
+          "who": "cluster owner gate_owner, same session pg_temp bait; resolution only",
+          "planted": [
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"pg_advisory_xact_lock\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"current_setting\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"hashtext\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"clock_timestamp\" already exists with same argument types"
+            }
+          ],
+          "executed": {
+            "ok": false,
+            "sqlstate": "P0001",
+            "message": "SHOP_DIRECTORY_SESSION"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        }
+      ]
+    }
+  },
+  "product_migrations": {
+    "status": "executed",
+    "acl": [
+      {
+        "signature": "backend_review.lock_content()",
+        "usage_execute": true,
+        "public_execute": false
+      },
+      {
+        "signature": "content_intake.execute_rollback(p_actor text, p_request jsonb, p_observation jsonb)",
+        "usage_execute": false,
+        "public_execute": false
+      },
+      {
+        "signature": "content_intake.manage_shop_directory_steward(p_session_hash text, p_target text, p_expected_version bigint, p_target_facts bigint, p_valid_until timestamp with time zone, p_reason text, p_operation text)",
+        "usage_execute": false,
+        "public_execute": false
+      },
+      {
+        "signature": "content_intake.preview_rollback(p_actor text, p_base text, p_target text)",
+        "usage_execute": false,
+        "public_execute": false
+      },
+      {
+        "signature": "content_intake.publish_candidate(p_actor text, p_request jsonb, p_observation jsonb)",
+        "usage_execute": false,
+        "public_execute": false
+      },
+      {
+        "signature": "content_intake.read_shop_directory(p_principal text, p_session_hash text, p_at timestamp with time zone, p_cursor text, p_limit integer, p_cursor_signing_key text, p_outer_deadline timestamp with time zone)",
+        "usage_execute": false,
+        "public_execute": false
+      }
+    ],
+    "dynamic": {
+      "asUsage": [
+        {
+          "label": "lock_content",
+          "who": "rev_usage after SET ROLE intake_usage",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "setRole": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          },
+          "privilege": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "allowed": true
+              }
+            ]
+          },
+          "executed": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "lock_content": ""
+              }
+            ]
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "publish_candidate",
+          "who": "rev_usage after SET ROLE intake_usage",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "setRole": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          },
+          "privilege": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "allowed": false
+              }
+            ]
+          },
+          "executed": {
+            "ok": false,
+            "sqlstate": "42501",
+            "message": "permission denied for function publish_candidate"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "preview_rollback",
+          "who": "rev_usage after SET ROLE intake_usage",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "setRole": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          },
+          "privilege": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "allowed": false
+              }
+            ]
+          },
+          "executed": {
+            "ok": false,
+            "sqlstate": "42501",
+            "message": "permission denied for function preview_rollback"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "execute_rollback",
+          "who": "rev_usage after SET ROLE intake_usage",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "setRole": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          },
+          "privilege": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "allowed": false
+              }
+            ]
+          },
+          "executed": {
+            "ok": false,
+            "sqlstate": "42501",
+            "message": "permission denied for function execute_rollback"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        }
+      ],
+      "asOwner": [
+        {
+          "label": "lock_content",
+          "who": "cluster owner gate_owner, same session pg_temp bait; resolution only",
+          "planted": [
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            },
+            {
+              "ok": true,
+              "sqlstate": null,
+              "rows": []
+            }
+          ],
+          "executed": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": [
+              {
+                "lock_content": ""
+              }
+            ]
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "publish_candidate",
+          "who": "cluster owner gate_owner, same session pg_temp bait; resolution only",
+          "planted": [
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"pg_advisory_xact_lock\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"current_setting\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"hashtext\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"clock_timestamp\" already exists with same argument types"
+            }
+          ],
+          "executed": {
+            "ok": false,
+            "sqlstate": "ZA003",
+            "message": "MODE_CONFLICT"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "preview_rollback",
+          "who": "cluster owner gate_owner, same session pg_temp bait; resolution only",
+          "planted": [
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"pg_advisory_xact_lock\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"current_setting\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"hashtext\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"clock_timestamp\" already exists with same argument types"
+            }
+          ],
+          "executed": {
+            "ok": false,
+            "sqlstate": "ZA005",
+            "message": "SCOPE_DENIED"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        },
+        {
+          "label": "execute_rollback",
+          "who": "cluster owner gate_owner, same session pg_temp bait; resolution only",
+          "planted": [
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"pg_advisory_xact_lock\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"current_setting\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"hashtext\" already exists with same argument types"
+            },
+            {
+              "ok": false,
+              "sqlstate": "42723",
+              "message": "function \"clock_timestamp\" already exists with same argument types"
+            }
+          ],
+          "executed": {
+            "ok": false,
+            "sqlstate": "ZA003",
+            "message": "MODE_CONFLICT"
+          },
+          "hits": {
+            "ok": true,
+            "sqlstate": null,
+            "rows": []
+          }
+        }
+      ]
+    }
+  }
+}

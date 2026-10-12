@@ -1,0 +1,23 @@
+{
+  "created_at": "2026-10-08T18:41:27.761140+00:00",
+  "artifacts": [
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/release/local-unsigned/客服话术浮窗 Demo-0.3.26-mac-universal-UNSIGNED.dmg",
+      "bytes": 223997599,
+      "sha256": "b834e9f79fe2b81d8eae361ea747ed70ccb6c4c4eeb45abd771fbb4e14b68cf7"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/release/local-unsigned/客服话术浮窗 Demo-0.3.26-mac-universal-UNSIGNED.zip",
+      "bytes": 223264263,
+      "sha256": "3a99bc250448551fca85044cd490edb3b43c26863f64b7276597fca89d4c3cec"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/Resources/app.asar",
+      "bytes": 11541268,
+      "sha256": "f9724de3438f87be8b376816e99018f410444ca8d41c0aa76dc7ef9ce34ea0d6"
+    }
+  ],
+  "installed_app": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/installed/客服话术浮窗 Demo.app",
+  "executable": "/Users/hutou/.codex/worktrees/intake-menokin-readiness/customer-agent-prototype/.gstack/qa-reports/intake-final-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+  "dmg_detached": true
+}

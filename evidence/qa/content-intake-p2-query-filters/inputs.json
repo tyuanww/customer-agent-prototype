@@ -1,0 +1,32 @@
+{
+  "base": "9a175ac",
+  "branch": "codex/content-intake-query",
+  "date": "2026-10-08",
+  "node": "24.19.0",
+  "pnpm": "11.19.0",
+  "postgres": "15",
+  "platform": "macOS arm64",
+  "files": {
+    "apps/api/src/content-intake/discovery.ts": "ae76ad62d03ff74ab42c2e89307acd132970746dc4b2f7d729828beebbe36b4e",
+    "apps/api/src/content-intake/usage-http.ts": "1933ccb548c4635ee6032f993bc7e00c20e305dfd4b55a922a5a6461240401e6",
+    "apps/api/tests/content-intake-usage-http.test.ts": "e2db8628bf510f1c5e431265221d7ffa6e148eb581690c8852823161bf8bed4c",
+    "apps/api/tests/content-intake.integration.test.ts": "92b38523c14ff5eebda7e892fa5dfa8040e1f469fa3bbc1facdd5cd9a726983e",
+    "apps/desktop/src/main/content-intake-access.ts": "e54393b25ac9126e0167dc36a23131b34050c80e50bf40f33c37a56172d1757c",
+    "apps/desktop/src/main/content-intake-query-ipc.ts": "c70509ccd96d5d8c9b28acef38a2f32e61ccb3285c145dce6853cb1422ed27b7",
+    "apps/desktop/src/main/content-intake-query.ts": "5e0668be009436615bebab51befb0643adc37377cb1c60160be1a96c9f03eacb",
+    "apps/desktop/src/preload/content-intake-query.ts": "18c702b1f466aefa3c17db2d30c656c29475ad3b737cc99789943c3d9619d92e",
+    "apps/desktop/src/renderer/QueryApp.tsx": "1eb1fdcdc90b22c503668774ae6faea3bd467d1b004eb72bfe95cd57b0b4b754",
+    "apps/desktop/src/renderer/features/search/QueryResultsPane.tsx": "6502eaf57a73ad1835a7595925bb4420f822c2e95b1c340a0625e39b64b8e512",
+    "apps/desktop/src/renderer/features/search/use-intake-shops.ts": "b24325a39a87de535d4fa3120884c5891a3d551efee758077e4f0ba227ec4936",
+    "apps/desktop/src/renderer/styles/app.css": "4558d5bdbe5d66a519ea3d72e62feef96b929c5df7af25ab5fcd532aa1f91f46",
+    "apps/desktop/src/shared/content-intake-query.ts": "5ff68d33f06a9799119e4370a6d304917d6b1b17311f521e2e414892e0e37466",
+    "apps/desktop/src/shared/ipc-channels.ts": "d8c4de722c10d06172f4a77548fd4fd869ce042a7f633112cacdedcd28fe29dd",
+    "apps/desktop/tests/component/QueryApp.test.tsx": "bb4f37eadca81eaa09d775422b9dda860de4f0ef588e76a8ad2c7dbc9cea5f27",
+    "apps/desktop/tests/e2e/content-intake-query.spec.ts": "9b28b28bf6a0d9261f9cdee323ec5b77323bf05bb7386bd512389833c0b604bd",
+    "apps/desktop/tests/fixtures/intake-query-data.ts": "b4228fe2cad3464929ea78630085a3706710e900b22adde4c91ac3a7576b22a9",
+    "apps/desktop/tests/unit/content-intake-query-ipc.test.ts": "bc4b22af3f4a7c29489ec27384ecb632efea780222f78d274fd062788b3c45bf",
+    "apps/desktop/tests/unit/content-intake-query.test.ts": "b4a4af9121f754426488eabcbb9ca35bfd9e9bc2cb08a2f308c1a2cbfaed32ab",
+    "apps/desktop/tests/unit/contracts.test.ts": "1ee8a303ea2a76bde383e6209073e9c4ad7a27c150603301cf5e34311c671e94",
+    "apps/desktop/src/renderer/features/search/IntakeQueryFilters.tsx": "bff22f0d842da5a2fa01f490525ccf690647057be8f7c44939cfeea7ebbed5bf"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "observationCapture": "006",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "sub-millisecond|uncommitted grant"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (31 tests | 27 skipped) 5083ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire  1380ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled  1326ms\n   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires  1326ms\n   ✓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit  1049ms\n\n Test Files  1 passed (1)\n      Tests  4 passed | 27 skipped (31)\n   Start at  09:55:53\n   Duration  5.57s (transform 147ms, setup 0ms, collect 339ms, tests 5.08s, environment 0ms, prepare 34ms)\n\n",
+  "hypothesis": "Because the eligibility repair changed the shared approval dependency, revalidate the original success and revoke contracts on current inputs as required repair verification.",
+  "nextCapture": "007",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "round-trips|keeps revoked"
+  ]
+}

@@ -1,0 +1,66 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-transaction-runtime.test.ts (4 tests) 5ms
+ ✓ tests/intake-runtime-candidate.integration.test.ts (1 test) 2732ms
+   ✓ formal runtime migration installs LOGIN capability guards block cross-purpose and forged cancellation outcomes  2731ms
+ ✓ tests/intake-grants-http.integration.test.ts (3 tests) 6661ms
+   ✓ business permission HTTP and PG15 (synthetic) > selects names, previews without writes, saves/replays/lists, then revokes a disabled recipient  2411ms
+   ✓ business permission HTTP and PG15 (synthetic) > excludes invisible scope rows before paging and invalidates cursors on authority change  1838ms
+   ✓ business permission HTTP and PG15 (synthetic) > rechecks after preview and refuses forged input or a partially invalid batch without writes  2412ms
+ ❯ experiments/intake-organization/registered-refresh.integration.test.ts (10 tests | 1 failed) 19584ms
+   ✓ registered organization input through the existing atomic facts writer > reads registered identity, persists exact provenance atomically and rejects modified replay  2208ms
+   ✓ registered organization input through the existing atomic facts writer > revokes binding and facts atomically, denies old/new usage and rejects a pre-rebind snapshot  1804ms
+   ✓ registered organization input through the existing atomic facts writer > serializes concurrent identical observations and fences different provenance  2401ms
+   ✓ registered organization input through the existing atomic facts writer > recovers a lost COMMIT from the original observation and original revocation only  1408ms
+   ✓ registered organization input through the existing atomic facts writer > rolls fact and binding pointers back if evidence insertion or final deadline fails  1408ms
+   ✓ registered organization input through the existing atomic facts writer > rejects wrong scope and active rebinding; cancellation cannot create an observation  1393ms
+   ✓ registered organization input through the existing atomic facts writer > revokes an expired active registration before registering a new identity  1698ms
+   ✓ registered organization input through the existing atomic facts writer > recovers registration COMMIT without rebinding and rejects an open ID already assigned to another principal  2641ms
+   ✓ registered organization input through the existing atomic facts writer > rolls an expired registration insert back at its final database-clock checkpoint  2401ms
+   × registered organization input through the existing atomic facts writer > rejects cross-scope, invalid domains, non-finite timestamps and null provenance in SQL itself 2221ms
+     → expected error: ORGANIZATION_BINDING_CONFLICT { …(15) } to match object { code: '23503' }
+(17 matching properties omitted from actual)
+ ✓ tests/intake-runtime-consumers.integration.test.ts (10 tests) 24287ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor  3157ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > publishes a confirmed corrective rollback through the actual service  3206ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > grants through the actual allocator and invalidates saved usage after revocation  1696ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > recovers an actually committed publication after a lost COMMIT response  1493ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT  2344ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > uses the worker pool for actual parser failure and report capacity without business writes  3841ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response  2406ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical revoked approval unavailable to reads and rollback  3449ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > keeps a real-shaped historical expired approval unavailable to reads and rollback  1635ms
+   ✓ actual service on formal purpose roles (synthetic PG15) > refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected  1058ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  experiments/intake-organization/registered-refresh.integration.test.ts > registered organization input through the existing atomic facts writer > rejects cross-scope, invalid domains, non-finite timestamps and null provenance in SQL itself
+AssertionError: expected error: ORGANIZATION_BINDING_CONFLICT { …(15) } to match object { code: '23503' }
+(17 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "code": "23503",
++ DatabaseError {
++   "code": "ZA003",
+  }
+
+ ❯ experiments/intake-organization/registered-refresh.integration.test.ts:208:5
+    206|     const insert = `INSERT INTO intake_organization.bindings VALUES($1…
+    207|     const common = ['tenant-a','app-a','agent',2,'0'.repeat(64),'synth…
+    208|     await expect(admin.query(insert, ['tenant-a','other-app',...common…
+       |     ^
+    209|     await expect(admin.query(insert, [...common.slice(0,6),'infinity']…
+    210|     await expect(admin.query(insert, ['',...common.slice(1)])).rejects…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 27 passed (28)
+   Start at  19:01:52
+   Duration  25.19s (transform 595ms, setup 0ms, collect 2.78s, tests 53.27s, environment 1ms, prepare 434ms)
+

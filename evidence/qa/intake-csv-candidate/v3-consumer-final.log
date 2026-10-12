@@ -1,0 +1,18 @@
+Command: ["node", "--test", ".gstack/qa-reports/intake-csv-candidate/v3-export-intake-roundtrip.test.mjs"]
+Working directory: /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype
+Environment: Node 24.19.0, macOS arm64; synthetic temporary Git source and product root
+Inputs at start: {"scripts/customer-agent-contract-set.mjs": "adfe1a553dca2a2bd620f513fceff5d6f13970107d30dae641d0c0cc19744d1f", "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": "40563cd00d542981f01816295cba2f9a9f6098e37343cc5af7ef194cbd8c2193", ".gstack/qa-reports/intake-csv-candidate/v3-export-intake-roundtrip.test.mjs": "9f8b03c69e025f403da3d0b9435b9101bddd030296cb3bba2b5a6069e52f3b93"}
+{"producer":"governance actual exporter","consumer":"product actual ingest CLI then verify CLI","schema":"customer-agent-contract-set/v3","members":14,"status":"VERIFIED_NOT_ACTIVATED","runtime_activated":false,"contract_set_id":"cs-ai-c11-openapi-1.22.0-schema-1.24-d6f97c877a46","source_git_sha":"d6f97c877a461460bafe743b78b0789a5e2d38a7","governance_source_sha":"5335107563510f54f656237b3d11bc375d179edb"}
+{"temporarySourceRemoved":true,"temporaryProductRemoved":true,"realProductLockUnchanged":true,"realProductLockSha256":"0161f430d0171b4836e6b08e011c0c8c4c92fde8edb5602608533b4c1a5bf858"}
+✔ CSV candidate profile refuses DRAFT and only consumes a complete v3 bundle in a disposable synthetic repository (45910.425625ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46033.68375
+Exit code: 0
+Inputs unchanged: true
+Completed: 2026-10-08T22:59:56.568522+08:00

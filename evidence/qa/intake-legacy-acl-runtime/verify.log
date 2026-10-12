@@ -1,0 +1,10 @@
+{
+  "status": "VERIFIED",
+  "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+  "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+  "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+  "lock_path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/contracts/upstream/customer-agent/contract-set.lock.json",
+  "intake_status": "VERIFIED_NOT_ACTIVATED",
+  "ddev_authorized": false,
+  "runtime_activated": false
+}

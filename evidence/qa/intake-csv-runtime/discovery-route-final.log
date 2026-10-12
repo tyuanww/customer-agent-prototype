@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires
+{"probe":"discovery-capacity","sources":5000,"pages":151,"elapsedMs":27870}
+
+ ✓ tests/content-intake.integration.test.ts (152 tests | 151 skipped) 29366ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires  29365ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 151 skipped (152)
+   Start at  23:41:02
+   Duration  30.18s (transform 295ms, setup 0ms, collect 543ms, tests 29.37s, environment 0ms, prepare 60ms)
+

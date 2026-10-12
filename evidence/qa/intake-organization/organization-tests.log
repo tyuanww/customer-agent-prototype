@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-organization.integration.test.ts (8 tests) 8338ms
+   ✓ offline organization refresh through frozen storage and real usage > refreshes with a non-owner writer; exact replay changes no deadline or generation and old lease stays bounded  1132ms
+   ✓ offline organization refresh through frozen storage and real usage > disables actual usage and an old enabled replay cannot restore it; role changes revoke the old qualification  863ms
+   ✓ offline organization refresh through frozen storage and real usage > rejects stale, future, expired, malformed and cross-scope snapshots without mutation  835ms
+   ✓ offline organization refresh through frozen storage and real usage > serializes concurrent snapshots and refuses a newer version with an older observation  910ms
+   ✓ offline organization refresh through frozen storage and real usage > recovers a lost commit using the exact immutable version after writer recreation  846ms
+   ✓ offline organization refresh through frozen storage and real usage > rolls back an observation that expires after writing but before commit  1969ms
+   ✓ offline organization refresh through frozen storage and real usage > department changes remove access and do not rewrite grants or silently choose a role  870ms
+   ✓ offline organization refresh through frozen storage and real usage > has no write authority over identity, role policy, grants, history or publication  912ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  11:24:19
+   Duration  9.05s (transform 256ms, setup 0ms, collect 523ms, tests 8.34s, environment 0ms, prepare 44ms)
+

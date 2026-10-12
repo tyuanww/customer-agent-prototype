@@ -1,0 +1,38 @@
+{
+  "runtimeInputs": {
+    "matched": 19,
+    "different": []
+  },
+  "runtimeLogs": {
+    "matched": 13,
+    "different": []
+  },
+  "budgetInputs": {
+    "matched": 7,
+    "different": [
+      "docs/reference-project-architecture.md"
+    ]
+  },
+  "budgetLogHashes": {
+    "matched": 11,
+    "different": []
+  },
+  "readinessInputs": {
+    "matched": 12,
+    "different": []
+  },
+  "macPackageInputs": {
+    "matched": 235,
+    "different": []
+  },
+  "macRuntimeInputs": {
+    "matched": 193,
+    "different": []
+  },
+  "macEvidence": {
+    "matched": 12,
+    "different": []
+  },
+  "scopeNote": "Budget architecture input differs only because root added the runtime candidate owner paragraph; measured code inputs match. Tests/package sources unchanged.",
+  "integrationHead": "f5f4ae425a0a63c9cf901a00f81e872383a774a4"
+}

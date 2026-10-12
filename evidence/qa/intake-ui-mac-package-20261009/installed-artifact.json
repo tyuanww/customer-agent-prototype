@@ -1,0 +1,20 @@
+{
+  "buildHead": "25c0bd55eb9c6fc6d86323a5a133a51f7258d93f",
+  "version": "0.3.26",
+  "app": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app",
+  "executable": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+  "executableSha256": "a4692c33e58b0afa46917e8dbb530fb8f909cf8eaa20abf639e0d48a91c3ccde",
+  "asarSha256": "6ae10425c066bca2d81916c932c0c509d9e3a7db66f1e729128c66f684049072",
+  "artifacts": [
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/release/local-unsigned/客服话术浮窗 Demo-0.3.26-mac-universal-UNSIGNED.dmg",
+      "bytes": 223995041,
+      "sha256": "6b2ac42908d96a23d128ef153261d164b7e6246574bda64300c7f8f242ff189f"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/release/local-unsigned/客服话术浮窗 Demo-0.3.26-mac-universal-UNSIGNED.zip",
+      "bytes": 223265470,
+      "sha256": "489b6e5dbc7035be89e01be26ea8a7bd181c668b007ecc663677d6bbc5e3d9de"
+    }
+  ]
+}

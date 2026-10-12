@@ -1,0 +1,40 @@
+{
+  "base_commit": "cd0d17c134af5966e49db8e7a9571331d41c635d",
+  "scope": "loopback-only transport resource cleanup; no observer/writer/runtime wiring change",
+  "source_sha256": {
+    "apps/api/experiments/intake-organization/http-transport.ts": "3edbb3d8e2958801ca5ef93868b70c10d7ea03f5b48c40a6ac54e741949d5e9d",
+    "apps/api/experiments/intake-organization/transport.test.ts": "e2faa1eba54e68b1723e4ca5d1fc6b6abb44efebd3b1522332caae95e194a082"
+  },
+  "logs_sha256": {
+    "cleanup-unit.txt": "3f5e7f9676df8a143035e3580804097c374a4cdfffd866d40246fc9a9354c45e",
+    "cleanup-eslint.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cleanup-typecheck.txt": "50a96f085ac4347857361ccce272773f6ef9b6d09abbe3a0e63af750cbdb5223"
+  },
+  "commands": [
+    {
+      "command": "cd apps/api && pnpm exec vitest run experiments/intake-organization/transport.test.ts --reporter=verbose",
+      "exit_code": 0,
+      "result": "24 passed, 0 failed, 0 skipped",
+      "log": "cleanup-unit.txt"
+    },
+    {
+      "command": "cd apps/api && pnpm exec eslint experiments/intake-organization/http-transport.ts experiments/intake-organization/transport.test.ts",
+      "exit_code": 0,
+      "log": "cleanup-eslint.txt"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api typecheck",
+      "exit_code": 0,
+      "log": "cleanup-typecheck.txt"
+    }
+  ],
+  "environment": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0"
+  },
+  "not_rerun": [
+    "Prior 4 PG15 consumer cases: fixture/observer/writer/consumer code unchanged; this follow-up only releases an already completed/rejected request. Original results are retained, not relabelled as a new run.",
+    "Production API build: experimental sources remain excluded; no build configuration change.",
+    "Full external /review remains INCOMPLETE."
+  ]
+}

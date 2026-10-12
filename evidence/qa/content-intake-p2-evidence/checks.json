@@ -1,0 +1,97 @@
+[
+  {
+    "check": "lint",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "exit": 0,
+    "seconds": 3.33
+  },
+  {
+    "check": "typecheck",
+    "command": [
+      "pnpm",
+      "typecheck"
+    ],
+    "exit": 0,
+    "seconds": 6.327
+  },
+  {
+    "check": "test",
+    "command": [
+      "pnpm",
+      "test"
+    ],
+    "exit": 0,
+    "seconds": 77.943
+  },
+  {
+    "check": "build",
+    "command": [
+      "pnpm",
+      "build"
+    ],
+    "exit": 0,
+    "seconds": 6.089
+  },
+  {
+    "check": "workspace",
+    "command": [
+      "pnpm",
+      "workspace:check"
+    ],
+    "exit": 0,
+    "seconds": 0.667
+  },
+  {
+    "check": "docs",
+    "command": [
+      "pnpm",
+      "docs:check"
+    ],
+    "exit": 0,
+    "seconds": 0.32
+  },
+  {
+    "check": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.024
+  },
+  {
+    "check": "final-workspace",
+    "command": [
+      "pnpm",
+      "workspace:check"
+    ],
+    "exit": 0,
+    "seconds": 0.392,
+    "scope": "final report and copied evidence"
+  },
+  {
+    "check": "final-docs",
+    "command": [
+      "pnpm",
+      "docs:check"
+    ],
+    "exit": 0,
+    "seconds": 0.253,
+    "scope": "final report and copied evidence"
+  },
+  {
+    "check": "final-diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.015,
+    "scope": "final report and copied evidence"
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "observationCapture": "007",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/content-intake-query.spec.ts"
+  ],
+  "observed": "\nRunning 1 test using 1 worker\n\n  ✓  1 tests/e2e/content-intake-query.spec.ts:12:1 › FAQ Query logs in, selects shops, searches, copies, expires, recovers and isolates other windows (4.8s)\n\n  1 passed (5.0s)\n",
+  "hypothesis": "Verify the default profile still opens and restores Dashboard through macOS activate after the FAQ-specific entry restriction.",
+  "nextCapture": "008",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "playwright",
+    "test",
+    "tests/e2e/dashboard.spec.ts",
+    "--grep",
+    "macOS-style Dock activation"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/content-intake-access.test.ts"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-access.test.ts (12 tests) 38ms\n\n Test Files  1 passed (1)\n      Tests  12 passed (12)\n   Start at  23:56:59\n   Duration  336ms (transform 69ms, setup 88ms, collect 113ms, tests 38ms, environment 0ms, prepare 30ms)\n\n",
+  "hypothesis": "Main 的完整分页和取消断言已通过；下一步用真实会话及隔离 PG 检验范围与游标，并实际消费发布 FAQ，排除纯桩验证的缺口。",
+  "nextCapture": "002",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "discovery:|usage: Main"
+  ]
+}

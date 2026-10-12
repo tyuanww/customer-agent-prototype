@@ -1,0 +1,64 @@
+{
+  "head": "789ce58e8944b2acdddd627d9a559b05612ede62",
+  "runtime": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18"
+  },
+  "checks": [
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=<PG15> CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake-material.test.ts tests/content-intake.integration.test.ts",
+      "exitCode": 0,
+      "outcome": "43 passed: 35 real PostgreSQL, 8 material tests; 7 newly added",
+      "log": ".gstack/content-intake-p2-quality/targeted.log",
+      "logSha256": "92ae9a7a04da2e38c1d77c1fab0cb6b40d80fcb2448f4263f3b9788a9c2bdcec"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "outcome": "passed",
+      "log": ".gstack/content-intake-p2-quality/lint.log",
+      "logSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "outcome": "passed",
+      "log": ".gstack/content-intake-p2-quality/typecheck.log",
+      "logSha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "outcome": "passed; default API 451 passed/137 skipped, desktop 1096 passed/1 skipped; explicit PG run is recorded separately",
+      "log": ".gstack/content-intake-p2-quality/test.log",
+      "logSha256": "02cad66646657c6a15641537bc5e005494d2f3562d8c448e73fb540a4e501f26"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "outcome": "passed",
+      "log": ".gstack/content-intake-p2-quality/build.log",
+      "logSha256": "ba553bbee2493faf7ddc4af48bc9ac45c1fc07c285cacd61dab892ad0e3796d9"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "outcome": "$ node scripts/check-documentation.mjs\nDocumentation PASS: 180 Markdown files, local links and workflow entry ownership.",
+      "log": ".gstack/content-intake-p2-quality/docs-final.log",
+      "logSha256": "daa7491d944ba3ae03ce9e4cc3524f0c454f2d72d6a15d8a21f95da6956c4e78"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "outcome": "$ node scripts/workspace-hygiene.mjs check\nWorkspace source budget: PASS (remainder 21.2 MiB / 32.0 MiB)\nWorkspace root policy: PASS",
+      "log": ".gstack/content-intake-p2-quality/workspace-final.log",
+      "logSha256": "55390724499df6c22c546884a5a30f686f24824ff73d1e34abe296f05ca6e603"
+    },
+    {
+      "command": "git diff --check; git diff --cached --check",
+      "exitCode": 0,
+      "outcome": "Both working-tree and exact staged changes passed whitespace checks."
+    }
+  ]
+}

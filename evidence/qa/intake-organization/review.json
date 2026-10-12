@@ -1,0 +1,189 @@
+{
+  "scope": {
+    "base": "29fc709",
+    "branch": "codex/intake-organization",
+    "description": "Only the new offline synthetic organization writer, tests, script and accompanying evidence/docs; earlier dependent commits are not re-certified."
+  },
+  "findings": [],
+  "core": {
+    "status": "no_actionable_findings",
+    "passes": [
+      "critical SQL/data safety, input boundary, races, state/replay",
+      "informational columns, time windows, coercion, completeness, build exclusion"
+    ]
+  },
+  "native_adversarial": {
+    "status": "completed",
+    "reviewer": "in-host subagent organization_adversarial",
+    "findings": [],
+    "coverage": "Full writer, frozen migration and existing authority/transaction/usage consumers; supplied test summary. Parent separately read the full test file."
+  },
+  "outside": {
+    "provider": "claude-code",
+    "adversarial": {
+      "status": "unavailable",
+      "reason": "timeout after 180000ms",
+      "evidence": "outside-adversarial.json"
+    },
+    "structured": {
+      "status": "unavailable",
+      "reason": "timeout after 180000ms",
+      "evidence": "outside-structured.json"
+    },
+    "model": "unknown; timeout result supplied no modelUsage"
+  },
+  "review_verdict": "INCOMPLETE: structured outside coverage is missing; native/core found no actionable defect. Not an all-reviewers pass.",
+  "verification": [
+    {
+      "command": "pnpm --filter @customer-agent/api test:intake:organization",
+      "status": "pass",
+      "result": "8/8 actual PG15 integration cases",
+      "output": "organization-tests.log"
+    },
+    {
+      "command": "pnpm lint",
+      "status": "pass",
+      "output": "lint.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "pass",
+      "output": "typecheck.log"
+    },
+    {
+      "command": "pnpm test",
+      "status": "pass",
+      "output": "workspace-tests.log",
+      "limits": "Ordinary test command retains environment-gated skips, including the 8 organization cases; these 8 ran separately with PG15 enabled."
+    },
+    {
+      "command": "pnpm build",
+      "status": "pass",
+      "output": "build.log"
+    },
+    {
+      "command": "pnpm docs:check",
+      "status": "pass",
+      "output": "docs-check.log"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "status": "pass",
+      "output": "workspace-check.log"
+    },
+    {
+      "command": "git diff --cached --check -- . :(exclude)evidence/qa/intake-organization/organization-tests.log",
+      "status": "pass",
+      "limits": "Exact captured stdout preserves a final blank line and is excluded from whitespace-only checking; its original bytes match qa-receipt.json. Full diff --check reports only this raw-output blank-at-EOF warning."
+    }
+  ],
+  "build_boundary": "API tsconfig includes src only and excludes experiments; actual dist contains no organization writer.",
+  "not_verified": [
+    "Native Feishu organization observation/authenticity/cache ordering",
+    "Production complete least-privilege wiring and tenant row isolation",
+    "GUI/Windows: unchanged desktop",
+    "Remote CI: no push/PR"
+  ],
+  "ocr": {
+    "mode": "workspace",
+    "total_files": 15,
+    "reviewable_files": 8,
+    "reviewed_files": 8,
+    "skipped_files": 0,
+    "coverage_rate": 1.0,
+    "checklist": [
+      {
+        "path": "apps/api/experiments/intake-organization/facts-writer.ts",
+        "status": "added",
+        "disposition": "reviewed"
+      },
+      {
+        "path": "apps/api/package.json",
+        "status": "modified",
+        "disposition": "reviewed"
+      },
+      {
+        "path": "evidence/qa/intake-organization/inputs.json",
+        "status": "added",
+        "disposition": "reviewed"
+      },
+      {
+        "path": "evidence/qa/intake-organization/outside-adversarial.json",
+        "status": "added",
+        "disposition": "reviewed"
+      },
+      {
+        "path": "evidence/qa/intake-organization/outside-structured.json",
+        "status": "added",
+        "disposition": "reviewed"
+      },
+      {
+        "path": "evidence/qa/intake-organization/qa-observation.json",
+        "status": "added",
+        "disposition": "reviewed"
+      },
+      {
+        "path": "evidence/qa/intake-organization/qa-receipt.json",
+        "status": "added",
+        "disposition": "reviewed"
+      },
+      {
+        "path": "evidence/qa/intake-organization/review.json",
+        "status": "added",
+        "disposition": "reviewed"
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "TODOS.md",
+        "status": "modified",
+        "insertions": 1,
+        "deletions": 1,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "apps/api/tests/intake-organization.integration.test.ts",
+        "status": "added",
+        "insertions": 156,
+        "deletions": 0,
+        "exclude_reason": "default_path"
+      },
+      {
+        "path": "docs/how-to-develop-content-intake.md",
+        "status": "modified",
+        "insertions": 10,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+        "status": "modified",
+        "insertions": 13,
+        "deletions": 1,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "docs/reference-project-architecture.md",
+        "status": "modified",
+        "insertions": 2,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "evidence/qa/intake-organization/README.md",
+        "status": "added",
+        "insertions": 31,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      },
+      {
+        "path": "evidence/qa/intake-organization/organization-tests.stderr",
+        "status": "added",
+        "insertions": 4,
+        "deletions": 0,
+        "exclude_reason": "unsupported_ext"
+      }
+    ],
+    "excluded_handling": "Parent additionally inspected the full integration test, all docs diffs and synthetic stderr. Raw ignored .log artifacts are absent from OCR preview; their command outcomes and source/capture fingerprints were inspected separately."
+  }
+}

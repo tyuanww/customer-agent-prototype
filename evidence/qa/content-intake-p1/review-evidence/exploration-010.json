@@ -1,0 +1,14 @@
+{
+  "observationCapture": "009",
+  "observationArgv": [
+    "node",
+    ".gstack/p1-review/edge-repro.mjs"
+  ],
+  "observed": "{\"case\":\"impossible-date\",\"ok\":false,\"issues\":[{\"code\":\"INVALID_TIME\",\"sheet\":\"FAQ\",\"row\":2,\"column\":\"I\",\"fix\":\"填写真实日历日期与带时区的 ISO 时间\"}]}\n{\"case\":\"example-question-id\",\"ok\":false,\"issues\":[{\"code\":\"INVALID_QUESTION\",\"sheet\":\"相似问法\",\"row\":2,\"column\":\"A\",\"fix\":\"核对条目引用、合法非示例问法编号、问法及状态\"}]}\n{\"case\":\"duplicate-cell\",\"ok\":false,\"issues\":[{\"code\":\"AMBIGUOUS_COORDINATE\",\"sheet\":\"\",\"row\":0,\"column\":\"\",\"fix\":\"检查文件或重新导出标准模板后重试\"}]}\n",
+  "hypothesis": "All first-round exact inputs reject; replay the second-round rich-text total, array state and retroactive grant examples on the current source.",
+  "nextCapture": "010",
+  "nextArgv": [
+    "node",
+    ".gstack/p1-review/edge-repro-r2.mjs"
+  ]
+}

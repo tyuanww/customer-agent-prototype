@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop
+
+ ✓ tests/unit/customer-agent-contract-set.test.ts (35 tests) 2895ms
+
+ Test Files  1 passed (1)
+      Tests  35 passed (35)
+   Start at  19:04:33
+   Duration  3.30s (transform 32ms, setup 94ms, collect 20ms, tests 2.90s, environment 192ms, prepare 28ms)
+

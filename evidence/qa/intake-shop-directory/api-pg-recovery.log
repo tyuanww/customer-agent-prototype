@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-shop-directory.integration.test.ts (4 tests) 4025ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > returns only names for visible shop IDs, denies forged selectors, and exposes no private envelope  943ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > rejects an entire missing-name set and invalidates pagination on rename and revocation  916ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > does not expose a page after an unknown COMMIT and allows a fresh read retry  902ms
+   ✓ shop directory through real auth/HTTP and restricted PG15 > fails closed on unavailable key and rejects a prepared page that expires before the final guard  1263ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  19:03:33
+   Duration  4.59s (transform 194ms, setup 0ms, collect 405ms, tests 4.02s, environment 0ms, prepare 44ms)
+

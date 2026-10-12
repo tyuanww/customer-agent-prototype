@@ -1,0 +1,69 @@
+{
+  "baseCommit": "98b888b5e98a367a9e3a458565504c704023d0f3",
+  "scope": "Native publication increment; unchanged earlier branch evidence is reused only when its input hash matches.",
+  "core": {
+    "confirmedDefects": 0,
+    "sourceReview": "Two-pass SQL/data/concurrency/auth/enum review plus module boundary and actual persisted consumer checks",
+    "sharedCode": "Reused existing transaction owner, approval adapter, frozen quality state and old source/owner gates; no additional extraction justified."
+  },
+  "native": {
+    "source": "in-host",
+    "agent": "publication_review",
+    "conclusion": "NO_FINDINGS",
+    "fixtureMode": "summary-only",
+    "independentTestRun": false,
+    "reviewed": [
+      "publication.ts",
+      "evidence.ts",
+      "service.ts",
+      "0024_intake_publication.sql",
+      "candidate/quality/authority/approval/transaction dependencies",
+      "old source/owner gate and lock order",
+      "generator/verifier sealed function boundary"
+    ],
+    "sqlSha256": "87a9e2825cdd781cd363441f16852b73191e37095af8c2567868ea7fbc2d1cc0"
+  },
+  "outside": {
+    "status": "unavailable",
+    "attemptedThisIncrement": false,
+    "reason": "Previous adversarial and structured attempts both timed out after 540000ms; no blind retry or model/global configuration change.",
+    "priorEvidence": "../content-intake-p2-quality/review.json"
+  },
+  "remainingConfirmedDefects": 0,
+  "testDevelopmentCorrections": [
+    "Success fixture contained unresolved media; kept parser rejection and removed attachment from success sample.",
+    "Updated five migration count expectations to 24.",
+    "Forwarded AbortSignal in the delayed synthetic transport wrapper."
+  ],
+  "remote": {
+    "fetchExitCode": 128,
+    "error": "RPC failed; curl 56 Recv failure: Operation timed out; expected flush after ref listing",
+    "latestRemoteHeadVerified": false,
+    "cachedOriginMain": "8ab309fcd9c494b7343ed88bacb253205d36575f"
+  },
+  "historicalHashReuse": {
+    "matched": 44,
+    "total": 58,
+    "changedExcludedFromReuse": [
+      "apps/api/src/content-intake/evidence.ts",
+      "apps/api/src/content-intake/service.ts",
+      "apps/api/tests/content-intake.integration.test.ts",
+      "docs/how-to-develop-content-intake.md",
+      "docs/plans/2026-10-03-content-intake-requirements.md",
+      "docs/reference-content-intake-p2-contract-handoff.md",
+      "docs/reference-project-architecture.md",
+      "packages/database/migrations/manifest.generated.json",
+      "packages/database/scripts/generate-migrations.mjs",
+      "packages/database/src/generated/migrations.generated.ts",
+      "packages/database/src/verifier.ts",
+      "packages/database/tests/generator.test.ts",
+      "packages/database/tests/planner.test.ts",
+      "packages/database/tests/postgres.integration.test.ts"
+    ]
+  },
+  "limits": [
+    "Internal synthetic publisher only; no current-shop native reader or production route.",
+    "Full positive owner-acceptance content package consumption through this new entry is unverified.",
+    "No claim that native coverage replaces unavailable external coverage."
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "observationCapture": "004",
+  "observationArgv": [
+    "pnpm",
+    "test:content-intake:p1"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (34 tests) 2028ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  633ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  485ms\n\n Test Files  1 passed (1)\n      Tests  34 passed (34)\n   Start at  20:20:56\n   Duration  2.40s (transform 63ms, setup 0ms, collect 204ms, tests 2.03s, environment 0ms, prepare 37ms)\n\n\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-p1.test.ts (28 tests) 5ms\n\n Test Files  1 passed (1)\n      Tests  28 passed (28)\n   Start at  20:20:59\n   Duration  189ms (transform 35ms, setup 0ms, collect 38ms, tests 5ms, environment 0ms, prepare 38ms)\n\n",
+  "hypothesis": "Library source inspection confirmed that yauzl uses central member names while JSZip re-reads local names; canonical member identity and path alias rejection must now pass alongside every previous regression.",
+  "nextCapture": "005",
+  "nextArgv": [
+    "pnpm",
+    "test:content-intake:p1"
+  ]
+}

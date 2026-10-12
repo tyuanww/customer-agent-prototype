@@ -1,8 +1,9 @@
 # 内容导入与发布合同
 
-> 本文是**当前实现**的参考。它描述桌面工作台「内容管理」到 API 的导入 / 取消 / 发布链路，字段、状态、限额与失败码均可从源码核对。
+> 本文是**既有 legacy 路径**的实现参考。它描述非 `faq-v2` 桌面工作台「内容管理」到 API 的导入 / 取消 / 发布链路，字段、状态、限额与失败码均可从源码核对。
+> 新权限/审批/统一模板已进入 P2 隔离合成 FAQ 闭环；其管理与坐席界面使用独立路径，当前状态见[P2 合同交接](reference-content-intake-p2-contract-handoff.md)、操作见[合成开发指南](how-to-develop-content-intake.md)。下文的 owner-only、第一张表和整域替换规则不可外推至 FAQ 新路径。
 >
-> 组织审核在**飞书文档**完成，产品不读飞书。库里的审核证据是 worker 自己写的一条声明，不是独立控制——见[组织已审证据的边界](explanation-org-review-evidence.md)。操作步骤见 [How to 用一张表替换四库之一](how-to-replace-one-library.md)。
+> 本页旧路径的组织审核在**飞书文档**完成，产品不读飞书。库里的审核证据是 worker 自己写的一条声明，不是独立控制——见[组织已审证据的边界](explanation-org-review-evidence.md)。操作步骤见 [How to 用一张表替换四库之一](how-to-replace-one-library.md)。
 
 ## 1. 链路概览
 

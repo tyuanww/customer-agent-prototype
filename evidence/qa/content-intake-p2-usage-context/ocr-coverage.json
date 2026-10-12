@@ -1,0 +1,319 @@
+{
+  "schema": "ocr-delegate-coverage/v1",
+  "mode": "workspace",
+  "base_commit": "b5d26ec496862eb477ba639e7b37a4c0bdb3015c",
+  "summary": {
+    "total_files": 40,
+    "reviewed_files": 40,
+    "skipped_files": 0,
+    "coverage_rate": 1.0,
+    "ocr_reviewable_files": 19,
+    "ocr_reviewed_files": 19,
+    "ocr_excluded_supplementally_reviewed": 21
+  },
+  "remaining_findings": [],
+  "gstack_status": "nonconverged at three fix cycles; no fourth native pass",
+  "files": [
+    {
+      "path": "apps/api/src/content-intake/material.ts",
+      "status": "modified",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "status": "modified",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "apps/api/src/product-auth-service.ts",
+      "status": "modified",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "contracts/upstream/customer-agent/contract-set.lock.json",
+      "status": "modified",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "packages/database/scripts/generate-migrations.mjs",
+      "status": "modified",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "packages/database/src/verifier.ts",
+      "status": "modified",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "scripts/customer-agent-contract-set.mjs",
+      "status": "modified",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-usage.ts",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/contract-set.json",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/openapi.v1.yaml",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Exact frozen source bytes and manifest hashes, immutable predecessor comparison and reviewed semantic increment; generator/runtime/PG checks."
+    },
+    {
+      "path": "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/schema-v1.21.sql",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Exact frozen source bytes and manifest hashes, immutable predecessor comparison and reviewed semantic increment; generator/runtime/PG checks."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/functional-evidence.json",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/ocr-coverage.json",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/qa-final/exploration-002.json",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/qa-history/exploration-003.json",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/qa-history/exploration-004.json",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/verification.json",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim."
+    },
+    {
+      "path": "packages/database/migrations/0025_intake_usage_v1_21.sql",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "scripts/probe-intake-usage-consumer.mjs",
+      "status": "added",
+      "ocr_reviewable": true,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full handwritten diff/new source, ownership, failure paths and relevant adjacent callers; final repair checked against regression results."
+    },
+    {
+      "path": "apps/api/README.md",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent read affected documentation, authorization/implementation alignment, limitations and link checks.",
+      "ocr_exclusion": "unsupported_ext"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full affected test diff/source and actual result; native reviewer fixtures summary-only.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/customer-agent-contract-set.test.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full affected test diff/source and actual result; native reviewer fixtures summary-only.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent read affected documentation, authorization/implementation alignment, limitations and link checks.",
+      "ocr_exclusion": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent read affected documentation, authorization/implementation alignment, limitations and link checks.",
+      "ocr_exclusion": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent read affected documentation, authorization/implementation alignment, limitations and link checks.",
+      "ocr_exclusion": "unsupported_ext"
+    },
+    {
+      "path": "packages/contracts/openapi/bundle.generated.yaml",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Deterministic source/generator review, exact provenance and regeneration checks; not a line-by-line claim for the expanded output.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/contracts/src/generated/codegen-manifest.generated.json",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Deterministic source/generator review, exact provenance and regeneration checks; not a line-by-line claim for the expanded output.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/contracts/src/generated/openapi.generated.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Deterministic source/generator review, exact provenance and regeneration checks; not a line-by-line claim for the expanded output.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/contracts/src/generated/provenance.generated.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Deterministic source/generator review, exact provenance and regeneration checks; not a line-by-line claim for the expanded output.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/contracts/src/generated/runtime-schema.generated.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Deterministic source/generator review, exact provenance and regeneration checks; not a line-by-line claim for the expanded output.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/contracts/tests/runtime.test.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full affected test diff/source and actual result; native reviewer fixtures summary-only.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/database/README.md",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent read affected documentation, authorization/implementation alignment, limitations and link checks.",
+      "ocr_exclusion": "unsupported_ext"
+    },
+    {
+      "path": "packages/database/migrations/manifest.generated.json",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Deterministic source/generator review, exact provenance and regeneration checks; not a line-by-line claim for the expanded output.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/database/src/generated/migrations.generated.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Deterministic source/generator review, exact provenance and regeneration checks; not a line-by-line claim for the expanded output.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/database/tests/generator.test.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full affected test diff/source and actual result; native reviewer fixtures summary-only.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/database/tests/planner.test.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full affected test diff/source and actual result; native reviewer fixtures summary-only.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "packages/database/tests/postgres.integration.test.ts",
+      "status": "modified",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full affected test diff/source and actual result; native reviewer fixtures summary-only.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-usage.test.ts",
+      "status": "added",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent reviewed full affected test diff/source and actual result; native reviewer fixtures summary-only.",
+      "ocr_exclusion": "default_path"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/README.md",
+      "status": "added",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim.",
+      "ocr_exclusion": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-usage-context/review.md",
+      "status": "added",
+      "ocr_reviewable": false,
+      "disposition": "reviewed",
+      "method": "Parent checks evidence schema, actual outputs, historical/current classifications, references and totals; review report itself has no circular hash claim.",
+      "ocr_exclusion": "unsupported_ext"
+    }
+  ]
+}

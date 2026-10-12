@@ -1,0 +1,54 @@
+{
+  "sourceCommit": "45a533088d11af09bdf237bb87d441e3100466b3",
+  "featureCommit": "c97dc801d19b9c4589e43a781320f4d15345c848",
+  "environment": {
+    "host": "Hangzhou Windows host, WSL2 Linux guest",
+    "node": "24.21.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.19"
+  },
+  "isolation": {
+    "user": "nobody (65534)",
+    "transientUnit": "intake-p2-usage-validation",
+    "InaccessiblePaths": "/srv/customer-agent",
+    "NoNewPrivileges": true,
+    "PrivateTmp": true,
+    "ProtectHome": true,
+    "ProtectSystem": "strict",
+    "RuntimeMaxSec": 600,
+    "scope": "owned temporary source/cache + Unix socket PG only; no production service restart"
+  },
+  "commands": [
+    "pnpm install --frozen-lockfile --store-dir ../store",
+    "pnpm --filter @customer-agent/api test:intake:transactions",
+    "pnpm --filter @customer-agent/api typecheck",
+    "pnpm --filter @customer-agent/api build"
+  ],
+  "exitCode": 0,
+  "tests": {
+    "passed": 85,
+    "failed": 0,
+    "pg": 77,
+    "material": 8,
+    "maxCatalogRows": 5000,
+    "maxCatalogPages": 50,
+    "maxCatalogWholeCaseMs": 8799
+  },
+  "finalLogSha256": "15015112739657e467413660214920611acc0a9525263b6a19430c2874f362d4",
+  "initialRun": {
+    "sourceCommit": "c97dc801d19b9c4589e43a781320f4d15345c848",
+    "passed": 83,
+    "failed": 2,
+    "reason": "Two synthetic exact-five-minute windows called clock_timestamp twice; PostgreSQL microseconds could make the window exceed its constraint. Fixed both endpoints to statement_timestamp.",
+    "logSha256": "da7a96516d53bb59ec38e9dba5130799fff6996c94c01c6061cf68cee2d64acd"
+  },
+  "cleanup": {
+    "ownedRootRemoved": true,
+    "logSha256": "766dfc434e1cb568dbd6541581e19814bf60aa6b5ea07dce580804a3953ab649",
+    "observed": "39297d4da1be7cd870644593392be672a319bc387f39103f9945274469e2dbcd  /opt/customer-agent-intake-usage.H0lFxq/source-final/apps/api/src/content-intake/usage.ts\nab529985b6393a5929fd040185633e8a3bb43a6cd2ac312b6a9f5714c8bf5552  /opt/customer-agent-intake-usage.H0lFxq/source-final/apps/api/tests/content-intake.integration.test.ts\n6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78  /opt/customer-agent-intake-usage.H0lFxq/source-final/pnpm-lock.yaml\nOWNED_TEST_ROOT_REMOVED\n"
+  },
+  "limits": [
+    "WSL proves Linux backend behavior, not native Windows Electron/clipboard/window/sandbox.",
+    "No real data, credentials, approval transport, production ACL or deployment."
+  ]
+}

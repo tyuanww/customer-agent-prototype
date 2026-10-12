@@ -28,6 +28,14 @@ async function* bytesOf(buffer: Buffer) {
 }
 
 describe('content object store', () => {
+  it('refuses reclamation when any receipt is unreadable or malformed', async () => {
+    const objects = store();
+    const object = await objects.persist(bytesOf(Buffer.from('synthetic')), 'csv');
+    writeFileSync(path.join(objects.rootDirectory, 'batches', 'damaged.json'), '{');
+    await expect(objects.reclaim(object.objectId)).rejects.toThrow('CONTENT_RECEIPT_INVALID');
+    expect(await objects.verify(object.objectId, object.sha256, object.sizeBytes)).toBe(true);
+  });
+
   it('persists an immutable object, verifies the digest, and reclaims unreferenced files', async () => {
     const objects = store();
     const payload = Buffer.from('script_id,title\n1,hello\n');

@@ -1,0 +1,252 @@
+{
+  "skill": "open-code-review-delegate",
+  "mode": "workspace",
+  "baseline": "bad169cf7bbc33424400b2fa6b44d596235a5de9",
+  "reviewers": "host plus native independent review agents",
+  "externalModelCalls": 0,
+  "total_files": 21,
+  "reviewed_files": 21,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "checklist": [
+    {
+      "path": "apps/api/src/content-intake/material.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "c635b152e23f757885e47d57b4c5bde578fa82de9ec615bd35b5a8979db1bd1a"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "7eac4221559dac6c475d5812febbf77faab8b4c3a92c627e9b25837c663126cb"
+    },
+    {
+      "path": "apps/api/src/content-intake/usage.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "3085ee36b4a052a54f2b928680ca7c4e6347fcee50e7d87de3b4b3b03ec3aebf"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/guard-explain-after.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "9dda1f782b7064bd4789c1de1c2c94eb124db633e7d1670c043278a548cfd660"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/guard-explain-before.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "453000dfc738207665625ca56ddc141462fac861f6b8d24f227ef0b835106993"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/pg-inputs.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "5adc02559a2e91e4ae172a059dfb589944add3a7254ca2f37f3c13e3f23c592f"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/pg-verification.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "d923736ef3d847400355c2c073b95010fa3a0f351d03fa2441f838a3a07ead6a"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/review.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": null
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/sql-probe.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "157a33876c4e8fbc62852317933e92041fd996625a7ae869c9780bb338c2589a"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/verification.json",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "d3d41a9bf1cd7c7d45701e24ad4357048618823a367f35165de829ff4cec7608"
+    },
+    {
+      "path": "packages/content-intake/scripts/probe-issue-report.mjs",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "608b56737a88e9a76ef6a3df7f4a733f052edb0de0df794aa16153af06b1e5b9"
+    },
+    {
+      "path": "packages/content-intake/src/policy.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "bb5598b55ff267e77824e1c84ecf3c7be1f4cf855706d58ba448aa28a27755d7"
+    },
+    {
+      "path": "packages/content-intake/src/workbook.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "37c233b43b1736ec7b5dc3d1df66d41e0004addee21f2e6dfe3e2fe5d3a96312"
+    },
+    {
+      "path": "packages/content-intake/tests/fixtures.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "91bda45e71c33f5e3844063a7d99392023167bf34542c858253303c967d0d793"
+    },
+    {
+      "path": "packages/database/migrations/0028_intake_family.sql",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "8b241e1b5f808c2278b53351a0d3cbee56f4ac23ca16c65736ba45ace859382e"
+    },
+    {
+      "path": "packages/database/overlays/0028_intake_family.sql",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "c9ee31814b6c611dbb98e83ddf1fa5a9a0c92eeba58415ba394186f346ec5c7e"
+    },
+    {
+      "path": "packages/database/scripts/generate-migrations.mjs",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "8290775439392ef03cdcb1515338a98e28fc89a4c641b1ffa1ed1b7546bfe6ae"
+    },
+    {
+      "path": "packages/database/src/verifier.ts",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "ec55fe89732b19c041ae420729d5589ab347287bcb44c4472e3b0a2c006b2a90"
+    },
+    {
+      "path": "packages/database/tests/support/family-catalog.ts",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "f6e517b08c5a6c77869a8fbe244f179319e692e81dfb38d0f2d4ea633da55a3c"
+    },
+    {
+      "path": "scripts/probe-intake-family-sql.mjs",
+      "status": "added",
+      "result": "reviewed",
+      "sha256": "d1e4ecdb61f1b0f5e71e7bab5c3abddab4d2230bb5295bebd5911a745780a812"
+    },
+    {
+      "path": "scripts/probe-intake-usage-consumer.mjs",
+      "status": "modified",
+      "result": "reviewed",
+      "sha256": "448c642c12423ecbfcd75b262a5c8691edb88eb539abc4a9393d24e1a8a36e22"
+    }
+  ],
+  "selfRecordHashNote": "review.json is the coverage record; reviewed for consistency, excluded from its own digest to avoid circular hashing",
+  "excluded_files": [
+    {
+      "path": "apps/api/tests/content-intake-material.test.ts",
+      "status": "modified",
+      "insertions": 48,
+      "deletions": 5,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "insertions": 253,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-family-http.test.ts",
+      "status": "added",
+      "insertions": 48,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "insertions": 16,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "insertions": 15,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-family/README.md",
+      "status": "added",
+      "insertions": 44,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/content-intake/tests/workbook.test.ts",
+      "status": "modified",
+      "insertions": 46,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/README.md",
+      "status": "modified",
+      "insertions": 3,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "packages/database/migrations/manifest.generated.json",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/src/generated/migrations.generated.ts",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/generator.test.ts",
+      "status": "modified",
+      "insertions": 6,
+      "deletions": 6,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/planner.test.ts",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 5,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "packages/database/tests/postgres.integration.test.ts",
+      "status": "modified",
+      "insertions": 211,
+      "deletions": 26,
+      "exclude_reason": "default_path"
+    }
+  ],
+  "supplementalReview": "Excluded tests, generated catalogs and documents reviewed for behavior, frozen migration consistency and claims. Logs checked against final test summaries and stored hashes. Evidence JSON parsed and hashes validated.",
+  "resolvedFindings": [
+    "Incomplete multi-select family coverage removed generic answers",
+    "Scope string brand confused a legal shop ID with brand scope",
+    "Dense family guard exceeded transaction budget",
+    "Selection query Cartesian/repeated aggregate plans exceeded budget",
+    "Unassociated catalog guard performed 25 million unnecessary comparisons",
+    "Guard SQLSTATE mapped to unknown instead of explicit denial"
+  ],
+  "unresolvedFindings": [],
+  "remainingScope": "Production integration, capacity lifecycle implementation, full historical capacity and onsite acceptance remain separate tasks; no claim of full P2 completion",
+  "historicalExternalReview": "Prior external timeout and invalid completion remain missing coverage, not PASS"
+}

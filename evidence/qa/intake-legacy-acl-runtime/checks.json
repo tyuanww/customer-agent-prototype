@@ -1,0 +1,268 @@
+{
+  "date": "2026-10-09",
+  "baseline": "f6f8cf35ef9a9007cddade8a0c7fa4b648bef9a1",
+  "version": "0.3.26",
+  "scope": "Frozen legacy CHECK helper ACL closure; synthetic integration only",
+  "environment": {
+    "os": "macOS",
+    "arch": "arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "dependencyInstall": false
+  },
+  "contract": {
+    "schema": "customer-agent-contract-consumption/v1",
+    "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+    "source_repository": "ai-赋能立项",
+    "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+    "manifest_sha256": "5824420144ff2a6267d588074594df56b9361df5908a03d5955d240826d58904",
+    "openapi_sha256": "3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94",
+    "database_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
+    "intake_status": "VERIFIED_NOT_ACTIVATED",
+    "ddev_authorized": false,
+    "runtime_activated": false
+  },
+  "governance": {
+    "sourceCommit": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+    "receiptCommit": "0125a97c284a78262a52a67b3d9834107a0f59bc",
+    "releaseStepsPassed": 46,
+    "releaseStepsTotal": 46,
+    "genericTestsPassed": 299,
+    "pgTestsReused": 17,
+    "unchangedPgInputHashes": 18,
+    "releaseLogSha256": "5855d6015c24cbd0fe0dda9fb2b45351b9a516ea9e80f0ae59059b7663dbafaa"
+  },
+  "validation": {
+    "intake": {
+      "exitCode": 0,
+      "status": "CREATED",
+      "verify": "VERIFIED",
+      "memberCount": 16,
+      "runtimeSourceCount": 13,
+      "log": "intake.log",
+      "verifyLog": "verify.log"
+    },
+    "intakeUnit": {
+      "exitCode": 0,
+      "passed": 87,
+      "log": "intake-v4-unit.log"
+    },
+    "exportIntakeGeneratorRoundtrip": {
+      "exitCode": 0,
+      "log": "intake-v4-roundtrip.log",
+      "temporaryProbeDidNotChangeProductLock": true
+    },
+    "previousMigrations": {
+      "count": 34,
+      "byteIdenticalToBaseline": true,
+      "metadataIdenticalToBaseline": true
+    },
+    "exactDatabaseDelta": {
+      "additionalAcl": 8,
+      "removedAcl": 0,
+      "objectManifestUnchanged": true,
+      "functionSecurityManifestUnchanged": true,
+      "triggerManifestUnchanged": true,
+      "evidence": "db-manifest-delta.json"
+    },
+    "databaseUnit": {
+      "exitCode": 0,
+      "passed": 40,
+      "log": "database-unit.log"
+    },
+    "databasePg15": {
+      "firstRun": {
+        "exitCode": 1,
+        "passed": 74,
+        "failed": 1,
+        "log": "database-pg15.log"
+      },
+      "failure": "Stale test assertion expected a 25-migration suffix; the correct current suffix contains 26",
+      "affectedRecheck": {
+        "exitCode": 0,
+        "passed": 1,
+        "skipped": 48,
+        "log": "database-pg15-recheck.log"
+      },
+      "totalDistinctTestsCovered": 75,
+      "singleFullGreenRun": false
+    },
+    "atomicPreflightRegression": {
+      "beforeFix": {
+        "expectedFailure": true,
+        "log": "preflight-red.log"
+      },
+      "initialRepair": {
+        "passed": 2,
+        "failed": 1,
+        "reason": "search_path changes pg_get_* textual qualifications",
+        "log": "preflight-green.log"
+      },
+      "finalTargeted": {
+        "exitCode": 0,
+        "passed": 3,
+        "skipped": 46,
+        "log": "preflight-green-final.log"
+      },
+      "sevenPredecessorDriftsAndSameTransactionRollbackAlsoPassedIn": "database-pg15.log"
+    },
+    "restrictedApiPg15": {
+      "exitCode": 0,
+      "passed": 31,
+      "skipped": 137,
+      "log": "api-pg15.log",
+      "inputsUnchanged": true,
+      "details": "api-result.json"
+    },
+    "lint": {
+      "exitCode": 0,
+      "log": "lint.log"
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "log": "typecheck.log"
+    },
+    "test": {
+      "exitCode": 0,
+      "log": "test.log",
+      "vitestPassed": {
+        "contracts": 24,
+        "retrievalCore": 9,
+        "contentIntake": 97,
+        "database": 42,
+        "api": 567,
+        "desktop": 1426
+      },
+      "vitestSkipped": {
+        "database": 26,
+        "api": 332,
+        "desktop": 7
+      },
+      "nodeTestsAlsoPassed": true
+    },
+    "build": {
+      "exitCode": 0,
+      "log": "build.log"
+    },
+    "docs": {
+      "exitCode": 0,
+      "markdownFiles": 240,
+      "log": "docs.log"
+    },
+    "workspace": {
+      "exitCode": 1,
+      "remainderMiB": 40.3,
+      "budgetMiB": 32,
+      "overMiB": 8.3,
+      "rootPolicy": "PASS",
+      "baselineRemainderMiB": 38.8,
+      "budgetChanged": false,
+      "log": "workspace.log"
+    },
+    "diffCheck": {
+      "exitCode": 0,
+      "scope": "tracked and complete staged diff, including immutable snapshot and raw evidence",
+      "rawLogAttributes": "Only evidence/qa/intake-legacy-acl-runtime/*.log preserves exact output bytes and intentional whitespace; source checks unchanged."
+    }
+  },
+  "commands": {
+    "intake": "node scripts/customer-agent-contract-set.mjs ingest --source=/Users/hutou/Desktop/ai-content-intake-p2-contracts/output/customer-agent-contract-sets/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780 --source-repository-root=/Users/hutou/Desktop/ai-content-intake-p2-contracts",
+    "verify": "pnpm contracts:verify",
+    "codegen": "pnpm contracts:generate",
+    "migrations": "pnpm db:migrations:generate",
+    "intakeUnit": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/customer-agent-contract-set.test.ts",
+    "databaseUnit": "pnpm --filter @customer-agent/database exec vitest run tests/generator.test.ts tests/planner.test.ts tests/runner.test.ts",
+    "databasePg15": "pnpm --filter @customer-agent/database test:integration",
+    "databasePg15Recheck": "CUSTOMER_AGENT_DB_PG15_INTEGRATION=1 pnpm --filter @customer-agent/database exec vitest run tests/postgres.integration.test.ts -t 'installs N from empty'",
+    "apiPg15": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts tests/intake-runtime-consumers.integration.test.ts --no-file-parallelism -t 'copies all eight legacy|publication rejects|legacy history: mixed direct|actual service on formal purpose roles'",
+    "root": [
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test",
+      "pnpm build",
+      "pnpm docs:check",
+      "pnpm workspace:check",
+      "git diff --check"
+    ]
+  },
+  "inputs": {
+    ".gitattributes": "5fd91457b6222226fc988b9378860c2813e01276ea10ccd3e8b60d9594c2f035",
+    "apps/api/src/content-intake/authority.ts": "de05d233acef0091e69ef9b391f4a11666610d1c985c99fbc35c5f2c24d9dfaa",
+    "apps/api/src/content-intake/service.ts": "5488a6dc5dd51976e869881d4a92cbf77e248c4c45305041ad108d40e392546b",
+    "apps/api/src/content-intake/transaction.ts": "9906ed543c4e30329a2b768d95ebe11929279be0721f7dee3dc06be73b0736ae",
+    "apps/api/tests/content-intake.integration.test.ts": "73ee6fca3d63f37944cea1779a03881c5ea8f3b6faffb70b6d586d635f23f382",
+    "apps/api/tests/intake-runtime-consumers.integration.test.ts": "456c42376b9ac5f8d44aaee26ea1a1bffc678757f272a2916777134bbfe0befa",
+    "apps/api/tests/support/intake-synthetic-seed.ts": "f772c13b7c0690a52ea27f10ba3e155717410564b57b0e6b4a29f936d9db8ba2",
+    "apps/desktop/package.json": "0ad47d29854d228b36907a481de044ca0b759000dc5c0aae6c26ec0d79a201e4",
+    "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": "88928dcc2f0c1b501b0831e406f3d20f717ded5271036feb9b9e9b4248532833",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "5de9d834517b02d3dc2e73d9a1cb7bf44099417a79125604733e6fdc326dd59d",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/contract-set.json": "5824420144ff2a6267d588074594df56b9361df5908a03d5955d240826d58904",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-csv-format.v1.sql": "f88db715af84ff0a4dc056ab3a37fdaf71cdd0ae439a78b2d565952a1b93b535",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-csv-installation.v1.json": "e7bee22391c96c498d96e20e868cbf90429405ac3793eeb02bbc93e817939a28",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-csv-protocol.v1.json": "ff83a005795f6a5bdd6597329d93c5fdc132267613886b701193bdf8583b62ca",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-legacy-check-acl.v1.sql": "6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-legacy-check-installation.v1.json": "fbc601f305013b54e5273e3c4b97faf009f348c3db6a6b4c9f397cfd87707418",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-acl.v1.sql": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-directory-acl.v1.sql": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-organization.v1.sql": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-protocol.v1.json": "4546e98510add2b02b97baaca5bdd9603208502b891fe3e92a3f3bc3ed4f6030",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-provenance.v1.json": "7b3699b3fbd94918c11f9250f643b6e896a634cbf262d022dc6b56c422a56c5c",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-roles.v1.sql": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-runtime-session.v1.sql": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/intake-shop-directory.v1.sql": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/openapi.v1.yaml": "3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780/schema-v1.25.sql": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
+    "package.json": "988f141eb7f362f259f5a1f6541008cdfc051a36dacbcd9b438064f8f0d792a4",
+    "packages/contracts/src/generated/codegen-manifest.generated.json": "0d06def61a6deac32e3f1354e4d9f1b669e40c6612b0196d805c668f9b04a8da",
+    "packages/contracts/src/generated/provenance.generated.ts": "bf5d4cffafe039f3d5717c43e3a6433677a7e910969bb6537d254a9f80e5f5d8",
+    "packages/contracts/tests/runtime.test.ts": "e0aba8b16437f7e79b15e81b0132a009d52e238624392bbaf4c5b3122de15452",
+    "packages/database/migrations/0035_intake_legacy_check_acl_v1_25.sql": "01a674d1f5a996a511babf193c28c217ec91a72a3f974922e9580cf2bcdabda7",
+    "packages/database/migrations/manifest.generated.json": "ffd584fec4912d780862d4207ddb9a23250d4ac80f2b80421e025eef82caa662",
+    "packages/database/package.json": "4c191ca7119764dcbeba2cdcea65d1ce50c47b021390967d4fb6cbe0352f857e",
+    "packages/database/scripts/generate-migrations.mjs": "a49b032d376614508bb020808066cfbe89f6a6b0385ff33ea14b622b2c8b9ff0",
+    "packages/database/src/generated/migrations.generated.ts": "c052bba7e37b7a26c10aacd43790864802c5857e8554f688c0770f1157cee8dc",
+    "packages/database/src/runner.ts": "e8ec9e600a419975ccd3c6f3eb52d875b25cc52f5542657fe6d497e3fe0fc8c3",
+    "packages/database/src/verifier.ts": "d20904982ae1b044513bd918ebdc793262ad3164a3f8e3d077c397d4fcc39c68",
+    "packages/database/tests/generator.test.ts": "85b734a8752480f93d46cfba0f2a7aac9ae28e3e4e108565587f32fecd66f713",
+    "packages/database/tests/planner.test.ts": "59881e3214f692878ed23cde8a8657ea1090035387eb39d97468b0926f7ed34a",
+    "packages/database/tests/postgres.integration.test.ts": "ad1094906305bf6d2136c10f368a4b58fcadb919a15690b96230c65253c4659d",
+    "packages/database/tests/runner.test.ts": "5afd2019702a94f5910617e1bd206e717c80433c2c35e9fc0ba3a04dc7b7723b",
+    "packages/database/tests/verifier-runtime.integration.test.ts": "84a9f13b9b1c8204df251145aed32491cf2a658bddf93437be30fac59db34c41",
+    "pnpm-lock.yaml": "2644b175dc2d784f232de0ea6a3198a39d11a650777dba26c42b8c09218e9e10",
+    "scripts/customer-agent-contract-set.mjs": "026944506ed879d7c448ca43432a37ec8f133261c91161e922d8d5cd16f2302e"
+  },
+  "evidenceReuse": {
+    "database74": "Only the failed assertion text changed after the full run. Its affected test was rerun; unchanged 74 tests reused.",
+    "governance17": "Approved objects and all 18 bound PG input hashes unchanged; governance freeze receipt records the check.",
+    "historicalRoleReview15of15": "REUSED_NOT_RERUN",
+    "priorMacPackage": "Preserved for original inputs only; no current package or GUI acceptance claimed."
+  },
+  "unverified": [
+    "full external /review (INCOMPLETE)",
+    "current packaged Mac GUI and human native-dialog acceptance",
+    "Windows device acceptance",
+    "real Feishu organization/runtime assembly",
+    "real customer source intake and production activation"
+  ],
+  "logs": {
+    "api-pg15.log": "babb864f8b2f20c190999e691b395a1507310adee403e54b93ad8fcb05ff8828",
+    "build.log": "30b42e98211ccbd3c3037640fb3d629880da77b0b5227243358d9c7f63d1cf24",
+    "contracts-generate.log": "b754741c0e47188f27052f0d377de1b6e833be9a05a29ebb6366aaef02f3395a",
+    "database-pg15-recheck.log": "2b92bda18f1ca0d451d62d282921028fc2bc1850fd33ae9476c767853eb2b366",
+    "database-pg15.log": "0c8b9cefe674af7263e8ca41c6a5d53ad3a5694c2b14beb8b79a78092fec11a7",
+    "database-unit.log": "0badc0d24ec48e9321ec563e472cc4a99be417763a5f079e0e6ca37d38f74756",
+    "docs.log": "51dd7f72260bdaf2d72ec3583e25e774cb16216dfc3c478107730a4af8b45767",
+    "intake-v4-roundtrip.log": "c3c775b13cb4d2c13773730af2dc6565fede6e2121e38f5900acbc863ac733fe",
+    "intake-v4-unit.log": "62d2c332a7e587196a78f986f3637a9632bc13d3e4c8f64d4dd2be2df52ff2c3",
+    "intake.log": "959575108239f79c3edd6672d9c9abaf60d5c6de5140ecbf85221c46668bc96b",
+    "lint.log": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+    "preflight-green-final.log": "76c0b281b524d267fea482c53059e112f2c2e8bbac9735c6766a44a5d7c88bf9",
+    "preflight-green.log": "4a301309d64e6ab8bbf9eea670f52e40cda03141dfc2d920b4a8ac6c57682fe7",
+    "preflight-red.log": "0d3e8086715570f98765a7a0132de810d4f202ad69480b3d9326b57cc8e78c33",
+    "test.log": "f6ed54c3b9b80a7fcdd740c9f9fa2cda93c7fbc6b1a93719382b3346eef495a4",
+    "typecheck.log": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+    "verify.log": "caeb84e96aafb27e32a2f1f60a0b6a1e78a9ba60e427f2896c15fcb587752625",
+    "workspace.log": "56ee466748653722c1f48b88fde730ea6b8da46f36d7335a9deaee2e97dae6cc"
+  }
+}

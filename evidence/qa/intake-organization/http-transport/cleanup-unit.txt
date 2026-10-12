@@ -1,0 +1,33 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-org-runtime-candidate/customer-agent-prototype/apps/api
+
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > consumes native HTTP pages through the existing observer and pins the deadline to observation start 49ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > does not let a display name or tenant-manager flag choose the job 11ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > rejects the wrong namespace before any HTTP request 1ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > rejects a different open_id even when the display name matches 1ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > does not normalize job title "" from the HTTP body 1ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > does not normalize job title " 合成坐席" from the HTTP body 15ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > does not normalize job title "合成坐席 " from the HTTP body 14ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > rejects duplicate names, a disabled title, and a missing job title without a snapshot 17ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > rejects a directory or user that changes between the two HTTP scans 15ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > stops on a bad later page, does not retry it, and hides the provider message 3ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > treats a logical Feishu failure, HTTP 429, and HTTP 401 as transport failures without their bodies 3ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > does not follow a redirect toward Feishu or retry a destroyed socket 1ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > times out a hung response and ignores a body that arrives after cancellation 50ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > rejects an already aborted call and an unsafe open id before HTTP 0ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > enforces the byte budget before returning a body 8ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > closes a response rejected during header validation without observer cleanup 7ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > refuses the eleventh job-title call in a published minute and does not reopen the window by rewinding the clock 14ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > refuses the 51st user call in one second and the 1001st call in one minute 1599ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > does not let a full job-title window block the separate user window 19ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > asks the supplier again only after expiry and never reads an environment token 4ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > cancels while the supplier is pending and does not surface its error text 14ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > refuses non-loopback origins and an unbounded request timeout before fetch 2ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > does not turn one page response into further requests and fails a third observation inside the published job-title window 28ms
+ ✓ experiments/intake-organization/transport.test.ts > loopback organization transport > preserves a page token with a space instead of trimming it 4ms
+
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Start at  16:41:43
+   Duration  2.92s (transform 555ms, setup 0ms, collect 797ms, tests 1.88s, environment 0ms, prepare 73ms)
+

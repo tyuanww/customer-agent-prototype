@@ -1,0 +1,110 @@
+{
+  "schema": "content-intake-installation/v1",
+  "status": "DRAFT",
+  "exportApproved": false,
+  "sqlContract": "schema.v1.23",
+  "openapi": {
+    "path": "business-docs/01-客服Agent项目/30-开发-进行中/openapi.v1.21.yaml",
+    "sha256": "bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7"
+  },
+  "database": {
+    "path": "business-docs/01-客服Agent项目/30-开发-进行中/schema.v1.23.sql",
+    "sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e"
+  },
+  "sources": {
+    "roles": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/roles.sql",
+      "sha256": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee"
+    },
+    "organization": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/organization.sql",
+      "sha256": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14"
+    },
+    "session": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/session-lock.sql",
+      "sha256": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6"
+    },
+    "acl": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/purpose-acl.sql",
+      "sha256": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05"
+    },
+    "directoryAcl": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/directory-acl.sql",
+      "sha256": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa"
+    },
+    "directory": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-shop-directory-candidate/storage.delta.sql",
+      "sha256": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc"
+    },
+    "provenance": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/provenance.json",
+      "sha256": "7b3699b3fbd94918c11f9250f643b6e896a634cbf262d022dc6b56c422a56c5c"
+    },
+    "protocol": {
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/protocol.json",
+      "sha256": "4546e98510add2b02b97baaca5bdd9603208502b891fe3e92a3f3bc3ed4f6030"
+    }
+  },
+  "referenceMode": {
+    "artifact": "database",
+    "includes": [
+      "roles",
+      "organization",
+      "session",
+      "directory",
+      "directoryAcl"
+    ],
+    "runtimeReady": false
+  },
+  "productMode": {
+    "implementation": {
+      "repository": "customer-agent-prototype",
+      "commit": "cff9fa9b611a5f77de465b3a5ee1022c64027d9c",
+      "migrationManifest": "0aed48efa48d9eb14f4a7bc620f0c3b7d04968fcecd0a742af3eaca75fa0daf5",
+      "overlayFiles": {
+        "0021_content_intake_v1_20.sql": "7c19bf3f97fecb5af61c92131c0ce2a5f5f42822d2e104bb4202d96e292c73db",
+        "0022_intake_legacy_fence.sql": "8df4f9127362aa49c320b87d7afffd910312d54fab7193224e3bece5993a8b03",
+        "0023_intake_quality.sql": "c3b37131c28b76b2453e24d5f432e70329c478a7f90d34c95598518124e50136",
+        "0024_intake_publication.sql": "9b3b1d0ae32f0fc6e0f333428ac52c2e688c57aad1e610bbb6bb7c94e4d13af2",
+        "0025_intake_usage_v1_21.sql": "f270f787323a65baf3727337dcc34c1ff3f7a0bac0baf79a1894a7f7ae9591f4",
+        "0026_intake_discovery_index.sql": "c96e289e3ae19d600913b80796f3051eb7c19c5f544e1b8b9e17d5f5f1cd911f",
+        "0027_intake_rollback.sql": "da90dd3eaa366037fbbe71f4296697fdf3f9f788954119731926e6500df55e98",
+        "0028_intake_family.sql": "8b241e1b5f808c2278b53351a0d3cbee56f4ac23ca16c65736ba45ace859382e",
+        "0029_intake_capacity.sql": "9d56a3ea4b56d5ec1ccbef5bc331c12f5f788da725a2d09030f2ccbe9e2f00ab",
+        "0030_intake_role_ceiling.sql": "8843955f79d970bdc5f03469a7bba316c2f1fb8fa070d2b0f61ba9bc1f5144a3",
+        "0031_intake_direct_v1_22.sql": "82407ae1c0ce3a3dc975b9b5fe76012b5ab4f19ee5952dafb912a23509c4dcc0",
+        "0032_intake_direct_publication.sql": "38e72eb66941256861aeb3edddc609cdbbfbc4e1eed56366b370526ad82cbddc"
+      },
+      "bodiesOwner": "product implementation; no duplicate function definitions in governance"
+    },
+    "order": [
+      "product-migrations",
+      "roles",
+      "organization",
+      "session",
+      "directory",
+      "directoryAcl",
+      "acl",
+      "environment-login-bindings"
+    ],
+    "atomicCandidateInstall": true,
+    "skipMissingDependencies": false
+  },
+  "requiredBundleArtifacts": [
+    "openapi",
+    "database",
+    "installation",
+    "roles",
+    "organization",
+    "session",
+    "acl",
+    "directoryAcl",
+    "directory",
+    "provenance",
+    "protocol"
+  ],
+  "capabilityLogin": false,
+  "environmentCredentialsIncluded": false,
+  "companionAclRequired": true,
+  "exporterCondition": "A versioned profile must include and verify ALL requiredBundleArtifacts, exact approval hashes and product implementation dependency hashes; the old two-file exporter cannot release this candidate."
+}

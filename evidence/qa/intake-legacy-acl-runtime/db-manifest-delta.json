@@ -1,0 +1,59 @@
+{
+  "aclResult": {
+    "before": {
+      "entries": 542,
+      "sha256": "95c8860d441fdb7429364476c09938e1935f8aa5383a9743a84b89399ff8f6b5"
+    },
+    "after": {
+      "entries": 550,
+      "sha256": "7890fde2f2bf59f2a941aa020864951091a8eef73e8010d869e14054fcefa38d"
+    },
+    "added": [
+      "function|public.content_question_hash(p_question jsonb)|intake_runtime_fn_owner|EXECUTE|f",
+      "function|public.content_questions_align_intent(p_questions jsonb, p_intent_taxonomy_version text, p_intent_id text)|intake_runtime_fn_owner|EXECUTE|f",
+      "function|public.content_questions_are_valid(p_questions jsonb)|intake_runtime_fn_owner|EXECUTE|f",
+      "function|public.content_risk_categories_are_valid(p_risk_level text, p_risk_categories text[])|intake_runtime_fn_owner|EXECUTE|f",
+      "function|public.content_template_placeholders_are_valid(p_answer_text text, p_placeholder_keys text[])|intake_runtime_fn_owner|EXECUTE|f",
+      "function|public.content_text_array_is_nonblank_unique(p_values text[])|intake_runtime_fn_owner|EXECUTE|f",
+      "function|public.content_utc_timestamp_text(p_value timestamp with time zone)|intake_runtime_fn_owner|EXECUTE|f",
+      "function|public.owner_acceptance_review_shape(p_risk text, p_conflict boolean, p_mode text, p_primary text, p_role text, p_evd text, p_secondary text, p_secondary_role text, p_secondary_evd text, p_record_sha256 text)|intake_runtime_fn_owner|EXECUTE|f"
+    ],
+    "removed": []
+  },
+  "objectResult": {
+    "before": {
+      "entries": 3090,
+      "sha256": "c31a0c03694ec13c86ba15eb596c6b47c5164335712d839bc53cc0fb40e0de03"
+    },
+    "after": {
+      "entries": 3090,
+      "sha256": "c31a0c03694ec13c86ba15eb596c6b47c5164335712d839bc53cc0fb40e0de03"
+    },
+    "added": [],
+    "removed": []
+  },
+  "functionSecurityResult": {
+    "before": {
+      "entries": 255,
+      "sha256": "51ec728928940da3bbd28767d8727727518574d124c24330e64eb5189a38d26b"
+    },
+    "after": {
+      "entries": 255,
+      "sha256": "51ec728928940da3bbd28767d8727727518574d124c24330e64eb5189a38d26b"
+    },
+    "added": [],
+    "removed": []
+  },
+  "triggerResult": {
+    "before": {
+      "entries": 109,
+      "sha256": "97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505"
+    },
+    "after": {
+      "entries": 109,
+      "sha256": "97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505"
+    },
+    "added": [],
+    "removed": []
+  }
+}
