@@ -1,7 +1,89 @@
 import { useEffect, useRef, useState } from 'react';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionView } from '@shared/content-intake-permissions';
-import { actionsForIntakePost, DEFAULT_INTAKE_POST, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
+import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
+import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
 import { formatIntakeTime } from './intake-time';
+
+function SeatAccounts({ disabled }: { disabled: boolean }) {
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [post, setPost] = useState<IntakePost>(DEFAULT_INTAKE_POST);
+  const [rows, setRows] = useState<SeatAccountRecord[]>([]);
+  const [resetting, setResetting] = useState('');
+  const [nextPassword, setNextPassword] = useState('');
+  const [disabling, setDisabling] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
+  const flight = useRef(false);
+  const blocked = disabled || busy;
+  const send = async (intent: SeatAccountIntent): Promise<SeatAccountReply | null> => {
+    const api = window.dashboardSeats;
+    if (!api) { setProblem('账号暂不可用。'); return null; }
+    if (flight.current) return null;
+    flight.current = true;
+    setBusy(true); setProblem('');
+    try {
+      const reply = await api.command(intent);
+      if (!reply.ok) { setProblem(reply.message); return null; }
+      return reply;
+    } catch {
+      setProblem('账号暂不可用。');
+      return null;
+    } finally { flight.current = false; setBusy(false); }
+  };
+  const create = async () => {
+    const reply = await send({ action: 'create', displayName: name.trim(), username: username.trim(), password, post });
+    if (reply === null || !reply.ok || reply.action !== 'create') return;
+    setRows(current => [...current, reply.seat]);
+    setName(''); setUsername(''); setPassword(''); setPost(DEFAULT_INTAKE_POST);
+  };
+  const reset = async (login: string) => {
+    const reply = await send({ action: 'reset', username: login, password: nextPassword });
+    if (reply === null || !reply.ok || reply.action !== 'reset') return;
+    setNextPassword(''); setResetting('');
+  };
+  const disable = async (login: string) => {
+    const reply = await send({ action: 'disable', username: login });
+    if (reply === null || !reply.ok || reply.action !== 'disable') return;
+    setRows(current => current.map(row => row.username === login ? { ...row, enabled: false } : row));
+    setDisabling('');
+  };
+  const choose = (value: string) => {
+    if (!isIntakePost(value)) { setProblem('请选择岗位。'); return; }
+    setPost(value);
+  };
+  return <section>
+    {problem && <p role="alert">{problem}</p>}
+    <fieldset disabled={blocked}><legend>新建外包坐席</legend>
+      <label>姓名<input aria-label="姓名" value={name} onChange={event => setName(event.target.value)} /></label>
+      <label>登录名<input aria-label="登录名" value={username} onChange={event => setUsername(event.target.value)} /></label>
+      <label>密码<input aria-label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} /></label>
+      <label>岗位<select aria-label="坐席岗位" value={post} onChange={event => choose(event.target.value)}>{INTAKE_POSTS.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+      <button disabled={!name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存坐席</button>
+    </fieldset>
+    <table className="intake-candidate-table" aria-label="外包坐席"><thead><tr><th>姓名</th><th>登录名</th><th>岗位</th><th>状态</th></tr></thead><tbody>
+      {rows.map(row => <tr key={row.username}>
+        <td>{row.displayName}</td>
+        <td>{row.username}</td>
+        <td>{row.post}</td>
+        <td>{row.enabled ? '使用中' : '已停用'}
+          {row.enabled && resetting !== row.username && <button disabled={blocked} onClick={() => { setResetting(row.username); setNextPassword(''); setDisabling(''); }}>重置</button>}
+          {row.enabled && resetting === row.username && <span>
+            <label>新密码<input aria-label="重置密码" type="password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} /></label>
+            <button disabled={blocked || nextPassword.length === 0} onClick={() => void reset(row.username)}>确认重置</button>
+            <button disabled={blocked} onClick={() => { setResetting(''); setNextPassword(''); }}>取消</button>
+          </span>}
+          {row.enabled && disabling !== row.username && <button disabled={blocked} onClick={() => { setDisabling(row.username); setResetting(''); setNextPassword(''); }}>停用</button>}
+          {row.enabled && disabling === row.username && <span>
+            <button className="intake-danger" disabled={blocked} onClick={() => void disable(row.username)}>确认停用</button>
+            <button disabled={blocked} onClick={() => setDisabling('')}>取消</button>
+          </span>}
+        </td>
+      </tr>)}
+    </tbody></table>
+  </section>;
+}
 export function IntakePermissions({ active }: { active: boolean }) {
   const [view,setView]=useState<IntakePermissionView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
@@ -49,6 +131,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
     {view && !view.signedIn && <p>请先登录。</p>}
     {view?.signedIn && !view.available && !view.pending && <p>当前没有可配置范围，或读取资格已到期。请刷新核对。</p>}
     {view?.available && <>
+      <SeatAccounts disabled={disabled} />
       <label>配置范围<select aria-label="配置范围" disabled={disabled || !!view.preview} value={view.source??''} onChange={e=>void apply({action:'source',selection:e.target.value})}>
         <option value="">请选择已有范围</option>{view.sources.map(s=><option key={s.selection} value={s.selection}>{s.label}</option>)}</select></label>
       {view.source && <>

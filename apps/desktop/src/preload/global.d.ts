@@ -1,5 +1,6 @@
 import type { IntakeCatalogApi } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi } from '../shared/content-intake-permissions';
+import type { SeatAccountApi } from '../shared/seat-account-intent';
 import type { IntakeManagementApi } from '../shared/content-intake-management';
 import type { CustomerAgentApi } from '../shared/contracts';
 import type { DashboardAnnounceApi } from '../shared/dashboard-announce';
@@ -14,6 +15,7 @@ declare global {
   interface Window {
     dashboardIntakeCatalog?: IntakeCatalogApi;
     dashboardPermissions?: IntakePermissionApi;
+    dashboardSeats?: SeatAccountApi;
     dashboardIntake?: IntakeManagementApi;
     customerAgent?: CustomerAgentApi;
     dashboardWording?: DashboardWordingApi;

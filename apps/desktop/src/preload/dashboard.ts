@@ -1,5 +1,6 @@
 import type { IntakeCatalogApi, IntakeCatalogCommand } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
+import type { SeatAccountApi, SeatAccountIntent } from '../shared/seat-account-intent';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -450,6 +451,10 @@ contextBridge.exposeInMainWorld('dashboardPermissions', {
     return () => { ipcRenderer.removeListener('dashboard:permissions-invalidated', handler); };
   },
 } satisfies IntakePermissionApi);
+
+contextBridge.exposeInMainWorld('dashboardSeats', {
+  command: (intent: SeatAccountIntent) => ipcRenderer.invoke('dashboard:seats-command', intent),
+} satisfies SeatAccountApi);
 
 contextBridge.exposeInMainWorld('dashboardIntakeCatalog', {
   current: () => ipcRenderer.invoke('dashboard:intake-catalog-current'),
