@@ -47,6 +47,7 @@ import { registerOpsLoopRoutes, type OpsLoopRouteDependencies } from './ops-loop
 import { contentIntakeManagementRoutes } from './content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from './content-intake/usage-http.js';
 import { createContentIntakeService } from './content-intake/service.js';
+import { syntheticPrincipalLabels } from './content-intake/synthetic-principal-labels.js';
 import type { ContentObjectStore } from './content-object-store.js';
 import type { IntakePurposePool } from './content-intake/runtime-pool.js';
 
@@ -177,6 +178,7 @@ export function createApiApp(
       pool: intakeDependencies.business,
       store: intakeDependencies.store,
       terminalPool: intakeDependencies.worker,
+      principalLabels: syntheticPrincipalLabels,
       report,
     });
     app.addHook('onClose', async () => {
