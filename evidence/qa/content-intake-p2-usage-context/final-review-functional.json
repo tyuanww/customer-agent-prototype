@@ -1,0 +1,23 @@
+{
+  "revision": "ab2b097422a4df350ddb1db441fd66df5df0a2f0",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Code unchanged from ab2b097; documentation correction only.",
+    "Native reviewer fixtures summary-only; outside model unavailable; no native UI or Windows evidence."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-usage.test.ts",
+      "contract": "资格局部到期与全局撤销，修后最终复审",
+      "expected": "18 cases pass",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/desktop\n\n ✓ tests/unit/content-intake-usage.test.ts (18 tests) 226ms\n\n Test Files  1 passed (1)\n      Tests  18 passed (18)\n   Start at  22:41:26\n   Duration  534ms (transform 65ms, setup 100ms, collect 105ms, tests 226ms, environment 0ms, prepare 32ms)\n\n"
+    }
+  ],
+  "learning": [],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

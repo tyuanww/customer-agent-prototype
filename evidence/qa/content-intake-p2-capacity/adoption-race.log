@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/apps/api
+
+ ✓ tests/content-intake.integration.test.ts (181 tests | 180 skipped) 1186ms
+   ✓ P2 sealed synthetic authority and durable candidates > capacity: adopted references resist cleanup and releasing tombstones reject late adoption  1185ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 180 skipped (181)
+   Start at  10:46:59
+   Duration  2.15s (transform 353ms, setup 0ms, collect 752ms, tests 1.19s, environment 0ms, prepare 59ms)

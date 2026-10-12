@@ -1,3 +1,7 @@
+import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
+import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
+import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
+import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
 import { registerProductSearchIpc } from './product-search-ipc';
 import { ProductHttp } from './product-http';
 import { ProductSession } from './product-session';
@@ -89,6 +93,10 @@ if (!gotLock) {
   let controllerReady = false;
   let productSession: ProductSession | null = null;
   let productAnnounce: ProductAnnounce | null = null;
+  let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
+  let intakePermissions: ReturnType<typeof registerContentIntakePermissionsIpc> | null = null;
+  let disposeIntakeCatalog: (() => void) | null = null;
+  let disposeIntakeQuery: (() => void) | null = null;
   let pendingSecondInstance = false;
 
   const handleActivate = (): void => {
@@ -120,6 +128,10 @@ if (!gotLock) {
   };
 
   const beginShutdown = (): void => {
+    intakeManagement?.dispose(); intakeManagement = null;
+    intakePermissions?.dispose(); intakePermissions = null;
+    disposeIntakeCatalog?.(); disposeIntakeCatalog = null;
+    disposeIntakeQuery?.(); disposeIntakeQuery = null;
     void productSession?.shutdown();
     shuttingDown.begin();
     controllerReady = false;
@@ -164,6 +176,13 @@ if (!gotLock) {
       // Tests and hosts without session.setProxy still reach loopback via Node fetch.
     }
 
+    const userDataDirectory = app.getPath('userData');
+    const productProfile = resolveProductProfile(
+      app.isPackaged,
+      userDataDirectory,
+      process.env,
+      app.isPackaged ? bundledOfflineProfilePath(process.resourcesPath) : undefined,
+    );
     const testAccelerator = isTestHarnessEnabled()
       ? process.env.DEMO_E2E_ACCELERATOR
       : undefined;
@@ -181,6 +200,7 @@ if (!gotLock) {
       },
     });
     const next = new OverlayController({
+      dashboardEnabled: true,
       fence: shuttingDown,
       rendererDevServerUrl,
       ...(testAccelerator ? { accelerator: testAccelerator } : {}),
@@ -207,16 +227,9 @@ if (!gotLock) {
     // Absence is not S0. Explicit `{ "mode": "synthetic-offline" }` starts S0.
     // Retrieval hydrate / BM25 use the known off-repo stack files, not leftover
     // `/v1/search`, and also must not require a developer shell.
-    const userDataDirectory = app.getPath('userData');
-    const productProfile = resolveProductProfile(
-      app.isPackaged,
-      userDataDirectory,
-      process.env,
-      app.isPackaged ? bundledOfflineProfilePath(process.resourcesPath) : undefined,
-    );
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
-      applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin });
+      if (!productProfile.contentIntake) applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin });
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
         createSessionStore(userDataDirectory, productProfile.apiOrigin), createLoginWindow(
           productProfile.identityOrigin,
@@ -227,8 +240,8 @@ if (!gotLock) {
               ? followAllowedLoginRedirects(productProfile.identityOrigin, productProfile.apiOrigin)
               : (url) => shell.openExternal(url),
           },
-        ));
-      productAnnounce = new ProductAnnounce(
+        ), productProfile.contentIntake ? () => null : undefined);
+      if (!productProfile.contentIntake) productAnnounce = new ProductAnnounce(
         productSession,
         readProductClientId(userDataDirectory),
         Date.now,
@@ -238,43 +251,57 @@ if (!gotLock) {
       );
       await productSession.restore();
     }
-    registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
-      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
-      identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
-    registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
-      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
-      () => controller?.dashboardWebContents() ?? null);
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => [controller?.dashboardWebContents() ?? null]);
-    registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
-      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
-    registerDashboardWordingIpc(
-      () => controller?.dashboardWebContents() ?? null,
-      () => controller?.rendererDevServerUrl,
-      () => productAnnounce?.snapshotCatalog() ?? null,
-    );
-    registerDashboardContentIpc(
-      productSession,
-      () => controller?.dashboardWebContents() ?? null,
-      () => controller?.rendererDevServerUrl,
-      async (sessionEpoch) => {
-        const announce = productAnnounce;
-        if (!announce) return null;
-        await announce.refresh({ sessionEpoch, generation: 0 });
-        return announce.currentDomainCounts();
-      },
-    );
-    registerDashboardIterationIpc(
-      productSession,
-      () => controller?.dashboardWebContents() ?? null,
-      () => controller?.rendererDevServerUrl,
-    );
-    registerDashboardOpsLoopIpc(
-      productSession,
-      () => controller?.dashboardWebContents() ?? null,
-      () => controller?.rendererDevServerUrl,
-    );
+    disposeIntakeCatalog = registerContentIntakeCatalogIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+    intakePermissions = registerContentIntakePermissionsIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+    intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+    disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
+      () => controller?.rendererDevServerUrl);
+    // The shared Fox still reads unread in FAQ mode. A null service supplies the
+    // existing unavailable projection without creating legacy I/O or missing IPC.
+    registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
+      () => controller?.dashboardWebContents() ?? null);
+    // The FAQ profile has no legacy hydrate, remote model, catalog or admin adapter.
+    if (!productProfile?.contentIntake) {
+      registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
+        contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
+        identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
+      registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
+        contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+      registerDashboardWordingIpc(
+        () => controller?.dashboardWebContents() ?? null,
+        () => controller?.rendererDevServerUrl,
+        () => productAnnounce?.snapshotCatalog() ?? null,
+      );
+      registerDashboardContentIpc(
+        productSession,
+        () => controller?.dashboardWebContents() ?? null,
+        () => controller?.rendererDevServerUrl,
+        async (sessionEpoch) => {
+          const announce = productAnnounce;
+          if (!announce) return null;
+          await announce.refresh({ sessionEpoch, generation: 0 });
+          return announce.currentDomainCounts();
+        },
+      );
+      registerDashboardIterationIpc(
+        productSession,
+        () => controller?.dashboardWebContents() ?? null,
+        () => controller?.rendererDevServerUrl,
+      );
+      registerDashboardOpsLoopIpc(
+        productSession,
+        () => controller?.dashboardWebContents() ?? null,
+        () => controller?.rendererDevServerUrl,
+      );
+    }
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {
       if (controller === next) {
@@ -335,7 +362,11 @@ if (!gotLock) {
     }
   });
 
-  app.on('before-quit', beginShutdown);
+  app.on('before-quit', event => {
+    if (intakePermissions && !intakePermissions.allowClose()) { event.preventDefault(); return; }
+    if (intakeManagement && !intakeManagement.allowClose()) { event.preventDefault(); return; }
+    beginShutdown();
+  });
   app.on('will-quit', beginShutdown);
 
   app.on('window-all-closed', () => {

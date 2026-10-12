@@ -1,0 +1,11 @@
+
+Running 1 test using 1 worker
+
+(node:68649) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"status":"OWNED_RESOURCES","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-HZuiLm","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-A0d8Oh"}
+{"status":"PASS","profile":"purpose-runtime","inputFormat":"xlsx","purposeQueries":{"business":2237,"usage":427,"worker":40,"organization":30},"electron":"darwin","api":"actual","postgres":15,"nativeDialog":"controlled-path-and-confirmation-responses","upload":"actual-multipart","issueReport":"saved-and-read-with-exceljs","publicationPolicy":"direct-v1","approvalRows":0,"revision":"same-id-v2-fresh-evidence","cancellation":"server-confirmed-live-release-unchanged","ordinarySeat":true,"releaseId":"rel_2","screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-csv-desktop-xlsx"}
+{"status":"OWNED_RESOURCES_REMOVED","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-HZuiLm","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-A0d8Oh"}
+  ✓  1 tests/e2e/content-intake-real-stack.spec.ts:11:1 › native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG (16.7s)
+
+  1 passed (17.0s)

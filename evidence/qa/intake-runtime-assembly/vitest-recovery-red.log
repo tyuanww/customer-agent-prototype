@@ -1,0 +1,86 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-assembly/customer-agent-prototype/apps/api
+
+ ❯ tests/intake-runtime-assembly.integration.test.ts (8 tests | 1 failed | 7 skipped) 1059ms
+   ↓ intake runtime purpose assembly (synthetic PG15) > installs non-login definer owners and empty purpose gaps for the four login roles
+   × intake runtime purpose assembly (synthetic PG15) > lets the definer execute the hashing, ticket and family checks used beyond early publication refusal 2ms
+     → permission denied for function digest
+   ↓ intake runtime purpose assembly (synthetic PG15) > does not treat an empty or later non-empty catalog as legacy adoption
+   ↓ intake runtime purpose assembly (synthetic PG15) > issues, pages and reads copy eligibility on the usage role without returning a lease token
+   ↓ intake runtime purpose assembly (synthetic PG15) > lets business execute direct publication denials and blocks grant, fact and quality writes
+   ↓ intake runtime purpose assembly (synthetic PG15) > finishes a report on the worker role and rejects validated input, grants and DDL
+   ↓ intake runtime purpose assembly (synthetic PG15) > applies one organization fact refresh and refuses the same write from the other roles
+   ↓ intake runtime purpose assembly (synthetic PG15) > rejects a legacy source mode, a missing purpose privilege, and a caller reopening a disabled session
+ ❯ tests/intake-runtime-assembly.test.ts (7 tests | 3 failed | 4 skipped) 5011ms
+   ↓ intake runtime assembly candidate without a database > keeps the existing absent-manifest refusal and does not query a non-null list
+   ↓ intake runtime assembly candidate without a database > refuses a missing parser, organization dependency, failed probe, cancel and close before adoption
+   ↓ intake runtime assembly candidate without a database > starts only when every purpose gap is empty and an empty catalog is not adoption
+   × intake runtime assembly candidate without a database > refuses cancel while a database check is pending 5ms
+     → promise resolved "{ state: 'running', …(4) }" instead of rejecting
+   × intake runtime assembly candidate without a database > refuses close while a database check is pending 0ms
+     → promise resolved "{ state: 'running', …(4) }" instead of rejecting
+   × intake runtime assembly candidate without a database > reserves the startup attempt before awaiting the parser 5004ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ↓ intake runtime assembly candidate without a database > does not open a connection for an actor without a private session
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/intake-runtime-assembly.integration.test.ts > intake runtime purpose assembly (synthetic PG15) > lets the definer execute the hashing, ticket and family checks used beyond early publication refusal
+error: permission denied for function digest
+ ❯ ../../../../intake-organization/customer-agent-prototype/node_modules/.pnpm/pg@8.23.0/node_modules/pg/lib/client.js:694:17
+ ❯ tests/intake-runtime-assembly.integration.test.ts:116:22
+    114|     try {
+    115|       await admin.query('SET LOCAL ROLE intake_runtime_fn_owner');
+    116|       const hashes = await admin.query(`SELECT octet_length(public.dig…
+       |                      ^
+    117|         octet_length(public.gen_random_bytes(32)) AS ticket_bytes`);
+    118|       expect(hashes.rows[0]).toEqual({ payload_bytes: 32, ticket_bytes…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/intake-runtime-assembly.test.ts > intake runtime assembly candidate without a database > refuses cancel while a database check is pending
+ FAIL  tests/intake-runtime-assembly.test.ts > intake runtime assembly candidate without a database > refuses close while a database check is pending
+AssertionError: promise resolved "{ state: 'running', …(4) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "catalogObjects": 0,
++   "claimManifest": null,
++   "legacyAdopted": false,
++   "reason": "CLAIM_MANIFEST_ABSENT",
++   "state": "running",
+  }
+
+ ❯ tests/intake-runtime-assembly.test.ts:118:25
+    116|     assembly[action]();
+    117|     resume();
+    118|     await expect(pending).rejects.toMatchObject({ reason: action === '…
+       |                         ^
+    119|     expect(fixture.business.sqls).toEqual([]);
+    120|     if (action === 'cancel') await expect(assembly.start()).resolves.t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/intake-runtime-assembly.test.ts > intake runtime assembly candidate without a database > reserves the startup attempt before awaiting the parser
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/intake-runtime-assembly.test.ts:124:3
+    122|   });
+    123|
+    124|   it('reserves the startup attempt before awaiting the parser', async …
+       |   ^
+    125|     const fixture = request();
+    126|     let resume!: (value: boolean) => void;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 11 skipped (15)
+   Start at  16:40:36
+   Duration  5.66s (transform 376ms, setup 0ms, collect 840ms, tests 6.07s, environment 0ms, prepare 121ms)

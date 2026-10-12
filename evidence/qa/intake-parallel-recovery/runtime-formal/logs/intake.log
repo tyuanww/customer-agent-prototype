@@ -1,0 +1,11 @@
+$ node scripts/customer-agent-contract-set.mjs ingest --source=/Users/hutou/Desktop/ai-content-intake-p2-contracts/output/customer-agent-contract-sets/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551 --source-repository-root=/Users/hutou/Desktop/ai-content-intake-p2-contracts
+{
+  "status": "CREATED",
+  "contract_set_id": "cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551",
+  "source_git_sha": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
+  "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551",
+  "lock_path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/contracts/upstream/customer-agent/contract-set.lock.json",
+  "intake_status": "VERIFIED_NOT_ACTIVATED",
+  "ddev_authorized": false,
+  "runtime_activated": false
+}

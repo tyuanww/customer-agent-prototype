@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-org-runtime-candidate/customer-agent-prototype/apps/api
+
+ ✓ experiments/intake-organization/transport-consumer.integration.test.ts > HTTP organization transport through the restricted writer and real usage > refreshes from the local HTTP double and does not extend the existing usage deadline 1059ms
+ ✓ experiments/intake-organization/transport-consumer.integration.test.ts > HTTP organization transport through the restricted writer and real usage > invalidates old usage after a job change, a department change, and deactivation 1028ms
+ ✓ experiments/intake-organization/transport-consumer.integration.test.ts > HTTP organization transport through the restricted writer and real usage > recovers an unknown commit only from the original snapshot, not from a later observation 923ms
+ ✓ experiments/intake-organization/transport-consumer.integration.test.ts > HTTP organization transport through the restricted writer and real usage > keeps the previous facts and expiry when a later HTTP page fails 878ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  16:05:24
+   Duration  4.62s (transform 242ms, setup 0ms, collect 506ms, tests 3.89s, environment 0ms, prepare 60ms)
+

@@ -1,0 +1,199 @@
+{
+  "baseCommit": "e25d528e7a611fb977901b6fd9b53f0b0335f549",
+  "environment": {
+    "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "scope": "synthetic-only, explicit purpose-runtime"
+  },
+  "checks": {
+    "architecture": {
+      "command": [
+        "pnpm",
+        "check:architecture"
+      ],
+      "startedAt": "2026-10-08T11:54:15.957878+00:00",
+      "endedAt": "2026-10-08T11:54:16.499309+00:00",
+      "exitCode": 0
+    },
+    "build": {
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "startedAt": "2026-10-08T11:45:58.154647+00:00",
+      "endedAt": "2026-10-08T11:46:06.498966+00:00",
+      "exitCode": 0
+    },
+    "docs": {
+      "command": [
+        "pnpm",
+        "docs:check"
+      ],
+      "startedAt": "2026-10-08T11:54:15.957932+00:00",
+      "endedAt": "2026-10-08T11:54:16.435513+00:00",
+      "exitCode": 0
+    },
+    "electron-workspace-appearance": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-workspace-real-stack.spec.ts"
+      ],
+      "environment": {
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E": "1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME": "1"
+      },
+      "startedAt": "2026-10-08T11:51:30.153814+00:00",
+      "endedAt": "2026-10-08T11:51:48.492195+00:00",
+      "exitCode": 0
+    },
+    "electron-workspace-final": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-workspace-real-stack.spec.ts"
+      ],
+      "environment": {
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E": "1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME": "1"
+      },
+      "startedAt": "2026-10-08T11:49:25.869160+00:00",
+      "endedAt": "2026-10-08T11:49:42.723257+00:00",
+      "exitCode": 0
+    },
+    "electron": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-real-stack.spec.ts",
+        "tests/e2e/content-intake-rollback-real-stack.spec.ts",
+        "tests/e2e/content-intake-permissions-real-stack.spec.ts",
+        "tests/e2e/content-intake-shop-directory-real-stack.spec.ts",
+        "tests/e2e/content-intake-workspace-real-stack.spec.ts"
+      ],
+      "environment": {
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E": "1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME": "1"
+      },
+      "startedAt": "2026-10-08T11:47:09.862750+00:00",
+      "endedAt": "2026-10-08T11:48:00.584848+00:00",
+      "exitCode": 1
+    },
+    "final-desktop-types": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "typecheck"
+      ],
+      "startedAt": "2026-10-08T11:54:15.957894+00:00",
+      "endedAt": "2026-10-08T11:54:19.143231+00:00",
+      "exitCode": 0
+    },
+    "final-e2e-lint": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "eslint",
+        "tests/e2e/content-intake-workspace-real-stack.spec.ts"
+      ],
+      "startedAt": "2026-10-08T11:54:15.957900+00:00",
+      "endedAt": "2026-10-08T11:54:16.878383+00:00",
+      "exitCode": 0
+    },
+    "lint": {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "startedAt": "2026-10-08T11:45:58.154658+00:00",
+      "endedAt": "2026-10-08T11:46:03.675672+00:00",
+      "exitCode": 0
+    },
+    "test": {
+      "command": [
+        "pnpm",
+        "test"
+      ],
+      "environment": {},
+      "startedAt": "2026-10-08T11:47:09.862744+00:00",
+      "endedAt": "2026-10-08T11:48:47.511699+00:00",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "startedAt": "2026-10-08T11:45:58.154648+00:00",
+      "endedAt": "2026-10-08T11:46:07.614520+00:00",
+      "exitCode": 0
+    },
+    "workspace": {
+      "command": [
+        "pnpm",
+        "workspace:check"
+      ],
+      "startedAt": "2026-10-08T11:54:15.957887+00:00",
+      "endedAt": "2026-10-08T11:54:16.974409+00:00",
+      "exitCode": 1
+    },
+    "docs-final": {
+      "command": [
+        "pnpm",
+        "docs:check"
+      ],
+      "exitCode": 0,
+      "completedAt": "2026-10-08T11:58:52.217967+00:00"
+    }
+  },
+  "electronCoverage": {
+    "originalFour": "electron.log first 4 cases passed; same final product code",
+    "newFour": "electron-workspace-appearance.log 4/4 passed",
+    "aggregate": "8/8 scenarios covered; first full command was 4 pass + 4 fail; no claim of single full-green run"
+  },
+  "skipped": {
+    "database": 21,
+    "api": 319,
+    "desktop": 7
+  },
+  "externalReview": "INCOMPLETE",
+  "workspaceBudget": "KNOWN_FAIL: 35.4 MiB / 32 MiB; root policy PASS",
+  "notRun": [
+    "Windows GUI",
+    "signed/packaged build",
+    "manual native dialog and whole-device offline",
+    "real data/production transport",
+    "unaffected historical role audit and all PG specialty suites"
+  ],
+  "stagedDiffCheck": {
+    "command": [
+      "git",
+      "diff",
+      "--cached",
+      "--check",
+      "--",
+      ".",
+      ":(exclude)**/*.log"
+    ],
+    "exitCode": 0,
+    "reason": "Raw tool logs preserved verbatim; checked all staged code and documents"
+  }
+}

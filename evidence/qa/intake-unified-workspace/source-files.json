@@ -1,0 +1,157 @@
+[
+  {
+    "path": "AGENTS.md",
+    "sha256": "b5f5cd80929ac7c61da6f54de6cd470b0dacc6339f26243ecbc03279c5e5a121",
+    "bytes": 23406
+  },
+  {
+    "path": "DESIGN.md",
+    "sha256": "91f2762aa32cf558d6654f65bf839bf4583e5e7fa8e8e1b5188b27eb8399c043",
+    "bytes": 43678
+  },
+  {
+    "path": "DEVELOPMENT_BRIEF.md",
+    "sha256": "eaa83d8e2112f173d59dc49cba7a00571f3a4296d5cdbdbd6e8e62634597ee20",
+    "bytes": 33408
+  },
+  {
+    "path": "TODOS.md",
+    "sha256": "4feacb0ef795eddac017beab398e4aafef55301eb8c920c759dd16a27a383394",
+    "bytes": 33131
+  },
+  {
+    "path": "apps/desktop/src/main/content-intake-catalog-ipc.ts",
+    "sha256": "729931a328bada706d9c80ad90c6e553fb1f652c8831dd95153a7b4510f5814f",
+    "bytes": 2756
+  },
+  {
+    "path": "apps/desktop/src/main/content-intake-catalog.ts",
+    "sha256": "7564b3dd204a0c86718137c5579c874e0794d4b3785bf2208267e80104c09503",
+    "bytes": 8639
+  },
+  {
+    "path": "apps/desktop/src/main/content-intake-upload.ts",
+    "sha256": "19f4f1320539ea6698a4e668f5715d2ad7936623b7c494b3392fab36b86bbda1",
+    "bytes": 21900
+  },
+  {
+    "path": "apps/desktop/src/main/content-intake-usage.ts",
+    "sha256": "3bd8c1fa4a91ff1c06fca04263c25a44979cbf9087106404aed459fb924e8b05",
+    "bytes": 11630
+  },
+  {
+    "path": "apps/desktop/src/main/main.ts",
+    "sha256": "ae1c99b715c095d6228abc0ef2d18bbf20189b06c10d4928ff3f03a0aa81fb60",
+    "bytes": 16919
+  },
+  {
+    "path": "apps/desktop/src/preload/dashboard.ts",
+    "sha256": "b2c7cd229c82495aa16c9dd128b43032be9c24d6d059459fb07baf33a517729a",
+    "bytes": 18788
+  },
+  {
+    "path": "apps/desktop/src/preload/global.d.ts",
+    "sha256": "09a8d66bcb938954c46e768fe2d421a0919fac984ebeb899cbdedc878ec3cff1",
+    "bytes": 1294
+  },
+  {
+    "path": "apps/desktop/src/renderer/DashboardApp.tsx",
+    "sha256": "6241739700d0afab628af98906ccb968c0d2500c9b478070c24c4b32edcc4dda",
+    "bytes": 49529
+  },
+  {
+    "path": "apps/desktop/src/renderer/features/dashboard/IntakeLibrary.tsx",
+    "sha256": "0dfd88cfd4972a19a0ae020306539ece027064fb2e9c7eea3c3989f9f0152955",
+    "bytes": 10971
+  },
+  {
+    "path": "apps/desktop/src/renderer/features/dashboard/IntakeUpload.tsx",
+    "sha256": "3315f0d57548e53039166b9cf08ac12e1cd0b5097322f48675f81dbfaa3a053c",
+    "bytes": 9063
+  },
+  {
+    "path": "apps/desktop/src/renderer/features/dashboard/intake-management.css",
+    "sha256": "e77efd2279db53beab241fb0da1cce25b428def4e0ea9508df0aebf1409b7f70",
+    "bytes": 6148
+  },
+  {
+    "path": "apps/desktop/src/shared/content-intake-catalog.ts",
+    "sha256": "361f33f42b1595b3d3d32cb07810e7b2857468c06c6839899c37f3f7f5f805ba",
+    "bytes": 1991
+  },
+  {
+    "path": "apps/desktop/src/shared/content-intake-upload.ts",
+    "sha256": "d1f3afc7c0f080c6150c98a699af61383f5dcd8b7833e65042a8648e223fe148",
+    "bytes": 3031
+  },
+  {
+    "path": "apps/desktop/tests/component/intake-dashboard-shell.test.tsx",
+    "sha256": "63c0d22ca56ec714b879d58138b3cb3427df7b68de5b98c241e0ab4ae84be12a",
+    "bytes": 7589
+  },
+  {
+    "path": "apps/desktop/tests/component/intake-library.test.tsx",
+    "sha256": "6bc6e62755fe5d83a7fc1376773cc9023369673b261355131282c4649aed70aa",
+    "bytes": 10066
+  },
+  {
+    "path": "apps/desktop/tests/component/intake-upload.test.tsx",
+    "sha256": "28eee36abe23623f49a2f9cdaf6466a73660c29894a4bf19290fc43bbca9c954",
+    "bytes": 15748
+  },
+  {
+    "path": "apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts",
+    "sha256": "5529491baf08c83a09e4c9101080cd4e0861539c283a6eb4faca63454ab65b53",
+    "bytes": 7819
+  },
+  {
+    "path": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+    "sha256": "3ac7cd984ac4ed8a231d6554994d540f610f7270d6f3500ff9955649ca060858",
+    "bytes": 28530
+  },
+  {
+    "path": "apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts",
+    "sha256": "d4638d68e1d257826472d051c49ebd082c32ce99401e73fedcb0e6b36bd33c64",
+    "bytes": 11522
+  },
+  {
+    "path": "apps/desktop/tests/unit/content-intake-catalog-ipc.test.ts",
+    "sha256": "92020270c2b16b99d2b4f1772126c3316c8c4dfd075367f0955bed41ef9ed63a",
+    "bytes": 3408
+  },
+  {
+    "path": "apps/desktop/tests/unit/content-intake-catalog.test.ts",
+    "sha256": "928ad9632632ba46c484c4387251e8a4af8d1c4753584f07eeb7b08030881077",
+    "bytes": 8907
+  },
+  {
+    "path": "apps/desktop/tests/unit/content-intake-usage.test.ts",
+    "sha256": "9f6956b37a4bcb1a0c52d6d6c5faf14289b913ef1896e93462b86ea0e748d9d3",
+    "bytes": 11043
+  },
+  {
+    "path": "docs/how-to-develop-content-intake.md",
+    "sha256": "6076072da710f7b7014b544d06d2cd897bbccf4785f9d3297fad770ea89d7ac6",
+    "bytes": 55851
+  },
+  {
+    "path": "docs/how-to-verify-desktop.md",
+    "sha256": "2ced97cdcf7a9803070abafa1335455f3d1f84a9bf246310344ed901edfe7214",
+    "bytes": 46854
+  },
+  {
+    "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+    "sha256": "2adaba61f3b2b0a8087ee26f2bd9b899dfc1ee96383279fcfa45a0074ca67b10",
+    "bytes": 609653
+  },
+  {
+    "path": "docs/reference-project-architecture.md",
+    "sha256": "f025d10ff90dc97d9c05c8b870a369530e3f19a868b183960b0fb6a4e0230ce6",
+    "bytes": 58492
+  },
+  {
+    "path": "package.json",
+    "sha256": "988f141eb7f362f259f5a1f6541008cdfc051a36dacbcd9b438064f8f0d792a4",
+    "bytes": 8202
+  }
+]

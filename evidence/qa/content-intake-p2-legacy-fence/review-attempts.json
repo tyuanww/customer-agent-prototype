@@ -1,0 +1,155 @@
+{
+  "skill": "open-code-review-delegate + gstack review",
+  "scope": "Prior2843647commit separately reviewed; current fence and related cancellation changes; prior unchanged evidence reused by hashes",
+  "attempts": [
+    {
+      "source": "claude-code",
+      "phase": "adversarial",
+      "token": "022c3d6d-2e57-4cad-a33b-a98a7c736bfe",
+      "completed": false,
+      "outsideStatus": "unavailable",
+      "disposition": "superseded; owner stopped readers to repair native confirmed defect",
+      "result": {
+        "status": "error",
+        "provider": "claude-code",
+        "result": "",
+        "error": {
+          "code": "exit",
+          "message": "Claude Code exited with code 143."
+        },
+        "exit_code": 143
+      }
+    },
+    {
+      "source": "claude-code",
+      "phase": "structured",
+      "token": "a364ad60-0caa-42fe-8ac0-9004c4555d48",
+      "completed": false,
+      "outsideStatus": "unavailable",
+      "disposition": "superseded; owner stopped readers to repair native confirmed defect",
+      "result": {
+        "status": "error",
+        "provider": "claude-code",
+        "result": "",
+        "error": {
+          "code": "exit",
+          "message": "Claude Code exited with code 143."
+        },
+        "exit_code": 143
+      }
+    },
+    {
+      "source": "in-host",
+      "round": 1,
+      "completed": true,
+      "converged": false,
+      "finding": "P1 snapshot mutation precedes legacy publish guard",
+      "action": "fixed; replay011 and API014 pass"
+    },
+    {
+      "source": "in-host",
+      "round": 2,
+      "token": "7d752aa1-45de-4e62-b210-f1a6fbd1efa0",
+      "completed": true,
+      "converged": false,
+      "finding": "P2 actor-wide cancel takes admission lock before content lock",
+      "action": "fixed; actual regression red then014 green"
+    },
+    {
+      "source": "in-host",
+      "round": 3,
+      "token": "5e80093c-dd17-4207-91e9-052d8570fa5f",
+      "completed": true,
+      "converged": true,
+      "result": "NO_FINDINGS; both confirmed defects resolved; tests reviewed in SUMMARY mode only"
+    },
+    {
+      "source": "claude-code",
+      "phase": "adversarial",
+      "token": "68e4d633-23af-4069-94b5-d174a568a361",
+      "completed": true,
+      "outsideStatus": "completed",
+      "inputSha256": "c139fd1ac1f28b9e4910fc61d660b97b200ca5eae84460fe276d25ea30163d9d",
+      "result": {
+        "status": "completed",
+        "provider": "claude-code",
+        "result": "## 审查结论\n\n当前增量要把旧写纳入「先 `lock_content()`、再 admission/publish」的共存门。`cancel_actor_in_flight_imports` 与 API 哨兵取消已按该顺序修好；**单批 `cancel_content_import` 没有**。`restore_source_snapshots` 现在在 **AFTER UPDATE** 触发器里再抢内容锁，会和同样持有内容锁、随后改同一行 `import_batches` 的 publish/finalize 形成死锁，而不是 0020 原先靠行锁排队的 cancel/publish CAS。\n\n## 缺陷\n\n### 1. [高] 单批取消 / restore 触发器与 content-lock-first 旧写锁序反转\n\n`0022` 让 restore 一进函数就 `lock_content()`：\n\n```168:175:packages/database/overlays/0022_intake_legacy_fence.sql\n    ('public.restore_source_snapshots(text)',\n      ...\n      '  PERFORM pg_catalog.set_config(''customer_agent.source_snapshot_advance'', ''on'', TRUE);',\n      '  PERFORM backend_review.lock_content();\n  IF NOT EXISTS ... THEN RETURN; END IF;\n  PERFORM content_intake.guard_legacy_domains(...);')\n```\n\n唯一运行时调用方仍是 0016 的 **AFTER UPDATE OF status**（行锁已持有）：\n\n```sql\n-- packages/database/overlays/0016_office_owner_publish.sql\n-- trg_restore_snapshots_on_import_failed\nIF NEW.status = 'failed' AND OLD.status IN ('validating', 'staged') THEN\n  PERFORM public.restore_source_snapshots(NEW.import_batch_id);\n```\n\n同增量里，publish 在改 batch 之前先拿内容锁：\n\n```27:35:packages/database/overlays/0022_intake_legacy_fence.sql\n  -- Same first lock as P2 writers. The original publisher takes its legacy lock\n  -- afterwards...\n  PERFORM backend_review.lock_content();\n```\n\n随后 `publish_content_release` 才 `UPDATE import_batches ... status='publishing'`。`finalize_org_reviewed_import_validation` 也被插了同样的先 `lock_content()`，再 `UPDATE import_batches SET status='staged'`。\n\n哨兵路径已修（内容锁 → admission → 循环取消）：\n\n```136:140:packages/database/overlays/0022_intake_legacy_fence.sql\n    ('public.cancel_actor_in_flight_imports(text,text)',\n      ...\n      '  FOR v_id IN',\n      '  PERFORM backend_review.lock_content();\n  PERFORM pg_catalog.pg_advisory_xact_lock(724019, 19);'),\n```\n\n单批路径没有进入 0022 手术列表。API 仍直接调 `cancel_content_import`：\n\n```419:447:apps/api/src/content-import-repository.ts\n        if (importBatchId === ACTOR_IN_FLIGHT_IMPORT_ID) {\n          // The SQL sweep owns content-lock → admission-lock ordering with enqueue.\n          ...\n        } else {\n          await client.query(\n            'SELECT public.cancel_content_import($1, $2, $3, $4)',\n            [importBatchId, reason, actor.user_id, actor.role],\n          );\n        }\n```\n\n并发：\n\n- T1 publish/finalize：`lock_content()` → 等待该 batch 行锁\n- T2 单批取消：先 `UPDATE import_batches`（行锁）→ AFTER 触发器 `lock_content()` 等待 T1\n\n结果从「cancel 先赢则 publish CAS 零行 / publish 先赢则 cancel 等到 publishing」退化成双方等待，`lock_timeout`/`statement_timeout` 后一侧 `commit: unknown`。worker 正在 `finalize` 时操作者取消同一 validating 批，是最容易打到的路径。已测的是「双 HTTP 取消/上传等内容锁、无提前 admission」，**不是** 单批取消 vs publish/finalize。\n\n修复：在 `cancel_content_import`（以及任何把 `validating|staged → failed` 的入口）里、**更新 `import_batches` 之前** `PERFORM backend_review.lock_content()`，与 `cancel_actor_in_flight_imports` 一致；并加一对会话：单批取消 vs `publish_content_release` / `finalize_org_reviewed_import_validation`。\n\n未把「coach enqueue 不经 snapshot、v2-preview 不挡旧写」算缺陷：预览非 live，原子发布仍是下一片；`guard_legacy_domains` 对绑定 domain 的全局 `v2-active`/当前 lineage 相交是按合同 fail-closed。质量/owner 门体未被手术跳过；应用角色仍无 `content_intake` 表/函数授权。\n\nRecommendation: patch `cancel_content_import` to `lock_content()` before updating `import_batches` because 0022 restore now takes the content lock from an AFTER UPDATE trigger, deadlocking specific-batch cancel against content-lock-first publish/finalize.",
+        "session_id": "60ff2ed0-1797-4dcb-ac49-c16f104c3635",
+        "usage": {
+          "input_tokens": 112786,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 21312,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "modelUsage": {
+          "claude-opus-5": {
+            "inputTokens": 112786,
+            "outputTokens": 21312,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 1.09673,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 64000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "exit_code": 0
+      },
+      "triage": {
+        "status": "false-positive",
+        "reason": "0013already patches cancel_content_import immediately afterBEGIN; no later migration replaces it. Real installed function verifiedfirststatementlock beforebatchUPDATE.",
+        "source": "packages/database/migrations/0013_backend_identity_content_v1_16.sql:181",
+        "validation": "outside-validation.json"
+      }
+    },
+    {
+      "source": "claude-code",
+      "phase": "structured",
+      "token": "4ec226ff-4148-4f68-a752-1d5666136b7d",
+      "completed": false,
+      "outsideStatus": "unavailable",
+      "gate": "MISSING COVERAGE",
+      "inputSha256": "c1277afcb6a2a6944096c51d6643b11d6b1003b1ff751b9ec4270ff9530c3250",
+      "result": {
+        "status": "unavailable",
+        "provider": "claude-code",
+        "result": "",
+        "error": {
+          "code": "timeout",
+          "message": "Claude Code timed out after 540000ms."
+        },
+        "exit_code": null
+      },
+      "modelIdentity": "unknown; no completed response metadata"
+    }
+  ],
+  "conclusion": {
+    "confirmedUnresolvedDefects": 0,
+    "fixedDefects": 2,
+    "coreOcr": "completed",
+    "nativeAdversarial": "completed; zero-edit third pass",
+    "outsideAdversarial": "completed; one false-positive verified against actual installed function",
+    "outsideStructured": "timed out after540000ms; not passed and not replaced by native coverage",
+    "bindingLimit": "External attempt started before documentation/evidence append; production source matches inputs.json. Its review-log binding reports changed, not a verified final-worktree binding. Final parent review separately accounts for these docs/evidence."
+  }
+}

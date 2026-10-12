@@ -1,0 +1,28 @@
+$ node --test scripts/architecture-boundary-check.test.mjs
+✔ renderer may import React, @shared, and contract types (2.431875ms)
+✔ renderer import of electron fails with file, rule, and fix (1.262875ms)
+✔ renderer import of main, preload, and database fails (6.786958ms)
+✔ preload may wrap fixed channels and keep a private channel helper (1.610875ms)
+✔ preload generic send/on/invoke fails (1.3315ms)
+✔ preload exposing a helper that accepts the caller channel fails (1.180792ms)
+✔ packages may import node builtins and root scripts (1.235334ms)
+✔ packages importing an app fails (0.986958ms)
+✔ packages package.json dependency on an app fails (1.188959ms)
+✔ api may import contracts and the D5 desktop adapter seam (1.643875ms)
+✔ api source importing desktop fails (0.662291ms)
+✔ D5 e2e file still fails when it loads a desktop module outside the four adapters (0.751667ms)
+✔ api package.json dependency on desktop fails (0.865375ms)
+✔ shared may import contract types, node:crypto, and a document parameter (1.182834ms)
+✔ shared import of React or Electron fails (1.058667ms)
+✔ shared DOM use fails while a document parameter stays allowed (1.062458ms)
+✔ the current repository has no architecture violations (181.687209ms)
+✔ cli exits non-zero and names the file, rule, and fix (29.722958ms)
+✔ cli exits 0 on this repository (193.11675ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 478.120541

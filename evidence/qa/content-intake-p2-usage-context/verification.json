@@ -1,0 +1,144 @@
+{
+  "schema": "content-intake-usage-context-evidence/v1",
+  "base_commit": "b5d26ec496862eb477ba639e7b37a4c0bdb3015c",
+  "date": "2026-10-06",
+  "environment": {
+    "os": "macOS arm64",
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "postgresql": "15.18, ephemeral Unix-socket clusters"
+  },
+  "inputs": {
+    "apps/api/src/content-intake/material.ts": "c3dbbd27ce65edf387e6e7b4f67e647da3c8b5313675ae0784103b0277b14b77",
+    "apps/api/src/content-intake/usage.ts": "a83f48533e7e19a0feb5b7fadc0266307d7a3b13c3b3487822ea3d37bd57ef59",
+    "apps/api/src/product-auth-service.ts": "a835aa796e6570e0ecba0a14e88b3bf8fef23b525f8bff92bf86850038d80689",
+    "apps/api/tests/content-intake.integration.test.ts": "da19d3630e32f0cb360279f3a11d7a4bad16b5e25a5794ef37bd25a00eabbceb",
+    "apps/desktop/src/main/content-intake-usage.ts": "c9df5f07772e59451367452394210e520f283cab9d1a6b6838b3d051b14c5635",
+    "apps/desktop/tests/unit/content-intake-usage.test.ts": "f55a4df1b4fdbdc77b88c8ee867004f9e2ab112c1b7f3f0f8cc8349664571120",
+    "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": "64f16bc06c557d8afc980d47b3dd0b105e33b63726a0e2cbea0b409c0157d138",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "24b4d68d72b55db78bfe6fb0451e6476f4067c066b9c4a1fae04bffd3867a630",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/contract-set.json": "718c32079c3bf350bcd52bd7d27079f1da3f1ae4eb9753a35dbeaf480ed90e33",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/openapi.v1.yaml": "3e0a3f122aefa0bff9c330e105f1a5cbb2b26662fd5f04db1ef3a93ac1bc1121",
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288/schema-v1.21.sql": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013",
+    "packages/contracts/openapi/bundle.generated.yaml": "3b89d8074f8996d2747d4e88eea3329cb0a0fc440a3237e709021cadc51dd3e7",
+    "packages/contracts/src/generated/codegen-manifest.generated.json": "274e3ef05e8dfac99dfc6494d0ca2d58d4ab078bee15d2b1d5e942d875c8baad",
+    "packages/contracts/src/generated/openapi.generated.ts": "d7e31554fca2bfa7b21941f355a4e73adb0807d88d8e55cff937b3568d18847c",
+    "packages/contracts/src/generated/provenance.generated.ts": "14f1478c5908433fe1fc33c366e100c92ab3e53f5e554db1029276dbf3ffdc67",
+    "packages/contracts/src/generated/runtime-schema.generated.ts": "a8c833db2b1b9a56daf134d7feee11fc356c74f1bebd92db97a15517e3797b9c",
+    "packages/contracts/tests/runtime.test.ts": "656787372f539a2e88d8172547a0c41906658933d4241a74fd599643d0dc0d5e",
+    "packages/database/migrations/0025_intake_usage_v1_21.sql": "f270f787323a65baf3727337dcc34c1ff3f7a0bac0baf79a1894a7f7ae9591f4",
+    "packages/database/migrations/manifest.generated.json": "d7e718ebaa035b680d035cf3931e6a465ac75b17534d1c58a982c07eca3ed340",
+    "packages/database/scripts/generate-migrations.mjs": "0853a7bb8930b7dfbca35f72b57cf6bca8cf60b07ad4616666c57883bfb9db3b",
+    "packages/database/src/generated/migrations.generated.ts": "19f4876bd45c723a5d1a08f57918abafb900a0d8326309cefbd9b9d106e7f242",
+    "packages/database/src/verifier.ts": "021eafe6eafc2fb49756aec1b2a159947a34c86423c734d6844c3e711dbd81c4",
+    "packages/database/tests/generator.test.ts": "eba78f231e762dcbe4e758f32f20aad30f546f4f48b23021546c1de809d38977",
+    "packages/database/tests/planner.test.ts": "df9ede5e9a5cd8130785fdc4d2e47c75461eb4365ca3ec17032f551bdd854563",
+    "packages/database/tests/postgres.integration.test.ts": "9452d32cfe6edbec4e0edc9bbdeae80a8c5594ad00ab41b3841be1833fedfed4",
+    "scripts/customer-agent-contract-set.mjs": "dc88df6b9bd07fa9adb78096573717e06fdb531fac9865c84063f8ab21cd9289",
+    "scripts/probe-intake-usage-consumer.mjs": "ba7ce21661f1de0cea8e6b0fd21347764134dd3aa173b1bfe969cb6ce120f6de"
+  },
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/lint-final.log",
+      "log_sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/typecheck-final.log",
+      "log_sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "outcome": "PASS: 1776 passed; 190 default gated/skipped",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/test-final-retry.log",
+      "log_sha256": "60930ffac4dd3582e6ee7804624157fef9c28c36654236c4dd1731751a4f1bb8"
+    },
+    {
+      "command": "pnpm build",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/build-final.log",
+      "log_sha256": "0aca4fad37a40e934b1008f8e783b82b90fd68c245b536159b64342069076154"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api test:intake:transactions",
+      "outcome": "PASS: 87 PG + 8 material; API services unchanged; final consumer/test delta revalidated below",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/api-pg.log",
+      "log_sha256": "226f692406455ed99c842a5e2559652220a3d4902ae095fbd999e75f201feb5c"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/database test:integration",
+      "outcome": "PASS: 22; database inputs unchanged",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/database-pg.log",
+      "log_sha256": "0d93b9908a5e7349162addd6d270d9281af7462fb2de261b2f5269f6e06b7cc4"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/product-auth.integration.test.ts",
+      "outcome": "PASS: 8; authentication source unchanged",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/auth-pg.log",
+      "log_sha256": "8c9261895c05459a42c222296af8fc4b3e7d0634f617d4cf017ec123475fe7e7"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/content-intake-usage.test.ts",
+      "outcome": "PASS: 18",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/main-unit-final.log",
+      "log_sha256": "7fe6ee505105ef3791cf9695773969ec8909396fc47d732d0b98a84582a00520"
+    },
+    {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'Main consumes actual'",
+      "outcome": "PASS: 1 actual API/PG/HTTP/Main chain; 86 intentionally filtered tests",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/main-http-r4.log",
+      "log_sha256": "2c592e85783a67e8b3b552b192771c482af051f545e82724bae9cbb174e29bf4"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/workspace-final.log",
+      "log_sha256": "e10593ab8674f0c18c13ec1160b25f0b9293720d1ceaa5fc5ecb58ff048716a1"
+    },
+    {
+      "command": "pnpm docs:check",
+      "outcome": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-persist/docs-final.log",
+      "log_sha256": "6810cf8d83ed33e5913e810e38a70b87e4394a86798479c1a8a172ce74c94df1"
+    }
+  ],
+  "limits": [
+    "Synthetic only; no production HTTP/ACL/factory/IPC",
+    "No native Mac/Windows, WSL rerun, real data, Feishu transport or deployment",
+    "Default skipped tests are not passes; impacted PG and HTTP chains were run explicitly",
+    "API 95-case run predates final Main expiry/probe repair. API service inputs are unchanged; the only altered API test is the actual Main consumer case, rerun on final inputs.",
+    "Gstack review ended at its three-fix-cycle cap with converged=false. No fourth native pass; final fixes have parent OCR and regression coverage only."
+  ],
+  "recorded_at": "2026-10-06T14:14:30.836663+00:00",
+  "failed_attempts": [
+    {
+      "command": "pnpm test",
+      "exit_code": 1,
+      "reason": "Concurrent build held the contract-set operation lock; no test cases started. Build completed before the serial successful retry.",
+      "local_log": ".gstack/content-intake-usage-persist/test-final.log",
+      "log_sha256": "f0f3ecd876ca8be4d11548719adf32f9522fb44aba087ff321cf13c03893c941"
+    }
+  ],
+  "review": {
+    "ocr": "reviewed; no remaining confirmed defects",
+    "gstack_completed": false,
+    "gstack_converged": false,
+    "gstack_cycles": 3,
+    "native_attempts": 3,
+    "outside_status": "unavailable"
+  }
+}

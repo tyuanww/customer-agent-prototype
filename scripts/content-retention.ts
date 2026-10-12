@@ -63,7 +63,8 @@ function usage() {
     `  --group            one of: ${GROUPS.join(', ')} (repeatable; default all)`,
     `  --failed-import-days  default ${DEFAULTS.failedImportDays}`,
     `  --stuck-staged-days   default ${DEFAULTS.stuckStagedDays}`,
-    '  --apply            actually delete (requires --confirm)',
+    '  --group intake-objects --dsn <url>  P2 JSON dry-run only; requires pnpm build',
+    '  --apply            actually delete legacy failed imports (requires --confirm)',
     '  --confirm <n>      must equal the dry-run total; guards against blind deletes',
     '  --dsn <url>        override DATABASE_URL / CONTENT_ADMIN_DATABASE_URL',
   ].join('\n');
@@ -194,6 +195,23 @@ async function main() {
   if (options.help) {
     process.stdout.write(`${usage()}\n`);
     return 0;
+  }
+  // P2 has no approved history TTL. Explicit selection also avoids reading the
+  // legacy formal-service env file merely to inspect this synthetic-only group.
+  if (options.groups.includes('intake-objects')) {
+    if (options.apply || options.groups.length !== 1 || !options.dsn) {
+      throw new Error('intake-objects requires explicit --dsn, is dry-run only, and cannot be combined with legacy groups');
+    }
+    const { intakeCapacityDryRun } = await import('../apps/api/dist/content-intake/capacity.js');
+    const client = new Client({ connectionString: options.dsn });
+    try {
+      await client.connect();
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      const result = await intakeCapacityDryRun(client);
+      await client.query('COMMIT');
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      return 0;
+    } finally { await client.end(); }
   }
   if (options.apply && !Number.isSafeInteger(options.confirm)) {
     process.stderr.write('--apply requires --confirm <n> with the count from a dry run\n');

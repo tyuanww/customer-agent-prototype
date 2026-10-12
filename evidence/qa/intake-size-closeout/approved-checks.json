@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "task": "intake-size-approved-policy",
+  "base": "ad5805919ca63c3dcbb72c00667326c53fff7bde",
+  "authorization": "User explicitly accepted source20 / frozen-contract15 / evidence10 MiB and aggregate45 MiB; relayed by main Agent in this task",
+  "activePolicy": {
+    "source-inputs": 20971520,
+    "frozen-contracts": 15728640,
+    "frozen-evidence": 10485760,
+    "aggregate": 47185920
+  },
+  "historicalEvidence": "checks.json and original logs remain unchanged; candidate was not enabled at ad58059",
+  "environment": {
+    "platform": "macOS arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0"
+  },
+  "commands": [
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/workspace-hygiene.test.ts",
+      "exitCode": 0,
+      "result": "47 PASS",
+      "log": "approved-tests.log",
+      "sha256": "cf029082ee43ed16ab6ac7214db9ad9724a8f93599fbb2701f3687127fe36b36"
+    },
+    {
+      "command": "pnpm exec eslint scripts/workspace-hygiene.mjs apps/desktop/tests/unit/workspace-hygiene.test.ts",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": "approved-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop typecheck",
+      "exitCode": 2,
+      "result": "Missing new group fields in existing companion .d.mts; fixed below",
+      "log": "approved-typecheck.log",
+      "sha256": "f202346ee528ec3a033420b2f552bdf5cb9f59de3b283354a7293a4b3ca9d88b"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop typecheck",
+      "exitCode": 0,
+      "result": "PASS after updating companion declaration",
+      "log": "approved-typecheck-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "command": "pnpm exec eslint scripts/workspace-hygiene.mjs scripts/workspace-hygiene.d.mts apps/desktop/tests/unit/workspace-hygiene.test.ts",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": "approved-lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "result": "all groups, aggregate and root policy PASS",
+      "log": "approved-workspace.log",
+      "sha256": "0ad4018a15c654df61c02bd739d86e535d31c24fde492e7dd92f95a987892614"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 1,
+      "result": "Only13 pre-existing ignored .gstack targets missing in independent worktree; affected references pass",
+      "log": "approved-docs.log",
+      "sha256": "f1df31530ef3088e508c8f0006ec4ad5011db5ca289a31e141f92628633fcea1"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/workspace-hygiene.test.ts -t 'symlinked ancestor when grouping'",
+      "exitCode": 1,
+      "result": "expected red: 1 FAIL /48 SKIP before ancestor boundary fix",
+      "log": "approved-symlink-red.log",
+      "sha256": "3baee8d0b456cbae80521fa83f8974477730677dd68782729ab3250e97dec328"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/workspace-hygiene.test.ts",
+      "exitCode": 0,
+      "result": "49 PASS after independent review fix",
+      "log": "approved-tests-final.log",
+      "sha256": "6c3be764c9f7bde8820635bf8e68d664a242e268501f4661f06f6b5e1cbaa87c"
+    },
+    {
+      "command": "pnpm exec eslint scripts/workspace-hygiene.mjs scripts/workspace-hygiene.d.mts apps/desktop/tests/unit/workspace-hygiene.test.ts",
+      "exitCode": 0,
+      "result": "PASS after independent review fix",
+      "log": "approved-lint-reviewed.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop typecheck",
+      "exitCode": 0,
+      "result": "PASS after independent review fix",
+      "log": "approved-typecheck-reviewed.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    }
+  ],
+  "inputFingerprints": [
+    {
+      "path": "scripts/workspace-hygiene.mjs",
+      "sha256": "030d0ca7f64ae8633f1838bc218f6eaa1c741fd89858a78283e2bf9dcee353f1"
+    },
+    {
+      "path": "scripts/workspace-hygiene.d.mts",
+      "sha256": "c0766dec424e84ca3e7c34e232a5560c39d4ab1530f3dd35fde015b6775c52f7"
+    },
+    {
+      "path": "apps/desktop/tests/unit/workspace-hygiene.test.ts",
+      "sha256": "f2ac6e8d88861fcc3789cc08f912d4528a1c3691a6c1cc2f7c0eda2794b48586"
+    },
+    {
+      "path": "docs/how-to-verify-desktop.md",
+      "sha256": "c40314120cb4e1fa5f1cda45fcd101356d02a999641fb82c174e8cfb5e18c3ea"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "sha256": "18f4f3562600a6c7bd644139fe3698d66dd663d105cf38bb344cd47aff999153"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "sha256": "0ad47d29854d228b36907a481de044ca0b759000dc5c0aae6c26ec0d79a201e4"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "2644b175dc2d784f232de0ea6a3198a39d11a650777dba26c42b8c09218e9e10"
+    },
+    {
+      "path": "evidence/qa/intake-size-closeout/README.md",
+      "sha256": "6890f6f59a31b920325effeffef5681b1e951c34b0221c20be6a52356174e68a"
+    }
+  ],
+  "reusedEvidence": [
+    {
+      "path": "build.log",
+      "reason": "actual root build at ad58059, runtime/contracts/migrations/build inputs unchanged; size checker alone changes",
+      "sha256": "aca5eb09a6754fef7bac47865ee818f50e8f9db3ad0ae13abd607a8e83956633"
+    }
+  ],
+  "review": {
+    "scope": "budget grouping, fixed caps, CLI, declaration, regression and relevant docs",
+    "independentAgent": "/root/closeout_runtime",
+    "finding": "Nested group measurement could follow a symlinked ancestor; reproduced in approved-symlink-red.log, fixed by reusing existing safe-directory traversal and covered by49 test pass",
+    "verdict": "Independent reviewer confirmed ancestor/leaf symlink boundary fix; no remaining actionable High/Medium findings in this increment",
+    "historicalExternalReview": "INCOMPLETE, unchanged"
+  },
+  "historicalEvidenceUnchanged": true,
+  "affectedDocumentationReferences": "PASS: local paths in this task README resolve; changed existing-document targets resolve"
+}

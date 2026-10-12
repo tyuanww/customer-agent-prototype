@@ -1,0 +1,255 @@
+{
+  "schema": "intake-runtime-adoption-evidence/v1",
+  "capturedAt": "2026-10-08T11:13:10.744409+00:00",
+  "status": "COMPOSITE_PASS_WITH_WORKSPACE_BUDGET_FAILURE",
+  "productBase": "326af87ef36baf61dcafab74aefa721df65c01d5",
+  "governanceSource": "e35c0c01b5510ffcff75f2b19ba441ad53a9b504",
+  "governanceReceipt": "830e1c826b2ee479146ccd23d7437e634b4b6be8",
+  "version": "0.3.26",
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "platform": "Mac arm64",
+    "data": "synthetic only",
+    "installation": "dependencies unchanged, no install"
+  },
+  "checks": {
+    "intake": {
+      "command": "pnpm contracts:intake --source=<governance output cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551> --source-repository-root=<governance workspace>",
+      "exit": 0,
+      "log": "intake.log"
+    },
+    "contractsGenerate": {
+      "command": "pnpm contracts:generate",
+      "exit": 0,
+      "log": "contracts-generate.log"
+    },
+    "databaseGenerate": {
+      "command": "pnpm db:migrations:generate",
+      "exit": 0,
+      "log": "migrations-generate.log"
+    },
+    "contractsVerify": {
+      "command": "pnpm contracts:verify",
+      "exit": 0,
+      "log": "contracts-verify.log"
+    },
+    "lint": {
+      "command": "pnpm lint",
+      "exit": 0,
+      "log": "lint-final.log"
+    },
+    "build": {
+      "command": "pnpm build",
+      "exit": 0,
+      "log": "build-final.log"
+    },
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "exit": 0,
+      "log": "typecheck-final.log"
+    },
+    "rootTest": {
+      "command": "pnpm test",
+      "exit": 1,
+      "log": "test.log",
+      "status": "FAILED_OLD_EXPECTATION_THEN_TARGETED_RECHECK",
+      "passedBeforeFix": {
+        "contracts": 24,
+        "retrieval": 9,
+        "content": 56,
+        "database": 36,
+        "api": 561,
+        "desktop": 1342
+      },
+      "skipped": {
+        "database": 21,
+        "api": 315,
+        "desktop": 7
+      },
+      "onlyFailure": "repository snapshot exact contract identity expected old1.20/1.22"
+    },
+    "contractIdentityRecheck": {
+      "command": "pnpm --filter @customer-agent/desktop exec vitest run tests/unit/customer-agent-contract-set.test.ts",
+      "exit": 0,
+      "passed": 35,
+      "log": "contract-intake-recheck.log"
+    },
+    "artifact": {
+      "command": "pnpm test:artifact-boundary",
+      "exit": 0,
+      "log": "artifact-boundary.log"
+    },
+    "architectureTest": {
+      "command": "pnpm test:architecture",
+      "exit": 0,
+      "log": "architecture-test.log"
+    },
+    "workflow": {
+      "command": "pnpm test:workflow",
+      "exit": 0,
+      "log": "workflow.log"
+    },
+    "databasePg": {
+      "command": "pnpm --filter @customer-agent/database exec vitest run tests/postgres.integration.test.ts",
+      "exit": 1,
+      "passed": 36,
+      "failed": 2,
+      "log": "database-pg-final.log",
+      "onlyFailures": "two historical drift assertions attempted current approved SECURITY DEFINER; changed to SECURITY INVOKER mutations",
+      "env": {
+        "CUSTOMER_AGENT_DB_PG15_INTEGRATION": "1",
+        "CUSTOMER_AGENT_PG15_BIN": "/Users/hutou/homebrew/opt/postgresql@15/bin"
+      }
+    },
+    "databasePgRecheck": {
+      "command": "pnpm --filter @customer-agent/database exec vitest run tests/postgres.integration.test.ts -t '24-row ledger|23-row ledger'",
+      "exit": 0,
+      "passed": 2,
+      "log": "database-pg-recheck.log",
+      "status": "COMPOSITE_38_ALL_COVERED",
+      "env": {
+        "CUSTOMER_AGENT_DB_PG15_INTEGRATION": "1",
+        "CUSTOMER_AGENT_PG15_BIN": "/Users/hutou/homebrew/opt/postgresql@15/bin"
+      }
+    },
+    "databaseVerifier": {
+      "exit": 0,
+      "passed": 21,
+      "log": "verifier-pg-final.log",
+      "inputs": "logs/verifier-checks.json"
+    },
+    "host": {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts",
+      "exit": 0,
+      "passed": 9,
+      "log": "host.log"
+    },
+    "electron": {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-shop-directory-real-stack.spec.ts",
+      "exit": 0,
+      "passed": 4,
+      "log": "electron.log",
+      "dialogs": "controlled paths and confirmation responses; actual Electron/HTTP/PG/clipboard"
+    },
+    "docs": {
+      "command": "pnpm docs:check",
+      "exit": 0,
+      "log": "docs.log"
+    },
+    "architecture": {
+      "command": "pnpm check:architecture",
+      "exit": 0,
+      "log": "architecture.log"
+    },
+    "workspace": {
+      "command": "pnpm workspace:check",
+      "exit": 1,
+      "log": "workspace.log",
+      "sourceMiB": 34.8,
+      "budgetMiB": 32,
+      "rootPolicy": "PASS"
+    },
+    "shopDirectoryFinal": {
+      "exit": 0,
+      "passed": 24,
+      "split": {
+        "realPG": 6,
+        "http": 18
+      },
+      "log": "evidence/qa/intake-shop-directory/api-pg-invalid-output.log",
+      "inputs": "evidence/qa/intake-shop-directory/checks.json"
+    },
+    "apiBuildFinal": {
+      "command": "pnpm --filter @customer-agent/api build",
+      "exit": 0,
+      "log": "api-build-final.log",
+      "purpose": "Final server-output error mapping build"
+    },
+    "docsFinal": {
+      "command": "pnpm docs:check",
+      "exit": 0,
+      "markdownFiles": 232,
+      "log": "docs-final.log"
+    },
+    "workspaceFinal": {
+      "command": "pnpm workspace:check",
+      "exit": 1,
+      "log": "workspace-final.log",
+      "sourceMiB": 35.1,
+      "budgetMiB": 32,
+      "excessMiB": 3.1,
+      "rootPolicy": "PASS",
+      "note": "After source, contract snapshot and raw verification evidence consolidation; exact captured result, budget unchanged."
+    },
+    "migrationHeaderFinal": {
+      "reason": "Final staged whitespace check found empty line-range annotation in the new generated SQL header. Generator fixed; only0033 line2 comment differs, executable SQL and first32 unchanged.",
+      "equivalence": "migration-header.json",
+      "generate": {
+        "exit": 0,
+        "log": "migrations-header-final.log"
+      },
+      "unit": {
+        "exit": 0,
+        "passed": 31,
+        "command": "pnpm --filter @customer-agent/database exec vitest run tests/generator.test.ts tests/planner.test.ts",
+        "log": "migrations-header-unit.log"
+      },
+      "build": {
+        "exit": 0,
+        "command": "pnpm --filter @customer-agent/database build",
+        "log": "migrations-header-build.log"
+      },
+      "lint": {
+        "exit": 0,
+        "command": "eslint packages/database/scripts/generate-migrations.mjs",
+        "log": "migrations-header-lint.log"
+      },
+      "postgres": {
+        "exit": 0,
+        "passed": 3,
+        "command": "CUSTOMER_AGENT_DB_PG15_INTEGRATION=1 CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/database exec vitest run tests/postgres.integration.test.ts -t 'appends the atomic runtime|rolls the whole runtime'",
+        "log": "migrations-header-pg.log"
+      }
+    },
+    "workspaceArchived": {
+      "command": "pnpm workspace:check",
+      "exit": 1,
+      "log": "workspace-archived.log",
+      "sourceMiB": 35.2,
+      "budgetMiB": 32,
+      "excessMiB": 3.17,
+      "rootPolicy": "PASS",
+      "note": "Final captured result after final header regression evidence; budget unchanged."
+    },
+    "stagedDiff": {
+      "command": "git diff --cached --check -- . ':(exclude)**/*.log'",
+      "exit": 0,
+      "scope": "All source, generated SQL and documentation; raw logs excluded to preserve original bytes."
+    },
+    "rawLogWhitespace": {
+      "command": "git diff --cached --check",
+      "exit": 2,
+      "scope": "Raw preserved test logs have terminal blank lines and a whitespace-bearing failure excerpt; not rewritten."
+    }
+  },
+  "specializedEvidence": [
+    "evidence/qa/intake-runtime-formal/checks.json",
+    "evidence/qa/intake-shop-directory/checks.json"
+  ],
+  "notRun": [
+    "real Feishu/employee/customer input",
+    "production activation/accounts/keys",
+    "office Windows/Linux",
+    "manual native dialogs/system offline",
+    "full external /review"
+  ],
+  "review": "INCOMPLETE outside coverage; independent in-host scope in review.json",
+  "evidenceReuse": [
+    "Last API change maps malformed server directory output to 503; affected real PG6/6, HTTP18/18, lint and API typecheck pass.",
+    "Mac Electron4/4 happy paths predate only that isolated failure mapping and the Main comment correction; those inputs remain behaviorally unchanged.",
+    "Root test and database PG outcomes are composite, with raw failed runs retained. No claim of one full rerun exiting 0.",
+    "0033 final difference is header comment line2 only; migration-header.json binds prior/final SHA. Targeted PG validates final checksum install and rollback; other original SQL behavior results remain applicable. Prior specialized manifests retain their actual tested fingerprints."
+  ]
+}

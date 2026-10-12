@@ -8,7 +8,7 @@
 
 Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.command)（或 `pnpm dev`）。要测最新已合入切片，用跟踪 `main` 的工作树，不要在正在跑 API 的登录目录里切分支。Windows 办公机首轮用未签名 `UNSIGNED.exe`，不要在 Mac 上安装 `.exe`。
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。当前任务、证据及下一动作只维护在[执行清单](docs/plans/2026-09-06-execution-goal.md)；模块实现查[架构参考](docs/reference-project-architecture.md)。桌面仍使用合成模式，复制只表示“已复制”，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。基线任务见[执行清单](docs/plans/2026-09-06-execution-goal.md)，本轮资料接入的批准与阶段证据见[资料接入计划](docs/plans/2026-10-03-content-intake-requirements.md)，剩余范围见 [TODOS](TODOS.md)；模块实现查[架构参考](docs/reference-project-architecture.md)。桌面仍使用合成模式，复制只表示“已复制”，不代发。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
@@ -55,6 +55,9 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 | 查端口、环境边界、发布软链和远端磁盘占用 | [运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) · [为什么要分环境](docs/explanation-environment-boundaries.md) |
 | 工程流程、打包签名、文档生命周期 | [workflow](docs/reference-engineering-workflow.md) · [signing](docs/reference-packaging-and-signing.md) · [lifecycle](docs/reference-document-lifecycle.md) |
 | 查看本轮开发体验、安全、架构和远端仓库诊断 | [2026-10-02 审计](docs/reviews/2026-10-02-docs-architecture-security-audit.md) · [2026-10-01 审计](docs/reviews/2026-10-01-devex-security-audit.md) |
+| 合成 FAQ 上传、二次确认直发、按店与商品/场景查询及回退 | [开发与验收入口](docs/how-to-develop-content-intake.md) · [当前合同交接](docs/reference-content-intake-p2-contract-handoff.md) · [解析包](packages/content-intake/README.md) |
+| 商品/场景选择与对象容量核对 | [选择器验收](evidence/qa/content-intake-p2-query-filters/README.md) · [容量验收](evidence/qa/content-intake-p2-capacity/README.md) |
+| 资料接入当前范围与阶段证据 | [资料接入计划](docs/plans/2026-10-03-content-intake-requirements.md) · [同题覆盖验收](evidence/qa/content-intake-p2-family/README.md) |
 | 当前一期任务与延后债 | [执行清单](docs/plans/2026-09-06-execution-goal.md) · [TODOS](TODOS.md) · [CHANGELOG](CHANGELOG.md) |
 | 合同 / API / 数据库包 README | [contracts](packages/contracts/README.md) · [api](apps/api/README.md) · [database](packages/database/README.md) |
 | 其它现行参考 | [组织已审证据](docs/explanation-org-review-evidence.md) · [adapter 衔接](docs/reference-api-adapter-handoff.md) · [抽出模块](docs/reference-extracted-module-contracts.md) · [API 配置](docs/reference-api-runtime-config.md) · [上游合同](contracts/upstream/customer-agent/README.md) · [失败安全](docs/explanation-failure-safe-lifecycle.md) · [M5 勾选](docs/how-to-verify-macos-m5.md) · [搜索实验](apps/api/experiments/search-decision/README.md) · [第三方许可](apps/desktop/THIRD_PARTY_NOTICES.md) |
@@ -70,7 +73,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 - 不从本仓自动修改 `ai-赋能立项`；需要变更批准范围或阶段门时，单独进入项目记录仓处理。
 - `apps/desktop` 是当前唯一可运行 Electron package；`apps/api` 是独立 Node 服务，当前只允许 loopback。无 `feishu.env` 时仍是 mock auth；有仓外 `feishu.env` 时本机可走飞书 OAuth，账号走 loopback 口令服务，公网 identity 用独立 HTTPS 主机（当前 how-to 为 `agent-pass.jianghua.site`）。合成 `search/adoption/escalate` 事务仍在。显式 loopback profile 下 D1–D5 桌面 adapter 已接线；登录后的查询主链是本地 BM25 + 仓外 origin 分文件 embedding + RRF 与可选 MiniMax，有 hydrate 快照时不打 leftover `/v1/search`。`packages/database` 是 W4 的离线 migration 控制面，不创建连接、不读取环境变量，只有其显式 testkit 作为 API 集成测试的 devDependency，生产 API 不导入 migration 控制面。根 `package.json` 只保留稳定的 workspace 命令和仓级工具入口。产品版本只写入 `apps/desktop/package.json`，`.gstack/package-json-path` 固定后续发布工具也使用这一清单。
 - `packages/contracts` 是正式 OpenAPI 的唯一产品仓编译边界；它只从已验证快照生成 bundle、TypeScript 类型与 component runtime validator，不拥有 HTTP、DB、桌面接线或运行时激活状态。
-- `packages/database` 是正式 DDL 的唯一产品仓 migration 边界；它从同一受锁快照确定性生成 `0001..0019`、内嵌 catalogue 与私有账本，并封装 `status → plan → apply → verify`。当前只在一次性本机 PG15 cluster 中使用合成数据验证，不等于已有业务数据库或生产连接。
+- `packages/database` 是正式 DDL 的唯一产品仓 migration 边界；它从受锁合同快照及受校验的产品 overlay 确定性生成 `0001..0035`、内嵌 catalogue 与私有账本，并封装 `status → plan → apply → verify`。当前只在一次性本机 PG15 cluster 中使用合成数据验证，不等于已有业务数据库或生产连接。
 - 根目录 `logo-wordmark.png` 是用户提供的透明字标，请保留原文件。本仓原创 raster canonical 是 `apps/desktop/assets/fox-head-master.png`（1254 RGBA，由用户批准的透明构图确定性 scale/pad + 高置信内部 recolor 生产化，禁止 Bézier 临摹）。`pnpm generate:fox-head` 从该 master 字节一致派生透明 `apps/desktop/fox-head.png`：有机非对称旧帽子、宽紫帽檐、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦，无白点眼、无对称头盔。该 PNG 用于浮窗 / Query / Tray，并作为 Dashboard 浅色 Logo。Dashboard 深色模式使用独立的 `apps/desktop/src/renderer/assets/dashboard-fox-headset-dark.png`，只把耳麦换成白 / 浅灰，狐狸本体不反色。**默认情况下** `generate:fox-head` 还会继续调用 `generateAppIcons`，从共享透明狐狸派生 `apps/desktop/assets/app-icon.png`（近白 squircle）、`apps/desktop/build/icon.png` 与 `apps/desktop/build/icon.ico`；在 macOS 上还会生成 `apps/desktop/build/icon.icns`。只有显式 `--skip-icons` 才跳过 App / Dock 图标。不要把透明狐狸直接设为 Dock 图标，Tray 也不得使用白底 Dock 图。`evidence/qa/2026-08-17-approved-fox/` 里的五张小图只是批准构图的派生 QA，不替代 canonical。默认主题取消闭合蓝圆；键盘焦点是双耳外侧的紫色短弧，鼠标按下会立刻消失。
 - Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Git 合成运行时；仓内话术与看板继续全部使用虚构合成内容。
 
@@ -107,7 +110,7 @@ curl --fail --silent http://127.0.0.1:3100/health
 curl --silent --include http://127.0.0.1:3100/ready
 ```
 
-`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/发布、announce 读取、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop（不准落库、SOP 树、话术 pending_review 草稿、检索账、软件目录）；部署型 profile 和 Feishu auth 在监听前拒启。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter 与 Dashboard `dashboardOps`。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
+`/health` 不访问 DB；`/ready` 实时核对 database/schema，auth/storage/content 由各自 owner 证明。未配置对象存储或内容读取边界失败时对应检查为 `not_ready`。已注册的 `/v1` 子集支持 mock/product 身份、policy、synthetic-only Search + Events、合成导入/发布、announce 读取、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 OpenAPI 1.14.0 ops-loop（不准落库、SOP 树、话术 pending_review 草稿、检索账、软件目录）；`single-host/multi-instance` 仍在监听前拒启，配置层已接受 `formal-dev/test/production`，但固定只绑 loopback；已支持配置齐全的 `AUTH_MODE=feishu` 登录，缺配置拒启。profile 名称不代表部署授权或 runtime activation。该登录能力不包含 P2 原生组织刷新或飞书审批 transport。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已接线 D1–D5 合成 adapter 与 Dashboard `dashboardOps`。详见 [API 启动配置](docs/reference-api-runtime-config.md)。
 
 W4 数据库包只接受调用方提供的已连接 migration-owner `pg.Client`；下面的命令只生成/核验不可变 catalogue，并在隔离临时 PostgreSQL 15 cluster 中测试，不会访问共享本机或生产数据库：
 
@@ -154,6 +157,8 @@ FOX_IDLE → SEARCH_INPUT → RESULTS | EMPTY | ERROR → COPIED → FOX_IDLE
 
 闲置时显示约 88px 的透明狐狸窗（狐狸视觉约 64px），待机动效约 3 秒一轮：4px 浮动、2° 摆动、轮廓呼吸。指针只在这只 88px 窗内时，整只狐狸会做非常克制的局部跟随，这不是全局眼球追踪。片刻无操作后会打盹、再睡着；窗口隐藏时睡眠钟暂停，重新可见后从头计时。任何局部活动或打开查询都会唤醒。点按有短促的戳感，拖过 4px 后会顺着方向被提起，拖太久会有一次很克制的烦躁反应。拖到当前屏左/右边缘 18px 内会自动吸附：原生窗口始终完整留在工作区，由 renderer 平移裁出等效 44px 窗区，对应 64px 狐狸视觉各露一半（32px），并重播一次方向性吸附。稳定半露时会做左右镜像的 inward-ready 动效：峰值向屏内探 3px、上抬 2px、内倾 5°并轻微放大，呈现“跃跃欲试”，但仍保持半露裁切和共享元素姿态连续。悬停或键盘聚焦时，狐狸用 420ms 镜像探头动效过渡到等效 80px 裁切；移开后用 300ms 反向动效缩回。这套贴边半露就是本项目的 mini mode，不是桌宠自由漫游。这样不会让 macOS WindowServer 与屏外透明窗反复争抢位置。打开采用两阶段共享元素交接：隐藏查询窗先按点击瞬间狐狸的真实位置、同尺寸 64px 和当前 2D 位移 / 旋转 / 缩放矩阵准备首帧，renderer 回执后才交换窗口并用约 260ms 的 `clip-path` 展开；贴边查询窗从物理屏幕边缘起步，保持 32px 半露轮廓连续。关闭约 200ms，抵达末帧后再反向换窗。玻璃只淡入淡出，不缩放模糊层；正常完成由动画回执驱动，定时器仅兜底。每个状态只一次性提交最终窗口 bounds，不逐帧 resize、不先弹出整颗贴边狐狸，也不让狐狸和查询同时消失。正常结果路径的高度是 Query 对 DOM 的实测 hug（capsule + banner + `result-content` + chrome + 容差），经 typed query-only layout / 纵向 resize IPC 上报后，Main 钳制到 `240..min(620, availableHeight)`（`availableHeight` 为当前 workArea 高减去 16px 边距），一次 `setBounds` 并 ACK，然后才展示内容。旧分档 `600×240 / 340 / 430 / 620` **只属于**测量缺失、过期或被拒绝时的异常 fallback，不是正常 Top 3 的固定窗高。查询中的狐狸会来回寻找，命中会弹跳，空态会歪头，复制后会点头；业务状态优先于待机动效。首击立即打开查询，不为识别双击增加延迟。
 
+以下介绍既有 Dashboard 路径；显式 `contentIntake: "faq-v2"` 合成 profile 使用独立的 FAQ 管理/查询界面，上传、逐条质量、二次确认直发和回退步骤见[资料导入指南](docs/how-to-develop-content-intake.md)，不套用下述旧整库替换流程。
+
 Dashboard 是第三个标准系统窗口（约 1180×760，最小 980×680），可缩放、非置顶、出现在任务栏。窗口标题是「客服运营工作台」。顶栏不再放「演示数据」或「无后端 · 不保存」；没有产品会话或没有冻结合同时用空态 / 「未接入」，不发明数字。左上使用项目狐狸头 Logo；浅色模式白色为主、紫色只做品牌 / 选中 / 关键动作。五个一期模块：管理概览、话术库、SOP、内容管理、系统同步。管理概览是统计范围 + 连续 KPI 条 + 待办决策表；待办走冻结 `GET /v1/metrics/iteration-tasks` 与 start/close；有产品会话时 KPI 走 `GET /v1/metrics/retrieval`（`current_release` / `last_7d`）显示无命中率与复制完成率，没有会话仍写「未接入」。话术库优先读 announce 内存 snapshot（`list().matchesLease`）；对不上时写「本机目录」，可导出 CSV，不在这页上传；管理员下架走 `DELETE /v1/content/scripts/{id}`，进入 `pending_review`，下次发布才离开目录。SOP 在有产品会话时读/导入/更新当前会话树（`GET /v1/sop/catalog`、`POST /v1/sop/import`、`PATCH /v1/sop/nodes/{id}`），删除仅管理员；没有会话保持「未接入」，不把合成过敏树当运营目录。「内容管理」顶栏是会话徽章加同一行取消 / 发布；「将替换」常驻折叠外；导入折成「内容导入」。接受本地 CSV 或 xlsx（只读第一张表）；中文表头映射到场景与标准话术。管理员点发布后：`publishDraft` 内部导入校验通过则 staged，再 `POST /v1/content/publish`。成功回执两行：`已发布 rel_N · 姓名` + 四库 delta，并可去系统同步 / 话术库。组织审核在飞书文档。一期发布仅管理员。系统同步「话术版本更新」是四张卡（产品 / 活动 / 售前 / 售后），写「本版已更新」或「本版沿用」；点卡打开话术库对应域；summary 读不出时写「无法标出本版更新了哪一库」。软件版本管理员读 `GET /v1/software/releases` 列出 signed/unsigned 行，禁止 `latest.yml`。狐狸内侧紫点表示有话术更新；查询胶囊 muted 横幅不清 Top 3。ACK 不是已读。adopted 只等于复制成功。
 
 Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色切换为白 / 浅灰耳麦以提高对比，狐狸本体保持原紫色。侧栏业务导航图标为 20px，文字比图标再靠近约 4px；折叠时图标中心仍固定在 macOS `nav.left+60` / Windows·Linux `nav.left+36`。
@@ -171,7 +176,7 @@ Dashboard 左上品牌狐狸固定为 40px；浅色显示紫色耳麦，深色�
 - 不使用 Menokin 名义、真实产品事实或真实客户原文；正式 Menokin 数据只可在 G0 / Ddev 与数据门通过后由受控 adapter 接入。
 - 不复制或迁移旧 `dafuyan-wording` 项目的代码、词典、权重、数据或配置；查询能力是在本仓按合成合同独立实现。
 - 过期与未生效话术永不返回；卡片不展示匹配分。
-- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 独立 `dashboard.ts` preload（话术库只读、内容会话/解析/发布/取消、话术优化待办 list/start/close、`dashboardOps` 检索账 / SOP / 话术下架 / 软件目录），没有 `customerAgent`。话术库读仓外 hydrate / 索引，与查询胶囊同一份目录。
+- Overlay renderer 无 Node 权限；复制只能走 preload 白名单 IPC。Dashboard 独立 `dashboard.ts` preload（话术库只读、内容会话/解析/发布/取消、话术优化待办 list/start/close、`dashboardOps` 检索账 / SOP / 话术下架 / 软件目录），没有 `customerAgent`。显式 FAQ profile 仅增加类型化 intake 管理/查询能力，具体白名单见 [AGENTS.md](AGENTS.md)；不开放通用 IPC。既有话术库读仓外 hydrate / 索引，与既有查询胶囊同一份目录。
 - 复制成功只显示「已复制」，不表示已发送、已采纳或回答正确。
 - Dashboard 不接 PostgreSQL、九端口、对象存储、Import Worker 或 LLM。状态标签不是生产可用声明。API host 已有合成范围的 `search/adoption/escalate` 事务端口、coach/owner 的冻结 iteration-task 列表/开始/关闭，以及 ops-loop（不准、SOP、话术草稿、检索账、软件目录）；默认 S0 不连接，显式 loopback 已接线 D1–D5、待办与 `dashboardOps` adapter，hydrate 检索不打 leftover `/v1/search`。合成 fixture / Dashboard manifest **不能**直接插入正式 `scripts` / `query_events` / `work_order_*` / `iteration_tasks`。字段、鉴权、版本、生效期、租户与复制语义的缺口见 [API adapter 衔接](docs/reference-api-adapter-handoff.md)。
 - 「智能检索」默认 ON：MiniMax 只规划检索式并重排已有 `scriptId`，不生成、不改写、不发送。失败 fail-open 到 BM25。未登录的 S0 fixture 路径仍不调用模型。
@@ -224,12 +229,12 @@ pnpm test:e2e
 
 | 命令 | 实际覆盖 | 不要误读成 |
 | --- | --- | --- |
-| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；165 个 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
-| `pnpm db:migrations:check` / `pnpm test:db` | 已验证 DDL catalogue 的 `0001..0019` 顺序与来源覆盖；PG15 临时 cluster 中的受锁 migration、账本/DDL 原子回滚、精确 ACL/函数/触发器/seed 漂移拒绝与 SQLSTATE 后验通过 | 已连接真实业务库、备份恢复或生产就绪 |
+| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；当前消费锁对应的 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
+| `pnpm db:migrations:check` / `pnpm test:db` | 已验证 DDL catalogue 的 `0001..0035` 顺序与来源覆盖；PG15 临时 cluster 中的受锁 migration、账本/DDL 原子回滚、精确 ACL/函数/触发器/seed 漂移拒绝与 SQLSTATE 后验通过 | 已连接真实业务库、备份恢复或生产就绪 |
 | `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
 | `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |
 | `pnpm test:e2e:float` | 先 `pnpm build`，再跑 `smoke.spec.ts` 里 `@float` | 不是全量 E2E，也不是真实台前调度验收 |
-| `pnpm test` | contracts 合同测试 + database unit/package smoke + API 配置/loopback 测试 + desktop 全量 unit/component（含 drag-settle 与 Dashboard 授权） | 不含 W4 PG15 集成门禁、Electron E2E、真实窗口、共享/生产数据库或生产依赖；数据库改动另跑 `pnpm test:db` |
+| `pnpm test` | contracts、retrieval-core、content-intake 测试 + database unit/package smoke + API 默认测试 + desktop unit/component + 仓级边界及工作流测试 | 不含 W4 PG15 集成门禁、Electron E2E、真实窗口、共享/生产数据库或生产依赖；数据库改动另跑 `pnpm test:db` |
 | `pnpm test:e2e` | 先 build，再跑全部 Playwright | 不是正式发包，也不是真实 OS 焦点 |
 
 `pnpm test:e2e` 会先 build，再启动 Electron：验证左右停靠与 drag-settle、台前调度边界采纳、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、内容贴合高度、数字键复制、自动收起，以及 Dashboard 的可信入口、单例、安全隔离与程序坞恢复，并核对系统剪贴板。探头 / 缩回、查询纵向拖拽、Dashboard 导航 / 模块 / 主题 / 筛选的状态机由更稳定的 unit/component 测试覆盖；默认 Playwright 门禁不再执行依赖 CDP 鼠标命中的长交互链。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递、侧栏与 Query 纵向拖拽、贴边 hover / retract，以及真实 OS 全局快捷键仍需人工确认。
@@ -238,7 +243,7 @@ pnpm test:e2e
 
 ## Windows 打包现状
 
-`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。安装包与实机阶段方案见 [DRAFT](docs/plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工；本文不授权打包或试装。
+`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `apps/desktop/build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。历史方案见[安装包与实机阶段方案](docs/plans/2026-09-10-windows-package-and-device-verification.md)。2026-10-07/08 已按后续授权完成指定版本的 Administrator 安装生命周期、默认快捷方式和 Windows→WSL 合成 FAQ 闭环，见[杭州分层验收](evidence/qa/content-intake-p2-hangzhou/README.md)。普通账号、可靠拖动、整机离线仍未确认；该证据不覆盖随后新增的回退及同题家族，也不代表正式外发许可。
 
 ## macOS 打包与发布
 
@@ -260,6 +265,6 @@ pnpm package:mac
 
 ## 产品化路线（不在当前 v3 原型基线）
 
-正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search、query/impression/adoption/escalate 的事务与幂等，以及通过正式 PostgreSQL 搜索主链执行的 50 条纯合成 runner；runner 只报告 `NOT_SIGNED` 原始分母，不证明真实业务准确率。查询文本仍不落库。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已合并合成桌面 adapter，不等于正式运行激活。真实飞书鉴权、storage/content readiness 与 runtime activation 仍未放行。向量检索、自动学习与自动发送仍需专项批准。本切片已批准 MiniMax 仅用于检索规划与已有 id 重排；生成话术仍禁止。把现有原型「换成 adapter 就能接库」仍不成立：已合并的是合成 loopback adapter，后续还需正式运行 adapter、飞书会话、正式内容/数据门与独立真实 G1a。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
+正式 OAuth / RBAC、完整九端口 Application API、正式话术快照、真实飞书源和自动更新不在**当前 v3 原型运行基线**，但属于本仓后续产品化范围，必须按 G0 / Ddev、数据和发布门分阶段实现。正式 OpenAPI / DDL 合同集继续以 `VERIFIED_NOT_ACTIVATED` 状态锁定；DEV-M0 已建立合同 codegen、API host、migration 基础、runtime readiness 与不可部署候选包。DEV-M1 已加入 development/test mock auth、runtime/admin 双池隔离、受控 policy 读写、合成范围 search、query/impression/adoption/escalate 的事务与幂等，以及通过正式 PostgreSQL 搜索主链执行的 50 条纯合成 runner；runner 只报告 `NOT_SIGNED` 原始分母，不证明真实业务准确率。查询文本仍不落库。默认 S0 桌面不连接 API；显式 loopback 接入 profile 已合并合成桌面 adapter，不等于正式运行激活。已有飞书 OAuth provider 可在受控配置下用于登录；其身份能力不等于 P2 组织/审批接入或正式 runtime activation 获准，storage/content readiness 仍须由各自依赖实证。向量检索、自动学习与自动发送仍需专项批准。本切片已批准 MiniMax 仅用于检索规划与已有 id 重排；生成话术仍禁止。把现有原型「换成 adapter 就能接库」仍不成立：已合并的是合成 loopback adapter，后续还需对应功能的正式运行 adapter、组织/审批可信映射、正式内容/数据门与独立真实 G1a。详见 [原型基线 → 正式九端口](docs/reference-api-adapter-handoff.md)。
 
 macOS 正式签名 / 公证的工程门禁已提供，但 Apple 账号、公司 Bundle ID 与发布审批仍属于外部发布条件。正式一期客户端边界是 Windows Electron；本 Demo 的 macOS 浮窗不能当成一期交付面。

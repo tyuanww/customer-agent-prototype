@@ -4,7 +4,8 @@ import type { OverlayPhase } from '@shared/overlay-machine';
 import { SOP_ENTRY_BUTTON, SOP_ENTRY_HINT, SOP_RESUME_BUTTON } from '@shared/sop-window';
 import { ScriptCard } from './ScriptCard';
 import type { HelpStatus } from '@shared/product-help';
-import type { RankedScript } from './types';
+import { isIntakeRow, type QueryResult, type RankedScript } from './types';
+import { IntakeFaqCard } from './IntakeFaqCard';
 
 type QueryResultsPaneProps = {
   contextControls?: ReactNode;
@@ -13,7 +14,7 @@ type QueryResultsPaneProps = {
   statusBannerRef: Ref<HTMLDivElement>;
   resultContentRef: Ref<HTMLDivElement>;
   errorMessage: string;
-  results: RankedScript[];
+  results: QueryResult[];
   copying: boolean;
   copiedRank: 1 | 2 | 3 | null;
   helpStatus?: HelpStatus;
@@ -23,7 +24,7 @@ type QueryResultsPaneProps = {
   sopEntryResume?: boolean;
   onOpenSop?: () => void;
   onRetry: () => void;
-  onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
+  onCopy: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
   reportedScriptIds?: ReadonlySet<string>;
   onReportInaccuracy?: (script: RankedScript) => void;
   onCopyContact?: () => void;
@@ -63,9 +64,9 @@ export function QueryResultsPane({
             aria-label="候选话术"
             tabIndex={-1}
           >
+            {contextControls ? <div data-query-context>{contextControls}</div> : null}
             {phase === 'EMPTY' ? (
               <div ref={statusBannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
-                {contextControls}
                 <span className="no-hit-mark" aria-hidden="true">?</span>
                 <strong>没找到可用话术</strong>
                 <span>请先让客户稍等，再联系话术师或运营核实；必要时升级客服经理。打开入口或复制联系方式只表示动作完成，不是转交回执。</span>
@@ -84,7 +85,6 @@ export function QueryResultsPane({
             {phase === 'ERROR' ? (
               <div ref={statusBannerRef} className="status-banner is-error" data-testid="error-state">
                 <strong>查询未完成</strong>
-                {results.length === 0 ? contextControls : null}
                 <span>{errorMessage || '出现可恢复错误，请重试。'}</span>
                 <button type="button" className="retry-btn" data-testid="retry-button" onClick={onRetry}>
                   重试
@@ -94,8 +94,7 @@ export function QueryResultsPane({
 
             {phase === 'RESULTS' || phase === 'COPIED' || (phase === 'ERROR' && results.length > 0) ? (
               <div className="result-content" data-testid="result-content" ref={resultContentRef}>
-                {contextControls}
-                <div className="card-list" data-testid="result-list">
+                {results.length > 0 ? <div className="card-list" data-testid="result-list">
                   <div className="result-heading" role="status" aria-live="polite">
                     <strong>候选话术</strong>
                     {phase === 'COPIED' ? (
@@ -123,7 +122,10 @@ export function QueryResultsPane({
                       ) : null}
                     </div>
                   ) : null}
-                  {results.map((script) => (
+                  {results.map((script) => isIntakeRow(script) ? (
+                    <IntakeFaqCard key={script.key} row={script} copying={copying || phase === 'COPIED'}
+                      copied={copiedRank === script.rank} onCopy={onCopy} />
+                  ) : (
                     <ScriptCard
                       key={script.scriptId}
                       script={script}
@@ -136,7 +138,7 @@ export function QueryResultsPane({
                       }}
                     />
                   ))}
-                </div>
+                </div> : null}
               </div>
             ) : null}
           </section>

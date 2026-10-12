@@ -1,0 +1,2201 @@
+{
+  "sourceCommit": "be1383a2336ddd8b359cd47108752a64a54fc581",
+  "branch": "codex/content-intake-p2",
+  "environment": {
+    "platform": "Hangzhou WSL2 Ubuntu 24.04.4",
+    "node": "24.21.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.19 (Ubuntu 15.19-1.pgdg24.04+2)",
+    "libpqPackage": "18.6-1.pgdg24.04+2"
+  },
+  "sourceArchive": "2138111fef0905492928517cc0be286ce30dc9ef56433da295b1b858f6911634",
+  "sourceFileVerification": {
+    "sourceCommit": "be1383a2336ddd8b359cd47108752a64a54fc581",
+    "files": 1151,
+    "mismatch": []
+  },
+  "sourceManifestSha256": "4679753bf75ab6030ab49325f76b86a583003140ded88d12aafecccd3519a249",
+  "isolation": {
+    "user": "nobody (65534)",
+    "NoNewPrivileges": true,
+    "PrivateTmp": true,
+    "ProtectHome": true,
+    "ProtectSystem": "strict",
+    "InaccessiblePaths": [
+      "/srv/customer-agent",
+      "/mnt/c",
+      "/mnt/d",
+      "/mnt/e"
+    ],
+    "database": "owned PG15 cluster; Unix socket only; no TCP listener",
+    "systemPackagesInstalled": false
+  },
+  "buildServices": "PASS",
+  "checks": [
+    {
+      "name": "intake-transactions-rerun",
+      "command": "pnpm --filter @customer-agent/api test:intake:transactions",
+      "status": "PASS",
+      "passed": 153,
+      "durationSeconds": 359.38,
+      "stdout": "intake-transactions-rerun.stdout",
+      "stderr": "intake-transactions-rerun.stderr",
+      "exitCode": 0
+    },
+    {
+      "name": "database-pg15",
+      "command": "pnpm --filter @customer-agent/database test:integration",
+      "status": "PASS",
+      "passed": 25,
+      "durationSeconds": 34.62,
+      "stdout": "database-pg15.stdout",
+      "stderr": "database-pg15.stderr",
+      "exitCode": 0
+    },
+    {
+      "name": "workbook",
+      "command": "pnpm --filter @customer-agent/content-intake test:built",
+      "status": "PASS",
+      "passed": 41,
+      "durationSeconds": 3.42,
+      "stdout": "workbook.stdout",
+      "stderr": "workbook.stderr",
+      "exitCode": 0
+    },
+    {
+      "name": "actual-http-host",
+      "command": "pnpm test:intake:synthetic",
+      "status": "PASS",
+      "passed": 5,
+      "durationSeconds": 8.557391255,
+      "stdout": "actual-http-host.stdout",
+      "stderr": "actual-http-host.stderr",
+      "exitCode": 0
+    },
+    {
+      "name": "api-types",
+      "command": "pnpm --filter @customer-agent/api typecheck",
+      "status": "PASS",
+      "passed": null,
+      "durationSeconds": null,
+      "stdout": "api-types.stdout",
+      "stderr": "api-types.stderr",
+      "exitCode": 0
+    }
+  ],
+  "passedTests": 224,
+  "observedProbes": [
+    {
+      "probe": "quality-http-capacity",
+      "samples": 5000,
+      "httpBytes": 8375220,
+      "pgBytes": 8415000,
+      "limit": 8388608,
+      "rowsCommitted": 5000
+    },
+    {
+      "probe": "workflow-http-second-seat",
+      "source": "uploaded-synthetic-xlsx",
+      "releaseId": "rel_2",
+      "faqRows": 3,
+      "multilinePreserved": true,
+      "qualityTransport": "Main-ProductSession-HTTP",
+      "approvalTransport": "synthetic"
+    },
+    {
+      "probe": "management-report-consumer",
+      "artifactBytes": 6614,
+      "sha256": "6af1621bfa1d20a9169383d3de1ea389bd8df704eb82939ed88448c4cdd8dccc",
+      "issueRows": 1,
+      "consumer": "ExcelJS",
+      "wholeBatchBlocked": true
+    },
+    {
+      "probe": "principals-capacity",
+      "items": 108,
+      "firstPageBytes": 126473,
+      "cursorLength": 346,
+      "scans": [
+        {
+          "limit": 101,
+          "count": 101
+        },
+        {
+          "limit": 101,
+          "count": 8
+        }
+      ]
+    },
+    {
+      "probe": "discovery-overlap",
+      "additionalGrants": 5000,
+      "elapsedMs": 37
+    },
+    {
+      "probe": "discovery-capacity",
+      "sources": 5000,
+      "pages": 150,
+      "elapsedMs": 44575
+    }
+  ],
+  "initialTransactionAttempt": {
+    "exitCode": 124,
+    "outerTimeoutSeconds": 240,
+    "status": "INCOMPLETE_TIMEOUT"
+  },
+  "transactionRerun": {
+    "exitCode": 0,
+    "outerTimeoutSeconds": 600,
+    "productAndPerTestDeadlinesChanged": false
+  },
+  "rawArchiveSha256": "69f2d66e46173477f25dba275879d4a099743dee34791b844067f9c010383861",
+  "rawEvidenceDirectory": ".gstack/qa-reports/content-intake-cross-platform-20261007/raw-final/evidence",
+  "rawEvidenceHashes": {
+    "actual-http-host.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "actual-http-host.stderr": "90fbac8b96bd311dd3012bf7eb85b9902906ef2c93ccde96f6de32bb6f8d6cba",
+    "actual-http-host.stdout": "06fac81962d4d059b86a59edf1244dbac0f0049253b212ac661cd1022b3ab6e4",
+    "api-types.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "api-types.stderr": "da8473bab9c5acc8bbcbaf80cf55fc5996474850471453f00b9220b4416cbe65",
+    "api-types.stdout": "3b5549255f43ba140329e7f314e2304a94eeb60dec01671f77d7ce5d278d3129",
+    "database-pg15.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "database-pg15.stderr": "a90c4d707e5f7c22625998dca1d419f5f5441f9a0835e90c3e91d2fe45ae2e5c",
+    "database-pg15.stdout": "d226befcf78cef6d5842c317180b83b4a03a91225b43f42e40a4dcc88105928b",
+    "intake-transactions-rerun.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "intake-transactions-rerun.stderr": "b194acd2a3ad94475897a9c8a3830ed04cda30a5c8f6d922ba8f3f4c2a4bef4d",
+    "intake-transactions-rerun.stdout": "80c296d3e87de436683795e3bfadb8ed7c1669e489928015c06b7503f1831609",
+    "intake-transactions.exit": "ca2ebdf97d7469496b1f4b78958f9dc8447efdcb623953fee7b6996b762f6fff",
+    "intake-transactions.stderr": "b194acd2a3ad94475897a9c8a3830ed04cda30a5c8f6d922ba8f3f4c2a4bef4d",
+    "intake-transactions.stdout": "acc863d9fd4a6afd96d243ac8b9304b8017b99f58a3e59b32a416ef9dbd3867e",
+    "pg-setup-2.log": "6ece1d2d19b4e78bbdca408d45f3359bacec49f5d4ea1f209d92e59915eaf0a7",
+    "pg-setup.log": "85b66e50005944c2e6c08799e585ebf69e8482b3dec144006102352e93bf0724",
+    "source-equality.json": "97d6b4678b391bdb67210c23380715b294c97c155f6cd3275a138470e2bfe3b8",
+    "source-ready": "35881f00c6ee2beb790a222d439585abb45315af3caef12a13c1745ed5489592",
+    "source-setup.log": "665c643f2038ea89459cb6dee2420cd1d04e9306fbbbad452cfeb3a47e11de5a",
+    "transactions-rerun.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation.log": "a766bd0c696b071ec7750868731dae2a686e63eba5ebe91f7a3dd969daa50ba3",
+    "workbook.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "workbook.stderr": "cb7efe2ed065b3202856f854f1645179984b659249d4ea99dde8467ed4a4b173",
+    "workbook.stdout": "6e3496e16299d3160e091b10baba2a5c9c4d5a80cb681d28a99d3c420f2f5d25"
+  },
+  "windows": {
+    "status": "PASS_WITH_LIMITS",
+    "platform": "Windows 10 10.0.19045 x64",
+    "entry": "UU remote / 人事-台式 / native PowerShell session1",
+    "privilege": "elevated Administrator; ordinary-account acceptance NOT_RUN",
+    "runtime": {
+      "node": "24.21.0",
+      "pnpm": "11.19.0",
+      "electron": "43.4.0",
+      "globalNodeUnchanged": "22.20.0",
+      "globalPnpmUnchanged": "12.9.1"
+    },
+    "toolchain": {
+      "nodeZipSha256": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+      "pnpmTarSha256": "b9e49603540d04107b98e93917a30e6114970d403c23e40309a44ea9c2bca7fd",
+      "source": "official nodejs.org and registry.npmjs.org; checksums verified",
+      "isolation": "test source, tool binaries and app profiles in one owned temporary root; existing global pnpm store reused"
+    },
+    "sourceBaseCommit": "be1383a2336ddd8b359cd47108752a64a54fc581",
+    "testPatchSha256": {
+      "apps/desktop/tests/e2e/content-intake-management.spec.ts": "26d40ffcc08937c4092da9b0f74726ae54e60d6648bd5acc00bb35d37417532a",
+      "apps/desktop/tests/e2e/content-intake-query.spec.ts": "7abef326defe44510b49445769634785f603560823e63978cc78ab019127b6c9",
+      "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "47e1fcbddad83f1f22f77dea28ea224c11cd704e3e2eb04c71612f8a326cd840",
+      "apps/desktop/tests/support/owned-electron.ts": "213699bf4bcb664b0a665a9393e626da552a182dd89507d772e89d3cb9696942"
+    },
+    "patchedManifestSha256": "3aea2c5a931d8f45855dcdbb9134bac61613666b9c90d6445e311aa6bc0a3a6c",
+    "sourceBefore": {
+      "files": 1152,
+      "mismatch": []
+    },
+    "sourceAfter": {
+      "files": 1152,
+      "mismatch": []
+    },
+    "initialChecks": [
+      {
+        "name": "pnpm-version",
+        "command": [
+          "pnpm",
+          "--version"
+        ],
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "durationMs": 526
+      },
+      {
+        "name": "install",
+        "command": [
+          "pnpm",
+          "install",
+          "--frozen-lockfile"
+        ],
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "durationMs": 30288
+      },
+      {
+        "name": "build",
+        "command": [
+          "pnpm",
+          "build"
+        ],
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "durationMs": 15660
+      },
+      {
+        "name": "faq-native",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@customer-agent/desktop",
+          "exec",
+          "playwright",
+          "test",
+          "tests/e2e/content-intake-management.spec.ts",
+          "tests/e2e/content-intake-query.spec.ts",
+          "--reporter=list,json",
+          "--output",
+          "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\test-results"
+        ],
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "durationMs": 187545
+      }
+    ],
+    "finalChecks": [
+      {
+        "name": "pnpm-version",
+        "command": [
+          "pnpm",
+          "--version"
+        ],
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "durationMs": 373
+      },
+      {
+        "name": "faq-native",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@customer-agent/desktop",
+          "exec",
+          "playwright",
+          "test",
+          "tests/e2e/content-intake-management.spec.ts",
+          "tests/e2e/content-intake-query.spec.ts",
+          "--reporter=list,json",
+          "--trace=on",
+          "--output",
+          "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\final-results\\faq"
+        ],
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "durationMs": 9050
+      },
+      {
+        "name": "windows-feasibility",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@customer-agent/desktop",
+          "exec",
+          "playwright",
+          "test",
+          "tests/e2e/smoke.spec.ts",
+          "--grep",
+          "@windows-feasibility",
+          "--reporter=list,json",
+          "--trace=on",
+          "--output",
+          "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\final-results\\windows"
+        ],
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "durationMs": 2692
+      }
+    ],
+    "faqStats": {
+      "startTime": "2026-10-07T14:13:44.680Z",
+      "duration": 8141.612000000001,
+      "expected": 2,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "feasibilityStats": {
+      "startTime": "2026-10-07T14:13:53.733Z",
+      "duration": 1769.391,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "passedTests": 3,
+    "initialFailure": {
+      "management": "ambiguous status locator; cleanup subsequently blocked by native unsaved-work dialog",
+      "query": "PASS",
+      "testDeadlineChanged": false,
+      "initialFaqStats": {
+        "startTime": "2026-10-07T13:50:25.647Z",
+        "duration": 186534.846,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "diagnosticStats": {
+        "startTime": "2026-10-07T14:04:16.261Z",
+        "duration": 21441.428,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    "macRegression": {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-management.spec.ts tests/e2e/content-intake-query.spec.ts tests/e2e/content-intake-real-stack.spec.ts --reporter=list,json",
+      "stats": {
+        "startTime": "2026-10-07T14:12:32.705Z",
+        "duration": 48485.581,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "actualApiAndPg15": true,
+      "nativeDialog": "owned-path-selection-only"
+    },
+    "localChecks": {
+      "targetedEslint": "PASS",
+      "desktopTypecheck": "PASS",
+      "workspaceBuild": "PASS",
+      "documentation": "PASS: 204 Markdown files",
+      "workspace": "PASS: source budget 28.4 MiB / 32 MiB; root policy",
+      "diffCheck": "PASS"
+    },
+    "rawEvidenceDirectory": ".gstack/qa-reports/content-intake-cross-platform-20261007/windows-native",
+    "limits": [
+      "ordinary Windows account NOT_RUN",
+      "native open/cancel PASS; native save/cancel and report consumer INCOMPLETE",
+      "actual WSL API plus Windows native frontend PARTIAL: login/read/cancel/expiry only; publication/second-seat NOT_RUN",
+      "installer, signing and manual compositor/focus matrix NOT_RUN",
+      "earlier automated Windows FAQ HTTP services remain contract doubles; later actual WSL smoke is separately recorded; approval and identity remain synthetic"
+    ],
+    "cleanRepeat": {
+      "reason": "Verify exit and temporary-profile disposal from a confirmed empty owned-process state after cleaning one prior residual Electron process/profile.",
+      "entry": "native Windows node.exe started through existing WSL interoperability after UU terminal stopped echoing keyboard input; not Linux Electron",
+      "archiveSha256": "e7fcca139f87b7079ed1ca184df5d2fd52cd6be7b422a0a1d3dc7e2fbdfa3ff0",
+      "rawHashes": {
+        "clean-repeat-evidence/complete.json": "c9fdb2d4376f441c7c5f452effb0f4076b62772d76caf34c50c64c4fe43cc935",
+        "clean-repeat-evidence/faq-native.json": "3d0dc33b6c7bc6e3910b619f71a44f07d312b0b8475a432277fcc78198e07fc8",
+        "clean-repeat-evidence/faq-native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "clean-repeat-evidence/faq-native.stdout": "c422739cf9ae7cd35017123043470e81709622e7ee44185f249f732efb6d0400",
+        "clean-repeat-evidence/management.png": "f62366612276b43a31e5c44632228f1cc829133dd47ae8acf19268b47cf17447",
+        "clean-repeat-evidence/native-environment.json": "353c06f001f91ba2a69752d32414fbf6771589a1a07905e27cd6cc74bb471ba1",
+        "clean-repeat-evidence/pnpm-version.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "clean-repeat-evidence/pnpm-version.stdout": "005206ab803f8881d8227540b7980b37e723b69a8849edb31734a90b7e7964e2",
+        "clean-repeat-evidence/query.png": "b67b7667e9bf8b48216ba7ce2e0f87b64602ea827c91c6ecb372de1fe6982768",
+        "clean-repeat-evidence/resource-status.json": "f0c5339cce29b68a10514af65ec506ce907c83eccd320860176a0f1c5aaef211",
+        "clean-repeat-evidence/results.json": "e164b661e619695b5609fa23cd54da4b3bce10324292f8b897607c46ee16f359",
+        "clean-repeat-evidence/source-after.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+        "clean-repeat-evidence/source-before.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+        "clean-repeat-evidence/windows-feasibility.json": "7ce2ad0e44bdbc8ed44f4b1f33f29ea17fa1dfd0b2e1b78ebccf859729c2b2c1",
+        "clean-repeat-evidence/windows-feasibility.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "clean-repeat-evidence/windows-feasibility.stdout": "919af60baae190615b268cdd6a12f500a7535de96c147b2bdc7ef6151cf80123",
+        "clean-repeat-results/faq/.last-run.json": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+        "clean-repeat-results/faq/content-intake-management--d9e3b-ns-unknown-receipt-recovery/trace.zip": "b25fc5853ee8568d52f370fba39bb1ee191539559603126dd7d56c23a56ee93c",
+        "clean-repeat-results/faq/content-intake-query-FAQ-Q-90ee9--and-isolates-other-windows/trace.zip": "9352846fcfc3a4197f0f782ad0de43c0fc3d1f8982ad3f109512b7058888a99a",
+        "clean-repeat-results/windows/.last-run.json": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+        "clean-repeat-results/windows/smoke--windows-feasibility-8b46d--shortcut-and-exits-cleanly/trace.zip": "58b4367aa09775827c4a4ac424ab30feea33b11eb20db92e42ff9c970a6745d8"
+      },
+      "checks": [
+        {
+          "name": "pnpm-version",
+          "command": [
+            "pnpm",
+            "--version"
+          ],
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "durationMs": 382
+        },
+        {
+          "name": "faq-native",
+          "command": [
+            "pnpm",
+            "--filter",
+            "@customer-agent/desktop",
+            "exec",
+            "playwright",
+            "test",
+            "tests/e2e/content-intake-management.spec.ts",
+            "tests/e2e/content-intake-query.spec.ts",
+            "--reporter=list,json",
+            "--trace=on",
+            "--output",
+            "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\clean-repeat-results\\faq"
+          ],
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "durationMs": 9114
+        },
+        {
+          "name": "windows-feasibility",
+          "command": [
+            "pnpm",
+            "--filter",
+            "@customer-agent/desktop",
+            "exec",
+            "playwright",
+            "test",
+            "tests/e2e/smoke.spec.ts",
+            "--grep",
+            "@windows-feasibility",
+            "--reporter=list,json",
+            "--trace=on",
+            "--output",
+            "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\clean-repeat-results\\windows"
+          ],
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "durationMs": 2578
+        }
+      ],
+      "faqStats": {
+        "startTime": "2026-10-07T14:25:47.714Z",
+        "duration": 8212.314999999999,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "feasibilityStats": {
+        "startTime": "2026-10-07T14:25:56.839Z",
+        "duration": 1659.5969999999998,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "resources": {
+        "ownedProcesses": [],
+        "temporaryProfiles": [],
+        "ownedRootRetained": true,
+        "note": "Retained for subsequent native-dialog / actual-WSL-backend acceptance. Existing global pnpm store was reused and is not removed."
+      },
+      "sourceAfter": {
+        "files": 1152,
+        "mismatch": []
+      }
+    },
+    "cleanup": {
+      "before": [
+        {
+          "ProcessId": 23952,
+          "Name": "electron.exe",
+          "ExecutablePath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\source\\node_modules\\.pnpm\\electron@43.4.0_supports-color@10.2.2\\node_modules\\electron\\dist\\electron.exe"
+        }
+      ],
+      "stopped": [
+        {
+          "pid": 23952,
+          "result": 0
+        }
+      ],
+      "after": [],
+      "removedFailedProfile": "intake-query-native-Q0I0B1",
+      "temporaryProfiles": [],
+      "ownedRootRetained": true
+    },
+    "rawHashes": {
+      "final-evidence/complete.json": "c9fdb2d4376f441c7c5f452effb0f4076b62772d76caf34c50c64c4fe43cc935",
+      "final-evidence/faq-native.json": "5a46e2384b3b51c8f255a27d780e83397716896e92e68fa6a64d54c650393867",
+      "final-evidence/faq-native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final-evidence/faq-native.stdout": "b7a818c78a27a95792a3ecadeadb40f5a07598898df8fbd72e81e468b34b4a73",
+      "final-evidence/management.png": "f62366612276b43a31e5c44632228f1cc829133dd47ae8acf19268b47cf17447",
+      "final-evidence/native-environment.json": "353c06f001f91ba2a69752d32414fbf6771589a1a07905e27cd6cc74bb471ba1",
+      "final-evidence/pnpm-version.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final-evidence/pnpm-version.stdout": "005206ab803f8881d8227540b7980b37e723b69a8849edb31734a90b7e7964e2",
+      "final-evidence/query.png": "db70bf77e74fe629ae8f9a57c8946c318ff4fce6cf68668eb71dfaa309b0e4f3",
+      "final-evidence/resource-status.json": "291fa16127fd80f1dfd4c6d2e9505c012aed3a20c88e0f24e7cf8a43244424dc",
+      "final-evidence/results.json": "1ddf58109fbfbedd6e3cfbc51fbacedd4f99192952a27a063dbe6dd87bdacb72",
+      "final-evidence/source-after.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+      "final-evidence/source-before.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+      "final-evidence/windows-feasibility.json": "d84af5ad4de03fe449be2db88d35f08af1e6103d47875d1429dcbc625d92b6f5",
+      "final-evidence/windows-feasibility.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final-evidence/windows-feasibility.stdout": "f4164d9fcc5b57bdb3a247871ab12abda253ded5f14ddc176a42ec4c64ad05b5",
+      "diagnostic-evidence/diagnostic.json": "d15d1ebc5d82d5bb44bbac565a2dbd2544a24dbad627f410302cf48f776f5313",
+      "diagnostic-evidence/management-diagnostic.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "diagnostic-evidence/management-diagnostic.stdout": "f88af05e5e6533aa04745193f72ca75f0a3bdf3ea6a742373b1c2ea419b5eef3",
+      "diagnostic-evidence/management.png": "f62366612276b43a31e5c44632228f1cc829133dd47ae8acf19268b47cf17447",
+      "diagnostic-evidence/native-environment.json": "353c06f001f91ba2a69752d32414fbf6771589a1a07905e27cd6cc74bb471ba1",
+      "diagnostic-evidence/pnpm-version.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "diagnostic-evidence/pnpm-version.stdout": "005206ab803f8881d8227540b7980b37e723b69a8849edb31734a90b7e7964e2",
+      "diagnostic-evidence/results.json": "1912f42229a56415e37b8cc238cbee037287169f2927a653d6cc0cd084a78d3f",
+      "diagnostic-evidence/source-before.json": "796a29066a129fcf23d26ac5856bd56342d9fd29bd477a0e9304c99ba47eec12",
+      "final-results/faq/.last-run.json": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+      "final-results/faq/content-intake-management--d9e3b-ns-unknown-receipt-recovery/trace.zip": "198a36969b511d06483871963c070c07e27195a0ef27a0b4195652543f0c1409",
+      "final-results/faq/content-intake-query-FAQ-Q-90ee9--and-isolates-other-windows/trace.zip": "2051761f1da2d67d803d47a9cb1db23a04c0462df7ddcd1334feb20a4a8e01ea",
+      "final-results/windows/.last-run.json": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+      "final-results/windows/smoke--windows-feasibility-8b46d--shortcut-and-exits-cleanly/trace.zip": "b6712a46814a712216e54081ebe8639add4e92f4bd5cd032693498f49087dde6",
+      "diagnostic-results/.last-run.json": "62dc518693d374adf93938b31cb2aa9b4be4b7d922e39923988a08b6b8ea4bb1",
+      "diagnostic-results/content-intake-management--26f97-ns-unknown-receipt-recovery/error-context.md": "ec9351f82d27a76a4fd3fe89f812ff7cc78645d72f0dd225714d7fed19c6dad1",
+      "diagnostic-results/content-intake-management--26f97-ns-unknown-receipt-recovery/trace.zip": "3f8f02067659e6224d492f3c5e6289b02f35ee95c2d580af4562ebd3873de1be",
+      "final-evidence/resource-cleanup.json": "62ad9fd28fc6b36df63a01ae8d72933daf26df1a261054a2030ead438cb18ec1"
+    },
+    "localRawHashes": {
+      "mac-regression.json": "c8fba794419858077999d0924170615df6e9f2b8d25d13f4585f9e4ae88ba806",
+      "mac-regression.log": "01544583d66cd89924358653291d87945cb3ca69a642d21edabbd298d4f00891",
+      "mac-build.log": "38c68e655bdc07cf3d912d418994ae59d1beac4084dd1b744d2df956fccf5a3d",
+      "test-patch-hashes.json": "48c2b66779958af730dd16a4f8a32acc26079ddd7c138e3299ffa5715f72627e",
+      "ocr-before-preview.json": "48e2d86f5c236d37d5c5d906a4fa2e34e23653f1108aa9998cb2a230dd279385",
+      "ocr-before-rules.json": "a0c2045b364b3d76d75d0795c5428e7bfe0ef2407b4b54de07b7aa320bbe26e5",
+      "ocr-before-review.json": "1df04ea8dbc07bb4877e497e8a1367ee9fd862bf2d892518eb0b44de349b8938",
+      "ocr-after-rules.json": "1f761b2d79626ee6c9a2c9553b4039b8af5b145d00ff382689b5d88bc3ff1af6"
+    },
+    "actualWslNative": {
+      "status": "PARTIAL_NATIVE_ACCEPTANCE",
+      "sourceCommit": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "rawEvidenceDirectory": ".gstack/qa-reports/content-intake-windows-real-20261007",
+      "archiveSha256": "19e926c6db7a5319c0fc9b06a71d8032be67dcf0a1d70a4151675c0c9a9df423",
+      "rawFiles": 22,
+      "rawHashes": {
+        "wsl/deps.stderr": "2828a62f3b25a9e0e2b5358e15d969696ea128a1ce5ddf69b1969dd0dc45936f",
+        "wsl/deps.stdout": "50689f0fa608a797a5d4245c4c0d969c91110fd260cf2a3f342d66aa6c430ed4",
+        "wsl/host-session-2.log": "6607b9f9e426924acd462b21accb41569e115c9fe0a4a88305f060018169f4e8",
+        "wsl/host-session-3.log": "43850611eaf151d4b6980f77f6bef51f91972530e30af8bfb47c76adbbb4bf9c",
+        "wsl/host-session-4.log": "7cf6e55207f2b63181c0060a86b44059336a60e01fe8bbae7f7b5245b844c3fa",
+        "wsl/resource-source-check.json": "127607ec6bf58140f5fb2c552dddc78e9e2eb91ee8f04634b81b4246db4b30e0",
+        "wsl/setup.stderr": "6b1bd2a7b233a5d260c1e40e284b8fa1f384c2fb750b6cb2a5cc1f907aa18a87",
+        "wsl/setup.stdout": "7ec0c498c5940a77ff4277bdc962a550b366239dee410e7d4f9b7699e70196e0",
+        "wsl/source-ready": "e765e47c38743a8c29e2ae1ed9de5a2931166ef7b62112879f17a2ded0b3c12a",
+        "windows/cleanup.json": "3405050813beaab2b5818bea7c2a80c60672bcbc02cbb6cd08eb0fdd214dfd23",
+        "windows/session-2/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-2/electron.stdout": "26f005e9bff54359c244a0bcc1902e9bc56c739d1e0aa484b68938272b643d57",
+        "windows/session-2/launch.json": "e072d2e84033c0f7014f0a33ec88d3c55fcc9d712a3d865f91edeb758d24cfd8",
+        "windows/session-2/windows-loopback.json": "57ffd84cef2caa59681ec5a2618e3afb9fef4fdc5ed38d98b019faba3422b189",
+        "windows/session-3/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-3/electron.stdout": "6a4a4cc319f70175f63c6486531b89360d2e282243f36f8c5bbd06e0ace5259c",
+        "windows/session-3/launch.json": "1441dadcb79ddc750c8e907cd5903b64955418535551951d7260113f7a7cccaf",
+        "windows/session-3/windows-loopback.json": "0ea00921b62a1213918d3f34ba62a313455dfc77364c19ed95e85f34db4590e1",
+        "windows/session-4/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-4/electron.stdout": "de6f625e7dba7ded248f41e145a7d582552e46e53932854a3ff1c22d03f495a4",
+        "windows/session-4/launch.json": "d7bd5da6a90ec155ed51e1367c8c3433d5b672c18e397dbe78b50f05c1dbd93f",
+        "windows/session-4/windows-loopback.json": "c4af3a507334d7af461fcf62f015b7592431f6de52d5782669d0cf5af04175de"
+      },
+      "allDownloadedHashesMatch": true,
+      "checks": [
+        {
+          "name": "windows-to-wsl-loopback-http",
+          "status": "PASS",
+          "evidence": "windows/session-2/windows-loopback.json; session-3 and session-4 equivalent",
+          "assertion": "win32 Node /v1/auth/me returns expected 401 before login"
+        },
+        {
+          "name": "native-login-source-candidate",
+          "status": "PASS",
+          "evidence": "CUA native UI observation and wsl/host-session-2.log",
+          "assertion": "administrator identity, source-a/shop-a and seeded candidate version 1 visible"
+        },
+        {
+          "name": "native-open-dialog-cancel",
+          "status": "PASS",
+          "evidence": "CUA native open/cancel observation and wsl/host-session-2.log",
+          "assertion": "waiting for file restored; no new upload after native preflight; rel_native_base, publications 0, pendingApprovals 0"
+        },
+        {
+          "name": "native-context-expiry-during-file-selection",
+          "status": "PASS_VISIBLE_PROTECTION",
+          "evidence": "CUA session-4 observation; wsl/host-session-4.log; windows/session-4/electron.stdout",
+          "assertion": "upload source removed and file selection disabled; no file confirmed or uploaded before expiry"
+        },
+        {
+          "name": "bad-workbook-and-native-save-consumer",
+          "status": "INCOMPLETE",
+          "reason": "remote input/IME delays; synthetic facts expired before file confirmation; no error workbook produced"
+        },
+        {
+          "name": "windows-wsl-publish-second-seat",
+          "status": "NOT_RUN",
+          "reason": "limited native session did not reach approval, quality or publication"
+        },
+        {
+          "name": "ordinary-windows-os-account",
+          "status": "NOT_RUN",
+          "reason": "provided session is elevated Administrator"
+        },
+        {
+          "name": "windows-installer-signing-focus-matrix",
+          "status": "NOT_RUN",
+          "reason": "separate acceptance scope"
+        }
+      ],
+      "sessions": [
+        {
+          "session": 2,
+          "expiresAt": "2026-10-07T14:59:58.379Z",
+          "preflight": {
+            "platform": "win32",
+            "node": "v24.21.0",
+            "status": 401,
+            "apiOrigin": "http://127.0.0.1:46053",
+            "at": "2026-10-07T14:55:48.417Z"
+          },
+          "stopped": {
+            "reason": "synthetic-facts-expired",
+            "hostDataRemoved": true
+          }
+        },
+        {
+          "session": 3,
+          "expiresAt": "2026-10-07T15:10:03.710Z",
+          "preflight": {
+            "platform": "win32",
+            "node": "v24.21.0",
+            "status": 401,
+            "apiOrigin": "http://127.0.0.1:41717",
+            "at": "2026-10-07T15:05:24.940Z"
+          },
+          "stopped": {
+            "reason": "synthetic-facts-expired",
+            "hostDataRemoved": true
+          }
+        },
+        {
+          "session": 4,
+          "expiresAt": "2026-10-07T15:16:28.969Z",
+          "preflight": {
+            "platform": "win32",
+            "node": "v24.21.0",
+            "status": 401,
+            "apiOrigin": "http://127.0.0.1:32781",
+            "at": "2026-10-07T15:11:48.586Z"
+          },
+          "stopped": {
+            "reason": "synthetic-facts-expired",
+            "hostDataRemoved": true
+          }
+        }
+      ],
+      "cancelObservedState": {
+        "currentReleaseId": "rel_native_base",
+        "publications": 0,
+        "pendingApprovals": 0,
+        "diagnostics": []
+      },
+      "seedCandidateIsNotNativeUpload": true,
+      "nativeDialogsStubbed": false,
+      "ttlChanged": false,
+      "newProductCodeChanges": false,
+      "newTestCodeChanges": false,
+      "serviceBuild": "PASS",
+      "wslSourceFilesVerified": 1151,
+      "windowsSourceFilesVerified": 1152,
+      "sourceMismatches": [],
+      "wslIsolation": {
+        "user": "nobody",
+        "NoNewPrivileges": true,
+        "PrivateTmp": true,
+        "ProtectHome": true,
+        "ProtectSystem": "strict",
+        "InaccessiblePaths": [
+          "/srv/customer-agent",
+          "/mnt/c",
+          "/mnt/d"
+        ],
+        "CorepackAndXdgCache": "task-owned root",
+        "systemPackagesInstalled": false
+      },
+      "failuresRetained": [
+        "nonexistent /mnt/e caused unit namespace failure before code execution",
+        "Corepack attempted nonexistent nobody home; fixed by process-scoped cache directories",
+        "intermittent SSH/SCP timeouts; final transfer succeeded and was hash verified",
+        "UU symbol loss/stale clipboard/IME composition and remote input latency; long session expired before bad-file confirmation"
+      ],
+      "desktopDiagnostics": "410 GONE after facts expiry and ECONNREFUSED after host shutdown retained; not described as a zero-error desktop session",
+      "cleanup": {
+        "wsl": {
+          "archiveSha256": "19e926c6db7a5319c0fc9b06a71d8032be67dcf0a1d70a4151675c0c9a9df423",
+          "units": {
+            "cai-intake-ui-setup-R44Nfp": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "failed"
+            },
+            "cai-intake-ui-setup-R44Nfp-r2": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "failed"
+            },
+            "cai-intake-ui-deps-R44Nfp": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            },
+            "cai-intake-ui-host-R44Nfp-2": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            },
+            "cai-intake-ui-host-R44Nfp-3": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            },
+            "cai-intake-ui-host-R44Nfp-4": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            }
+          },
+          "ownedRootRemoved": true,
+          "windowsRootRetained": true,
+          "globalToolsAndServicesChanged": false
+        },
+        "windows": {
+          "at": "2026-10-07T15:21:43.457Z",
+          "before": [
+            {
+              "ProcessId": 15868,
+              "Name": "electron.exe",
+              "ExecutablePath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\source\\node_modules\\.pnpm\\electron@43.4.0_supports-color@10.2.2\\node_modules\\electron\\dist\\electron.exe"
+            },
+            {
+              "ProcessId": 6500,
+              "Name": "electron.exe",
+              "ExecutablePath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\source\\node_modules\\.pnpm\\electron@43.4.0_supports-color@10.2.2\\node_modules\\electron\\dist\\electron.exe"
+            },
+            {
+              "ProcessId": 4688,
+              "Name": "electron.exe",
+              "ExecutablePath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\source\\node_modules\\.pnpm\\electron@43.4.0_supports-color@10.2.2\\node_modules\\electron\\dist\\electron.exe"
+            },
+            {
+              "ProcessId": 28520,
+              "Name": "electron.exe",
+              "ExecutablePath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\source\\node_modules\\.pnpm\\electron@43.4.0_supports-color@10.2.2\\node_modules\\electron\\dist\\electron.exe"
+            },
+            {
+              "ProcessId": 30912,
+              "Name": "electron.exe",
+              "ExecutablePath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\source\\node_modules\\.pnpm\\electron@43.4.0_supports-color@10.2.2\\node_modules\\electron\\dist\\electron.exe"
+            },
+            {
+              "ProcessId": 21764,
+              "Name": "electron.exe",
+              "ExecutablePath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\source\\node_modules\\.pnpm\\electron@43.4.0_supports-color@10.2.2\\node_modules\\electron\\dist\\electron.exe"
+            }
+          ],
+          "stoppedParent": 15868,
+          "after": [],
+          "removedProfiles": [
+            "session-2",
+            "session-3",
+            "session-4"
+          ],
+          "remainingProfiles": [],
+          "sourceFilesVerified": 1152,
+          "mismatch": [],
+          "rootRetained": true
+        },
+        "wslReceiptSha256": "4feb068ac89e91291b4dc4b1381b147aca3bed9aa170ed7e5718e74595575598"
+      },
+      "remainingNativeSequence": [
+        "Prepare fixture path and reliable input before starting bounded host",
+        "Bad file upload; native save/cancel; read the actual exported XLSX",
+        "New bounded session: source confirmation, synthetic approval, human quality checks, publication, ordinary product-seat same-release query",
+        "Ordinary OS-account and installer acceptance remain separate"
+      ],
+      "review": {
+        "skill": "open-code-review-delegate",
+        "mode": "workspace",
+        "reviewableFiles": 2,
+        "reviewedFiles": 2,
+        "skippedFiles": 0,
+        "coverageRate": 1,
+        "supplementalFiles": 5,
+        "allChangedFiles": 7,
+        "newEvidenceFilesReviewed": 3,
+        "unchangedTestFilesReusedByHash": 4,
+        "unresolvedConfirmedFindings": 0,
+        "externalModel": false,
+        "scope": "New native evidence and planning record reviewed; unchanged E2E test patches reuse previous review and validation. Incomplete native acceptance remains explicit."
+      },
+      "localChecks": {
+        "documentation": "PASS: 204 Markdown files",
+        "diffCheck": "PASS",
+        "artifactHashVerification": "PASS: 22 files",
+        "testPatchHashReuse": "PASS: four unchanged files",
+        "fullUnitSuite": "NOT_RERUN: no code/dependency changes in this slice"
+      }
+    },
+    "nativeContinuationAfterCommit": {
+      "status": "PARTIAL_NATIVE_ACCEPTANCE",
+      "localCommit": "732ca7b2e7c46a307ff819135ab37815bd84f950",
+      "runtimeSourceCommit": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "sourceEquivalence": "WSL uses the exact be1383a archive (1151 files); Windows uses that archive plus four committed test patches (1152 files). Neither remote is the full 732ca7b documentation tree. Runtime source/contracts/dependencies/lockfile are unchanged.",
+      "testDate": "2026-10-07",
+      "documentationDate": "2026-10-08",
+      "serviceBuild": "PASS: pnpm build:services",
+      "newProductCodeChanges": false,
+      "newTestCodeChanges": false,
+      "nativeDialogsStubbed": false,
+      "ttlChanged": false,
+      "newCompleteTestCasesCounted": 0,
+      "sessions": [
+        {
+          "id": "session-5",
+          "platform": "win32",
+          "node": "v24.21.0",
+          "preflightAt": "2026-10-07T15:41:44.488Z",
+          "preflightAuthMeStatus": 401,
+          "apiOrigin": "http://127.0.0.1:38115",
+          "expiresAt": "2026-10-07T15:46:24.195Z",
+          "pid": 31544,
+          "uiObservation": "Native login only; no file uploaded.",
+          "hostStopReason": "synthetic-facts-expired",
+          "hostDataRemoved": true,
+          "windowsCleanupAt": "2026-10-07T15:47:23.372Z",
+          "ownedWindowsProcessesRemaining": 0,
+          "ownedWindowsProfilesRemaining": 0,
+          "windowsSourceFilesVerified": 1152
+        },
+        {
+          "id": "session-6",
+          "platform": "win32",
+          "node": "v24.21.0",
+          "preflightAt": "2026-10-07T15:47:53.246Z",
+          "preflightAuthMeStatus": 401,
+          "apiOrigin": "http://127.0.0.1:40375",
+          "expiresAt": "2026-10-07T15:52:36.931Z",
+          "pid": 31560,
+          "uiObservation": "CUA observed native bad.xlsx selection, participant confirmation, upload and whole-batch rejection with one issue. Save action coincided with expiry; no native save dialog or output file observed.",
+          "hostStopReason": "synthetic-facts-expired",
+          "hostDataRemoved": true,
+          "windowsCleanupAt": "2026-10-07T15:53:09.982Z",
+          "ownedWindowsProcessesRemaining": 0,
+          "ownedWindowsProfilesRemaining": 0,
+          "windowsSourceFilesVerified": 1152
+        },
+        {
+          "id": "session-7",
+          "platform": "win32",
+          "node": "v24.21.0",
+          "preflightAt": "2026-10-07T15:53:57.089Z",
+          "preflightAuthMeStatus": 401,
+          "apiOrigin": "http://127.0.0.1:36277",
+          "expiresAt": "2026-10-07T15:58:39.255Z",
+          "pid": 31188,
+          "uiObservation": "Native login/source selection; UU keyboard events did not reliably reach the native filename field. Expired before file confirmation.",
+          "hostStopReason": "synthetic-facts-expired",
+          "hostDataRemoved": true,
+          "windowsCleanupAt": "2026-10-07T15:59:09.155Z",
+          "ownedWindowsProcessesRemaining": 0,
+          "ownedWindowsProfilesRemaining": 0,
+          "windowsSourceFilesVerified": 1152
+        }
+      ],
+      "checks": [
+        {
+          "name": "Windows native bad workbook selection and upload to actual WSL API/PG15",
+          "status": "OBSERVED",
+          "evidence": "CUA native UI, session-6; no persisted screenshot or post-upload host status dump."
+        },
+        {
+          "name": "Whole-batch rejection",
+          "status": "OBSERVED",
+          "issueCount": 1,
+          "excludedSheets": 2,
+          "excludedMedia": 0,
+          "exactIssueCoordinateObserved": false
+        },
+        {
+          "name": "Visible invalidation at expiry",
+          "status": "OBSERVED",
+          "evidence": "Save action followed by context/permission changed notice and removal of upload sources."
+        },
+        {
+          "name": "Native error report save/cancel and artifact readback",
+          "status": "INCOMPLETE",
+          "reason": "Expiry before native save dialog; no output artifact. Subsequent UU filename input unreliable."
+        },
+        {
+          "name": "Windows actual-stack approval, quality, publication and other product-agent query",
+          "status": "NOT_RUN"
+        },
+        {
+          "name": "Ordinary Windows OS account and installer acceptance",
+          "status": "NOT_RUN"
+        }
+      ],
+      "evidenceLimits": [
+        "Session-6 UI observations are not independently corroborated by a post-upload API request trace or database status snapshot.",
+        "Session-7 status output is its initial seeded state before native login; it must not be used as session-6 post-upload evidence.",
+        "No approval, quality or publication operation was performed in these three native sessions.",
+        "Session-6 filename entry succeeded once; repeated input failed in session-7. The UU input issue is not resolved.",
+        "Electron logs retain expiry/shutdown 410 GONE, UND_ERR_SOCKET and ECONNREFUSED diagnostics.",
+        "Previous Windows contract doubles, Mac actual-stack and WSL test counts remain separate evidence; no new full-suite or installer run."
+      ],
+      "rawEvidenceDirectory": ".gstack/qa-reports/content-intake-native-continuation-20261007/raw",
+      "archiveSha256": "acf8bbb3c29e66358e57fb9e5a43ebbc76c6eac3d0ff81e22fc42948a675a855",
+      "rawFiles": 22,
+      "rawHashes": {
+        "wsl/host-session-5.log": "c11e9e329f85cb839da61118fad83b93ee827e19b393978dd63fd48422990535",
+        "wsl/host-session-6.log": "230372a5f57c8e520ecb43f75025b89ff3cfcf92b5c333fabb08a8af531ea371",
+        "wsl/host-session-7.log": "d74e5359ea54ecaf2b7949bbd81bd5948bf1891a3464dba694d84bdd8877ac99",
+        "wsl/resource-source-check.json": "b5bc98109df81317fdc3ac043944cc9fa4e9815a14d42d48453138e07fa88490",
+        "wsl/setup.stderr": "8488374b9318244eec2a87caf1355664e87d0901cf5d3b54de6a139ffea0ab6e",
+        "wsl/setup.stdout": "7710a2fe389ae807aae7b65018c8a33ee4d4a27cfb7424723b4cf126c2718612",
+        "wsl/source-ready": "35881f00c6ee2beb790a222d439585abb45315af3caef12a13c1745ed5489592",
+        "windows/cleanup-session-5.json": "5842494bb91923ef63dd07ac6be6de41d7d77d174fdba4b7b6a17e03f5e8bcc8",
+        "windows/cleanup-session-6.json": "5c964e1f97c69978b3990dd9d1516bcbed0450a58b31564f6d7b3b507a135e9f",
+        "windows/cleanup-session-7.json": "9c611dc4a1033a2d89b30dd45ce335aaf19aa6d40863dfa5ea6d479fed09a747",
+        "windows/session-5/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-5/electron.stdout": "bb1190208cd86193f5d80ed85f4e44c2628f31e7d103ab795cb57a5bc941e7ed",
+        "windows/session-5/launch.json": "26fae5e14b726e3649cbd5e9ecddec084c808ae0cb50cc7c6c3256538d24f166",
+        "windows/session-5/windows-loopback.json": "51d66b1f421e00a35c1c750c70798dcef08bcb12b717a8b399894cc9bbf9a79c",
+        "windows/session-6/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-6/electron.stdout": "91205f592fe48ebad11a132f2a042598f9bc5e0b7724ea925474427d64994bc4",
+        "windows/session-6/launch.json": "ee25e719d2cb91f0dbbda073c86753d8ea5e4572f0aea2936b425cffdf48a280",
+        "windows/session-6/windows-loopback.json": "06025e4716f85c02a666ca1d39528fc71f173a52901ba4e62dc7b093bcdd680a",
+        "windows/session-7/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-7/electron.stdout": "1ac92f7447660c69f48463cdbb0e6504de4d8a85134df88bca0b783239991db1",
+        "windows/session-7/launch.json": "029266595f73b874b091021c4a0f714a6be22b2e49daed1d96c82315d1c02be7",
+        "windows/session-7/windows-loopback.json": "90ca24e05c7538851fb68f85d9045116771c3def6fc79bc7eb2a740a1cf30f25"
+      },
+      "allDownloadedHashesMatch": true,
+      "cleanup": {
+        "sourceFilesVerified": 1151,
+        "mismatch": [],
+        "units": {
+          "cai-intake-native-setup-ZBhU6i": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-ZBhU6i-5": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-ZBhU6i-6": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-ZBhU6i-7": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          }
+        },
+        "ownedRootRemoved": true,
+        "windowsRootRetained": true,
+        "globalToolsAndServicesChanged": false,
+        "archiveSha256": "acf8bbb3c29e66358e57fb9e5a43ebbc76c6eac3d0ff81e22fc42948a675a855"
+      },
+      "cleanupReceipt": {
+        "path": ".gstack/qa-reports/content-intake-native-continuation-20261007/wsl-cleanup.json",
+        "sha256": "fa6932e498c62103fa48a34818e84b2c6f7eb964e50a0eb745cc0f657ecd84d5"
+      },
+      "nextSequence": [
+        "Verify reliable native keyboard and file navigation before starting the limited host.",
+        "Complete native report save/cancel, then open and validate the generated report.",
+        "Use a separate session for approval, quality, publication and another product-agent query."
+      ],
+      "review": {
+        "skill": "open-code-review-delegate",
+        "mode": "workspace",
+        "externalModel": false,
+        "total_files": 1,
+        "reviewed_files": 1,
+        "skipped_files": 0,
+        "coverage_rate": 100,
+        "supplemental_reviewed_files": [
+          "docs/plans/2026-10-03-content-intake-requirements.md",
+          "evidence/qa/content-intake-p2-hangzhou/README.md"
+        ],
+        "all_changed_files": 3,
+        "unresolvedFindings": [],
+        "scope": "JSON rule review plus supplemental evidence-value, source, cleanup, Git-status and Markdown consistency review; no new code review or full-branch review claimed."
+      },
+      "localChecks": {
+        "documentation": "PASS: 204 Markdown files, local links and workflow entry ownership",
+        "diffCheck": "PASS",
+        "rawEvidenceHashes": "PASS: 22 files, archive and separate cleanup receipt",
+        "runtimeDiff": "PASS: no runtime source/contracts/dependency/lockfile changes from be1383a to 732ca7b",
+        "fullUnitSuite": "NOT_RERUN: evidence/plan documents only since local commit"
+      }
+    },
+    "nativeReportAcceptance20261008": {
+      "status": "PARTIAL_NATIVE_ACCEPTANCE_REPORT_SAVE_READBACK_PASSED",
+      "sourceBaseCommit": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "localHead": "732ca7b2e7c46a307ff819135ab37815bd84f950",
+      "sourceScope": "Unchanged runtime; WSL archive 1151 files and Windows archive plus four committed test patches 1152 files. Remote is not the full 732ca7b documentation tree.",
+      "platform": "Windows 10 x64 native Electron via UU; actual WSL API/PG15; synthetic identity and approval transport",
+      "businessTtlChanged": false,
+      "nativeDialogsStubbed": false,
+      "codeChanged": false,
+      "buildServices": "PASS",
+      "sessions": [
+        {
+          "session": 8,
+          "candidateIdSeededByHost": "candidate_13607bb2-5334-4326-8747-947aa69368fb",
+          "expiresAt": "2026-10-07T16:20:29.956Z",
+          "stopReason": "requested",
+          "hostDataRemoved": true,
+          "uiObservation": "Corrected a Windows launcher argument from a WSL absolute path to a path relative to the owned Windows root. Native login/read operations only; stopped via quit.",
+          "windowsLaunch": {
+            "platform": "win32",
+            "node": "v24.21.0",
+            "status": 401,
+            "apiOrigin": "http://127.0.0.1:33911",
+            "at": "2026-10-07T16:16:05.789Z"
+          },
+          "cleanup": {
+            "at": "2026-10-07T16:20:42.432Z",
+            "stoppedParent": 30924,
+            "after": [],
+            "removedProfiles": [
+              "session-8"
+            ],
+            "remainingProfiles": [],
+            "sourceFilesVerified": 1152,
+            "mismatch": [],
+            "rootRetained": true
+          },
+          "statusSummary": {
+            "currentReleaseId": "rel_native_base",
+            "publications": 0,
+            "pendingApprovals": 0,
+            "diagnostics": []
+          },
+          "requestCount": 67
+        },
+        {
+          "session": 9,
+          "candidateIdSeededByHost": "candidate_846d041f-fafd-4fd4-9bc4-bcbbd83dbf9a",
+          "expiresAt": "2026-10-07T16:26:11.781Z",
+          "stopReason": "synthetic-facts-expired",
+          "hostDataRemoved": true,
+          "uiObservation": "Native login, source selection and window focus operations only; host expired before file selection.",
+          "windowsLaunch": {
+            "platform": "win32",
+            "node": "v24.21.0",
+            "status": 401,
+            "apiOrigin": "http://127.0.0.1:45997",
+            "at": "2026-10-07T16:21:32.479Z"
+          },
+          "cleanup": {
+            "at": "2026-10-07T16:27:30.918Z",
+            "stoppedParent": 15728,
+            "after": [],
+            "removedProfiles": [
+              "session-9"
+            ],
+            "remainingProfiles": [],
+            "sourceFilesVerified": 1152,
+            "mismatch": [],
+            "rootRetained": true
+          }
+        },
+        {
+          "session": 10,
+          "candidateIdSeededByHost": "candidate_20a59e43-0c38-4e6d-9cd4-3d0a3b2bf7ac",
+          "expiresAt": "2026-10-07T16:32:40.110Z",
+          "stopReason": "synthetic-facts-expired",
+          "hostDataRemoved": true,
+          "uiObservation": "Native bad.xlsx selected; synthetic participant declaration confirmed; upload and parse refresh showed whole-batch rejection with one issue and two excluded sheets. Native Save wrote native-report.xlsx and UI confirmed saved. Second Save dialog was cancelled only after expiry; valid-session cancel remains unverified.",
+          "windowsLaunch": {
+            "platform": "win32",
+            "node": "v24.21.0",
+            "status": 401,
+            "apiOrigin": "http://127.0.0.1:41481",
+            "at": "2026-10-07T16:27:48.784Z"
+          },
+          "cleanup": {
+            "at": "2026-10-07T16:33:38.988Z",
+            "stoppedParent": 31512,
+            "after": [],
+            "removedProfiles": [
+              "session-10"
+            ],
+            "remainingProfiles": [],
+            "sourceFilesVerified": 1152,
+            "mismatch": [],
+            "rootRetained": true
+          },
+          "statusSummary": {
+            "currentReleaseId": "rel_native_base",
+            "publications": 0,
+            "pendingApprovals": 0,
+            "diagnostics": []
+          },
+          "requestCount": 89
+        }
+      ],
+      "checks": [
+        {
+          "name": "Native bad workbook upload and whole-batch rejection",
+          "status": "PASS",
+          "evidence": "session-10 UI plus same-host request snapshot; second objects/candidates sequence follows native login and source management-context reads"
+        },
+        {
+          "name": "Native Save and actual XLSX consumption",
+          "status": "PASS",
+          "evidence": "UI confirmed saved; Windows Node24 and ExcelJS4.4 read the actual output; Mac verified output and readback hashes"
+        },
+        {
+          "name": "Native Save dialog cancel during valid session",
+          "status": "NOT_COMPLETED",
+          "reason": "Second dialog crossed expiry before Cancel. Only dialog dismissal and fail-closed context are observed."
+        },
+        {
+          "name": "Windows-to-WSL approval, quality, publication and another product-agent query",
+          "status": "NOT_RUN"
+        },
+        {
+          "name": "Ordinary Windows OS account and packaged distribution",
+          "status": "NOT_RUN"
+        }
+      ],
+      "report": {
+        "at": "2026-10-07T16:33:55.849Z",
+        "platform": "win32",
+        "node": "v24.21.0",
+        "file": "native-evidence/session-10/native-report.xlsx",
+        "bytes": 6615,
+        "sha256": "2a01345d10cc1a8239f87406e18fd53b48f6e094b0c982e30fad3d579f214f93",
+        "sheets": [
+          {
+            "name": "校验问题",
+            "rowCount": 2,
+            "rows": [
+              [
+                "工作表",
+                "行",
+                "列",
+                "错误码",
+                "修正建议"
+              ],
+              [
+                "FAQ",
+                "3",
+                "C",
+                "REQUIRED",
+                "补齐必填内容后整批重新上传"
+              ]
+            ]
+          }
+        ],
+        "reportFiles": [
+          "native-report.xlsx"
+        ]
+      },
+      "postUploadStatus": "session-10: rel_native_base, publications 0, pendingApprovals 0, diagnostics []; not a zero-error claim about subsequent desktop logs",
+      "limitations": [
+        "Remote IME is per-window: switching one dialog to English does not ensure the next dialog is English. Explicit colon/backslash and observed full lowercase path worked.",
+        "Session-8 launch initially failed with MODULE_NOT_FOUND before Electron; corrected relative script path without changing runtime source.",
+        "Desktop logs retain 410 GONE and post-host-stop ECONNREFUSED.",
+        "No approval or publication performed. Preseeded candidate is not native upload evidence.",
+        "Initial local evidence count check used a dotted-name glob and missed source-ready; corrected file enumeration verified all 24 exact path/hash pairs."
+      ],
+      "rawEvidenceDirectory": ".gstack/qa-reports/content-intake-native-20261008/raw",
+      "rawArchiveSha256": "8798125f572340303c744287d19ef17dc0e3ceb8b3bb0a58629f065ced2055d6",
+      "rawEvidenceHashes": {
+        "wsl/host-session-10.log": "c7a6452277406c6b1e6b05807b148a4190d42da2b164f5b713a18a798be08ae7",
+        "wsl/host-session-8.log": "b608d1635594ab35184c7722ed4a710f920daeb5078c6e6f20b906f1841a833f",
+        "wsl/host-session-9.log": "e2e5f2f0c1effc309573c4e971b26bc699d36333980f68bb468ece0ef9c25cde",
+        "wsl/resource-source-check.json": "feec0005f215ac40e9d0472134662bb5206de2067dfa93b1092224d18d4b5e01",
+        "wsl/setup.stderr": "3381d7c4e90ae360160eb072ccc14bdbaf1f68ecc779779e7f385eeb138fd1c0",
+        "wsl/setup.stdout": "0da046c257dce9a3eff9dd2ad309213b9b1f501bb0c2f6a2837f73ca9e6c884e",
+        "wsl/source-ready": "35881f00c6ee2beb790a222d439585abb45315af3caef12a13c1745ed5489592",
+        "windows/cleanup-session-10.json": "648f144cd622a5106c537c169a5eb32a6480d2b573d3d4cc6d988848878dca4f",
+        "windows/cleanup-session-8.json": "85e25514882317f5ddef4408ed46c6ffca476854d0b062d08f441adb682ab161",
+        "windows/cleanup-session-9.json": "238468897983f232fe411abd7faf72079b222bfdaa670ea6c1cd9f004ee18bec",
+        "windows/session-10/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-10/electron.stdout": "72c8a3e6d8ca988738176b3bfc5a39e56064fb40e8b31cfe4abf211460e74c56",
+        "windows/session-10/launch.json": "e9aa866b77074b625625caa2b812a78bfed8174a6a895faf1eb741630adcac0b",
+        "windows/session-10/native-report.xlsx": "2a01345d10cc1a8239f87406e18fd53b48f6e094b0c982e30fad3d579f214f93",
+        "windows/session-10/report-readback.json": "e306475d6c605b07262507d1caabda23acbd2fcf820b77d0a4c0595c05dab061",
+        "windows/session-10/windows-loopback.json": "af55905f7e139412866e207f2dbb8d0d1580cee698fc7dc0b86def6108091959",
+        "windows/session-8/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-8/electron.stdout": "195b33a08dfd695df431466eebefae3af88792717f7dd2127651e1ed111cee00",
+        "windows/session-8/launch.json": "588f1f93ed19bb17206ff741455862cf61d4823ef8eea78213b32da2ea74525f",
+        "windows/session-8/windows-loopback.json": "1a7dacf9c34a108a3452213ff8c47aad20ea7eea79a64719dcf31e3de4e8e80c",
+        "windows/session-9/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-9/electron.stdout": "92b8f4a7fca5a676015a3ed0f12b890e1bf0fff9ddbd2420682878687673f739",
+        "windows/session-9/launch.json": "0c0f232086c42c17c4b7ccb7b279fe6a24ec121aebaad538f1ae7a373ce0d5da",
+        "windows/session-9/windows-loopback.json": "03d6341deae95a4c10fcbaffef6f2c88e61b6f064b8e85a7f0d54ed610c94e67"
+      },
+      "allDownloadedHashesMatch": true,
+      "cleanup": {
+        "at": "2026-10-07T16:36:43.790721+00:00",
+        "ownedRootRemoved": true,
+        "root": "/opt/customer-agent-intake-native.AWDBgO",
+        "units": {
+          "cai-intake-native-setup-AWDBgO": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-AWDBgO-8": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-AWDBgO-9": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-AWDBgO-10": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          }
+        },
+        "archiveSha256": "8798125f572340303c744287d19ef17dc0e3ceb8b3bb0a58629f065ced2055d6",
+        "evidenceTransferredAndVerifiedBeforeRemoval": true,
+        "windowsRootRetained": true,
+        "globalToolsAndServicesChanged": false
+      },
+      "sourceVerification": {
+        "sourceFilesVerified": 1151,
+        "mismatch": [],
+        "units": {
+          "cai-intake-native-setup-AWDBgO": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-AWDBgO-8": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-AWDBgO-9": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-AWDBgO-10": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          }
+        },
+        "ownedRootRetainedUntilEvidenceTransfer": true,
+        "timing": "Before owned root removal; final state is recorded in cleanup"
+      },
+      "cleanupReceiptSha256": "166245d907842657bdeccb277c2fc5f86228472217f5c6ee238c8bf9861534bc",
+      "nextSequence": [
+        "Complete valid-session native Save cancellation without an IME-dependent filename.",
+        "Use a fresh host for approval, quality, publication and another product-agent query; retain the fixed TTL.",
+        "Complete ordinary Windows account and package acceptance within their existing authorization."
+      ],
+      "review": {
+        "skill": "open-code-review-delegate",
+        "mode": "workspace",
+        "externalModel": false,
+        "total_files": 1,
+        "reviewed_files": 1,
+        "skipped_files": 0,
+        "coverage_rate": 100,
+        "supplemental_reviewed_files": [
+          "docs/plans/2026-10-03-content-intake-requirements.md",
+          "evidence/qa/content-intake-p2-hangzhou/README.md"
+        ],
+        "all_changed_files": 3,
+        "unresolvedFindings": [],
+        "scope": "OCR JSON-key rules plus supplemental host review of evidence values, same-session correlation, source identity, cleanup, limitations, Git state and both excluded Markdown diffs. This is an evidence-document review, not a new code or full-branch review."
+      },
+      "localChecks": {
+        "documentation": "PASS: 204 Markdown files",
+        "diffCheck": "PASS",
+        "rawEvidence": "PASS: 24 exact file hashes, archive, cleanup receipt, report readback, same-session request correlation",
+        "fullCodeSuite": "NOT_RERUN: no product/test/contract/dependency changes since 732ca7b"
+      }
+    },
+    "actualWslPublication20261008": {
+      "status": "PARTIAL_PLATFORM_ACCEPTANCE; actual WSL publication/query E2E PASS",
+      "localHead": "732ca7b2e7c46a307ff819135ab37815bd84f950",
+      "runtimeSourceCommit": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "testPatch": {
+        "path": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+        "sha256": "30eb9f661cd176672f7e65a1cebe68bbfd75764a9a2b37117ee40ce75b11cbc9",
+        "changes": [
+          "Retain outer size gate; compare renderer width to native content width",
+          "Wait for enabled confirmed shop context before query"
+        ]
+      },
+      "windowsFinal": [
+        {
+          "name": "pnpm-version",
+          "command": [
+            "pnpm",
+            "--version"
+          ],
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "durationMs": 372
+        },
+        {
+          "name": "actual-wsl",
+          "command": [
+            "pnpm",
+            "--filter",
+            "@customer-agent/desktop",
+            "exec",
+            "playwright",
+            "test",
+            "tests/e2e/content-intake-wsl-evidence.spec.ts",
+            "--reporter=list,json",
+            "--trace=on",
+            "--output",
+            "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\actual-wsl-final-results"
+          ],
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "durationMs": 21275
+        }
+      ],
+      "windowsDurationSeconds": 19.8,
+      "macFinal": {
+        "passed": 1,
+        "durationSeconds": 19.4,
+        "stdout": "mac-final.stdout",
+        "stderr": "mac-final.stderr"
+      },
+      "hostFinal": {
+        "currentReleaseId": "rel_2",
+        "publications": 1,
+        "pendingApprovals": 0,
+        "diagnostics": [],
+        "requestCount": 130
+      },
+      "failedAttempts": [
+        {
+          "directory": "actual-wsl-evidence",
+          "reason": "Expected innerWidth 980, received 964; native outer/content distinction"
+        },
+        {
+          "directory": "actual-wsl-fixed-evidence",
+          "reason": "Query raced selected-shop authorization context; publication itself completed"
+        }
+      ],
+      "nativeCancel": {
+        "status": "UNCONFIRMED",
+        "uiObservation": "UU displayed 已取消保存报告",
+        "incompleteEvidence": "stdout and status contain NUL bytes; final test result and cleanup receipt absent after reconnect; originals retained",
+        "notCountedAsPass": true
+      },
+      "boundary": {
+        "approval": "scripted-synthetic-transport",
+        "qualityCheck": "script-driven UI; not real human review",
+        "dialogsInFullE2e": "owned path selection only; native save cancellation separate",
+        "windowsAccount": "Administrator; ordinary Windows OS user NOT_RUN",
+        "productChanges": false,
+        "permissionOrTtlChanges": false,
+        "externalModelUsed": false,
+        "temporaryStdioAdapter": "evidence helper only; not reusable CI delivery"
+      },
+      "checks": {
+        "desktopEslint": "PASS",
+        "desktopTypecheck": "PASS",
+        "buildServices": "PASS",
+        "fullWorkspaceSuite": "REUSED for unchanged runtime; no new full-suite claim",
+        "documentation": "PASS: 204 Markdown files",
+        "diffCheck": "PASS"
+      },
+      "rawEvidenceDirectory": ".gstack/qa-reports/content-intake-native-publication-20261008/",
+      "archive": {
+        "files": 114,
+        "archiveSha256": "53f61ded2a2bab313790754637760407f70ab23784bc3769f55a006598a1f68c",
+        "sourceFilesVerified": 1151,
+        "mismatch": [],
+        "units": {
+          "cai-intake-native-setup-oQVhXZ": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-oQVhXZ-11": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-e2e-oQVhXZ": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          }
+        },
+        "ownedRootRetainedUntilEvidenceTransfer": true
+      },
+      "rawHashes": {
+        "wsl/bridge-audit.jsonl": "b53becd6a9463207e502b2d2d341dedaae426daa0a2dc8955181c1588896a862",
+        "wsl/bridge.log": "9f9f7060ee7c3e314f99989bbfeb01482c5ed7e7fbc093d3ec958ebd2ec10398",
+        "wsl/failed-bridge-audit.jsonl": "0996ace5d91cea0587b36ea2a21b2468f9a3a7a9d75081eb6383c43fd6bd6aa0",
+        "wsl/failed-bridge.log": "806731207f6b43bf33799d015fdd06297a005b492efca72db72c5b819caaa8a5",
+        "wsl/host-session-11.log": "1148ce1d5f57651be1d512e3e0ef8af23a204a6d26bed076027c061c3c358f6f",
+        "wsl/passed-bridge-audit.jsonl": "eb942dcfd2933493c0acce05ae302780babacdd430afffd77477b42b4eb20c94",
+        "wsl/passed-bridge.log": "a95d50602507c0cebead29ab78a5e6eae765ca1e63dabe74221043681f774c1a",
+        "wsl/query-failed-bridge-audit.jsonl": "37ec793ba4884bb4b18bbfdbe66e3d91196e5934861ab399b987381061608f0e",
+        "wsl/query-failed-bridge.log": "f1272f2622d9b238accc9d2c32fae9956b7fb2c73c3b5bba49efbb30cd873b0a",
+        "wsl/resource-source-check.json": "b7bf52796c2eddb0646e767c4204ec7d46cf2ad912429cba1a67d7c93c3906b3",
+        "wsl/setup.stderr": "239976c0484f66724cf572771b71d87a9c276ad4ccfffcc9cb57d4414526b409",
+        "wsl/setup.stdout": "35b953f604f7cdd9dd17789e816ced6fd72eb74bdcb2e87a411c66503302e181",
+        "wsl/source-ready": "35881f00c6ee2beb790a222d439585abb45315af3caef12a13c1745ed5489592",
+        "windows/actual-wsl-evidence/actual-wsl.json": "eab86b50a603accca7542013703726aa0886f48fe04df2b6be6771c72583d0b8",
+        "windows/actual-wsl-evidence/actual-wsl.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/actual-wsl-evidence/actual-wsl.stdout": "d1464ff88cefe9138dd73cb8ff95354887f8ec25c54b1a8d723ed4caf91845db",
+        "windows/actual-wsl-evidence/native-environment.json": "353c06f001f91ba2a69752d32414fbf6771589a1a07905e27cd6cc74bb471ba1",
+        "windows/actual-wsl-evidence/pnpm-version.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/actual-wsl-evidence/pnpm-version.stdout": "005206ab803f8881d8227540b7980b37e723b69a8849edb31734a90b7e7964e2",
+        "windows/actual-wsl-evidence/results.json": "386daa0eea7d39c525e87923f9e8a8d9e074a804b435e7d6862ad46780c2fefb",
+        "windows/actual-wsl-evidence/screenshots/dashboard-failure.png": "ec1a81b81968dfb5fbbdfeb04c7eab6a6e4af2999d14e0af183f27bced66e667",
+        "windows/actual-wsl-evidence/screenshots/dashboard-intake-dark.json": "b9414ae7a550f237e78b4e6447eb046be08eb5fe317cee9a7abb6ed8b9785b41",
+        "windows/actual-wsl-evidence/screenshots/dashboard-intake-dark.png": "759d63edf2e2a2e42aa284a132fe70e2b2733dbc9e59e6f0a24c94bc0c70a21f",
+        "windows/actual-wsl-evidence/screenshots/dashboard-intake-light.json": "208fd16e5c50d0687157c822eec8dd28ac517d4fc83413617df3c0a2993fbcdb",
+        "windows/actual-wsl-evidence/screenshots/dashboard-intake-light.png": "8b5ede4fa13c22f4efe4708656c26b7c59bb3ce0e0417cbfaacc9d6d030f4c5c",
+        "windows/actual-wsl-evidence/screenshots/dashboard-intake-start.png": "f56855f62bbb5efaeb2cdf7bd1fb6b59be9374ec620621a46b74b20970352996",
+        "windows/actual-wsl-evidence/source-before.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+        "windows/actual-wsl-results/.last-run.json": "2a48db2dd6a3b56c209a2da6b2a7c1da66e7cdc55c4f4f300892d53613e97cb1",
+        "windows/actual-wsl-results/content-intake-wsl-evidenc-d7365-ry-seat-through-real-API-PG/error-context.md": "abffe2dad162bdd8e7815144f54b98a51bb2da39f7b4b2d8543bc3ba758ec7fe",
+        "windows/actual-wsl-results/content-intake-wsl-evidenc-d7365-ry-seat-through-real-API-PG/trace.zip": "f9ac8ab88f684eb8bd9cae5b90eacfbf24201e88ce948bc55b71ecf96157e411",
+        "windows/actual-wsl-fixed-evidence/actual-wsl.json": "39c72e85bd3fcc367d47cd0c54605977b4431f5351c8356ad16575fbfc4258e0",
+        "windows/actual-wsl-fixed-evidence/actual-wsl.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/actual-wsl-fixed-evidence/actual-wsl.stdout": "8d1e0cd0c17dd2e6f16f9e79200820c85988b62b37cf434b9a291de06ba0ef9b",
+        "windows/actual-wsl-fixed-evidence/native-environment.json": "353c06f001f91ba2a69752d32414fbf6771589a1a07905e27cd6cc74bb471ba1",
+        "windows/actual-wsl-fixed-evidence/pnpm-version.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/actual-wsl-fixed-evidence/pnpm-version.stdout": "005206ab803f8881d8227540b7980b37e723b69a8849edb31734a90b7e7964e2",
+        "windows/actual-wsl-fixed-evidence/results.json": "efdf3bb265fa03ed58be329dfe51e2eda21ca47f622e5923e12facb0c6305389",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-approved-v1.png": "b3dd612746062c0ec870fea8111a533b4b06d4d1b7408a321bd8826a37fb2820",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-approved-v2.png": "c84f538be8411ddbf2649451d64487ad692f6b5d3322b2b63bb0b57f466f57df",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-cancelled.png": "f0e3ee5f7800a252e23ad4a71c058e156ec43b6d17c3a53cf9af98229e427504",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-dark.json": "b9414ae7a550f237e78b4e6447eb046be08eb5fe317cee9a7abb6ed8b9785b41",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-dark.png": "759d63edf2e2a2e42aa284a132fe70e2b2733dbc9e59e6f0a24c94bc0c70a21f",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-declaration-dark.json": "b9414ae7a550f237e78b4e6447eb046be08eb5fe317cee9a7abb6ed8b9785b41",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-declaration-dark.png": "34c8d5aa0dd935ee38baf5738564027198c28871b0cd7e260aa8b1f4df63e855",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-light.json": "208fd16e5c50d0687157c822eec8dd28ac517d4fc83413617df3c0a2993fbcdb",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-light.png": "8b5ede4fa13c22f4efe4708656c26b7c59bb3ce0e0417cbfaacc9d6d030f4c5c",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-minimum-dark.json": "576d7c9488ffe1af9677331dc525c612669c589ac9b9b9e3e911acf1ead93bda",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-minimum-dark.png": "ec1a81b81968dfb5fbbdfeb04c7eab6a6e4af2999d14e0af183f27bced66e667",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-intake-start.png": "f56855f62bbb5efaeb2cdf7bd1fb6b59be9374ec620621a46b74b20970352996",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-published.png": "2e60896d90179aa002ff0c833c45375651cff0794cdb3edca1dc254c06e500d3",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-revision-v2.png": "45920456512c9786de068724967460e2c2a6d69b4644a1ddbd496ebb9d9773a1",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-upload-error-report.png": "25690b1a2a0370e828396b7ea46f582d5685786f6fc1380fe7e564be6f009969",
+        "windows/actual-wsl-fixed-evidence/screenshots/dashboard-uploaded-material.png": "e856ce7f9da1650d0943f8794c7ae3e2d7ce8b07688ad7caa63c0bde1404cc50",
+        "windows/actual-wsl-fixed-evidence/screenshots/query-failure.png": "30e47998970684f0f727c421f458749d8a8dcb67a5086d6da083f2ce428361fc",
+        "windows/actual-wsl-fixed-evidence/source-before.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+        "windows/actual-wsl-fixed-results/.last-run.json": "2a48db2dd6a3b56c209a2da6b2a7c1da66e7cdc55c4f4f300892d53613e97cb1",
+        "windows/actual-wsl-fixed-results/content-intake-wsl-evidenc-d7365-ry-seat-through-real-API-PG/error-context.md": "1d81a68c842a811eb721cd62f337111222bddc48a82f09730cd47efbaaf720e7",
+        "windows/actual-wsl-fixed-results/content-intake-wsl-evidenc-d7365-ry-seat-through-real-API-PG/trace.zip": "3e437d9bab5a95e78630cc84b669430d9eb2837c71f9f434650abfcb617e55e6",
+        "windows/actual-wsl-final-evidence/actual-wsl.json": "c1d6fb1b05e21596fdb052fa7eb68fa4a8e9e768d472c57eeb8e6db8d041bbe2",
+        "windows/actual-wsl-final-evidence/actual-wsl.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/actual-wsl-final-evidence/actual-wsl.stdout": "73ef2d2ff4cefd3ed8ca11f49e019da2257b3a46da155bd1369a91e744e4d942",
+        "windows/actual-wsl-final-evidence/complete.json": "e58ef5b5f3c3c67e1efd66e199b729829ecd83c07509b0721d1669942abd0e87",
+        "windows/actual-wsl-final-evidence/native-environment.json": "353c06f001f91ba2a69752d32414fbf6771589a1a07905e27cd6cc74bb471ba1",
+        "windows/actual-wsl-final-evidence/pnpm-version.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/actual-wsl-final-evidence/pnpm-version.stdout": "005206ab803f8881d8227540b7980b37e723b69a8849edb31734a90b7e7964e2",
+        "windows/actual-wsl-final-evidence/resource-status.json": "f0c5339cce29b68a10514af65ec506ce907c83eccd320860176a0f1c5aaef211",
+        "windows/actual-wsl-final-evidence/results.json": "dbea997a02000613b15735b87a894ec0373eb1ffb6cbb35fcf5d025912823b1f",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-approved-v1.png": "cf5d5288e65d5c8113b5a9cc8137636008fd05a5840918d8175ea3b4061328b1",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-approved-v2.png": "19e12a7951cc2dc7bb55e3cf33d8f3379790b44353aea2bd07ff599fa2eaa9a9",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-cancelled.png": "ee951d5c31137f96c76c80db8e974c919dfed82f64d18ae352ed9b14c4e8e904",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-dark.json": "b9414ae7a550f237e78b4e6447eb046be08eb5fe317cee9a7abb6ed8b9785b41",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-dark.png": "759d63edf2e2a2e42aa284a132fe70e2b2733dbc9e59e6f0a24c94bc0c70a21f",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-declaration-dark.json": "b9414ae7a550f237e78b4e6447eb046be08eb5fe317cee9a7abb6ed8b9785b41",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-declaration-dark.png": "34c8d5aa0dd935ee38baf5738564027198c28871b0cd7e260aa8b1f4df63e855",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-light.json": "208fd16e5c50d0687157c822eec8dd28ac517d4fc83413617df3c0a2993fbcdb",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-light.png": "8b5ede4fa13c22f4efe4708656c26b7c59bb3ce0e0417cbfaacc9d6d030f4c5c",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-minimum-dark.json": "576d7c9488ffe1af9677331dc525c612669c589ac9b9b9e3e911acf1ead93bda",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-minimum-dark.png": "ec1a81b81968dfb5fbbdfeb04c7eab6a6e4af2999d14e0af183f27bced66e667",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-intake-start.png": "f56855f62bbb5efaeb2cdf7bd1fb6b59be9374ec620621a46b74b20970352996",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-published.png": "1b5fec57ee4fd2a6b71ff20ee7b7e055a554e847a689a91edc3a0c56e41cf2dd",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-revision-v2.png": "45920456512c9786de068724967460e2c2a6d69b4644a1ddbd496ebb9d9773a1",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-upload-error-report.png": "25690b1a2a0370e828396b7ea46f582d5685786f6fc1380fe7e564be6f009969",
+        "windows/actual-wsl-final-evidence/screenshots/dashboard-uploaded-material.png": "fd7074e95bb6a2de9770c84ea69e96d804adc9a95602c4e42476c65ca6b56975",
+        "windows/actual-wsl-final-evidence/screenshots/final-host-status.json": "41eaa8677bf13f35d0060050de5e0a41fe67ba3e674abbd6660311a59d8a3326",
+        "windows/actual-wsl-final-evidence/screenshots/query-published-faq.png": "c7b602380b71a07ae273225f6fd6688113ffdd477301f482c9091132056a28b3",
+        "windows/actual-wsl-final-evidence/source-after.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+        "windows/actual-wsl-final-evidence/source-before.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+        "windows/actual-wsl-final-results/.last-run.json": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+        "windows/actual-wsl-final-results/content-intake-wsl-evidenc-d7365-ry-seat-through-real-API-PG/trace.zip": "c80f41aa5e2c51ccbf918852977075a887e9e66cc8d4f5c6ba81615b4cd46539",
+        "windows/native-cancel-evidence/actual-wsl.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/native-cancel-evidence/actual-wsl.stdout": "0f654345dc8f565d54fb5a9fb620df3b35a96c8bc0d0c247cc0096e5444ee65b",
+        "windows/native-cancel-evidence/native-environment.json": "353c06f001f91ba2a69752d32414fbf6771589a1a07905e27cd6cc74bb471ba1",
+        "windows/native-cancel-evidence/pnpm-version.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/native-cancel-evidence/pnpm-version.stdout": "005206ab803f8881d8227540b7980b37e723b69a8849edb31734a90b7e7964e2",
+        "windows/native-cancel-evidence/results.json": "5a03af85975a7445b7389adb5a3f47250ac3340c8676028541ba38cd34916b34",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-dark.json": "b9414ae7a550f237e78b4e6447eb046be08eb5fe317cee9a7abb6ed8b9785b41",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-dark.png": "759d63edf2e2a2e42aa284a132fe70e2b2733dbc9e59e6f0a24c94bc0c70a21f",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-declaration-dark.json": "b9414ae7a550f237e78b4e6447eb046be08eb5fe317cee9a7abb6ed8b9785b41",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-declaration-dark.png": "34fd14e63a1de0ffb7c4ee3bd7e639792a83561fb07b1b37b69851bb9ccab09d",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-light.json": "208fd16e5c50d0687157c822eec8dd28ac517d4fc83413617df3c0a2993fbcdb",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-light.png": "8b5ede4fa13c22f4efe4708656c26b7c59bb3ce0e0417cbfaacc9d6d030f4c5c",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-minimum-dark.json": "576d7c9488ffe1af9677331dc525c612669c589ac9b9b9e3e911acf1ead93bda",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-minimum-dark.png": "ec1a81b81968dfb5fbbdfeb04c7eab6a6e4af2999d14e0af183f27bced66e667",
+        "windows/native-cancel-evidence/screenshots/dashboard-intake-start.png": "f56855f62bbb5efaeb2cdf7bd1fb6b59be9374ec620621a46b74b20970352996",
+        "windows/native-cancel-evidence/screenshots/native-cancel-status.json": "5286ef6bb75c095dab30526a5ac162b3a9ca94551abf9cbaa293524210de76e8",
+        "windows/native-cancel-evidence/screenshots/native-save-cancelled.png": "16898dc0e0208c7cc89c13886bbdad3380a004ae3d6ad7f5f32c79abb2ccfb5b",
+        "windows/native-cancel-evidence/source-before.json": "0cf04feb225946bb70272896224f749c6fdd8906ec69b443d076e41a3ade5f4a",
+        "windows/session-11/electron.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "windows/session-11/electron.stdout": "700b6eef5fa2be68a59fcfa7e2f45603e639966c9da002b4f2754fb2b4fc893d",
+        "windows/session-11/launch.json": "04699685ac46ef5c142c3d8540c240abb515f6d937010cdcfea588147affaea8",
+        "windows/session-11/windows-loopback.json": "82b07f5adbcaf10b5ad8fcac999f0fc47ca5e9ebc0c619d5c5d21ee70a535de9",
+        "windows/native-evidence/cleanup-session-11.json": "55e32628d5dac19951d97ac942bbc47485f85420f6113fe419df774c162bf430",
+        "windows/patched-source-manifest.json": "761249dbab8d3a01dedd7845f948530544e9c3af92afdde1c152a64e532fde12",
+        "windows/patched-source-manifest.before-wsl.json": "3aea2c5a931d8f45855dcdbb9134bac61613666b9c90d6445e311aa6bc0a3a6c"
+      },
+      "cleanup": {
+        "ownedProcesses": [],
+        "temporaryProfiles": [],
+        "sourceFiles": 1152,
+        "mismatch": [],
+        "removedProfile": "intake-real-stack-electron-qk6FlS",
+        "wslRootRemoved": true,
+        "units": {
+          "cai-intake-native-setup-oQVhXZ": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-host-oQVhXZ-11": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-native-e2e-oQVhXZ": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          }
+        },
+        "windowsToolsRetained": true,
+        "cancelTestCompletion": "unconfirmed; incomplete/corrupt files preserved in verified archive"
+      },
+      "remaining": [
+        "Effective-session native save-cancel complete evidence",
+        "Ordinary Windows OS account",
+        "Packaged application acceptance",
+        "Real Feishu/data and deployment separately authorized"
+      ],
+      "review": {
+        "skill": "open-code-review-delegate",
+        "total_files": 4,
+        "reviewed_files": 4,
+        "skipped_files": 0,
+        "coverage_rate": 1,
+        "supplementalFiles": [
+          "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+          "docs/plans/2026-10-03-content-intake-requirements.md",
+          "evidence/qa/content-intake-p2-hangzhou/README.md"
+        ],
+        "fixedFindings": [
+          "Windows outer/content width assumption",
+          "Query before selected-shop authorization completed"
+        ],
+        "unresolvedFindings": [],
+        "scope": "Current test/evidence diff; prior reviewed unchanged runtime reused. Cancellation evidence remains incomplete, not passed."
+      }
+    },
+    "nativeCancelAndPackaged20261008": {
+      "productBaseline": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "localHead": "732ca7b2e7c46a307ff819135ab37815bd84f950",
+      "evidenceDirectory": ".gstack/qa-reports/content-intake-native-cancel-r2-20261008",
+      "testSourceSha256": {
+        "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "9b20655aa6972c9411b1a8e5f25e2d0b3765fb367222d2fda772178362417825",
+        "apps/desktop/tests/support/owned-electron.ts": "e95c705236069cedecd82538b341baff1f11218b02a26dac43c8e210c35cbe65",
+        "apps/desktop/tests/e2e/owned-electron-windows.spec.ts": "9a59bccefb6df1df96a4b16e03719f5699b6290250af91bd3a49fd135df749f7"
+      },
+      "nativeSaveCancel": {
+        "status": "PASS",
+        "passed": 1,
+        "testSeconds": 31.9,
+        "totalSeconds": 32.4,
+        "commandResults": [
+          {
+            "name": "pnpm-version",
+            "command": [
+              "pnpm",
+              "--version"
+            ],
+            "code": 0,
+            "signal": null,
+            "timedOut": false,
+            "durationMs": 377
+          },
+          {
+            "name": "actual-wsl",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@customer-agent/desktop",
+              "exec",
+              "playwright",
+              "test",
+              "tests/e2e/content-intake-native-cancel-r2.spec.ts",
+              "--reporter=list,json",
+              "--trace=on",
+              "--output",
+              "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\native-cancel-r2-results"
+            ],
+            "code": 0,
+            "signal": null,
+            "timedOut": false,
+            "durationMs": 33343
+          }
+        ],
+        "observation": {
+          "at": "2026-10-07T17:48:24.579Z",
+          "expiresAt": "2026-10-07T17:52:55.018Z",
+          "reportCreated": false,
+          "currentReleaseId": "rel_native_base",
+          "publications": 0,
+          "pendingApprovals": 0,
+          "diagnostics": []
+        },
+        "dialog": "Actual Windows Save dialog cancelled through UU CUA before expiry; Open dialog only uses owned path selection",
+        "resources": "raw/windows/native-cancel-r2-evidence/resource-status.json"
+      },
+      "package": {
+        "status": "PASS",
+        "command": "pnpm package:win",
+        "exitCode": 0,
+        "durationMs": 106712,
+        "workspaceBeforeAndAfter": "PASS",
+        "version": "0.3.26",
+        "windowsRoot": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952",
+        "releaseRelative": "source/release/local-unsigned/windows",
+        "audit": {
+          "artifacts": {
+            "客服话术浮窗 Demo-0.3.26-win-x64-UNSIGNED.exe": {
+              "bytes": 92203324,
+              "sha256": "86f263baaf27cb5a60a9ef0f3631ce307a29eae0cd8cc0aa9af4239588df1514"
+            },
+            "win-unpacked/客服话术浮窗 Demo.exe": {
+              "bytes": 225546240,
+              "sha256": "a136aeb85f286f8f05a166e1324d36e839a530c01de64e53960204aefe392896"
+            },
+            "win-unpacked/resources/app.asar": {
+              "bytes": 11393671,
+              "sha256": "8f0994778bcd41940bd6f1dd56502af7f20b9a5330af79854df4de4ebe4bb4a1"
+            },
+            "win-unpacked/resources/icon.ico": {
+              "bytes": 49684,
+              "sha256": "e475fac4f22ad3f107f876bbfd03bdb8bbc973cc3b37e50f485fd34d82d97dd2"
+            }
+          },
+          "signatureAndToken": {
+            "status": "NotSigned",
+            "hasCertificate": false,
+            "administrator": true
+          },
+          "installerExecuted": false,
+          "installedApplicationModified": false
+        },
+        "iconEquivalence": {
+          "sourceSha256": "4d6a0daceb0e0525468b5109ca4532010d8c9f8cc5a0589c55cb0eb7d94b150d",
+          "generatedSha256": "fed149a8d1d428d8892a0fe6e0d7e151694aea0a18606388b7188641a37b10d3",
+          "sourceDimensions": [
+            1024,
+            1024
+          ],
+          "generatedDimensions": [
+            1024,
+            1024
+          ],
+          "samePixels": true,
+          "sourcePixelsSha256": "d840051026b93fd183c0daee644328c0f74f35093e56eebb9ea007a53500b254",
+          "generatedPixelsSha256": "d840051026b93fd183c0daee644328c0f74f35093e56eebb9ea007a53500b254"
+        },
+        "outerRunner": "Initial evidence runner failed source hash check after successful official package. Generated PNG bytes differ but all decoded RGBA pixels match; separate expected build manifest records generated asset.",
+        "auditNote": "Artifact audit precedes installer followup. Installer is now launched at license page; no license accepted or installation completed."
+      },
+      "windowsTeardown": {
+        "status": "PASS",
+        "passed": 2,
+        "totalSeconds": 11.3,
+        "commandResults": [
+          {
+            "name": "pnpm-version",
+            "command": [
+              "pnpm",
+              "--version"
+            ],
+            "code": 0,
+            "signal": null,
+            "timedOut": false,
+            "durationMs": 363
+          },
+          {
+            "name": "actual-wsl",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@customer-agent/desktop",
+              "exec",
+              "playwright",
+              "test",
+              "tests/e2e/owned-electron-windows.spec.ts",
+              "--reporter=list,json",
+              "--trace=on",
+              "--output",
+              "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\teardown-supervised-results"
+            ],
+            "code": 0,
+            "signal": null,
+            "timedOut": false,
+            "durationMs": 12146
+          }
+        ],
+        "cases": [
+          "before-quit prevented with launcher alive",
+          "before-quit prevented after launcher exits"
+        ],
+        "rootCause": "Playwright 1.62.1 Windows shell launcher PID is not Electron main PID. Supervise captured main PID and kill only owned process tree at bounded teardown; verify native exit."
+      },
+      "packagedActualWsl": {
+        "status": "PASS",
+        "passed": 1,
+        "testSeconds": 19.8,
+        "totalSeconds": 20.3,
+        "commandResults": [
+          {
+            "name": "pnpm-version",
+            "command": [
+              "pnpm",
+              "--version"
+            ],
+            "code": 0,
+            "signal": null,
+            "timedOut": false,
+            "durationMs": 367
+          },
+          {
+            "name": "actual-wsl",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@customer-agent/desktop",
+              "exec",
+              "playwright",
+              "test",
+              "tests/e2e/content-intake-packaged-wsl-final.spec.ts",
+              "--reporter=list,json",
+              "--trace=on",
+              "--output",
+              "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\packaged-wsl-supervised-results"
+            ],
+            "code": 0,
+            "signal": null,
+            "timedOut": false,
+            "durationMs": 21162
+          }
+        ],
+        "runtime": "win-unpacked executable, app.isPackaged true, app.asar",
+        "scope": "Actual API/PG15 upload, reject/report/readback, revision v2/fresh evidence, synthetic approval and scripted quality check, rel_2 publish, candidate cancel, agent shop-a three revised answers/copy, shop-b forbidden, sandbox/preload gates",
+        "resources": "packaged-raw/windows/packaged-wsl-supervised-evidence/resource-status.json"
+      },
+      "macRegression": {
+        "status": "PASS",
+        "passed": 3,
+        "totalSeconds": 26.2,
+        "tests": [
+          "content-intake-management",
+          "content-intake-query",
+          "content-intake-real-stack"
+        ],
+        "log": "mac-supervised.stdout"
+      },
+      "staticChecks": {
+        "changedTestFilesEslint": "PASS",
+        "desktopTypecheck": "PASS",
+        "workspaceCheck": "PASS",
+        "docsCheck": "PASS: 204 Markdown files",
+        "gitDiffCheck": "PASS"
+      },
+      "collections": [
+        {
+          "files": 34,
+          "archiveSha256": "963545d0f57a9cce0a74a6ed153710a706561b1eab716951e1cb222c4c53b7b2",
+          "sourceFilesVerified": 1151,
+          "mismatch": [],
+          "units": {
+            "cai-intake-cancel-setup-TXwWhY": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            },
+            "cai-intake-cancel-e2e-TXwWhY": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            }
+          },
+          "ownedRootRetainedUntilEvidenceTransfer": true,
+          "manifestSha256": "f8eb6b07c97911b389014b491eb00b7d6ec348ada49ddc20ab905ef7058919cc"
+        },
+        {
+          "files": 215,
+          "archiveSha256": "0e3df0a77896c977201e82d0d3690cb73900433eb9bfc7e38b0f8c7c38788217",
+          "sourceFilesVerified": 1151,
+          "mismatch": [],
+          "units": {
+            "cai-intake-cancel-setup-TXwWhY": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            },
+            "cai-intake-cancel-e2e-TXwWhY": {
+              "MainPID": "0",
+              "ControlGroup": "",
+              "ActiveState": "inactive"
+            }
+          },
+          "ownedRootRetainedUntilEvidenceTransfer": true,
+          "manifestSha256": "a9907eacd2f5e154e48e8eb1699e59b9c7bbf672238ac4d301f4118bc8d93296"
+        }
+      ],
+      "collectionNote": "34 and 215 files are separate verified batches; shared WSL logs must not be added as unique files. Earlier failed/interrupted results retained.",
+      "cleanup": {
+        "ownedProcesses": [],
+        "temporaryProfiles": [],
+        "sourceFiles": 1153,
+        "mismatch": [],
+        "units": {
+          "cai-intake-cancel-setup-TXwWhY": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          },
+          "cai-intake-cancel-e2e-TXwWhY": {
+            "MainPID": "0",
+            "ControlGroup": "",
+            "ActiveState": "inactive"
+          }
+        },
+        "wslRootRemoved": true,
+        "windowsToolsSourceAndPackageRetained": true,
+        "artifactsUnchangedAfterRuntimeTest": {
+          "客服话术浮窗 Demo-0.3.26-win-x64-UNSIGNED.exe": {
+            "bytes": 92203324,
+            "sha256": "86f263baaf27cb5a60a9ef0f3631ce307a29eae0cd8cc0aa9af4239588df1514"
+          },
+          "win-unpacked/客服话术浮窗 Demo.exe": {
+            "bytes": 225546240,
+            "sha256": "a136aeb85f286f8f05a166e1324d36e839a530c01de64e53960204aefe392896"
+          },
+          "win-unpacked/resources/app.asar": {
+            "bytes": 11393671,
+            "sha256": "8f0994778bcd41940bd6f1dd56502af7f20b9a5330af79854df4de4ebe4bb4a1"
+          },
+          "win-unpacked/resources/icon.ico": {
+            "bytes": 49684,
+            "sha256": "e475fac4f22ad3f107f876bbfd03bdb8bbc973cc3b37e50f485fd34d82d97dd2"
+          }
+        }
+      },
+      "remaining": [
+        "Ordinary Windows OS account: user confirmed none available; deferred",
+        "NSIS opened at MIT license page; awaiting action-time license consent before install/start/uninstall. Existing default appData untouched.",
+        "Real Feishu/data and deployment require their respective authorization"
+      ],
+      "review": {
+        "skill": "open-code-review-delegate",
+        "externalModel": false,
+        "total_files": 6,
+        "reviewed_files": 6,
+        "skipped_files": 0,
+        "coverage_rate": 1,
+        "fixedFindings": [
+          "Windows outer/content size assumption",
+          "Selected-shop authorization readiness",
+          "Query reopening handoff readiness",
+          "Windows native Electron process supervision after launcher exit"
+        ],
+        "unresolvedFindings": [],
+        "scope": "Current three test files plus three plan/evidence documents; unchanged runtime review reused"
+      },
+      "installerFollowup": {
+        "elevated": true,
+        "exitedHistoricalRecords": [
+          {
+            "Id": 1084,
+            "HasExited": true,
+            "HandleCount": 0
+          },
+          {
+            "Id": 23988,
+            "HasExited": true,
+            "HandleCount": 0
+          }
+        ],
+        "installerLaunched": true,
+        "installationCompleted": false,
+        "ordinaryOsAccountAvailable": false,
+        "at": "2026-10-07T18:29:32.5809538Z",
+        "agreementAccepted": false,
+        "target": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-p2",
+        "targetExists": true,
+        "installedEntries": [],
+        "stage": "license-consent-pending"
+      }
+    },
+    "latestFollowup": "defaultShortcutAcceptance20261008",
+    "installerAcceptance20261008": {
+      "status": "PASS for scoped current-user install/start/quit/uninstall; broader platform acceptance remains partial",
+      "productBaseline": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "localHead": "732ca7b2e7c46a307ff819135ab37815bd84f950",
+      "version": "0.3.26",
+      "installerSha256": "86f263baaf27cb5a60a9ef0f3631ce307a29eae0cd8cc0aa9af4239588df1514",
+      "evidenceDirectory": ".gstack/qa-reports/content-intake-native-cancel-r2-20261008",
+      "evidenceSha256": {
+        "installed-prelaunch.json": "2563f01b7b9d4266337c3b3718d265606a166aadcc3654fa025fe7516e6063af",
+        "installed-running.json": "6a75346a43b58590f85603d757404d67b5f97b02adf5cefeddeb60e1325c1685",
+        "installed-exit-uninstall.json": "eeb63cdf34e68d320289d9461d2cd934e1d5d3f1161c66e2dfcb25f5d9089eda",
+        "installed-cleanup.json": "1f42b7474c6026ed177fc3acd19c6ce641f2627234140e50611205fa02adcc40",
+        "installed-ui-observations.json": "289b5d3cf2f043884d4e8bbaedd4420d93bd700498dd2ab4242231fea9f0425c"
+      },
+      "prelaunch": {
+        "at": "2026-10-07T18:41:17.0637318Z",
+        "shortcuts": [
+          {
+            "path": "C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\客服话术浮窗 Demo.lnk",
+            "arguments": "",
+            "target": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-p2\\@customer-agentdesktop\\客服话术浮窗 Demo.exe"
+          },
+          {
+            "path": "C:\\Users\\Administrator\\Desktop\\客服话术浮窗 Demo.lnk",
+            "arguments": "",
+            "target": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-p2\\@customer-agentdesktop\\客服话术浮窗 Demo.exe"
+          }
+        ],
+        "defaultUserDataNotLaunched": true,
+        "registry": [
+          {
+            "DisplayName": "客服话术浮窗 Demo 0.3.26",
+            "DisplayVersion": "0.3.26",
+            "UninstallString": "\"C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-p2\\@customer-agentdesktop\\Uninstall 客服话术浮窗 Demo.exe\" /currentuser",
+            "PSChildName": "3c3477e7-e0e9-546b-8d76-b17fd4621d73"
+          }
+        ],
+        "installedHashes": {
+          "resources\\icon.ico": "E475FAC4F22AD3F107F876BBFD03BDB8BBC973CC3B37E50F485FD34D82D97DD2",
+          "resources\\app.asar": "8F0994778BCD41940BD6F1DD56502AF7F20B9A5330AF79854DF4DE4EBE4BB4A1",
+          "客服话术浮窗 Demo.exe": "A136AEB85F286F8F05A166E1324D36E839A530C01DE64E53960204AEFE392896"
+        },
+        "launchPid": 23284,
+        "profile": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-p2-profile"
+      },
+      "config": {
+        "mode": "synthetic-offline"
+      },
+      "cleanup": {
+        "registryEntries": [],
+        "shortcuts": [],
+        "activeProcesses": [],
+        "at": "2026-10-07T18:45:56.1947841Z",
+        "profileRetainedByUninstaller": true,
+        "ownedProfileRemoved": true,
+        "ownedInstallRootRemoved": true,
+        "existingDefaultUserDataRetained": true,
+        "installedFilesAfterUninstall": [],
+        "installerRetained": true
+      },
+      "ui": {
+        "date": "2026-10-08",
+        "timezone": "Asia/Shanghai",
+        "machine": "DESKTOP-FAEJK8S",
+        "transport": "UU 人事-台式 via CUA; actual Windows GUI",
+        "operator": "Codex via user-authorized remote control; no human acceptance signature",
+        "licenseConsent": "User explicitly replied 同意许可，继续 before clicking MIT agreement",
+        "observations": {
+          "chineseAssistedInstaller": "PASS",
+          "currentUserSelection": "PASS: Administrator; elevated OS session",
+          "installCompletePage": "PASS",
+          "autoRunAfterFinish": "unchecked to preserve existing default profile",
+          "installedAppStartup": "PASS: installed EXE with new --user-data-dir profile",
+          "foxVisible": "PASS",
+          "globalCtrlShiftSpace": "PASS: query capsule opened",
+          "foxInteraction": "query capsule opened during drag attempts; no stable position change observed",
+          "escapeClosesQuery": "PASS",
+          "foxContextMenuQuit": "PASS; actual processes empty before uninstall",
+          "uninstallWizard": "PASS: Chinese success page and OS resource readback"
+        },
+        "limits": [
+          "Drag through UU was interpreted as click; native drag not confirmed",
+          "Did not disconnect network; no physical offline acceptance claim",
+          "No ordinary Windows OS account available",
+          "Used installed executable with isolated profile, not unchanged desktop shortcut default-profile launch",
+          "No actual API/Feishu interaction in installation smoke; prior packaged actual-stack tests remain separate"
+        ],
+        "initialProbeFailure": "Expected executable directly in installed-p2 not found. Registry/shortcuts identified actual appended @customer-agentdesktop subdirectory; corrected probe path. No product files changed."
+      },
+      "review": {
+        "skill": "open-code-review-delegate",
+        "mode": "workspace-followup",
+        "changedThisTurn": 3,
+        "reviewedThisTurn": 3,
+        "skippedThisTurn": 0,
+        "coverage_rate": 1,
+        "priorThreeTestReviewsReusedByExactHash": true,
+        "externalModel": false,
+        "unresolvedFindings": []
+      }
+    },
+    "defaultShortcutAcceptance20261008": {
+      "status": "PASS scoped unchanged-shortcut first startup with fresh synthetic default-path profile; broader acceptance partial",
+      "localHead": "ecb6e03e0483cf39e4c214431ba46d051c99e0db",
+      "productBaseline": "be1383a2336ddd8b359cd47108752a64a54fc581",
+      "installerSha256": "86f263baaf27cb5a60a9ef0f3631ce307a29eae0cd8cc0aa9af4239588df1514",
+      "evidenceDirectory": ".gstack/qa-reports/content-intake-native-cancel-r2-20261008",
+      "evidenceSha256": {
+        "shortcut-prepare.json": "f88bd7409acb8cc3caa8c6ba99f727dc19738e81df8aeaf8cf73acd966ab2afd",
+        "shortcut-launch.json": "04f28a65ce07a2c4558abe192687bb89d809da66eff1e169d676030438888a65",
+        "shortcut-running.json": "66cfed676b42ddf4a72106014d8937fab8f71ea32d76b9f90348870a9d295a1d",
+        "shortcut-restored.json": "c2a2e313a581bf57925ce281936e4023e45381029ed5bb9878b945adb41c341d",
+        "shortcut-uninstall-r2.json": "237a08cc7a7967483ba886a5a0f2580a404011451f06fca88bf76831a3d988d0",
+        "shortcut-cleanup.json": "130fe65470b4470d2e06633b540a1bcee7bef6e4d7a3ea85d31178e7d1d9c56f",
+        "shortcut-ui-observations.json": "11270df600595c0941f0477866af692decec535bd76af403e1d95759f3f8736a"
+      },
+      "launch": {
+        "originalCreationTicks": 639256559945246597,
+        "original": "C:\\Users\\Administrator\\AppData\\Roaming\\客服话术浮窗 Demo",
+        "target": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-shortcut-p2\\客服话术浮窗 Demo.exe",
+        "at": "2026-10-07T18:58:36.7037975Z",
+        "shortcut": "C:\\Users\\Administrator\\Desktop\\客服话术浮窗 Demo.lnk",
+        "backup": "C:\\Users\\Administrator\\AppData\\Roaming\\客服话术浮窗 Demo.cai-p2-backup-ecb6e03",
+        "arguments": "",
+        "originalLastWriteTicks": 639264121026582220,
+        "originalContentsRead": false
+      },
+      "config": {
+        "mode": "synthetic-offline"
+      },
+      "mainCommandLine": "\"C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-shortcut-p2\\客服话术浮窗 Demo.exe\" ",
+      "restore": {
+        "ownedActiveProcesses": 0,
+        "termination": "owned main PID taskkill /T /F for cleanup; not a normal-exit assertion",
+        "originalRestored": true,
+        "at": "2026-10-07T19:03:16.4186024Z",
+        "killResult": "SUCCESS: The process with PID 14276 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 20460 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 18660 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 18728 (child process of PID 23624) has been terminated.\r\nSUCCESS: The process with PID 23624 (child process of PID 23848) has been terminated.\r\n",
+        "backupAbsent": true,
+        "mainPid": [
+          23624
+        ],
+        "quarantine": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\shortcut-synthetic-profile-ecb6e03",
+        "originalContentsRead": false
+      },
+      "uninstall": {
+        "exitCode": 0,
+        "completed": true,
+        "registryPath": "Microsoft.PowerShell.Core\\Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\3c3477e7-e0e9-546b-8d76-b17fd4621d73",
+        "uninstaller": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\cai-p2-be1383a-269952\\installed-shortcut-p2\\Uninstall 客服话术浮窗 Demo.exe",
+        "at": "2026-10-07T19:04:14.9761552Z"
+      },
+      "cleanup": {
+        "ownedSyntheticProfileRemoved": true,
+        "installerRetained": true,
+        "registryEntries": [],
+        "shortcuts": [],
+        "activeProcesses": [],
+        "at": "2026-10-07T19:04:43.8855654Z",
+        "originalRestored": true,
+        "backupAbsent": true,
+        "ownedInstallRootRemoved": true,
+        "installedFilesAfterUninstall": [],
+        "originalContentsRead": false
+      },
+      "ui": {
+        "date": "2026-10-08",
+        "transport": "UU 人事-台式 via CUA",
+        "foxVisible": true,
+        "clickVerification": "UNCONFIRMED: cua click returned noWindowsAvailable twice; no successful input assertion",
+        "launchMethod": "Windows Shell Start-Process on unchanged installer-created desktop .lnk, empty arguments",
+        "cleanupMethod": "Owned main PID taskkill /T /F; silent owned uninstaller exit 0. Not a normal GUI-exit assertion.",
+        "limits": [
+          "fresh synthetic default-path profile, not existing-profile upgrade",
+          "no ordinary OS account",
+          "native drag unconfirmed",
+          "machine network not disconnected"
+        ],
+        "probeFailure": "Initial uninstall path probe incorrectly included /currentuser in filename; Test-Path rejected before uninstall. Corrected quoted command parsing and rerun exit 0."
+      },
+      "review": {
+        "skill": "open-code-review-delegate",
+        "externalModel": false,
+        "total_files": 3,
+        "reviewed_files": 3,
+        "skipped_files": 0,
+        "coverage_rate": 1,
+        "unresolvedFindings": [],
+        "checks": [
+          "7 evidence hashes and JSON readback PASS",
+          "docs:check 204 Markdown PASS",
+          "git diff --check PASS"
+        ],
+        "scope": "OCR JSON plus both default-excluded Markdown files; evidence attribution, cleanup, limitations and Git state"
+      }
+    }
+  },
+  "limits": [
+    "WSL backend, native Windows contract-double tests, Mac actual-stack tests and Windows-to-WSL native partial acceptance are distinct evidence layers.",
+    "Synthetic approval transport does not prove actual Feishu tenant integration.",
+    "Reviewed test fixes and prior evidence committed locally as ecb6e03; default-shortcut followup and remaining-work preparation are documented in plan sections 0.41–0.42. Product baseline remains be1383a. No external-model review, push, PR, merge or deployment."
+  ],
+  "cleanup": {
+    "status": "CONFIRMED",
+    "ownedRootRemoved": true,
+    "allOwnedUnitsMainPidZero": true,
+    "allOwnedControlGroupsEmpty": true,
+    "sourceFilesVerifiedAfterTests": 1151,
+    "mismatch": [],
+    "logSha256": "40c7a821362c7fe41bfddcaffbb34084fad1ae4483d96dbae4639094327f1580",
+    "downloadedLogsMatchRemoteBeforeRemoval": true,
+    "failedUnitMetadata": "Historical failed-unit status may remain in systemd; no live processes or temporary source/tool/cache/database directories remain."
+  },
+  "review": {
+    "skill": "open-code-review-delegate",
+    "mode": "workspace",
+    "externalModel": false,
+    "total_files": 2,
+    "reviewed_files": 2,
+    "skipped_files": 0,
+    "coverage_rate": 1,
+    "supplemental_reviewed_files": 5,
+    "all_changed_files": 7,
+    "fixedFindings": [
+      {
+        "path": "apps/desktop/tests/e2e/content-intake-management.spec.ts",
+        "category": "test",
+        "severity": "medium",
+        "content": "Scoped status assertion to current candidate receipt; original quality, receipt and permission assertions retained."
+      },
+      {
+        "path": "apps/desktop/tests/support/owned-electron.ts",
+        "category": "test",
+        "severity": "medium",
+        "content": "Reused bounded test-owned Electron teardown; HTTP/profile cleanup guaranteed by outer finally."
+      }
+    ],
+    "unresolvedFindings": 0,
+    "scope": "This test/evidence slice only; prior full feature review reused for unchanged production content. No new full-branch or outside-model review claimed."
+  }
+}

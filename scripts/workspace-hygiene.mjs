@@ -35,7 +35,14 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // This budget covers source, tests, docs and checked-in assets only. Generated
 // packages and reinstallable dependencies are reported separately and are not
 // allowed to make the source budget fail.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 32 * 1024 * 1024;
+// Approved 2026-10-09: each retained input remains budgeted. A group cannot
+// borrow unused space from another group, even with a larger aggregate override.
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 45 * 1024 * 1024;
+export const SOURCE_BUDGET_GROUPS = Object.freeze([
+  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 16 * 1024 * 1024 }),
+  Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 18.5 * 1024 * 1024 }),
+]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
   'release/local-unsigned',
@@ -99,6 +106,9 @@ const INVENTORY_CATEGORIES = Object.freeze([
   { key: 'dependencies', label: 'reinstallable dependencies', path: 'node_modules' },
   { key: 'api-dependencies', label: 'API package dependency links', path: 'apps/api/node_modules' },
   { key: 'database-dependencies', label: 'database package dependency links', path: 'packages/database/node_modules' },
+  { key: 'contracts-dependencies', label: 'contracts package dependency links', path: 'packages/contracts/node_modules' },
+  { key: 'content-intake-dependencies', label: 'content-intake package dependency links', path: 'packages/content-intake/node_modules' },
+  { key: 'retrieval-core-dependencies', label: 'retrieval-core package dependency links', path: 'packages/retrieval-core/node_modules' },
   { key: 'desktop-dependencies', label: 'desktop package dependency links', path: 'apps/desktop/node_modules' },
   { key: 'git', label: 'Git history and metadata', path: '.git' },
   { key: 'local-reference', label: 'user-owned ignored reference', path: 'clawd-on-desk-0.15.0.zip' },
@@ -107,6 +117,17 @@ const INVENTORY_CATEGORIES = Object.freeze([
   { key: 'api-build-output', label: 'rebuildable API output', path: 'apps/api/dist' },
   { key: 'search-decision-lab-generated', label: 'rebuildable search-decision lab copy', path: 'apps/api/experiments/search-decision/.generated' },
   { key: 'database-build-output', label: 'rebuildable database output', path: 'packages/database/dist' },
+  { key: 'contracts-build-output', label: 'rebuildable contracts output', path: 'packages/contracts/dist' },
+  { key: 'content-intake-build-output', label: 'rebuildable content-intake output', path: 'packages/content-intake/dist' },
+  { key: 'retrieval-core-build-output', label: 'rebuildable retrieval-core output', path: 'packages/retrieval-core/dist' },
+  // Only the exact derived icon files are excluded. Canonical assets, build
+  // configuration, checked-in generated source and frozen evidence still count.
+  { key: 'derived-icon-png', label: 'rebuildable packaging icon', path: 'apps/desktop/build/icon.png' },
+  { key: 'derived-icon-ico', label: 'rebuildable packaging icon', path: 'apps/desktop/build/icon.ico' },
+  { key: 'derived-icon-icns', label: 'rebuildable packaging icon', path: 'apps/desktop/build/icon.icns' },
+  { key: 'legacy-derived-icon-png', label: 'pre-move rebuildable packaging icon', path: 'build/icon.png' },
+  { key: 'legacy-derived-icon-ico', label: 'pre-move rebuildable packaging icon', path: 'build/icon.ico' },
+  { key: 'legacy-derived-icon-icns', label: 'pre-move rebuildable packaging icon', path: 'build/icon.icns' },
   { key: 'build-output', label: 'rebuildable renderer/main output', path: 'apps/desktop/out' },
   { key: 'test-output', label: 'temporary test output', path: 'apps/desktop/test-results' },
   { key: 'playwright-output', label: 'temporary Playwright report', path: 'apps/desktop/playwright-report' },
@@ -492,12 +513,23 @@ export function workspaceInventory(projectRoot) {
     ...category,
     bytes: measureAllocatedBytes(path.join(resolvedRoot, category.path), seen),
   }));
-  let remainderBytes = 0;
+  // These are budgeted groups, not exclusions. Use the same inode set as the
+  // whole inventory so hard links and rebuildable output are counted once.
+  const sourceBudgetGroups = SOURCE_BUDGET_GROUPS.filter((group) => group.path).map((group) => ({
+    ...group,
+    // Entering a nested group directly must not follow an ancestor symlink.
+    // Leave that link for the original root traversal to count without following.
+    bytes: workspaceDirectoryStatus(resolvedRoot, path.posix.dirname(group.path)) === 'safe'
+      ? measureAllocatedBytes(path.join(resolvedRoot, group.path), seen) : 0,
+  }));
+  let sourceInputBytes = 0;
   for (const entry of readdirSync(resolvedRoot)) {
     if (!claimedTopLevel.has(entry)) {
-      remainderBytes += measureAllocatedBytes(path.join(resolvedRoot, entry), seen);
+      sourceInputBytes += measureAllocatedBytes(path.join(resolvedRoot, entry), seen);
     }
   }
+  sourceBudgetGroups.push({ ...SOURCE_BUDGET_GROUPS.at(-1), bytes: sourceInputBytes });
+  const remainderBytes = sourceBudgetGroups.reduce((sum, group) => sum + group.bytes, 0);
   categories.push({
     key: 'workspace-remainder',
     label: 'source, tests, docs, assets and small build inputs',
@@ -509,6 +541,7 @@ export function workspaceInventory(projectRoot) {
     root: resolvedRoot,
     totalBytes: categories.reduce((sum, category) => sum + category.bytes, 0),
     categories,
+    sourceBudgetGroups,
   };
 }
 
@@ -531,6 +564,9 @@ export function checkWorkspaceBudget(
         budgetBytes: remainderBudgetBytes,
       }]
     : [];
+  violations.push(...inventory.sourceBudgetGroups
+    .filter((group) => group.bytes > group.budgetBytes)
+    .map(({ key, bytes, budgetBytes }) => ({ key, bytes, budgetBytes })));
   return {
     ...inventory,
     remainderBytes,
@@ -644,6 +680,9 @@ function runCli() {
       + `(remainder ${formatBytes(result.remainderBytes)} / `
       + `${formatBytes(result.remainderBudgetBytes)})`,
     );
+    for (const group of result.sourceBudgetGroups) {
+      console.log(`${group.key}: ${formatBytes(group.bytes)} / ${formatBytes(group.budgetBytes)}`);
+    }
     if (!result.pass) {
       for (const violation of result.violations) {
         console.error(

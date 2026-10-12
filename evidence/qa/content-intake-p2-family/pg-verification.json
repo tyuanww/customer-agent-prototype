@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-10-07T21:04:02.631764+00:00",
+  "changedInputs": [],
+  "inputManifestSha256": "5adc02559a2e91e4ae172a059dfb589944add3a7254ca2f37f3c13e3f23c592f",
+  "logSha256": "43976074a8a585225334a9a0c7b40bc3a86af934b26c6483426b6b1f7010b345",
+  "passed": 40,
+  "filteredOut": 136,
+  "durationSeconds": 73.1,
+  "maximum5000RowMilliseconds": 6870
+}

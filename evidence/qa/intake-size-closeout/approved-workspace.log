@@ -1,0 +1,6 @@
+$ node scripts/workspace-hygiene.mjs check
+Workspace source budget: PASS (remainder 38.2 MiB / 45.0 MiB)
+frozen-contracts: 12.8 MiB / 15.0 MiB
+frozen-evidence: 8.71 MiB / 10.0 MiB
+source-inputs: 16.7 MiB / 20.0 MiB
+Workspace root policy: PASS

@@ -1,0 +1,17 @@
+{
+  "name": "@customer-agent/content-intake",
+  "private": true,
+  "type": "module",
+  "description": "Versioned standard FAQ workbook parsing and bounded process runner; synthetic P1/P2 development",
+  "exports": { ".": { "types": "./dist/workbook.d.ts", "import": "./dist/workbook.js" }, "./runner": { "types": "./dist/runner.d.ts", "import": "./dist/runner.js" } },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test:built": "vitest run",
+    "test": "pnpm build && pnpm test:built",
+    "probe": "pnpm build && node scripts/probe.mjs"
+  },
+  "dependencies": { "csv-parse": "7.0.3", "exceljs": "4.4.0", "yauzl": "3.4.0", "saxes": "6.0.0" },
+  "devDependencies": { "@types/node": "24.13.3", "@types/yauzl": "2.10.3", "jszip": "3.10.1", "typescript": "5.9.2", "vitest": "3.2.7" }
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "customer-agent-repair-successor-approval/v1",
+  "decisionDate": "2026-10-12",
+  "status": "APPROVED",
+  "versions": {
+    "openapi": "1.24.0",
+    "schema": "1.28",
+    "migration": "0040",
+    "exportProfile": "content-intake-repair-successor-v1"
+  },
+  "freezeApproved": true,
+  "exportApproved": true,
+  "intakeApproved": true,
+  "gitCommitAuthorized": false,
+  "productionConsumerReady": false,
+  "runtimeActivated": false,
+  "syntheticOnly": true,
+  "artifacts": {
+    "openapi.candidate.json": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+    "schema.candidate.sql": "c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69",
+    "upgrade.candidate.sql": "a0e2e9d04a44bc78a2ab77b14ebf35f3bca4e2b9427d328405bd9ca141795b8f",
+    "installation.candidate.json": "adac07c832853c64ac273762138ebdb3b998259607e13a4345eafdb5bd3abe9f",
+    "manifest.json": "08f1e5149ab5f4a4fbcd9e7ad062428adcedb4b96d1c4bb2e9e2976d4a2f27f2",
+    "predecessor-lock.json": "0e33365085437efa1c2bf899ca87c7cef68147848edc8a3f9e42d6d3b2c8caf2"
+  },
+  "scope": "Exact candidate bytes approved in current user conversation. Freeze/export/versioned product intake and synthetic verification; no Git commit/push/PR/deploy, real data or production activation. Embedded DRAFT metadata is preserved immutable source, not a missing approval."
+}

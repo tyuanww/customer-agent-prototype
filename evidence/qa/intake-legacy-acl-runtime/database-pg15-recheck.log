@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ✓ tests/postgres.integration.test.ts (49 tests | 48 skipped) 1098ms
+   ✓ PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op  1098ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 48 skipped (49)
+   Start at  01:03:43
+   Duration  1.55s (transform 203ms, setup 0ms, collect 245ms, tests 1.10s, environment 0ms, prepare 51ms)
+

@@ -1,0 +1,16 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop
+
+ ✓ tests/unit/customer-agent-contract-set.test.ts (87 tests) 10867ms
+   ✓ CSV v3 bundle intake preparation > consumes all fourteen immutable artifacts without activating CSV or installing SQL  367ms
+   ✓ CSV v3 bundle intake preparation > checks declared-SHA CSV history and refuses downgraded sources even after deletion; shallow=false  348ms
+   ✓ legacy check v4 complete bundle intake > consumes all sixteen files and exposes all thirteen immutable runtime inputs  315ms
+   ✓ legacy check v4 complete bundle intake > rejects bad-acl declared-source approval  359ms
+   ✓ legacy check v4 complete bundle intake > preserves valid v3 history but rejects later downgraded sources after approval deletion; shallow=false  570ms
+   ✓ legacy check v4 complete bundle intake > preserves valid v3 history but rejects later downgraded sources after approval deletion; shallow=true  487ms
+
+ Test Files  1 passed (1)
+      Tests  87 passed (87)
+   Start at  00:57:23
+   Duration  11.30s (transform 42ms, setup 102ms, collect 29ms, tests 10.87s, environment 195ms, prepare 33ms)
+

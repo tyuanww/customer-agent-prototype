@@ -1,0 +1,11 @@
+{
+  "original": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+  "original_sha256": "1f72d14ac95ea0dc0addc98b4c3a6f861ec71ede0e5b43e6f8a28556eb2ceb08",
+  "temporary_spec": "apps/desktop/tests/e2e/content-intake-packaged-compact-20261009.spec.ts",
+  "temporary_spec_sha256": "5212bb4c59d9a7e6931a30b73617bf5eecc912b5f7388dc739573e72ef3b6aa7",
+  "only_change": {
+    "from": "await resizeDashboard(1180, 760);",
+    "to": "await resizeDashboard(1180, 680);"
+  },
+  "reason": "Current macOS display bounds 960x600, workArea 960x485; native height 760 clamps to 680. Original acceptance failed and is retained. This scoped run cannot certify default 1180x760."
+}

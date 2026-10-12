@@ -1,0 +1,29 @@
+{
+  "observationCapture": "002",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake-usage-http.test.ts"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-usage-http.test.ts (15 tests) 64ms\n\n Test Files  1 passed (1)\n      Tests  15 passed (15)\n   Start at  23:18:40\n   Duration  406ms (transform 90ms, setup 0ms, collect 177ms, tests 64ms, environment 0ms, prepare 41ms)\n\n",
+  "hypothesis": "Diagnostic failures now preserve IntakeError; repeat the published-material HTTP journey after the handler and test-host cleanup repairs, checking the downstream desktop result.",
+  "nextCapture": "003",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "Main consumes actual synthetic HTTP"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "apps/api/experiments/intake-organization/http-transport.ts": "3edbb3d8e2958801ca5ef93868b70c10d7ea03f5b48c40a6ac54e741949d5e9d",
+  "apps/api/experiments/intake-organization/synthetic-contact-double.ts": "e77afd0489dd390f5e0089ac87f3b64de14d6e1a3f95aaea510158fcde12fb97",
+  "apps/api/experiments/intake-organization/transport-consumer.integration.test.ts": "e84062bb1ef4811b6893d89162f2c20b5f2d66a27220dd11a21871930caa5169",
+  "apps/api/experiments/intake-organization/transport.test.ts": "e2faa1eba54e68b1723e4ca5d1fc6b6abb44efebd3b1522332caae95e194a082",
+  "apps/api/experiments/intake-runtime/INTEGRATION.md": "6b8ed749395e572777472608d31f15f8c90cb124b2aeb927914a09ac5d91fd5b",
+  "apps/api/experiments/intake-runtime/PURPOSE-ACL.md": "fc68c42b9eed5e1939e7612e2e0e1a384e58d21b3bad965121db5f0eefd70217",
+  "apps/api/experiments/intake-runtime/assembly.ts": "5bcbee7b86451fae4b73f56d237db1806d4a9d246d62810bf50f8779921d443c",
+  "apps/api/experiments/intake-runtime/purpose-acl.sql": "4bb27efc556c9931b70386c29982db68dd2ee9e050feccc1dd6772a160fae23c",
+  "apps/api/experiments/intake-runtime/purpose-boundary.ts": "40480ac845a676e47319ed36e3253db7ee23f2719a0f1cccbdf416e7c37c6352",
+  "apps/api/package.json": "03c0657edb76826d2efb99c6e5ad8ef10e5535e72a8f078f493975219056b2a9",
+  "apps/api/tests/intake-runtime-assembly.integration.test.ts": "15d3148ff3fe4bc8dd0b032687a37d06d056d2ed982ad9b6df0d1d594e02205d",
+  "apps/api/tests/intake-runtime-assembly.test.ts": "ba0015ea6bd0ae1186854974860da337336bb175559b555db9b83208cfaef690",
+  "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78",
+  "apps/api/tsconfig.build.json": "9072c6cfb121e8ea0cf1d68a261522dd964b54b9e5fb69e8a8ca3c35afea5e1f"
+}

@@ -1,0 +1,9 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api
+
+----------------------------------------------------------··············---------------------------------------------------------------------------------------
+
+ Test Files  1 passed (1)
+      Tests  14 passed | 145 skipped (159)
+   Start at  04:05:48
+   Duration  23.67s (transform 277ms, setup 0ms, collect 554ms, tests 22.92s, environment 0ms, prepare 51ms)

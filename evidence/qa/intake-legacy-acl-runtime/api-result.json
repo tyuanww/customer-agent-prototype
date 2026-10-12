@@ -1,0 +1,55 @@
+{
+  "started_at": "2026-10-08T17:02:03.897338+00:00",
+  "command": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "tests/intake-runtime-consumers.integration.test.ts",
+    "--no-file-parallelism",
+    "-t",
+    "copies all eight legacy|publication rejects|legacy history: mixed direct|actual service on formal purpose roles"
+  ],
+  "environment": {
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION": "1"
+  },
+  "inputs": {
+    "apps/api/tests/content-intake.integration.test.ts": "73ee6fca3d63f37944cea1779a03881c5ea8f3b6faffb70b6d586d635f23f382",
+    "apps/api/tests/intake-runtime-consumers.integration.test.ts": "456c42376b9ac5f8d44aaee26ea1a1bffc678757f272a2916777134bbfe0befa",
+    "packages/database/migrations/0035_intake_legacy_check_acl_v1_25.sql": "01a674d1f5a996a511babf193c28c217ec91a72a3f974922e9580cf2bcdabda7",
+    "packages/database/dist/generated/migrations.generated.js": "c3f4257ef94a25e384e5eb216c0eed6a7ee071bb5b0f9ca81098265d448cc24f",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "5de9d834517b02d3dc2e73d9a1cb7bf44099417a79125604733e6fdc326dd59d"
+  },
+  "exit_code": 0,
+  "finished_at": "2026-10-08T17:02:46.668315+00:00",
+  "log_sha256": "babb864f8b2f20c190999e691b395a1507310adee403e54b93ad8fcb05ff8828",
+  "checks": {
+    "pg": {
+      "exit_code": 0,
+      "files_passed": 2,
+      "tests_passed": 31,
+      "tests_skipped": 137,
+      "seconds": 42.28
+    },
+    "eslint": {
+      "exit_code": 0,
+      "log": "eslint.log"
+    },
+    "typecheck": {
+      "exit_code": 0,
+      "log": "typecheck.log"
+    },
+    "diff_check": {
+      "exit_code": 0
+    },
+    "inputs_unchanged_after_checks": true
+  },
+  "files": {
+    "pg-regressions.log": "babb864f8b2f20c190999e691b395a1507310adee403e54b93ad8fcb05ff8828",
+    "eslint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

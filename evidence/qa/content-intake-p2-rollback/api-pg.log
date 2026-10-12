@@ -1,0 +1,27 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api
+
+····stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > quality HTTP rejects raw and PostgreSQL byte excess atomically, then accepts all 5000 critical checks
+{"probe":"quality-http-capacity","samples":5000,"httpBytes":8375220,"pgBytes":8415000,"limit":8388608,"rowsCommitted":5000}
+
+··stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > workflow HTTP publishes the uploaded material after real evidence gates and a second seat consumes that release
+{"probe":"workflow-http-second-seat","source":"uploaded-synthetic-xlsx","releaseId":"rel_2","faqRows":3,"multilinePreserved":true,"qualityTransport":"Main-ProductSession-HTTP","approvalTransport":"synthetic"}
+
+················stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS
+{"probe":"management-report-consumer","artifactBytes":6614,"sha256":"72f0df7d23eede2e821f610705361c9dfff1e0b13b3b81c4f6314a5d53e2b227","issueRows":1,"consumer":"ExcelJS","wholeBatchBlocked":true}
+
+·····················stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > principals: 100 maximum Unicode labels survive standard HTTP JSON, keyset scans are bounded and use ASCII order
+{"probe":"principals-capacity","items":108,"firstPageBytes":126473,"cursorLength":346,"scans":[{"limit":101,"count":101},{"limit":101,"count":8}]}
+
+·············stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > discovery: folds 5000 overlapping grants without changing effective authority or exceeding the SQL deadline
+{"probe":"discovery-overlap","additionalGrants":5000,"elapsedMs":21}
+
+·stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires
+{"probe":"discovery-capacity","sources":5000,"pages":150,"elapsedMs":29499}
+
+·····································································································
+
+ Test Files  1 passed (1)
+      Tests  158 passed (158)
+   Start at  04:04:43
+   Duration  244.00s (transform 244ms, setup 0ms, collect 536ms, tests 243.29s, environment 0ms, prepare 52ms)

@@ -1,0 +1,65 @@
+{
+  "schema": "content-intake-csv-protocol/v1",
+  "status": "DRAFT",
+  "freezeApproved": false,
+  "exportApproved": false,
+  "runtimeActivated": false,
+  "templateVersion": "faq-csv-v1",
+  "ruleVersion": "intake-csv-v1",
+  "mappingVersion": "faq-csv-columns-v1",
+  "mime": "text/csv",
+  "selectedSheets": [
+    "CSV"
+  ],
+  "headers": [
+    "sourceId",
+    "templateVersion",
+    "brandId",
+    "scope",
+    "domain",
+    "条目编号",
+    "标题",
+    "标准话术",
+    "商品编号",
+    "场景编号",
+    "分类",
+    "适用说明",
+    "状态",
+    "生效时间",
+    "失效时间",
+    "对应通用条目",
+    "内部说明",
+    "风险提示",
+    "附件说明",
+    "品牌不可覆盖",
+    "问法编号",
+    "问法",
+    "问法状态"
+  ],
+  "structureDigestAlgorithm": "SHA-256(UTF-8(JSON.stringify(headers)))",
+  "structureDigest": "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165",
+  "budgets": {
+    "fileBytes": 10485760,
+    "records": 5000,
+    "normalizedFaqPlusQuestions": 5000,
+    "cellCharacters": 32767,
+    "normalizedTextCharacters": 3000000,
+    "cells": 200000
+  },
+  "frozenPredecessor": {
+    "openapi.v1.21.yaml": "bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7",
+    "schema.v1.23.sql": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e"
+  },
+  "characterUnit": "UTF-16 code units",
+  "budgetAccounting": {
+    "recordsIncludeHeader": false,
+    "cellsIncludeHeader": true,
+    "textIncludesHeaderAndRepeatedFields": true
+  },
+  "recordDelimiters": [
+    "CRLF",
+    "LF",
+    "CR"
+  ],
+  "encoding": "strict UTF-8; optional leading BOM"
+}

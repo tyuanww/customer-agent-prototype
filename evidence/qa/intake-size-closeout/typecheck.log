@@ -1,0 +1,31 @@
+$ tsc --noEmit
+../api/src/content-intake/input-format.ts(2,67): error TS2307: Cannot find module '@customer-agent/content-intake' or its corresponding type declarations.
+../api/src/content-intake/material.ts(3,56): error TS2307: Cannot find module '@customer-agent/content-intake' or its corresponding type declarations.
+../api/src/content-intake/material.ts(78,45): error TS7006: Parameter 'q' implicitly has an 'any' type.
+../api/tests/support/intake-synthetic-host.ts(9,73): error TS2307: Cannot find module '@customer-agent/content-intake' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(13,59): error TS2307: Cannot find module '../../dist/product-auth-service.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(14,43): error TS2307: Cannot find module '../../dist/product-auth-routes.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(15,36): error TS2307: Cannot find module '../../dist/auth-routes.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(16,44): error TS2307: Cannot find module '../../dist/auth-service.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(17,42): error TS2307: Cannot find module '../../dist/content-object-store.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(18,44): error TS2307: Cannot find module '../../dist/content-intake/service.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(19,47): error TS2307: Cannot find module '../../dist/content-intake/management-http.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(20,42): error TS2307: Cannot find module '../../dist/content-intake/usage-http.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(21,50): error TS2307: Cannot find module '../../dist/content-intake/transaction.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(22,65): error TS2307: Cannot find module '../../dist/content-intake/runtime-pool.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(23,53): error TS2307: Cannot find module '../../dist/content-intake/organization/registered-refresh.js' or its corresponding type declarations.
+../api/tests/support/intake-synthetic-host.ts(169,21): error TS7006: Parameter 'state' implicitly has an 'any' type.
+../api/tests/support/intake-synthetic-host.ts(170,23): error TS7006: Parameter 'code' implicitly has an 'any' type.
+../api/tests/support/intake-synthetic-host.ts(184,120): error TS18046: 'error' is of type 'unknown'.
+../api/tests/support/intake-synthetic-host.ts(188,27): error TS7031: Binding element 'tenantId' implicitly has an 'any' type.
+../api/tests/support/intake-synthetic-host.ts(188,37): error TS7031: Binding element 'appId' implicitly has an 'any' type.
+../api/tests/support/intake-synthetic-host.ts(188,44): error TS7031: Binding element 'principalId' implicitly has an 'any' type.
+../api/tests/support/intake-synthetic-seed.ts(3,101): error TS2307: Cannot find module '@customer-agent/content-intake' or its corresponding type declarations.
+tests/e2e/content-intake-rollback-real-stack.spec.ts(13,48): error TS2307: Cannot find module '../../../../packages/contracts/dist/index.js' or its corresponding type declarations.
+tests/e2e/content-intake-rollback-real-stack.spec.ts(53,33): error TS7006: Parameter 'row' implicitly has an 'any' type.
+tests/e2e/content-intake-workspace-real-stack.spec.ts(13,50): error TS2307: Cannot find module '../../../../packages/contracts/dist/index.js' or its corresponding type declarations.
+tests/e2e/content-intake-workspace-real-stack.spec.ts(41,35): error TS7006: Parameter 'row' implicitly has an 'any' type.
+../../packages/content-intake/tests/fixtures.ts(2,69): error TS2307: Cannot find module '@customer-agent/content-intake' or its corresponding type declarations.
+/Users/hutou/.codex/worktrees/intake-size-closeout/customer-agent-prototype/apps/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @customer-agent/desktop@0.3.26 typecheck: `tsc --noEmit`
+Exit status 2

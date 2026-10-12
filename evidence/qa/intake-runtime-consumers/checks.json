@@ -1,0 +1,63 @@
+{
+  "base": "4eea8ea0d5f7c9ad20cc3254577c6ca237610810",
+  "integrationDependencyCheckout": "ddd1b4e5a269c63e04f2f5e91bb9f5c09dc93b5f",
+  "version": "0.3.26",
+  "inputs": {
+    "apps/api/src/content-intake/service.ts": "5741b3c5982714f5703506868da0682bc7e2764c53a82c56440ad1e267895ea3",
+    "apps/api/src/content-intake/capacity.ts": "8c6c8815e0315509f2ced03ca8a0962cfc3da6e4773259ff298ee823dbd8d160",
+    "apps/api/src/content-intake/transaction.ts": "8464bc5dcb0b7cb4d025940b2d6f505fe58bf369bb82f34385963f2ed4a1436e",
+    "apps/api/experiments/intake-runtime/consumer-acl.sql": "90a2f756fb4bdba374b6060d823cc4896003294bce83895f48924bd29adb81cd",
+    "apps/api/experiments/intake-runtime/consumer-pool.ts": "4b9fc861231fe3bb83369298666c5008d6e69ff674c32e0e1cc3a6ee45c44799",
+    "apps/api/experiments/intake-runtime/purpose-acl.sql": "4bb27efc556c9931b70386c29982db68dd2ee9e050feccc1dd6772a160fae23c",
+    "apps/api/experiments/intake-runtime/session-lock.sql": "4e8928fd8bc2efd2e8ec45d2fc3d08e000fa82373f6c237a9472d3fc549efca1",
+    "apps/api/tests/intake-runtime-consumer-pool.test.ts": "080c82a111596dddbeb16029866dc0933f7b9d58732811b06cb53e8b59cfa397",
+    "apps/api/tests/intake-runtime-consumers.integration.test.ts": "7365205af5076faa946e5ee4fe3c1a2ad8e7e6564a0bbf7636eb653982e2f462",
+    "apps/api/tests/content-intake.integration.test.ts": "1422d3d6487fd7c73cf61383523ffc13e83ce529f45e8498081cd24deac7056e",
+    "apps/api/tests/support/intake-synthetic-seed.ts": "edc6e42ea472dc3d7c0f51bae9a6d44e8acba7bc972126e3ab0ae590e9600f47",
+    "apps/api/tests/support/intake-synthetic-host.ts": "13649a4ffa7ede3144ad379315f62d40c6e5963e31119ad592a8d41f3feb8b8c",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78"
+  },
+  "logs": {
+    "consumer.log": "246fbeb4c2cd7fd8f6ee23a9fd005d2b0e8b39a9a7dab407aef19fa2189657ba",
+    "capacity-before-fix.log": "865dd357b8ba4420fd39d986c42f9e0f92b282a29fcc10c643f8bacc2a303b3c",
+    "default-path-first.log": "89a42e2743cde99aa8666fcd782922e6a25a87394ccd78f11e0abd78f1340a9d",
+    "default-path-cli.log": "16d7ec835a45a1613b9697b437dd6525059d3d3718d541b85ee6e7ffd37e3758",
+    "deadline.log": "8a4b571b199a0aba72f95c2f7b0070ee7fe9ba5fc80757984285e106cd8d21b9",
+    "lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "results": {
+    "consumer": {
+      "exitCode": 0,
+      "passed": 13
+    },
+    "deadlineSupplement": {
+      "exitCode": 0,
+      "passed": 1
+    },
+    "capacityBeforeFix": {
+      "exitCode": 1,
+      "failed": 1
+    },
+    "defaultPathFirst": {
+      "exitCode": 1,
+      "passed": 7,
+      "failed": 1,
+      "failure": "cwd-relative CLI path"
+    },
+    "defaultPathCliCorrectCwd": {
+      "exitCode": 0,
+      "passed": 1
+    },
+    "lint": {
+      "exitCode": 0
+    },
+    "typecheck": {
+      "exitCode": 0
+    },
+    "apiBuild": {
+      "exitCode": 0
+    }
+  }
+}

@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-capacity/customer-agent-prototype/packages/database
+
+ ✓ tests/postgres.integration.test.ts (34 tests | 33 skipped) 875ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the exact 28-row prefix with only the private capacity ledger and no application access  874ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 33 skipped (34)
+   Start at  10:52:51
+   Duration  1.27s (transform 167ms, setup 0ms, collect 202ms, tests 875ms, environment 0ms, prepare 54ms)

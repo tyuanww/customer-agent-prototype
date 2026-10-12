@@ -40,6 +40,12 @@ const NON_VALIDATION_SCHEMA_KEYS = new Set([
   'xml',
 ]);
 const VALIDATION_EXTENSION_SCHEMA_KEYS = new Set(['x-unique-by']);
+const SCHEMA_MAP_KEYS = new Set(['properties', 'patternProperties', '$defs', 'dependentSchemas']);
+const SCHEMA_ARRAY_KEYS = new Set(['allOf', 'anyOf', 'oneOf', 'prefixItems']);
+const SUBSCHEMA_KEYS = new Set([
+  'items', 'contains', 'not', 'if', 'then', 'else', 'propertyNames',
+  'additionalProperties', 'unevaluatedProperties', 'unevaluatedItems', 'contentSchema',
+]);
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -115,8 +121,22 @@ export function toRuntimeSchema(value) {
       } else {
         transformed[key] = requireString(child, key);
       }
-    } else {
+    } else if (SCHEMA_MAP_KEYS.has(key)) {
+      // Dictionary keys are business field names, even when named "required",
+      // "description" or "x-*". Only their values are schema nodes.
+      const schemas = Object.create(null);
+      for (const [name, schema] of Object.entries(requireRecord(child, key))) {
+        schemas[name] = toRuntimeSchema(schema);
+      }
+      transformed[key] = schemas;
+    } else if (SCHEMA_ARRAY_KEYS.has(key)) {
+      if (!Array.isArray(child)) throw new Error(`${key} must be a schema array`);
+      transformed[key] = child.map(toRuntimeSchema);
+    } else if (SUBSCHEMA_KEYS.has(key)) {
       transformed[key] = toRuntimeSchema(child);
+    } else {
+      // const/enum/default and other literal values are data, not schemas.
+      transformed[key] = child;
     }
   }
 
@@ -177,7 +197,8 @@ function artifactDescriptor(relativePath, content) {
 }
 
 async function buildGeneratedArtifactsFromSnapshot(snapshot) {
-  const { lock, manifest, openapi_source: source } = snapshot;
+  const effectiveSnapshot = snapshot.readiness ?? snapshot.repair ?? snapshot;
+  const { lock, manifest, openapi_source: source } = effectiveSnapshot;
   const openapiDescriptor = requireRecord(manifest.openapi, 'OpenAPI descriptor');
   const databaseDescriptor = requireRecord(manifest.database, 'Database descriptor');
   const openapiDocument = parse(source, { maxAliasCount: 0 });
@@ -228,15 +249,15 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
   };
   const provenanceValue = {
     schema: CODEGEN_SCHEMA,
-    contract_set_id: snapshot.contract_set_id,
+    contract_set_id: effectiveSnapshot.contract_set_id,
     source_repository: lock.source_repository,
-    source_git_sha: snapshot.source_git_sha,
+    source_git_sha: effectiveSnapshot.source_git_sha,
     manifest_sha256: lock.manifest_sha256,
     openapi_version: contractVersion,
     openapi_sha256: lock.openapi_sha256,
     database_version: databaseDescriptor.version,
     database_sha256: lock.database_sha256,
-    intake_status: snapshot.intake_status,
+    intake_status: effectiveSnapshot.intake_status,
     runtime_activated: false,
     runtime_schema_dialect: RUNTIME_SCHEMA_DIALECT,
     component_schema_count: schemaNames.length,
@@ -259,7 +280,7 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
   }, null, 2)}\n`;
 
   return Object.freeze({
-    contract_set_id: snapshot.contract_set_id,
+    contract_set_id: effectiveSnapshot.contract_set_id,
     runtime_activated: false,
     schema_count: schemaNames.length,
     files: new Map([

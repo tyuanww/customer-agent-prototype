@@ -1,0 +1,26 @@
+{
+  "observationCapture": "002",
+  "observationArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "discovery:|usage: Main"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (92 tests | 86 skipped) 8535ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants  993ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation  890ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: signs paging to a live session, route, complete projection and service lifetime  882ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: handles zero scope, conflicting role, expired facts and strict query shapes without inventing access  839ms\n   ✓ P2 sealed synthetic authority and durable candidates > discovery: pages more than 100 authorized sources with no loss and rejects a logged-out cursor  877ms\n   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  4055ms\n\n Test Files  1 passed (1)\n      Tests  6 passed | 86 skipped (92)\n   Start at  23:57:49\n   Duration  9.18s (transform 232ms, setup 0ms, collect 490ms, tests 8.54s, environment 0ms, prepare 46ms)\n\n",
+  "hypothesis": "The append-only discovery index must preserve all historical ledgers and ACL; revalidate the actual PG15 migration gate including a 25-to-26 upgrade and index drift.",
+  "nextCapture": "003",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "pnpm",
+    "test:db:integration"
+  ]
+}

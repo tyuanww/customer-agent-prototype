@@ -1,0 +1,13 @@
+
+Running 2 tests using 1 worker
+
+(node:16306) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"status":"OWNED_RESOURCES","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-gpkmBt","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-Bqr0j8"}
+{"status":"PASS","electron":"darwin","api":"actual","postgres":15,"nativeDialog":"owned-path-selection-only","upload":"actual-multipart","issueReport":"saved-and-read-with-exceljs","approval":"manual-synthetic-transport","revision":"same-id-v2-fresh-evidence","cancellation":"server-confirmed-live-release-unchanged","ordinarySeat":true,"releaseId":"rel_2","screenshots":"<worktree>/.gstack/intake-synthetic/2026-10-08T02-00-29-933Z"}
+{"status":"OWNED_RESOURCES_REMOVED","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-gpkmBt","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-Bqr0j8"}
+  ✓  1 tests/e2e/content-intake-real-stack.spec.ts:11:1 › native FAQ upload, revision and cancellation preserve the approved release consumed by an ordinary seat through real API/PG (21.3s)
+{"status":"PASS","flow":"rollback-review-publication-ordinary-seat","http":"actual","postgres":15,"target":"rel_2","base":"rel_3","newRelease":"rel_4","approval":"independent-manual-synthetic","screenshots":"<worktree>/.gstack/intake-synthetic/rollback-2026-10-08T02-00-50-561Z"}
+  ✓  2 tests/e2e/content-intake-rollback-real-stack.spec.ts:10:1 › independent rollback review creates a new release whose historical FAQ is consumed by another seat (6.4s)
+
+  2 passed (28.1s)

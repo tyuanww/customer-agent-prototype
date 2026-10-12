@@ -1,0 +1,38 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "usage: another agent",
+    "--reporter=dot"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n·----------------------------------------------------------------------------\n\n Test Files  1 passed (1)\n      Tests  1 passed | 76 skipped (77)\n   Start at  16:50:02\n   Duration  2.28s (transform 199ms, setup 0ms, collect 386ms, tests 1.71s, environment 0ms, prepare 43ms)\n\n",
+  "hypothesis": "Because the successful second-agent read proves the valid path, test revocation and vocabulary boundaries next to detect stale authority or missing page content.",
+  "nextCapture": "002",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "usage: (denies every page|pages within)",
+    "--reporter=dot"
+  ]
+}

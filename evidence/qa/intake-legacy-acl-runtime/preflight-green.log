@@ -1,0 +1,87 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ❯ tests/postgres.integration.test.ts (49 tests | 1 failed | 46 skipped) 2853ms
+   × PostgreSQL 15 immutable migration gate > appends only eight helper grants to the exact thirty-four-row ledger and preserves role attributes 981ms
+     → Migration 0035_intake_legacy_check_acl_v1_25 failed and was rolled back
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor owner LOGIN before granting any legacy helper capability  873ms
+   ↓ PostgreSQL 15 immutable migration gate > rejects predecessor owner member before granting any legacy helper capability
+   ↓ PostgreSQL 15 immutable migration gate > rejects predecessor ACL leakage before granting any legacy helper capability
+   ↓ PostgreSQL 15 immutable migration gate > rejects predecessor ACL missing before granting any legacy helper capability
+   ↓ PostgreSQL 15 immutable migration gate > rejects predecessor helper missing before granting any legacy helper capability
+   ↓ PostgreSQL 15 immutable migration gate > rejects predecessor function changed before granting any legacy helper capability
+   ↓ PostgreSQL 15 immutable migration gate > rejects predecessor CSV guard missing before granting any legacy helper capability
+   ✓ PostgreSQL 15 immutable migration gate > rolls newly granted helpers and ledger back if the same transaction fails the final verifier  999ms
+   ↓ PostgreSQL 15 immutable migration gate > appends CSV to the exact thirty-three-row ledger without changing historical SQL or role attributes
+   ↓ PostgreSQL 15 immutable migration gate > rolls CSV constraints and ledger back together when a later format function conflicts
+   ↓ PostgreSQL 15 immutable migration gate > appends the atomic runtime installation to the exact thirty-two-row ledger
+   ↓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for role-conflict
+   ↓ PostgreSQL 15 immutable migration gate > rolls the whole runtime installation back for missing-implementation
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the exact thirty-row ledger with only direct storage and runtime overlays
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the exact 28-row prefix with only the private capacity ledger and no application access
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the unchanged 27-row prefix and keeps family policy private
+   ↓ PostgreSQL 15 immutable migration gate > checks explicit roots and all three applicability dimensions on the complete catalog
+   ↓ PostgreSQL 15 immutable migration gate > validates 5000 entries with grouped expansion under a bounded PG budget
+   ↓ PostgreSQL 15 immutable migration gate > keeps fifty usage-page guard checks on 5000 unassociated rows within five seconds
+   ↓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint products under five seconds
+   ↓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint scenarios under five seconds
+   ↓ PostgreSQL 15 immutable migration gate > validates a dense 5000-entry family with disjoint half-open-time under five seconds
+   ↓ PostgreSQL 15 immutable migration gate > matches a fixed-seed pairwise applicability oracle across wildcard and interval-chain catalogs
+   ↓ PostgreSQL 15 immutable migration gate > installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'usage' ledger with the rollback and family overlays
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the existing 26-row 'quality' ledger with the rollback and family overlays
+   ↓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.12 ledger prefix through the immutable v1.13/v1.14 suffix
+   ↓ PostgreSQL 15 immutable migration gate > upgrades v1.16 with the deferred guard and ops-loop migrations and rejects privilege drift
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the shipped nineteen-migration prefix and keeps P2 storage sealed
+   ↓ PostgreSQL 15 immutable migration gate > appends discovery and rollback to the exact 25-row ledger and detects index drift
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints
+   ↓ PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed
+   ↓ PostgreSQL 15 immutable migration gate > appends sealed quality storage without rewriting the 22-row ledger or opening application access
+   ↓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=false
+   ↓ PostgreSQL 15 immutable migration gate > appends the fence to the exact 21-row ledger; predecessor drift=true
+   ↓ PostgreSQL 15 immutable migration gate > upgrades v1.17 with only the ops-loop migration
+   ↓ PostgreSQL 15 immutable migration gate > upgrades the exact v1.15 ledger with only the backend migration
+   ↓ PostgreSQL 15 immutable migration gate > upgrades v1.14 with only the atomic owner suffix and denies registrar/runtime privilege drift
+   ↓ PostgreSQL 15 immutable migration gate > upgrades an exact v1.13 ledger prefix with only the immutable v1.14 suffix
+   ↓ PostgreSQL 15 immutable migration gate > rolls back an interrupted synthetic backfill and safely retries the same migration id
+   ↓ PostgreSQL 15 immutable migration gate > keeps DDL and its immutable ledger row atomic when the ledger insert fails
+   ↓ PostgreSQL 15 immutable migration gate > reconciles an unknown COMMIT acknowledgement from the immutable ledger on a new session
+   ↓ PostgreSQL 15 immutable migration gate > serializes two independent fresh clients and applies the catalogue exactly once
+   ↓ PostgreSQL 15 immutable migration gate > rejects concurrent control-plane operations on the same client session
+   ↓ PostgreSQL 15 immutable migration gate > rejects ACL, function-security, trigger-mode, and policy-key drift by exact manifest
+   ↓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a table
+   ↓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a enum
+   ↓ PostgreSQL 15 immutable migration gate > refuses to adopt an untracked database containing a schema
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/postgres.integration.test.ts > PostgreSQL 15 immutable migration gate > appends only eight helper grants to the exact thirty-four-row ledger and preserves role attributes
+DatabaseMigrationError: Migration 0035_intake_legacy_check_acl_v1_25 failed and was rolled back
+ ❯ rollback src/runner.ts:129:9
+    127|   }
+    128|   const diagnostic = databaseDiagnostic(original);
+    129|   throw new DatabaseMigrationError(
+       |         ^
+    130|     'MIGRATION_APPLY_FAILED',
+    131|     `Migration ${migrationId} failed and was rolled back`,
+ ❯ applyMigrationCatalogue src/runner.ts:209:9
+ ❯ tests/postgres.integration.test.ts:158:15
+
+Caused by: DatabaseMigrationError: Database migration verification failed: exact database object/owner manifest [3090:209ec4049c094fe48dece5c39e877fbbc00d1383cd2969cfaedab2f38d3d47f4]
+ ❯ verifyCatalogueState src/verifier.ts:849:11
+ ❯ applyMigrationCatalogue src/runner.ts:207:33
+ ❯ tests/postgres.integration.test.ts:158:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'MIGRATION_VERIFY_FAILED', migrationId: undefined, databaseCode: undefined, databaseDetail: undefined }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed | 46 skipped (49)
+   Start at  00:58:33
+   Duration  3.35s (transform 210ms, setup 0ms, collect 257ms, tests 2.85s, environment 0ms, prepare 77ms)
+
+undefined
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/postgres.integration.test.ts -t 'predecessor owner LOGIN|appends only eight|same transaction fails'

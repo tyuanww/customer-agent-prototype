@@ -1,0 +1,360 @@
+{
+  "schema": "intake-ui-mac-package/v1",
+  "date": "2026-10-09",
+  "status": "PARTIAL",
+  "buildHead": "25c0bd55eb9c6fc6d86323a5a133a51f7258d93f",
+  "version": "0.3.26",
+  "environment": {
+    "macOS": "26.5.2",
+    "macOSBuild": "25F84",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "electron": "43.4.0",
+    "platform": "darwin-arm64",
+    "timezone": "Asia/Shanghai",
+    "dependencyInstall": false
+  },
+  "inputs": "inputs.json",
+  "verifiedInputs": 437,
+  "commands": [
+    {
+      "command": "pnpm package:mac:local",
+      "status": "completed-through-built-in-post-verification",
+      "exitCode": null,
+      "note": "Initial asynchronous command result did not retain its exit status. Raw output reaches macOS local unsigned package verification passed; a separate verifier command below exited0 and the actual artifact was consumed.",
+      "log": "package-build.log",
+      "sha256": "a524ab60e5e2955a0530a9ffe9de8337331e88b76a3e274559284a49aa5ea3a4"
+    },
+    {
+      "command": "node apps/desktop/scripts/verify-mac-package.mjs local",
+      "exitCode": 0,
+      "log": "package-verify.log",
+      "sha256": "bff80f64471c86b22c3b47545b5b5f51251599d7ed81592375c41bf7fd346a40"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-permissions-real-stack.spec.ts",
+        "tests/e2e/content-intake-workspace-real-stack.spec.ts",
+        "tests/e2e/content-intake-rollback-real-stack.spec.ts",
+        "tests/e2e/content-intake-shop-directory-real-stack.spec.ts"
+      ],
+      "environment": {
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E": "1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME": "1",
+        "CUSTOMER_AGENT_INTAKE_INPUT_FORMAT": "csv",
+        "CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo"
+      },
+      "exitCode": 0,
+      "seconds": 36.71,
+      "log": "package-eight-flows-except-upload.log",
+      "passed": 7,
+      "sha256": "8062f23111bf85348b2aaaea319dd105099f948ecd51ac9c9b3f065fa127e18f"
+    },
+    {
+      "original": "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts",
+      "temporary": "apps/desktop/tests/e2e/intake-ui-package-compact-temporary.spec.ts",
+      "originalSha256": "7a325f5424f08312a2c64387548f002162944c04155a1341ac6857b3ea67d239",
+      "temporarySha256": "78466d9ad3ee1e0dbba34bb96b7624da5e545e111ac00e7075dbc9624250ead7",
+      "onlyDifference": "Restore native window to1180x680 rather than1180x760; all other assertions preserved",
+      "reusedDisplayFailure": "evidence/qa/intake-final-mac-package/checks.json; actual current displays unchanged",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/intake-ui-package-compact-temporary.spec.ts"
+      ],
+      "environment": {
+        "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E": "1",
+        "CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME": "1",
+        "CUSTOMER_AGENT_INTAKE_INPUT_FORMAT": "csv",
+        "CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/installed/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo",
+        "INTAKE_REAL_STACK_SCREENSHOT_DIR": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact"
+      },
+      "exitCode": 0,
+      "seconds": 14.23,
+      "temporaryRemoved": true,
+      "passed": 1,
+      "log": "package-csv-compact.log",
+      "sha256": "b471a4be2f72386bcae788c310a4d40fec29ae740437aa74c61d360dfd388e76"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@customer-agent/desktop",
+        "exec",
+        "playwright",
+        "test",
+        "tests/e2e/content-intake-permissions-real-stack.spec.ts"
+      ],
+      "exitCode": 0,
+      "seconds": 5.23,
+      "packagedExecutable": "unset",
+      "log": "development-launch-regression.log",
+      "passed": 1,
+      "sha256": "eebb652b50b3da1f696cdfbec8050f189abf7fafa3c92c7cce463d8243135401"
+    },
+    {
+      "command": "pnpm exec eslint apps/desktop/tests/support/intake-electron.ts apps/desktop/tests/e2e/content-intake-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts apps/desktop/tests/e2e/content-intake-shop-directory-real-stack.spec.ts",
+      "exit_code": 0,
+      "log": "eslint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/desktop exec tsc --noEmit",
+      "exit_code": 0,
+      "log": "typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "log": "docs.log",
+      "sha256": "4d2c3479c545d627a4fd5633a7d5c5313ebf808ddce984a6255d85465f40d3ca"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "log": "workspace.log",
+      "sha256": "bc008be87574a76e2d36728c4234ea93c1ce4b10adf2232fc9e10b1872c74416"
+    }
+  ],
+  "installedScenarioCount": 8,
+  "developmentRegressionCount": 1,
+  "installedIdentities": "installed-identities.json",
+  "installedArtifact": "installed-artifact.json",
+  "preservedArtifacts": "preserved-artifacts.json",
+  "installTranscript": "package-install.json",
+  "allRecordedUserDataAbsent": true,
+  "dmgDetached": true,
+  "screenshots": [
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-permissions/2026-10-09T02-14-13.586Z/permissions-dark.png",
+      "bytes": 159482,
+      "sha256": "48d6aca0369dad45d7160617e245100f937e830b796d14b84d1df8bfdbed1049"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-permissions/2026-10-09T02-14-13.586Z/permissions-light.png",
+      "bytes": 158720,
+      "sha256": "e10e87bd78870c9bc868451fff3d8c5eaf37f8b9580b56739147c99782f0ff67"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-09T02-14-25-282Z/rollback-light.png",
+      "bytes": 199516,
+      "sha256": "06858cbecf194972a9caccfa40c90f1e23b228f5876389dc906f1e24f492865b"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-09T02-14-25-282Z/rollback-ordinary-seat.png",
+      "bytes": 155172,
+      "sha256": "21c57db537f1b668c3f09a9c14d25eb3e6355f3b54d87f6bc03a69ad738bc18e"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-09T02-14-25-282Z/rollback-dark.png",
+      "bytes": 198738,
+      "sha256": "eed7f55a6d96d3ea6dc3f12f74817c24c4fb989828246b624a2149a4fa0f5f08"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-revision-v2.png",
+      "bytes": 193225,
+      "sha256": "d86dd9b0bd24375f6781afdbd3f6b4b975b499cdcd96ac90ea0d1d83c69b257d"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-cancelled.png",
+      "bytes": 197703,
+      "sha256": "18ba1c1e5eaf7b3923f30fede8d3c3dc30b5503f2692d04857830aeecb98f47a"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-intake-declaration-dark.png",
+      "bytes": 220122,
+      "sha256": "d9ac3c8a81f83cf176374ea40f4294bd673e5eea229c00c7e277b5c565ce021f"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-intake-dark.png",
+      "bytes": 239298,
+      "sha256": "e90f5692d3cea611df9caf6ef705df7e54ad6985288ec2c105b709f077d9628a"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-intake-start.png",
+      "bytes": 237768,
+      "sha256": "335b514154abd0422cefb1189e29838715e93ea7a87576b8b7558410e33f95bb"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-published.png",
+      "bytes": 229457,
+      "sha256": "b69ce0a1ab55c48995328e0ac8de31ba82f697b6f9d4fedde1f9cd66c011bc7a"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/query-published-faq.png",
+      "bytes": 168042,
+      "sha256": "ef42b60d377f93f67dd477b12599b5a6b0780b13bf3f0e38c78379ecbffa0fb5"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-uploaded-material.png",
+      "bytes": 181622,
+      "sha256": "5735d6bb4d5567a3d97ad47d7200ab44aca517c2adb768a51a68b30e9f93560d"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-upload-error-report.png",
+      "bytes": 270244,
+      "sha256": "cf2f7ae38432486d131b8e3872a7e16cda01a350209ca7c99024de017a162208"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-intake-minimum-dark.png",
+      "bytes": 239298,
+      "sha256": "e90f5692d3cea611df9caf6ef705df7e54ad6985288ec2c105b709f077d9628a"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-ui-mac-package-20261009/csv-compact/dashboard-intake-light.png",
+      "bytes": 238058,
+      "sha256": "06eb53b2934f08ea4dcc4c4f90b2b8729557d3581ae8355a8cc55ce455620ebb"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-09T02-14-33-313Z/library-dark.png",
+      "bytes": 183710,
+      "sha256": "91628402ecc5ce4915f09f7800a3acc795208c8daf464e75803cec850627b44f"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-09T02-14-33-313Z/current-version.png",
+      "bytes": 187296,
+      "sha256": "3a61c9355c96db31c1e3ed17e660e00efb269194752d0e4e1d73efc6c4f88a6b"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-09T02-14-33-313Z/library-light.png",
+      "bytes": 181885,
+      "sha256": "33d3839419238cae7265e1f44ddc3460770c3f51b09645426b88091494033742"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-09T02-14-37-248Z/library-dark.png",
+      "bytes": 194694,
+      "sha256": "d078e07e8ff490a5dfb568f9d90f18c778cd44a5357936ea9b29c0815598f3e2"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-09T02-14-37-248Z/current-version.png",
+      "bytes": 186858,
+      "sha256": "57af5535de420d111d42d09fc4ddc4656135743f19ee021bbf2848a632132d52"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-09T02-14-37-248Z/library-light.png",
+      "bytes": 192676,
+      "sha256": "d1b259f2c5399cb23e6c43e3a8fd0547aa014719dacd90fcd927670f2812cce0"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-09T02-14-41-211Z/library-dark.png",
+      "bytes": 184556,
+      "sha256": "4f911c96a4b5d9c0a8e14ca9357ee17b34b56436f291404ae746b2d8022800a8"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-09T02-14-41-211Z/current-version.png",
+      "bytes": 186873,
+      "sha256": "0829739deb50c3c18bb4976e83b7d4ac4efcbb65db728573e9828c77a6098c53"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-09T02-14-41-211Z/library-light.png",
+      "bytes": 182693,
+      "sha256": "bb969b2f5ff85370a21f41a76cda8be084ed187fdd59f7cfbe894c559eb69b4e"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-09T02-14-45-119Z/library-dark.png",
+      "bytes": 184987,
+      "sha256": "363c8b80cc233c5d9a7b898d9c8da4ce342f03ec53c50397ca12032b89956a81"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-09T02-14-45-119Z/current-version.png",
+      "bytes": 187228,
+      "sha256": "766a921dffaf84ce86a6bd4108440dc2b6063e3cce5d4a9710f247efa88608e3"
+    },
+    {
+      "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-09T02-14-45-119Z/library-light.png",
+      "bytes": 183114,
+      "sha256": "95a16583a7dec0ac768a18ae2579e457b0560d65f3b267a6dfdab7a659175345"
+    }
+  ],
+  "screenBoundary": "All8 identities report960x600/workArea960x485/scale2, same as prior failed original1180x760 gate. Reused prior failure; compact CSV restore changed only760->680. Standard test unchanged.",
+  "review": {
+    "localIndependent": "No actionable findings on test launcher and5spec diff; business assertions and native dimensions unchanged.",
+    "external": "INCOMPLETE; OCRconfig metadata unchanged since2026-09-09, built-in provider listing is not authentication. No external request/retry/model change.",
+    "priorEvidence": "../intake-closeout-20261009/design-checks.json",
+    "reviewer": "closeout_runtime",
+    "evidenceIndependent": "closeout_data independently matched434 build snapshot hashes to25c0bd55 Git objects,6test overrides,8installed identities,4new/preserved archives,28screenshots and compact reconstruction; no actionable finding. Window geometry source unchanged since prior failed standard-size evidence."
+  },
+  "notVerified": [
+    "Standard1180x760 native acceptance",
+    "Human native dialogs/focus/Dock/Stage Manager/Gatekeeper",
+    "Nonempty legacy8-row adoption and rollback in installed app; current rollback creates two new intake-v2 releases",
+    "OfficeWindows native acceptance",
+    "RealFeishu/Menokin data/production assembly/signing/notarization/deployment",
+    "Full historical external review"
+  ],
+  "reuse": "Prior UI126 component/unit tests, existing PG/role and contract evidence unchanged; not mechanically rerun.",
+  "finalWorkspaceOutput": "$ node scripts/workspace-hygiene.mjs check\nWorkspace source budget: PASS (remainder 39.0 MiB / 45.0 MiB)\nfrozen-contracts: 12.8 MiB / 15.0 MiB\nfrozen-evidence: 9.38 MiB / 10.0 MiB\nsource-inputs: 16.8 MiB / 20.0 MiB\nWorkspace root policy: PASS\n",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5244,
+      "sha256": "8695abcd823927d3e5e5ae7ec3983c0980509d724f320ede35349d0a5d66686b"
+    },
+    {
+      "path": "compact-test.patch",
+      "bytes": 462,
+      "sha256": "f940985ba3045e941e242fcdb8df052d2def7ee336fd25e8fff0c8631cf94981"
+    },
+    {
+      "path": "inputs.json",
+      "bytes": 53500,
+      "sha256": "371ca74b9b9fb12892386c8f42d428fda20f1dfa51dad8fe44f0893daa008834"
+    },
+    {
+      "path": "installed-artifact.json",
+      "bytes": 1266,
+      "sha256": "fd3c92f7f4abe99a34c3d89cfd9434dee190f792b03eb7074bf817ad1b37773e"
+    },
+    {
+      "path": "installed-identities.json",
+      "bytes": 10029,
+      "sha256": "f9a0001f105c1f62aea9379d87b1ad0208a59e28fbd0fd35271117953919be25"
+    },
+    {
+      "path": "launcher-validation.json",
+      "bytes": 2404,
+      "sha256": "3963e5bfbb82b317fa5dffa873b39aa0f811a1acdb3e4fde323582e0a0238d99"
+    },
+    {
+      "path": "logs.json",
+      "bytes": 41473,
+      "sha256": "3f8d2488eed95829e34f744dc0ef9011aed5c33c473707ae4ad87397ff7ea7a4"
+    },
+    {
+      "path": "package-install.json",
+      "bytes": 2340,
+      "sha256": "a996c44a35dee549096de536ed410e9ae056e73f934cfab060df939b5c9fef21"
+    },
+    {
+      "path": "preserved-artifacts.json",
+      "bytes": 983,
+      "sha256": "415f8ead1d0b63e734ae2f8564eb1c0d7a127220be8fba8091e72fecdc3e39d4"
+    }
+  ],
+  "finalBudgetAfterEvidenceArchive": {
+    "status": "PASS",
+    "totalMiB": 39.0,
+    "totalLimitMiB": 45,
+    "frozenContractsMiB": 12.8,
+    "frozenContractsLimitMiB": 15,
+    "frozenEvidenceMiB": 9.39,
+    "frozenEvidenceLimitMiB": 10,
+    "sourceInputsMiB": 16.8,
+    "sourceInputsLimitMiB": 20,
+    "rootPolicy": "PASS",
+    "source": "Final pnpm workspace:check after all archived evidence; actual stdout retained in task tool transcript. Earlier budget output remains in logs.json."
+  }
+}

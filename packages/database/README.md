@@ -1,6 +1,6 @@
 # @customer-agent/database
 
-PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 确定性生成十五个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是已复核 `schema.v1.13` 的受控 search projection 升级，第十一段是 `schema.v1.14` 的 ready-no-hit 搜索上下文升级；第十二段以一个事务安装 `schema.v1.15` 的完整负责人承接后缀，第十三段安装 `schema.v1.16` 的身份和审核命名空间；第十四段以固定 definer 修复发布延迟校验权限，不给 app_content_admin 增加底表权限；第十五段追加 `schema.v1.18` 的 ops-loop 存储与 SECURITY DEFINER 入口；公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
+PostgreSQL 15 控制面深模块。它从已验证的合同 snapshot 与产品 overlay 确定性生成三十五个不可变 migration，并把来源、顺序、checksum、session advisory lock、逐 migration 事务、私有账本和精确 catalog/ACL/函数定义后验封装在 `status → plan → apply → verify` 接口内。前九段是已签 `schema.v1.12` 基线，第十段是已复核 `schema.v1.13` 的受控 search projection 升级，第十一段是 `schema.v1.14` 的 ready-no-hit 搜索上下文升级；第十二段以一个事务安装 `schema.v1.15` 的完整负责人承接后缀，第十三段安装 `schema.v1.16` 的身份和审核命名空间；第十四段以固定 definer 修复发布延迟校验权限，不给 app_content_admin 增加底表权限；第十五段追加 `schema.v1.18` 的 ops-loop 存储与 SECURITY DEFINER 入口；第十六至十九段为冻结的产品 overlay；第二十段接收 coach 发布合同，第二十一段安装未开放应用授权的 content_intake 存储，第二十二段追加旧写共存门及统一锁序；第二十三/二十四段为候选质量及原子发布 overlay；第二十五段接入 schema.v1.21 的不可变使用资格上下文，第二十六段追加来源授权检索索引，第二十七段实现私有纠正回退事务与独立审批谱系，第二十八段追加显式同题家族的完整目录守卫，第二十九段追加私有对象容量账本与索引，第三十段只替换业务操作角色上限、不改冻结合同；第三十一段精确接收冻结 schema.v1.22 的发布政策与确认记录增量，第三十二段追加确认直发运行事务。0033 以一个事务安装已接收的运行伴随 SQL，0034 接收 CSV 格式守卫，0035 只追加旧目录 CHECK 所需八个函数 EXECUTE；本次0001–0034 的 SQL、来源与校验和保持不变。公共 status/plan 只返回 provenance 元数据，不暴露可执行 SQL。
 
 生成命令会先在同一文件系统完整暂存 migration 目录与内嵌 catalogue 目录，再进行目录级替换；普通 I/O 失败会把两个目录一起回滚，避免留下已知的新旧混合生成物，额外旧成员也会在成功发布时被移除。
 
@@ -14,8 +14,27 @@ pnpm test:db                 # database 全门禁，含隔离 PG15
 pnpm test:db:integration     # 仅隔离 PG15 集成门禁
 ```
 
-PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前验证 `schema.v1.18` 全迁移安装、精确 `schema.v1.12` / `v1.13` / `v1.14` / `v1.15` / `v1.16` / `v1.17` ledger 分别只执行 `0010–0015` / `0011–0015` / `0012–0015` / `0013–0015` / `0014–0015` / `0015`；未知、缺失、改写或额外 ledger 仍失败关闭。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
+PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOMER_AGENT_PG15_BIN=/path/to/postgresql-15/bin`。当前门禁覆盖 `schema.v1.25` 的三十五段全迁移安装及已接入历史 ledger 的精确前缀升级；已有三十四行账本只追加 0035，旧账本行不改写。未知、缺失、改写或额外 ledger 仍失败关闭。0025 是使用上下文合同增量，0026 仅追加授权检索索引；0027 的私有回退审批谱系保留为历史依赖，既有不可登录 `cs_ai_definer` 仅获该表 SELECT，用于拒绝旧发布路径丢失回退审批的继承。应用 runtime/admin/worker/auth/review 角色仍无新表或函数访问权。本地测试使用一次性 PostgreSQL 15 cluster 和合成数据，不构成托管 PG、备份恢复、部署或生产认证。
+
+`0031_intake_direct_v1_22` 从已接收的 OpenAPI 1.20.0 / schema.v1.22 版本对提取冻结 DDL 后缀。候选、操作、票据、发布及谱系记录不可变 `publication_policy`，旧行默认保留 `approval-v1`；复合外键禁止跨政策关联。直发候选审批版本为 0，直发操作／票据／谱系的审批字段为空，直发发布记录服务器 `confirmed_at`；不会用虚构审核人满足旧约束。
+
+`0032_intake_direct_publication` 是产品私有运行 overlay，替换候选发布、回退预检／执行及两条谱系继承函数，保留原函数身份、权限和家族／容量触发器。新发布与回退只接受 `confirmed: true`，不接受旧审批字段；首次发布要求 `direct-v1` 候选，旧候选须显式修订或重新导入。资料来源、质量结果、当前权限、范围、base CAS 与最早截止仍在最终事务内复核；质量在来源确认后完成时，同一事务按原状态图先进入 ready 再发布。目录可保留已过期及未来条目，读端仍按原有效期筛选；候选发布只将受理时尚未到达的内容截止纳入票据，不因保留过期条目阻止整本目录发布。票据至多 60 秒，API 在最终 COMMIT 前继续复核返回截止。发布／回退均生成新 release、公告、current 和永久回执，不直接倒拨指针。
+
+混合目录按每项原政策保留历史：直发条目不读取不存在的审批，`approval-v1` 条目与旧回退审批依赖仍检查真实审批状态、有效期及撤销，不由确认弹窗续期或复活。两类条目都保留来源／材料绑定及内容期限；旧发布继承完整政策字段，继续拒绝它无法证明的家族或回退审批继承。旧未知操作只能读取原永久回执，不能改写成新的直发请求。
 
 仓内其它 package 若需复用同一临时 PG15 证据面，只能以 devDependency 导入显式 `@customer-agent/database/testkit` 子入口；它不属于 migration/runtime 公共入口，也不得进入生产请求链。
 
 负责人承接迁移保留 0001–0011 的原字节与来源，将完整新合同的六段增量按来源行号提取为单个事务，最后更新 schema marker。`app_owner_acceptance_registrar` 为未绑定登录的 NOLOGIN 能力角色；合同要求安装时不存在同名角色，遇到既有角色即回滚本段并保留可追踪的旧账本前缀。因此隔离测试各自使用独立 cluster，不向共享 cluster 重复安装。runtime 无登记、撤销或登记表读取权限，当前不授权真实装载。
+
+历史 overlay 源与冻结 SQL 必须逐字节对应，修改旧源会失败关闭；新的产品事务必须追加 migration。P2 新命名空间纳入 ACL、对象/owner、DOMAIN 定义和 CHECK、函数和触发器的精确后验，旧应用角色仍无新访问权；存储安装不代表新事务或正式激活已完成。
+
+`0028_intake_family` 仅追加产品 overlay，不改冻结合同或旧迁移字节。私有 `content_intake.assert_family_catalog(releaseId)` 对完整目录验证显式通用根、同租户/应用/品牌/域、店铺不可自设品牌强制及商品/场景/半开时间三维交集；标题不建立关系。启用店铺稿要求根启用；停用历史保留引用，可同时停用根与店铺稿。根仍参与结构校验，即使它的生效时间已经结束。正常发布和纠正回退在既有内容锁与 current 事务内通过 publication trigger 共用校验；API 签发/续签资格复用该私有函数。旧发布入口遇显式家族目录明确拒绝继承，不丢失关系；只有既有不可登录 definer 获 candidate_versions SELECT 用于此拒绝，应用角色 ACL 保持关闭。真实 PG 门禁覆盖 27→28 精确前缀、冲突矩阵、ACL/trigger 篡改，以及 5,000 条完整目录与 50,000 条未引用历史条目的有界验证；另覆盖同一家族 1 个根与 4,999 个覆盖的商品互斥、场景互斥、全不限半开时间不交叠三种稠密合法目录。区间以 running-max 结束时间划分相交分量，每分量按商品或场景倒排桶预计配对数选择更稀疏的一维，wildcard 单独处理；最后仍验证真实三维交集。无关联条目的本地字段检查不进入根关联扫描，品牌根物化后供结构/品牌强制复用；5,000 条无关联目录连续 50 次逐页 guard 共享 5 秒数据库预算，避免把家族判定成本施加到普通分页。固定 seed `0x5eed0028` 的 85 个目录与独立朴素逐对 oracle 比对，覆盖长区间桥接、空集、多词项和停用。
+
+`0030_intake_role_ceiling` 是角色上限 overlay：只替换当前业务操作的 `authorization_deadline`，不删除历史 grant，不改冻结合同，也不授予应用角色权限。
+`0029_intake_capacity` 增加 `object_reservations`（reserved/persisted/adopted/releasing/released）及 tenant 容量索引，不授予应用角色任何权限。API 在落盘前持久预留，业务事务原子采用；未知提交保留额度，清理成功且目录 fsync 后才能释放。历史保留期未批准，已登记对象及引用全部保留，干跑命令不能 apply。生命周期、真实 PG 并发及十倍历史证据见[容量收尾验收](../../evidence/qa/content-intake-p2-capacity/README.md)。
+
+`0033_intake_runtime_v1_23` 从已验证完整 v2 包消费 roles→organization→session→directory→directoryAcl→acl；不重复安装完整参考 schema。生成器绑定 installation 摘要、全部伴随输入及原 32 段依赖 manifest/overlay 摘要；安装缺函数或同名角色冲突时整体回滚，不修补未知角色。七个新能力/属主角色均不可登录，环境 LOGIN 绑定不写入 migration，正式生产账号不由本包创建。新用途权限只供可信服务按已批准合同消费，不能把 capability 当作用户授权。
+
+0033 后验覆盖运行/组织命名空间、七个角色边界、ACL、对象、函数安全属性和完整触发器定义（含 WHEN/延迟约束）。合成实际验证与正式环境未满足项见[接入证据](../../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。
+
+`0035_intake_legacy_check_acl_v1_25` 来自精确批准的 v4 完整十六件包，只有既有 NOLOGIN `intake_runtime_fn_owner` 获得八项纯 CHECK helper EXECUTE，其他用途/应用角色没有新增能力。旧schema1.24、CSV安装清单和全部运行依赖保留原字节；不重放完整参考DDL。安装器在0035同一事务内先以冻结34段账本和旧ACL摘要核对角色、membership、对象、函数正文及触发器，再执行增量和写账本，最后以新ACL摘要完整核验后才提交。生成SQL会临时设置search_path，因此后验恢复前验的会话路径，避免pg_get_*的名称限定差异被误判为结构漂移；不放宽任何摘要。COMMIT响应未知仍保留原账本恢复语义，不在提交异常后盲目回滚。具体红绿验证、权限精确差异与旧资料发布/回退见[本轮证据](../../evidence/qa/intake-legacy-acl-runtime/README.md)。

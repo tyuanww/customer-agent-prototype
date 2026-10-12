@@ -1,0 +1,86 @@
+{
+  "baseCommit": "0566cf2fd514872d9cbab19259496d0eec3d92a2",
+  "scope": "quality persistence increment; prior unchanged evidence reused only by hash",
+  "native": {
+    "skill": "adversarial-review",
+    "timestamp": "2026-10-06T07:21:21.813613+00:00",
+    "status": "clean",
+    "source": "in-host",
+    "host": "codex",
+    "phase": "adversarial",
+    "gate": "informational",
+    "commit": "0566cf2",
+    "completed": true,
+    "converged": true,
+    "issues_found": 0,
+    "findings": [],
+    "fixtureMode": "summary-only",
+    "independentTestRun": false,
+    "scope": "final quality persistence increment",
+    "conclusion": "NO_FINDINGS",
+    "verifiedFix": "5000-row statement timeout reproduced twice by parent; set JOIN preserves validation and passes unchanged budget",
+    "independentChecks": [
+      "previous 22 migration hashes unchanged",
+      "overlay/migration/catalogue bytes and SHA match",
+      "git diff --check"
+    ]
+  },
+  "outside": {
+    "status": "unavailable",
+    "attemptedThisIncrement": false,
+    "reason": "Previous adversarial and structured calls both timed out at 540000ms; no blind retry or model/configuration change after user discussion.",
+    "priorEvidence": "../content-intake-p2-quality/review.json"
+  },
+  "fixed": [
+    {
+      "path": "packages/database/overlays/0023_intake_quality.sql",
+      "category": "performance",
+      "severity": "P2",
+      "problem": "Per-item population scans timeout for a valid 5000-entry critical candidate",
+      "confirmation": "Two unchanged real PG/XLSX probes failed with statement_timeout",
+      "fix": "Set-based exact validation; no deadline increase",
+      "verification": "Same test passed and full current-input regressions run"
+    }
+  ],
+  "remainingConfirmedDefects": 0,
+  "remote": [
+    {
+      "argv": [
+        "git",
+        "fetch",
+        "origin",
+        "main",
+        "--quiet"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gh",
+        "pr",
+        "view",
+        "--json",
+        "number,url"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "no pull requests found for branch \"codex/content-intake-p2\"\n"
+    }
+  ],
+  "historicalHashReuse": {
+    "matched": 35,
+    "total": 43,
+    "changedExcludedFromReuse": [
+      "apps/api/src/content-intake/quality.ts",
+      "apps/api/src/content-intake/reviewer.ts",
+      "apps/api/src/content-intake/service.ts",
+      "apps/api/tests/content-intake.integration.test.ts",
+      "docs/how-to-develop-content-intake.md",
+      "docs/plans/2026-10-03-content-intake-requirements.md",
+      "docs/reference-content-intake-p2-contract-handoff.md",
+      "docs/reference-project-architecture.md"
+    ]
+  }
+}

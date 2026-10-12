@@ -50,6 +50,29 @@ describe('contract runtime schema transformation', () => {
     }
   });
 
+  it('distinguishes schema keywords from field names and literal values', () => {
+    const source = {
+      type: 'object', additionalProperties: false,
+      required: ['required', 'description', 'x-business'],
+      properties: {
+        required: { type: 'boolean' },
+        description: { type: 'string', description: 'annotation' },
+        'x-business': { const: { required: true, description: 'literal', 'x-data': 1 } },
+      },
+      allOf: [{ properties: { required: { const: true } } }],
+    };
+    expect(generator.toRuntimeSchema(source)).toEqual({
+      type: 'object', additionalProperties: false,
+      required: ['required', 'description', 'x-business'],
+      properties: {
+        required: { type: 'boolean' },
+        description: { type: 'string' },
+        'x-business': { const: { required: true, description: 'literal', 'x-data': 1 } },
+      },
+      allOf: [{ type: 'object', properties: { required: { const: true } } }],
+    });
+  });
+
   it('fails closed for malformed validation extensions and non-schema references', () => {
     expect(() => generator.toRuntimeSchema({ 'x-unique-by': [''] })).toThrow(
       /x-unique-by must be a non-empty string/,

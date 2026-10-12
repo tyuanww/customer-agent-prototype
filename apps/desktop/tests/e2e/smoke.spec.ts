@@ -727,6 +727,53 @@ test('@windows-feasibility @linux-feasibility launches transparent overlays, reg
   }
 });
 
+for (const dismissBeforeReady of [false, true]) {
+  test(`@float query subscription reconciles delayed mode confirmation; dismissed=${dismissBeforeReady}`, async () => {
+    const app = await launchApp();
+    try {
+      const query = await waitForRole(app, 'query');
+      await waitForHarness(app);
+      await query.getByTestId('query-shell').waitFor({ state: 'attached' });
+      // Hold the existing IPC handler, not a fake renderer result. Main can open
+      // the native window while QueryEntry is still waiting for its profile.
+      await app.evaluate(({ ipcMain }) => {
+        const handlers = (ipcMain as unknown as {
+          _invokeHandlers: Map<string, (...args: unknown[]) => unknown>;
+        })._invokeHandlers;
+        const original = handlers.get('intake-query:mode');
+        if (!original) throw new Error('mode handler missing');
+        const probe = globalThis as typeof globalThis & { __releaseQueryMode?: () => void };
+        const gate = new Promise<void>((resolve) => { probe.__releaseQueryMode = resolve; });
+        ipcMain.removeHandler('intake-query:mode');
+        ipcMain.handle('intake-query:mode', async (...args) => { await gate; return original(...args); });
+      });
+      await query.reload({ waitUntil: 'domcontentloaded' });
+      await query.getByText('正在准备查询…').waitFor({ state: 'attached' });
+      await app.evaluate(() => {
+        (globalThis as typeof globalThis & { __demoTest: { expand: () => void } }).__demoTest.expand();
+      });
+      await expect.poll(async () => (await windowSnapshot(app)).find(w => w.role === 'query')?.visible).toBe(true);
+      await app.evaluate(({ BrowserWindow }, dismiss) => {
+        const probe = globalThis as typeof globalThis & { __releaseQueryMode?: () => void };
+        if (dismiss) {
+          // Exercise the real typed dismiss route before releasing the profile.
+          const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=query'));
+          if (!win) throw new Error('query missing');
+          return win.webContents.executeJavaScript('window.customerAgent.dismiss()').then(() => probe.__releaseQueryMode?.());
+        }
+        probe.__releaseQueryMode?.();
+      }, dismissBeforeReady);
+      if (dismissBeforeReady) {
+        await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+        await expect.poll(async () => (await windowSnapshot(app)).find(w => w.role === 'query')?.visible).toBe(false);
+      } else {
+        await waitForInteractiveQuery(app, query);
+        await expect(query.getByTestId('query-shell')).not.toHaveAttribute('data-handoff-id', '0');
+      }
+    } finally { await app.close(); }
+  });
+}
+
 test('resizes the query window by result count in one session', async () => {
   const app = await launchApp();
   try {

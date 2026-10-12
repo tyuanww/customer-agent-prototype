@@ -1,0 +1,49 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-family/customer-agent-prototype/apps/api
+
+ ✓ tests/content-intake.integration.test.ts (176 tests | 136 skipped) 72300ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: explicit source/entry roots select each shop override before pagination without merging equal titles  1957ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: inapplicable time, product and scenario overrides fall back to their exact generic roots  1404ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: actual HTTP and Main query/copy consume shop overrides and another shop generic fallback  2285ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects missing-root atomically after actual parsing and human review  1113ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects foreign-brand atomically after actual parsing and human review  1364ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects foreign-domain atomically after actual parsing and human review  1354ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects linked-root atomically after actual parsing and human review  1540ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects same-shop-overlap atomically after actual parsing and human review  1332ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects cross-source-overlap atomically after actual parsing and human review  1673ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects protected-root atomically after actual parsing and human review  1424ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: nonoverlapping products allow two same-shop overrides  1417ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: nonoverlapping scenarios allow two same-shop overrides  1390ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: nonoverlapping half-open-time allow two same-shop overrides  1485ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: a disabled override does not block later explicit disable of its generic root  1985ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: multiple selections retain every uncovered root cell and suppress only complete override coverage  1633ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: a historical catalog guard rejection fails closed for issuance and every existing snapshot page  1392ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: use qualifications expire at both override boundaries before switching generic and shop answers  10821ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages  1917ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a logout session  2406ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a cleanup session  1648ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a disabled session  1522ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a expired session  1033ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: caps issuance at session expiry and reauthenticates persisted selection after a service restart  897ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: validates explicit selections by kind and scope without expanding source access  899ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (reader-first)  837ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (logout-first)  836ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  3648ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: contextless predecessor qualifications cannot be guessed or reused  844ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: shop access does not imply brand access, and brand permission alone cannot select an arbitrary shop  869ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after grant changes  1096ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after source changes  1070ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after release changes  1079ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after facts changes  1067ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-unavailable changes  1353ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-revoked changes  1076ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: a normal new publication preserves a valid old page and a fresh empty snapshot clears explicitly disabled rows  1275ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: filters product/scenario/time before paging, pins vocabulary labels and expires at the next content boundary  1197ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: does not renew or return a page after its immutable deadline, even when facts are refreshed  2004ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: consumes a maximum 5000-row native catalog within bounded transactions without duplicate or missing pages  6870ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: pages within the 100 vocabulary budget and rejects an individually unpageable candidate before review  1286ms
+
+ Test Files  1 passed (1)
+      Tests  40 passed | 136 skipped (176)
+   Start at  05:02:33
+   Duration  73.10s (transform 249ms, setup 0ms, collect 594ms, tests 72.30s, environment 0ms, prepare 42ms)

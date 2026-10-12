@@ -1,0 +1,18 @@
+{"status":"PASS","profile":"existing","domain":"product","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated existing/product HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1629.551708ms)
+{"status":"PASS","profile":"purpose-candidate","domain":"product","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-candidate/product HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1226.005458ms)
+{"status":"PASS","profile":"purpose-candidate","domain":"campaign","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-candidate/campaign HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1445.817917ms)
+{"status":"PASS","profile":"purpose-candidate","domain":"presale","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-candidate/presale HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1233.374583ms)
+{"status":"PASS","profile":"purpose-candidate","domain":"aftersale","consumer":"ordinary-seat","http":"actual","postgres":15,"publicationPolicy":"direct-v1","approvalFacts":0,"publications":1,"faq":3,"multilinePreserved":true}
+✔ isolated purpose-candidate/aftersale HTTP/PG consumes parsed material, quality, confirmed direct, publication and ordinary-seat snapshot (1199.490875ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7017.044541

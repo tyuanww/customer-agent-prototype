@@ -1,0 +1,1 @@
+{"status":"PASS","checks":253,"postgres":"postgres (PostgreSQL) 15.18 (Homebrew)","port":56244,"scope":"synthetic shop directory only; not approved for real tenant data"}

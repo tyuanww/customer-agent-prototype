@@ -1,0 +1,24 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/.bun/bin:/Users/hutou/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "test:intake:transactions"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-material.test.ts (4 tests) 148ms\n ✓ tests/content-intake.integration.test.ts (11 tests) 10599ms\n   ✓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant  875ms\n   ✓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation  828ms\n   ✓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes  818ms\n   ✓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager  1004ms\n   ✓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report  1116ms\n   ✓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving  1150ms\n   ✓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate  983ms\n   ✓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock  810ms\n   ✓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result  958ms\n   ✓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot  981ms\n   ✓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations  1075ms\n\n Test Files  2 passed (2)\n      Tests  15 passed (15)\n   Start at  01:47:00\n   Duration  10.96s (transform 132ms, setup 0ms, collect 410ms, tests 10.75s, environment 0ms, prepare 55ms)\n\n",
+  "hypothesis": "修复后复验五个具体缺陷：授权提交截止、永久回执、风险提示、接管历史时段、初始 current 的旧发布锁；并复验委派不增加本人业务权限。原探索计时已结束，本次为明确修复回归。",
+  "nextCapture": "002",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/.bun/bin:/Users/hutou/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "test:intake:transactions"
+  ]
+}

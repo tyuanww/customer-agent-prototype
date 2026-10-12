@@ -2402,3 +2402,24 @@ html[data-role='fox'] #root {
 .product-query-context label { display: flex; align-items: center; gap: 6px; }
 .product-query-context input, .product-query-context select { max-width: 220px; min-height: 32px; color: inherit; background: var(--query-glass-solid); border: 1px solid var(--hairline); border-radius: 6px; }
 .catalog-scope-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; line-height: 16px; }
+
+/* Narrow shop IDs are the only labels in the intake contract. Keep the full ID
+   in the native select without growing the fixed-width query capsule. */
+/* FAQ filters share the existing result region and its hug/scroll measurement. */
+.intake-query-filters { padding: 12px; border-bottom: 1px solid var(--hairline); color: var(--ink); font-size: 12px; }
+.intake-query-filters p { margin: 8px 0 0; color: var(--muted); }
+.intake-shop-control { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.intake-shop-control label { white-space: nowrap; }
+.intake-shop-control select { min-width: 0; flex: 1; color: var(--ink); background: var(--query-control); border: 1px solid var(--hairline); border-radius: 6px; padding: 4px; }
+.intake-shop-control .retry-btn { white-space: nowrap; }
+.intake-condition-controls { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; }
+.intake-terms { flex: 1; min-width: 0; border: 1px solid var(--hairline); border-radius: 6px; background: var(--query-control); }
+.intake-terms summary { padding: 6px 8px; cursor: pointer; }
+.intake-terms fieldset { border: 0; padding: 8px; min-width: 0; }
+.intake-terms input:not([type="checkbox"]) { box-sizing: border-box; width: 100%; color: var(--ink); background: var(--query-control); border: 1px solid var(--hairline); border-radius: 4px; padding: 4px; }
+.intake-term-options { max-height: 120px; overflow-y: auto; margin-top: 6px; }
+.intake-term-options label { display: flex; align-items: flex-start; gap: 5px; padding: 4px 0; overflow-wrap: anywhere; }
+
+.intake-faq-card .answer-text { white-space: pre-wrap; }
+
+.intake-term-options input[type="checkbox"] { accent-color: var(--fox); }

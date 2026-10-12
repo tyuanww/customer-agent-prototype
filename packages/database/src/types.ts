@@ -42,6 +42,12 @@ export type ExecutableMigrationCatalogue = Readonly<{
     priorReviewedUpgrades: readonly Readonly<MigrationProvenance & {
       migrationCount: number;
     }>[];
+    /** The last migration may belong to this additive contract. The catalogue identity stays the consumed contract. */
+    additiveSuccessor?: MigrationProvenance | null;
+    /** Exact 0040 successor over the immutable 39-migration closure. */
+    /** Exact 0041 readiness upgrade over the immutable forty-migration closure. */
+    readinessSuccessor?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
+    repairSuccessor?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
   }>;
   migrations: readonly ExecutableDatabaseMigration[];
 }>;

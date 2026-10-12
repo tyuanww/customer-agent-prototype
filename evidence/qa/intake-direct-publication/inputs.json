@@ -1,0 +1,275 @@
+{
+  "base_commit": "dc45d742f0d6184c0850fb928b25fdfea149801c",
+  "version": "0.3.26",
+  "binding": "exact file bytes; evidence files excluded to avoid self reference",
+  "files": {
+    "DESIGN.md": {
+      "sha256": "d10fe81b8be7a33d415c9fc659c9a4b7aa738bc005e64fd937f4b63536921c51",
+      "bytes": 41901
+    },
+    "TODOS.md": {
+      "sha256": "64690f1ab96bbe57f0322c7b91fd08830b364e76ce50f8cf9fd673bd8bec2601",
+      "bytes": 31085
+    },
+    "VERSION": {
+      "sha256": "96dc7b2030f175dace0b2bf3be7de7f39acbbec8a0bdc76ac19a58945e8e58e5",
+      "bytes": 7
+    },
+    "apps/api/package.json": {
+      "sha256": "9480bfb01bca05a37ed979e6a9a2cf638d0f91b27fc547ecbd3d442a1c44cd6d",
+      "bytes": 5168
+    },
+    "apps/api/src/content-intake/authority.ts": {
+      "sha256": "1ec051e3745ecc662358a158455ae806cd4a9407372412db2790b240fea54f1f",
+      "bytes": 11518
+    },
+    "apps/api/src/content-intake/candidate.ts": {
+      "sha256": "7c41e32a03bfc90b66c0f43cc606d19d541d9d0fc788d8dece8fd74d6720cc99",
+      "bytes": 21422
+    },
+    "apps/api/src/content-intake/evidence.ts": {
+      "sha256": "916ec76e46983591c288b41130944aab145477821e275e7b95c060b75cc5b917",
+      "bytes": 7951
+    },
+    "apps/api/src/content-intake/publication.ts": {
+      "sha256": "2721db7829ccd2cfe8a2d4df1078060831b503df296ca25463e0ff1a1791829e",
+      "bytes": 5377
+    },
+    "apps/api/src/content-intake/rollback.ts": {
+      "sha256": "ff4eec72f27c4bb2763dc5881e531a68d31aa315d42ba4532d9769395898e22c",
+      "bytes": 9899
+    },
+    "apps/api/src/content-intake/service.ts": {
+      "sha256": "9a8492a8fd6cb861bc46a924c4d7bd8187618187d2154dd0350691d345b0fc36",
+      "bytes": 15372
+    },
+    "apps/api/src/content-intake/usage.ts": {
+      "sha256": "38dde1d4db5645b3e87262533eb79816790ef7e9fe0d3f7c8f36f973c05e0a28",
+      "bytes": 24486
+    },
+    "apps/api/tests/content-intake.integration.test.ts": {
+      "sha256": "1422d3d6487fd7c73cf61383523ffc13e83ce529f45e8498081cd24deac7056e",
+      "bytes": 269303
+    },
+    "apps/api/tests/support/intake-synthetic-host.ts": {
+      "sha256": "13649a4ffa7ede3144ad379315f62d40c6e5963e31119ad592a8d41f3feb8b8c",
+      "bytes": 14991
+    },
+    "apps/desktop/package.json": {
+      "sha256": "0ad47d29854d228b36907a481de044ca0b759000dc5c0aae6c26ec0d79a201e4",
+      "bytes": 5481
+    },
+    "apps/desktop/src/main/content-intake-management-ipc.ts": {
+      "sha256": "792037eb108554fea8abe43a43653e50c018b2ef4cb2a513a5743e657508d5de",
+      "bytes": 6081
+    },
+    "apps/desktop/src/main/content-intake-management.ts": {
+      "sha256": "8e1ead6041825a6bd656f3c779cb9295540e561e68e4adea82f13d4ced9a6da4",
+      "bytes": 25355
+    },
+    "apps/desktop/src/main/content-intake-native-files.ts": {
+      "sha256": "8c15bb07843caf6ad290a2461e1266b3f3ae08a352e7295b9b90e8a2a7529e5f",
+      "bytes": 5340
+    },
+    "apps/desktop/src/main/content-intake-rollback.ts": {
+      "sha256": "b2041a1231df3936f9a6fcc64ce11d382f4d73bf265fd84a001272c49267ee5a",
+      "bytes": 7814
+    },
+    "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx": {
+      "sha256": "d9c2b2b617dc18c8b3a4d0c9989513f4324454febb4469aaad6cd038ed0d8078",
+      "bytes": 23980
+    },
+    "apps/desktop/src/renderer/features/dashboard/IntakeRollback.tsx": {
+      "sha256": "4762ff8e80c9e6387cb0be509644122a7a8f9ea915e61f2645a22db6c583c981",
+      "bytes": 5708
+    },
+    "apps/desktop/src/shared/content-intake-management.ts": {
+      "sha256": "22a37427690a2eef66dacd46e175d931a2d6087eec77bf789a57db318126edb7",
+      "bytes": 6138
+    },
+    "apps/desktop/tests/component/intake-dashboard-shell.test.tsx": {
+      "sha256": "c9ea738742ddd9f4f591dcfc48960808e46fc0b002208795d807a9b7e2d9e83e",
+      "bytes": 2930
+    },
+    "apps/desktop/tests/component/intake-management.test.tsx": {
+      "sha256": "343304ec38582df6d034269091ffeb60a09f1adcf55c2b4da378478ef4cf56ed",
+      "bytes": 13713
+    },
+    "apps/desktop/tests/component/intake-rollback.test.tsx": {
+      "sha256": "2e7bf49222fd18b99b04f1429264b2f176a4f258587e73043463fdc10c9ce20b",
+      "bytes": 4439
+    },
+    "apps/desktop/tests/e2e/content-intake-management.spec.ts": {
+      "sha256": "ad7a3f77ea80c7f5fa684c0849f56d51e58369b6d7cf33b9617f899d0b457c70",
+      "bytes": 11507
+    },
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": {
+      "sha256": "b10c10f212f126c889befa90dce1687a1c80a0694f96bc717f48ecd86c8465dc",
+      "bytes": 25461
+    },
+    "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts": {
+      "sha256": "7528965ff10c336a08393429844c23a9a1bb4d716bc861f5837200e0262dddda",
+      "bytes": 11716
+    },
+    "apps/desktop/tests/fixtures/intake-management-data.ts": {
+      "sha256": "e62a64901880b5a2522935339b051550ca12ff59ada9daf40e923f1632e1fe58",
+      "bytes": 8787
+    },
+    "apps/desktop/tests/unit/content-intake-management.test.ts": {
+      "sha256": "27ec1062171a41ced11610fde24e30d6f8ad2272c42c6eac1f33017ad5cfe602",
+      "bytes": 35874
+    },
+    "apps/desktop/tests/unit/content-intake-native-files.test.ts": {
+      "sha256": "61a71c3fe98525fcc1758a31c62cbccba6b69c0d77594847bee51061750c3120",
+      "bytes": 7448
+    },
+    "apps/desktop/tests/unit/content-intake-rollback.test.ts": {
+      "sha256": "397d4d3afab482a72344986c923d88277c4bd6a5b6c244674d0869e37971b022",
+      "bytes": 9833
+    },
+    "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": {
+      "sha256": "13e8687e766d19818f9b0e2eeece7f31cc12859490c19d88534f1098e2ebd377",
+      "bytes": 21306
+    },
+    "contracts/upstream/customer-agent/contract-set.lock.json": {
+      "sha256": "96f85ac2b8072cb6b33b64f11b3ae65122f24c7e834ae4b58cde1d24dfbf79b4",
+      "bytes": 606
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929/contract-set.json": {
+      "sha256": "1db23189fe6f088f312e5753f5a517dbf4fc4d386da0febeaa0ec3958265608c",
+      "bytes": 853
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929/openapi.v1.yaml": {
+      "sha256": "1513fe499773c83f4a2b9f0ca8e3a5f7369638f72dc1d18a291235093cfc034d",
+      "bytes": 415022
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929/schema-v1.22.sql": {
+      "sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce",
+      "bytes": 636987
+    },
+    "docs/how-to-develop-content-intake.md": {
+      "sha256": "8902a7f6516084dde1ce7dc9f78b777c42584eb3f94df0f3b754be3573daa6b3",
+      "bytes": 48486
+    },
+    "docs/how-to-verify-desktop.md": {
+      "sha256": "159b24dede6a848a2515bf8f13ecf5e2e605f3b923872de3fc0165893234998e",
+      "bytes": 45594
+    },
+    "docs/plans/2026-10-03-content-intake-requirements.md": {
+      "sha256": "e20e22fc52a5547b2c238b35d5842b7b264584001cd39e866139339087140c6d",
+      "bytes": 597150
+    },
+    "docs/reference-content-intake-p2-contract-handoff.md": {
+      "sha256": "ccd9ae9585be5ce4bab67afd903c322157242304abc3619dd3143f167c225a99",
+      "bytes": 64226
+    },
+    "docs/reference-project-architecture.md": {
+      "sha256": "939f2c01bb865d7dc55c774f326f8b612ed82da0a5ea29359c33b528f0e7adda",
+      "bytes": 54128
+    },
+    "package.json": {
+      "sha256": "0938118eec06a03f3cfc375d02b88215d8dfb525a9e6eb14774c1feca637fdf1",
+      "bytes": 8033
+    },
+    "packages/contracts/openapi/bundle.generated.yaml": {
+      "sha256": "e576e1f86099c624ffda255556c3ec552a555e7e51111a2a1ec527c20f570b12",
+      "bytes": 527617
+    },
+    "packages/contracts/src/generated/codegen-manifest.generated.json": {
+      "sha256": "065a3ab45e705015d46ccdb13ff8d8e616251a0cd6dc44429b0c7836477d7960",
+      "bytes": 1710
+    },
+    "packages/contracts/src/generated/openapi.generated.ts": {
+      "sha256": "49dce0f1fe46f58ab62f8d9f6a76534677f5863f9f3bd0ca84a487ed05b03639",
+      "bytes": 411360
+    },
+    "packages/contracts/src/generated/provenance.generated.ts": {
+      "sha256": "3c7d83c9dadec3faecbe4a45da16bd93d844ee3ed92ba627fd745a2e117b68c1",
+      "bytes": 1648
+    },
+    "packages/contracts/src/generated/runtime-schema.generated.ts": {
+      "sha256": "955716edaf71e35a5f534694e12c75514e0e7a6032795b00e3b8ba5de6e94679",
+      "bytes": 339251
+    },
+    "packages/contracts/tests/runtime.test.ts": {
+      "sha256": "b21ce76977fe919c0448cde3e75ef0e20bd64839a6b19a0753e7609004fb7a3f",
+      "bytes": 12323
+    },
+    "packages/database/README.md": {
+      "sha256": "e17d35b8b373738aaff9cde6276c899507e50c586ca0f8e841b23a57e26087d2",
+      "bytes": 8850
+    },
+    "packages/database/migrations/0030_intake_role_ceiling.sql": {
+      "sha256": "8843955f79d970bdc5f03469a7bba316c2f1fb8fa070d2b0f61ba9bc1f5144a3",
+      "bytes": 1835
+    },
+    "packages/database/migrations/0031_intake_direct_v1_22.sql": {
+      "sha256": "82407ae1c0ce3a3dc975b9b5fe76012b5ab4f19ee5952dafb912a23509c4dcc0",
+      "bytes": 7123
+    },
+    "packages/database/migrations/0032_intake_direct_publication.sql": {
+      "sha256": "38e72eb66941256861aeb3edddc609cdbbfbc4e1eed56366b370526ad82cbddc",
+      "bytes": 35044
+    },
+    "packages/database/migrations/manifest.generated.json": {
+      "sha256": "0aed48efa48d9eb14f4a7bc620f0c3b7d04968fcecd0a742af3eaca75fa0daf5",
+      "bytes": 22485
+    },
+    "packages/database/overlays/0032_intake_direct_publication.sql": {
+      "sha256": "87fb79a0ceaa09f7ff724b5076ccca8e47fbc500f5be73e23e81ac14f8145e8a",
+      "bytes": 34645
+    },
+    "packages/database/package.json": {
+      "sha256": "432b96755bc700af4d3f5e142b0311c74b020e3e670bcc438dbc46804391f300",
+      "bytes": 1426
+    },
+    "packages/database/scripts/generate-migrations.mjs": {
+      "sha256": "d5116a7092a52816125d1469377dc0acd85164563f62a0e08bf0fb6d9a6d26e2",
+      "bytes": 35643
+    },
+    "packages/database/src/generated/migrations.generated.ts": {
+      "sha256": "1de2c88ceabca02ed336ef238a709e8605a7fb9d56290aa3311f0aebe83f5f02",
+      "bytes": 826617
+    },
+    "packages/database/src/verifier.ts": {
+      "sha256": "dc683cb134b25458e53bd25b59fc6e22bb7a9983fff3cff7f1cfb9475df5e2c4",
+      "bytes": 38367
+    },
+    "packages/database/tests/generator.test.ts": {
+      "sha256": "b054b8ab0013e37e699e3711f8547ed1c5363f46c2032cacd86ee40ec2413ae1",
+      "bytes": 16858
+    },
+    "packages/database/tests/planner.test.ts": {
+      "sha256": "f5ef6b1f6c68bd9252665a8408ce55c3e60b79d4432a2018ab948b68eb17ca23",
+      "bytes": 9857
+    },
+    "packages/database/tests/postgres.integration.test.ts": {
+      "sha256": "c4b4c0db1b6e0ce75a1f9fd8e1eaf96dad77af930722664de6b0a0713fe83afa",
+      "bytes": 66500
+    },
+    "packages/database/tests/support/family-catalog.ts": {
+      "sha256": "0af8acc811480140733a80f37282b9da23d8070017e3ce3e85debe412523680f",
+      "bytes": 3238
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78",
+      "bytes": 204364
+    },
+    "scripts/customer-agent-contract-set.mjs": {
+      "sha256": "d01432cc07058a333791b2231045e8e89e629d4da36576bc4f47349e571fc0e0",
+      "bytes": 23088
+    },
+    "scripts/intake-synthetic/cli.test.ts": {
+      "sha256": "40ac20cdc25a65a2144e119d4348ea359ae183813bc6208a3513604676e1bd3b",
+      "bytes": 7883
+    },
+    "scripts/intake-synthetic/host.test.ts": {
+      "sha256": "e1d2709428484fbe297691e253995f7772c47313c0b35cb40f1b60bb5f772f92",
+      "bytes": 5127
+    },
+    "scripts/intake-synthetic/run.ts": {
+      "sha256": "42746561dd36bae9c41139188d6d8f71f6ddd9b315ccfe383fb013b23743baf2",
+      "bytes": 5047
+    }
+  }
+}

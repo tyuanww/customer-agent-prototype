@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ✓ tests/postgres.integration.test.ts (49 tests | 46 skipped) 2804ms
+   ✓ PostgreSQL 15 immutable migration gate > appends only eight helper grants to the exact thirty-four-row ledger and preserves role attributes  1006ms
+   ✓ PostgreSQL 15 immutable migration gate > rejects predecessor owner LOGIN before granting any legacy helper capability  875ms
+   ✓ PostgreSQL 15 immutable migration gate > rolls newly granted helpers and ledger back if the same transaction fails the final verifier  922ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 46 skipped (49)
+   Start at  01:00:22
+   Duration  3.26s (transform 200ms, setup 0ms, collect 245ms, tests 2.80s, environment 0ms, prepare 58ms)
+

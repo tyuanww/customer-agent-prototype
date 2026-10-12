@@ -11,7 +11,7 @@ export type PreparedIdempotencyHashes = Readonly<{
   hashes: Readonly<Record<string, string>>;
 }>;
 
-function canonicalJson(value: CanonicalJsonValue): string {
+export function canonicalJson(value: CanonicalJsonValue): string {
   if (value === null || typeof value === 'boolean' || typeof value === 'string') {
     return JSON.stringify(value);
   }

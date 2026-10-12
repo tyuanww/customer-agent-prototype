@@ -1,0 +1,69 @@
+{
+  "revision": "bfa68aa6d6f35a8f700e49d9250a8dc7dac05061",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Functional-only; no HTTP/Main/renderer or native Windows UI tested.",
+    "All data synthetic; owned Unix socket PG and object directories cleaned by harness.",
+    "Two captures / eight selected tests."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t \"usage: another agent\" --reporter=dot",
+      "contract": "Second principal, shop + independently granted brand, immutable safe pages",
+      "expected": "One PG case passes with stored entitlement and reloaded pages, no internal notes or other shop",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n·----------------------------------------------------------------------------\n\n Test Files  1 passed (1)\n      Tests  1 passed | 76 skipped (77)\n   Start at  16:50:02\n   Duration  2.28s (transform 199ms, setup 0ms, collect 386ms, tests 1.71s, environment 0ms, prepare 43ms)\n\n"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t \"usage: (denies every page|pages within)\" --reporter=dot",
+      "contract": "Revocation/fact deadline fails closed; bounded vocabulary preserves complete records",
+      "expected": "Seven PG cases pass, permission or fact changes block later pages, 80/31 vocabulary pages and unpageable candidate rejection",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n--······----·----------------------------------------------------------------\n\n Test Files  1 passed (1)\n      Tests  7 passed | 70 skipped (77)\n   Start at  16:51:50\n   Duration  8.72s (transform 180ms, setup 0ms, collect 413ms, tests 8.15s, environment 0ms, prepare 42ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "usage: another agent",
+        "--reporter=dot"
+      ],
+      "hypothesis": "Because the successful second-agent read proves the valid path, test revocation and vocabulary boundaries next to detect stale authority or missing page content.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "env",
+        "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "usage: (denies every page|pages within)",
+        "--reporter=dot"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

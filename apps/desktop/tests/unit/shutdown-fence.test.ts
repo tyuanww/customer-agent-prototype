@@ -75,7 +75,7 @@ describe('overlay shutdown contract', () => {
     expect(main).toContain('controller = null');
     expect(main.indexOf('controller = null')).toBeLessThan(main.indexOf('outgoing?.dispose()'));
     expect(main).toContain('outgoing?.dispose()');
-    expect(main).toContain('app.on(\'before-quit\', beginShutdown)');
+    expect(main).toMatch(/app\.on\('before-quit', event => \{[\s\S]*?event\.preventDefault\(\); return;[\s\S]*?beginShutdown\(\)/);
     expect(main).toContain("}).catch((error: unknown) => {");
     expect(main).toContain("console.error('[bootstrap] 主进程启动失败，已安全退出。', error)");
     expect(main).toContain('process.env.DEMO_E2E_ACCELERATOR');

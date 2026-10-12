@@ -1,11 +1,11 @@
 {
   "schema": "customer-agent-contract-consumption/v1",
-  "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+  "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
   "source_repository": "ai-赋能立项",
-  "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-  "manifest_sha256": "4799468a36febe0c383163ebbb4c8a3b490bbada6e2707a2a31bccf63ca668c8",
-  "openapi_sha256": "39f69edfdbffcad6a57d3e9fc43e1f6a3cbdc1e8fdd951e30bdbbfe97eb3e394",
-  "database_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+  "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+  "manifest_sha256": "5824420144ff2a6267d588074594df56b9361df5908a03d5955d240826d58904",
+  "openapi_sha256": "3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94",
+  "database_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "ddev_authorized": false,
   "runtime_activated": false

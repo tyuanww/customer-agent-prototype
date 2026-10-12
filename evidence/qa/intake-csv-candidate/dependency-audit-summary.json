@@ -1,0 +1,23 @@
+{
+  "command": "pnpm audit --json",
+  "exitCode": 1,
+  "dependency": "csv-parse@7.0.3",
+  "license": "MIT",
+  "newDependencyAdvisories": [],
+  "wholeWorkspace": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 4,
+      "moderate": 19,
+      "high": 41,
+      "critical": 2
+    },
+    "dependencies": 153,
+    "devDependencies": 555,
+    "optionalDependencies": 76,
+    "totalDependencies": 709
+  },
+  "rawSha256": "60cc1a14b5564a363cfdbf8344bf60cb96f234239f70a19069571006c0bbb19b",
+  "rawPath": ".gstack/qa-reports/intake-csv-candidate/dependency-audit.json",
+  "note": "Workspace advisories include existing dependencies; this change does not remediate or claim a clean full audit."
+}

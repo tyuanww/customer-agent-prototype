@@ -1,0 +1,234 @@
+{
+  "base": "9a175ac",
+  "mode": "workspace",
+  "total_files": 18,
+  "reviewed_files": 18,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "files": [
+    {
+      "path": "apps/api/src/content-intake/discovery.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/api/src/content-intake/usage-http.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-access.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-query-ipc.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-query.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/preload/content-intake-query.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/renderer/QueryApp.tsx",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/QueryResultsPane.tsx",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/use-intake-shops.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/renderer/styles/app.css",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-query.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/shared/ipc-channels.ts",
+      "status": "reviewed"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/IntakeQueryFilters.tsx",
+      "status": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/inputs.json",
+      "status": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/outside-review.json",
+      "status": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/pg-observation.json",
+      "status": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/pg-receipt.json",
+      "status": "reviewed"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/review.json",
+      "status": "reviewed"
+    }
+  ],
+  "excluded": [
+    {
+      "path": "AGENTS.md",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "DESIGN.md",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "TODOS.md",
+      "status": "modified",
+      "insertions": 2,
+      "deletions": 2,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "apps/api/tests/content-intake-usage-http.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "status": "modified",
+      "insertions": 42,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/component/QueryApp.test.tsx",
+      "status": "modified",
+      "insertions": 5,
+      "deletions": 2,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/e2e/content-intake-query.spec.ts",
+      "status": "modified",
+      "insertions": 34,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/fixtures/intake-query-data.ts",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 5,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-query-ipc.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-query.test.ts",
+      "status": "modified",
+      "insertions": 39,
+      "deletions": 4,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "apps/desktop/tests/unit/contracts.test.ts",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "insertions": 3,
+      "deletions": 3,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-content-intake-p2-contract-handoff.md",
+      "status": "modified",
+      "insertions": 11,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/README.md",
+      "status": "added",
+      "insertions": 41,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/electron.txt",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/real-stack.txt",
+      "status": "added",
+      "insertions": 13,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query-filters/selectors.png",
+      "status": "binary",
+      "insertions": 0,
+      "deletions": 0,
+      "exclude_reason": "binary"
+    }
+  ],
+  "fixed": [
+    {
+      "severity": "P2",
+      "path": "apps/desktop/src/renderer/features/search/IntakeQueryFilters.tsx",
+      "issue": "details and filter text changed height without requesting layout",
+      "fix": "onToggle/text change use existing layout ACK; stable context participates in measured extent"
+    },
+    {
+      "severity": "P2",
+      "path": "apps/desktop/src/renderer/features/search/use-intake-shops.ts",
+      "issue": "normal choice retained usage invalidation error and remounted controls",
+      "fix": "current successful selection resets view; stable context preserves focus; optimistic intent stays query-disabled until accepted"
+    }
+  ],
+  "remaining_findings": [],
+  "native_adversarial": "completed, fixes rereviewed; tests reviewed in summary mode",
+  "outside": "unavailable: 180000ms timeout, no findings or model usage returned; not a pass"
+}

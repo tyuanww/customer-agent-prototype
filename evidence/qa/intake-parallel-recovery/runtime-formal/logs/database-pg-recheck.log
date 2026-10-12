@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+ ✓ tests/postgres.integration.test.ts (38 tests | 36 skipped) 2012ms
+   ✓ PostgreSQL 15 immutable migration gate > upgrades the approved 24-row ledger and verifies private context constraints  1036ms
+   ✓ PostgreSQL 15 immutable migration gate > appends the native publisher and usage context to the exact 23-row ledger and keeps every application pool sealed  975ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 36 skipped (38)
+   Start at  19:04:02
+   Duration  2.46s (transform 209ms, setup 0ms, collect 254ms, tests 2.01s, environment 0ms, prepare 56ms)
+

@@ -501,7 +501,7 @@ function isProductAnnounceUnreadValue(value: unknown): boolean {
 }
 
 describe('install-stable client id', () => {  it('binds a distinct announce client id per signed-in user', () => {
-    const feishu = announceClientId(installId, 'usr_ou_5a6b7c7a3ae19edc72676dbfff328f75');
+    const feishu = announceClientId(installId, 'usr_synthetic_feishu');
     expect(boundClientId).toMatch(/^desk_[0-9a-f]{32}$/);
     expect(feishu).toMatch(/^desk_[0-9a-f]{32}$/);
     expect(feishu).not.toBe(boundClientId);

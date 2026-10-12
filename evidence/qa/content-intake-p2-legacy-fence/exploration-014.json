@@ -1,0 +1,38 @@
+{
+  "observationCapture": "013",
+  "observationArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-release.integration.test.ts",
+    "-t",
+    "inherits the catalog|inheritance cannot complete"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-release.integration.test.ts (13 tests | 11 skipped) 1921ms\n   ✓ content publish and rollback > inherits the catalog on a disjoint-domain legacy publish and refuses legacy rollback through it  987ms\n   ✓ content publish and rollback > rolls back the old release, pointer, announcement and catalog when inheritance cannot complete  933ms\n\n Test Files  1 passed (1)\n      Tests  2 passed | 11 skipped (13)\n   Start at  10:56:13\n   Duration  2.37s (transform 185ms, setup 0ms, collect 311ms, tests 1.92s, environment 0ms, prepare 35ms)\n\n",
+  "hypothesis": "The repaired catalog consumer and rollback pass; validate the final combined import/cancellation, source and evidence regression suites after their test type correction, including real concurrent HTTP cancellation and upload.",
+  "nextCapture": "014",
+  "nextArgv": [
+    "env",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:/Users/hutou/homebrew/bin:/usr/bin:/bin",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-release.integration.test.ts",
+    "tests/content-intake.integration.test.ts",
+    "tests/content-intake-material.test.ts",
+    "tests/content-import.integration.test.ts",
+    "tests/content-worker.integration.test.ts"
+  ]
+}

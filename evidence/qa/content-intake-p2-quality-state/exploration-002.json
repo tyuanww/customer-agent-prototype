@@ -1,0 +1,28 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "freezes quality before"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (45 tests | 44 skipped) 1046ms\n   ✓ P2 sealed synthetic authority and durable candidates > freezes quality before individual checks, survives service recreation and creates no approval or release  1046ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 44 skipped (45)\n   Start at  15:21:31\n   Duration  1.48s (transform 150ms, setup 0ms, collect 296ms, tests 1.05s, environment 0ms, prepare 31ms)\n\n",
+  "hypothesis": "The persisted success path passed, so now verify invalid samples leave no writes and the corrected 5000-row limit still respects the unchanged transaction budget.",
+  "nextCapture": "002",
+  "nextArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "rejects omitted|all 5000 critical checks"
+  ]
+}

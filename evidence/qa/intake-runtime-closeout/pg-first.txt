@@ -1,0 +1,82 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api
+
+ ❯ tests/intake-runtime-closeout.integration.test.ts (18 tests | 5 failed) 26897ms
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > uses existing Feishu identity normalization, native observation, restricted writer, usage and management HTTP 1748ms
+     → expected 400 to be 201 // Object.is equality
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for disabled facts after a real session was issued 1475ms
+     → expected 400 to be 201 // Object.is equality
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for job facts after a real session was issued 1459ms
+     → expected 400 to be 201 // Object.is equality
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for department facts after a real session was issued 1396ms
+     → expected 400 to be 201 // Object.is equality
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for expired facts after a real session was issued 1371ms
+     → expected 400 to be 201 // Object.is equality
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on missing-job refresh refusal  1602ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on unregistered refresh refusal  1486ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on network refresh refusal  1466ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > aborts in-flight native reads before draining pools and can restart against retained receipts  1579ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after wrong-purpose startup rejection  1425ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after admin startup rejection  1494ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after auth-role startup rejection  1923ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after storage startup rejection  1612ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects scope configuration before opening resources  1305ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects remote-origin configuration before opening resources  1215ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects duplicate-login configuration before opening resources  1167ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects profile configuration before opening resources  1294ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects implicit-database configuration before opening resources  1877ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > uses existing Feishu identity normalization, native observation, restricted writer, usage and management HTTP
+AssertionError: expected 400 to be 201 // Object.is equality
+
+- Expected
++ Received
+
+- 201
++ 400
+
+ ❯ login tests/intake-runtime-closeout.integration.test.ts:66:28
+     64|     const created = await json(`${runtime!.address}/v1/auth/login-requ…
+     65|       body: JSON.stringify({ client_challenge: createHash('sha256').up…
+     66|     expect(created.status).toBe(201);
+       |                            ^
+     67|     const state = new URL(created.body.authorize_url as string).search…
+     68|     const callback = await fetch(`${runtime!.address}/v1/auth/callback…
+ ❯ tests/intake-runtime-closeout.integration.test.ts:81:34
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for disabled facts after a real session was issued
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for job facts after a real session was issued
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for department facts after a real session was issued
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for expired facts after a real session was issued
+AssertionError: expected 400 to be 201 // Object.is equality
+
+- Expected
++ Received
+
+- 201
++ 400
+
+ ❯ login tests/intake-runtime-closeout.integration.test.ts:66:28
+     64|     const created = await json(`${runtime!.address}/v1/auth/login-requ…
+     65|       body: JSON.stringify({ client_challenge: createHash('sha256').up…
+     66|     expect(created.status).toBe(201);
+       |                            ^
+     67|     const state = new URL(created.body.authorize_url as string).search…
+     68|     const callback = await fetch(`${runtime!.address}/v1/auth/callback…
+ ❯ tests/intake-runtime-closeout.integration.test.ts:97:34
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 13 passed (18)
+   Start at  02:25:38
+   Duration  28.68s (transform 877ms, setup 0ms, collect 1.50s, tests 26.90s, environment 0ms, prepare 102ms)
+
+undefined
+/Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/intake-runtime-closeout.integration.test.ts --no-file-parallelism

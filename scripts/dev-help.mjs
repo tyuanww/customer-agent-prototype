@@ -22,6 +22,18 @@ const text = `客服话术浮窗 Demo · 开发入口
   4. 逐步说明：docs/tutorial-first-run.md
   5. 贡献约定：CONTRIBUTING.md
 
+P1 合成资料导入验证（不启动产品、API 或真实飞书）：
+  pnpm test:content-intake:p1
+  pnpm content:intake:probe  # 生成并重开合成 XLSX/报告，测量限制和取消
+  说明：docs/how-to-develop-content-intake.md
+
+P2 FAQ 桌面与实库合成联调（Mac / WSL 后端，不读取业务配置）：
+  pnpm dev:intake:synthetic  # 前台临时数据库；按输出的独立配置启动桌面
+  pnpm test:intake:synthetic # 真实 API / PG 合成流程
+  pnpm test:intake:desktop   # Mac Electron + API / PG；需桌面图形环境
+  合成审批由终端 approve 显式推进；约 5 分钟事实到期后清理宿主数据，独立桌面目录退出后手动清理。
+  说明：docs/how-to-develop-content-intake.md
+
 文档写错了或命令对不上：
   GitHub Issues → 模板「文档」或「缺陷」
 `;

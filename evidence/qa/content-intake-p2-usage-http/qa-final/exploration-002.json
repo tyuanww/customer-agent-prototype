@@ -1,0 +1,29 @@
+{
+  "observationCapture": "001",
+  "observationArgv": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake-usage-http.test.ts"
+  ],
+  "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-usage-http.test.ts (15 tests) 61ms\n\n Test Files  1 passed (1)\n      Tests  15 passed (15)\n   Start at  23:25:56\n   Duration  397ms (transform 100ms, setup 0ms, collect 189ms, tests 61ms, environment 0ms, prepare 35ms)\n\n",
+  "hypothesis": "All 15 strict-ingress/error/sink cases pass on final source; confirm the same repaired adapter still delivers actual published PG material through the real desktop session and cleans up.",
+  "nextCapture": "002",
+  "nextArgv": [
+    "env",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+    "pnpm",
+    "--filter",
+    "@customer-agent/api",
+    "exec",
+    "vitest",
+    "run",
+    "tests/content-intake.integration.test.ts",
+    "-t",
+    "Main consumes actual synthetic HTTP"
+  ]
+}

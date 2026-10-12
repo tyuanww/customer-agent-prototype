@@ -26,11 +26,66 @@ function ledgerRow(index: number) {
 }
 
 describe('database migration planner', () => {
+  it('accepts only the declared repair at position 40 after the additive predecessor', () => {
+    const prefix = generatedMigrationCatalogue.migrations.slice(0, 39);
+    const repair = { contractSetId: 'cs-ai-c11-openapi-1.24.0-schema-1.28-' + 'a'.repeat(12),
+      sourceGitSha: 'a'.repeat(40), sourceSchemaSha256: 'b'.repeat(64) };
+    const sql = '-- GENERATED FILE. Synthetic repair test\nSELECT 1;';
+    const migration = { ...repair, position: 40, id: '0040_intake_repair_successor_v1_28',
+      bytes: Buffer.byteLength(sql), sha256: createHash('sha256').update(sql).digest('hex'), sourceRanges: [], sql };
+    const catalogue = { ...generatedMigrationCatalogue, migrations: [...prefix, migration],
+      compatibility: { ...generatedMigrationCatalogue.compatibility, repairSuccessor: { ...repair, migrationSha256: migration.sha256 } } };
+    expect(() => assertMigrationCatalogue(catalogue)).not.toThrow();
+    for (const change of [{ id: '0040_unapproved' }, { sourceGitSha: 'c'.repeat(40) }]) {
+      expect(() => assertMigrationCatalogue({ ...catalogue, migrations: [...prefix, { ...migration, ...change }] })).toThrow(DatabaseMigrationError);
+    }
+    expect(() => assertMigrationCatalogue({ ...catalogue,
+      compatibility: { ...catalogue.compatibility, repairSuccessor: null } })).toThrow(DatabaseMigrationError);
+  });
+
+  it('accepts identical wire-only predecessor prefixes before a later overlay and rejects duplicate identities or changed DDL', () => {
+    const quality = { contractSetId: 'cs-ai-c11-openapi-1.18.0-schema-1.21-18297cf802b1',
+      sourceGitSha: '18297cf802b195d8ff4e9f625143e50bff169418',
+      sourceSchemaSha256: '5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013', migrationCount: 26 };
+    const beforeQuality = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.filter(p => p.contractSetId !== quality.contractSetId && p.migrationCount <= quality.migrationCount);
+    const afterQuality = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.filter(p => p.migrationCount > quality.migrationCount);
+    const catalogue = { ...generatedMigrationCatalogue,
+      compatibility: { ...generatedMigrationCatalogue.compatibility, priorReviewedUpgrades: [...beforeQuality, quality, ...afterQuality] } };
+    expect(() => assertMigrationCatalogue(catalogue)).not.toThrow();
+    const status = deriveMigrationStatus(generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)), catalogue);
+    expect(status.state).toBe('COMPLETE');
+    expect(planMigrationCatalogue(status).migrations).toEqual([]);
+    for (const priorReviewedUpgrades of [
+      [...beforeQuality, { ...quality, sourceSchemaSha256: 'f'.repeat(64) }],
+      [...beforeQuality, quality, quality],
+      [...beforeQuality, { ...quality, migrationCount: 24 }],
+    ]) expect(() => assertMigrationCatalogue({ ...catalogue, compatibility: { ...catalogue.compatibility, priorReviewedUpgrades } }))
+      .toThrow(/reviewed-upgrade metadata/);
+    for (const change of [{ migration_sha256: 'f'.repeat(64) }, { contract_set_id: quality.contractSetId }]) {
+      const rows = generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index));
+      rows[rows.length - 1] = { ...rows.at(-1)!, ...change };
+      expect(() => deriveMigrationStatus(rows, catalogue)).toThrow(DatabaseMigrationError);
+    }
+  });
+
+  it('preserves the exact thirty-four-row predecessor while planning its legacy CHECK ACL suffix', () => {
+    expect(() => assertMigrationCatalogue(generatedMigrationCatalogue)).not.toThrow();
+    const prior = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;
+    expect(prior.migrationCount).toBe(34);
+    const prefix = deriveMigrationStatus(generatedMigrationCatalogue.migrations.slice(0,34).map((_,index)=>ledgerRow(index)),generatedMigrationCatalogue);
+    expect(prefix.pending.map(m=>m.id)).toEqual(['0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29']);
+    for (const change of [{ sourceSchemaSha256: 'f'.repeat(64) }, { contractSetId: generatedMigrationCatalogue.contractSetId }, { migrationCount: generatedMigrationCatalogue.migrations.length + 1 }]) {
+      const invalid = { ...generatedMigrationCatalogue, compatibility: { ...generatedMigrationCatalogue.compatibility,
+        priorReviewedUpgrades: [...generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1), { ...prior, ...change }] } };
+      expect(() => assertMigrationCatalogue(invalid)).toThrow(/reviewed-upgrade metadata|provenance changes/);
+    }
+  });
+
   it('plans only the missing suffix for partial and complete ledgers', () => {
     const partial = deriveMigrationStatus([ledgerRow(0), ledgerRow(1)], generatedMigrationCatalogue);
     expect(partial.state).toBe('PARTIAL');
     expect(partial.pending[0]?.id).toBe('0003_events_and_metrics');
-    expect(planMigrationCatalogue(partial).migrations).toHaveLength(17);
+    expect(planMigrationCatalogue(partial).migrations).toHaveLength(generatedMigrationCatalogue.migrations.length - 2);
 
     const complete = deriveMigrationStatus(
       generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index)),
@@ -39,7 +94,7 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 10-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 32-migration current suffix',
     );
   });
 
@@ -62,7 +117,7 @@ describe('database migration planner', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24', '0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29',
     ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
@@ -136,7 +191,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(19);
+    expect(status.pending).toHaveLength(41);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });

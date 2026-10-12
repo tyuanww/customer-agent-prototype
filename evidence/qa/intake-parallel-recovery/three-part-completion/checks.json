@@ -1,0 +1,358 @@
+{
+  "status": "SCOPED_SYNTHETIC_PASS_FORMAL_RUNTIME_NOT_ACTIVATED",
+  "recordedAt": "2026-10-08T18:49:22.403935+08:00",
+  "baseCommit": "cff9fa9b611a5f77de465b3a5ee1022c64027d9c",
+  "recovery": {
+    "A": [
+      "84f7f12",
+      "8656d04"
+    ],
+    "B": [
+      "96c2440",
+      "8b78bfa"
+    ],
+    "governance": "6a25304",
+    "governanceSource": "1b917512a7ac9aa95814fb04eca1149c6b067c50"
+  },
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15.18",
+    "dependencyInstall": false,
+    "fixtures": "synthetic only"
+  },
+  "results": {
+    "rootLint": {
+      "command": "pnpm lint",
+      "exit": 0,
+      "log": "lint.log"
+    },
+    "rootTypecheck": {
+      "command": "pnpm typecheck",
+      "exit": 0,
+      "log": "typecheck-final.log"
+    },
+    "rootTests": {
+      "command": "pnpm test",
+      "exit": 0,
+      "log": "test.log",
+      "api": {
+        "passed": 550,
+        "skipped": 312
+      },
+      "desktop": {
+        "passed": 1326,
+        "skipped": 7
+      }
+    },
+    "rootBuild": {
+      "command": "pnpm build",
+      "exit": 0,
+      "log": "build.log"
+    },
+    "finalDelta": {
+      "tests": 55,
+      "exit": 0,
+      "log": "final-delta.log",
+      "files": [
+        "customer-agent-contract-set.test.ts",
+        "content-intake-permissions.test.ts",
+        "content-intake-permissions-ipc.test.ts",
+        "intake-permissions.test.tsx",
+        "intake-management.test.tsx"
+      ]
+    },
+    "finalDesktopBuild": {
+      "exit": 0,
+      "log": "desktop-build-final.log"
+    },
+    "finalDesktopTypes": {
+      "exit": 0,
+      "log": "desktop-types-final.log"
+    },
+    "finalDeltaLint": {
+      "exit": 0,
+      "log": "lint-final-delta.log"
+    },
+    "grantsHTTP": {
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/intake-grants-http.integration.test.ts",
+      "passed": 3,
+      "exit": 0,
+      "log": "grants-integrated.log"
+    },
+    "electronFinal": {
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 CUSTOMER_AGENT_INTAKE_PURPOSE_CANDIDATE=1 playwright test tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts",
+      "passed": 3,
+      "exit": 0,
+      "log": "electron-final.log",
+      "scope": [
+        "director grants named agent query and revokes",
+        "upload/report/revision/cancel/confirm publication/other seat clipboard",
+        "rollback creates new publication/other seat clipboard"
+      ],
+      "organizationPool": "precheck only"
+    },
+    "bundleRoundtrip": {
+      "files": 12,
+      "runtimeSources": 9,
+      "log": "bundle-roundtrip.log",
+      "productRoot": "isolated temporary fixture",
+      "realLockUnchanged": true
+    },
+    "governance": {
+      "pgChecks": 253,
+      "contractExportTests": 7,
+      "legacyDirectTests": 7,
+      "releaseSteps": 41,
+      "releaseExit": 0,
+      "inputFingerprintsVerified": 25,
+      "rawLogsRecoveredAndVerified": 14,
+      "checks": "/Users/hutou/Desktop/ai-content-intake-p2-contracts/business-docs/01-客服Agent项目/30-开发-进行中/content-intake-runtime-candidate/checks.json"
+    },
+    "docs": {
+      "exit": 0,
+      "log": "docs-final.log"
+    },
+    "architecture": {
+      "exit": 0,
+      "log": "architecture.log"
+    },
+    "contractVerify": {
+      "exit": 0,
+      "log": "contracts-verify.log"
+    },
+    "workspace": {
+      "exit": 1,
+      "log": "workspace.log",
+      "rootPolicy": "PASS",
+      "sourceBudget": "FAIL",
+      "remainder": "33.2 MiB",
+      "budget": "32.0 MiB",
+      "over": "1.17 MiB"
+    },
+    "desktopHTML": {
+      "path": "/Users/hutou/Desktop/客服Agent-内容板块与发布流程.html",
+      "sha256": "d4a98cf02ee4e976026d7bded9282eb9cd0b990ccc67614b6d15480c5f3407f8",
+      "result": "five tabs, one visible panel, offline render, 390px no overflow, no JS errors; original keyboard checks reused",
+      "inProductRuntime": false
+    }
+  },
+  "evidenceReuse": {
+    "fourDomainHTTP": "evidence/qa/intake-release-acceptance/checks.json; upload/quality/publication code paths and candidate SQL unchanged; integrated product Electron rerun",
+    "fullChecks": "Full test and typecheck precede final narrow Main stale failure fix and switch appearance fix; affected 55 tests, lint/types/build and all 3 Electron rerun after them",
+    "priorRoleReview": "15/15 reused; role ceiling and migration0030 unchanged"
+  },
+  "preservedFailures": {
+    "typecheck.log": "exit2: new consumer adapter requires error factory; test seam fixed; subsequent full typecheck PASS",
+    "electron-mac.log": "exit1: checkbox hidden; existing publication+rollback2 passed; fixed CSS then final3 PASS",
+    "workspace.log": "existing size budget remains failed; no threshold change or deletion"
+  },
+  "candidate": {
+    "status": "DRAFT_NOT_FROZEN",
+    "openapi": "1.21.0",
+    "schema": "1.23",
+    "openapiSha256": "bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7",
+    "schemaSha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e",
+    "installationSha256": "1683c487d6dc84e84b44d9f2a80ca9ab9cfb941144ace8d3b2cf7f520bb58486"
+  },
+  "formalConsumer": {
+    "contractSet": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
+    "unchangedSinceBase": true,
+    "migrations": 32,
+    "version": "0.3.26",
+    "ddevAuthorized": false,
+    "runtimeActivated": false
+  },
+  "inputs": {
+    "AGENTS.md": "f46391b584356b7e42f0995f40a7076477832e8c6e1444bcd6576ce7a06123a9",
+    "TODOS.md": "d3dc35adf6a0e3085d28709ab0d6829689da45d6f7ad8e49afc9b088646575b2",
+    "VERSION": "96dc7b2030f175dace0b2bf3be7de7f39acbbec8a0bdc76ac19a58945e8e58e5",
+    "apps/api/dist/content-intake/management-http.js": "a8aec4551e7cc8ab92b21de07f98ea93444d60b6859f5e7143c539b3ea7a337a",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/README.md": "2c3e0f5d6548b45007f8d7c3a6db2608f258bbc9db6e00444a587ddfd3f1f23e",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/directory-acl.sql": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/manifest.json": "c911f74fd3840ac993c6f31630ae73b7378fe40c4269eb0a0805b5b29eeebdba",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/organization.sql": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/purpose-acl.sql": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/roles.sql": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/session-lock.sql": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+    "apps/api/experiments/intake-runtime/acceptance-candidate/storage.delta.sql": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+    "apps/api/experiments/intake-runtime/consumer-pool.ts": "5b829c4d86d01f95d5875aae44045b7c3d76a0a6b5e1dd7aa89d7665cefe9ba1",
+    "apps/api/src/content-intake/authority.ts": "cfdf8829a75b4cf7ed9672a503e5d0a4089efe18a38a253333b1be29d0a38cec",
+    "apps/api/src/content-intake/discovery.ts": "f442e0b40843e619ed3928d188a4f212388c5ae1126972ae5c356255997b639b",
+    "apps/api/src/content-intake/grants-http.ts": "71d9e5bdd9406ad19947377954c6c6e4fad0022fe1e29dce7c22e077d2dc3f91",
+    "apps/api/src/content-intake/management-http.ts": "b57937ad7d6848e3bd5ddbe4bffa897fd259d4af0aea0a0bb0aebe894ff0b1da",
+    "apps/api/src/content-intake/service.ts": "1ad700408e608f76ebc065f168e0c056425af53bc83e18191aae416b9c2d3996",
+    "apps/api/tests/intake-grants-http.integration.test.ts": "90fa34e23cd00c941ddd4b2c6b5c632daea40c1190d953b5b52ddad4888e97a2",
+    "apps/api/tests/intake-runtime-candidate.integration.test.ts": "720ee658572977b0a9f9e0658e572996ae60d5318fa45c5c43d99c056c681641",
+    "apps/api/tests/intake-runtime-consumer-pool.test.ts": "6c0440c08b3b94c46d30ce7c5936037b87d8687d01afc8874fbbaa533f975e60",
+    "apps/api/tests/intake-runtime-consumers.integration.test.ts": "e1da4284f27f865627e9d70f36c4e9b2620e3653d6f056b30b0d5fad6f537375",
+    "apps/api/tests/support/intake-runtime-candidate.ts": "9dcb530f4416de3bd35324210b8baa96bb95fe091a52fdf1638b4b73527102c9",
+    "apps/api/tests/support/intake-synthetic-host.ts": "b705a53250b7e6f869e44e9050f691d89daa167ad0382c72690ba1b3c34d14c0",
+    "apps/api/tests/support/intake-synthetic-seed.ts": "797e870961ffe88b5441432a6c7358d704fbd546470cd49b9961481ec348bdf3",
+    "apps/desktop/out/main/index.js": "d66a1747eb2c84395c5a59ae27e912a21cb09513f97e6af88ee7f5151031dcb6",
+    "apps/desktop/src/main/content-intake-access.ts": "4a2e3903d2398bcacdb33289e380b9173f5e0a7b41fd68193676a852a52e1d11",
+    "apps/desktop/src/main/content-intake-permissions-ipc.ts": "6c2bf636b187eb00ae9a000f906c33cdc9ccc46ab2b04c709bb4cab7d1ec8b05",
+    "apps/desktop/src/main/content-intake-permissions.ts": "080be9165a1075a47a2220d9a104a0e77d59d8fa3d0efca83fa27064a736500c",
+    "apps/desktop/src/main/main.ts": "4551c6c6c6cb8ca58d49a68719492d32d43c4f42e24598dd863f2b07ae6b3d63",
+    "apps/desktop/src/preload/dashboard.ts": "ff565afa3afa0f8d2f3cf9fb12ea9d1d9ccb79ea9f5ee20b75e2516c5ac549ed",
+    "apps/desktop/src/preload/global.d.ts": "f0b10bdea40647bcb9d5edc70cf0c044eb6b44e9663e80df9102f992d2fb210b",
+    "apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx": "4d2608aaf555be882c866222ba71ee5710d678f7ea05869dd3b572c2d0b42fb8",
+    "apps/desktop/src/renderer/features/dashboard/IntakePermissions.tsx": "5c099e5666a6f46dfedb1f0fda6355fc19f4d500ca25c9e317a936aaafd5d2e3",
+    "apps/desktop/src/renderer/features/dashboard/intake-management.css": "657c953ebd9a277cd5594659fea0bb68894216aa68163f3cd4a936635b95c80a",
+    "apps/desktop/src/shared/content-intake-permissions.ts": "b49bec4a20ef50f65e6352131f851ef8773121ddee60f0284b172562eb417394",
+    "apps/desktop/tests/component/intake-permissions.test.tsx": "c7712acc3b4e3600d3bc382fcb504c275a86c64551fcd8f2d5c799fcda306e05",
+    "apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts": "952e1d8f818e913ed4feb2bf0772717fa560113e3df89c4640d01924935a3a48",
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": "5535c2b7848a4d1e7a1e9e607914d965d73c547bc66a1e73f43f51ebc7d27504",
+    "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts": "d9dae9441a5867bdae77187a86af9405c367e5ec1329e2d21d69cefa2af90dc0",
+    "apps/desktop/tests/fixtures/intake-permissions-data.ts": "1c2f8043feed7b5c2760b359aab9543859d76684b17a42d7317e46699f0a56a3",
+    "apps/desktop/tests/unit/content-intake-permissions-ipc.test.ts": "b95800c60c6230c1390cc08b0be7877f2517d1a3cfe888484101d0de5ef66c7b",
+    "apps/desktop/tests/unit/content-intake-permissions.test.ts": "a7016beecae1f08af47d761b16696a1c397eca0387e28c685d89ed0c4286dac6",
+    "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": "1d02f5bd7f736e68d7fc4ff1199e519923400b3ad02fd1ae004aad380e279c84",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "96f85ac2b8072cb6b33b64f11b3ae65122f24c7e834ae4b58cde1d24dfbf79b4",
+    "docs/how-to-develop-content-intake.md": "a07704c4da241a00b33eae8030e833e65da88f1243c43b9a4477925a647559a9",
+    "docs/plans/2026-10-03-content-intake-requirements.md": "e7ef12e2f1d6af14098e7b1c6260e9e978b55bbea09c1e990cfdb14a9747dd7a",
+    "docs/reference-content-intake-p2-contract-handoff.md": "f495bbf54344be93d2b77f02064410eeb782c81fac4165f3f6cc0aa2a128b762",
+    "docs/reference-project-architecture.md": "8717fd6bb40411b8f49e9075135b47dec55ad091a765d20c62a84e76eddb7a93",
+    "package.json": "9f1060af882ccbd5b043501804ee3901c3a1328765201262de427fedf1e81783",
+    "packages/database/migrations/manifest.generated.json": "0aed48efa48d9eb14f4a7bc620f0c3b7d04968fcecd0a742af3eaca75fa0daf5",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78",
+    "scripts/customer-agent-contract-set.mjs": "d25dad27a5ddd1683e9d7c23bb9cb09cd1a779b585b32014b150d81e4e2b0446",
+    "scripts/intake-synthetic/host.test.ts": "02e24c5769a549fd223790f6adb469535985de8842d94b18fcf2fcac5cf35394"
+  },
+  "logs": {
+    ".gstack/intake-three-part-completion/architecture.log": {
+      "sha256": "ad162348d2ce245e4c942233b6f9fef09657062cf39d04ba804f2386e3489411",
+      "bytes": 100
+    },
+    ".gstack/intake-three-part-completion/build.log": {
+      "sha256": "d439b3205abd7538ee45148fed5c32b2704a2a4b3f1fd83230a3a4902dbb8206",
+      "bytes": 24952
+    },
+    ".gstack/intake-three-part-completion/bundle-binding-lint.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".gstack/intake-three-part-completion/bundle-binding-regression.log": {
+      "sha256": "0835ceaae06147780b431482f526403d74467b239e7e650e67790407cf19452b",
+      "bytes": 360
+    },
+    ".gstack/intake-three-part-completion/bundle-roundtrip.log": {
+      "sha256": "d05cdad9bf60abfae160f4a2a627aedf07559a1c7eaa267b587486da6e48b15e",
+      "bytes": 605
+    },
+    ".gstack/intake-three-part-completion/contracts-verify.log": {
+      "sha256": "802a1b5cb0942496f9d90204e32e94b2682361a58168363b16c27f163000d0ec",
+      "bytes": 644
+    },
+    ".gstack/intake-three-part-completion/desktop-build-final.log": {
+      "sha256": "044842b3754f1228f97cac98acb9e39cda24dc9637d7f1c3ff5a94bcb84c8cb3",
+      "bytes": 1279
+    },
+    ".gstack/intake-three-part-completion/desktop-build-fix.log": {
+      "sha256": "37c34f425df96c21bd9d6edd5fc60cb4e4e318ceecd961e62000e009ecd99d69",
+      "bytes": 1279
+    },
+    ".gstack/intake-three-part-completion/desktop-types-final.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".gstack/intake-three-part-completion/docs-final.log": {
+      "sha256": "19308abadb923e7333ca5542259f5990280b5c7f5a3f104ec8e56018fdeaa640",
+      "bytes": 121
+    },
+    ".gstack/intake-three-part-completion/docs.log": {
+      "sha256": "19308abadb923e7333ca5542259f5990280b5c7f5a3f104ec8e56018fdeaa640",
+      "bytes": 121
+    },
+    ".gstack/intake-three-part-completion/electron-final.log": {
+      "sha256": "32d20ce141e211987c65124ab6dc898be6eba99ea5a533a364b425087426dfc4",
+      "bytes": 2540
+    },
+    ".gstack/intake-three-part-completion/electron-mac.log": {
+      "sha256": "81ae3732b26ef9e66d1f4329df0a39bc057b7521916ce488179224b9cf709c27",
+      "bytes": 5040
+    },
+    ".gstack/intake-three-part-completion/electron-purpose-fixed.log": {
+      "sha256": "bce33ff55fcb323d84977b81551ef659193d72787cf729888c3edaf39d50f838",
+      "bytes": 2354
+    },
+    ".gstack/intake-three-part-completion/final-delta.log": {
+      "sha256": "eb93fee3f604e7e9c5039a66524049ca9af9f37f0b4540fdde3505b9303b5fe3",
+      "bytes": 627
+    },
+    ".gstack/intake-three-part-completion/grants-integrated.log": {
+      "sha256": "56e705bffef3efbd4a7bd4e3229a646aa305ead212b192ed46304fc691809c21",
+      "bytes": 814
+    },
+    ".gstack/intake-three-part-completion/lint-final-delta.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".gstack/intake-three-part-completion/lint.log": {
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "bytes": 11
+    },
+    ".gstack/intake-three-part-completion/permission-late-failure-lint.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".gstack/intake-three-part-completion/permission-late-failure-types.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".gstack/intake-three-part-completion/permission-late-failure.log": {
+      "sha256": "e38a13f41395c26097b1c588b7527b9a0fd148701dcef17f6c90fb8056c6dd7b",
+      "bytes": 423
+    },
+    ".gstack/intake-three-part-completion/permissions-visual.log": {
+      "sha256": "7557184a9dc455e08cf13367d429b1571ea9341b4deb09623b365fa20efc424b",
+      "bytes": 730
+    },
+    ".gstack/intake-three-part-completion/test.log": {
+      "sha256": "fd2d1c66f98cc6ac3a78f11a7c29ef58eb5a89f215d9feb51493ad562592a843",
+      "bytes": 68805
+    },
+    ".gstack/intake-three-part-completion/typecheck-final.log": {
+      "sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+      "bytes": 612
+    },
+    ".gstack/intake-three-part-completion/typecheck.log": {
+      "sha256": "bafe7e3363fe5d0ac508c7cd2e2fca7c6d07992343d3734b9cada25bafc654d4",
+      "bytes": 989
+    },
+    ".gstack/intake-three-part-completion/workspace.log": {
+      "sha256": "8620f85063bc5487bd1cc9f4fcb894d716174656fa88b5333f3153808d5a46d5",
+      "bytes": 226
+    }
+  },
+  "screenshots": {
+    ".gstack/intake-permissions/2026-10-08T10-45-24.543Z/permissions-dark.png": "bc671ded16288297238b37d264393723f6957ea62f2752796e83e39935bbdacf",
+    ".gstack/intake-permissions/2026-10-08T10-45-24.543Z/permissions-light.png": "68664823c616d14eec8bcb152622b0cb5ee8dfb2ad24bc77c9e481c8f26ade14",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-cancelled.png": "66b183a4c962406c43080593a10a6de347efb96ce0d1fc8a164879ef8c0c1b7d",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-intake-dark.png": "a4c4f74a5a33829467bedd8394a9732c501a707796c80316e9186c300778e6c0",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-intake-declaration-dark.png": "d71cff92db4d4e937073fbd99376637f058a12cee5489e72791b1d18ea056f22",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-intake-light.png": "fefc2261277b3ea66d806131fcdee3e7769f947824d22e8a7cb1f983e43f5f6e",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-intake-minimum-dark.png": "b318591b6c10fbb8f1829af919e36b1b2cbb5249e0ca45ff940791f6ed4c1d1a",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-intake-start.png": "c53aba85423d18f6385253503767d17589cfccd36f54fe6b41107d988048ca13",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-published.png": "f03c8401baa74bd48f40631ae6c6b03deea222a099a7a0a54e25fd4276e65931",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-revision-v2.png": "d65e5b34f936165fbe5e64c1ba5bd944e8e377692543bd5ddbff0540db82ebed",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-upload-error-report.png": "949f73421e7fdd2d913cee7dd4aa2a897be4bab523fc5ab4cfcc2b2020c1f683",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/dashboard-uploaded-material.png": "d57208005f0fd60654df75b6900313e99168c09f8f3e74e6dfda0a08ea73f3fc",
+    ".gstack/intake-synthetic/2026-10-08T10-45-28-528Z/query-published-faq.png": "27c018245e8ec650c5ae9797b48c83c7f96dc0f8dd9bd31e279c708213039b1c",
+    ".gstack/intake-synthetic/rollback-2026-10-08T10-45-43-524Z/rollback-dark.png": "77aacacfda40f088c6e7a867000ef61993c96ca871f6f86d5aa6ad67849aaa7e",
+    ".gstack/intake-synthetic/rollback-2026-10-08T10-45-43-524Z/rollback-light.png": "761f694768c088059160573e7428146458b085e00bc063b1b16eaf9e5fc0c232",
+    ".gstack/intake-synthetic/rollback-2026-10-08T10-45-43-524Z/rollback-ordinary-seat.png": "db467e30d90314a1acc138a64ddcd31b40b82e5fb83a350f529e577c2ea35029"
+  },
+  "notClaimed": [
+    "real Feishu transport/organization freshness",
+    "real shops/sources/owners/adoption",
+    "formal 1.21 freeze/export/intake",
+    "production factory or ACL activated",
+    "full external review passed",
+    "four content tabs separately tested in Electron",
+    "manager independently tested in Electron",
+    "manual native dialogs/Dock/Stage Manager/offline/Windows/installer acceptance"
+  ]
+}

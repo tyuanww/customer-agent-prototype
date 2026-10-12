@@ -1,0 +1,20 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-assembly/customer-agent-prototype
+
+ ✓ apps/api/tests/intake-runtime-consumer-pool.test.ts (3 tests) 3ms
+ ✓ apps/api/tests/intake-runtime-consumers.integration.test.ts (10 tests) 11796ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor  1314ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > publishes a confirmed corrective rollback through the actual service  1285ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > grants through the actual allocator and invalidates saved usage after revocation  1105ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > recovers an actually committed publication after a lost COMMIT response  1057ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT  1490ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > uses the worker pool for actual parser failure and report capacity without business writes  1049ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response  1040ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > keeps a real-shaped historical revoked approval unavailable to reads and rollback  1283ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > keeps a real-shaped historical expired approval unavailable to reads and rollback  1283ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected  889ms
+
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  17:16:22
+   Duration  12.29s (transform 195ms, setup 0ms, collect 499ms, tests 11.80s, environment 0ms, prepare 88ms)

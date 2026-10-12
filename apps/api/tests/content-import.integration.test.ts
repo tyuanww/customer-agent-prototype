@@ -340,6 +340,50 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     expect(byId.get(coachBatch.json().import_batch_id)).toBe('validating');
   });
 
+  it('serializes actor cancellation and upload on the same first lock without taking the admission lock early', async () => {
+    await seedSources(sha256(CSV));
+    const auth = await login('owner');
+    const first = await app.inject({ method: 'POST', url: '/v1/content/import',
+      headers: importHeaders(auth, '----t2boundary', 'idem-t2-lock-first'), payload: multipart(CSV, 'text/csv') });
+    expect(first.statusCode).toBe(202);
+    const holder = await harness.connect(dbConfig);
+    const pending: Promise<unknown>[] = [];
+    async function waitForContentWaiters(count: number) {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const result = await admin.query("SELECT count(*)::int AS n FROM pg_locks WHERE locktype='advisory' AND classid=724019 AND objid=1 AND NOT granted");
+        if (result.rows[0].n >= count) return;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      throw new Error('requests did not wait for the common content lock');
+    }
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT backend_review.lock_content()');
+      const cancelPending = app.inject({ method: 'POST', url: '/v1/content/import/imp_actor_in_flight_01/cancel',
+        headers: { ...auth, 'idempotency-key': 'idem-t2-lock-cancel', 'content-type': 'application/json' },
+        payload: { reason: 'synthetic-revise' } });
+      pending.push(cancelPending);
+      // Start light-my-request's lazy injection before observing its database locks.
+      void cancelPending.then(() => undefined);
+      await waitForContentWaiters(1);
+      const uploadPending = app.inject({ method: 'POST', url: '/v1/content/import',
+        headers: importHeaders(auth, '----t2boundary', 'idem-t2-lock-next'), payload: multipart(CSV, 'text/csv') });
+      pending.push(uploadPending);
+      void uploadPending.then(() => undefined);
+      await waitForContentWaiters(2);
+      expect((await admin.query("SELECT count(*)::int AS n FROM pg_locks WHERE locktype='advisory' AND classid=724019 AND objid=19 AND granted")).rows[0].n).toBe(0);
+      await holder.query('COMMIT');
+      const [cancelled, uploaded] = await Promise.all([cancelPending, uploadPending]);
+      expect(cancelled.statusCode, cancelled.body).toBe(200);
+      expect(uploaded.statusCode, uploaded.body).toBe(202);
+      expect((await admin.query('SELECT status FROM public.import_batches WHERE import_batch_id=$1', [first.json().import_batch_id])).rows[0].status).toBe('failed');
+    } finally {
+      await holder.query('ROLLBACK');
+      await Promise.allSettled(pending);
+      await holder.end();
+    }
+  });
+
   it('waits on the enqueue lock so a concurrent enqueue cannot slip past the sweep', async () => {
     const auth = await login('owner');
     // Hold the exact key assert_no_in_flight_content_import / enqueue take.

@@ -2,18 +2,18 @@
 
 export const CONTRACT_PROVENANCE = Object.freeze({
   "schema": "customer-agent-contract-codegen/v1",
-  "contract_set_id": "cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534",
+  "contract_set_id": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9",
   "source_repository": "ai-赋能立项",
-  "source_git_sha": "260ef224c5340a4d26e857bd02119044dd813f9a",
-  "manifest_sha256": "4799468a36febe0c383163ebbb4c8a3b490bbada6e2707a2a31bccf63ca668c8",
-  "openapi_version": "1.14.0",
-  "openapi_sha256": "39f69edfdbffcad6a57d3e9fc43e1f6a3cbdc1e8fdd951e30bdbbfe97eb3e394",
-  "database_version": "schema.v1.18",
-  "database_sha256": "5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa",
+  "source_git_sha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+  "manifest_sha256": "a5ebf6299b482881609e72fa41063c763f47f08bb6a36f78450bcd1d2de7fec6",
+  "openapi_version": "1.24.0",
+  "openapi_sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+  "database_version": "schema.v1.29",
+  "database_sha256": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771",
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "runtime_activated": false,
   "runtime_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
-  "component_schema_count": 165,
+  "component_schema_count": 246,
   "tools": {
     "openapi_typescript": "7.13.0",
     "yaml": "2.9.0",
@@ -23,18 +23,18 @@ export const CONTRACT_PROVENANCE = Object.freeze({
   "artifacts": {
     "bundle": {
       "path": "packages/contracts/openapi/bundle.generated.yaml",
-      "sha256": "a840444d834ce3cdd8e620721e9c953ffbd733449f076c95f8b1ceef27cd6bd2",
-      "bytes": 259810
+      "sha256": "048030ca51fdd3725a2370fac9e6494c0ed0265f1f034ab3495e2cdbd276beca",
+      "bytes": 570725
     },
     "types": {
       "path": "packages/contracts/src/generated/openapi.generated.ts",
-      "sha256": "e8ed79079696bf6e8e075f3ba8225444dbe2cd75389ac373245ada642719509f",
-      "bytes": 207173
+      "sha256": "4d73618ab96b45f87340912368aadd3750610247eae761482f7742557c85b4dc",
+      "bytes": 454617
     },
     "runtime_schema": {
       "path": "packages/contracts/src/generated/runtime-schema.generated.ts",
-      "sha256": "21c254ef8a46f74be8a9496abfb7c83f37db17b966c0fbcea5d90a0c1e6448ca",
-      "bytes": 130362
+      "sha256": "c9860905598d2d60164172751239654127ac1e38c2827e1d7e4e3089a5386534",
+      "bytes": 354026
     }
   }
 });

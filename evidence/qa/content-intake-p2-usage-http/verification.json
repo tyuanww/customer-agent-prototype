@@ -1,0 +1,158 @@
+{
+  "schema": "content-intake-usage-http-evidence/v1",
+  "base_commit": "90a72c57695b7d353622aa1cee9b476ddd060560",
+  "timestamp": "2026-10-06T15:28:11.581145+00:00",
+  "environment": {
+    "os": "macOS arm64",
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "postgresql": "15.18 ephemeral Unix-socket clusters"
+  },
+  "inputs": {
+    "apps/api/src/auth-service.ts": "bab918fef86eb5598e31ba6dbced67a2d2ab60cdc5b3a80d054a3beeb2d30c89",
+    "apps/api/src/content-intake/transaction.ts": "a4313c7e90b3bacf6cac567f97d2ca5e30cf85cfcc78505e25669cde2b6b541c",
+    "apps/api/src/content-intake/usage-http.ts": "3adb38223b6c67f84efc555aa0cdb7d36ef9e1d829e20e1f20dcf721a50ce68d",
+    "apps/api/src/content-intake/usage.ts": "a83f48533e7e19a0feb5b7fadc0266307d7a3b13c3b3487822ea3d37bd57ef59",
+    "apps/api/src/product-auth-service.ts": "a835aa796e6570e0ecba0a14e88b3bf8fef23b525f8bff92bf86850038d80689",
+    "apps/api/tests/content-intake-usage-http.test.ts": "31683ac705dddf7200be8778b04439e6e6d6780004dd50e6f7fb54686a819759",
+    "apps/api/tests/content-intake.integration.test.ts": "2a4e51fcffbef5d4631d143ee9f1e52dcbab797df08a4206ec2cc4e7eac3e2d8",
+    "apps/desktop/src/main/content-intake-usage.ts": "d0b790995fa4b58c11c2e5ef7a9c86a1a8fa53eca974285a258b53e386500091",
+    "apps/desktop/src/main/product-http.ts": "d77adaa621bddce39470ddbdaec1e1a9ca7f2dd46135fe2cce3308436e89ed03",
+    "apps/desktop/src/main/product-session.ts": "e3d5ba02f219e01065616d3bfe5b1d857e6ea584dc3500b05144ee06e33d7e60",
+    "apps/desktop/tests/unit/content-intake-usage-http.test.ts": "6bf7b37904fd9d2dd3dff1c1b3835751e4701f090e16756abe3fc76dbba5d3f7",
+    "apps/desktop/tests/unit/product-http.test.ts": "f161d1e8f7f7dea38f13932f05df22c5e4dde125e049155e32b4c1d767457d75",
+    "apps/desktop/vitest.config.ts": "b6ac4a02ab90f6918a36d48586d772efb6297224de42513af9539316be2fc683",
+    "contracts/upstream/customer-agent/contract-set.lock.json": "24b4d68d72b55db78bfe6fb0451e6476f4067c066b9c4a1fae04bffd3867a630",
+    "docs/how-to-develop-content-intake.md": "1e3ae521fcf75adb12b686d2015d30e27dabe2df5b18680daa04aeb5813e5d12",
+    "docs/plans/2026-10-03-content-intake-requirements.md": "a5f9a00342758e6347eef17654b957b2e0297e2c601f4cf8fa688864c6f6a6e7",
+    "docs/reference-project-architecture.md": "d57213792551a212845a3eac95b33a41185cd3dfb062abe2693f7f4d06633d28",
+    "package.json": "89c15dd870721678541cbf45904f391f6425c972bfe82438c6f32b54fad21b5f",
+    "pnpm-lock.yaml": "6bfe5eb80bf9209e4abec2b2e910c51cb32979ccc1cfd9db2e679ad98ae2ba78",
+    "scripts/probe-intake-usage-consumer.mjs": "16480bbd3e7af920f601025c44b1317fb09e8b90fac6ec4cbb61b89452237ec1"
+  },
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "outcome": "PASS",
+      "summary": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/lint.log",
+      "log_sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "outcome": "PASS",
+      "summary": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/typecheck.log",
+      "log_sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "command": "pnpm test",
+      "outcome": "PASS",
+      "summary": "1801 passed; 191 gated-skipped",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/test.log",
+      "log_sha256": "ed4285238596b4919df97320997ca4113fbff5e8b91155da138dc529decf8a08"
+    },
+    {
+      "command": "pnpm build",
+      "outcome": "PASS",
+      "summary": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/build.log",
+      "log_sha256": "cf77ceb9c6fd303c7bb211604c5e9d360dd6ed8892173acf0a3bb4018e3fe79a"
+    },
+    {
+      "command": "CUSTOMER_AGENT_PG15_BIN=<PG15 bin> CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts tests/content-intake-material.test.ts",
+      "outcome": "PASS",
+      "summary": "95 passed (87 PG + 8 material)",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/pg-intake.log",
+      "log_sha256": "6b863a0133aba4ce69e2bc8dc0ce5919f640384cf6ca2ffca6b84064b6c26fa2"
+    },
+    {
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/content-intake-usage-http.test.ts",
+      "outcome": "PASS",
+      "summary": "15 passed",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/api-http.log",
+      "log_sha256": "c3f9697babc636ab7d491a195482d6b2214506913cc37021a17df62cb913f3b5"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "outcome": "PASS",
+      "summary": "PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/architecture.log",
+      "log_sha256": "8b165043f507381c750b14e3281c7dca7460604c1482b50b0eecb806fd156211"
+    },
+    {
+      "command": "pnpm docs:check",
+      "outcome": "PASS",
+      "summary": "189 Markdown files PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/docs.log",
+      "log_sha256": "55f896a584082b4be61163100c55cc312afc8dbf69d57e617bb6c19dcd28484c"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "outcome": "PASS",
+      "summary": "source budget 23.1 MiB / 32.0 MiB; root policy PASS",
+      "exit_code": 0,
+      "local_log": ".gstack/content-intake-usage-http/workspace.log",
+      "log_sha256": "5cf428f62c2526e1f046c0d05a21a8abcb9fda87141be26a15aa4cc7f2209c80"
+    },
+    {
+      "command": "temporary integration-test copy: replace early expected status 400 with 499, observe onClose",
+      "outcome": "EXPECTED_FAILURE_CLEANUP_PASS",
+      "exit_code": 1,
+      "summary": {
+        "intentionalAssertionFailure": true,
+        "closeHookCount": 1,
+        "noRunnerForceExitWarning": true,
+        "durationSeconds": 2.83
+      },
+      "local_log": ".gstack/content-intake-usage-http/cleanup-fault.log",
+      "log_sha256": "521b183e691013dff93febec465833a608df096e32a4ef0529e1964a624c0011"
+    },
+    {
+      "command": "parse and byte-compare autoplan-baseline-edits against HEAD",
+      "outcome": "PASS",
+      "summary": [
+        {
+          "stage": "ceo",
+          "replacements": 19,
+          "headByteIdentical": true
+        },
+        {
+          "stage": "eng",
+          "replacements": 13,
+          "headByteIdentical": true
+        }
+      ]
+    }
+  ],
+  "functional": "functional-evidence.json",
+  "limitations": [
+    "Native reviewer fixtures summary-only; host fully reviewed tests.",
+    "Outside model unavailable; no new external invocation.",
+    "No production factory/ACL/activation, renderer/IPC, native clipboard or Mac/Windows GUI proof; WSL not rerun."
+  ],
+  "review": {
+    "status": "NO_FINDINGS",
+    "completed": true,
+    "converged": true,
+    "editing_cycles": 1,
+    "native_receipt": "75d42c54-2558-466a-8494-c0cade4c559c",
+    "core_receipt": "d14d809c-00e1-4b9b-96a3-195d0e034894",
+    "native_independent_replays": 13,
+    "fixtures": "summary-only for native reviewer; host reviewed full tests",
+    "outside_model": "unavailable; not invoked",
+    "fixed": [
+      "diagnostic-sink exception escaped IntakeError",
+      "test host cleanup on early failure and child termination",
+      "historical autoplan JSON corruption"
+    ]
+  }
+}

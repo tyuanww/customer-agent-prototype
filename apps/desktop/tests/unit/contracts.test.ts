@@ -1,3 +1,4 @@
+import { transpileModule, ModuleKind } from 'typescript';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +34,9 @@ function readApiSource(relative: string): string {
 describe('IPC whitelist', () => {
   it('only allows the typed overlay and clipboard channels', () => {
     expect(IPC_CHANNEL_WHITELIST).toEqual([
+      IPC_CHANNELS.INTAKE_QUERY_MODE, IPC_CHANNELS.INTAKE_QUERY_ACCESS, IPC_CHANNELS.INTAKE_QUERY_CONDITIONS, IPC_CHANNELS.INTAKE_QUERY_SELECT,
+      IPC_CHANNELS.INTAKE_QUERY_SEARCH, IPC_CHANNELS.INTAKE_QUERY_COPY, IPC_CHANNELS.INTAKE_QUERY_CANCEL,
+      IPC_CHANNELS.INTAKE_QUERY_INVALIDATED,
       IPC_CHANNELS.PRODUCT_SEARCH,
       IPC_CHANNELS.PRODUCT_CANCEL_SEARCH,
       IPC_CHANNELS.PRODUCT_COPY_ADOPT,
@@ -55,6 +59,7 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET,
       IPC_CHANNELS.COPY_TEXT,
       IPC_CHANNELS.GET_WINDOW_CONTEXT,
+      IPC_CHANNELS.QUERY_SUBSCRIBED,
       IPC_CHANNELS.OPEN_SEARCH,
       IPC_CHANNELS.OPEN_DASHBOARD,
       IPC_CHANNELS.DASHBOARD_WORDING_LIST,
@@ -126,7 +131,10 @@ describe('IPC whitelist', () => {
   });
 
   it('keeps the dashboard wording preload free of shared overlay modules', () => {
-    expect(dashboardPreload).not.toContain("from '../shared/");
+    // Type-only references disappear before bundling; runtime shared imports
+    // would create a chunk that Electron's Windows sandbox cannot load.
+    const runtime = transpileModule(dashboardPreload, { compilerOptions: { module: ModuleKind.ESNext } }).outputText;
+    expect(runtime).not.toMatch(/(?:from|import)\s*['"]\.\.\/shared\//);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_WORDING_LIST}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_SESSION}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_CONTENT_PARSE}'`);

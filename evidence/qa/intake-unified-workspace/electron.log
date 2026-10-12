@@ -1,0 +1,132 @@
+
+Running 8 tests using 1 worker
+
+(node:81363) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"status":"PASS","flow":"director-named-seat-preview-cancel-save-revoke","profile":"purpose-runtime","entitlements":"denied-enabled-denied","appearance":"980x680-light-dark","screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-permissions/2026-10-08T11-47-12.120Z"}
+  ✓  1 tests/e2e/content-intake-permissions-real-stack.spec.ts:10:1 › director previews without saving, grants a named seat query access, then revokes it through real Electron/HTTP/PG (5.7s)
+{"status":"OWNED_RESOURCES","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-32UkFt","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-lHf4tn"}
+{"status":"PASS","profile":"purpose-runtime","purposeQueries":{"business":2253,"usage":427,"worker":40,"organization":30},"electron":"darwin","api":"actual","postgres":15,"nativeDialog":"controlled-path-and-confirmation-responses","upload":"actual-multipart","issueReport":"saved-and-read-with-exceljs","publicationPolicy":"direct-v1","approvalRows":0,"revision":"same-id-v2-fresh-evidence","cancellation":"server-confirmed-live-release-unchanged","ordinarySeat":true,"releaseId":"rel_2","screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z"}
+{"status":"OWNED_RESOURCES_REMOVED","hostDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/customer-agent-pg15-32UkFt","desktopDirectory":"/var/folders/tz/wswl3q3117v437rw68yd90gh0000gn/T/intake-real-stack-electron-lHf4tn"}
+  ✓  2 tests/e2e/content-intake-real-stack.spec.ts:11:1 › native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG (18.1s)
+{"status":"PASS","flow":"rollback-confirmed-publication-ordinary-seat","http":"actual","postgres":15,"target":"rel_2","base":"rel_3","newRelease":"rel_4","publicationPolicy":"direct-v1","approvalRows":0,"screenshots":"/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-08T11-47-35-213Z"}
+  ✓  3 tests/e2e/content-intake-rollback-real-stack.spec.ts:10:1 › confirmed rollback creates a new release whose historical FAQ is consumed by another seat (6.1s)
+PASS registered synthetic duplicate display names in actual Query; two stable IDs; shop-b fresh qualification through restricted usage
+  ✓  4 tests/e2e/content-intake-shop-directory-real-stack.spec.ts:8:1 › real Query shows registered duplicate shop names while selection and qualification keep distinct IDs (2.5s)
+  ✘  5 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified product publication without old adapters or Query selection coupling (3.6s)
+(node:83364) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  6 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified campaign publication without old adapters or Query selection coupling (4.5s)
+(node:83472) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  7 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified presale publication without old adapters or Query selection coupling (4.3s)
+(node:83553) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  8 tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified aftersale publication without old adapters or Query selection coupling (4.4s)
+
+
+  1) tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified product publication without old adapters or Query selection coupling 
+
+    Error: expect(received).toMatchObject(expected)
+
+    - Expected  - 2
+    + Received  + 1
+
+      Object {
+    -   "copied": true,
+    -   "ok": true,
+    +   "ok": false,
+      }
+
+      107 |       // Directory refresh/navigation must leave Query's original qualification
+      108 |       // intact; its still-valid opaque key remains usable in its own window.
+    > 109 |       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: true, copied: true });
+          |                                                                                                                     ^
+      110 |       await host.revokeSyntheticQuery();
+      111 |       await versions.getByRole('button', { name: '刷新可用资料', exact: true }).click();
+      112 |       await dashboard.getByTestId('nav-wording').click();
+        at /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts:109:117
+
+    Error Context: test-results/content-intake-workspace-r-65edc-or-Query-selection-coupling/error-context.md
+
+  2) tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified campaign publication without old adapters or Query selection coupling 
+
+    Error: expect(received).toMatchObject(expected)
+
+    - Expected  - 2
+    + Received  + 1
+
+      Object {
+    -   "copied": true,
+    -   "ok": true,
+    +   "ok": false,
+      }
+
+      107 |       // Directory refresh/navigation must leave Query's original qualification
+      108 |       // intact; its still-valid opaque key remains usable in its own window.
+    > 109 |       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: true, copied: true });
+          |                                                                                                                     ^
+      110 |       await host.revokeSyntheticQuery();
+      111 |       await versions.getByRole('button', { name: '刷新可用资料', exact: true }).click();
+      112 |       await dashboard.getByTestId('nav-wording').click();
+        at /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts:109:117
+
+    Error Context: test-results/content-intake-workspace-r-c45ca-or-Query-selection-coupling/error-context.md
+
+  3) tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified presale publication without old adapters or Query selection coupling 
+
+    Error: expect(received).toMatchObject(expected)
+
+    - Expected  - 2
+    + Received  + 1
+
+      Object {
+    -   "copied": true,
+    -   "ok": true,
+    +   "ok": false,
+      }
+
+      107 |       // Directory refresh/navigation must leave Query's original qualification
+      108 |       // intact; its still-valid opaque key remains usable in its own window.
+    > 109 |       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: true, copied: true });
+          |                                                                                                                     ^
+      110 |       await host.revokeSyntheticQuery();
+      111 |       await versions.getByRole('button', { name: '刷新可用资料', exact: true }).click();
+      112 |       await dashboard.getByTestId('nav-wording').click();
+        at /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts:109:117
+
+    Error Context: test-results/content-intake-workspace-r-eb5e6-or-Query-selection-coupling/error-context.md
+
+  4) tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified aftersale publication without old adapters or Query selection coupling 
+
+    Error: expect(received).toMatchObject(expected)
+
+    - Expected  - 2
+    + Received  + 1
+
+      Object {
+    -   "copied": true,
+    -   "ok": true,
+    +   "ok": false,
+      }
+
+      107 |       // Directory refresh/navigation must leave Query's original qualification
+      108 |       // intact; its still-valid opaque key remains usable in its own window.
+    > 109 |       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: true, copied: true });
+          |                                                                                                                     ^
+      110 |       await host.revokeSyntheticQuery();
+      111 |       await versions.getByRole('button', { name: '刷新可用资料', exact: true }).click();
+      112 |       await dashboard.getByTestId('nav-wording').click();
+        at /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts:109:117
+
+    Error Context: test-results/content-intake-workspace-r-078b8-or-Query-selection-coupling/error-context.md
+
+  4 failed
+    tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified product publication without old adapters or Query selection coupling 
+    tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified campaign publication without old adapters or Query selection coupling 
+    tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified presale publication without old adapters or Query selection coupling 
+    tests/e2e/content-intake-workspace-real-stack.spec.ts:10:3 › unified workspace reads the qualified aftersale publication without old adapters or Query selection coupling 
+  4 passed (50.2s)
+undefined
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/desktop:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-rollback-real-stack.spec.ts tests/e2e/content-intake-permissions-real-stack.spec.ts tests/e2e/content-intake-shop-directory-real-stack.spec.ts tests/e2e/content-intake-workspace-real-stack.spec.ts

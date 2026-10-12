@@ -1,0 +1,88 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api
+
+ ❯ tests/intake-runtime-closeout.integration.test.ts (18 tests | 3 failed) 19590ms
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > uses existing Feishu identity normalization, native observation, restricted writer, usage and management HTTP 1427ms
+     → expected 404 to be 403 // Object.is equality
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for disabled facts after a real session was issued  1226ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for job facts after a real session was issued  1297ms
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for department facts after a real session was issued 1224ms
+     → expected 404 to be 403 // Object.is equality
+   × closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for expired facts after a real session was issued 1235ms
+     → INTAKE_HISTORY_IMMUTABLE
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on missing-job refresh refusal  1097ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on unregistered refresh refusal  1272ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on network refresh refusal  1200ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > aborts in-flight native reads before draining pools and can restart against retained receipts  1249ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after wrong-purpose startup rejection  1044ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after admin startup rejection  918ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after auth-role startup rejection  937ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after storage startup rejection  952ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects scope configuration before opening resources  893ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects remote-origin configuration before opening resources  902ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects duplicate-login configuration before opening resources  901ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects profile configuration before opening resources  928ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects implicit-database configuration before opening resources  886ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > uses existing Feishu identity normalization, native observation, restricted writer, usage and management HTTP
+AssertionError: expected 404 to be 403 // Object.is equality
+
+- Expected
++ Received
+
+- 403
++ 404
+
+ ❯ tests/intake-runtime-closeout.integration.test.ts:89:27
+     87|     expect((await entitlement(token)).status).toBe(200);
+     88|     const denied = await json(`${runtime!.address}/v1/intake/sources/s…
+     89|     expect(denied.status).toBe(403); // The OAuth login label never be…
+       |                           ^
+     90|     expect(await json(`${runtime!.address}/v1/intake/sources`, { heade…
+     91|     expect(errors).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for department facts after a real session was issued
+AssertionError: expected 404 to be 403 // Object.is equality
+
+- Expected
++ Received
+
+- 403
++ 404
+
+ ❯ tests/intake-runtime-closeout.integration.test.ts:108:50
+    106|     const outcome = await entitlement(token);
+    107|     // A new job with no exact department/job role mapping, disabled o…
+    108|     if (change !== 'job') expect(outcome.status).toBe(403);
+       |                                                  ^
+    109|     else expect((await facts()).revocation_generation).toBe('1');
+    110|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/intake-runtime-closeout.integration.test.ts > closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for expired facts after a real session was issued
+error: INTAKE_HISTORY_IMMUTABLE
+ ❯ ../../node_modules/.pnpm/pg@8.23.0/node_modules/pg/lib/client.js:694:17
+ ❯ tests/intake-runtime-closeout.integration.test.ts:99:7
+     97|     await start(); const token = await login(); expect((await entitlem…
+     98|     if (change === 'expired') {
+     99|       await admin.query("UPDATE content_intake.principal_facts SET val…
+       |       ^
+    100|     } else {
+    101|       if (change === 'disabled') contact.user.status.is_resigned = tru…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 15 passed (18)
+   Start at  02:26:40
+   Duration  20.49s (transform 329ms, setup 0ms, collect 752ms, tests 19.59s, environment 0ms, prepare 52ms)
+
+undefined
+/Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/intake-runtime-closeout.integration.test.ts --no-file-parallelism

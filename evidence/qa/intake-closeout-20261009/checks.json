@@ -1,0 +1,63 @@
+{
+  "schema": "intake-closeout/v1",
+  "date": "2026-10-09",
+  "version": "0.3.26",
+  "codeHead": "f5f4ae425a0a63c9cf901a00f81e872383a774a4",
+  "commands": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "seconds": 4.46,
+      "log": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-closeout-20261009/lint.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "seconds": 7.88,
+      "log": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-closeout-20261009/typecheck.log",
+      "sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "seconds": 107.16,
+      "log": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-closeout-20261009/test.log",
+      "sha256": "1dd9c8140bc33975443ced7595daa89fafd27565b70a831d514ab26360f8e6bc"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "seconds": 6.88,
+      "log": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-closeout-20261009/build.log",
+      "sha256": "34e9e100c98d72bfeb67a3a5f5003241542a4d74e3cf116ddb91be348c0cc8c4"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "log": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-closeout-20261009/docs.log",
+      "sha256": "a3cd3f8c1cd329bbc9bb69bed743b16c2f867bd3c423123f011c65cc33adca3b"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "log": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-closeout-20261009/workspace.log",
+      "sha256": "8fbbc0a73e860fabc251f3a3c2acbab2a076fee94ae687be2264a33a00efae53"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "log": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/qa-reports/intake-closeout-20261009/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "externalReview": "INCOMPLETE",
+  "deviceAcceptance": "PARTIAL",
+  "designReview": "3 Medium / 2 Low; read-only, deferred",
+  "approvedBudgetMiB": {
+    "source": 20,
+    "contracts": 15,
+    "evidence": 10,
+    "total": 45
+  }
+}

@@ -311,3 +311,17 @@ describe('packaged synthetic product profile', () => {
     }
   });
 });
+
+it('enables FAQ only through explicit synthetic loopback configuration', () => {
+  expect(developmentProductProfile({ ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2' })).toMatchObject({ contentIntake: 'faq-v2' });
+  for (const env of [
+    { CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2' },
+    { ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'true' },
+    { ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2', CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'https://synthetic.invalid' },
+  ]) expect(() => developmentProductProfile(env)).toThrow();
+  const directory = userDataDirectory();
+  write(directory, { ...STACK_PROFILE, contentIntake: 'faq-v2' });
+  expect(readPackagedProductProfile(directory)).toMatchObject({ contentIntake: 'faq-v2' });
+  write(directory, { mode: 'product-remote', apiOrigin: 'https://synthetic-api.invalid', identityOrigin: 'https://synthetic-id.invalid', contentIntake: 'faq-v2' });
+  expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
+});

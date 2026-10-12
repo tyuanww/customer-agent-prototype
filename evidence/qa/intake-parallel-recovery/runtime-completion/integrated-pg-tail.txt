@@ -1,0 +1,31 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-runtime-consumer-pool.test.ts (3 tests) 9ms
+ ✓ experiments/intake-organization/registered-refresh.integration.test.ts (10 tests) 18032ms
+   ✓ registered organization input through the existing atomic facts writer > reads registered identity, persists exact provenance atomically and rejects modified replay  1863ms
+   ✓ registered organization input through the existing atomic facts writer > revokes binding and facts atomically, denies old/new usage and rejects a pre-rebind snapshot  1741ms
+   ✓ registered organization input through the existing atomic facts writer > serializes concurrent identical observations and fences different provenance  1628ms
+   ✓ registered organization input through the existing atomic facts writer > recovers a lost COMMIT from the original observation and original revocation only  1805ms
+   ✓ registered organization input through the existing atomic facts writer > rolls fact and binding pointers back if evidence insertion or final deadline fails  1789ms
+   ✓ registered organization input through the existing atomic facts writer > rejects wrong scope and active rebinding; cancellation cannot create an observation  1512ms
+   ✓ registered organization input through the existing atomic facts writer > revokes an expired active registration before registering a new identity  2111ms
+   ✓ registered organization input through the existing atomic facts writer > recovers registration COMMIT without rebinding and rejects an open ID already assigned to another principal  2016ms
+   ✓ registered organization input through the existing atomic facts writer > rolls an expired registration insert back at its final database-clock checkpoint  1884ms
+   ✓ registered organization input through the existing atomic facts writer > rejects cross-scope, invalid domains, non-finite timestamps and null provenance in SQL itself  1682ms
+ ✓ tests/intake-runtime-consumers.integration.test.ts (10 tests) 23538ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > uploads, parses, checks, publishes and serves all non-empty pages to another authenticated actor  2743ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > publishes a confirmed corrective rollback through the actual service  2677ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > grants through the actual allocator and invalidates saved usage after revocation  2295ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > recovers an actually committed publication after a lost COMMIT response  2004ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > rolls back publication and its receipt if consumed permission expires before COMMIT  2811ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > uses the worker pool for actual parser failure and report capacity without business writes  2415ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > retains report capacity after an actual worker COMMIT has an unknown response  2005ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > keeps a real-shaped historical revoked approval unavailable to reads and rollback  2625ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > keeps a real-shaped historical expired approval unavailable to reads and rollback  2447ms
+   ✓ actual service on candidate purpose roles (synthetic PG15) > refuses cloned actors and wrong-purpose writes while leaving root allocations and identity protected  1514ms
+
+ Test Files  3 passed (3)
+      Tests  23 passed (23)
+   Start at  17:34:17
+   Duration  24.84s (transform 810ms, setup 0ms, collect 2.43s, tests 41.58s, environment 1ms, prepare 236ms)

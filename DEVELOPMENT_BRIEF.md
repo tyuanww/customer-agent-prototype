@@ -221,3 +221,9 @@ scripts/                      仓级合同接收与 workspace 卫生门
 - 读取或伪造 Menokin 正式发布快照，或把仓外 Menokin 材料写入本 Git 合成运行时。
 - 自动更新、真实 Windows 安装验收。
 - 替公司代选长期 Bundle ID、代办 Apple Developer Program 或把签名 / 公证凭证写入仓库；这些是正式外发的审批与凭证前置。
+
+### FAQ P2 显式合成接线
+
+2026-10-07 接续已批准资料导入计划 §0.18：Main `ContentIntakeQuery` 复用 `ContentIntakeUsage` 与授权发现，只向可信 Query 主 frame 投影通用 FAQ Top 3 和不透明复制 key。renderer 复用既有窗口几何/焦点状态机，结果类型区分新 FAQ 与旧话术。该入口、限制和验证命令以[资料导入开发说明](docs/how-to-develop-content-intake.md#p2-桌面-query-合成入口)为准；不改变 S0 / 已有远程 adapter，不代表真实接入或完整 P2 退出。
+
+FAQ 工作台后续接线复用原五模块外壳，内容/权限保活；只读话术库与当前可用版本使用独立 Dashboard 资格消费者，不能共享 Query 的选择/复制句柄或回退旧 hydrate。当前条件集合不代表全店总量，未接线的经营统计/SOP/软件更新保持未接入。对应交互不变量由 `DESIGN.md` 的“FAQ P2 工作台接线”拥有，验证按资料导入开发说明办理。

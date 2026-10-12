@@ -1,0 +1,113 @@
+{
+  "scope": "P2 management upload through immutable candidate material, isolated synthetic HTTP/PG only",
+  "baseCommit": "5e199d5aedf3f46dd2590beab7d67a498d154b13",
+  "branch": "codex/content-intake-p2",
+  "runtime": {
+    "node": "v24.19.0",
+    "pnpm": "11.19.0",
+    "postgres": "15",
+    "platform": "macOS"
+  },
+  "inputsSha256": {
+    "apps/api/src/content-import-multipart.ts": "be755329280c46bb7403a24830ad52a75359373f3fa42d31d4381a3ba37a91ed",
+    "apps/api/src/content-intake/service.ts": "5137fa9458e75b29554d7648196f4759d3f29b4d47803724947adad98d098552",
+    "apps/api/src/content-intake/transaction.ts": "9b884123bf0f222b6011b103480f154bce8d093f8c43c428185e092a24b33cfe",
+    "apps/api/src/content-intake/usage-http.ts": "845ab385b6021f88911c4ef4c34206a492bff6e7c5941dfbe5637732765f053c",
+    "apps/api/src/content-intake/files.ts": "421163fd11903b23ce71aa3b7dc46ee7cf407aecfc38b6fc780087053906d3a8",
+    "apps/api/src/content-intake/http-boundary.ts": "9a28642f997e5d01fd57b672fa316ca3beb026006346c74cf7d65fcac8be737b",
+    "apps/api/src/content-intake/management-http.ts": "24098d8e9e874b479f098e75743734fcfd7f014850b1a2bbbf82edab0470896f",
+    "apps/api/tests/content-import-multipart.test.ts": "327cd72fdd3f9eea0da4a715da4a83ca73f3bf044287c17c61d06a14b52d964e",
+    "apps/api/tests/content-intake.integration.test.ts": "d59c215bcf60c78aa8690b7109767f52ecb125585a9dfa179d99337806351647"
+  },
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "durationSeconds": 3.76,
+      "log": "lint-final.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "durationSeconds": 6.87,
+      "log": "typecheck-final.log"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "durationSeconds": 83.23,
+      "log": "test-final.log"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "durationSeconds": 6.99,
+      "log": "build-final.log"
+    },
+    {
+      "command": "pnpm check:architecture",
+      "exitCode": 0,
+      "durationSeconds": 0.42,
+      "log": "check-architecture-final.log"
+    },
+    {
+      "command": "pnpm workspace:check",
+      "exitCode": 0,
+      "durationSeconds": 0.74,
+      "log": "workspace-check-final.log"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "durationSeconds": 0.3,
+      "log": "docs-check-final.log"
+    }
+  ],
+  "rootTests": {
+    "passed": 1837,
+    "gatedSkipped": 209
+  },
+  "postgresTests": {
+    "passed": 112,
+    "command": "CUSTOMER_AGENT_PG15_BIN=<local PostgreSQL 15 bin> CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts tests/content-intake-material.test.ts",
+    "exitCode": 0,
+    "durationSeconds": 154.77
+  },
+  "httpManagementTests": 10,
+  "multipartTests": 10,
+  "adjacentUsageHttpTests": 17,
+  "artifactConsumption": {
+    "probe": "management-report-consumer",
+    "artifactBytes": 6614,
+    "sha256": "fdfb23a5632df5d3a392381996af1fe29b2b5956466795f728c85305ab84608c",
+    "issueRows": 1,
+    "consumer": "ExcelJS",
+    "wholeBatchBlocked": true
+  },
+  "fixed": [
+    {
+      "id": "multipart-original-crlf",
+      "red": "Original-byte assertion removed CRLF before fix (2 failures including strict epilogue rejection); /tmp/intake-multipart-before.log",
+      "green": "content-import-multipart.test.ts, 10 passed, included in root final tests"
+    },
+    {
+      "id": "terminal-replay-report-leak",
+      "redCaptures": [
+        "004",
+        "005"
+      ],
+      "greenCaptures": [
+        "006",
+        "007"
+      ],
+      "effect": "Repeated failed-job receive preserves 2 files/2 object rows/1 job; concurrent finalizers retain exactly one report"
+    }
+  ],
+  "limits": [
+    "Production factory/ACL/runtime activation unchanged; no real Feishu, employee or customer data.",
+    "Full management UI and approval/quality/publication HTTP remain separate steps.",
+    "No Electron/UI/package/Windows/WSL validation for this API-only change.",
+    "Large error-report peak RSS stress test not run; one export at a time and existing parser bounds apply.",
+    "External model review disabled by established user preference; historical failures are not marked passed."
+  ]
+}

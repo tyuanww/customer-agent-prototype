@@ -1,0 +1,42 @@
+{
+  "schema": "readiness-successor-assembly-proposal/v1",
+  "status": "DRAFT",
+  "predecessorContractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed",
+  "predecessorArtifacts": {
+    "openapi": {
+      "file": "openapi.v1.yaml",
+      "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5"
+    },
+    "database": {
+      "file": "schema-v1.28.sql",
+      "sha256": "c676b8a580e51f6a0cc2ce0b25919fb9aec2b5e470076461131ea233972e6c69"
+    }
+  },
+  "composition": {
+    "openapi": {
+      "operation": "exact-reuse",
+      "predecessor": "openapi",
+      "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5"
+    },
+    "database": {
+      "operation": "concat",
+      "predecessor": "database",
+      "separatorUtf8": "\n-- EXACT schema.v1.28 predecessor above; DRAFT schema.v1.29 delta below.\n",
+      "delta": "upgrade.candidate.sql",
+      "deltaSha256": "848bf0222dcbd02f406611979d4221fa3d5add8c4941df775356b901435ece2d",
+      "sha256": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771"
+    }
+  },
+  "retainInProduct": [
+    "upgrade.candidate.sql",
+    "assembly.candidate.json",
+    "installation.candidate.json",
+    "manifest.json",
+    "predecessor-lock.json"
+  ],
+  "consumerRequirements": [
+    "Only the fixed predecessor contract ID and closed artifact names; no caller paths, symlinks or network fallback.",
+    "Verify predecessor export provenance and every reused hash, then verify reconstructed result before codegen, migration generation or runtime startup.",
+    "Missing or changed predecessor, composition or delta fails closed. Full reference artifacts remain in governance; consumer support is not implemented by this proposal."
+  ]
+}

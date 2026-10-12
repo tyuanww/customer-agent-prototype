@@ -1,0 +1,226 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-family/customer-agent-prototype/apps/api
+
+ ✓ tests/content-intake-material.test.ts (17 tests) 372ms
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > quality HTTP rejects raw and PostgreSQL byte excess atomically, then accepts all 5000 critical checks
+{"probe":"quality-http-capacity","samples":5000,"httpBytes":8375220,"pgBytes":8415000,"limit":8388608,"rowsCommitted":5000}
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > workflow HTTP publishes the uploaded material after real evidence gates and a second seat consumes that release
+{"probe":"workflow-http-second-seat","source":"uploaded-synthetic-xlsx","releaseId":"rel_2","faqRows":3,"multilinePreserved":true,"qualityTransport":"Main-ProductSession-HTTP","approvalTransport":"synthetic"}
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS
+{"probe":"management-report-consumer","artifactBytes":6615,"sha256":"613d6cfcc683d05dbdd11be904e1e006ba4bda1aa12a13497b41c36e1f44407a","issueRows":1,"consumer":"ExcelJS","wholeBatchBlocked":true}
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > principals: 100 maximum Unicode labels survive standard HTTP JSON, keyset scans are bounded and use ASCII order
+{"probe":"principals-capacity","items":108,"firstPageBytes":126473,"cursorLength":346,"scans":[{"limit":101,"count":101},{"limit":101,"count":8}]}
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > discovery: folds 5000 overlapping grants without changing effective authority or exceeding the SQL deadline
+{"probe":"discovery-overlap","additionalGrants":5000,"elapsedMs":18}
+
+stdout | tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires
+{"probe":"discovery-capacity","sources":5000,"pages":150,"elapsedMs":28577}
+
+ ❯ tests/content-intake.integration.test.ts (176 tests | 1 failed) 326823ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality HTTP requires an explicit empty initial round when all entries are withdrawn  1452ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality HTTP strictly binds inputs, preserves text and returns compact historical receipts  1077ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality HTTP cursors expire across sessions, phase, limit, restart and current authorization changes  1085ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality HTTP recovers a lost COMMIT after restart and review revocation without disclosing check reasons  1018ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality HTTP rejects raw and PostgreSQL byte excess atomically, then accepts all 5000 critical checks  20098ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality HTTP expands from immutable initial checks and rejects old keys after revision  1934ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP publishes the uploaded material after real evidence gates and a second seat consumes that release  2599ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP validates exact candidate paths, complete bodies and action namespaces without trusting caller approval  1223ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP recovers an unknown provider creation with its original UUID across host restart  1181ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fails closed without an adapter and does not accept critical self-review or renew facts on provider failure  1195ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences logout during publish approval I/O  1115ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences revoke during publish approval I/O  1097ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences cancel during publish approval I/O  1097ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP fences source-change during publish approval I/O  1126ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP recovers a lost publish COMMIT through actor/action-scoped receipts without another publication  1125ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP preserves historical cancellation receipts and requires a live owning session to recover them  1019ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP approval package cleanup keeps only the concurrently adopted package  1070ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP approval package cleanup reclaims after verification before registration  1029ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP approval package cleanup reclaims after logout before registration  1025ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP retains the adopted approval package after unknown-commit  1035ms
+   ✓ P2 sealed synthetic authority and durable candidates > workflow HTTP retains the adopted approval package after logout-after-adoption  1047ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP uploads real bytes idempotently, drives parse and pages immutable authorized material  1062ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP blocks the entire bad revision and exports an XLSX report consumed by ExcelJS  1241ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP rejects anonymous/agent/cross-shop upload and untrusted multipart or receive fields  859ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP rechecks the real session after upload I/O and cannot admit with a cloned actor  908ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP records terminal failure when session revocation happens during parser I/O  1076ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP retains a committed object after a lost response and recovers it on exact replay  1014ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP replay of a terminal failed job creates no unreferenced report objects  1009ms
+   ✓ P2 sealed synthetic authority and durable candidates > management concurrent failure finalizers keep exactly one referenced report  1008ms
+   ✓ P2 sealed synthetic authority and durable candidates > management HTTP bounds the queue and settles accepted jobs when its host closes  989ms
+   ✓ P2 sealed synthetic authority and durable candidates > management session-bound parser closes an admitted job revoked before queue execution  876ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: real HTTP exposes only source, current base and authenticated principal with no business writes or leases  864ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: import scope and the private session reject other permissions, tenants, apps, missing sessions and actor clones  855ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: slow current read cannot borrow time beyond its original session deadline  1210ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: slow current read cannot borrow time beyond its original grant deadline  1274ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: slow current read cannot borrow time beyond its original facts deadline  1206ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: waits for the existing publication lock and reads the committed current pointer  853ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: real publication and source remapping invalidate stale receive hints without admitting a job or receipt  1117ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: strict GET rejects every query or body and accepts the maximum legal source id over HTTP  836ms
+   ✓ P2 sealed synthetic authority and durable candidates > management context: actual Main ProductHttp/ProductSession uses context to receive and parse, then rejects cancelled and logged-out responses  1559ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: HTTP only exposes scoped confirmed identities, including disabled or ungranted contributors, with no write side effects  845ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: grant recipients include first-time targets, exclude stale/ineligible/self identities and advance an empty filtered page  839ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: strict HTTP queries reject unknowns, duplicates, noncanonical limits, body and oversize cursor  836ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: 100 maximum Unicode labels survive standard HTTP JSON, keyset scans are bounded and use ASCII order  868ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: cursors bind session, source, purpose, limit, authority and service lifetime  867ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: missing, unavailable and invalid labels fail the whole page without guessing or disclosing label content  865ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: slow bulk read cannot outlive the original session deadline  1161ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: slow bulk read cannot outlive the original grant deadline  1165ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: slow bulk read cannot outlive the original facts deadline  1150ms
+   ✓ P2 sealed synthetic authority and durable candidates > principals: actual Main ProductHttp/ProductSession consumes every page and discards cancelled or logged-out responses  1370ms
+   ✓ P2 sealed synthetic authority and durable candidates > candidate discovery: session and scope bound keyset paging with live state filters  1261ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: uses real session authority, keeps brand and multi-shop scopes distinct, and hides other tenants  844ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: shows allocation separately, preserving delegated agent limits and manager-only delegation  833ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: signs paging to a live session, route, complete projection and service lifetime  852ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: handles zero scope, conflicting role, expired facts and strict query shapes without inventing access  840ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: pages more than 100 authorized sources with no loss and rejects a logged-out cursor  849ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: folds 5000 overlapping grants without changing effective authority or exceeding the SQL deadline  1085ms
+   ✓ P2 sealed synthetic authority and durable candidates > discovery: completes the 5000-source menu through real HTTP and Main before authority expires  29767ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: explicit source/entry roots select each shop override before pagination without merging equal titles  1612ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: inapplicable time, product and scenario overrides fall back to their exact generic roots  1348ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: actual HTTP and Main query/copy consume shop overrides and another shop generic fallback  1980ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects missing-root atomically after actual parsing and human review  1084ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects foreign-brand atomically after actual parsing and human review  1315ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects foreign-domain atomically after actual parsing and human review  1310ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects linked-root atomically after actual parsing and human review  1497ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects same-shop-overlap atomically after actual parsing and human review  1268ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects cross-source-overlap atomically after actual parsing and human review  1483ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: publication rejects protected-root atomically after actual parsing and human review  1308ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: nonoverlapping products allow two same-shop overrides  1305ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: nonoverlapping scenarios allow two same-shop overrides  1301ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: nonoverlapping half-open-time allow two same-shop overrides  1284ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: a disabled override does not block later explicit disable of its generic root  1698ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: multiple selections retain every uncovered root cell and suppress only complete override coverage  1331ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: a historical catalog guard rejection fails closed for issuance and every existing snapshot page  1292ms
+   ✓ P2 sealed synthetic authority and durable candidates > family: use qualifications expire at both override boundaries before switching generic and shop answers  10258ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: HTTP independent review publishes a new release consumed by another seat and replays the original operation  1373ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: creation uncertainty retains its independent UUID and original package across restart  1313ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: lost COMMIT recovers the original permanent receipt without observing the provider again  1358ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: rejects revoke during the lock-free approval observation without moving current  1321ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: rejects publish during the lock-free approval observation without moving current  1500ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: rejects cancel-target during the lock-free approval observation without moving current  1292ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: rejects wrong-package during the lock-free approval observation without moving current  1317ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: rejects expired-target during the lock-free approval observation without moving current  1481ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: normal publication inherits independent review and source revocations through the restored lineage  1639ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: a synthetic two-source catalog proves full impact authorization without exposing denied scopes  1727ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: normal publication and read eligibility cannot outlive inherited rollback approval  1720ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: original source approval revocation invalidates both original and restored releases  1397ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: preview cannot retain a plan after its consumed grant expires before COMMIT  1628ms
+   ✓ P2 sealed synthetic authority and durable candidates > rollback: partial scopes require a corrective candidate and cannot leak the unowned source  1341ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages  1676ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a logout session  884ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a cleanup session  870ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a disabled session  876ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: stored qualification immediately rejects a expired session  865ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: caps issuance at session expiry and reauthenticates persisted selection after a service restart  876ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: validates explicit selections by kind and scope without expanding source access  937ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (reader-first)  898ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: linearizes the page with logout (logout-first)  877ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: Main consumes actual synthetic HTTP pages and handles publication and revocation  3824ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: contextless predecessor qualifications cannot be guessed or reused  899ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: shop access does not imply brand access, and brand permission alone cannot select an arbitrary shop  928ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after grant changes  1150ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after source changes  1136ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after release changes  1120ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after facts changes  1140ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-unavailable changes  1398ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: denies every page after approval-revoked changes  1150ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: a normal new publication preserves a valid old page and a fresh empty snapshot clears explicitly disabled rows  1379ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: filters product/scenario/time before paging, pins vocabulary labels and expires at the next content boundary  1310ms
+   ✓ P2 sealed synthetic authority and durable candidates > usage: does not renew or return a page after its immutable deadline, even when facts are refreshed  2018ms
+   × P2 sealed synthetic authority and durable candidates > usage: consumes a maximum 5000-row native catalog within bounded transactions without duplicate or missing pages 62419ms
+     → Test timed out in 60000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ✓ P2 sealed synthetic authority and durable candidates > usage: pages within the 100 vocabulary budget and rejects an individually unpageable candidate before review  1319ms
+   ✓ P2 sealed synthetic authority and durable candidates > publishes native material atomically without invented legacy fields, and recovers its permanent receipt  1071ms
+   ✓ P2 sealed synthetic authority and durable candidates > retains missing rows, explicit disables and versions across subsequent native releases  1276ms
+   ✓ P2 sealed synthetic authority and durable candidates > inherits another source unchanged and propagates its later approval revocation  1366ms
+   ✓ P2 sealed synthetic authority and durable candidates > copies every existing legacy field from a different domain without manufacturing review evidence  1139ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects quality with zero release/ticket side effects  1275ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects publisher-revoked with zero release/ticket side effects  1099ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects reviewer-revoked with zero release/ticket side effects  1212ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects cancelled with zero release/ticket side effects  1138ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects source-version with zero release/ticket side effects  1149ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects revoked-approval with zero release/ticket side effects  1116ms
+   ✓ P2 sealed synthetic authority and durable candidates > publication rejects suspended-source with zero release/ticket side effects  1127ms
+   ✓ P2 sealed synthetic authority and durable candidates > rolls back ticket, catalog, candidate, current and release on a late announcement failure  1190ms
+   ✓ P2 sealed synthetic authority and durable candidates > recovers a lost publication COMMIT after restart without remote I/O or a second release  1140ms
+   ✓ P2 sealed synthetic authority and durable candidates > lets cancel win while publication is observing approval without locks  1152ms
+   ✓ P2 sealed synthetic authority and durable candidates > lets revoke win while publication is observing approval without locks  1138ms
+   ✓ P2 sealed synthetic authority and durable candidates > commits once when cancellation waits behind the final publication transaction  1142ms
+   ✓ P2 sealed synthetic authority and durable candidates > requires a new candidate and approval after another candidate wins the same base  1349ms
+   ✓ P2 sealed synthetic authority and durable candidates > refuses missing bootstrap and unmapped legacy-domain rows instead of silently replacing them  1318ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects an exact but stale observation at the private commit boundary  1065ms
+   ✓ P2 sealed synthetic authority and durable candidates > freezes quality before individual checks, survives service recreation and creates no approval or release  1044ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects omitted, invented, duplicate, changed-content and caller-supplied quality conclusions atomically  1010ms
+   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 2 initial defects as revision_required  1308ms
+   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 3 initial defects as expansion_required  1382ms
+   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 5 initial defects as expansion_required  1367ms
+   ✓ P2 sealed synthetic authority and durable candidates > derives the 501-row quality state with 6 initial defects as blocked  1263ms
+   ✓ P2 sealed synthetic authority and durable candidates > records all 5000 critical checks within the unchanged transaction budget  3025ms
+   ✓ P2 sealed synthetic authority and durable candidates > requires a non-contributing person for critical quality and refuses reuse after revision  1163ms
+   ✓ P2 sealed synthetic authority and durable candidates > rechecks scope, revocation and cancellation before recording quality  994ms
+   ✓ P2 sealed synthetic authority and durable candidates > recovers a lost quality COMMIT once and rejects changed payload under the original operation  1019ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality preview preserves the candidate and is actually consumable by the existing SQL plan freezer  1015ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality SQL requires expanded review and rejects a fabricated passing conclusion  1222ms
+   ✓ P2 sealed synthetic authority and durable candidates > critical quality population requires every live entry and does not fabricate owner acceptance  1128ms
+   ✓ P2 sealed synthetic authority and durable candidates > quality preview rechecks role, current grants, the exact key and cancellation on every read  1007ms
+   ✓ P2 sealed synthetic authority and durable candidates > ignores the login owner label; enabler needs an exact shop/source business grant  1045ms
+   ✓ P2 sealed synthetic authority and durable candidates > commits multi-action batches atomically; rejects self, agent writes, wider scope, stale policy and redelegation  880ms
+   ✓ P2 sealed synthetic authority and durable candidates > recovers lost COMMIT responses using the original durable operation and rejects payload changes  855ms
+   ✓ P2 sealed synthetic authority and durable candidates > keeps permanent operation replay independent of retired HTTP HMAC keys  822ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects admission when its business grant expires after authorization but before commit  1113ms
+   ✓ P2 sealed synthetic authority and durable candidates > allows a newly qualified supervisor to take over and revoke existing business grants  839ms
+   ✓ P2 sealed synthetic authority and durable candidates > fences legacy publication while admitting against an empty current pointer  858ms
+   ✓ P2 sealed synthetic authority and durable candidates > parses an actual stored workbook, freezes contributors/material, and supports another authorized manager  999ms
+   ✓ P2 sealed synthetic authority and durable candidates > keeps the old candidate on bad input and durably reopens the actual error report  1160ms
+   ✓ P2 sealed synthetic authority and durable candidates > serializes two revisions against one key and prevents cancelled material from reviving  1200ms
+   ✓ P2 sealed synthetic authority and durable candidates > reserves quotas atomically and records parser cancellation without a candidate  1002ms
+   ✓ P2 sealed synthetic authority and durable candidates > rechecks revocation after waiting on the same content lock  817ms
+   ✓ P2 sealed synthetic authority and durable candidates > resumes a durable parsing job after restart and replays its successful result  979ms
+   ✓ P2 sealed synthetic authority and durable candidates > cannot freeze after import permission is revoked during object I/O, and releases the failed job slot  1006ms
+   ✓ P2 sealed synthetic authority and durable candidates > refuses expiry while queued and unknown wire fields without persisting mutations  1099ms
+   ✓ P2 sealed synthetic authority and durable candidates > round-trips the full review package and reaches ready with independent source confirmation and routine self-review  1017ms
+   ✓ P2 sealed synthetic authority and durable candidates > requires a qualified noncontributor for critical changes and verifies decision-time history separately from current eligibility  1052ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects a historical PASS before the review grant or before the qualifying role existed  1034ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects forged instance/form bindings, automatic PASS, timeline mismatch and attachment substitution without renewing evidence  1050ms
+   ✓ P2 sealed synthetic authority and durable candidates > persists creation before I/O and recovers a lost provider response with one UUID across restart  1028ms
+   ✓ P2 sealed synthetic authority and durable candidates > invalidates approval work when cancellation or source evidence wins during external I/O  1038ms
+   ✓ P2 sealed synthetic authority and durable candidates > serializes concurrent review replacement and prevents old evidence from marking the candidate ready  1075ms
+   ✓ P2 sealed synthetic authority and durable candidates > keeps revoked evidence terminal and rejects a late approved response from another service  1055ms
+   ✓ P2 sealed synthetic authority and durable candidates > recovers an approval COMMIT with the original operation even when the provider is now unavailable  1027ms
+   ✓ P2 sealed synthetic authority and durable candidates > projects expiry without renewing facts on reads and refuses a stale or mismatched source confirmation  1218ms
+   ✓ P2 sealed synthetic authority and durable candidates > inherits exact candidate and approval lineage and propagates later revocation to both releases  1058ms
+   ✓ P2 sealed synthetic authority and durable candidates > binds evidence freshness to verification start and leaves no locks held while reading the provider  1137ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-expire  1391ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: facts-disabled  1349ms
+   ✓ P2 sealed synthetic authority and durable candidates > rejects ambiguous sub-millisecond eligibility: grant-expires  1365ms
+   ✓ P2 sealed synthetic authority and durable candidates > does not backdate authority from an uncommitted grant and recovers with a new review after commit  1063ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/content-intake.integration.test.ts > P2 sealed synthetic authority and durable candidates > usage: consumes a maximum 5000-row native catalog within bounded transactions without duplicate or missing pages
+Error: Test timed out in 60000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/content-intake.integration.test.ts:2447:3
+    2445|   });
+    2446|
+    2447|   it('usage: consumes a maximum 5000-row native catalog within bounded…
+       |   ^
+    2448|     await publicationBase();
+    2449|     const rows=Array.from({length:5000},(_,i)=>[`faq-${String(i).padSt…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 192 passed (193)
+   Start at  04:48:59
+   Duration  327.44s (transform 293ms, setup 0ms, collect 691ms, tests 327.20s, environment 0ms, prepare 71ms)
+
+undefined
+/Users/hutou/.codex/worktrees/content-intake-family/customer-agent-prototype/apps/api:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/content-intake.integration.test.ts tests/content-intake-material.test.ts

@@ -1,0 +1,9 @@
+$ tsc --noEmit
+tests/unit/workspace-hygiene.test.ts(483,18): error TS2339: Property 'sourceBudgetGroups' does not exist on type 'Readonly<{ root: string; totalBytes: number; categories: readonly Readonly<{ key: string; label: string; path: string; bytes: number; }>[]; remainderBytes: number; remainderBudgetBytes: number; violations: readonly Readonly<...>[]; pass: boolean; }>'.
+tests/unit/workspace-hygiene.test.ts(483,45): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+tests/unit/workspace-hygiene.test.ts(483,50): error TS7006: Parameter 'group' implicitly has an 'any' type.
+tests/unit/workspace-hygiene.test.ts(513,19): error TS2339: Property 'sourceBudgetGroups' does not exist on type 'Readonly<{ root: string; totalBytes: number; categories: readonly Readonly<{ key: string; label: string; path: string; bytes: number; }>[]; remainderBytes: number; remainderBudgetBytes: number; violations: readonly Readonly<...>[]; pass: boolean; }>'.
+tests/unit/workspace-hygiene.test.ts(513,42): error TS7006: Parameter 'group' implicitly has an 'any' type.
+/Users/hutou/.codex/worktrees/intake-size-closeout/customer-agent-prototype/apps/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @customer-agent/desktop@0.3.26 typecheck: `tsc --noEmit`
+Exit status 2

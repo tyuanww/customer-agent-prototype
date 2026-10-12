@@ -1,0 +1,102 @@
+{
+  "schema": "content-intake-p1-verification/1",
+  "mode": "SYNTHETIC_ONLY",
+  "recordedAt": "2026-10-04T12:55:01.914849+00:00",
+  "baseCommit": "8ab309fcd9c494b7343ed88bacb253205d36575f",
+  "branch": "codex/content-intake-p1",
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "osRelease": "25.5.0",
+    "cpu": "Apple M5",
+    "pnpm": "11.19.0"
+  },
+  "inputs": {
+    "packages/content-intake/src/archive.ts": "9d477f89275892cc41fea14001d8269f95ee6322c312305085773e6935a6322f",
+    "packages/content-intake/src/parser-process.ts": "634c7f13a654134ed2c8f247377368c55e708201cab985e81d5d9f016239de4d",
+    "packages/content-intake/src/policy.ts": "175f2f09b56568dca50357dced250446e971ed103a7e8498e7709ecbf7ccd0b0",
+    "packages/content-intake/src/runner.ts": "683f80db3a581f4ab5374c38ef43f8fea8602bc9709b2121ae8b162d3e0e7ca4",
+    "packages/content-intake/src/workbook.ts": "2ca3b60e86294250f91d360e104c03ca1c77bb9c46be1597445d4a0e1de27505",
+    "packages/content-intake/tests/fixtures.ts": "c7b25b2b1bdce5511e02e31e3fd7075d8369c4ef53e351ac1a77f57f0ee8bb04",
+    "packages/content-intake/tests/workbook.test.ts": "2abd79e98a73fd7db5cd90717a27e2f23ab1f87bb5e965f8b8695c3619e85c58",
+    "apps/api/experiments/content-intake-p1/approval.ts": "9928080a9476451bb03a8de0ef5f1415feb96efe4c068ff2c5adab89d0d7a459",
+    "apps/api/experiments/content-intake-p1/permissions.ts": "0c867063ac723c7a2218c5d5d2a061b801f75c9e262496324627b412fa2b8963",
+    "apps/api/tests/content-intake-p1.test.ts": "fb550b2c9815723ffe184dff6793187ef71b0eeeaabd4cfd2e0f201bc245b0ea",
+    "apps/api/tests/support/g1a-e0/content-identity.ts": "b5fcdd9be179066f9c3a97c3581f327ea27dd51d2d1c56bff3d42747b7b4ca00",
+    "packages/content-intake/package.json": "35358c8a5c5d0406f91f07fa74d298139afdbc40ac746a125fe412389298320e",
+    "packages/content-intake/tsconfig.json": "785087c1c77adb80248801ee4bf5ef477ebd0e90957a51cc6ac366a8fe996a39",
+    "packages/content-intake/tsconfig.build.json": "89f7cffdd3fbb928b80acb12c5e601ef29fb608b43193065ce686dc231a93c08",
+    "packages/content-intake/scripts/probe.mjs": "e328a5e5adb03d2946c3e11c6dd826a82e874c4b2d466ada5592549aa3982335",
+    "package.json": "89c15dd870721678541cbf45904f391f6425c972bfe82438c6f32b54fad21b5f",
+    "pnpm-lock.yaml": "b7c7657ec245ce7aa6c0de09c1af474c66bd90f5aa9da055621471056d2d2eac",
+    "pnpm-workspace.yaml": "e73d6796c65573f47469238478a68181ecc6a1458d65e279dd2788f716896f49",
+    "scripts/dev-help.mjs": "3d448c83c026af7396eb487aef115cbecca49b2b3133eeb23d1c2eb29e1b0135"
+  },
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "log": ".gstack/p1-final-checks/lint.log",
+      "logSha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "log": ".gstack/p1-final-checks/typecheck.log",
+      "logSha256": "2d04208e6cdad20b16b90d90f409a3e306077d29d71ca506b6f772a4191a2542"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "log": ".gstack/p1-final-checks/build.log",
+      "logSha256": "6d6ee77b4a15369b2a56c5f33362957063312c0fabe663dd41e010ffd56f210a"
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "log": ".gstack/p1-final-checks/test.log",
+      "logSha256": "299b73b79adedd76e457dbecdb6f22878058025fdf284922023cb96923da0f82"
+    },
+    {
+      "command": "pnpm content:intake:probe",
+      "exitCode": 0,
+      "log": ".gstack/p1-final-checks/probe.log",
+      "logSha256": "4a6b25575e37ec829da1dab8614a03244e1ac3c297b005f491e5713b22d35db5"
+    }
+  ],
+  "tests": {
+    "p1ParserProcess": 41,
+    "p1PermissionsApproval": 31,
+    "api": {
+      "passed": 440,
+      "skipped": 91
+    },
+    "desktop": {
+      "passed": 1095,
+      "skipped": 1
+    },
+    "otherWorkspaceVitestPassed": 47,
+    "scope": "Counts are separate per workspace; P1 API cases are included in the API total. Root Node test suites also exited zero."
+  },
+  "artifactProbeSha256": "7a0075d43c1c0193746e7c99278e55ead3d64446a691afe2fd85053d5fe46e6d",
+  "audit": {
+    "command": "pnpm audit --json",
+    "exitCode": 1,
+    "log": ".gstack/p1-audit.json",
+    "logSha256": "e9a489b4e5232ad0ea572efada8b0c38cbeb110b9f24973a48695b61d4021acd",
+    "wholeWorkspace": {
+      "high": 40,
+      "moderate": 18,
+      "low": 4
+    },
+    "scope": "No remaining reported production advisory paths for new exceljs/yauzl/saxes chain after scoped overrides. Existing and shared development-tool advisories remain; this is not an all-workspace clean audit."
+  },
+  "review": {
+    "cycles": 3,
+    "completed": false,
+    "converged": false,
+    "knownUnresolvedDefects": 0,
+    "limit": "Final fixes passed automated checks but received no further complete review after the third fix cycle."
+  }
+}

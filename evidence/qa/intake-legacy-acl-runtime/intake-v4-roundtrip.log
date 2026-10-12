@@ -1,0 +1,30 @@
+{
+  "status": "PASS",
+  "intakeStatus": "CREATED",
+  "verifyStatus": "VERIFIED",
+  "members": 16,
+  "productLockUnchanged": true,
+  "productLockSha256": "493d7d74a1b4d102562d102c6c639c8afb946d2b64d0ca2a403543fd3ca20f70",
+  "runtimeActivated": false,
+  "sourceGitSha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+  "contractSetId": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+  "runtimeKeys": [
+    "acl",
+    "csv",
+    "csvInstallation",
+    "csvProtocol",
+    "directory",
+    "directoryAcl",
+    "installation",
+    "legacyAcl",
+    "organization",
+    "protocol",
+    "provenance",
+    "roles",
+    "session"
+  ],
+  "migrationCount": 35,
+  "prior34MetadataIdentical": true,
+  "prior34SqlIdentical": true,
+  "incrementSha256": "01a674d1f5a996a511babf193c28c217ec91a72a3f974922e9580cf2bcdabda7"
+}

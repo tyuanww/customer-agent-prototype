@@ -1,0 +1,65 @@
+      "contract_set_id": "cs-ai-c11-openapi-1.19.0-schema-1.21-240ae98a47d8",
+      "source_git_sha": "240ae98a47d8b9432559c298f60af6fdc9ba8c4e",
+      "source_schema_sha256": "5f958e4f7dcde7e11f9a6d38d8339b96654517209a493776acbfc7c3f5202013"
+    },
+    {
+      "position": 31,
+      "id": "0031_intake_direct_v1_22",
+      "file": "0031_intake_direct_v1_22.sql",
+      "source_ranges": [
+        {
+          "start_line": 12797,
+          "end_line": 12897
+        }
+      ],
+      "sha256": "82407ae1c0ce3a3dc975b9b5fe76012b5ab4f19ee5952dafb912a23509c4dcc0",
+      "bytes": 7123,
+      "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
+      "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
+      "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce"
+    },
+    {
+      "position": 32,
+      "id": "0032_intake_direct_publication",
+      "file": "0032_intake_direct_publication.sql",
+      "source_ranges": [],
+      "sha256": "38e72eb66941256861aeb3edddc609cdbbfbc4e1eed56366b370526ad82cbddc",
+      "bytes": 35044,
+      "contract_set_id": "cs-ai-c11-openapi-1.20.0-schema-1.22-6f318d448929",
+      "source_git_sha": "6f318d448929d1a87c5dc9e725ea4f90c48a4b97",
+      "source_schema_sha256": "c5e4896e8ed1ff587e23a70723bd9d81c056ba65561cd9d94963aa6b5f1ae3ce"
+    }
+  ]
+}
+$ tsc -p tsconfig.build.json
+$ tsc -p tsconfig.build.json
+$ electron-vite build
+vite v6.4.3 building SSR bundle for production...
+transforming...
+✓ 318 modules transformed.
+rendering chunks...
+out/main/index.js  1,120.37 kB
+✓ built in 451ms
+vite v6.4.3 building SSR bundle for production...
+transforming...
+✓ 24 modules transformed.
+rendering chunks...
+out/preload/login.cjs       1.48 kB
+out/preload/sop.cjs         7.91 kB
+out/preload/dashboard.cjs  15.68 kB
+out/preload/index.cjs      47.58 kB
+✓ built in 33ms
+vite v6.4.3 building for production...
+transforming...
+✓ 106 modules transformed.
+rendering chunks...
+../../out/renderer/index.html                                        0.45 kB
+../../out/renderer/assets/dashboard-fox-headset-dark-C9mwmYh5.png  655.56 kB
+../../out/renderer/assets/fox-head-DuCgrBSA.png                    706.19 kB
+../../out/renderer/assets/SopApp-CP028QG-.css                        2.84 kB
+../../out/renderer/assets/LoginApp-v_PWWaJd.css                      3.08 kB
+../../out/renderer/assets/index-D0rXesek.css                       162.16 kB
+../../out/renderer/assets/LoginApp-dPtooKvb.js                       9.64 kB
+../../out/renderer/assets/SopApp-B8NBksEv.js                        11.28 kB
+../../out/renderer/assets/index-Cm-YH4tk.js                        703.07 kB
+✓ built in 284ms

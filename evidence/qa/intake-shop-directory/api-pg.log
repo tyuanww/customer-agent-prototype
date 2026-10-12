@@ -1,0 +1,33 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ❯ tests/intake-shop-directory.integration.test.ts (3 tests | 3 failed) 3408ms
+   × shop directory through real auth/HTTP and restricted PG15 > returns only names for visible shop IDs, denies forged selectors, and exposes no private envelope 1055ms
+     → Database migration verification failed: object or extension inventory, exact schema/relation/column/function/default ACL manifest [508:c874f489248d42ee7d3ff17b1463a04f38c5f98dbe22535decfa5ffed21ec6a7], exact database object/owner manifest [3085:fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca], exact function definition/owner/security manifest [240:2375f0b5bb9e3963dccaaa254b0e7652f50c46f9537e6407bacf5d07cef2caa1], exact trigger table/function/event/enabled manifest [100:4cc5d08f3fc25318b6368606aaa8ab177feb6aba56a3cdafef170ff2959f0d3b]
+   × shop directory through real auth/HTTP and restricted PG15 > rejects an entire missing-name set and invalidates pagination on rename and revocation 1267ms
+     → Database migration verification failed: object or extension inventory, exact schema/relation/column/function/default ACL manifest [508:c874f489248d42ee7d3ff17b1463a04f38c5f98dbe22535decfa5ffed21ec6a7], exact database object/owner manifest [3085:fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca], exact function definition/owner/security manifest [240:2375f0b5bb9e3963dccaaa254b0e7652f50c46f9537e6407bacf5d07cef2caa1], exact trigger table/function/event/enabled manifest [100:4cc5d08f3fc25318b6368606aaa8ab177feb6aba56a3cdafef170ff2959f0d3b]
+   × shop directory through real auth/HTTP and restricted PG15 > fails closed on unavailable key and rejects a prepared page that expires before the final guard 1086ms
+     → Database migration verification failed: object or extension inventory, exact schema/relation/column/function/default ACL manifest [508:c874f489248d42ee7d3ff17b1463a04f38c5f98dbe22535decfa5ffed21ec6a7], exact database object/owner manifest [3085:fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca], exact function definition/owner/security manifest [240:2375f0b5bb9e3963dccaaa254b0e7652f50c46f9537e6407bacf5d07cef2caa1], exact trigger table/function/event/enabled manifest [100:4cc5d08f3fc25318b6368606aaa8ab177feb6aba56a3cdafef170ff2959f0d3b]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/intake-shop-directory.integration.test.ts > shop directory through real auth/HTTP and restricted PG15 > returns only names for visible shop IDs, denies forged selectors, and exposes no private envelope
+ FAIL  tests/intake-shop-directory.integration.test.ts > shop directory through real auth/HTTP and restricted PG15 > rejects an entire missing-name set and invalidates pagination on rename and revocation
+ FAIL  tests/intake-shop-directory.integration.test.ts > shop directory through real auth/HTTP and restricted PG15 > fails closed on unavailable key and rejects a prepared page that expires before the final guard
+DatabaseMigrationError: Database migration verification failed: object or extension inventory, exact schema/relation/column/function/default ACL manifest [508:c874f489248d42ee7d3ff17b1463a04f38c5f98dbe22535decfa5ffed21ec6a7], exact database object/owner manifest [3085:fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca], exact function definition/owner/security manifest [240:2375f0b5bb9e3963dccaaa254b0e7652f50c46f9537e6407bacf5d07cef2caa1], exact trigger table/function/event/enabled manifest [100:4cc5d08f3fc25318b6368606aaa8ab177feb6aba56a3cdafef170ff2959f0d3b]
+ ❯ tests/intake-shop-directory.integration.test.ts:22:3
+     20|  beforeEach(async()=>{
+     21|   harness=new Pg15Harness();harness.start();const db=harness.createDat…
+     22|   await applyDatabaseMigrations(admin);await seedIntakeSyntheticHost(a…
+       |   ^
+     23|   await admin.query('CREATE ROLE synthetic_shop_usage LOGIN NOINHERIT;…
+     24|   await admin.query('CREATE ROLE synthetic_shop_auth LOGIN NOINHERIT; …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  19:00:49
+   Duration  4.18s (transform 238ms, setup 0ms, collect 526ms, tests 3.41s, environment 0ms, prepare 43ms)
+

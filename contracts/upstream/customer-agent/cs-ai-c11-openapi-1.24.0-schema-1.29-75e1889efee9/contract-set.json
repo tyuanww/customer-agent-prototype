@@ -1,0 +1,66 @@
+{
+  "schema": "customer-agent-contract-set/v7",
+  "contract_set_id": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+  "architecture_version": "1.16",
+  "implementation_version": "1.22",
+  "openapi": {
+    "version": "1.24.0",
+    "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/openapi.v1.yaml",
+    "file": "openapi.v1.yaml",
+    "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+    "bytes": 795585
+  },
+  "database": {
+    "version": "schema.v1.29",
+    "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/schema-v1.29.sql",
+    "file": "schema-v1.29.sql",
+    "sha256": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771",
+    "bytes": 840498
+  },
+  "readiness": {
+    "upgrade": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/upgrade.v1.sql",
+      "file": "upgrade.v1.sql",
+      "sha256": "848bf0222dcbd02f406611979d4221fa3d5add8c4941df775356b901435ece2d",
+      "bytes": 5534
+    },
+    "assembly": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/assembly.v1.json",
+      "file": "assembly.v1.json",
+      "sha256": "5b76a4712bbf40f047104323e142a835742ae27f2af5ee94695b4244fec77bb2",
+      "bytes": 1731
+    },
+    "installation": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/installation.v1.json",
+      "file": "installation.v1.json",
+      "sha256": "ebe48223f3ea16598668ef892339bfd2b5dd1c920c196083f711627b5ca47c0b",
+      "bytes": 1521
+    },
+    "predecessor": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/predecessor-lock.v1.json",
+      "file": "predecessor-lock.v1.json",
+      "sha256": "c9b85e65a83925c2520394b562f26f8e07a6d2e7f1d5b91b62e8a07dd4d41c0d",
+      "bytes": 9429
+    },
+    "provenance": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/provenance.v1.json",
+      "file": "provenance.v1.json",
+      "sha256": "60c0a22e31d6ed1f6d08f1e1305266a4a634da5d1fb5a95f3e1a21c4cd0e2a71",
+      "bytes": 2006
+    },
+    "approval": {
+      "version": "1",
+      "source_path": "business-docs/01-客服Agent项目/90-评审/2026-10-12_就绪边界后继合同批准.json",
+      "file": "approval.v1.json",
+      "sha256": "9a097a7cec49d0cbd55741ffc80177639307544209476a4c777aff04e9f1c7bc",
+      "bytes": 1383
+    }
+  }
+}

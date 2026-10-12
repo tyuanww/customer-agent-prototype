@@ -1,0 +1,211 @@
+{
+  "status": "LOCAL_SYNTHETIC_VERIFIED_NOT_ACTIVATED",
+  "base": "ef700cb",
+  "date": "2026-10-07",
+  "environment": {
+    "os": "macOS 26.5.2 arm64",
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgresql": "15.18"
+  },
+  "inputs": [
+    {
+      "path": "apps/api/src/content-intake/authority.ts",
+      "sha256": "36356e2c97ddbd4e64c067bd6016edf4837caed48d4ec28783c0656da1139313"
+    },
+    {
+      "path": "apps/api/src/content-intake/discovery.ts",
+      "sha256": "04c9e8a7d25b51935bb1c1369a27af4f53d0fd367572e075bda06ab2ecf20762"
+    },
+    {
+      "path": "apps/api/src/content-intake/management-http.ts",
+      "sha256": "6f1caea4803f797e938fb520777ca78bb9c80a999a59aae579ec26c387f08fd3"
+    },
+    {
+      "path": "apps/api/src/content-intake/service.ts",
+      "sha256": "e7076808481ec173460ab9bc0de682f31a2b2e2972f067ee2e8a9e51f399978e"
+    },
+    {
+      "path": "apps/api/src/content-intake/transaction.ts",
+      "sha256": "8464bc5dcb0b7cb4d025940b2d6f505fe58bf369bb82f34385963f2ed4a1436e"
+    },
+    {
+      "path": "apps/api/tests/content-intake.integration.test.ts",
+      "sha256": "d75bae4ff8877c3b919814c23d1d9010706a3dc633a25ed60d43295bf8fe1797"
+    },
+    {
+      "path": "apps/api/tests/support/intake-synthetic-host.ts",
+      "sha256": "adda4c0986f7d24735dffe770c8ec47a1b7017a2e9986608aad07298b2caf566"
+    },
+    {
+      "path": "apps/api/tests/support/intake-synthetic-seed.ts",
+      "sha256": "453a55cdc9a9e330ef72e89673b3a4f6de3f361b470f490ff6406f4bf4a96bd2"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-principals-http.test.ts",
+      "sha256": "d86a86daa1d06c4ced42a77a6cbdf9a9ca1443601c17b88977c54a2a77108a28"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "sha256": "91386e95aa875318bdb004fe19250ba90ae907894c2353c58d29d722e5e370d2"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "sha256": "446d207f232b329cefc7b5bd012725d1482336ebbac53cfdd1c8c05f8fa88be4"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "sha256": "4148315045cd4adb7996d42b3686ca3778156f4972b5c459e7d67a595b225fb6"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-principals/README.md",
+      "sha256": "574094500d802fdb61aea6bbb3d115489da0fbe218cb066beb200790cee695a7"
+    },
+    {
+      "path": "scripts/probe-intake-usage-consumer.mjs",
+      "sha256": "bb4af84247626821e281f8bb6cfa7d79593f5483b2f59588d501b5f7aa6f9555"
+    },
+    {
+      "path": "contracts/upstream/customer-agent/contract-set.lock.json",
+      "sha256": "a923677ad9cb94db5652e8bad42a37e60ffab6e015ce059c0efbe01d6b69165d"
+    }
+  ],
+  "logs": [
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/root-lint.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/root-typecheck.log",
+      "sha256": "f70544d150b0906bf27727d3302d922e2f2f40365c2c7f8b270dafd54d866796"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/root-typecheck-after-build.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/root-typecheck-final.log",
+      "sha256": "4bf7dad22cfc2238597fd3a8c4497dcc9fed8e2d152b73d722152df384e35d08"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/root-lint-final.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/root-test.log",
+      "sha256": "aed747566b9da53e2ffb67c8326f2a3e81574795d3e3f536deab2a4f4cd90880"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/root-build.log",
+      "sha256": "8e038c916bb1312682cf37d72b8f8d2c9d9d6f9d819355d870ea5cff8058c375"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/full-intake-pg.log",
+      "sha256": "864bd569f73fce63933b778ae2f480033a12269a8bf8ac5faac5b1a64e31cd69"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/api-frozen-files.json",
+      "sha256": "8976b15bf2ad0c6a0525df7098ce9a0dc138bb83354ba81631cb53f1644d9208"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/.qa-evidence/001/receipt.json",
+      "sha256": "898b646162e169a8aa00a1753208acd3213b4c67e2d74992a939540d7ffd2ea4"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/.qa-evidence/002/receipt.json",
+      "sha256": "cb9a6638d35843035005a907ac785c3799c98026374b405725544ec3c0b13f1f"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/.qa-evidence/003/receipt.json",
+      "sha256": "8fb489be51be988a01896d5fb14e80ea2c6ff0034a5c87fc629f7012753d81dc"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/.qa-evidence/004/receipt.json",
+      "sha256": "65b69af67a5febe7c7f8d479cefc4a4c98d49abb9296c72b9144b1e695d96672"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/docs-check.log",
+      "sha256": "a14b5bad74ad0246a76aae922c9c9e519b326f80759bad59041ae0f569319ca6"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/workspace-check.log",
+      "sha256": "d32674a8dddd06c97f26547aa6a2fa5bb5bf1a5c6f12e935f088fca97fabeb17"
+    },
+    {
+      "path": ".gstack/qa-reports/content-intake-principals-20261007/architecture-check.log",
+      "sha256": "00c4429e86eb9e31013b3f452e4ac96fb09323aba7e5c1310aecf5ab00b88b7b"
+    }
+  ],
+  "checks": {
+    "directoryPgHttpMain": {
+      "passed": 10,
+      "capture": "004"
+    },
+    "completeIntakePg": {
+      "passed": 144,
+      "reusedAfterTestOnlyFix": 134
+    },
+    "syntheticHostCli": {
+      "passed": 5,
+      "capture": "003"
+    },
+    "root": [
+      "lint",
+      "typecheck",
+      "test",
+      "build"
+    ],
+    "defaultDesktop": {
+      "passed": 1201,
+      "skipped": 5
+    },
+    "defaultApi": {
+      "passed": 476,
+      "skipped": 238
+    },
+    "documentation": {
+      "markdownFiles": 198,
+      "result": "PASS"
+    },
+    "architecture": {
+      "sourceFiles": 344,
+      "violations": 0
+    },
+    "workspace": {
+      "sourceMiB": 25.4,
+      "budgetMiB": 32,
+      "result": "PASS"
+    }
+  },
+  "capacity": {
+    "firstPageItems": 100,
+    "fullPagesItems": 108,
+    "utf8ResponseBytes": 126473,
+    "cursorCharacters": 346,
+    "scanCounts": [
+      101,
+      8
+    ],
+    "firstPageIdentityQueries": 3
+  },
+  "review": {
+    "ocr": "Host delegation; all selected paths read; default-excluded tests/docs parent full read",
+    "native": "5 production files full, zero confirmed findings; test/fixture/probe SUMMARY only",
+    "outside": "disabled; not called",
+    "fixed": "Sequential snapshot queries on the one pg Client; trace before and after; production source unchanged"
+  },
+  "history": [
+    "First root typecheck failed against stale API dist; rebuilt and reran successfully",
+    "Full PG/root test and build predate the test-only snapshot sequencing fix; production/commands unchanged, affected ten PG cases and lint/typecheck rerun",
+    "Initial fixture corrections respected immutable identity/grant bounds; no production guards relaxed"
+  ],
+  "notVerified": [
+    "management-context 1.19 freeze/export/intake",
+    "upload or report-saving UI",
+    "real identity or Feishu",
+    "new Electron GUI/package/platform/manual checks",
+    "Hangzhou Windows or WSL",
+    "production activation",
+    "external Git delivery"
+  ]
+}

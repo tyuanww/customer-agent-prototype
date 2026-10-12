@@ -1,0 +1,33 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-runtime-closeout/customer-agent-prototype/apps/api
+
+ ✓ tests/intake-runtime-closeout.integration.test.ts (23 tests) 22858ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > uses existing Feishu identity normalization, native observation, restricted writer, usage and management HTTP  1122ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for disabled facts after a real session was issued  1041ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for job facts after a real session was issued  982ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for department facts after a real session was issued  965ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > fails closed for expired facts after a real session was issued  1669ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > drives the actual business upload queue and worker report finalization through the composed HTTP plugins  1416ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > denies an authenticated user outside the assembly tenant/app instead of borrowing a login role  949ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on missing-job refresh refusal  951ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on unregistered refresh refusal  934ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > keeps old fact deadline unchanged on network refresh refusal  931ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > aborts in-flight native reads before draining pools and can restart against retained receipts  1046ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > preserves prototype methods and receiver identity of an admitted identity provider  980ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > drains the auth pool when provider.close throws (startup refusal: false)  956ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > drains the auth pool when provider.close throws (startup refusal: true)  922ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after wrong-purpose startup rejection  893ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after admin startup rejection  880ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after auth-role startup rejection  888ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > releases all resources after storage startup rejection  895ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects scope configuration before opening resources  898ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects remote-origin configuration before opening resources  885ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects duplicate-login configuration before opening resources  887ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects profile configuration before opening resources  882ms
+   ✓ closed runtime candidate through real auth, HTTP and formal PG15 purposes > rejects implicit-database configuration before opening resources  886ms
+
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Start at  02:37:30
+   Duration  23.88s (transform 363ms, setup 0ms, collect 900ms, tests 22.86s, environment 0ms, prepare 32ms)
+

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "@customer-agent/desktop",
+    "typecheck"
+  ],
+  "startedAt": "2026-10-08T11:54:15.957894+00:00",
+  "endedAt": "2026-10-08T11:54:19.143231+00:00",
+  "exitCode": 0
+}

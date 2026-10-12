@@ -1,0 +1,36 @@
+{
+  "source": "second native adversarial review, own synthetic PG15/Unix-socket fixtures",
+  "candidateSourceSha256": "da27175d79c9e92ebc8c784dcdda5643161b1d3376177c1c724dfd773cd1794c",
+  "fixture": {
+    "sources": 1,
+    "overlappingBusinessGrants": 5000,
+    "actualGrantParentConstraint": true,
+    "existingAnd0026Indexes": true
+  },
+  "before": {
+    "elapsedMs": 5010,
+    "sqlstate": "57014",
+    "functionContext": "authorization_deadline"
+  },
+  "inMemoryQueryVariant": {
+    "change": "CASE outside max aggregate; business predicate once per action/kind",
+    "elapsedMs": 12,
+    "rows": 1
+  },
+  "actualServiceTargetedRegression": {
+    "additionalGrants": 5000,
+    "elapsedMs": 28,
+    "assertions": [
+      "one source and one query capability",
+      "no allocation or delegation",
+      "query allowed and publish denied"
+    ]
+  },
+  "limit": "Before/variant timings are isolated SQL experiments, not complete application runs; actual service regression is a separate run.",
+  "actualServiceFullMatrixRegression": {
+    "capture": "006",
+    "additionalGrants": 5000,
+    "elapsedMs": 19,
+    "matrixPassed": 102
+  }
+}

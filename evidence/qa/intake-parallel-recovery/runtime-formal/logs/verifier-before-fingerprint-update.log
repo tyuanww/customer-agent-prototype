@@ -1,0 +1,43 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/packages/database
+
+stdout | tests/verifier-runtime.integration.test.ts > runtime verifier PostgreSQL 15 > measures exact installed runtime catalogues
+{"tables":97,"views":7,"functions":250,"pgcrypto":"1.3","pg_trgm":"1.6"}
+
+stdout | tests/verifier-runtime.integration.test.ts > runtime verifier PostgreSQL 15 > measures exact installed runtime catalogues
+{"entries":537,"hash":"aaabfeda8877ef28c5d8d3aa7a6c8143e41254c221497778d9d4d11a231ec1a9","kind":"acl"}
+
+stdout | tests/verifier-runtime.integration.test.ts > runtime verifier PostgreSQL 15 > measures exact installed runtime catalogues
+{"entries":3085,"hash":"fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca","kind":"object"}
+
+stdout | tests/verifier-runtime.integration.test.ts > runtime verifier PostgreSQL 15 > measures exact installed runtime catalogues
+{"entries":250,"hash":"71a71dfbb803858ea4c7728fb04d625e2b3038c531194d177e9510007c158662","kind":"function"}
+
+stdout | tests/verifier-runtime.integration.test.ts > runtime verifier PostgreSQL 15 > measures exact installed runtime catalogues
+{"entries":105,"hash":"3f262813591fee4cd2938bbd7078d55f02664942eef253fd093271f33cc1ca71","kind":"trigger"}
+
+ ❯ tests/verifier-runtime.integration.test.ts (1 test | 1 failed) 934ms
+   × runtime verifier PostgreSQL 15 > measures exact installed runtime catalogues 934ms
+     → Database migration verification failed: object or extension inventory, exact schema/relation/column/function/default ACL manifest [537:aaabfeda8877ef28c5d8d3aa7a6c8143e41254c221497778d9d4d11a231ec1a9], exact database object/owner manifest [3085:fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca], exact function definition/owner/security manifest [250:71a71dfbb803858ea4c7728fb04d625e2b3038c531194d177e9510007c158662], exact trigger table/function/event/enabled manifest [105:3f262813591fee4cd2938bbd7078d55f02664942eef253fd093271f33cc1ca71]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/verifier-runtime.integration.test.ts > runtime verifier PostgreSQL 15 > measures exact installed runtime catalogues
+DatabaseMigrationError: Database migration verification failed: object or extension inventory, exact schema/relation/column/function/default ACL manifest [537:aaabfeda8877ef28c5d8d3aa7a6c8143e41254c221497778d9d4d11a231ec1a9], exact database object/owner manifest [3085:fb60a658c67a6ba547216b65b7050519ef8709e4f6f27b828072d7ad339cd1ca], exact function definition/owner/security manifest [250:71a71dfbb803858ea4c7728fb04d625e2b3038c531194d177e9510007c158662], exact trigger table/function/event/enabled manifest [105:3f262813591fee4cd2938bbd7078d55f02664942eef253fd093271f33cc1ca71]
+ ❯ verifyMigrationCatalogue src/verifier.ts:842:11
+    840|   }
+    841|   if (failures.length > 0) {
+    842|     throw new DatabaseMigrationError(
+       |           ^
+    843|       'MIGRATION_VERIFY_FAILED',
+    844|       `Database migration verification failed: ${failures.join(', ')}`,
+ ❯ tests/verifier-runtime.integration.test.ts:14:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  18:59:34
+   Duration  1.29s (transform 155ms, setup 0ms, collect 190ms, tests 934ms, environment 0ms, prepare 50ms)
+

@@ -73,6 +73,8 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
   }
 
   let precedingMigrationCount = prior?.migrationCount ?? 0;
+  let precedingSchemaSha256 = prior?.sourceSchemaSha256;
+  const reviewedIds = new Set([catalogue.contractSetId, ...(prior ? [prior.contractSetId] : [])]);
   for (const upgrade of reviewedUpgrades) {
     if (
       prior === null
@@ -80,15 +82,26 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       || !GIT_SHA_PATTERN.test(upgrade.sourceGitSha)
       || !HASH_PATTERN.test(upgrade.sourceSchemaSha256)
       || !Number.isSafeInteger(upgrade.migrationCount)
-      || upgrade.migrationCount <= precedingMigrationCount
-      || upgrade.migrationCount >= catalogue.migrations.length
+      || upgrade.migrationCount < precedingMigrationCount
+      || (upgrade.migrationCount === precedingMigrationCount && upgrade.sourceSchemaSha256 !== precedingSchemaSha256)
+      || upgrade.migrationCount > catalogue.migrations.length
+      || reviewedIds.has(upgrade.contractSetId)
+      // A reviewed HTTP-only contract may retain the complete SQL catalogue.
+      // Equal historical counts are safe only for identical predecessor DDL
+      // and a distinct source contract, including after a product overlay.
+      // Every migration still has its exact provenance/hash checked below.
+      || (upgrade.migrationCount === catalogue.migrations.length
+        && (upgrade.sourceSchemaSha256 !== catalogue.sourceSchemaSha256 || upgrade.contractSetId === catalogue.contractSetId))
     ) {
       catalogueError('Migration catalogue reviewed-upgrade metadata is invalid');
     }
     precedingMigrationCount = upgrade.migrationCount;
+    precedingSchemaSha256 = upgrade.sourceSchemaSha256;
+    reviewedIds.add(upgrade.contractSetId);
   }
 
   const ids = new Set<string>();
+  let successorSuffix = false;
   for (const [index, migration] of catalogue.migrations.entries()) {
     if (
       migration.position !== index + 1
@@ -114,10 +127,34 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     const expectedProvenance = prior !== null && index < prior.migrationCount
       ? prior
       : reviewedUpgrades.find(({ migrationCount }) => index < migrationCount) ?? catalogue;
+    const successor = catalogue.compatibility.additiveSuccessor ?? null;
+    const matchesSuccessor = successor !== null
+      && migration.contractSetId === successor.contractSetId
+      && migration.sourceGitSha === successor.sourceGitSha
+      && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
+      && successor.contractSetId !== catalogue.contractSetId;
+    const repair = catalogue.compatibility.repairSuccessor;
+    const matchesRepair = repair != null && index === 39 && [40, 41].includes(catalogue.migrations.length)
+      && migration.id === '0040_intake_repair_successor_v1_28'
+      && migration.contractSetId === repair.contractSetId && migration.sourceGitSha === repair.sourceGitSha
+      && migration.sourceSchemaSha256 === repair.sourceSchemaSha256
+      && migration.sha256 === repair.migrationSha256;
+    const readiness = catalogue.compatibility.readinessSuccessor;
+    const matchesReadiness = readiness != null && index === 40 && catalogue.migrations.length === 41
+      && migration.id === '0041_intake_readiness_v1_29'
+      && migration.contractSetId === readiness.contractSetId && migration.sourceGitSha === readiness.sourceGitSha
+      && migration.sourceSchemaSha256 === readiness.sourceSchemaSha256 && migration.sha256 === readiness.migrationSha256
+      && repair != null && catalogue.migrations[39]?.id === '0040_intake_repair_successor_v1_28'
+      && catalogue.migrations[39]?.sha256 === repair.migrationSha256;
+    if (matchesReadiness && !successorSuffix) catalogueError('Readiness requires the preceding repair successor');
+    if (matchesRepair && !successorSuffix) catalogueError('Repair requires the preceding additive successor');
+    if (matchesSuccessor || matchesRepair || matchesReadiness) successorSuffix = true;
+    else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
-      migration.contractSetId !== expectedProvenance.contractSetId
+      !matchesSuccessor && !matchesRepair && !matchesReadiness
+      && (migration.contractSetId !== expectedProvenance.contractSetId
       || migration.sourceGitSha !== expectedProvenance.sourceGitSha
-      || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256
+      || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256)
     ) {
       catalogueError(`Migration catalogue provenance changes outside the declared baseline boundary at ${migration.id}`);
     }

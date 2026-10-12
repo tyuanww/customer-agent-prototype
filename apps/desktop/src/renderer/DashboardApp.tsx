@@ -1,3 +1,5 @@
+import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
+import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
   useMemo,
@@ -73,7 +75,22 @@ type NavTooltipState = {
 };
 
 export function DashboardApp() {
-  const [active, setActive] = useState<DashboardModuleId>('overview');
+  const [mode, setMode] = useState<'loading' | 'legacy' | 'intake' | 'failed'>(window.dashboardIntake ? 'loading' : 'legacy');
+  useEffect(() => {
+    if (!window.dashboardIntake) return;
+    let active = true;
+    void window.dashboardIntake.mode().then(r => { if (active) setMode(r.ok ? r.enabled ? 'intake' : 'legacy' : 'failed'); })
+      .catch(() => { if (active) setMode('failed'); });
+    return () => { active = false; };
+  }, []);
+  if (mode === 'loading' || mode === 'failed') return <p role="status">{mode === 'loading' ? '正在读取管理模式…' : '管理模式不可用，请重新打开窗口。'}</p>;
+  return <DashboardWorkspace profile={mode} />;
+}
+/** Both profiles share native chrome and appearance. Only the selected profile
+ * mounts business modules or subscribes to its session API. */
+function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
+  const navItems = DASHBOARD_NAV;
+  const [active, setActive] = useState<DashboardModuleId>(profile === 'intake' ? 'content' : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [signedIn, setSignedIn] = useState(false);
@@ -120,6 +137,7 @@ export function DashboardApp() {
   const contentRef = useRef<HTMLElement | null>(null);
   const navMaxWidth = getDashboardNavMaxWidth(viewportWidth);
   const resolvedTheme = resolveDashboardTheme(themeMode, systemDark);
+  const legacyDisclaimer = signedIn ? DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED : DASHBOARD_MANIFEST.banners.disclaimer;
   const navCollapsed = isDashboardNavRailPhase(navPhase);
   const hostPlatform = useMemo(
     () => inferDashboardHostPlatform({
@@ -133,8 +151,8 @@ export function DashboardApp() {
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
   const activeItem = useMemo(
-    () => DASHBOARD_NAV.find((item) => item.id === active) ?? DASHBOARD_NAV[0],
-    [active],
+    () => navItems.find((item) => item.id === active) ?? navItems[0],
+    [active, navItems],
   );
 
   useLayoutEffect(() => {
@@ -146,6 +164,7 @@ export function DashboardApp() {
   }, [active]);
 
   useEffect(() => {
+    if (profile !== 'legacy') return undefined;
     const api = window.dashboardContent;
     if (!api) return undefined;
     let live = true;
@@ -176,7 +195,7 @@ export function DashboardApp() {
       window.removeEventListener('focus', load);
       stopSession?.();
     };
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -975,7 +994,7 @@ export function DashboardApp() {
   };
 
   const move = (delta: number) => {
-    const nextId = nextDashboardNavId(active, delta);
+    const nextId = nextDashboardNavId(active, delta, navItems);
     setActive(nextId);
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${nextId}`)?.focus();
@@ -1086,7 +1105,7 @@ export function DashboardApp() {
           aria-label="工作台功能"
           aria-orientation="vertical"
         >
-          {DASHBOARD_NAV.map((item) => {
+          {navItems.map((item) => {
             const selected = item.id === active;
             const showGroup = item.group !== lastGroup;
             lastGroup = item.group;
@@ -1141,13 +1160,13 @@ export function DashboardApp() {
                     }
                     if (event.key === 'Home') {
                       event.preventDefault();
-                      const first = DASHBOARD_NAV[0].id;
+                      const first = navItems[0].id;
                       setActive(first);
                       focusModule(first);
                     }
                     if (event.key === 'End') {
                       event.preventDefault();
-                      const last = DASHBOARD_NAV[DASHBOARD_NAV.length - 1].id;
+                      const last = navItems[navItems.length - 1].id;
                       setActive(last);
                       focusModule(last);
                     }
@@ -1162,7 +1181,7 @@ export function DashboardApp() {
         </div>
         <p className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
           <span data-testid="dashboard-boundary-disclaimer">
-            {signedIn ? DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED : DASHBOARD_MANIFEST.banners.disclaimer}
+            {profile === 'intake' ? '合成验证 · 未接入真实业务资料' : legacyDisclaimer}
           </span>
         </p>
         <div
@@ -1219,7 +1238,7 @@ export function DashboardApp() {
           <div className="dashboard-page-context">
             <strong>{activeItem.label}</strong>
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
-              {refreshLabel}
+              {profile === 'intake' ? 'PILOT-S0 · SYNTHETIC' : refreshLabel}
             </p>
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
@@ -1235,20 +1254,36 @@ export function DashboardApp() {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
-          {active === 'wording' ? (
-            <WordingLibraryModule
-              initialDomain={wordingDomain}
-              onDomainConsumed={() => setWordingDomain(undefined)}
-            />
-          ) : null}
-          {active === 'sop' ? <SopLibraryModule /> : null}
-          {active === 'announce' ? <AnnounceModule onOpenDomain={openWordingDomain} /> : null}
-          {keepContent || active === 'content' ? (
-            <div hidden={active !== 'content'}>
-              <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
-            </div>
-          ) : null}
+          {profile === 'intake' ? <>
+            {active === 'overview' && <section className="dash-module" data-testid="module-overview">
+              <header className="dash-module-head"><h1>管理概览</h1></header>
+              <p>资料上传、检查与确认发布在内容管理中完成，总监和经理可在其中配置权限。</p>
+              <div className="intake-toolbar"><button className="dash-action-primary" onClick={() => setActive('content')}>打开内容管理</button>
+                <button className="dash-reset" onClick={() => setActive('wording')}>浏览可用话术</button></div>
+              <p className="dash-scope">经营统计与待办指标未接入。</p>
+            </section>}
+            {active === 'sop' && <section className="dash-module" data-testid="module-sop">
+              <header className="dash-module-head"><h1>SOP</h1></header>
+              <p>当前资料模式尚未接入 SOP。可在内容管理中维护售前、售后等 FAQ 资料。</p>
+            </section>}
+            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
+            {keepContent || active === 'content' ? <div hidden={active !== 'content'}><IntakeManagement /></div> : null}
+          </> : <>
+            {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
+            {active === 'wording' ? (
+              <WordingLibraryModule
+                initialDomain={wordingDomain}
+                onDomainConsumed={() => setWordingDomain(undefined)}
+              />
+            ) : null}
+            {active === 'sop' ? <SopLibraryModule /> : null}
+            {active === 'announce' ? <AnnounceModule onOpenDomain={openWordingDomain} /> : null}
+            {keepContent || active === 'content' ? (
+              <div hidden={active !== 'content'}>
+                <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
+              </div>
+            ) : null}
+          </>}
         </main>
       </div>
     </div>

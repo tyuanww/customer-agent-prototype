@@ -1,0 +1,55 @@
+
+ RUN  v3.2.7 /Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api
+
+ ❯ tests/intake-organization-observer.test.ts (19 tests | 1 failed | 18 skipped) 46ms
+   ↓ offline native organization observation > follows both full scans, returns only mapped facts and pins the deadline to observation start
+   ↓ offline native organization observation > maps is_frozen to disabled without inventing a role
+   ↓ offline native organization observation > maps is_resigned to disabled without inventing a role
+   ↓ offline native organization observation > maps is_exited to disabled without inventing a role
+   ↓ offline native organization observation > maps is_unjoin to disabled without inventing a role
+   ↓ offline native organization observation > maps unactivated users to disabled and rejects missing or non-boolean status
+   ↓ offline native organization observation > rejects wrong scope/version before I/O and a different returned user even with the same name
+   ↓ offline native organization observation > does not normalize or guess job title ""
+   ↓ offline native organization observation > does not normalize or guess job title " 合成坐席"
+   ↓ offline native organization observation > does not normalize or guess job title "合成坐席 "
+   ↓ offline native organization observation > does not normalize or guess job title "未登记岗位"
+   ↓ offline native organization observation > rejects duplicate names and disabled titles, including the previously documented wrong enabled field
+   ↓ offline native organization observation > rejects repeated cursor/ID, missing pages, oversized pages and nonterminal final tokens
+   ↓ offline native organization observation > accepts an empty intermediate page but fails a never-ending directory at its page budget
+   ↓ offline native organization observation > rejects user/department or directory changes across reads
+   ↓ offline native organization observation > sorts departments but rejects empty and duplicate department facts
+   ↓ offline native organization observation > rejects expired/backward clocks and provider errors without reflecting messages or partial facts
+   × offline native organization observation > does not start transport after cancellation while the initial clock is pending 45ms
+     → expected [ { kind: 'user', …(2) } ] to have a length of +0 but got 1
+   ↓ offline native organization observation > cancels hung I/O, ignores late results and rejects an already-aborted call before I/O
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/intake-organization-observer.test.ts > offline native organization observation > does not start transport after cancellation while the initial clock is pending
+AssertionError: expected [ { kind: 'user', …(2) } ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ tests/intake-organization-observer.test.ts:121:21
+    119|     resume(started);
+    120|     await new Promise<void>(resolve => setImmediate(resolve));
+    121|     expect(f.calls).toHaveLength(0);
+       |                     ^
+    122|   });
+    123|   it('cancels hung I/O, ignores late results and rejects an already-ab…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  13:09:53
+   Duration  999ms (transform 254ms, setup 0ms, collect 577ms, tests 46ms, environment 0ms, prepare 64ms)
+
+undefined
+/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/apps/api:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/intake-organization-observer.test.ts -t 'initial clock is pending'

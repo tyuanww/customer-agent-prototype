@@ -1,0 +1,1156 @@
+{
+  "createdAt": "2026-10-07T21:02:04.020Z",
+  "nodeVersion": "v24.19.0",
+  "source": "apps/api/src/content-intake/usage.ts",
+  "sourceSha256": "3085ee36b4a052a54f2b928680ca7c4e6347fcee50e7d87de3b4b3b03ec3aebf",
+  "sqlSha256": "352753b8ef5cb9a266110d61b0ddc011879e6aaf5025dd6f372718f970203389",
+  "fixtureSha256": "f6e517b08c5a6c77869a8fbe244f179319e692e81dfb38d0f2d4ea633da55a3c",
+  "migrationManifestSha256": "b1032b455a4275090ba75b0fdb7d325365357b2dec91f2ff1fcc7028723f3695",
+  "boundary": "Snapshot selection SQL only; synthetic fixture bypasses FK/immutability during seeding. Excludes entitlement, approval, vocabulary projection and complete HTTP/history performance. The dense guard case separately measures assert_family_catalog. Random query-oracle catalogs may contain overlapping children and are not evidence that the publication guard accepts them.",
+  "statementTimeoutMs": 5000,
+  "randomSeed": "0x6012809",
+  "cases": [
+    {
+      "name": "guard-5000-unassociated-shop-entries",
+      "inputSha256": "dd9dcc1eff2c32b04829e4d2ed7d3793af6a08e1f06bf9da11e9b2742f76bfcf",
+      "entries": 5000,
+      "products": 0,
+      "scenarios": 0,
+      "elapsedMs": 12.2,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "guard-1-root-4999-disjoint-product-children",
+      "inputSha256": "598352b25dcad3c7028c115c39dced322f19dd760d7682e7d8254d2c5dc8f8f6",
+      "entries": 5000,
+      "products": 0,
+      "scenarios": 0,
+      "elapsedMs": 35.3,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "usage-2500-wildcard-families",
+      "inputSha256": "33325489da5e844af440dde43cc46d6155768b82d4ee813b5f56ecea05906bc6",
+      "entries": 5000,
+      "products": 100,
+      "scenarios": 100,
+      "elapsedMs": 352.1,
+      "returned": 101,
+      "status": "PASS"
+    },
+    {
+      "name": "usage-1666-product-partition-families",
+      "inputSha256": "3a8caf3bcf080c199dd162803fc0f4044aaf1c4c6edf2afdaf56aec383c8c8a9",
+      "entries": 4998,
+      "products": 100,
+      "scenarios": 100,
+      "elapsedMs": 416.4,
+      "returned": 101,
+      "status": "PASS"
+    },
+    {
+      "name": "usage-1666-scenario-partition-families",
+      "inputSha256": "ea018686acee2e0459d8a2797b154aa8f357a2359fc28dac07669544e18a4452",
+      "entries": 4998,
+      "products": 100,
+      "scenarios": 100,
+      "elapsedMs": 632.5,
+      "returned": 101,
+      "status": "PASS"
+    },
+    {
+      "name": "partial-root",
+      "inputSha256": "7e128c57d98947b888a54521f4f675214465cbc320a51812e6e2bfccf7692b2c",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 1.1,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "union-complete",
+      "inputSha256": "af3dc0ef26259b9c7fbe64306b9df9b58ab16ee75e629f8c801199db0a0a4016",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.9,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "empty-both",
+      "inputSha256": "16a71c8563862a030428361851c1f4b823a14ea21fccb091d1ba1b66f7547ccd",
+      "entries": 3,
+      "products": 0,
+      "scenarios": 0,
+      "elapsedMs": 0.9,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "empty-wildcard",
+      "inputSha256": "56297507a54e3a2fcd124bf27d3661f20e8ba8e047090ba3bf4612f1782c0c1a",
+      "entries": 2,
+      "products": 0,
+      "scenarios": 0,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "noncontiguous-gap",
+      "inputSha256": "360a316cedf6bba90f88387910646db2553dcbd58f73397615a3cd9e43bd062e",
+      "entries": 2,
+      "products": 1,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "noncontiguous-root",
+      "inputSha256": "fc38f44e8f4e148b7f58468500e2cccabcd3da1009cd9485360f8ef7f9c27ba7",
+      "entries": 2,
+      "products": 1,
+      "scenarios": 3,
+      "elapsedMs": 0.9,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "cross-gap",
+      "inputSha256": "40a40d87fba67457cd28501545173e5d09ffeea0b473cd45757a66a95ae08ea7",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.9,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "protected-disjoint",
+      "inputSha256": "6f226115267b03423c3b33c60677bd8e94fad0d0da252c93e8211346f07390aa",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.9,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "inactive-children",
+      "inputSha256": "ebabd411b5fda0aa966c96c30f16760a824f746deb66ea059fd3731e281a76c6",
+      "entries": 4,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-0",
+      "inputSha256": "9950ff34740f422660a9745faa1b1f04deb1e623efb8796c57a469fc823f7c81",
+      "entries": 3,
+      "products": 3,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-1",
+      "inputSha256": "87058a9038f8ed481d22b4cd4a8237a1edff4c665dd8419c5158870040908f3a",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-2",
+      "inputSha256": "f9a7d5b539b18ced40dd553b405993e1d8a7eb7b611121294cd3463c8c5af634",
+      "entries": 4,
+      "products": 4,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-3",
+      "inputSha256": "4ac8c9dabf69aa30943a4b2fd1221819d48fc4e0190c3c9e15eb70e4184b41a0",
+      "entries": 4,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-4",
+      "inputSha256": "36aa5699f50fcc0313ccd1b91ca368b1ed14a8a0b40f89242922379515e245d1",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-5",
+      "inputSha256": "c13ecaa62ead8858ff904b7dcea0b71a377576ed04021c522c716043fa6d88b1",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 2,
+      "elapsedMs": 0.9,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-6",
+      "inputSha256": "0d0455ed2fe8ed357db8f94adbdcea95f5765a4b05abfdf02ce5e6c8512148ab",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.9,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-7",
+      "inputSha256": "538e6bab4e2be1f98e9ecb3b62c8477aa02237a92871d40ce73f141f171b9f69",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-8",
+      "inputSha256": "fa31d51bb93fcaff57f452c815e0ac1387e69219fbdf7c9506bc87c0f1d2a6b7",
+      "entries": 4,
+      "products": 0,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-9",
+      "inputSha256": "29c8336196c6b760891e7b19f2a03560ed17b353893af3edcdcf63b661f26a01",
+      "entries": 4,
+      "products": 0,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-10",
+      "inputSha256": "89372847795e1424ef0c7dbb606dde29044303edc2c1d637ee65754a363b957e",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-11",
+      "inputSha256": "0065ac9dc86e071597239cfe12ea8fef8f6456e0c614622668628bedbefc6f77",
+      "entries": 6,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-12",
+      "inputSha256": "06fe162fca92ee5c7f71b3044295924adc3584266e41b7fa078a23ff5a5d93d9",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-13",
+      "inputSha256": "bf79ecc972ae087eec011e07498dbd38cc1fbac45833de176a21196cedbadf5b",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-14",
+      "inputSha256": "483dd54ecf83c75f6b5c10ea2431596da407558d4fd3a7488bde134d71599fa5",
+      "entries": 5,
+      "products": 3,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 5,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-15",
+      "inputSha256": "844054e956141919317febfbcb6a0ab6908f05492fc642966ab2e91a3656bfa8",
+      "entries": 5,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.9,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-16",
+      "inputSha256": "7dfe8ea3c67f4a9ed42a580a923b33da333d74179219921de326acd19f115d1e",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-17",
+      "inputSha256": "490c876abb0c722a5a386f1b94723777076343f206796b48ec2e3c75716d55ce",
+      "entries": 5,
+      "products": 2,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-18",
+      "inputSha256": "a4c3b8c91f719e6a2d446387ddf095f1cd6a7d53b22cc51df138798331809e62",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-19",
+      "inputSha256": "9d1070d852570c1f032987ed5d533b72cc63205d626bc6f49d9b99a3c2aaab68",
+      "entries": 4,
+      "products": 0,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-20",
+      "inputSha256": "d952732b188ffa5ae9f8d6a7629483270bffa3276e0a11673c20fb3e339e1613",
+      "entries": 3,
+      "products": 0,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-21",
+      "inputSha256": "6bb068cfa4153b789bb3df1d53ed58bb68981154ac88c0b12721bf9045905ce4",
+      "entries": 6,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-22",
+      "inputSha256": "29469cefe911285d30d9250b5b196fe87fd4c946750a155597801ccdfeb98616",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-23",
+      "inputSha256": "68925bea257cfb415d9dcc4928ca9c95849fcec89d20a14a18e53dc81a89dc1c",
+      "entries": 4,
+      "products": 1,
+      "scenarios": 4,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-24",
+      "inputSha256": "17eb7a4fdd4eb119f1d747fcfeb2ef07833871bc541bb7f52e38f3413099c997",
+      "entries": 5,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-25",
+      "inputSha256": "1384080822a068fc6dd2d53771cdd7adefdf3f673930a2612421c4d5eb55198f",
+      "entries": 4,
+      "products": 4,
+      "scenarios": 4,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-26",
+      "inputSha256": "2b28a732f4edec5485583dbfe32ca62cee3f785a1565ab7eb82c8d7c56a4e716",
+      "entries": 5,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-27",
+      "inputSha256": "79dad209d534dca163f9f866411f4daf1a190950992fabc416660b90e12e02bc",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-28",
+      "inputSha256": "34a947722e0c07cf55098c78d7c299e9a504993b9e9980bab331f106f16d8b1f",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-29",
+      "inputSha256": "d8e040fe9341589f99de0a5a0213411a50d38fb1cfed424344b556b3f90de712",
+      "entries": 5,
+      "products": 1,
+      "scenarios": 4,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-30",
+      "inputSha256": "83d9f0a83218eea5bfc712490f1e5a9e87ecb99aab44fc993d9764be307da09e",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 0,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-31",
+      "inputSha256": "0ee62d1620dda2c0bc3efdf0447a26bfedf9cc4d1cb584619024fb8439b8ae89",
+      "entries": 7,
+      "products": 1,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-32",
+      "inputSha256": "ca4991e3aa41fc15ebc173e910cd78aa88f6b46f8d2cf3001f075b1edcaba094",
+      "entries": 2,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-33",
+      "inputSha256": "e35777ffb8f0bed6fe3284791037476ab51de337a27c813765e3aead40f49cb6",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-34",
+      "inputSha256": "f6987dcfd92f70a3d30c32548763260863a489bdab10325785966459a875b51e",
+      "entries": 2,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-35",
+      "inputSha256": "5a5e02126fd22a88564fc7016538b3b7bdb007b74685573e28dd04e832578282",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-36",
+      "inputSha256": "583dad3d3ff3cecbfea4cec16ee6e03370626ccc1d7c1d69dfbae86baa57178c",
+      "entries": 4,
+      "products": 4,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-37",
+      "inputSha256": "c4c5e2818b579280e957e751dcb686b725155b9a3d3a6a02497973922f749fb2",
+      "entries": 5,
+      "products": 4,
+      "scenarios": 4,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-38",
+      "inputSha256": "46d18e1d8c3cb8656744439f969f64217f164beb7ff663a488adf3e8d5bb9d83",
+      "entries": 5,
+      "products": 1,
+      "scenarios": 4,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-39",
+      "inputSha256": "b754b084417def066a3e048edb1d13e7d036dd5d58669fdd3183d00d2be1d26f",
+      "entries": 2,
+      "products": 1,
+      "scenarios": 0,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-40",
+      "inputSha256": "14271f7504c51429f7fc305d7da66eae711f773472847b83ffdb3df64fd5edd6",
+      "entries": 5,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-41",
+      "inputSha256": "ed006d5d154b05954c4a648216a8332b03cdadae70b018ea985d7250a0c1dfea",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-42",
+      "inputSha256": "11ab7af82c3cc2f28ceeeadf206e098e63db74da31ee12d40a5bcb96ba0c2bd7",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-43",
+      "inputSha256": "461e600b4bb3298041e3fb196c03d56b030ab14fb91e99afbcabfcfc956d81a6",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.9,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-44",
+      "inputSha256": "84feb43be253bbadec1c1a5a87b68a3bef33629efc8cf90ebb3c5703eced75a2",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 0,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-45",
+      "inputSha256": "aa56a5d6d04077f53c93634ffc2fdd2cc973c600fa11ffabdf4e1914221c94d4",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-46",
+      "inputSha256": "89d9f1cfdb8cdbe7831ce24946be2fadec541148f8cd57f579eca32d0c5df822",
+      "entries": 4,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-47",
+      "inputSha256": "672c8db5534e9778d4290afb1c3f74e4af4df1a2f398cdb2ac9bf860ef52c5f9",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-48",
+      "inputSha256": "2a52c6fcec38e76a501db5efb7e6d62770baaab700b01638be5ee79b43ff2626",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-49",
+      "inputSha256": "1d4924d6e5542c5c6b974ff81a78846978508c7a3c514ab4abea7bfcfdc0d585",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-50",
+      "inputSha256": "a26dcb12df5fc10e0fe45e8941d677059520d0573d57c6880c34aff78b6eccfa",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 4,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-51",
+      "inputSha256": "4f88ec46eb2a1a9f184f659ebf7cf48fbacf9f4f72110b7bc3e007ff56f49f4d",
+      "entries": 4,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-52",
+      "inputSha256": "be1b89a1e789e426442df374176d7f01bfc91e8e529bf18c623e21e4f616a8fb",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-53",
+      "inputSha256": "a5bec3d87233e1cf31f500dc2636326c4be2943fd0abcd50555c0fb83f2a4105",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-54",
+      "inputSha256": "1a382b63143ef840f07946e8c580875b10fed2ca641f4ca349a5d851ee7961af",
+      "entries": 6,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-55",
+      "inputSha256": "ac4dec27d9cde12787a0fffdc8384d092ad19d933c28d7a4ae09067f5629524e",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-56",
+      "inputSha256": "8e591e2f6916bd040c6e72f65044f7bad39f6439daafe31dd207d24d3eb8dab3",
+      "entries": 2,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-57",
+      "inputSha256": "7bf1a535b564913a81eea2bd76689c6588479979f58843843859858fbd5c5895",
+      "entries": 4,
+      "products": 4,
+      "scenarios": 0,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-58",
+      "inputSha256": "86992ec69ac83f43453c6139e5d00e2b67e1186739eddeb7aef4d5cc999ec75a",
+      "entries": 2,
+      "products": 0,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-59",
+      "inputSha256": "f52c3cc0960fcb31d1e07ec301eefa1e4cd12b3e3176a7ddd55cb254f564ebf4",
+      "entries": 6,
+      "products": 1,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-60",
+      "inputSha256": "498d18333349fc36d64e231cbb24d9a026e07fb400cdf6e8b641501c34a0eef6",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-61",
+      "inputSha256": "49420fcc392f3a05a54292d09c1ad340343ee98e897823afaf1502df8976fe93",
+      "entries": 4,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-62",
+      "inputSha256": "ade211578fa8548de109933b2f6bfe47e007eb9e0b035254829278da87fd6cab",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-63",
+      "inputSha256": "4ae2b3762a24940e313f809d772158465c13c2f7b9fac9573f4a084f0ea0f46c",
+      "entries": 7,
+      "products": 1,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-64",
+      "inputSha256": "48ee4f9a450da7541ea54bd64c06876158670e9fee0195193522b09d617c639c",
+      "entries": 4,
+      "products": 3,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-65",
+      "inputSha256": "1c67d5a64088ba0bc119e8a2f10b58097e0eb74beb3327ab3441a4e2cdd121b9",
+      "entries": 2,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-66",
+      "inputSha256": "068deca20c146f94e24b4e0e1e78390166b8c16834973ffb83a869a3d2bb1915",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-67",
+      "inputSha256": "05f64b092ff083a735396e3d0ad8a8ca3a016c3b2204a221e674407b0a16af96",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-68",
+      "inputSha256": "25078e6b2d2be4b4f87bd04cf70b4d6d9cdbb1d9c608f514f2374176f0fa0b94",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-69",
+      "inputSha256": "d065b2af9a12f1e1d1ecac791187dbcf13341f64fe7d828a78bf037fa5ea72e2",
+      "entries": 5,
+      "products": 0,
+      "scenarios": 0,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-70",
+      "inputSha256": "a728948e3dc26782e56d734bf9ae71fd6c76340df6df3c80c9de3c0a341f2077",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-71",
+      "inputSha256": "9d9cc8e36c095e107e9e8f500fed2eb1b099269b414695d5ae13057e905e2814",
+      "entries": 6,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 5,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-72",
+      "inputSha256": "5733f94c9e131cf3a9f0f6758308c5052009b642f4c67a5cf8af6985a7cb191e",
+      "entries": 4,
+      "products": 3,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-73",
+      "inputSha256": "0b31574cdada31c032445cf2d9033f6eb36a1d610f54c40a7e412c15d09d731a",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-74",
+      "inputSha256": "715ce39d916e4a946dc6e6749b696687a0c9330ef386b68a3b010a6aee092df2",
+      "entries": 5,
+      "products": 3,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-75",
+      "inputSha256": "6929dd0b0c5f3f4c98ca010deff2872a98e880e7faa4683fc044f2f57898ada3",
+      "entries": 4,
+      "products": 3,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-76",
+      "inputSha256": "aa4c11aed26a6a1f07b58f2d03087b0fe68cf9bba95486e048c1cb343423ea3f",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-77",
+      "inputSha256": "0f850731a68c430f384da364505a0ff0c37511858613f05104e39dea2c959913",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-78",
+      "inputSha256": "3f61c7a24348c678b02b3c4b3e692c9a36a4b79ba97f0bbf89a03e6ad6b35036",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-79",
+      "inputSha256": "05956f5f6bec033b9fb296349a171ea0b48bf439a85d63b4ef6f01d9a915d779",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-80",
+      "inputSha256": "8459a611c7aa8afd40e6070f861aed2e4391608fe18a714101c996de1d3cb949",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-81",
+      "inputSha256": "840ff3296dbdcd09a7e39f02160be24afc6e30803545bf66885bf2a6642cba5b",
+      "entries": 4,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-82",
+      "inputSha256": "430e3e82cc211377d171a7a276f679e845a3200e17c94a5c5ffa432832f9790e",
+      "entries": 3,
+      "products": 0,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-83",
+      "inputSha256": "74f98a75a1c9799212d85c176e1b24fccb4025f26ee9ed65b260b48ff446e5c4",
+      "entries": 5,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-84",
+      "inputSha256": "f16e3d1fe3326ceb9570e99aab3c0301e2c6e8897fbd358a29a7c69aa17478f2",
+      "entries": 5,
+      "products": 4,
+      "scenarios": 3,
+      "elapsedMs": 0.9,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-85",
+      "inputSha256": "6f7e80054581d0e423938a11408e0f3f32ad2221a28dc1be2851e40fe1c959d6",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-86",
+      "inputSha256": "7141d9107a259c4f2359a0522a2d9282e2a30d66733f003912e9395a44478d87",
+      "entries": 3,
+      "products": 1,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-87",
+      "inputSha256": "ca1f9292233bf9b456990c46e72e5cfdfe57468c04245cb9ff31ed0e4be4fee8",
+      "entries": 5,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-88",
+      "inputSha256": "6efec1dea6a4c924a570b4767fe798646f15de28f0f5493f8b108fa922e8a49d",
+      "entries": 4,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-89",
+      "inputSha256": "e1d4b348f23603820c2c3bca3b32a6a209c270e76cdc69c08fb852b01dcfa26b",
+      "entries": 2,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-90",
+      "inputSha256": "3efceb0a7dd1f0c24f4bbec9dc2190d3d7e333493ac81f823e1015e2e1368f7b",
+      "entries": 6,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-91",
+      "inputSha256": "beabc9753a4879ea13743b5e8ca5997b3fa22737251b402e737ad38c84815531",
+      "entries": 5,
+      "products": 3,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-92",
+      "inputSha256": "87fc18ccbe9033cf9b26a82e172c4413c5eb73bc67e21b0ab4801c1960d7e9f8",
+      "entries": 4,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-93",
+      "inputSha256": "72ed0c2e2ed3fd97d460419c16d4440e91a895977de384ccddf63d3fc8bffdc2",
+      "entries": 5,
+      "products": 2,
+      "scenarios": 0,
+      "elapsedMs": 0.8,
+      "returned": 2,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-94",
+      "inputSha256": "c29dfe871b946eafc97a6fe67be01e8c62cf9fb63ecd655170179d2ef7f95fb8",
+      "entries": 3,
+      "products": 2,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-95",
+      "inputSha256": "9f0b7cae9ba4e47be77726a707cf6acf36298c4bd23aa6cb771c531995cf0d0e",
+      "entries": 5,
+      "products": 2,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-96",
+      "inputSha256": "66dc4b504e1b9cd65d20e059b02d5e69cb6059121d1496880a3a922402f16a91",
+      "entries": 2,
+      "products": 3,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-97",
+      "inputSha256": "67b94baf10cfcdd88465c83d1ad5f139532595a6f8a3c561a3f8c89d97d64180",
+      "entries": 3,
+      "products": 3,
+      "scenarios": 2,
+      "elapsedMs": 0.8,
+      "returned": 1,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-98",
+      "inputSha256": "f54575ddb57003a9f939c55df92d35976f8672b7d570ccbd488b0f69e69491ef",
+      "entries": 5,
+      "products": 3,
+      "scenarios": 1,
+      "elapsedMs": 0.8,
+      "returned": 3,
+      "status": "PASS"
+    },
+    {
+      "name": "oracle-99",
+      "inputSha256": "14d4ed239a7488310e19134c5ef4cdd47c6cc7e03620a9bd9e54b670934281ca",
+      "entries": 6,
+      "products": 3,
+      "scenarios": 3,
+      "elapsedMs": 0.8,
+      "returned": 4,
+      "status": "PASS"
+    }
+  ],
+  "oracleCases": 100,
+  "status": "PASS"
+}

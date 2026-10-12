@@ -1,0 +1,65 @@
+{
+  "revision": "789ce58e8944b2acdddd627d9a559b05612ede62",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype",
+  "limits": [
+    "Functional only, two probes; no browser or production data. This is preview and SQL-consumer validation, not durable P2 quality evidence or publication.",
+    "Required 43-test regression and root lint/typecheck/test/build ran separately on unchanged source; final report links their log hashes.",
+    "Earlier development run rejected two invalid test fixture constructions (nonempty P2 attachment note and direct revocation without grant version); fixture construction repaired. This is not a discovered production bug."
+  ],
+  "evidence": [
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'quality preview preserves'",
+      "contract": "Plan §0.9: authorized immutable candidate → quality preview → real SQL frozen plan; preview itself has zero quality/release writes",
+      "expected": "Test passes: actual freezer accepts projection and returned targets/hashes match; repeated preview stable; no candidate/evidence/release mutation",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (35 tests | 34 skipped) 1100ms\n   ✓ P2 sealed synthetic authority and durable candidates > quality preview preserves the candidate and is actually consumable by the existing SQL plan freezer  1100ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 34 skipped (35)\n   Start at  14:30:12\n   Duration  1.58s (transform 160ms, setup 0ms, collect 316ms, tests 1.10s, environment 0ms, prepare 37ms)\n\n"
+    },
+    {
+      "command": "env CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/content-intake.integration.test.ts -t 'quality SQL requires'",
+      "contract": "Existing DEC-042 SQL rejects missing expansion and fabricated pass",
+      "expected": "501 ordinary entries yield 100/151 samples; SQL rejects missing expansion and false pass with zero evidence writes, accepts blocked evidence, no release",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p2/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake.integration.test.ts (35 tests | 34 skipped) 1149ms\n   ✓ P2 sealed synthetic authority and durable candidates > quality SQL requires expanded review and rejects a fabricated passing conclusion  1148ms\n\n Test Files  1 passed (1)\n      Tests  1 passed | 34 skipped (35)\n   Start at  14:31:01\n   Duration  1.58s (transform 147ms, setup 0ms, collect 292ms, tests 1.15s, environment 0ms, prepare 42ms)\n\n"
+    }
+  ],
+  "learning": [
+    {
+      "observationCapture": "001",
+      "observationArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "quality preview preserves"
+      ],
+      "hypothesis": "Projection froze correctly; test whether missing expansion or a fabricated pass can bypass the existing quality conclusion gate.",
+      "nextCapture": "002",
+      "nextArgv": [
+        "env",
+        "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin",
+        "CUSTOMER_AGENT_API_PG15_INTEGRATION=1",
+        "pnpm",
+        "--filter",
+        "@customer-agent/api",
+        "exec",
+        "vitest",
+        "run",
+        "tests/content-intake.integration.test.ts",
+        "-t",
+        "quality SQL requires"
+      ]
+    }
+  ],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

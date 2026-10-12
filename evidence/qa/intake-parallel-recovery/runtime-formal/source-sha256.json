@@ -1,0 +1,340 @@
+{
+  "schema": "changed-input-sha256/v1",
+  "base": "326af87ef36baf61dcafab74aefa721df65c01d5",
+  "files": {
+    "TODOS.md": {
+      "sha256": "ef48c8347980d264b2af77555799aef4042d5cffc85c7983e9dbe0e1878916b3",
+      "bytes": 32651
+    },
+    "apps/api/README.md": {
+      "sha256": "fde92de73f50cda42f8b378e74481cfc46a5ac5fc19c3b3b04e2610eec119721",
+      "bytes": 20629
+    },
+    "apps/api/experiments/intake-organization/http-transport.ts": {
+      "sha256": "999e458c405d9103e099d7916da7bcf34a6070f65bf119929fa83add64af2935",
+      "bytes": 18541
+    },
+    "apps/api/experiments/intake-organization/registered-refresh.integration.test.ts": {
+      "sha256": "19b941c1c212d0e0c787372d133ffec44906245ad0248c6137bee030837f020c",
+      "bytes": 17658
+    },
+    "apps/api/experiments/intake-organization/session-owner.test.ts": {
+      "sha256": "9e3c6758b415cb7f56f9f742a58685d2ef2b071d8e7a382d71667797cd3e8763",
+      "bytes": 10078
+    },
+    "apps/api/experiments/intake-organization/transport-consumer.integration.test.ts": {
+      "sha256": "4f8e38170ed451173cf962b1d3808b2abe8cb13a14cdc8250c993af5de352715",
+      "bytes": 15439
+    },
+    "apps/api/experiments/intake-organization/transport.test.ts": {
+      "sha256": "dd86ed39f16511a06938181fc1900a7760c36878ef8c3fdb7b39dd5656fa8a0f",
+      "bytes": 21945
+    },
+    "apps/api/experiments/intake-runtime/purpose-boundary.ts": {
+      "sha256": "78ca0736342eac9c667e4c103ecf539554db1bdec512a5a1f7f03e6ed672286a",
+      "bytes": 20765
+    },
+    "apps/api/src/content-intake/http-boundary.ts": {
+      "sha256": "c50907eaeb222b28481a55297f063ddf2514d6bf53fdba1792bc228b5ae2d50c",
+      "bytes": 3761
+    },
+    "apps/api/src/content-intake/organization/facts-writer.ts": {
+      "sha256": "df1dbdd45fe3f3c59d8044123bcae14b28a14c367c629772709d2c0f695e9413",
+      "bytes": 7697
+    },
+    "apps/api/src/content-intake/organization/feishu-observer.ts": {
+      "sha256": "c24c5303613013bdc3a04014be13e8c90a5c2eef58ab40d59b7b1b2afe95aa80",
+      "bytes": 9424
+    },
+    "apps/api/src/content-intake/organization/registered-refresh.ts": {
+      "sha256": "9d0782fe5d44039b538353d3dd866b477e0bfd4cd67f1cdf401426bf8a1d9b4e",
+      "bytes": 12223
+    },
+    "apps/api/src/content-intake/runtime-pool.ts": {
+      "sha256": "a0c483565a2c932f2c2c36bcaad181607a03c160be4601925b644ae7a1fe7d3c",
+      "bytes": 2211
+    },
+    "apps/api/src/content-intake/service.ts": {
+      "sha256": "5da8018affbf47cb25d2d40863c04dbd03345e19a2e9f3a751e389f6e9193c2f",
+      "bytes": 16183
+    },
+    "apps/api/src/content-intake/shop-directory.ts": {
+      "sha256": "813317a93953cf0ad913c042e87ac51487addc245b936b126019416b0ee0b0e3",
+      "bytes": 4326
+    },
+    "apps/api/src/content-intake/transaction.ts": {
+      "sha256": "90353e11a17b4f7ba7f520320f267899df260e9bd0157a1ab0e2cc8a47fedefb",
+      "bytes": 11650
+    },
+    "apps/api/src/content-intake/usage-http.ts": {
+      "sha256": "89f7422ca2b5cbfbd2b8af95e6bd3f1ec9f2598e162c626a5e293b96507c1765",
+      "bytes": 2396
+    },
+    "apps/api/tests/content-intake-usage-http.test.ts": {
+      "sha256": "106461bf2f65cb2321fafd03a97b605c677b7265526d028115367aae0e2cbc74",
+      "bytes": 8202
+    },
+    "apps/api/tests/content-intake.integration.test.ts": {
+      "sha256": "62a33a264969c9650955a56216d3e68856e4aa65e018066801f91c01b9e605cc",
+      "bytes": 269358
+    },
+    "apps/api/tests/intake-grants-http.integration.test.ts": {
+      "sha256": "2817d37cc52db4ad4e3e6ba793cbcae1cff7f9a46f531848f3650167b56a8fd8",
+      "bytes": 9768
+    },
+    "apps/api/tests/intake-organization-observer.test.ts": {
+      "sha256": "faecdd3ee0f732b6886e00a2e2a4d500f98dd6d6bb9911ec77dcdaa8f2b8d28a",
+      "bytes": 9332
+    },
+    "apps/api/tests/intake-organization.integration.test.ts": {
+      "sha256": "262185d880d6cc2f05b43e23849d4208f522ca20fcf70803dd9e60a7c8163acc",
+      "bytes": 15336
+    },
+    "apps/api/tests/intake-runtime-assembly.integration.test.ts": {
+      "sha256": "ac2def5ad73520061022eb84b0646865220b4369e4234ae35cb119ae19c3fad6",
+      "bytes": 24901
+    },
+    "apps/api/tests/intake-runtime-boundary.integration.test.ts": {
+      "sha256": "3871e5e43b988119b2d4181ae9a5418e9d14e6118549aad4b7c3531748f7c78a",
+      "bytes": 15608
+    },
+    "apps/api/tests/intake-runtime-candidate.integration.test.ts": {
+      "sha256": "f6227f2e2f7624978c3751a6bc9596d570cfcc132c3b9b8895e414f3d1f4b5e2",
+      "bytes": 5964
+    },
+    "apps/api/tests/intake-runtime-consumer-pool.test.ts": {
+      "sha256": "9279eb58f5f4ffcccc955af902f988018d5dd7522242e437a4a07047c0b3619f",
+      "bytes": 4199
+    },
+    "apps/api/tests/intake-runtime-consumers.integration.test.ts": {
+      "sha256": "8ae2737bbd090e3a6262cdd7ac52535bc8630aef8f58aae76ac589f697bdf93f",
+      "bytes": 26571
+    },
+    "apps/api/tests/intake-scope-runtime.integration.test.ts": {
+      "sha256": "8ea3543298753c249292ae50b47ae612353e367bbcd99fffaa5325a2f2f03f48",
+      "bytes": 14120
+    },
+    "apps/api/tests/intake-shop-directory.integration.test.ts": {
+      "sha256": "1c1c98cd85899d8195a12db59741d174edc847d0aeb1cf5b38f9f05040f73050",
+      "bytes": 9075
+    },
+    "apps/api/tests/intake-transaction-runtime.test.ts": {
+      "sha256": "71f7f9c7df6da164db8fda4382c895285b02d97cb45831b704f39e9c4009c040",
+      "bytes": 4405
+    },
+    "apps/api/tests/support/intake-historical-migrations.ts": {
+      "sha256": "45f07a78fac920a2464bf348b607a6daf9bcfe3d16993ef20846765c45344796",
+      "bytes": 1756
+    },
+    "apps/api/tests/support/intake-organization-native.ts": {
+      "sha256": "aac1adbe1f702e36ff113cdbb5dd810481783c898c8a5ab89bf8662824f33f4e",
+      "bytes": 1342
+    },
+    "apps/api/tests/support/intake-synthetic-directory.ts": {
+      "sha256": "039b0192657671f6cd5ffbdf6bd6ef056974f4c12268017af450b3c11fd64f69",
+      "bytes": 2176
+    },
+    "apps/api/tests/support/intake-synthetic-host.ts": {
+      "sha256": "1ee53cbd7476a84de5d4039ff85ecfa24172208abda333b648ad21bfeba29a08",
+      "bytes": 19510
+    },
+    "apps/desktop/src/main/content-intake-access.ts": {
+      "sha256": "7c3b02c789ac45960be604f849633a0078a356213446d4db531c4b803a1d5089",
+      "bytes": 12166
+    },
+    "apps/desktop/src/main/content-intake-query.ts": {
+      "sha256": "c78fb06b98f38747f3437711daa8ac7812da23e525307f6731f3f340f9ddeb56",
+      "bytes": 7969
+    },
+    "apps/desktop/src/renderer/features/search/IntakeQueryFilters.tsx": {
+      "sha256": "5d15cad1176a977e81ed3d8755d623d1515b3a038b703bf455ce4265ea6f2357",
+      "bytes": 4207
+    },
+    "apps/desktop/src/renderer/features/search/use-intake-shops.ts": {
+      "sha256": "9956689e9412e2eb1af97551884a05b5f779d8fafbc7bcbadf4826bbff68d4b8",
+      "bytes": 3494
+    },
+    "apps/desktop/src/shared/content-intake-query.ts": {
+      "sha256": "77ab3ecc785f3c3f8e3d3bf35154225f224c5f4bd0ad942d944fb2d36c6b6a0e",
+      "bytes": 6757
+    },
+    "apps/desktop/tests/component/intake-shop-directory.test.tsx": {
+      "sha256": "323661eccf112d1df0d38114ee408e12f3754ba196ee541564c894aa7d8365b3",
+      "bytes": 1840
+    },
+    "apps/desktop/tests/e2e/content-intake-permissions-real-stack.spec.ts": {
+      "sha256": "5ed8229b049bd9f3d8275ba9ed8b02c4f94d5d582ee8d050cb59371fba8c814d",
+      "bytes": 7508
+    },
+    "apps/desktop/tests/e2e/content-intake-real-stack.spec.ts": {
+      "sha256": "b6662b34ccac90424f6f425f128ead8f8d5e7b8d9b1a55dca4c5435d61b81580",
+      "bytes": 27424
+    },
+    "apps/desktop/tests/e2e/content-intake-rollback-real-stack.spec.ts": {
+      "sha256": "3821e581a85c907e6b8fdcde32a16e001b47214d74389206f1b815dd58d98870",
+      "bytes": 11972
+    },
+    "apps/desktop/tests/e2e/content-intake-shop-directory-real-stack.spec.ts": {
+      "sha256": "266c94465dfb425cffb588c44e187b2be023e2da893f8fe25394d59d9419039a",
+      "bytes": 3338
+    },
+    "apps/desktop/tests/unit/content-intake-access.test.ts": {
+      "sha256": "d29416ac621bd1a1b100e927f24cc675876bea8b39dee3dc5d683e9c15531f73",
+      "bytes": 9996
+    },
+    "apps/desktop/tests/unit/customer-agent-contract-set.test.ts": {
+      "sha256": "07413cc5cfbd96ee52bd5739b90b9b91b0c38d808240c1b5f79136334d42a792",
+      "bytes": 34593
+    },
+    "contracts/upstream/customer-agent/contract-set.lock.json": {
+      "sha256": "0161f430d0171b4836e6b08e011c0c8c4c92fde8edb5602608533b4c1a5bf858",
+      "bytes": 606
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/contract-set.json": {
+      "sha256": "a15e0193a8e577e9f1c4a1c52b5b7cba7a11674e3cd157c1eb135fa5e4f2aa1a",
+      "bytes": 3846
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-acl.v1.sql": {
+      "sha256": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05",
+      "bytes": 17007
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-directory-acl.v1.sql": {
+      "sha256": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+      "bytes": 5378
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-installation.v1.json": {
+      "sha256": "1683c487d6dc84e84b44d9f2a80ca9ab9cfb941144ace8d3b2cf7f520bb58486",
+      "bytes": 5045
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-organization.v1.sql": {
+      "sha256": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+      "bytes": 7893
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-protocol.v1.json": {
+      "sha256": "4546e98510add2b02b97baaca5bdd9603208502b891fe3e92a3f3bc3ed4f6030",
+      "bytes": 2189
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-provenance.v1.json": {
+      "sha256": "7b3699b3fbd94918c11f9250f643b6e896a634cbf262d022dc6b56c422a56c5c",
+      "bytes": 3659
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-roles.v1.sql": {
+      "sha256": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+      "bytes": 978
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-runtime-session.v1.sql": {
+      "sha256": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+      "bytes": 3763
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/intake-shop-directory.v1.sql": {
+      "sha256": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+      "bytes": 44220
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/openapi.v1.yaml": {
+      "sha256": "bde5124df711333e6860c0cea1734f47fe5c45c95b56c0d5cde3d2e9466246d7",
+      "bytes": 420290
+    },
+    "contracts/upstream/customer-agent/cs-ai-c11-openapi-1.21.0-schema-1.23-e35c0c01b551/schema-v1.23.sql": {
+      "sha256": "4c2969459265262fabfe38ae425ab8c1275c46274d03ae09ec39b75ae9cc978e",
+      "bytes": 699965
+    },
+    "docs/how-to-develop-content-intake.md": {
+      "sha256": "bf2511b869a8617bd8afcbe97d4c482c252084e8b4fb93095ddd57b0b884da15",
+      "bytes": 54434
+    },
+    "docs/plans/2026-10-03-content-intake-requirements.md": {
+      "sha256": "69181c903dcdc50bb796d40acfb421d44a56fe8c5a1b42dbd3b1e33cc06625ca",
+      "bytes": 608862
+    },
+    "docs/reference-content-intake-p2-contract-handoff.md": {
+      "sha256": "e46e5e4687ad39c6e6e3700e7186a076048b3696c1f684232f5c6f85e0819776",
+      "bytes": 73838
+    },
+    "docs/reference-project-architecture.md": {
+      "sha256": "db296423f872a7d6542a5e3f0e32bf6b0a3c62f0f43c6e9ee83f9e054a517588",
+      "bytes": 57257
+    },
+    "package.json": {
+      "sha256": "90b420d7fb525e8aea53656b18c0044a0ee76ce0710cf35e1c73e292e768870b",
+      "bytes": 8148
+    },
+    "packages/contracts/openapi/bundle.generated.yaml": {
+      "sha256": "82660cde0fe9b4e66ec86257a0a36af2a38339b5c58c18a0f87f05ba9da306cc",
+      "bytes": 533813
+    },
+    "packages/contracts/src/generated/codegen-manifest.generated.json": {
+      "sha256": "409156c9156def0489dd7adb17e8b862f2f700052d43e1b7c85dff9c92b25f55",
+      "bytes": 1710
+    },
+    "packages/contracts/src/generated/openapi.generated.ts": {
+      "sha256": "e28c995a3cb67ecc942dd4545823287829d02c8c3d5b9a221c147ed5e5a23341",
+      "bytes": 417087
+    },
+    "packages/contracts/src/generated/provenance.generated.ts": {
+      "sha256": "eabe2f66459b73883878277e900a5557afbc9177823d0df097940dc5127da3dd",
+      "bytes": 1648
+    },
+    "packages/contracts/src/generated/runtime-schema.generated.ts": {
+      "sha256": "fd132ba0526acf387c97b7e54ed19d26bdfe13b5b0f70950b7af45dbba9c6e22",
+      "bytes": 340882
+    },
+    "packages/contracts/tests/runtime.test.ts": {
+      "sha256": "c0d2c294adb2757e156bceb2115d1d245a30e1832b71196b285ece1aa2fa135b",
+      "bytes": 12323
+    },
+    "packages/database/README.md": {
+      "sha256": "b2df1c115e65bd3e5c90824725081cf271d97d141c90b24b0e274b890e38ae46",
+      "bytes": 9771
+    },
+    "packages/database/migrations/0033_intake_runtime_v1_23.sql": {
+      "sha256": "0cbc24c3f6ffbe877c6cd5f3f55fdf71a9af67aac069e04c4544bde74f463e1b",
+      "bytes": 80365
+    },
+    "packages/database/migrations/manifest.generated.json": {
+      "sha256": "b881f7a03f134c2bd115054b17b40f1eb7a96211c3865412bedef05d8d9fc59d",
+      "bytes": 23281
+    },
+    "packages/database/package.json": {
+      "sha256": "4c191ca7119764dcbeba2cdcea65d1ce50c47b021390967d4fb6cbe0352f857e",
+      "bytes": 1506
+    },
+    "packages/database/scripts/generate-migrations.mjs": {
+      "sha256": "ff177951d7c8535b282732db2e99dee82652043b91167f3500feccce07623680",
+      "bytes": 39968
+    },
+    "packages/database/src/generated/migrations.generated.ts": {
+      "sha256": "52027c4a975f48ed73ce9ead0c08bda79a35a75a5da243ade86b88582d5e8c7e",
+      "bytes": 908979
+    },
+    "packages/database/src/verifier.ts": {
+      "sha256": "74ebe95b671e3a62db4525ad8a43513e350bd7ad6b5ea420dc236c4f3f2ea92a",
+      "bytes": 40375
+    },
+    "packages/database/tests/generator.test.ts": {
+      "sha256": "951597674921e75838ffa26c8d1e394ce4e6f52f61bcfdcb0dbf1b384bd916a9",
+      "bytes": 18103
+    },
+    "packages/database/tests/planner.test.ts": {
+      "sha256": "35463e1cb2ebc8a830c17bfa5d79a542db56962babdacef8a3e02b359cae1f22",
+      "bytes": 9858
+    },
+    "packages/database/tests/postgres.integration.test.ts": {
+      "sha256": "220979463db1cd97e42f901ccd25d17a8d68ad33308f88601dd108803093ca4b",
+      "bytes": 69990
+    },
+    "packages/database/tests/verifier-runtime.integration.test.ts": {
+      "sha256": "cd81f3bfd73fe240b6be3008d27cf47758990e443d1b37e2dc0f0869a3635b4b",
+      "bytes": 5595
+    },
+    "scripts/intake-synthetic/host.test.ts": {
+      "sha256": "d34527b2f730a2f885c59189184f75c81fbdad7cf26e15de6235f2d8373a1248",
+      "bytes": 8724
+    }
+  },
+  "removed": [
+    "apps/api/experiments/intake-organization/facts-writer.ts",
+    "apps/api/experiments/intake-organization/feishu-observer.ts",
+    "apps/api/experiments/intake-organization/registered-refresh.ts"
+  ],
+  "note": "Final sources after local fixes; source-only comment changes do not invalidate behavioral evidence. Logs record specific runs and failed/rechecked scopes."
+}

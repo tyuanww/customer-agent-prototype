@@ -1,0 +1,82 @@
+{
+  "status": "PASS",
+  "nativeDialogs": "real Electron dialogs, CUA operated, not human acceptance",
+  "input": "synthetic XLSX only",
+  "observations": [
+    {
+      "returnedAt": "2026-10-08T13:40:50.686Z",
+      "buttons": [
+        "取消",
+        "确认发布"
+      ],
+      "defaultId": 0,
+      "cancelId": 0,
+      "detail": "来源：source-a\n候选版本：1\n发布成功后，坐席重新查询将使用更新后的内容。",
+      "response": 0
+    },
+    {
+      "returnedAt": "2026-10-08T13:41:04.083Z",
+      "buttons": [
+        "取消",
+        "确认发布"
+      ],
+      "defaultId": 0,
+      "cancelId": 0,
+      "detail": "来源：source-a\n候选版本：1\n发布成功后，坐席重新查询将使用更新后的内容。",
+      "response": 1
+    }
+  ],
+  "publications": 1,
+  "approvalFacts": 0,
+  "requests": [
+    "/v1/auth/login-requests",
+    "/v1/auth/callback",
+    "/v1/auth/login-requests/login_42DjzgeSvmtNQaXZAA1PNB18f9mnFN6QEoXdAz6y7fw/exchange",
+    "/v1/auth/me",
+    "/v1/notices/current",
+    "/v1/intake/authorization",
+    "/v1/notices/current",
+    "/v1/intake/sources",
+    "/v1/intake/authorization",
+    "/v1/intake/shop-directory",
+    "/v1/intake/sources/source-a/vocabulary",
+    "/v1/auth/me",
+    "/v1/intake/authorization",
+    "/v1/intake/sources",
+    "/v1/intake/authorization",
+    "/v1/intake/shop-directory",
+    "/v1/intake/candidates",
+    "/v1/auth/me",
+    "/v1/notices/current",
+    "/v1/auth/me",
+    "/v1/notices/current",
+    "/v1/intake/sources/source-a/management-context",
+    "/v1/intake/principals",
+    "/v1/intake/sources/source-a/management-context",
+    "/v1/intake/sources/source-a/management-context",
+    "/v1/intake/sources/source-a/objects",
+    "/v1/intake/sources/source-a/management-context",
+    "/v1/intake/sources/source-a/candidates",
+    "/v1/intake/parse-jobs/parse_0765edb7-a37a-4de2-b1ae-4256a4e9f59e",
+    "/v1/intake/parse-jobs/parse_0765edb7-a37a-4de2-b1ae-4256a4e9f59e",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/material",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/source-confirmation",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality/samples",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality/freeze",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality/samples",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/quality/checks",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1",
+    "/v1/auth/me",
+    "/v1/notices/current",
+    "/v1/auth/me",
+    "/v1/notices/current",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1/publish",
+    "/v1/intake/candidates/candidate_acc6e313-ced2-41bf-97ef-5ec7a6aabb28/versions/1"
+  ]
+}

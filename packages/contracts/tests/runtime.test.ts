@@ -46,18 +46,18 @@ describe('generated customer-agent runtime contracts', () => {
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
-      contract_set_id: 'cs-ai-c11-openapi-1.14.0-schema-1.18-260ef224c534',
-      source_git_sha: '260ef224c5340a4d26e857bd02119044dd813f9a',
-      openapi_sha256: '39f69edfdbffcad6a57d3e9fc43e1f6a3cbdc1e8fdd951e30bdbbfe97eb3e394',
-      database_sha256: '5713f80e9abfd72592ad49955efb83cd8498ce9cd6c7be52b96c57bcde836caa',
+      contract_set_id: 'cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9',
+      source_git_sha: '75e1889efee91322dab1dfa28aadc53fd718682b',
+      openapi_sha256: '9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5',
+      database_sha256: '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771',
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
     });
     const runtimeDefinitions = (OPENAPI_RUNTIME_SCHEMA_DOCUMENT as {
       $defs: Record<string, unknown>;
     }).$defs;
-    expect(contractSchemaNames).toHaveLength(165);
-    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(165);
+    expect(contractSchemaNames).toHaveLength(246);
+    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(246);
     expect(Object.keys(runtimeDefinitions)).toEqual([...contractSchemaNames]);
     expect(runtimeDefinitions).toMatchObject({
       FileImportRequest: {
@@ -72,12 +72,48 @@ describe('generated customer-agent runtime contracts', () => {
     });
   });
 
+  it('requires confirmed direct requests and server-owned candidate policy', () => {
+    const key = { candidateId: 'synthetic-candidate', version: 1, digest: 'a'.repeat(64) };
+    const publish = { operationId: 'synthetic-publish', key, baseReleaseId: null,
+      sourceEvidenceVersion: 1, title: '合成发布', summary: '合成说明', confirmed: true };
+    const rollback = { operationId: 'synthetic-rollback', baseReleaseId: 'release-b',
+      targetReleaseId: 'release-a', impactDigest: 'a'.repeat(64), rollbackPlanId: 'plan-a', confirmed: true };
+    for (const [schema, body] of [['IntakePublish', publish], ['IntakeRollback', rollback]] as const) {
+      expect(validateContractSchema(schema, body).ok).toBe(true);
+      for (const confirmed of [undefined, false, 'true', 1, null]) {
+        expect(validateContractSchema(schema, { ...body, confirmed }).ok).toBe(false);
+      }
+      for (const extra of [{ approvalEvidenceVersion: 1 }, { publicationPolicy: 'direct-v1' }, { actorId: 'director' }]) {
+        expect(validateContractSchema(schema, { ...body, ...extra }).ok).toBe(false);
+      }
+    }
+    const candidate = { key, sourceId: 'source-a', state: 'awaiting-evidence', readinessReasons: [],
+      sourceEvidenceVersion: 0, approvalEvidenceVersion: 0, revocationGeneration: 0,
+      createdAt: '2026-10-08T00:00:00Z', updatedAt: '2026-10-08T00:00:00Z',
+      publishedReleaseId: null, publicationPolicy: 'direct-v1' };
+    expect(validateContractSchema('IntakeCandidate', candidate).ok).toBe(true);
+    expect(validateContractSchema('IntakeCandidate', { ...candidate, approvalEvidenceVersion: 1 }).ok).toBe(false);
+    expect(validateContractSchema('IntakeCandidate', { ...candidate, publicationPolicy: undefined }).ok).toBe(false);
+    expect(validateContractSchema('IntakeCandidate', { ...candidate, publicationPolicy: 'approval-v1', approvalEvidenceVersion: 1 }).ok).toBe(true);
+  });
+
   it('compiles every generated component schema on demand', () => {
     expect(() => {
       for (const name of contractSchemaNames) {
         validateContractSchema(name, null);
       }
     }).not.toThrow();
+  });
+
+  it('requires the exact management context with an explicit nullable base and server-owned identity', () => {
+    const context = { sourceId: 'source-a', sourceVersion: 1, baseReleaseId: null,
+      principalId: 'principal-a', factsVersion: 2, validUntil: '2026-10-07T09:00:00Z' };
+    expect(parseContractSchema('IntakeManagementContext', context)).toEqual(context);
+    expect(validateContractSchema('IntakeManagementContext', { ...context, baseReleaseId: 'release-a' }).ok).toBe(true);
+    for (const change of [{ baseReleaseId: undefined }, { sourceVersion: 0 }, { factsVersion: Number.MAX_SAFE_INTEGER + 1 },
+      { principalId: '' }, { validUntil: 'later' }, { userId: 'forged' }]) {
+      expect(validateContractSchema('IntakeManagementContext', { ...context, ...change }).ok).toBe(false);
+    }
   });
 
   it('rejects repeated quality identities while allowing distinct tuples', () => {
@@ -89,6 +125,28 @@ describe('generated customer-agent runtime contracts', () => {
     const result = validateContractSchema('QualityEvidence', { ...envelope, checks: [item, { ...item, defect: true }] });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.issues[0]?.keyword).toBe('x-unique-by');
+  });
+
+  it('requires explicit bounded selections and keeps session references out of the wire', () => {
+    const request={shopId:'shop-a',contextGeneration:1,releaseId:null,productIds:[],scenarioIds:[]};
+    expect(validateContractSchema('IntakeEntitlementRequest',request).ok).toBe(true);
+    for(const change of [{productIds:undefined},{scenarioIds:undefined},{productIds:['same','same']},
+      {productIds:Array.from({length:101},(_,i)=>`p-${i}`)},{sessionTokenHash:'a'.repeat(64)},{userId:'forged'}]) {
+      expect(validateContractSchema('IntakeEntitlementRequest',{...request,...change}).ok).toBe(false);
+    }
+  });
+
+  it('enforces all combined 100-reference boundaries in the generated published validator', () => {
+    const entry={businessEntryId:'entry',scriptVersion:1,operation:'upsert',title:'合成标题',answerText:'合成原文',questions:[],
+      effectiveFrom:'2020-01-01T00:00:00Z',effectiveTo:null,applicabilityNote:'',familySourceId:null,familyBusinessEntryId:null,
+      brandNonOverridable:false,category:'分类',riskNote:''};
+    const refs=(n:number,prefix:string)=>Array.from({length:n},(_,i)=>({id:`${prefix}-${i}`,displayVersion:1}));
+    for(let products=0;products<=100;products++) {
+      const valid={...entry,productRefs:refs(products,'p'),scenarioRefs:refs(100-products,'s')};
+      expect(validateContractSchema('IntakePublishedEntry',valid).ok,`${products}+${100-products}`).toBe(true);
+      if(products<100)expect(validateContractSchema('IntakePublishedEntry',{...valid,productRefs:refs(products+1,'p')}).ok).toBe(false);
+    }
+    expect(validateContractSchema('IntakePublishedEntry',{...entry,productRefs:refs(100,'p'),scenarioRefs:refs(1,'s')}).ok).toBe(false);
   });
 
   it('accepts a contract-valid search request' , () => {

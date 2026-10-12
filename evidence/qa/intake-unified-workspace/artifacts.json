@@ -1,0 +1,233 @@
+[
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-permissions/2026-10-08T11-47-12.120Z/permissions-dark.png",
+    "sha256": "48d6aca0369dad45d7160617e245100f937e830b796d14b84d1df8bfdbed1049",
+    "bytes": 159482,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-permissions/2026-10-08T11-47-12.120Z/permissions-light.png",
+    "sha256": "e10e87bd78870c9bc868451fff3d8c5eaf37f8b9580b56739147c99782f0ff67",
+    "bytes": 158720,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-cancelled.png",
+    "sha256": "0a48f6abc6b0c59681e0c944942c5265bbbd07829846496048975c5fc72b5eeb",
+    "bytes": 202352,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-dark.json",
+    "sha256": "8eed69f2be744956c7d47870176b080aaf1b01561ab121138a25967f228ce96f",
+    "bytes": 220,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-dark.png",
+    "sha256": "196897908bbfd57ce8183687edf254deda3dee4aa10ee7dd76ed4e3c7ac09917",
+    "bytes": 240832,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-declaration-dark.json",
+    "sha256": "8eed69f2be744956c7d47870176b080aaf1b01561ab121138a25967f228ce96f",
+    "bytes": 220,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-declaration-dark.png",
+    "sha256": "fc4ff3e0460766a26c403b1ac5070dddf9f042ec05af9e6179ae55a82ef78346",
+    "bytes": 230513,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-light.json",
+    "sha256": "005d135e8cea28a90e5d7211390861ea15ef7be54345f183a3caeec63309b092",
+    "bytes": 222,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-light.png",
+    "sha256": "7bef8f653457bf933df13b35e3b07628f5688545f156def5a25d3362730fea60",
+    "bytes": 239392,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-minimum-dark.json",
+    "sha256": "98356d21df13ea3c23c71bbd4f4e611609eae0f76fed7a88ce845f7cdeb3eb3e",
+    "bytes": 219,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-minimum-dark.png",
+    "sha256": "18715dfbd70b6cbaf75a8cb19ae9337567cfe677371c01681ff07582937a8f0e",
+    "bytes": 225604,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-intake-start.png",
+    "sha256": "3daab85ce7ee0f25a8422767b607a58c885d9fb532b227a8225591e008c7e9cb",
+    "bytes": 239103,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-published.png",
+    "sha256": "21073625ef7a6e5b5a4f92889ede0ba8deb68b263163c167aa2947e047904380",
+    "bytes": 217239,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-revision-v2.png",
+    "sha256": "a7824e045c8065cdf9e07b6c3168f9172a3af637f8d5d2b350c840e729a99afc",
+    "bytes": 208059,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-upload-error-report.png",
+    "sha256": "0fc670fdaf17176bfc4952d098225ae9dde707b928f2c13035354be67250d1ea",
+    "bytes": 275527,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/dashboard-uploaded-material.png",
+    "sha256": "3b30b5e5ad0397d37565f3851a4b3885fd7b7af01610934321a7651927a2cc07",
+    "bytes": 214842,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/2026-10-08T11-47-17-146Z/query-published-faq.png",
+    "sha256": "362b30b5cc7098aff47545ffc83789c310c2a4f8fa13921d7cc0a37db672bd75",
+    "bytes": 236325,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-08T11-47-35-213Z/rollback-dark.png",
+    "sha256": "63aae9a29b02e737664653027cae93a7cdd1a0428e061e3b86b2bb1d82d30baf",
+    "bytes": 244621,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-08T11-47-35-213Z/rollback-light.png",
+    "sha256": "00d4366eaa4be74d6bde772cb883aa61c6cf76eb7ae7edeee08d17d51e69097d",
+    "bytes": 243890,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-synthetic/rollback-2026-10-08T11-47-35-213Z/rollback-ordinary-seat.png",
+    "sha256": "a3d341310c906715df43f79d858dfa95761040ff35c9e1cb534abf853e52b223",
+    "bytes": 236924,
+    "sourceLog": "electron.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-08T11-51-32-511Z/current-version.png",
+    "sha256": "a10e10792a98fdf5e1539826c3f5d80d0f8009f21b76673d65942105e1efa0cc",
+    "bytes": 183632,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-08T11-51-32-511Z/library-dark.png",
+    "sha256": "51bd1d227a17a47e611c9d7a08202ae95765f41ec443d9d3b6de9048341e0a0a",
+    "bytes": 180456,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/product-2026-10-08T11-51-32-511Z/library-light.png",
+    "sha256": "f7f304abd6a15c6b848be8583ec91a3ef3ff0b28f66546c635b82c703cdaac43",
+    "bytes": 180900,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-08T11-51-37-161Z/current-version.png",
+    "sha256": "62a3407eb5888253a7dc5c821c084d5787b747d44bb3eec89f5447eacf68b203",
+    "bytes": 183977,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-08T11-51-37-161Z/library-dark.png",
+    "sha256": "4fd3c922c72fb4df8fdd2cecc2543fe3c00031131321fd1dd28b1ad2e47da7e3",
+    "bytes": 187036,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/campaign-2026-10-08T11-51-37-161Z/library-light.png",
+    "sha256": "f2670e4afa42f34f09d5176b0bf9abf50d81d66b73ccfbf79f979949b38cefb9",
+    "bytes": 187257,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-08T11-51-41-244Z/current-version.png",
+    "sha256": "947a0076c07ba60c880f658424bdb31dcc71bd6f136961f45b901bb53eb9dcb0",
+    "bytes": 183460,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-08T11-51-41-244Z/library-dark.png",
+    "sha256": "0a066f1b8fdf1b11c9701a67214a5b4737a1a5ee3b20bc4381b8c36ea654e16c",
+    "bytes": 182484,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/presale-2026-10-08T11-51-41-244Z/library-light.png",
+    "sha256": "fab0170c1a0fc58b09db686a2718b700f9a4cb0e67b7c29226fd51e02d1953b0",
+    "bytes": 182066,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-08T11-51-45-282Z/current-version.png",
+    "sha256": "228b01e81e95c8619515f054d11b1b61e9805e16b9b3f94fe2a223144691d7d6",
+    "bytes": 184620,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-08T11-51-45-282Z/library-dark.png",
+    "sha256": "0d4bd4ab56d8c3467b40ec4c1a15b127168bb3f8cae4bb6a8605ef114c79303b",
+    "bytes": 182384,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/.codex/worktrees/intake-organization/customer-agent-prototype/.gstack/intake-workspace/aftersale-2026-10-08T11-51-45-282Z/library-light.png",
+    "sha256": "810c3b57e53d0e2df0062d5e1556db6345665adc6064c28619c8554377b88f6a",
+    "bytes": 180437,
+    "sourceLog": "electron-workspace-appearance.log",
+    "tracked": false
+  },
+  {
+    "path": "/Users/hutou/Desktop/客服Agent-内容板块与发布流程.html",
+    "sha256": "5a68bb5c48c1032ee0f59bddd40ee64e371d25071074a9f96a0eaecb78d880b4",
+    "bytes": 24284,
+    "purpose": "user-requested offline tab/flow explanation",
+    "tracked": false
+  }
+]

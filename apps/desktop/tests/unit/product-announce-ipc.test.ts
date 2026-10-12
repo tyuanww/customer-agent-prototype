@@ -15,6 +15,9 @@ it('rejects Fox, subframes, extra arguments and unsigned Query', async () => {
   expect(await invoke(event(query, {}), { sessionEpoch: 1, generation: 1 })).toMatchObject({ code: 'FORBIDDEN' });
   expect(await invoke(event(query), {}, {})).toMatchObject({ code: 'VALIDATION' });
   expect(await invoke(event(query), { sessionEpoch: 1, generation: 1 })).toMatchObject({ code: 'UNAUTHORIZED' });
+  const unread = handlers.get(IPC_CHANNELS.PRODUCT_ANNOUNCE_UNREAD)!;
+  expect(await unread(event(fox))).toEqual({ ok: false, signedIn: false, unread: false, domains: [] });
+  expect(await unread(event(query))).toEqual({ ok: false, signedIn: false, unread: false, domains: [] });
 });
 
 it('marks read on the session userId only, ignoring any renderer-supplied identity', async () => {

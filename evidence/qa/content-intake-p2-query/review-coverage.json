@@ -1,0 +1,333 @@
+{
+  "scope": "workspace changes since a995ac14bdca458a6122f256c0c4a039f5a5d2fa; previously reviewed commits retained",
+  "tool": "open-code-review-delegate; OCR file/rule resolution, in-host analysis",
+  "total_files": 53,
+  "reviewable_files": 35,
+  "reviewed_files": 35,
+  "skipped_files": 0,
+  "coverage_rate": 1,
+  "files": [
+    {
+      "path": "apps/desktop/src/main/content-intake-usage.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "e14b98d622c3f96be63b45ce205d619edebb79df1892c77f4651838d62eaacc0"
+    },
+    {
+      "path": "apps/desktop/src/main/desktop-lifecycle.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "20c8eeb16c920fee0c02d3e8fdec213a870d1f64c8e912465be317b3441e3e66"
+    },
+    {
+      "path": "apps/desktop/src/main/desktop-menu-model.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "3b148c19c96634a50e5fa084ec9fe35b207c2da488b3462028180164bbb237cc"
+    },
+    {
+      "path": "apps/desktop/src/main/desktop-shell.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "09f675f3ed58291eb209d1d42ed9aa110740e4a241285e0c42b5d9c0840acb19"
+    },
+    {
+      "path": "apps/desktop/src/main/main.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "e03d64b80c97472002d9b90f5772e5e57491cf6e1459a92c43dfc3577c979f52"
+    },
+    {
+      "path": "apps/desktop/src/main/overlay-controller.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "9f5acce53f990f41fdbc4565e06186984bbd93a1a66e8cc7ff01d070a3d82680"
+    },
+    {
+      "path": "apps/desktop/src/main/product-runtime-config.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "202e8b513e052bc2dfb1d07e8d0db23fff807a5db8320a8fbe7a34712970e7fd"
+    },
+    {
+      "path": "apps/desktop/src/main/product-session.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "516e5e83337a1194c42815ffd7f0e5315217e88b441623b9f5182894ec3c39c0"
+    },
+    {
+      "path": "apps/desktop/src/preload/index.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "2f67c566abee6ac40ff1b78dee58e70c9a77f2b0433164b4ba6bed22c10e9ab6"
+    },
+    {
+      "path": "apps/desktop/src/renderer/App.tsx",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "0640c390b2cac52fbc7bc5666333bdd298096422bfd0b316c24c644415e08526"
+    },
+    {
+      "path": "apps/desktop/src/renderer/QueryApp.tsx",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "681decc422e2f034f1e05d1a31c535969476a3730e4e99e62d2044030b9ed809"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/QueryCapsule.tsx",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "749017b3c41c95d970fc2a6ca2dd41ae42e9c34efaae67993ff61829a9c6e8dc"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/QueryResultsPane.tsx",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "e76155c596fe502e20d8c482177008ff3b6b803065644c4c60e7f2e15df7e02f"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/types.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "3c5219bb362a9b6ba1616ee3e447fdc898b42994cc6a494c4ad5447359145d00"
+    },
+    {
+      "path": "apps/desktop/src/renderer/styles/app.css",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "f700200b8e3d94fd6ae5c84623d079f1ffd526ec215cf1a2e55abd1953cd02b2"
+    },
+    {
+      "path": "apps/desktop/src/shared/contracts.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "108f84f3536594aadbcaf63ecef04d9825f43f710807f98dfc12039f27ca6e44"
+    },
+    {
+      "path": "apps/desktop/src/shared/ipc-channels.ts",
+      "status": "modified",
+      "disposition": "reviewed",
+      "sha256": "546e07e187dc50151652ba3c5507075e0f958f92d0101448fac268d66abe23a0"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-query-ipc.ts",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "f84e030d470572ce271d9ccb21f028e52a77b78ef0b333ce2178b75e8bee5cdf"
+    },
+    {
+      "path": "apps/desktop/src/main/content-intake-query.ts",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "6f4ec0b5c2488e9b4e728daa839de6f31a25de1e1f9e8ae603824af2c4791ef6"
+    },
+    {
+      "path": "apps/desktop/src/preload/content-intake-query.ts",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "1a3df6cca08ce025d1ff5d7fbe2798eefa731f1ce66d61d9a6eac11ea53f19cb"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/IntakeFaqCard.tsx",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "3ca8348b710a38d624319f964561646864170159be119c15b5f9150324d08ff5"
+    },
+    {
+      "path": "apps/desktop/src/renderer/features/search/use-intake-shops.ts",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "3c6957178d573b212f4344f957a5b4fd518ea3fdccb7f2401964f1e1d9e8371b"
+    },
+    {
+      "path": "apps/desktop/src/shared/content-intake-query.ts",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "4fe59cd6c91a7169a131615c0382742cbfdb3299b790c5029f816403784f33db"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-002.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "785807825cb7b9b43f153833bbd15b1c8c40adcf406c279d619826ae91b55f4e"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-003.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "03cafac824660c31cf2db7870b71edea3d200125c7324fca3e828ecb60ba07ab"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-004.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "7cc4633e9870157744fb19b295181c9aed6aba9623a037cd09125e19d6b8477c"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-005.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "a995511c7fed29442f64d86523e35b42d77e835d491d309d1e652e2c1dc0ffcc"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-006.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "d508d652ee2129d33dcde51f01688f7fd9ca43ca1bd788c4bea5b9b5f1b4169a"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-007.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "b453ec1d48b165cc6e26837217c8b9ac28bcaa76c3315d1eece026108ea6591a"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-008.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "a8422ca550561d1eda270bd46e5f14633040b5d1b40510bb5d62169b14fbbaf9"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-009.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "fd1b472802ff611ff8bb7d6532cf651fc938c2616a11e83ac67e0eeb61c112b1"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/exploration-010.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "7d6eae3cc3c2689a004765255282d1820a0aa25a0b7da0193ee61b1bf9b59384"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/functional-evidence.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "57e1527f5358a7fe9e93ada05783dd149c5e040b32038bca6468b8eab0efe094"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/review-coverage.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "hashNote": "Self-referential manifest is not self-hashed; gstack final review binding owns the complete candidate digest."
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/verification.json",
+      "status": "added",
+      "disposition": "reviewed",
+      "sha256": "3a8718518cd70273d21c6333ea6b9354766e6b3767fff4dbaddc86198ed6462b"
+    }
+  ],
+  "excluded_files": [
+    {
+      "path": "AGENTS.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "DESIGN.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "DEVELOPMENT_BRIEF.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/component/QueryApp.test.tsx",
+      "status": "modified",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/component/QueryResultsPane.test.tsx",
+      "status": "modified",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/unit/contracts.test.ts",
+      "status": "modified",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/unit/desktop-lifecycle.test.ts",
+      "status": "modified",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/unit/desktop-menu-model.test.ts",
+      "status": "modified",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/unit/product-runtime-config.test.ts",
+      "status": "modified",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "docs/how-to-develop-content-intake.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "docs/how-to-verify-desktop.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "docs/plans/2026-10-03-content-intake-requirements.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "docs/reference-project-architecture.md",
+      "status": "modified",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/e2e/content-intake-query.spec.ts",
+      "status": "added",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/fixtures/intake-query-data.ts",
+      "status": "added",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-query-ipc.test.ts",
+      "status": "added",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "apps/desktop/tests/unit/content-intake-query.test.ts",
+      "status": "added",
+      "ocrReason": "default_path",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    },
+    {
+      "path": "evidence/qa/content-intake-p2-query/README.md",
+      "status": "added",
+      "ocrReason": "unsupported_ext",
+      "disposition": "manual review of diff/full new file; tests read in full by parent; generated evidence checked against actual receipts"
+    }
+  ],
+  "native_adversarial": "required; tests and fixtures summary-only; final binding recorded by gstack-review-log",
+  "outside_review": "not run; historical timeout/validation failures are not credited"
+}

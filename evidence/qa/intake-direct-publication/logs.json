@@ -1,0 +1,142 @@
+{
+  "archive": "logs.json.gz",
+  "archive_sha256": "9f0903eebd56bfc4bc9c5387e97ed5539750426f4b51faee46ad3635240575a0",
+  "format": "gzip of UTF-8 JSON: basename -> complete raw log text",
+  "entries": {
+    "intake-direct-freeze-release.log": {
+      "sha256": "7ac1654623f4ea2dc59ca026f6f116be78a4372394531b580563b76060d33c58",
+      "bytes": 181457,
+      "original_path": "/tmp/intake-direct-freeze-release.log"
+    },
+    "intake-direct-freeze-only.log": {
+      "sha256": "9d7a0b4bdb540c39a646c02e811c5befc188215ab9ef654a3d9534e0ee9bb9b6",
+      "bytes": 846,
+      "original_path": "/tmp/intake-direct-freeze-only.log"
+    },
+    "intake-direct-formal-export.json": {
+      "sha256": "6253f92cdec513a16ff50acf57161505f216002c1a9a155ed784983745421351",
+      "bytes": 372,
+      "original_path": "/tmp/intake-direct-formal-export.json"
+    },
+    "intake-direct-formal-intake.log": {
+      "sha256": "ad9347d1d0943ff56d3f5cbbe66aa75d6c419a8bd112597019428bb68e1a41cb",
+      "bytes": 867,
+      "original_path": "/tmp/intake-direct-formal-intake.log"
+    },
+    "intake-direct-root-test.log": {
+      "sha256": "56ea729744b5c999b5b0d5bfabff5e60a94090a3cabb07393667b09cc03800aa",
+      "bytes": 67188,
+      "original_path": "/tmp/intake-direct-root-test.log"
+    },
+    "intake-api-direct-full.log": {
+      "sha256": "f618fb3294a2c40f29a372ae3989a397f70f0ddd1419230f59c09faff795178e",
+      "bytes": 34416,
+      "original_path": "/tmp/intake-api-direct-full.log"
+    },
+    "intake-api-direct-time-regression.log": {
+      "sha256": "a7c69ce4aa6071a98ed47151f4629d2525c7d55e86b52a9d0e885fc7153dc58f",
+      "bytes": 2179,
+      "original_path": "/tmp/intake-api-direct-time-regression.log"
+    },
+    "intake-api-direct-content-deadline.log": {
+      "sha256": "bdc1af42e4652e97019e8f47e5a793678d7f51b83432714d2db195bb5e1d00dc",
+      "bytes": 531,
+      "original_path": "/tmp/intake-api-direct-content-deadline.log"
+    },
+    "intake-api-direct-old-receipts.log": {
+      "sha256": "002ad5ca9eef7fd1f231cadda223a1714392c60a72357dfbdf79dbaa21c2f5b3",
+      "bytes": 564,
+      "original_path": "/tmp/intake-api-direct-old-receipts.log"
+    },
+    "intake-direct-db-final.log": {
+      "sha256": "5dbaea5e02c0c0a7f94a6ddf3ec60b0bd8edfeede2e0402f446a49d6025c1024",
+      "bytes": 5117,
+      "original_path": "/tmp/intake-direct-db-final.log"
+    },
+    "intake-direct-cli-final.log": {
+      "sha256": "5e5ffd7d39910677cec1d2abd70344d97dcaec8dd38b5f715e131a957ecddc9b",
+      "bytes": 856,
+      "original_path": "/tmp/intake-direct-cli-final.log"
+    },
+    "direct-desktop-final-tests.log": {
+      "sha256": "7daaa392e4275bfce3a8e2f817a154448c2e4b2f822b700288ab10b4c39863ad",
+      "bytes": 879,
+      "original_path": "/tmp/direct-desktop-final-tests.log"
+    },
+    "direct-desktop-wire-e2e.log": {
+      "sha256": "7c31afe43eaaac58f30956739ef96d96b0c2e6ef9b2cffe844d5b0ca6e23b81c",
+      "bytes": 385,
+      "original_path": "/tmp/direct-desktop-wire-e2e.log"
+    },
+    "direct-desktop-real-e2e.log": {
+      "sha256": "39841cfc76d360ee7bf1c417ce5746bc9a64116cc99d8a806b67b29cd9720dbe",
+      "bytes": 1921,
+      "original_path": "/tmp/direct-desktop-real-e2e.log"
+    },
+    "direct-desktop-real-final.log": {
+      "sha256": "3e0963a4c84336aa85c97ac39db32a644cfd2c559267e01802f37c537be4cc0f",
+      "bytes": 1921,
+      "original_path": "/tmp/direct-desktop-real-final.log"
+    },
+    "intake-direct-lint-final.log": {
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "bytes": 11,
+      "original_path": "/tmp/intake-direct-lint-final.log"
+    },
+    "intake-direct-typecheck-final.log": {
+      "sha256": "8c451e9486fbdccc6284495f50d0b55896722df9bc5984997a7264d9b8e2476b",
+      "bytes": 612,
+      "original_path": "/tmp/intake-direct-typecheck-final.log"
+    },
+    "intake-direct-build-final.log": {
+      "sha256": "23da86c4649c558dac12fc8d073008b19370bf117fb644d1c7ddd1359c0ebb54",
+      "bytes": 24952,
+      "original_path": "/tmp/intake-direct-build-final.log"
+    },
+    "intake-direct-desktop-build-final.log": {
+      "sha256": "de58bc0c03fc3d56f99352c91534bd491a927f5b39e4c819ffe1d99959c76dac",
+      "bytes": 1279,
+      "original_path": "/tmp/intake-direct-desktop-build-final.log"
+    },
+    "intake-direct-ipc-final.log": {
+      "sha256": "6b809a6aef00b1dce70792dbffaf38ef4a4d648ef76fdd6a78ba34defd5248e3",
+      "bytes": 352,
+      "original_path": "/tmp/intake-direct-ipc-final.log"
+    },
+    "intake-direct-final-local-lint.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "original_path": "/tmp/intake-direct-final-local-lint.log"
+    },
+    "intake-direct-docs-final.log": {
+      "sha256": "8e838a103b9549702e0df18a3017aae347232f680b7b8270adda91400edcf8b2",
+      "bytes": 121,
+      "original_path": "/tmp/intake-direct-docs-final.log"
+    },
+    "intake-direct-workspace-final.log": {
+      "sha256": "fba6c2d519bebf8215b5700172a92bca47fe4ce27b8930f550b499eac6e0c7ff",
+      "bytes": 225,
+      "original_path": "/tmp/intake-direct-workspace-final.log"
+    },
+    "intake-direct-workspace-inventory.json": {
+      "sha256": "3a46bd70572aa6a9e042b262de7976c7712444658c6653aede27a93ccf4dfccb",
+      "bytes": 3483,
+      "original_path": "/tmp/intake-direct-workspace-inventory.json"
+    },
+    "intake-direct-verify-final.log": {
+      "sha256": "802a1b5cb0942496f9d90204e32e94b2682361a58168363b16c27f163000d0ec",
+      "bytes": 644,
+      "original_path": "/tmp/intake-direct-verify-final.log"
+    },
+    "intake-direct-codegen-check-final.log": {
+      "sha256": "ffbcb6ffe8ae944f61563d4caa5dc4f23fd612f0192b5903885198aa211155e4",
+      "bytes": 603,
+      "original_path": "/tmp/intake-direct-codegen-check-final.log"
+    },
+    "intake-direct-migrations-final.log": {
+      "sha256": "006e428aa27e9004ce0f0f03e0aab86bda2f21e4567e407856ae4466da47ffb6",
+      "bytes": 22613,
+      "original_path": "/tmp/intake-direct-migrations-final.log"
+    }
+  }
+}

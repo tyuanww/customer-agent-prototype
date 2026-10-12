@@ -1,0 +1,24 @@
+{
+  "revision": "8ab309fcd9c494b7343ed88bacb253205d36575f",
+  "runtime": "bun 1.4.2",
+  "cwd": "/Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype",
+  "limits": [
+    "Synthetic-only automated verification, not a fourth code-review pass.",
+    "PG, real Feishu, actual workbooks, Electron IPC and packaged platforms are not exercised.",
+    "Root gates and actual artifact probe are logged separately and bound to the same implementation inputs."
+  ],
+  "evidence": [
+    {
+      "command": "pnpm test:content-intake:p1",
+      "contract": "Final P1 parser/process and permission/approval regressions after the third repair cycle",
+      "expected": "41 parser/process + 31 permission/approval cases pass",
+      "classification": "pass",
+      "observed": "\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/packages/content-intake\n\n ✓ tests/workbook.test.ts (41 tests) 2293ms\n   ✓ P1 mature XLSX parser and real output roundtrip > rejects expanded bytes before ExcelJS object-model allocation  692ms\n   ✓ P1 mature XLSX parser and real output roundtrip > accepts the row budget and refuses one additional data row  490ms\n\n Test Files  1 passed (1)\n      Tests  41 passed (41)\n   Start at  20:51:15\n   Duration  2.68s (transform 68ms, setup 0ms, collect 195ms, tests 2.29s, environment 0ms, prepare 43ms)\n\n\n RUN  v3.2.7 /Users/hutou/.codex/worktrees/content-intake-p1/customer-agent-prototype/apps/api\n\n ✓ tests/content-intake-p1.test.ts (31 tests) 5ms\n\n Test Files  1 passed (1)\n      Tests  31 passed (31)\n   Start at  20:51:18\n   Duration  214ms (transform 36ms, setup 0ms, collect 41ms, tests 5ms, environment 0ms, prepare 36ms)\n\n"
+    }
+  ],
+  "learning": [],
+  "verdict": {
+    "status": "pass",
+    "open": []
+  }
+}

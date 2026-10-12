@@ -1,0 +1,234 @@
+{
+  "schema": "content-intake-p1-probe/1",
+  "mode": "SYNTHETIC_ONLY",
+  "generatedAt": "2026-10-04T12:52:53.332Z",
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "osRelease": "25.5.0",
+    "cpu": "Apple M5"
+  },
+  "policy": {
+    "version": "p1-synthetic-1",
+    "fileBytes": 10485760,
+    "expandedBytes": 52428800,
+    "zipEntries": 512,
+    "rows": 5000,
+    "columns": 32,
+    "cells": 200000,
+    "cellChars": 32767,
+    "sharedStrings": 100000,
+    "mediaCount": 100,
+    "mediaBytes": 20971520,
+    "normalizedTextChars": 3000000,
+    "oneMediaBytes": 5242880,
+    "timeoutMs": 30000,
+    "outputBytes": 52428800
+  },
+  "artifacts": [
+    {
+      "name": "valid.xlsx",
+      "bytes": 9693,
+      "sha256": "9b451d9fa2e298cae8424f379f3882c59883f4f565ae1a55b32aa3c0ebf56764",
+      "reopened": true
+    },
+    {
+      "name": "missing-c3.xlsx",
+      "bytes": 9676,
+      "sha256": "f33a8ccfbc32eb8fb2e1ed6e76c507f037a3dda1d08625fae85d065c20c292a9",
+      "reopened": true
+    },
+    {
+      "name": "issues.xlsx",
+      "bytes": 6615,
+      "sha256": "a4954515ac890f30875b3a73ee6de2fa1cff08c7728defb20ada0244556324a6",
+      "reopened": true
+    }
+  ],
+  "roundtrip": {
+    "validRows": 2,
+    "multilineExact": true,
+    "invalidIssues": [
+      {
+        "code": "REQUIRED",
+        "sheet": "FAQ",
+        "row": 3,
+        "column": "C",
+        "fix": "补齐必填内容后整批重新上传"
+      }
+    ],
+    "repairedReimport": true
+  },
+  "measurements": {
+    "baseline": {
+      "n": 10,
+      "inputSha256": "b47326707bea40599dcdb3cbddeee22d2792cabbd8ef7aed5e468f5b0cafb800",
+      "fileBytes": 35250,
+      "p95Ms": 146.135541,
+      "p99Ms": 146.135541,
+      "maxRssKiB": 94464
+    },
+    "tenfold": {
+      "n": 10,
+      "inputSha256": "52e53cf0592a5f483e6d4d27b9dc3b9ed2559a8b00bf58c1751c30339ebeebbe",
+      "fileBytes": 242601,
+      "p95Ms": 292.14704200000006,
+      "p99Ms": 292.14704200000006,
+      "maxRssKiB": 198064
+    }
+  },
+  "cancelMs": 1.7489579999992202,
+  "supervisorEventLoopP99Ms": 12.058623,
+  "networkAttempts": 0,
+  "dbQueries": 0,
+  "limits": [
+    "n=10 per input: tail estimates are sample maxima, not a production SLA",
+    "Node supervisor measured; Electron Main/utilityProcess and packaged platforms not measured",
+    "Network entrypoint instrumentation is not an OS egress sandbox",
+    "V8 heap bound is not an RSS/Buffer hard limit",
+    "No API/DB/Feishu tenant, actual users, real workbooks or production contract intake"
+  ],
+  "samples": [
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 140.36416700000007,
+      "maxRssKiB": 94032,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 140.27524999999991,
+      "maxRssKiB": 94112,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 143.4632919999999,
+      "maxRssKiB": 94080,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 146.135541,
+      "maxRssKiB": 94032,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 141.9793749999999,
+      "maxRssKiB": 94256,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 142.47670800000014,
+      "maxRssKiB": 94368,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 143.54895799999986,
+      "maxRssKiB": 94352,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 140.65091700000016,
+      "maxRssKiB": 94464,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 143.39683300000002,
+      "maxRssKiB": 94320,
+      "networkAttempts": 0
+    },
+    {
+      "input": "baseline",
+      "rows": 500,
+      "elapsedMs": 143.1874170000001,
+      "maxRssKiB": 94096,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 288.12745900000004,
+      "maxRssKiB": 196304,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 288.522958,
+      "maxRssKiB": 197136,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 289.01558399999976,
+      "maxRssKiB": 196224,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 292.14704200000006,
+      "maxRssKiB": 197312,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 287.86991599999965,
+      "maxRssKiB": 195792,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 289.1037500000002,
+      "maxRssKiB": 197520,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 287.725958,
+      "maxRssKiB": 195856,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 288.80283299999974,
+      "maxRssKiB": 196528,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 287.239458,
+      "maxRssKiB": 197248,
+      "networkAttempts": 0
+    },
+    {
+      "input": "tenfold",
+      "rows": 5000,
+      "elapsedMs": 288.45045800000025,
+      "maxRssKiB": 198064,
+      "networkAttempts": 0
+    }
+  ]
+}

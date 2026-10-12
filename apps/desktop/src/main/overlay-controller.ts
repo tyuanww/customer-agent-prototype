@@ -110,6 +110,7 @@ const HANDOFF_FALLBACK_BUFFER_MS = 100;
 const DISPLAY_RECONCILE_DELAY_MS = 100;
 
 export type OverlayControllerOptions = {
+  dashboardEnabled?: boolean;
   preloadPath?: string;
   accelerator?: string;
   testHarness?: boolean;
@@ -178,9 +179,11 @@ export class OverlayController {
   private readonly preloadPath: string;
   private readonly onDispose?: () => void;
   private readonly onDashboardShown?: () => void;
+  readonly dashboardEnabled: boolean;
   readonly rendererDevServerUrl: string | undefined;
 
   constructor(options: OverlayControllerOptions = {}) {
+    this.dashboardEnabled = options.dashboardEnabled !== false;
     this.preloadPath = options.preloadPath ?? join(__dirname, '../preload/index.cjs');
     this.accelerator = options.accelerator ?? DEFAULT_GLOBAL_ACCELERATOR;
     this.testHarness = options.testHarness ?? isTestHarnessEnabled();
@@ -329,6 +332,14 @@ export class OverlayController {
     this.applyEvent({ type: 'OPEN' });
   }
 
+  querySubscribed(): void {
+    // A profile lookup can delay Query's first subscription past native open.
+    // Re-arm from Main's current intent; a late receiver must not undo dismiss.
+    if (!this.isInactive() && isOpenPhase(this.phase)) {
+      this.applyEvent({ type: 'OPEN' });
+    }
+  }
+
   dismiss(restorePreviousApp = false): void {
     if (this.isInactive()) {
       return;
@@ -372,7 +383,7 @@ export class OverlayController {
   }
 
   async openDashboard(): Promise<OpenDashboardResult> {
-    if (this.isInactive()) {
+    if (!this.dashboardEnabled || this.isInactive()) {
       return openDashboardUnavailable();
     }
     if (this.dashboardOpening) {

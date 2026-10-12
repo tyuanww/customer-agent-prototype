@@ -1,0 +1,150 @@
+{
+  "count": 18,
+  "mismatch": 0,
+  "rows": [
+    {
+      "path": "sites/tests/content-intake-runtime-closure.pg.mjs",
+      "expectedBytes": 18599,
+      "actualBytes": 18599,
+      "expected": "cdf1e437931512372f6aaac5228cfb688e09360b25af2824fb4ea363f2cb9c73",
+      "actual": "cdf1e437931512372f6aaac5228cfb688e09360b25af2824fb4ea363f2cb9c73",
+      "match": true
+    },
+    {
+      "path": "business-docs/08-\u5de5\u5177/build_customer_agent_runtime_closure.mjs",
+      "expectedBytes": 3906,
+      "actualBytes": 3906,
+      "expected": "e0ff8b6cd0d8d799b7b527d5022c1adb337dbd310c1473aeeb65e4b00c28cb75",
+      "actual": "e0ff8b6cd0d8d799b7b527d5022c1adb337dbd310c1473aeeb65e4b00c28cb75",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/legacy-check-acl.v1.sql",
+      "expectedBytes": 865,
+      "actualBytes": 865,
+      "expected": "6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584",
+      "actual": "6e286747d15b8af6a11a03d9b00c33d36ac62c36f25efa653285c1cbc6984584",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/legacy-check-installation.v1.json",
+      "expectedBytes": 4261,
+      "actualBytes": 4261,
+      "expected": "fbc601f305013b54e5273e3c4b97faf009f348c3db6a6b4c9f397cfd87707418",
+      "actual": "fbc601f305013b54e5273e3c4b97faf009f348c3db6a6b4c9f397cfd87707418",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/schema.v1.25.sql",
+      "expectedBytes": 706504,
+      "actualBytes": 706504,
+      "expected": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
+      "actual": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/schema.v1.24.sql",
+      "expectedBytes": 705427,
+      "actualBytes": 705427,
+      "expected": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
+      "actual": "c4ceffa961728423b755b00d551b9ab67fbf33ffe1dd87d8e671f6d151f744c5",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-csv-candidate/installation.generated.json",
+      "expectedBytes": 5561,
+      "actualBytes": 5561,
+      "expected": "e7bee22391c96c498d96e20e868cbf90429405ac3793eeb02bbc93e817939a28",
+      "actual": "e7bee22391c96c498d96e20e868cbf90429405ac3793eeb02bbc93e817939a28",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/openapi.v1.22.yaml",
+      "expectedBytes": 423919,
+      "actualBytes": 423919,
+      "expected": "3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94",
+      "actual": "3f741eb980aba1cd9a2a273b25771b50299e1aef3acbc6a1579b57541ed43a94",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/roles.sql",
+      "expectedBytes": 978,
+      "actualBytes": 978,
+      "expected": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+      "actual": "54a7a75d8b58f0217cdbc782b450ffc0f256633cb050a509fb930274e17fb9ee",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/organization.sql",
+      "expectedBytes": 7893,
+      "actualBytes": 7893,
+      "expected": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+      "actual": "656113a5b12a5f6438df467e1afe5858b26c60062568cec4c4535069a283ca14",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/session-lock.sql",
+      "expectedBytes": 3763,
+      "actualBytes": 3763,
+      "expected": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+      "actual": "4447e3d2a4477cd66aea754d2eb970d6e92f328c61192bb26edfc054d1768ac6",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/purpose-acl.sql",
+      "expectedBytes": 17007,
+      "actualBytes": 17007,
+      "expected": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05",
+      "actual": "59a5fda26bd839a2edea3d73a2c009f12dba7e89edab787b80c23364dc583e05",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/directory-acl.sql",
+      "expectedBytes": 5378,
+      "actualBytes": 5378,
+      "expected": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+      "actual": "49b4555f80cfe8d7302c67d081cc49a915949b613acda564dcd408a6232c67fa",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-shop-directory-candidate/storage.delta.sql",
+      "expectedBytes": 44220,
+      "actualBytes": 44220,
+      "expected": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+      "actual": "73254ecac5144e7416e87177e1443944579cbc82ec93ed89273e98e4d1d5d9fc",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/provenance.json",
+      "expectedBytes": 3659,
+      "actualBytes": 3659,
+      "expected": "7b3699b3fbd94918c11f9250f643b6e896a634cbf262d022dc6b56c422a56c5c",
+      "actual": "7b3699b3fbd94918c11f9250f643b6e896a634cbf262d022dc6b56c422a56c5c",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-runtime-candidate/protocol.json",
+      "expectedBytes": 2189,
+      "actualBytes": 2189,
+      "expected": "4546e98510add2b02b97baaca5bdd9603208502b891fe3e92a3f3bc3ed4f6030",
+      "actual": "4546e98510add2b02b97baaca5bdd9603208502b891fe3e92a3f3bc3ed4f6030",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-csv-candidate/storage.delta.sql",
+      "expectedBytes": 5283,
+      "actualBytes": 5283,
+      "expected": "f88db715af84ff0a4dc056ab3a37fdaf71cdd0ae439a78b2d565952a1b93b535",
+      "actual": "f88db715af84ff0a4dc056ab3a37fdaf71cdd0ae439a78b2d565952a1b93b535",
+      "match": true
+    },
+    {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-csv-candidate/protocol.json",
+      "expectedBytes": 1642,
+      "actualBytes": 1642,
+      "expected": "ff83a005795f6a5bdd6597329d93c5fdc132267613886b701193bdf8583b62ca",
+      "actual": "ff83a005795f6a5bdd6597329d93c5fdc132267613886b701193bdf8583b62ca",
+      "match": true
+    }
+  ]
+}

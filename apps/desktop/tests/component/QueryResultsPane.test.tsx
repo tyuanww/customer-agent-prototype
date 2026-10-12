@@ -8,7 +8,7 @@ import {
   SCRIPT_INACCURACY_ACTION_LABEL,
   SCRIPT_INACCURACY_RECORDED_STATUS,
 } from '../../src/renderer/features/search/query-view';
-import type { RankedScript } from '../../src/renderer/features/search/types';
+import type { QueryResult, RankedScript } from '../../src/renderer/features/search/types';
 
 function rankedScript(overrides: Partial<RankedScript> = {}): RankedScript {
   return {
@@ -32,7 +32,7 @@ function rankedScript(overrides: Partial<RankedScript> = {}): RankedScript {
 function renderResults(input: {
   results?: RankedScript[];
   copiedRank?: 1 | 2 | 3 | null;
-  onCopy?: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
+  onCopy?: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
 } = {}) {
   const onCopy = input.onCopy ?? vi.fn();
   render(
