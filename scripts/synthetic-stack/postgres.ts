@@ -221,7 +221,25 @@ export async function ensureLoginRoles(cluster: SyntheticCluster, database: stri
       );
       if (member.rowCount === 0) await admin.query(`GRANT ${capability} TO ${login}`);
     }
-    return `roles: ${String(roleSpecs.length)} login roles ensured`;
+    const intakeSpecs = [
+      ['stack_intake_business', 'intake_business'],
+      ['stack_intake_usage', 'intake_usage'],
+      ['stack_intake_worker', 'intake_worker'],
+    ] as const;
+    let intakeRoles = 0;
+    for (const [login, capability] of intakeSpecs) {
+      const capabilityRole = await admin.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [capability]);
+      if (capabilityRole.rowCount === 0) continue;
+      intakeRoles += 1;
+      const exists = await admin.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [login]);
+      if (exists.rowCount === 0) await admin.query(`CREATE ROLE ${login} LOGIN NOINHERIT`);
+      const member = await admin.query(
+        `SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid JOIN pg_roles g ON g.oid = m.member
+         WHERE r.rolname = $1 AND g.rolname = $2`, [capability, login],
+      );
+      if (member.rowCount === 0) await admin.query(`GRANT ${capability} TO ${login}`);
+    }
+    return `roles: ${String(roleSpecs.length)} login roles ensured; intake logins ${String(intakeRoles)}`;
   } finally {
     await admin.end();
   }
