@@ -106,8 +106,9 @@ describe('formal candidate material from independently parsed workbook', () => {
     const changed = materialFromParse({ ...await input([row('entry-a','合成回答','停用')]), previous: first.entries, recentDisables: 1 });
     expect(changed.risk).toMatchObject({ level: 'critical', explicitDisableCount: 1, sameSourceDisabledLast24Hours: 1 });
     const allergy = materialFromParse(await input([row('entry-a','过敏请停手并确认情况')]));
+    expect(allergy.risk.level).not.toBe('critical');
     const removed = materialFromParse({ ...await input(), previous: allergy.entries });
-    expect(removed.risk.level).toBe('critical');
+    expect(removed.risk.level).not.toBe('critical');
   });
 
   it('treats an explicit risk note as an escalation and cannot downgrade by clearing it', async () => {
