@@ -2,6 +2,8 @@
 
 ## 当前资料接入：沿既有内容管理完成本期收尾（2026-10-09 并行回收）
 
+**2026-10-12 草稿 PR 合同断言与 e2e 构建顺序：** PR #38 在 `5c1e4b9` 上，Linux 正式检查失败于运行时合同测试仍断言 schema 1.28／`379b793`，生成来源已是 schema 1.29／`75e1889`。PostgreSQL 作业的数据库 75 项与 API 集成 112 项通过后，`test:e2e:backend` 在干净检出上编译 API 时找不到 `@customer-agent/content-intake` 的 dist 类型。测试断言已对齐当前来源，并在 API `tsc` 前构建 content-intake。定向 `vitest run tests/runtime.test.ts` 19/19 通过；移走 dist 后 content-intake 构建与 API `tsc -p tsconfig.build.json` 通过。本机 Node v25.8.2，仓库要求 `>=24 <25`，CI 为 Node 24。完整 PostgreSQL 端到端、完整 `/review` 与真实接入未在本轮重跑。
+
 **2026-10-12 就绪后继已完成版本化接收：** 用户批准 OpenAPI 1.24.0／schema 1.29／0041／`content-intake-readiness-successor-v1` 的固定前序加差量方案。治理提交 `75e1889` 已通过治理 release 与导出检查，导出包 `cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9` 状态为 `EXPORTED_NOT_INTAKE`；产品已实际 intake 同一包，合同锁、生成物和 0041 已落地，状态为 `VERIFIED_NOT_ACTIVATED`，`ddev_authorized=false`、`runtime_activated=false`。PG15 迁移/运行时 75/75、产品 intake 11/11、contracts/db 生成检查、typecheck、build 均通过；本轮保留旧失败记录，不宣称全仓审查或生产启用完成。完整 `/review` 与 `externalCompleteReview` 仍为 `INCOMPLETE`，真实飞书/客户资料、生产 HTTP/runner、Windows 与办公设备人工验收仍未完成。治理仓原有未相关的9项工作树修改未触碰；产品提交 `04c0f5e` 已推送。
 
 **2026-10-12 CI增量审核与就绪修订实验：** 精确 `8e95ce5..2405494` 的21文件已完成本机核心、七专项及native对抗，未发现新增可行动缺陷；CI测试外审返回的PG异步启动P2经 `start(): void` / `execFileSync` / `pg_ctl -w` 证据反驳，桌面外审仍超时，完整审核保持INCOMPLETE。当前头Linux完整检查及Windows/Linux冒烟通过，数据库75通过，旧API110通过/2失败仍保留。已在隔离PG15及仓外副本验证最小权限/版本标记修订：原两条失败测试2通过/31跳过，拒绝PUBLIC或登录账号越权授权；API探针及原断言未改。后续已生成治理 DRAFT 候选（沿用 OpenAPI 1.24.0，拟 schema 1.29／0041），生成器5项、PG15父测试及11子项共12项、受限账号HTTP/PG15四域CSV及XLSX共9项通过。前序四十段字节不变，旧1.28消费者仍正确拒绝1.29；待精确版本批准、冻结、export/intake后再跑正式就绪CI，不把候选通过写成PR全绿。详见[本轮核对](evidence/qa/intake-legacy-acl-runtime/ci-delta-review-2026-10-12.md)。
